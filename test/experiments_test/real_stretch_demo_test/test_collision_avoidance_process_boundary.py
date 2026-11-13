@@ -6,7 +6,7 @@ from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.executors import RealRobotPlanExecutor
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.robots.stretch import Stretch
@@ -43,4 +43,4 @@ def test_a_plan_avoiding_collisions_runs_against_a_controller_in_another_process
     executor.execute()
     executor.close()
 
-    assert park_arms.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert park_arms.life_cycle_state == LifeCycleValue.SUCCEEDED

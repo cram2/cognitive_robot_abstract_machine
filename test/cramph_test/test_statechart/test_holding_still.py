@@ -16,7 +16,7 @@ from cramph.composites import (
     RepeatUntil,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import (
     ExecutorExtension,
     StatechartExecutor,
@@ -113,7 +113,7 @@ def _choosing_statechart(
     chooser = ChooserNotingTheTick(
         executor=executor,
         child=NodeSucceedingOnObservingTrue(
-            name="child", observation=ObservationStateValues.TRUE
+            name="child", observation=ObservationStateValue.TRUE
         ),
     )
     executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
@@ -258,5 +258,5 @@ def test_resetting_a_node_choosing_its_child_compiles_nothing_while_moving(
 
     executor.tick_until_end(timeout=60)
 
-    assert loop.life_cycle_state == LifeCycleValues.FAILED
+    assert loop.life_cycle_state == LifeCycleValue.FAILED
     assert extension.compiles_while_not_at_rest == 0

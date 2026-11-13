@@ -13,7 +13,7 @@ from typing_extensions import (
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import VariableParameters
 from cramph.data_types import (
-    LifeCycleValues,
+    LifeCycleValue,
     LifeCyclePredicate,
 )
 from cramph.exceptions import (
@@ -104,12 +104,12 @@ class LifeCycleChange:
     The node whose life cycle state changed.
     """
 
-    previous_state: LifeCycleValues
+    previous_state: LifeCycleValue
     """
     The life cycle state before the change.
     """
 
-    new_state: LifeCycleValues
+    new_state: LifeCycleValue
     """
     The life cycle state after the change.
     """
@@ -123,19 +123,19 @@ class LifeCycleChange:
         nothing.
         """
         match (self.previous_state, self.new_state):
-            case (_, LifeCycleValues.NOT_STARTED):
+            case (_, LifeCycleValue.NOT_STARTED):
                 self.node.on_reset()
-            case (LifeCycleValues.NOT_STARTED, LifeCycleValues.RUNNING):
+            case (LifeCycleValue.NOT_STARTED, LifeCycleValue.RUNNING):
                 self.node.on_start()
-            case (LifeCycleValues.NOT_STARTED, LifeCycleValues.PAUSED):
+            case (LifeCycleValue.NOT_STARTED, LifeCycleValue.PAUSED):
                 self.node.on_start()
                 self.node.on_pause()
-            case (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED):
+            case (LifeCycleValue.RUNNING, LifeCycleValue.PAUSED):
                 self.node.on_pause()
-            case (LifeCycleValues.PAUSED, LifeCycleValues.RUNNING):
+            case (LifeCycleValue.PAUSED, LifeCycleValue.RUNNING):
                 self.node.on_unpause()
             case (
-                (LifeCycleValues.RUNNING | LifeCycleValues.PAUSED),
+                (LifeCycleValue.RUNNING | LifeCycleValue.PAUSED),
                 _,
             ) if self.new_state.is_terminal:
                 self.node.on_end()
@@ -591,7 +591,7 @@ class CompiledTick:
         """
         self._has_tick_observation.data.fill(0)
         running_indices = np.flatnonzero(
-            self._life_cycle_at_cycle_start.data == float(LifeCycleValues.RUNNING)
+            self._life_cycle_at_cycle_start.data == float(LifeCycleValue.RUNNING)
         )
         for index in running_indices:
             tick_observation = self._nodes[index].on_tick()
@@ -608,8 +608,8 @@ class CompiledTick:
         return [
             LifeCycleChange(
                 node=self._nodes[index],
-                previous_state=LifeCycleValues(int(life_cycle[index])),
-                new_state=LifeCycleValues(int(self._next_life_cycle[index])),
+                previous_state=LifeCycleValue(int(life_cycle[index])),
+                new_state=LifeCycleValue(int(self._next_life_cycle[index])),
             )
             for index in np.flatnonzero(self._next_life_cycle != life_cycle)
         ]

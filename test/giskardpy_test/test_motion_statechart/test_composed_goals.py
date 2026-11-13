@@ -2,7 +2,7 @@ import json
 
 from cramph.composites import Parallel, Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -95,7 +95,7 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
         CartesianPositionVelocityLimit,
     ]
     assert speed_cap.parent_node is pose
-    assert pose.last_observation_state == ObservationStateValues.TRUE
+    assert pose.last_observation_state == ObservationStateValue.TRUE
 
 
 def test_cartesian_pose_observes_its_goal_reached(
@@ -120,10 +120,9 @@ def test_cartesian_pose_observes_its_goal_reached(
     executor.tick_until_end()
 
     assert all(
-        task.last_observation_state == ObservationStateValues.TRUE
-        for task in pose.nodes
+        task.last_observation_state == ObservationStateValue.TRUE for task in pose.nodes
     )
-    assert pose.last_observation_state == ObservationStateValues.TRUE
+    assert pose.last_observation_state == ObservationStateValue.TRUE
 
 
 def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(

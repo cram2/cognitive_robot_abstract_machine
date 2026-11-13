@@ -8,7 +8,7 @@ from typing_extensions import TypeVar, Any, Sequence
 from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from krrood.entity_query_language.predicate import Triple
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
@@ -128,7 +128,7 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
     def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
         return super().required_context_extensions + (SegmindContext,)
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         """
         Executes one update cycle of the detector.
 
@@ -136,8 +136,8 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         computes new contact relationships, and triggers events if
         contact changes are detected.
 
-        :return: ObservationStateValues.TRUE if events were triggered,
-        otherwise ObservationStateValues.FALSE.
+        :return: ObservationStateValue.TRUE if events were triggered,
+        otherwise ObservationStateValue.FALSE.
         """
         segmind_context_extension = self.context.require_extension(
             extension_type=SegmindContext
@@ -159,7 +159,7 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
             segmind_context_extension.logger.log_event(
                 event, segmind_context_extension.tracker_registry
             )
-        return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
+        return ObservationStateValue.TRUE if events else ObservationStateValue.FALSE
 
     @classmethod
     def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:

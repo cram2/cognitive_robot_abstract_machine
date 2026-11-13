@@ -9,7 +9,7 @@ from enum import IntEnum
 from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
 from typing_extensions import Self
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.exceptions import (
     GriplinkParameterOutOfRangeError,
@@ -258,7 +258,7 @@ class GriplinkActionServerTask(
             )
         return endpoint
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         """
         Observes the gripper status the server reports once its result arrived.
 
@@ -269,11 +269,11 @@ class GriplinkActionServerTask(
             gripper_status = self._result.result.status
             logger.info(f"Gripper status: {GriplinkStatus(gripper_status)}")
             return (
-                ObservationStateValues.TRUE
+                ObservationStateValue.TRUE
                 if gripper_status == GriplinkStatus.SUCCESS
-                else ObservationStateValues.FALSE
+                else ObservationStateValue.FALSE
             )
-        return ObservationStateValues.UNKNOWN
+        return ObservationStateValue.UNKNOWN
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

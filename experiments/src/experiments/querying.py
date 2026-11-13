@@ -29,7 +29,7 @@ from typing_extensions import Any
 import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 import krrood.entity_query_language.factories as eql
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from coraplex.orm.ormatic_interface import Base  # type: ignore
 from coraplex.plans.failures import PlanFailure
 from coraplex.robot_plans.actions.base import Action
@@ -284,7 +284,7 @@ def _q_what_did_you_do(plan: StatechartNode) -> BehaviourQuery:
     return BehaviourQuery(
         question="What did you just do?",
         query=eql.an(
-            eql.entity(n).where(n.life_cycle_state == LifeCycleValues.SUCCEEDED)
+            eql.entity(n).where(n.life_cycle_state == LifeCycleValue.SUCCEEDED)
         ).ordered_by(
             variable=n.start_time,
             descending=False,
@@ -300,7 +300,7 @@ def _q_walk_through_in_order(plan: StatechartNode) -> BehaviourQuery:
     return BehaviourQuery(
         question="Walk me through what you did in order.",
         query=eql.an(
-            eql.entity(n).where(n.life_cycle_state == LifeCycleValues.SUCCEEDED)
+            eql.entity(n).where(n.life_cycle_state == LifeCycleValue.SUCCEEDED)
         ).ordered_by(variable=n.start_time),
     )
 
@@ -339,7 +339,7 @@ def _q_did_anything_go_wrong(plan: StatechartNode) -> BehaviourQuery:
     n = eql.variable(StatechartNode, domain=_nodes_of(plan))
     return BehaviourQuery(
         question="Did anything go wrong?",
-        query=eql.an(eql.entity(n).where(n.life_cycle_state == LifeCycleValues.FAILED)),
+        query=eql.an(eql.entity(n).where(n.life_cycle_state == LifeCycleValue.FAILED)),
     )
 
 
@@ -363,7 +363,7 @@ def _q_how_many_retries(plan: StatechartNode) -> BehaviourQuery:
         question="How many times did you retry before giving up?",
         query=(
             eql.set_of(c := eql.count_all()).where(
-                n.life_cycle_state == LifeCycleValues.FAILED
+                n.life_cycle_state == LifeCycleValue.FAILED
             )
         ),
     )
@@ -379,8 +379,8 @@ def _q_which_fallback(plan: StatechartNode) -> BehaviourQuery:
         question="Which fallback did you end up using?",
         query=eql.an(
             eql.entity(n).where(
-                n.life_cycle_state == LifeCycleValues.SUCCEEDED,
-                eql.exists(s, s.life_cycle_state == LifeCycleValues.FAILED),
+                n.life_cycle_state == LifeCycleValue.SUCCEEDED,
+                eql.exists(s, s.life_cycle_state == LifeCycleValue.FAILED),
             )
         ),
     )

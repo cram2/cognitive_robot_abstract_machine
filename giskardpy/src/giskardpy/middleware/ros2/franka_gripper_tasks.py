@@ -14,7 +14,7 @@ from franka_msgs.action import Grasp, Homing, Move
 from franka_msgs.msg import GraspEpsilon
 from rclpy.task import Future
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.ros2_nodes.action_servers import (
     Action,
     ActionFeedback,
@@ -44,15 +44,15 @@ class FrankaGripperTask(
                 f"Gripper action {self.action_topic} failed: {self._result.result.error}"
             )
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         """
         :return: Whether the gripper reported success, unknown until it reports.
         """
         if self._result is None:
-            return ObservationStateValues.UNKNOWN
+            return ObservationStateValue.UNKNOWN
         if self._result.result.success:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

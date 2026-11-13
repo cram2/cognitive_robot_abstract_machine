@@ -20,8 +20,8 @@ from cramph.node import EndedByOwner, SucceedsOnObservingTrue, FailsOnObservingF
 from cramph.context import ContextExtension
 from cramph.data_types import (
     LifeCyclePredicate,
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from cramph.exceptions import (
     NoChildChooserForNodeError,
@@ -434,7 +434,7 @@ class Parallel(EndedByOwner, ControlStructureNode):
             for child in self.nodes
             if rebuild.rebuilt(node=child) is None
             and child.life_cycle_state
-            not in (LifeCycleValues.FAILED, LifeCycleValues.INTERRUPTED)
+            not in (LifeCycleValue.FAILED, LifeCycleValue.INTERRUPTED)
         ]
         rebuilt.minimum_success = max(
             0, self.minimum_success - len(counted_as_succeeded)
@@ -1164,12 +1164,12 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
             handed them, and nothing at all unless `child` failed. Empty as well for a
             child that failed on its own, which no monitor is the reason for.
         """
-        if child.life_cycle_state != LifeCycleValues.FAILED:
+        if child.life_cycle_state != LifeCycleValue.FAILED:
             return []
         return [
             monitor
             for monitor in self.failure_monitors_of(child=child)
-            if monitor.last_observation_state == ObservationStateValues.TRUE
+            if monitor.last_observation_state == ObservationStateValue.TRUE
         ]
 
     @property
@@ -1191,12 +1191,12 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         if self._out_of_children:
             return False
-        if self.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.life_cycle_state != LifeCycleValue.RUNNING:
             return False
         latest_child = self.latest_child
         return latest_child is None or latest_child.life_cycle_state in (
-            LifeCycleValues.FAILED,
-            LifeCycleValues.INTERRUPTED,
+            LifeCycleValue.FAILED,
+            LifeCycleValue.INTERRUPTED,
         )
 
     def choose_child(self) -> None:
@@ -1309,7 +1309,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         latest_child = self.latest_child
         if latest_child is None:
             return NodeArtifacts(
-                observation=Scalar(float(ObservationStateValues.UNKNOWN))
+                observation=Scalar(float(ObservationStateValue.UNKNOWN))
             )
         return NodeArtifacts(observation=Scalar(latest_child.last_observation))
 

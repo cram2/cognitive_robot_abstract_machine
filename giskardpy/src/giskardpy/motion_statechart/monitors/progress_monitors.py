@@ -24,7 +24,7 @@ from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from giskardpy.motion_statechart.exceptions import NoProgressError
 from cramph.node import (
     CancelStatechart,
@@ -192,7 +192,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         error = task.error_signal
         return sm.trinary_logic_or(
-            sm.Scalar(task.life_cycle_variable != int(LifeCycleValues.RUNNING)),
+            sm.Scalar(task.life_cycle_variable != int(LifeCycleValue.RUNNING)),
             task.goal_reached_at(error),
             self._fell_too_little(
                 error_at_last_progress=self._errors_at_last_progress_variables[index],
@@ -288,7 +288,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         return np.array(
             [
-                task.life_cycle_state == LifeCycleValues.RUNNING
+                task.life_cycle_state == LifeCycleValue.RUNNING
                 for task in self.monitored_tasks
             ],
             dtype=bool,
@@ -301,7 +301,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         return self._running() & np.array(
             [
-                task.observation_state != ObservationStateValues.TRUE
+                task.observation_state != ObservationStateValue.TRUE
                 for task in self.monitored_tasks
             ],
             dtype=bool,
@@ -393,7 +393,7 @@ class AnyMonitoredTaskShortOfItsGoal(EndedByOwner, MotionStatechartNode):
                 sm.Vector(
                     [
                         sm.Scalar(
-                            task.life_cycle_variable == int(LifeCycleValues.RUNNING)
+                            task.life_cycle_variable == int(LifeCycleValue.RUNNING)
                         )
                         * sm.logic_not(task.observes_true)
                         for task in self.monitored_tasks

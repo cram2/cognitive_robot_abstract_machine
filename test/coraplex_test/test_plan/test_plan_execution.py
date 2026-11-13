@@ -33,7 +33,7 @@ from cramph.exceptions import (
     DuplicateContextExtensionError,
     StatechartOfDifferentContextError,
 )
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import Pacer, StatechartExecutor
 from cramph.node import CancelStatechart
 from cramph.nodes_for_testing import NodeFailingOnObservingFalse
@@ -118,12 +118,12 @@ def test_executing_runs_the_plan_until_it_succeeded(pr2_apartment_context) -> No
     executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_plan_that_fails_raises_motion_did_not_finish(pr2_apartment_context) -> None:
     world, robot_view, extensions = pr2_apartment_context
-    plan = NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE)
+    plan = NodeFailingOnObservingFalse(observation=ObservationStateValue.FALSE)
     executor = simulated_executor(extensions)
 
     with pytest.raises(MotionDidNotFinish):
@@ -160,8 +160,8 @@ def test_a_plan_of_several_top_level_nodes_ends_once_all_of_them_succeeded(
     executor.execute()
 
     assert executor.plan_nodes == [torso, arms]
-    assert torso.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert arms.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert torso.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert arms.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_statechart_without_a_plan_is_refused(pr2_apartment_context) -> None:
@@ -312,7 +312,7 @@ def test_a_plan_may_take_longer_the_more_actions_it_holds(
 
     run_plan(plan, extensions, simulation_time_per_action=timedelta(seconds=25))
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_the_simulation_time_limit_grows_when_an_action_joins(
@@ -457,7 +457,7 @@ def test_a_plan_avoiding_collisions_succeeds_in_a_world_with_another_robot(
     executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% performing a plan in a physically simulated world

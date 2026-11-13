@@ -32,7 +32,7 @@ from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from cramph.composites import Sequence, Parallel
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
@@ -1534,7 +1534,7 @@ def test_building_a_rules_node_keeps_the_temporary_rules_in_force(
 
     executor.compile(statechart=statechart)
 
-    assert rules_node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert rules_node.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert collision_manager.temporary_rules == [rule_in_force]
 
 
@@ -1702,7 +1702,7 @@ def test_cable_guide_collision(
         end_when=local_min,
     )
 
-    assert joint_goal.observation_state == ObservationStateValues.FALSE
+    assert joint_goal.observation_state == ObservationStateValue.FALSE
 
 
 def test_attached_self_collision_avoid_stick(
@@ -1793,7 +1793,7 @@ def test_box_overlapping_with_gripper(
         end_when=cart_goal,
     )
 
-    assert cart_goal.observation_state == ObservationStateValues.TRUE
+    assert cart_goal.observation_state == ObservationStateValue.TRUE
 
 
 def test_avoid_self_collision_specific_link(
@@ -2069,4 +2069,4 @@ def test_hsr_self_collision_avoidance(
         end_when=cart_goal,
     )
 
-    assert cart_goal.observation_state == ObservationStateValues.TRUE
+    assert cart_goal.observation_state == ObservationStateValue.TRUE

@@ -2,7 +2,7 @@ import json
 
 from geometry_msgs.msg import WrenchStamped
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
@@ -65,13 +65,13 @@ def test_force_impact_node(rclpy_node):
     statechart_copy.draw(file_name="muh.pdf")
     assert (
         statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[0]
-        == ObservationStateValues.UNKNOWN
+        == ObservationStateValue.UNKNOWN
     )
     assert (
-        ObservationStateValues.FALSE
+        ObservationStateValue.FALSE
         in statechart_copy.state_history.get_observation_history_of_node(node=ft_node)
     )
     assert (
         statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )

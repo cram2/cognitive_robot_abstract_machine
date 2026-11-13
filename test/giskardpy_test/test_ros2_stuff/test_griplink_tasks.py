@@ -19,7 +19,7 @@ from rclpy.node import Node
 from typing_extensions import Any
 
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -97,7 +97,7 @@ class RecordingGriplinkServer:
 
 def run_until_observed(
     task: GriplinkActionServerTask,
-    observation: ObservationStateValues,
+    observation: ObservationStateValue,
     rclpy_node: Node,
 ) -> None:
     """
@@ -105,7 +105,7 @@ def run_until_observed(
     """
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(node=task)
-    if observation == ObservationStateValues.TRUE:
+    if observation == ObservationStateValue.TRUE:
         statechart.add_node(node=EndMotion.when_true(node=task))
     else:
         statechart.add_node(node=EndMotion.when_false(node=task))
@@ -228,13 +228,13 @@ def test_a_state_served_by_an_action_of_the_other_kind_has_no_endpoint(
 @pytest.mark.parametrize(
     "status, observation",
     [
-        (GriplinkStatus.SUCCESS, ObservationStateValues.TRUE),
-        (GriplinkStatus.AXIS_BLOCKED, ObservationStateValues.FALSE),
+        (GriplinkStatus.SUCCESS, ObservationStateValue.TRUE),
+        (GriplinkStatus.AXIS_BLOCKED, ObservationStateValue.FALSE),
     ],
     ids=["succeeding", "failing"],
 )
 def test_task_observes_whether_the_server_reports_success(
-    status: GriplinkStatus, observation: ObservationStateValues, rclpy_node: Node
+    status: GriplinkStatus, observation: ObservationStateValue, rclpy_node: Node
 ) -> None:
     server = RecordingGriplinkServer(action=Grip, status=status).serve(
         rclpy_node, GriplinkActionName.GRIP
@@ -258,7 +258,7 @@ def test_preset_task_sends_its_preset(rclpy_node: Node) -> None:
         grip_preset=GriplinkGripPreset.PRESET_2,
     )
 
-    run_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+    run_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
     server.destroy()
 
     assert [goal.index for goal in gripper.received_goals] == [task.grip_preset.value]
@@ -276,7 +276,7 @@ def test_flex_task_sends_its_parameters_in_micro_units(rclpy_node: Node) -> None
         grip_acceleration=1.0,
     )
 
-    run_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+    run_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
     server.destroy()
 
     assert [

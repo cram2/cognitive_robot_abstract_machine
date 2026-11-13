@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from cramph.composites import Parallel, RepeatUntil, Sequence, StartedWhenTrue
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountNodeResets
 from cramph.node import DerivedConditionVariable, EndStatechart
@@ -23,7 +23,7 @@ def _succeeding(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -41,7 +41,7 @@ def _parallel_with_a_child_of_each_outcome(
         nodes=[
             _succeeding("succeeded"),
             NodeFailingOnObservingFalse(
-                name="failed", observation=ObservationStateValues.FALSE
+                name="failed", observation=ObservationStateValue.FALSE
             ),
             ConstFalseNode(name="running"),
         ],
@@ -53,15 +53,15 @@ def _parallel_with_a_child_of_each_outcome(
     succeeded, failed, running = parallel.nodes
     for _ in range(maximum_ticks):
         if (
-            succeeded.life_cycle_state == LifeCycleValues.SUCCEEDED
-            and failed.life_cycle_state == LifeCycleValues.FAILED
+            succeeded.life_cycle_state == LifeCycleValue.SUCCEEDED
+            and failed.life_cycle_state == LifeCycleValue.FAILED
         ):
             break
         statechart_executor.tick()
     assert [child.life_cycle_state for child in parallel.nodes] == [
-        LifeCycleValues.SUCCEEDED,
-        LifeCycleValues.FAILED,
-        LifeCycleValues.RUNNING,
+        LifeCycleValue.SUCCEEDED,
+        LifeCycleValue.FAILED,
+        LifeCycleValue.RUNNING,
     ]
     return parallel
 
@@ -180,7 +180,7 @@ def test_a_monitor_counting_resets_counts_those_of_the_node_built_anew() -> None
 
 def test_a_repeated_task_is_built_anew_with_its_stop_monitor_built_anew() -> None:
     task = NodeFailingOnObservingFalse(
-        name="task", observation=ObservationStateValues.FALSE
+        name="task", observation=ObservationStateValue.FALSE
     )
     stop_retry_monitor = _succeeding("stop")
     rebuild = RebuildLeavingNodesOut()
@@ -199,7 +199,7 @@ def test_a_repeated_task_without_its_stop_monitor_is_left_out() -> None:
 
     rebuilt = rebuild.rebuilt(
         node=RepeatUntil(
-            task=NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE),
+            task=NodeFailingOnObservingFalse(observation=ObservationStateValue.FALSE),
             stop_retry_monitor=stop_retry_monitor,
         )
     )
@@ -249,7 +249,7 @@ def test_a_condition_reads_a_node_without_counterpart_as_it_is_now(
     statechart.add_node(node=EndStatechart.when_true(node=ended))
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
-    assert ended.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert ended.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     succeeded = DerivedConditionVariable.reading_counterparts(
         condition=ended.is_succeeded, counterpart_of=lambda node: None

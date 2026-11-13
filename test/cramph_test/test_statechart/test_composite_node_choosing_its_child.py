@@ -15,7 +15,7 @@ from cramph.composites import (
     Sequence,
     StoppedWhenTrue,
 )
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import (
     NoChildChooserForNodeError,
     SeveralChildChoosersForNodeError,
@@ -132,7 +132,7 @@ def _succeeding_child(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -141,7 +141,7 @@ def _failing_child(name: str) -> NodeFailingOnObservingFalse:
     :return: A node that fails on the tick after it starts.
     """
     return NodeFailingOnObservingFalse(
-        name=name, observation=ObservationStateValues.FALSE
+        name=name, observation=ObservationStateValue.FALSE
     )
 
 
@@ -150,7 +150,7 @@ def _undecided_child(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that never ends on its own.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.UNKNOWN
+        name=name, observation=ObservationStateValue.UNKNOWN
     )
 
 
@@ -160,7 +160,7 @@ def _run_count(statechart: Statechart, node: StatechartNode) -> int:
     """
     life_cycles = statechart.state_history.get_life_cycle_history_of_node(node=node)
     return sum(
-        previous == LifeCycleValues.NOT_STARTED and current == LifeCycleValues.RUNNING
+        previous == LifeCycleValue.NOT_STARTED and current == LifeCycleValue.RUNNING
         for previous, current in zip(life_cycles, life_cycles[1:])
     )
 
@@ -227,8 +227,8 @@ def test_the_node_succeeds_with_the_child_it_chose(
     )
 
     assert choosing_node.children == [child]
-    assert child.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert choosing_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert child.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert choosing_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_failed_child_makes_the_node_choose_again(
@@ -243,8 +243,8 @@ def test_a_failed_child_makes_the_node_choose_again(
     )
 
     assert choosing_node.children == [failing, succeeding]
-    assert failing.life_cycle_state == LifeCycleValues.FAILED
-    assert choosing_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert failing.life_cycle_state == LifeCycleValue.FAILED
+    assert choosing_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_no_child_left_fails_the_node(statechart_executor: StatechartExecutor) -> None:
@@ -255,7 +255,7 @@ def test_no_child_left_fails_the_node(statechart_executor: StatechartExecutor) -
     )
 
     assert choosing_node.children == []
-    assert choosing_node.life_cycle_state == LifeCycleValues.FAILED
+    assert choosing_node.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_pending_choice_is_asked_again_on_the_next_tick(
@@ -267,7 +267,7 @@ def test_a_pending_choice_is_asked_again_on_the_next_tick(
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
     assert chooser.asked_nodes == [choosing_node] * 3
-    assert choosing_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert choosing_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_that_is_not_running_is_not_asked(
@@ -288,7 +288,7 @@ def test_a_node_that_is_not_running_is_not_asked(
     statechart_executor.tick()
 
     assert chooser.asked_nodes == []
-    assert choosing_node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert choosing_node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 def test_choosing_keeps_the_state_and_history_of_the_nodes_already_there(
@@ -307,12 +307,12 @@ def test_choosing_keeps_the_state_and_history_of_the_nodes_already_there(
     statechart.add_node(node=EndStatechart.when_true(node=choosing_node))
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
-    assert earlier.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert earlier.life_cycle_state == LifeCycleValue.SUCCEEDED
     recorded_before_choosing = len(statechart.state_history)
 
     statechart_executor.tick_until_end(timeout=30)
 
-    assert earlier.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert earlier.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert len(statechart.state_history) == recorded_before_choosing + (
         statechart_executor.tick_count - 1
     )
@@ -348,7 +348,7 @@ def test_the_node_observes_what_its_latest_child_observed(
         statechart_executor, ChooserAnsweringInTurn(children=[child])
     )
 
-    assert choosing_node.last_observation_state == ObservationStateValues.TRUE
+    assert choosing_node.last_observation_state == ObservationStateValue.TRUE
 
 
 @dataclass(kw_only=True)
@@ -480,7 +480,7 @@ def test_a_node_chooses_before_the_nodes_starting_beside_it_act(
     statechart = Statechart(context=statechart_executor.context)
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
     sibling = NodeNotingItsStart(
-        name="sibling", observation=ObservationStateValues.UNKNOWN, log=log
+        name="sibling", observation=ObservationStateValue.UNKNOWN, log=log
     )
     statechart.add_nodes(nodes=[choosing_node, sibling])
 
@@ -577,7 +577,7 @@ def test_a_node_handed_its_child_by_another_choice_is_not_asked_again(
 
     assert chooser.asked_nodes == [asking]
     assert handed.chosen_children == [chooser.children[handed]]
-    assert root.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert root.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_choice_another_choice_enables_is_taken_on_the_same_tick(
@@ -630,7 +630,7 @@ def test_a_node_handed_its_child_before_it_started_runs_it_once_it_starts(
 
     assert chooser.asked_nodes == [asking]
     assert later.chosen_children == [chooser.children[later]]
-    assert chooser.children[later].life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert chooser.children[later].life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% choosing with the chooser of the node's kind
@@ -726,8 +726,8 @@ def test_a_child_is_given_up_on_once_one_of_its_failure_monitors_fires(
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
     assert choosing_node.chosen_children == [undecided, succeeding]
-    assert undecided.life_cycle_state == LifeCycleValues.FAILED
-    assert choosing_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert undecided.life_cycle_state == LifeCycleValue.FAILED
+    assert choosing_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_child_reaching_its_goal_succeeds_although_a_monitor_fires_on_that_tick(
@@ -735,7 +735,7 @@ def test_a_child_reaching_its_goal_succeeds_although_a_monitor_fires_on_that_tic
 ) -> None:
     child = _succeeding_child("child")
     firing_at_once = NodeObservingAFixedValue(
-        name="firing at once", observation=ObservationStateValues.TRUE
+        name="firing at once", observation=ObservationStateValue.TRUE
     )
     chooser = ChooserGivingUpOnItsChildren(
         children=[child], failure_monitors=[[firing_at_once]]
@@ -743,7 +743,7 @@ def test_a_child_reaching_its_goal_succeeds_although_a_monitor_fires_on_that_tic
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
-    assert child.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert child.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert choosing_node.failure_reasons == []
 
 
@@ -762,8 +762,8 @@ def test_the_failure_monitors_of_a_child_stop_once_it_ended(
         statechart_executor, chooser, end_node_factory=EndStatechart.when_failed
     )
 
-    assert never_firing.life_cycle_state == LifeCycleValues.INTERRUPTED
-    assert timeout.last_observation_state == ObservationStateValues.TRUE
+    assert never_firing.life_cycle_state == LifeCycleValue.INTERRUPTED
+    assert timeout.last_observation_state == ObservationStateValue.TRUE
 
 
 def test_the_failure_monitors_of_a_child_are_not_among_the_chosen_children(
@@ -814,7 +814,7 @@ def test_a_child_failing_on_its_own_has_no_failure_reasons(
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
-    assert failing.life_cycle_state == LifeCycleValues.FAILED
+    assert failing.life_cycle_state == LifeCycleValue.FAILED
     assert choosing_node.failure_reasons_of(child=failing) == []
 
 
@@ -854,7 +854,7 @@ def test_a_reset_node_chooses_again_instead_of_running_its_earlier_children(
     assert choosing_node.children == [failing, undecided, succeeding]
     assert _run_count(statechart, failing) == 1
     assert _run_count(statechart, undecided) == 1
-    assert choosing_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert choosing_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_that_ran_out_of_children_chooses_again_after_a_reset(
@@ -871,7 +871,7 @@ def test_a_node_that_ran_out_of_children_chooses_again_after_a_reset(
     assert chooser.asked_nodes == [choosing_node] * 2
     assert choosing_node.children == [succeeding]
     assert not choosing_node.ran_out_of_children
-    assert choosing_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert choosing_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% sending a node together with the child it chose

@@ -7,7 +7,7 @@ import pytest
 
 from cramph.composites import Sequence
 from cramph.context import ContextExtension, StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import (
     MissingExecutorExtensionError,
     StatechartOfDifferentContextError,
@@ -42,7 +42,7 @@ def test_generic_nodes_tick_until_the_statechart_ends(
     statechart_executor.tick_until_end()
 
     assert statechart.is_ended()
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
     # +1 for EndStatechart to observe True
     assert statechart_executor.tick_count == first_step.ticks + second_step.ticks + 1
 
@@ -73,7 +73,7 @@ def test_end_statechart_ends_the_tick_after_it_starts(
     statechart_executor.compile(statechart=statechart)
 
     statechart_executor.tick()
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
     assert not statechart.is_ended()
 
     statechart_executor.tick()
@@ -124,10 +124,10 @@ def test_simulation_time_is_counted_in_tick_durations(
 
     for _ in range(ticks - 1):
         statechart_executor.tick()
-    assert counter.observation_state == ObservationStateValues.FALSE
+    assert counter.observation_state == ObservationStateValue.FALSE
 
     statechart_executor.tick()
-    assert counter.observation_state == ObservationStateValues.TRUE
+    assert counter.observation_state == ObservationStateValue.TRUE
     assert statechart_executor.time == ticks * tick_duration
 
 

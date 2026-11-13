@@ -6,7 +6,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.plotters.gantt_chart_plotter import HistoryGanttChartPlotter, StateSpan
@@ -27,14 +27,14 @@ def _run_a_statechart_gaining_a_node(
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=NodeSucceedingOnObservingTrue(
-            name="first", observation=ObservationStateValues.TRUE
+            name="first", observation=ObservationStateValue.TRUE
         )
     )
     executor.compile(statechart=statechart)
     for _ in range(4):
         executor.tick()
     late = NodeSucceedingOnObservingTrue(
-        name="late", observation=ObservationStateValues.TRUE
+        name="late", observation=ObservationStateValue.TRUE
     )
     statechart.add_node(node=late)
     for _ in range(4):
@@ -56,12 +56,12 @@ def test_the_bars_of_a_late_node_span_the_ticks_it_was_recorded_at(
 
     assert spans == [
         StateSpan(
-            state=LifeCycleValues.RUNNING,
+            state=LifeCycleValue.RUNNING,
             start_tick=run.start_tick,
             end_tick=run.end_tick,
         ),
         StateSpan(
-            state=LifeCycleValues.SUCCEEDED,
+            state=LifeCycleValue.SUCCEEDED,
             start_tick=run.end_tick,
             end_tick=statechart.state_history.latest_item.tick_count,
         ),
@@ -87,7 +87,7 @@ def test_a_node_no_snapshot_records_has_no_bars(
     _run_a_statechart_gaining_a_node(statechart_executor)
     statechart = statechart_executor.statechart
     unrecorded = NodeSucceedingOnObservingTrue(
-        name="unrecorded", observation=ObservationStateValues.TRUE
+        name="unrecorded", observation=ObservationStateValue.TRUE
     )
     statechart.add_node(node=unrecorded)
     plotter = HistoryGanttChartPlotter(statechart=statechart)

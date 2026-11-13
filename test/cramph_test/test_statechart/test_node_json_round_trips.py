@@ -24,7 +24,7 @@ from cramph.composites import (
     TryInOrder,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.exceptions import NodeNotFoundError
 from cramph.executor import StatechartExecutor
 from cramph.monitors import (
@@ -69,7 +69,7 @@ def _node_that_can_fail() -> NodeFailingOnObservingFalse:
     """
     :return: A node that can fail, as the nodes moving on after a failure need it.
     """
-    return NodeFailingOnObservingFalse(observation=ObservationStateValues.TRUE)
+    return NodeFailingOnObservingFalse(observation=ObservationStateValue.TRUE)
 
 
 def _context(world: World) -> StatechartContext:

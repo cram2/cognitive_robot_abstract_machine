@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
@@ -71,9 +71,9 @@ def test_set_seed_configuration(pr2_world_state_reset):
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
-    assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert end.observation_state == ObservationStateValue.TRUE
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     assert np.isclose(connection.position, goal)
 
@@ -110,9 +110,9 @@ def test_set_seed_odometry(pr2_world_state_reset):
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
-    assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert end.observation_state == ObservationStateValue.TRUE
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     assert np.allclose(
         expected.to_np(),
@@ -174,10 +174,10 @@ def test_joint_goal(tmp_path):
 
     executor.compile(statechart=statechart)
 
-    assert task1.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert task1.observation_state == ObservationStateValue.UNKNOWN
+    assert end.observation_state == ObservationStateValue.UNKNOWN
+    assert task1.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
     statechart.draw(file_name=str(tmp_path / "muh.pdf"))
     executor.tick_until_end()
     statechart.draw(file_name=str(tmp_path / "muh.pdf"))
@@ -186,19 +186,19 @@ def test_joint_goal(tmp_path):
     assert len(statechart.state_history) == 7
     assert (
         statechart.state_history.get_observation_history_of_node(node=task1)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )
     assert (
         statechart.state_history.get_observation_history_of_node(node=end)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )
     assert (
         statechart.state_history.get_life_cycle_history_of_node(node=task1)[-1]
-        == LifeCycleValues.RUNNING
+        == LifeCycleValue.RUNNING
     )
     assert (
         statechart.state_history.get_life_cycle_history_of_node(node=end)[-1]
-        == LifeCycleValues.RUNNING
+        == LifeCycleValue.RUNNING
     )
 
 
@@ -301,7 +301,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
             f"head_pan_joint's velocity {observed_velocity} exceeded the "
             f"{max_velocity} rad/s cap on tick {i}"
         )
-        if statechart.observation_state[joint_goal] == ObservationStateValues.TRUE:
+        if statechart.observation_state[joint_goal] == ObservationStateValue.TRUE:
             break
     else:
         raise TimeoutError(

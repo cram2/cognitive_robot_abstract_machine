@@ -22,7 +22,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.tasks.drive_tasks import (
@@ -93,7 +93,7 @@ class OrientationWhileRunning(TickingExecutorExtension):
     """
 
     def after_tick(self, *, executor: StatechartExecutor) -> None:
-        if self.node.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.node.life_cycle_state != LifeCycleValue.RUNNING:
             return
         self.orientations.append(self.body.global_pose.to_np()[:3, :3])
 
@@ -699,7 +699,7 @@ def test_a_simulated_stretch_reaches_without_turning_its_base(
 
     executor.execute()
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert_kept_its_heading(recording)
 
 

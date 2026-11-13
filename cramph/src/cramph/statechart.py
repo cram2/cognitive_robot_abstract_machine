@@ -28,9 +28,9 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 from cramph.context import ContextExtension, StatechartContext
 from cramph.compiled_tick import LifeCycleChange
 from cramph.data_types import (
-    LifeCycleValues,
+    LifeCycleValue,
     TransitionKind,
-    ObservationStateValues,
+    ObservationStateValue,
 )
 from cramph.exceptions import (
     EmptyStatechartError,
@@ -847,7 +847,7 @@ class Statechart(SubclassJSONSerializer):
             :class:`EndStatechart` observes True, False otherwise.
         """
         return any(
-            self.observation_state[node] == ObservationStateValues.TRUE
+            self.observation_state[node] == ObservationStateValue.TRUE
             for node in self._end_nodes
         )
 
@@ -891,12 +891,11 @@ class Statechart(SubclassJSONSerializer):
             LifeCycleChange(
                 node=node,
                 previous_state=node.life_cycle_state,
-                new_state=LifeCycleValues.INTERRUPTED,
+                new_state=LifeCycleValue.INTERRUPTED,
             )
             for node in self.nodes
             if node is not cancelling_node
-            and node.life_cycle_state
-            in (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED)
+            and node.life_cycle_state in (LifeCycleValue.RUNNING, LifeCycleValue.PAUSED)
         ]
         for change in changes:
             self.life_cycle_state[change.node] = change.new_state

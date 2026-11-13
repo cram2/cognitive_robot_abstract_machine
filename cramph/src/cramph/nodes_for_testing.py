@@ -10,7 +10,7 @@ from enum import Enum, auto
 
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue, FailsOnObservingFalse
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import StatechartError
 from cramph.composites import Sequence
 from cramph.node import (
@@ -481,7 +481,7 @@ class NodeObservingAFixedValue(EndedByOwner, StatechartNode):
     owner.
     """
 
-    observation: ObservationStateValues
+    observation: ObservationStateValue
     """
     What this node observes on every tick.
     """
@@ -820,9 +820,9 @@ class NodeObservingTrueOnlyOnTick(EndedByOwner, StatechartNode):
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_false())
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         self.on_tick_calls += 1
-        return ObservationStateValues.TRUE
+        return ObservationStateValue.TRUE
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -846,7 +846,7 @@ class NodeWritingAVariableOnStart(EndedByOwner, StatechartNode):
 
     def on_start(self) -> None:
         self.context.float_variable_data.set_value(
-            expression=self.variable, value=float(ObservationStateValues.TRUE)
+            expression=self.variable, value=float(ObservationStateValue.TRUE)
         )
 
 
@@ -872,7 +872,7 @@ class NodeObservingAWrittenVariable(EndedByOwner, StatechartNode):
         return NodeArtifacts(
             observation=sm.if_eq(
                 self.writer.variable,
-                float(ObservationStateValues.TRUE),
+                float(ObservationStateValue.TRUE),
                 sm.Scalar.const_true(),
                 sm.Scalar.const_false(),
             )
@@ -908,7 +908,7 @@ class CompositeNodeObservingItsSecondChildRun(EndedByOwner, CompositeNode):
         return NodeArtifacts(
             observation=sm.if_eq(
                 self.second.life_cycle_variable,
-                int(LifeCycleValues.RUNNING),
+                int(LifeCycleValue.RUNNING),
                 sm.Scalar.const_true(),
                 sm.Scalar.const_false(),
             )
@@ -962,7 +962,7 @@ class CompositeNodeObservingItsCancellingChildRun(EndedByOwner, CompositeNode):
         return NodeArtifacts(
             observation=sm.if_eq(
                 self.cancel.life_cycle_variable,
-                int(LifeCycleValues.RUNNING),
+                int(LifeCycleValue.RUNNING),
                 sm.Scalar.const_true(),
                 sm.Scalar.const_false(),
             )

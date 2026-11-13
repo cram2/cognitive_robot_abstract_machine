@@ -20,7 +20,7 @@ from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
 from cramph.threaded_nodes import FunctionCall
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from coraplex.robot_plans.plan_transformations import (
     OpenDrawerBeforeMoveAndPickUp,
     ParkArmsBeforeFirstAction,
@@ -1124,7 +1124,7 @@ def test_search_action(multiple_robot_apartment_context) -> None:
     first_detection = next(
         node for node in search.descendants if isinstance(node, DetectAction)
     )
-    assert first_detection.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first_detection.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_search_looks_at_the_target_then_at_the_ends_of_a_cross_around_it(
@@ -2259,10 +2259,10 @@ def allowances_while_reattaching(
     [reattaching] = branch_moves_of(plan.descendants)
     allowances = []
     for _ in range(max_ticks):
-        if plan.life_cycle_state == LifeCycleValues.SUCCEEDED:
+        if plan.life_cycle_state == LifeCycleValue.SUCCEEDED:
             break
         executor.tick()
-        if reattaching.life_cycle_state == LifeCycleValues.RUNNING:
+        if reattaching.life_cycle_state == LifeCycleValue.RUNNING:
             allowances.append(
                 any(
                     isinstance(rule, AllowCollisionForEndEffector)
@@ -2270,7 +2270,7 @@ def allowances_while_reattaching(
                     for rule in executor.context.world.collision_manager.temporary_rules
                 )
             )
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     return allowances
 
 
