@@ -58,7 +58,7 @@ class StretchTester(GiskardTester):
                 robots=[RobotSpecification.specify_real_robot(Stretch)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(debug_mode=True),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 

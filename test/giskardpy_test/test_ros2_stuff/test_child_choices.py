@@ -154,7 +154,7 @@ class ChoosingGoal:
     def goal_json(self) -> str:
         return json.dumps(
             MotionGoal.for_motion_statechart(
-                self.statechart,
+                motion_statechart=self.statechart,
                 client=MetaData(node_name="unwatched_client", process_id=0),
             ).to_json()
         )
@@ -211,6 +211,9 @@ def _cancel_after(motion_server: MotionServerFixture, ticks: int) -> None:
 def _server_choosing_node(
     motion_server: MotionServerFixture, goal: ChoosingGoal
 ) -> CompositeNodeChoosingItsChild:
+    """
+    :return: The node of the motion server that stands for the choosing node of `goal`.
+    """
     return motion_server.executor.statechart.get_node_by_index(
         index=goal.choosing_node.index
     )
@@ -338,6 +341,10 @@ def test_a_choice_for_another_goal_is_not_taken(
 
 
 def test_the_client_answers_a_waiting_node_once_per_child_it_holds() -> None:
+    """
+    A node reported as waiting is sent the child the client chose once, however often
+    the report repeats.
+    """
     goal = ChoosingGoal.ending_when(EndMotion.when_true)
     client = ChildChoiceClient(
         statechart=goal.statechart,

@@ -1,3 +1,7 @@
+"""
+Integration tests of Giskard controlling the PR2.
+"""
+
 from __future__ import division
 
 import asyncio
@@ -46,8 +50,6 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
 
-from ...pytest_environment import runs_in_continuous_integration
-
 
 @dataclass
 class PR2Tester(GiskardTester):
@@ -81,10 +83,7 @@ class PR2Tester(GiskardTester):
                 robots=[RobotSpecification.specify_real_robot(PR2)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=not runs_in_continuous_integration(),
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig(
                 target_frequency=20,
             ),
@@ -115,6 +114,10 @@ def pocky_pose_setup(giskard_factory, pocky_pr2_pose: dict[str, float]) -> PR2Te
 
 
 class TestJointGoals:
+    """
+    Moving the joints of the PR2 to goal positions.
+    """
+
     def test_joint_goal(self, giskard: PR2Tester):
         js = {
             PR2Joint.TORSO_LIFT: 0.2999225173357618,
@@ -164,6 +167,10 @@ class TestJointGoals:
 
 
 class TestCartGoals:
+    """
+    Moving links of the PR2 to Cartesian goal poses.
+    """
+
     def test_cart_goal_1eef(self, giskard: PR2Tester):
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=giskard.right_tip
@@ -239,7 +246,11 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
 
 
 class TestActionServerEvents:
-    def test_wrong_params1(self, giskard: PR2Tester):
+    """
+    How the action server answers goals that cannot be executed.
+    """
+
+    def test_wrong_params1(self, *, giskard: PR2Tester) -> None:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=(
@@ -268,7 +279,7 @@ class TestActionServerEvents:
         giskard.api.execute()
 
     @pytest.mark.asyncio
-    async def test_cancel_with_new_goal(self, giskard: PR2Tester):
+    async def test_cancel_with_new_goal(self, *, giskard: PR2Tester) -> None:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
@@ -307,7 +318,7 @@ class TestActionServerEvents:
         await giskard.api.get_result()
 
     @pytest.mark.asyncio
-    async def test_interrupt(self, giskard: PR2Tester):
+    async def test_interrupt(self, *, giskard: PR2Tester) -> None:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(

@@ -27,7 +27,6 @@ from pathlib import Path
 from experiments.control_loop_experiments.scenarios import (
     BENCHMARK_SCENARIOS,
     IsolatedBenchmarkSession,
-    PlotterMode,
     ScenarioRunner,
 )
 from experiments.experiment_definitions import (
@@ -47,20 +46,15 @@ from krrood.exceptions import DataclassException
 # %% one configuration of the sweep
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControlLoopBenchmarkResult(ExperimentResult):
     """
-    What the repetitions of one scenario under one plotter mode measured.
+    What the repetitions of one scenario measured.
     """
 
     scenario_name: str
     """
     Which motion was measured.
-    """
-
-    plotter_mode: PlotterMode
-    """
-    Whether the post goal plotters recorded the motion while it was measured.
     """
 
     control_cycles: MeanAndStandardDeviation
@@ -101,7 +95,7 @@ class ControlLoopBenchmarkResult(ExperimentResult):
 
     @classmethod
     def from_profiles(
-        cls, plotter_mode: PlotterMode, profiles: list[CallTreeProfile]
+        cls, *, profiles: list[CallTreeProfile]
     ) -> ControlLoopBenchmarkResult:
         """
         Aggregate the repetitions of one configuration into a single row.
@@ -109,11 +103,10 @@ class ControlLoopBenchmarkResult(ExperimentResult):
         :raises NoProfilesMeasuredError: If not a single repetition was measured.
         """
         if not profiles:
-            raise NoProfilesMeasuredError(plotter_mode=plotter_mode)
+            raise NoProfilesMeasuredError()
         cycles = [profile.control_cycle for profile in profiles]
         return cls(
             scenario_name=profiles[0].scenario_name,
-            plotter_mode=plotter_mode,
             control_cycles=MeanAndStandardDeviation.from_measurements(
                 [profile.control_cycles for profile in profiles]
             ),
@@ -139,22 +132,14 @@ class ControlLoopBenchmarkResult(ExperimentResult):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoProfilesMeasuredError(DataclassException):
     """
     Raised when a configuration is aggregated that was never measured.
     """
 
-    plotter_mode: PlotterMode
-    """
-    The plotter mode whose repetitions are missing.
-    """
-
     def error_message(self) -> str:
-        return (
-            f"No repetition was measured under the {self.plotter_mode} plotter mode, "
-            f"so there is nothing to aggregate."
-        )
+        return "No repetition was measured, so there is nothing to aggregate."
 
     def suggest_correction(self) -> str:
         return "Measure at least one repetition before aggregating."
@@ -249,7 +234,7 @@ class PhaseBreakdownResult(ExperimentResult):
 # %% driving the measurements
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BenchmarkMultiRun:
     """
     Runs every requested configuration in a subprocess and collects the results.
@@ -258,11 +243,6 @@ class BenchmarkMultiRun:
     scenario_names: list[str]
     """
     The motions that are measured.
-    """
-
-    plotter_modes: list[PlotterMode]
-    """
-    The plotter modes every motion is measured under.
     """
 
     repeats: int
@@ -285,17 +265,18 @@ class BenchmarkMultiRun:
         Measure every configuration and aggregate its repetitions.
         """
         for scenario_name in self.scenario_names:
-            for plotter_mode in self.plotter_modes:
-                profiles = [
-                    self._measure_in_subprocess(scenario_name, plotter_mode, repetition)
-                    for repetition in range(self.repeats)
-                ]
-                self.results.append(
-                    ControlLoopBenchmarkResult.from_profiles(plotter_mode, profiles)
+            profiles = [
+                self._measure_in_subprocess(
+                    scenario_name=scenario_name, repetition=repetition
                 )
+                for repetition in range(self.repeats)
+            ]
+            self.results.append(
+                ControlLoopBenchmarkResult.from_profiles(profiles=profiles)
+            )
 
     def _measure_in_subprocess(
-        self, scenario_name: str, plotter_mode: PlotterMode, repetition: int
+        self, *, scenario_name: str, repetition: int
     ) -> CallTreeProfile:
         """
         Run one measurement in a process of its own and read its result.
@@ -309,15 +290,13 @@ class BenchmarkMultiRun:
                 "experiments.control_loop_experiments.benchmark",
                 "--scenario",
                 scenario_name,
-                "--plotter-mode",
-                plotter_mode.value,
                 "--target-frequency",
                 str(self.target_frequency),
                 "--write-result-to",
                 result_file.name,
             ]
             print(
-                f"measuring {scenario_name} ({plotter_mode}, run {repetition})",
+                f"measuring {scenario_name} (run {repetition})",
             )
             completed = subprocess.run(command)
             if completed.returncode != 0:
@@ -377,12 +356,11 @@ def measure_one_scenario(arguments: argparse.Namespace) -> None:
     scenario = BENCHMARK_SCENARIOS[arguments.scenario]()
     python_profiler = None if arguments.profile_to is None else cProfile.Profile()
     runner = ScenarioRunner(
-        plotter_mode=PlotterMode(arguments.plotter_mode),
         target_frequency=arguments.target_frequency,
         python_profiler=python_profiler,
     )
     with IsolatedBenchmarkSession():
-        profile = runner.run(scenario)
+        profile = runner.run(scenario=scenario)
         if python_profiler is not None:
             statistics = pstats.Stats(python_profiler)
             statistics.dump_stats(arguments.profile_to)
@@ -400,14 +378,8 @@ def run_sweep(arguments: argparse.Namespace) -> None:
     """
     Measure every requested configuration and print the comparison.
     """
-    plotter_modes = {
-        "debug": [PlotterMode.DEBUG],
-        "plain": [PlotterMode.PLAIN],
-        "both": [PlotterMode.PLAIN, PlotterMode.DEBUG],
-    }[arguments.plotters]
     sweep = BenchmarkMultiRun(
         scenario_names=arguments.scenarios,
-        plotter_modes=plotter_modes,
         repeats=arguments.repeats,
         target_frequency=arguments.target_frequency,
     )
@@ -435,12 +407,6 @@ def parse_arguments() -> argparse.Namespace:
         help="how often to measure every configuration",
     )
     parser.add_argument(
-        "--plotters",
-        default="both",
-        choices=["debug", "plain", "both"],
-        help="whether the post goal plotters record while measuring",
-    )
-    parser.add_argument(
         "--target-frequency",
         type=float,
         default=ScenarioRunner.target_frequency,
@@ -454,12 +420,6 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         choices=list(BENCHMARK_SCENARIOS),
         help="measure only this scenario, in this process",
-    )
-    parser.add_argument(
-        "--plotter-mode",
-        default=PlotterMode.PLAIN.value,
-        choices=[mode.value for mode in PlotterMode],
-        help="whether the post goal plotters record, only together with --scenario",
     )
     parser.add_argument(
         "--profile-to",

@@ -116,6 +116,7 @@ class CartesianTask(ConvergingTask, ABC):
 
     def add_goal_and_current_debug_expressions(
         self,
+        *,
         artifacts: MotionNodeArtifacts,
         goal: SpatialType,
         current: SpatialType,
@@ -183,7 +184,7 @@ class CartesianPosition(CartesianTask):
         )
 
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_P_goal, current=root_P_current
+            artifacts=artifacts, goal=root_P_goal, current=root_P_current
         )
 
         artifacts.error = root_P_goal.euclidean_distance(root_P_current)
@@ -355,7 +356,7 @@ class CartesianPositionTrajectory(CartesianTask):
         )
 
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_P_goal, current=root_P_current
+            artifacts=artifacts, goal=root_P_goal, current=root_P_current
         )
 
         self.compile_current_point_on_tick()
@@ -638,7 +639,7 @@ class CartesianPositionStraight(CartesianTask):
         )
 
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_P_goal, current=root_P_tip
+            artifacts=artifacts, goal=root_P_goal, current=root_P_tip
         )
 
         artifacts.error = root_P_goal.euclidean_distance(root_P_tip)
@@ -691,8 +692,13 @@ class CartesianOrientation(CartesianTask):
             quadratic_weight=self.weight,
         )
 
+        # the goal axes are drawn at the tip, next to the current ones
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_R_goal, current=root_R_current
+            artifacts=artifacts,
+            goal=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=root_T_current.position, rotation_matrix=root_R_goal
+            ),
+            current=root_T_current,
         )
 
         artifacts.error = sm.abs(root_R_current.rotational_distance(root_R_goal))

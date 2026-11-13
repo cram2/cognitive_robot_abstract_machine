@@ -1,3 +1,7 @@
+"""
+Tests of applying the states Giskard reports to the statechart of a client.
+"""
+
 import json
 from dataclasses import dataclass, field
 
@@ -210,6 +214,9 @@ def test_the_reported_states_are_written_into_the_client_statechart(
 def test_a_node_giskard_has_not_added_yet_keeps_its_state(
     client_statechart: Statechart,
 ) -> None:
+    """
+    A node the client added that Giskard does not report yet keeps its life cycle state.
+    """
     payload = _reported_states(ticks=2)
     client_statechart.add_node(node=(chosen := CountTicks(ticks=1)))
 
@@ -219,6 +226,9 @@ def test_a_node_giskard_has_not_added_yet_keeps_its_state(
 
 
 def test_states_of_more_nodes_than_the_client_holds_are_rejected() -> None:
+    """
+    A report covering nodes the client statechart does not have raises.
+    """
     payload = _reported_states(ticks=2)
     client_statechart = Statechart(context=StatechartContext(world=World()))
     client_statechart.add_node(node=CountTicks(ticks=1))
@@ -230,6 +240,9 @@ def test_states_of_more_nodes_than_the_client_holds_are_rejected() -> None:
 def test_the_observers_of_the_client_statechart_learn_the_reported_tick(
     client_statechart: Statechart,
 ) -> None:
+    """
+    Applying a report tells the observers of the state history the tick it reports.
+    """
     observer = ObserverRecordingTicks()
     client_statechart.state_history.add_observer(observer=observer)
     update = StatechartStateUpdate.from_json(
@@ -258,6 +271,10 @@ def test_the_same_states_reported_twice_are_recorded_once(
 def test_the_client_sees_a_node_run_before_the_goal_ends(
     motion_server: MotionServerFixture,
 ) -> None:
+    """
+    A client following a goal sees a node running while the statechart has not ended
+    yet, and ended at last.
+    """
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(node=(counter := CountSimulationTimeSeconds(seconds=0.1)))
     statechart.add_node(node=EndMotion.when_true(node=counter))
@@ -271,7 +288,8 @@ def test_the_client_sees_a_node_run_before_the_goal_ends(
     motion_server.control_loop.inputs.synchronizers.append(following)
     motion_server.action_server.goal_json = json.dumps(
         MotionGoal.for_motion_statechart(
-            statechart, client=MetaData(node_name="unwatched_client", process_id=0)
+            motion_statechart=statechart,
+            client=MetaData(node_name="unwatched_client", process_id=0),
         ).to_json()
     )
 
@@ -287,6 +305,9 @@ def test_the_client_sees_a_node_run_before_the_goal_ends(
 def test_the_client_follows_a_child_it_chose_once_giskard_runs_it(
     motion_server: MotionServerFixture,
 ) -> None:
+    """
+    The life cycle states of a client that chose a child end equal to those of Giskard.
+    """
     motion_server.executor.context.add_extension(
         extension=ChildChooserAccess(
             choosers=[

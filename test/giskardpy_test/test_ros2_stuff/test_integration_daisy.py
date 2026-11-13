@@ -1,3 +1,7 @@
+"""
+Integration tests of Giskard controlling DAiSy.
+"""
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,7 +26,6 @@ from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
-from ...pytest_environment import runs_in_continuous_integration
 
 # %% trajectory length limit
 
@@ -70,11 +73,7 @@ class DAiSyTester(GiskardTester):
                 robots=[RobotSpecification.specify_real_robot(DAiSy)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=not runs_in_continuous_integration(),
-                plot_gantt_chart=True,
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 
@@ -93,6 +92,9 @@ def robot():
 
 
 def test_joints1(giskard: DAiSyTester) -> None:
+    """
+    The left finger tip of DAiSy reaches the pose its joint goal implies.
+    """
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
         node=(

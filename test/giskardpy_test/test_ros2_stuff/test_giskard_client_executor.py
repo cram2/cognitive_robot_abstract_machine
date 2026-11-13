@@ -1,5 +1,10 @@
+"""
+Tests of executing statecharts on Giskard through :class:`GiskardClientExecutor`.
+"""
+
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -14,6 +19,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import (
     GiskardClientExecutor,
     GiskardClientExecutorNode,
 )
+from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.world import World
 
@@ -101,6 +107,45 @@ def test_an_extension_is_told_that_an_aborted_goal_stopped(
         executor_with_a_statechart.execute()
 
     assert extension.run_count == 1
+
+
+# %% debug expressions
+
+
+@pytest.mark.parametrize("publishes_debug_expressions", [True, False])
+def test_executing_says_whether_the_goal_publishes_its_debug_expressions(
+    giskard_command_server: ActionServerHandler,
+    executor_with_a_statechart: GiskardClientExecutor,
+    publishes_debug_expressions: bool,
+) -> None:
+    server = ServerAnsweringOneGoal(
+        action_server=giskard_command_server,
+        outcome_unless_canceled=GoalOutcome.ABORTED,
+    )
+
+    with pytest.raises(ExecutionAbortedException):
+        executor_with_a_statechart.execute(
+            publishes_debug_expressions=publishes_debug_expressions
+        )
+
+    sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
+    assert sent_goal.publishes_debug_expressions is publishes_debug_expressions
+
+
+def test_executing_publishes_no_debug_expressions_unless_asked(
+    giskard_command_server: ActionServerHandler,
+    executor_with_a_statechart: GiskardClientExecutor,
+) -> None:
+    server = ServerAnsweringOneGoal(
+        action_server=giskard_command_server,
+        outcome_unless_canceled=GoalOutcome.ABORTED,
+    )
+
+    with pytest.raises(ExecutionAbortedException):
+        executor_with_a_statechart.execute()
+
+    sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
+    assert sent_goal.publishes_debug_expressions is False
 
 
 # %% closing

@@ -42,7 +42,7 @@ artifacts.debug_expressions.append(
 ```
 
 See `tasks/align_planes.py` for a worked example. For Cartesian tasks there is a convenience
-helper, `CartesianTask.add_goal_and_current_debug_expressions(artifacts, goal, current)`
+helper, `CartesianTask.add_goal_and_current_debug_expressions(artifacts=..., goal=..., current=...)`
 (`tasks/cartesian_tasks.py`), which registers `<task name>/goal` (green) and
 `<task name>/current` (red) so the two can be told apart in RViz.
 

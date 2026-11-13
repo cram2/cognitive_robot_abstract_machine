@@ -90,18 +90,21 @@ class AlignPlanes(ConvergingTask):
         root_V_tip_normal.scale(1)
 
         root_V_tip_normal.visualisation_frame = self.tip_link
-        current_dbg = DebugExpression(
+        current_normal_debug_expression = DebugExpression(
             name=f"{self.name}/current_normal",
             expression=root_V_tip_normal,
             color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
-        goal_dbg = DebugExpression(
+        # a copy, since transforming returns the goal normal itself if it is in the root
+        root_V_goal_normal_at_tip = Vector3.from_iterable(root_V_root_normal)
+        root_V_goal_normal_at_tip.visualisation_frame = self.tip_link
+        goal_normal_debug_expression = DebugExpression(
             name=f"{self.name}/goal_normal",
-            expression=root_V_root_normal,
+            expression=root_V_goal_normal_at_tip,
             color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
         )
-        artifacts.debug_expressions.append(current_dbg)
-        artifacts.debug_expressions.append(goal_dbg)
+        artifacts.debug_expressions.append(current_normal_debug_expression)
+        artifacts.debug_expressions.append(goal_normal_debug_expression)
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
