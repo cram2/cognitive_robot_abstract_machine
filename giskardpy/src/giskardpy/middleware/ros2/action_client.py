@@ -29,12 +29,13 @@ from giskardpy.middleware.ros2.exceptions import (
 from giskardpy.middleware.ros2.utils.asynio_utils import wait_until_not_none
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import from_json
+from krrood.patterns.called_positionally import called_positionally
 
 
 # %% action client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardActionClient:
     """
     Sends goals to a Giskard action server one at a time and waits for their results.
@@ -134,7 +135,7 @@ class GiskardActionClient:
         self._client = None
 
     def send_goal_async(
-        self, goal: Any, feedback_callback: Callable[[Any], None] | None = None
+        self, *, goal: Any, feedback_callback: Callable[[Any], None] | None = None
     ) -> Future:
         """
         Send `goal` without waiting for it to be accepted.
@@ -158,6 +159,7 @@ class GiskardActionClient:
         )
         return future
 
+    @called_positionally
     def _receive_feedback(
         self, feedback_callback: Callable[[Any], None], feedback_message: Any
     ) -> None:
@@ -180,7 +182,7 @@ class GiskardActionClient:
                 self._goal_handle.cancel_goal_async()
 
     def send_goal(
-        self, goal: Any, feedback_callback: Callable[[Any], None] | None = None
+        self, *, goal: Any, feedback_callback: Callable[[Any], None] | None = None
     ) -> Any:
         """
         Send `goal` and wait for its result.
@@ -194,7 +196,9 @@ class GiskardActionClient:
             within :attr:`goal_response_timeout`. The goal is given up, so a server that
             accepts it later has it canceled.
         """
-        goal_response = self.send_goal_async(goal, feedback_callback=feedback_callback)
+        goal_response = self.send_goal_async(
+            goal=goal, feedback_callback=feedback_callback
+        )
         answered = threading.Event()
         goal_response.add_done_callback(lambda _: answered.set())
         answered.wait(self.goal_response_timeout.total_seconds())
@@ -232,14 +236,16 @@ class GiskardActionClient:
             case GoalStatus.STATUS_ABORTED | GoalStatus.STATUS_SUCCEEDED:
                 return result
             case GoalStatus.STATUS_CANCELED:
-                raise ExecutionCanceledException(self.action_name, goal_id)
+                raise ExecutionCanceledException(
+                    action_server_name=self.action_name, goal_id=goal_id
+                )
             case _:
                 raise UnexpectedGoalStatusError(
                     action_name=self.action_name, status=result.status
                 )
 
     @staticmethod
-    def create_abort_exception(result: Any, **kwargs: Any) -> Exception:
+    def create_abort_exception(*, result: Any, **kwargs: Any) -> Exception:
         """
         Rebuild the exception that made the server abort the goal.
 
@@ -263,6 +269,7 @@ class GiskardActionClient:
         except (JSONSerializationError, TypeError):
             return ExecutionAbortedException()
 
+    @called_positionally
     def _receive_goal_response(self, future: Future, goal_id: int) -> None:
         """
         Start waiting for the result of the goal ``goal_id`` if its server accepted it.
@@ -300,10 +307,12 @@ class GiskardActionClient:
 
         self._result_future = self._goal_handle.get_result_async()
         self._result_future.add_done_callback(
-            lambda result_future: self._receive_result(result_future, goal_id)
+            lambda result_future: self._receive_result(
+                future=result_future, goal_id=goal_id
+            )
         )
 
-    def _receive_result(self, future: Future, goal_id: int) -> None:
+    def _receive_result(self, *, future: Future, goal_id: int) -> None:
         """
         Keep the result of the goal ``goal_id`` for :meth:`get_result`, unless a newer
         goal was sent since.

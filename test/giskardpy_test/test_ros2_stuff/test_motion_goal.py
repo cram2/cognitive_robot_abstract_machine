@@ -39,7 +39,7 @@ class TestMotionGoalPayload:
     def test_the_motion_statechart_survives_the_round_trip(self):
         motion_statechart = create_motion_statechart()
         goal = MotionGoal.for_motion_statechart(
-            motion_statechart, client=create_client()
+            motion_statechart=motion_statechart, client=create_client()
         )
 
         restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
@@ -53,7 +53,7 @@ class TestMotionGoalPayload:
         """
         client = create_client()
         goal = MotionGoal.for_motion_statechart(
-            create_motion_statechart(), client=client
+            motion_statechart=create_motion_statechart(), client=client
         )
 
         restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
@@ -63,7 +63,7 @@ class TestMotionGoalPayload:
     def test_a_goal_built_on_a_change_names_it(self):
         position = StreamPosition(origin=create_client(), sequence_number=11)
         goal = MotionGoal.for_motion_statechart(
-            create_motion_statechart(),
+            motion_statechart=create_motion_statechart(),
             client=create_client(),
             required_position=position,
         )
@@ -74,7 +74,7 @@ class TestMotionGoalPayload:
 
     def test_a_goal_built_on_nothing_requires_nothing(self):
         goal = MotionGoal.for_motion_statechart(
-            create_motion_statechart(), client=create_client()
+            motion_statechart=create_motion_statechart(), client=create_client()
         )
 
         restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))

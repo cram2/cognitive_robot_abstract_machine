@@ -70,7 +70,7 @@ class RootRelativeGoalMonitor(EndedByOwner, MotionStatechartNode, ABC):
             tip=self.goal.reference_frame,
             float_variable_data=self.context.float_variable_data,
         )
-        self._forward_kinematics_binding.bind(self.context.world)
+        self._forward_kinematics_binding.bind(world=self.context.world)
 
     def resolve_root_goal(self) -> SpatialType:
         """
@@ -81,7 +81,7 @@ class RootRelativeGoalMonitor(EndedByOwner, MotionStatechartNode, ABC):
 
     def on_start(self) -> None:
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._forward_kinematics_binding.bind(self.context.world)
+            self._forward_kinematics_binding.bind(world=self.context.world)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

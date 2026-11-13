@@ -12,7 +12,7 @@ from giskardpy.middleware.ros2.action_client import GiskardActionClient
 # %% test doubles
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LateServerActionClient:
     """
     Stand-in for an action client whose server only shows up after a few waits, so that
@@ -44,7 +44,7 @@ class LateServerActionClient:
     Number of waits that were asked for so far.
     """
 
-    def wait_for_server(self, timeout_sec: float) -> bool:
+    def wait_for_server(self, *, timeout_sec: float) -> bool:
         self.performed_waits += 1
         if self.performed_waits <= self.waits_until_the_server_appears:
             return False
@@ -62,7 +62,9 @@ def test_waiting_for_a_late_server_uses_the_given_node(rclpy_node, monkeypatch):
     monkeypatch.setattr(background_node, "get_node", None)
     monkeypatch.setattr(action_client, "ActionClient", LateServerActionClient)
 
-    client = GiskardActionClient(rclpy_node, JsonAction, "late_server_action")
+    client = GiskardActionClient(
+        node_handle=rclpy_node, action_type=JsonAction, action_name="late_server_action"
+    )
 
     assert client.node_handle is rclpy_node
     assert (

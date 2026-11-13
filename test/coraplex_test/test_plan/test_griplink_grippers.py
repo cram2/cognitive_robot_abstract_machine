@@ -152,7 +152,9 @@ def test_a_daisy_driven_by_a_standalone_giskard_moves_its_fingers_with_a_giskard
         robot_executor(daisy_extensions),
     )
 
-    assert type(action.goal) is type(MoveFingers.moving_gripper_to(configuration))
+    assert type(action.goal) is type(
+        MoveFingers.moving_gripper_to(configuration=configuration)
+    )
 
 
 # %% grasping

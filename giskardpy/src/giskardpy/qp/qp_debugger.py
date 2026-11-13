@@ -46,7 +46,7 @@ class DebuggerColumn(StrEnum):
     """Upper bounds of the inequality constraints."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuadraticProgramDebugger:
     """
     This class is designed to help you debug Giskard's quadratic programs (QP) by using names of constraints and
@@ -92,9 +92,9 @@ class QuadraticProgramDebugger:
     """
 
     def __post_init__(self):
-        self.update(self.current_solution)
+        self.update(current_solution=self.current_solution)
 
-    def update(self, current_solution: np.ndarray | None) -> None:
+    def update(self, *, current_solution: np.ndarray | None) -> None:
         """
         Updates the debugger with a new solution.
         """

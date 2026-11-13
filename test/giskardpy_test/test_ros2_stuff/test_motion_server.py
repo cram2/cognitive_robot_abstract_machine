@@ -52,7 +52,7 @@ from .test_client_presence import SteppingClock, heartbeat_of, let_heartbeats_st
 # %% mimics of the ros facing collaborators
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GoalQueueMimic:
     """
     Stands in for the action server: hands out one goal and records the outcome.
@@ -114,10 +114,10 @@ class GoalQueueMimic:
     def is_cancel_requested(self) -> bool:
         return self.cancel_requested
 
-    def loginfo(self, message: str) -> None:
+    def loginfo(self, *, message: str) -> None:
         pass
 
-    def send_feedback(self, message: Any) -> None:
+    def send_feedback(self, *, message: Any) -> None:
         self.feedback_messages.append(message)
 
     def set_canceled(self) -> None:
@@ -133,7 +133,7 @@ class GoalQueueMimic:
         self.sent_results.append(self.result_message)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GoalMessageMimic:
     """
     Stands in for the goal request of the action.
@@ -145,7 +145,7 @@ class GoalMessageMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdatesMimic:
     """
     Stands in for the incoming world updates, counting how they are drained and
@@ -195,7 +195,7 @@ class WorldUpdatesMimic:
     def apply_state_updates(self) -> None:
         self.applied_state_update_batches += 1
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
         self.awaited_positions.append(position)
         self.compiled_while_waiting.append(
             self.executor is not None and self.executor.statechart is not None
@@ -209,7 +209,7 @@ class WorldUpdatesMimic:
         return self.pending_model_change
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PublicationProgressMimic:
     """
     Stands in for the synchronizer that publishes the changes of the world, reporting
@@ -241,7 +241,7 @@ class PublicationProgressMimic:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingInputSynchronizer(InputSynchronizer):
     """
     Records in which order inputs are read relative to the control cycles.
@@ -262,7 +262,7 @@ class RecordingInputSynchronizer(InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WritingInputSynchronizer(InputSynchronizer):
     """
     Reports that it wrote into the world state, standing in for an input that received a
@@ -273,7 +273,7 @@ class WritingInputSynchronizer(InputSynchronizer):
         return True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingCommandPublisher(CommandPublisher):
     """
     Records how often commands were published and when the robot was stopped.
@@ -301,7 +301,7 @@ class RecordingCommandPublisher(CommandPublisher):
         self.stop_count += 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PublishingCommandPublisher(CommandPublisher):
     """
     Advances the publication progress once per control cycle, standing in for a goal
@@ -320,7 +320,7 @@ class PublishingCommandPublisher(CommandPublisher):
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FailingInputSynchronizer(InputSynchronizer):
     """
     Fails while reading its input, standing in for a broken robot interface.
@@ -357,7 +357,7 @@ class UnserializableFailureInputSynchronizer(InputSynchronizer):
         raise create_error_holding_a_variable()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InterruptingInputSynchronizer(InputSynchronizer):
     """
     Raises KeyboardInterrupt while reading its input, standing in for a process
@@ -368,7 +368,7 @@ class InterruptingInputSynchronizer(InputSynchronizer):
         raise KeyboardInterrupt
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CycleWatchingGoalCanceler(InputSynchronizer):
     """
     Watches the completed cycles from inside the control loop and cancels the goal once
@@ -402,7 +402,7 @@ class CycleWatchingGoalCanceler(InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CycleWatchingClientDisconnector(InputSynchronizer):
     """
     Watches the completed cycles from inside the control loop and lets the client of the
@@ -439,7 +439,7 @@ class CycleWatchingClientDisconnector(InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CycleWatchingLateClientDisconnector(CycleWatchingClientDisconnector):
     """
     Lets the client of the goal announce itself only once the motion is running, and
@@ -466,12 +466,12 @@ class CycleWatchingLateClientDisconnector(CycleWatchingClientDisconnector):
         if not self.announced and (
             self.cycle_counter.completed_cycles >= self.ticks_until_first_heartbeat
         ):
-            self.client_presence.receive_heartbeat(heartbeat_of(self.client))
+            self.client_presence.receive_heartbeat(message=heartbeat_of(self.client))
             self.announced = True
         return super().apply()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FeedbackCountingSynchronizer(InputSynchronizer):
     """
     Records how much feedback was already published when a control cycle read its
@@ -495,7 +495,7 @@ class FeedbackCountingSynchronizer(InputSynchronizer):
         return False
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StateChangeRecorder(StateChangeCallback):
     """
     Records every announced state change, standing in for the publishers that observe
@@ -511,7 +511,7 @@ class StateChangeRecorder(StateChangeCallback):
         self.announced_changes += 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PendingModelChangeInjector(InputSynchronizer):
     """
     Announces a pending model change after a few control cycles, standing in for another
@@ -540,7 +540,7 @@ class PendingModelChangeInjector(InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingPlotter(PostGoalPlotter):
     """
     Records for which goals debug plots were requested.
@@ -551,17 +551,17 @@ class RecordingPlotter(PostGoalPlotter):
     The goal ids that were plotted.
     """
 
-    def plot(self, goal_id: int) -> None:
+    def plot(self, *, goal_id: int) -> None:
         self.plotted_goal_ids.append(goal_id)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FailingPlotter(PostGoalPlotter):
     """
     Fails while drawing its plot, standing in for a broken plotting backend.
     """
 
-    def plot(self, goal_id: int) -> None:
+    def plot(self, *, goal_id: int) -> None:
         raise BrokenPlotError()
 
 
@@ -615,12 +615,14 @@ def create_goal_json(
     if client is None:
         client = MetaData(node_name="unwatched_client", process_id=0)
     goal = MotionGoal.for_motion_statechart(
-        motion_statechart, client=client, required_position=required_position
+        motion_statechart=motion_statechart,
+        client=client,
+        required_position=required_position,
     )
     return json.dumps(goal.to_json())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionServerFixture:
     """
     A motion server wired to mimics, so its lifecycle can be driven from a test.
@@ -663,7 +665,7 @@ def motion_server(init_background_node) -> MotionServerFixture:
     client_presence = HeartbeatPresence(
         node=background_node.get_node(), clock=SteppingClock()
     )
-    client_presence.receive_heartbeat(heartbeat_of(client))
+    client_presence.receive_heartbeat(message=heartbeat_of(client))
     client_watchdog = ClientWatchdog(presence=client_presence)
     control_loop = ControlLoop(
         executor=executor,
@@ -714,7 +716,7 @@ class TestGoalResult:
     A goal is always answered, with an outcome that reflects what happened.
     """
 
-    def test_finished_motion_succeeds(self, motion_server: MotionServerFixture):
+    def test_finished_motion_succeeds(self, *, motion_server: MotionServerFixture):
         motion_server.action_server.goal_json = create_goal_json()
 
         motion_server.motion_server.run_idle_cycle()
@@ -723,7 +725,7 @@ class TestGoalResult:
         assert len(motion_server.action_server.sent_results) == 1
 
     def test_a_goal_that_changed_the_world_reports_how_far_it_published(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         The client reads the world once the goal is answered, so it has to be told what
@@ -751,7 +753,7 @@ class TestGoalResult:
         )
 
     def test_a_goal_that_changed_nothing_reports_no_position(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         There is nothing to catch up with when the world published nothing, and waiting
@@ -765,7 +767,7 @@ class TestGoalResult:
         assert "published_position" not in result
 
     def test_canceled_goal_is_reported_as_canceled(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json(seconds=100.0)
         motion_server.action_server.cancel_requested = True
@@ -774,7 +776,7 @@ class TestGoalResult:
 
         assert motion_server.action_server.outcome == GoalOutcome.CANCELED
 
-    def test_broken_input_aborts_the_goal(self, motion_server: MotionServerFixture):
+    def test_broken_input_aborts_the_goal(self, *, motion_server: MotionServerFixture):
         motion_server.control_loop.inputs.synchronizers = [
             FailingInputSynchronizer(world=motion_server.executor.context.world)
         ]
@@ -786,7 +788,7 @@ class TestGoalResult:
         assert len(motion_server.action_server.sent_results) == 1
 
     def test_the_reason_of_a_failure_is_reported(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         A motion terminated by a world model modification can be sent again, so the
@@ -808,13 +810,13 @@ class TestGoalResult:
         )
 
     def test_the_fields_of_a_failure_survive_the_round_trip(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         An error only helps a client if it arrives with the details it was raised with.
         """
         result = motion_server.motion_server.create_result(
-            ExecutionCanceledException(action_server_name="mimic", goal_id=7)
+            error=ExecutionCanceledException(action_server_name="mimic", goal_id=7)
         )
 
         error = from_json(json.loads(result.result)["error"])
@@ -823,7 +825,7 @@ class TestGoalResult:
         assert error.goal_id == 7
 
     def test_a_failure_that_cannot_be_serialized_is_reported_by_its_message(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         An error holding objects of the running motion cannot travel to the client,
@@ -831,7 +833,7 @@ class TestGoalResult:
         """
         failure = create_error_holding_a_variable()
 
-        result = motion_server.motion_server.create_result(failure)
+        result = motion_server.motion_server.create_result(error=failure)
 
         error = from_json(json.loads(result.result)["error"])
         assert isinstance(error, UnserializableGoalError)
@@ -839,7 +841,7 @@ class TestGoalResult:
         assert error.message == str(failure)
 
     def test_a_failure_that_cannot_be_serialized_still_answers_the_client(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.control_loop.inputs.synchronizers = [
             UnserializableFailureInputSynchronizer(
@@ -854,7 +856,7 @@ class TestGoalResult:
         assert len(motion_server.action_server.sent_results) == 1
 
     def test_a_successful_goal_reports_no_failure(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -863,7 +865,9 @@ class TestGoalResult:
         result = json.loads(motion_server.action_server.sent_results[0].result)
         assert "error" not in result
 
-    def test_result_contains_the_final_states(self, motion_server: MotionServerFixture):
+    def test_result_contains_the_final_states(
+        self, *, motion_server: MotionServerFixture
+    ):
         motion_server.action_server.goal_json = create_goal_json()
 
         motion_server.motion_server.run_idle_cycle()
@@ -873,7 +877,7 @@ class TestGoalResult:
         assert "observation_state" in result
 
     def test_result_contains_the_last_observation_state(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ) -> None:
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -896,7 +900,7 @@ class TestStatesOfAFailedGoal:
     """
 
     def test_a_goal_failing_before_it_compiled_reports_no_states(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ) -> None:
         motion_server.action_server.goal_json = create_goal_json()
         motion_server.motion_server.run_idle_cycle()
@@ -914,7 +918,7 @@ class TestCleanupAfterGoal:
     """
 
     def test_robot_is_stopped_after_a_successful_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -923,7 +927,7 @@ class TestCleanupAfterGoal:
         assert motion_server.command_publisher.stop_count == 1
 
     def test_robot_is_stopped_after_a_failed_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.control_loop.inputs.synchronizers = [
             FailingInputSynchronizer(world=motion_server.executor.context.world)
@@ -935,7 +939,7 @@ class TestCleanupAfterGoal:
         assert motion_server.command_publisher.stop_count == 1
 
     def test_debug_plots_are_written_for_the_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -946,7 +950,7 @@ class TestCleanupAfterGoal:
         ]
 
     def test_feedback_is_published_at_the_end_of_the_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -955,7 +959,7 @@ class TestCleanupAfterGoal:
         assert len(motion_server.action_server.feedback_messages) > 0
 
     def test_a_failing_plotter_still_answers_the_client(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.motion_server.post_goal_plotters = [
             FailingPlotter(executor=motion_server.executor)
@@ -967,7 +971,7 @@ class TestCleanupAfterGoal:
         assert len(motion_server.action_server.sent_results) == 1
 
     def test_a_failing_plotter_keeps_the_server_taking_goals(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         A debug plot is a diagnostic, so it may never escape the idle cycle: an
@@ -986,7 +990,7 @@ class TestCleanupAfterGoal:
         assert len(motion_server.action_server.sent_results) == 2
 
     def test_a_failing_plotter_does_not_stop_the_remaining_plotters(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.motion_server.post_goal_plotters = [
             FailingPlotter(executor=motion_server.executor),
@@ -1007,7 +1011,7 @@ class TestStateFeedback:
     """
 
     def test_the_last_feedback_carries_the_tick_the_goal_ended_on(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ) -> None:
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1029,7 +1033,7 @@ class TestGoalStructureFeedback:
     """
 
     def test_the_structure_is_published_before_the_first_control_cycle(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         watcher = FeedbackCountingSynchronizer(
             world=motion_server.executor.context.world,
@@ -1045,7 +1049,7 @@ class TestGoalStructureFeedback:
         assert StatechartPayloadKey.STATECHART in first_feedback
 
     def test_the_structure_is_published_once_per_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1059,7 +1063,7 @@ class TestGoalStructureFeedback:
         assert len(structures) == 1
 
     def test_every_goal_publishes_its_own_structure(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
         motion_server.motion_server.run_idle_cycle()
@@ -1083,7 +1087,7 @@ class TestStateChangeAnnouncement:
     observer of the world, so it is only worth doing when an input wrote something.
     """
 
-    def test_nothing_is_announced_when_no_input_wrote(self, init_background_node):
+    def test_nothing_is_announced_when_no_input_wrote(self, *, init_background_node):
         world = World()
         inputs = WorldStateInputs(world=world, synchronizers=[])
         recorder = StateChangeRecorder(_world=world)
@@ -1092,7 +1096,7 @@ class TestStateChangeAnnouncement:
 
         assert recorder.announced_changes == 0
 
-    def test_the_change_is_announced_when_an_input_wrote(self, init_background_node):
+    def test_the_change_is_announced_when_an_input_wrote(self, *, init_background_node):
         world = World()
         inputs = WorldStateInputs(
             world=world, synchronizers=[WritingInputSynchronizer(world=world)]
@@ -1104,7 +1108,7 @@ class TestStateChangeAnnouncement:
         assert recorder.announced_changes == 1
 
     def test_the_state_is_announced_on_request_even_when_no_input_wrote(
-        self, init_background_node
+        self, *, init_background_node
     ):
         """
         The idle loop needs this: nothing else announces while no goal is running, so
@@ -1128,7 +1132,7 @@ class TestControlCycleOrder:
     """
 
     def test_inputs_are_read_before_the_controller_ticks(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1140,7 +1144,7 @@ class TestControlCycleOrder:
         assert applied[-1] == motion_server.executor.tick_count - 1
 
     def test_commands_are_published_once_per_cycle(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1156,7 +1160,7 @@ class TestStopClearsCommands:
     Stopping the control loop leaves no commanded motion behind.
     """
 
-    def test_derivatives_are_zeroed(self, motion_server: MotionServerFixture):
+    def test_derivatives_are_zeroed(self, *, motion_server: MotionServerFixture):
         world = motion_server.executor.context.world
         world.state.velocities[:] = 1
         world.state.accelerations[:] = 1
@@ -1168,7 +1172,7 @@ class TestStopClearsCommands:
         assert not world.state.accelerations.any()
         assert not world.state.jerks.any()
 
-    def test_publishers_are_stopped(self, motion_server: MotionServerFixture):
+    def test_publishers_are_stopped(self, *, motion_server: MotionServerFixture):
         motion_server.control_loop.stop()
 
         assert motion_server.command_publisher.stop_count == 1
@@ -1181,7 +1185,7 @@ class TestRobotIsStoppedOnInterrupt:
     """
 
     def test_the_robot_is_stopped_when_interrupted_while_idle(
-        self, motion_server: MotionServerFixture, monkeypatch: pytest.MonkeyPatch
+        self, *, motion_server: MotionServerFixture, monkeypatch: pytest.MonkeyPatch
     ):
         def raise_keyboard_interrupt() -> None:
             raise KeyboardInterrupt
@@ -1196,7 +1200,7 @@ class TestRobotIsStoppedOnInterrupt:
         assert motion_server.command_publisher.stop_count == 1
 
     def test_the_robot_is_stopped_when_interrupted_during_a_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.control_loop.inputs.synchronizers = [
             InterruptingInputSynchronizer(world=motion_server.executor.context.world)
@@ -1218,14 +1222,14 @@ class TestIdleLoop:
     """
 
     def test_world_updates_of_other_processes_are_applied(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.motion_server.run_idle_cycle()
 
         assert motion_server.world_updates.applied_batches == 1
 
     def test_the_state_change_is_announced_to_the_observers_of_the_world(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         The idle loop hands the published state to the world callbacks instead of
@@ -1237,13 +1241,13 @@ class TestIdleLoop:
 
         assert recorder.announced_changes == 1
 
-    def test_inputs_are_read(self, motion_server: MotionServerFixture):
+    def test_inputs_are_read(self, *, motion_server: MotionServerFixture):
         motion_server.motion_server.run_idle_cycle()
 
         assert len(motion_server.idle_input.applied_at_control_cycles) == 1
 
     def test_one_cycle_is_counted_per_idle_cycle(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.motion_server.run_idle_cycle()
         motion_server.motion_server.run_idle_cycle()
@@ -1251,7 +1255,7 @@ class TestIdleLoop:
         assert motion_server.cycle_counter.completed_cycles == 2
 
     def test_nothing_happens_while_the_world_is_being_modified(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         with motion_server.executor.context.world.modify_world():
             motion_server.motion_server.run_idle_cycle()
@@ -1266,7 +1270,9 @@ class TestCycleCountingDuringGoals:
     the server to make progress is never blocked by a motion that only ends on cancel.
     """
 
-    def test_cycles_are_counted_during_a_goal(self, motion_server: MotionServerFixture):
+    def test_cycles_are_counted_during_a_goal(
+        self, *, motion_server: MotionServerFixture
+    ):
         motion_server.action_server.goal_json = create_goal_json()
         cycles_before_goal = motion_server.cycle_counter.completed_cycles
 
@@ -1280,7 +1286,7 @@ class TestCycleCountingDuringGoals:
         )
 
     def test_cycles_are_counted_while_a_goal_never_ends_on_its_own(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         A goal without an end motion only stops on cancel; an observer must still see
@@ -1309,7 +1315,7 @@ class TestWorldUpdatesDuringGoals:
     """
 
     def test_state_updates_are_applied_once_per_control_cycle(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1322,7 +1328,7 @@ class TestWorldUpdatesDuringGoals:
         )
 
     def test_the_whole_buffer_is_not_applied_while_a_goal_runs(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1331,7 +1337,7 @@ class TestWorldUpdatesDuringGoals:
         assert motion_server.world_updates.applied_batches == 1
 
     def test_a_pending_model_change_terminates_the_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         inject_modification = PendingModelChangeInjector(
             world=motion_server.executor.context.world,
@@ -1348,7 +1354,7 @@ class TestWorldUpdatesDuringGoals:
         assert control_cycles < 10, "the goal ran on instead of terminating promptly"
 
     def test_the_buffered_modification_is_applied_by_the_next_idle_cycle(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         inject_modification = PendingModelChangeInjector(
             world=motion_server.executor.context.world,
@@ -1375,7 +1381,7 @@ class TestWaitingForTheWorldOfTheClient:
     """
 
     def test_a_goal_that_requires_nothing_is_not_delayed(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json()
 
@@ -1385,7 +1391,7 @@ class TestWaitingForTheWorldOfTheClient:
         assert motion_server.world_updates.awaited_positions == []
 
     def test_a_goal_waits_until_the_change_it_requires_arrived(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         position = StreamPosition(
             origin=MetaData(node_name="client", process_id=1), sequence_number=4
@@ -1402,7 +1408,7 @@ class TestWaitingForTheWorldOfTheClient:
         assert motion_server.world_updates.applied_batches == 3
 
     def test_the_goal_is_not_compiled_before_the_change_arrived(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         Compiling resolves the entities the goal refers to against the world, so a goal
@@ -1425,7 +1431,7 @@ class TestWaitingForTheWorldOfTheClient:
         )
 
     def test_a_change_that_never_arrives_aborts_the_goal(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.motion_server.world_update_timeout = 0.2
         motion_server.action_server.goal_json = create_goal_json(
@@ -1454,7 +1460,7 @@ class TestClientDisconnect:
     """
 
     def test_a_goal_whose_client_leaves_mid_motion_is_aborted(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json(
             seconds=1000.0, client=motion_server.client
@@ -1476,7 +1482,7 @@ class TestClientDisconnect:
         assert error.client == motion_server.client
 
     def test_a_goal_whose_client_announces_itself_mid_motion_is_aborted_when_it_leaves(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         A client's first heartbeat can arrive after its goal was accepted, and that goal
@@ -1503,7 +1509,7 @@ class TestClientDisconnect:
         assert error.client == late_client
 
     def test_the_robot_is_stopped_when_its_client_leaves(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json(
             seconds=1000.0, client=motion_server.client
@@ -1521,7 +1527,7 @@ class TestClientDisconnect:
         assert motion_server.command_publisher.stop_count == 1
 
     def test_a_goal_whose_client_stays_runs_to_its_end(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         motion_server.action_server.goal_json = create_goal_json(
             client=motion_server.client
@@ -1532,7 +1538,7 @@ class TestClientDisconnect:
         assert motion_server.action_server.outcome == GoalOutcome.SUCCEEDED
 
     def test_a_goal_from_a_client_nothing_recognizes_runs_to_its_end(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         A client Giskard cannot see is not a client that left.
@@ -1544,7 +1550,7 @@ class TestClientDisconnect:
         assert motion_server.action_server.outcome == GoalOutcome.SUCCEEDED
 
     def test_a_finished_goal_stops_being_watched(
-        self, motion_server: MotionServerFixture
+        self, *, motion_server: MotionServerFixture
     ):
         """
         The client of a finished goal may leave whenever it wants, and the next goal

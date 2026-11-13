@@ -21,7 +21,7 @@ from giskardpy.middleware.ros2.exceptions import StateUpdateAheadOfStatechartErr
 # %% the states Giskard reports
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartStateUpdate:
     """
     The state of every node of a running goal at one tick, as Giskard reported it.
@@ -53,7 +53,7 @@ class StatechartStateUpdate:
     """
 
     @classmethod
-    def from_json(cls, payload: dict[str, Any], statechart: Statechart) -> Self:
+    def from_json(cls, *, payload: dict[str, Any], statechart: Statechart) -> Self:
         """
         :param payload: The feedback or result of a goal, as Giskard sent it.
         :param statechart: The client's copy of the statechart of the goal.

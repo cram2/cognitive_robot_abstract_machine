@@ -29,7 +29,7 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% standalone giskard
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardTester(ABC):
     """
     A standalone Giskard with a motion server running in the background and a client
@@ -51,7 +51,7 @@ class GiskardTester(ABC):
         self.giskard.setup()
         self.default_root = self.world.root
         self.giskard.motion_server.start_in_background()
-        self.wait_for_cycles(1)
+        self.wait_for_cycles(number_of_cycles=1)
         self.api = GiskardClientExecutorNode(node_name="tests")
 
     @abstractmethod
@@ -75,7 +75,7 @@ class GiskardTester(ABC):
         robot = self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
         return isinstance(robot.drive, OmniDrive)
 
-    def wait_for_cycles(self, number_of_cycles: int = 5) -> None:
+    def wait_for_cycles(self, *, number_of_cycles: int = 5) -> None:
         """
         Block until the motion server completed that many more cycles.
 
@@ -108,6 +108,7 @@ class GiskardTester(ABC):
 
     def add_box_to_world(
         self,
+        *,
         name: str,
         size: tuple[float, float, float],
         pose: HomogeneousTransformationMatrix,
@@ -143,6 +144,7 @@ class GiskardTester(ABC):
 
     def add_urdf_to_world(
         self,
+        *,
         name: str,
         file_path: str,
         pose: HomogeneousTransformationMatrix,

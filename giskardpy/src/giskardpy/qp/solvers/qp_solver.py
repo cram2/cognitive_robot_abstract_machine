@@ -10,9 +10,8 @@ from giskardpy.qp.qp_data import QPDataExplicit, QPDataTwoSidedInequality
 T = TypeVar("T", QPDataExplicit, QPDataTwoSidedInequality)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPSolver(Generic[T]):
-
     @classmethod
     def qp_data_type(cls) -> type[T]:
         """
@@ -20,10 +19,10 @@ class QPSolver(Generic[T]):
         """
         return get_args(cls.__orig_bases__[0])[0]
 
-    def solver_call(self, qp_data: T) -> np.ndarray:
+    def solver_call(self, *, qp_data: T) -> np.ndarray:
         raise NotImplementedError()
 
-    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
+    def solver_call_explicit_interface(self, *, qp_data: QPDataExplicit) -> np.ndarray:
         """
         min_x 0.5 x^T H x + g^T x s.t.
 

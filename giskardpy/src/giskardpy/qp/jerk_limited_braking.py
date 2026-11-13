@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from datetime import timedelta
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class JerkLimitedBraking:
     """
     Braking of a degree of freedom from its velocity limit to rest with bounded jerk, on
@@ -41,7 +41,7 @@ class JerkLimitedBraking:
 
     @classmethod
     def from_braking_time(
-        cls, velocity_limit: float, braking_time: timedelta, time_step: timedelta
+        cls, *, velocity_limit: float, braking_time: timedelta, time_step: timedelta
     ) -> JerkLimitedBraking:
         """
         Creates the braking whose jerk limit brings a continuous, jerk-limited braking
@@ -60,7 +60,7 @@ class JerkLimitedBraking:
 
     @classmethod
     def number_of_steps_for_braking_time(
-        cls, braking_time: timedelta, time_step: timedelta
+        cls, *, braking_time: timedelta, time_step: timedelta
     ) -> int:
         """
         Returns the number of steps a braking created by :meth:`from_braking_time`
@@ -73,9 +73,13 @@ class JerkLimitedBraking:
         :param time_step: Duration of a single step of the grid.
         :return: Number of steps the braking needs.
         """
-        return cls._smallest_number_of_steps((braking_time / time_step) ** 2 / 4)
+        return cls._smallest_number_of_steps(
+            velocity_in_jerk_steps=(braking_time / time_step) ** 2 / 4
+        )
 
-    def limited_to_acceleration(self, acceleration_limit: float) -> JerkLimitedBraking:
+    def limited_to_acceleration(
+        self, *, acceleration_limit: float
+    ) -> JerkLimitedBraking:
         """
         Returns this braking with its jerk limit lowered, where needed, so that its
         acceleration stays within ``acceleration_limit``.
@@ -101,12 +105,12 @@ class JerkLimitedBraking:
         Smallest number of steps in which the braking reaches rest.
         """
         return self._smallest_number_of_steps(
-            self.velocity_limit
+            velocity_in_jerk_steps=self.velocity_limit
             / (self.jerk_limit * self.time_step.total_seconds() ** 2)
         )
 
     @classmethod
-    def _smallest_number_of_steps(cls, velocity_in_jerk_steps: float) -> int:
+    def _smallest_number_of_steps(cls, *, velocity_in_jerk_steps: float) -> int:
         """
         Returns the smallest number of steps that removes the given velocity, expressed
         in units of ``jerk_limit * time_step**2``.
@@ -117,12 +121,15 @@ class JerkLimitedBraking:
         """
         required = velocity_in_jerk_steps * (1 - cls.relative_tolerance)
         number_of_steps = 0
-        while cls._removable_velocity_in_jerk_steps(number_of_steps) < required:
+        while (
+            cls._removable_velocity_in_jerk_steps(number_of_steps=number_of_steps)
+            < required
+        ):
             number_of_steps += 1
         return number_of_steps
 
     @staticmethod
-    def _removable_velocity_in_jerk_steps(number_of_steps: int) -> int:
+    def _removable_velocity_in_jerk_steps(*, number_of_steps: int) -> int:
         """
         Returns the largest velocity that ``number_of_steps`` steps remove, in units of
         ``jerk_limit * time_step**2``.

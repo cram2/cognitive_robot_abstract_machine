@@ -12,7 +12,7 @@ from cramph.statechart import Statechart
 # %% the payload of a motion goal
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionGoal(SubclassJSONSerializer):
     """
     What a client asks Giskard to execute, together with the change of the world the
@@ -50,6 +50,7 @@ class MotionGoal(SubclassJSONSerializer):
     @classmethod
     def for_motion_statechart(
         cls,
+        *,
         motion_statechart: Statechart,
         client: MetaData,
         required_position: StreamPosition | None = None,

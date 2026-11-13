@@ -38,7 +38,7 @@ class QPSolverQPalm(QPSolver[QPDataTwoSidedInequality]):
     settings.eps_rel = 1e-8
     settings.nonconvex = False
 
-    def solver_call(self, qp_data: QPDataTwoSidedInequality) -> np.ndarray:
+    def solver_call(self, *, qp_data: QPDataTwoSidedInequality) -> np.ndarray:
         data = qpalm.Data(
             qp_data.inequality_matrix.shape[1], qp_data.inequality_matrix.shape[0]
         )
@@ -56,5 +56,5 @@ class QPSolverQPalm(QPSolver[QPDataTwoSidedInequality]):
             )
         return solver.solution.x
 
-    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
-        return self.solver_call(qp_data.to_two_sided_inequality())
+    def solver_call_explicit_interface(self, *, qp_data: QPDataExplicit) -> np.ndarray:
+        return self.solver_call(qp_data=qp_data.to_two_sided_inequality())

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 from cramph.exceptions import StatechartError, NodeInitializationError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionViolatedError(DataclassException):
     """
     Raised when bodies came closer to each other than their collision threshold allows.

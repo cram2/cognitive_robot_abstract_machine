@@ -54,7 +54,7 @@ from .test_world_updates import PublishingSynchronizerMimic
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionServerRunningOneGoal:
     """
     Stands in for the action server while one goal runs.
@@ -70,11 +70,11 @@ class ActionServerRunningOneGoal:
     Every feedback message that was sent.
     """
 
-    def send_feedback(self, message: Any) -> None:
+    def send_feedback(self, *, message: Any) -> None:
         self.sent_feedback.append(message)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdatesCaughtUpOnDemand:
     """
     Stands in for the incoming world updates, catching up with a client when told to.
@@ -85,7 +85,7 @@ class WorldUpdatesCaughtUpOnDemand:
     Whether every position asked about counts as applied.
     """
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
         return self.caught_up
 
 
@@ -234,7 +234,7 @@ def _node_succeeding_at_once(name: str) -> NodeSucceedingOnObservingTrue:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TwoChoosingNodes:
     """
     A statechart in which the choosing node with the higher index starts first.
@@ -261,7 +261,7 @@ class TwoChoosingNodes:
     """
 
     @classmethod
-    def in_context(cls, context: StatechartContext) -> TwoChoosingNodes:
+    def in_context(cls, *, context: StatechartContext) -> TwoChoosingNodes:
         """
         :param context: The context the statechart is built in.
         """
@@ -279,7 +279,7 @@ class TwoChoosingNodes:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientAndRunningStatechart:
     """
     A client holding a copy of a statechart that runs elsewhere, and the two ends of the
@@ -364,7 +364,7 @@ class ClientAndRunningStatechart:
         self.executor.context.add_extension(
             extension=ChildChooserAccess(choosers=[self.receiving_chooser])
         )
-        self.running = TwoChoosingNodes.in_context(self.executor.context)
+        self.running = TwoChoosingNodes.in_context(context=self.executor.context)
         self.outgoing_world_updates = OutgoingWorldUpdates(
             world_synchronizer=self.running_side_publications
         )
@@ -378,7 +378,7 @@ class ClientAndRunningStatechart:
         client_context.add_extension(
             extension=ChildChooserAccess(choosers=[self.client_chooser])
         )
-        self.copy = TwoChoosingNodes.in_context(client_context)
+        self.copy = TwoChoosingNodes.in_context(context=client_context)
         self.client = ChildChoiceClient(
             statechart=self.copy.statechart,
             child_chooser_access=ChildChooserAccess(choosers=[self.client_chooser]),
@@ -414,10 +414,10 @@ class ClientAndRunningStatechart:
         feedback[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         sent_choices = [
             ChildChoiceMessage.from_json(data=json.loads(json.dumps(choice.to_json())))
-            for choice in self.client.answer(json.loads(json.dumps(feedback)))
+            for choice in self.client.answer(feedback=json.loads(json.dumps(feedback)))
         ]
         for choice in sent_choices:
-            self.receiving_chooser.receive(choice)
+            self.receiving_chooser.receive(message=choice)
         return sent_choices
 
     def let_both_nodes_be_answered_before_any_choice_is_taken(self) -> None:
@@ -497,7 +497,7 @@ def test_a_choice_skipping_nodes_the_statechart_never_got_is_rejected(
 ) -> None:
     waiting_node = exchange.running.starting_first
     exchange.receiving_chooser.receive(
-        ChildChoiceMessage(
+        message=ChildChoiceMessage(
             goal_id=exchange.action_server.goal_id,
             node_index=waiting_node.index,
             first_node_index=len(exchange.running.statechart.nodes) + 1,
@@ -608,7 +608,7 @@ def test_a_client_catching_up_just_behind_the_running_side_keeps_waiting(
         exchange.running_side_publications.publish_one_update()
         assert exchange.let_the_client_answer() == []
         exchange.let_the_client_catch_up()
-        clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+        clock.advance(seconds=exchange.client_world_updates.timeout.total_seconds() / 2)
 
     [answer] = exchange.let_the_client_answer()
 
@@ -623,10 +623,10 @@ def test_a_change_that_never_reaches_the_client_is_reported_while_later_ones_fol
     exchange.running_side_publications.publish_one_update()
     lost_change = exchange.running_side_publications.published_sequence_number
     exchange.let_the_client_answer()
-    clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+    clock.advance(seconds=exchange.client_world_updates.timeout.total_seconds() / 2)
     exchange.running_side_publications.publish_one_update()
     exchange.let_the_client_answer()
-    clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+    clock.advance(seconds=exchange.client_world_updates.timeout.total_seconds() / 2)
     exchange.running_side_publications.publish_one_update()
 
     with pytest.raises(GiskardWorldUpdateNotReceivedError) as raised:

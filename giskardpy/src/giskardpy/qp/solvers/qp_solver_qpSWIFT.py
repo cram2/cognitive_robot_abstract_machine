@@ -18,9 +18,8 @@ class QPSWIFTExitFlags(IntEnum):
     ERROR = 3  # Unknown Problem in Solver
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPSolverQPSwift(QPSolver[QPDataExplicit]):
-
     big_ball_mode: bool = False
     """
     QpSWIFT does not have infeasible detection and cannot differentiate suboptimal from
@@ -40,7 +39,7 @@ class QPSolverQPSwift(QPSolver[QPDataExplicit]):
         "VERBOSE": 0,  # 0 = no print; 1 = print
     }
 
-    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
+    def solver_call_explicit_interface(self, *, qp_data: QPDataExplicit) -> np.ndarray:
         result = qpSWIFT.solve_sparse_H_diag(
             H=qp_data.quadratic_weights,
             g=qp_data.linear_weights,

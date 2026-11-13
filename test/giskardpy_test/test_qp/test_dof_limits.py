@@ -47,7 +47,7 @@ def _default_config() -> QPControllerConfig:
 
 
 def _profiler() -> DegreeOfFreedomLimitProfiler:
-    return DegreeOfFreedomLimitProfiler(_default_config())
+    return DegreeOfFreedomLimitProfiler(qp_controller_config=_default_config())
 
 
 def _single_dof(world: World) -> DegreeOfFreedom:
@@ -73,7 +73,7 @@ def _directional_bounds_at(
     """
     world.controlled_connections[0].position = position
     degree_of_freedom = _single_dof(world)
-    limits = profiler.resolve_limits(degree_of_freedom)
+    limits = profiler.resolve_limits(degree_of_freedom=degree_of_freedom)
     lower_limits, upper_limits = limits.lower, limits.upper
     time_step = profiler.time_step
     position_range = upper_limits.position - lower_limits.position
@@ -118,7 +118,7 @@ def _horizon_bounds_at(
     its lower position limit.
     """
     degree_of_freedom = _single_dof(world)
-    limits = profiler.resolve_limits(degree_of_freedom)
+    limits = profiler.resolve_limits(degree_of_freedom=degree_of_freedom)
     state = world.state[degree_of_freedom.id]
     state.position = limits.lower.position + distance_to_lower_limit
     state.velocity = velocity
@@ -140,7 +140,7 @@ def _horizon_bounds_at(
 
 
 def test_resolve_limits_with_position_limits(prismatic_bot):
-    limits = _profiler().resolve_limits(_single_dof(prismatic_bot))
+    limits = _profiler().resolve_limits(degree_of_freedom=_single_dof(prismatic_bot))
 
     assert limits.upper.position == POSITION_LIMIT
     assert limits.lower.position == -POSITION_LIMIT
@@ -149,7 +149,9 @@ def test_resolve_limits_with_position_limits(prismatic_bot):
 
 
 def test_resolve_limits_without_position_limits(prismatic_world_no_position_limits):
-    limits = _profiler().resolve_limits(_single_dof(prismatic_world_no_position_limits))
+    limits = _profiler().resolve_limits(
+        degree_of_freedom=_single_dof(prismatic_world_no_position_limits)
+    )
 
     assert limits.lower.position is None
     assert limits.upper.position is None
@@ -166,7 +168,7 @@ def test_jerk_relaxed_steps_follow_the_highest_optimized_derivative(
     max_derivative, number_of_jerk_relaxed_steps
 ):
     profiler = DegreeOfFreedomLimitProfiler(
-        QPControllerConfig(
+        qp_controller_config=QPControllerConfig(
             target_frequency=TARGET_FREQUENCY, max_derivative=max_derivative
         )
     )
@@ -184,7 +186,9 @@ def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
     config = QPControllerConfig(target_frequency=target_frequency)
     degree_of_freedom = _single_dof(prismatic_bot)
 
-    limits = DegreeOfFreedomLimitProfiler(config).resolve_limits(degree_of_freedom)
+    limits = DegreeOfFreedomLimitProfiler(qp_controller_config=config).resolve_limits(
+        degree_of_freedom=degree_of_freedom
+    )
 
     expected_jerk_limit = (
         4
@@ -197,7 +201,7 @@ def test_derived_jerk_limit_follows_the_braking_time_at_every_control_frequency(
 def test_declared_jerk_limit_is_kept(prismatic_bot_with_jerk_limit):
     degree_of_freedom = _single_dof(prismatic_bot_with_jerk_limit)
 
-    limits = _profiler().resolve_limits(degree_of_freedom)
+    limits = _profiler().resolve_limits(degree_of_freedom=degree_of_freedom)
 
     assert limits.upper.jerk == degree_of_freedom.limits.upper.jerk
 
@@ -248,7 +252,7 @@ def test_declared_acceleration_limit_caps_the_jerk_limit(
     velocity_limit = degree_of_freedom.limits.upper.velocity
     acceleration_limit = degree_of_freedom.limits.upper.acceleration
 
-    limits = _profiler().resolve_limits(degree_of_freedom)
+    limits = _profiler().resolve_limits(degree_of_freedom=degree_of_freedom)
 
     assert limits.upper.jerk == pytest.approx(
         acceleration_limit**2 / (2 * velocity_limit)
@@ -328,7 +332,9 @@ def test_joint_goal_respects_the_declared_acceleration_limit(
 
 
 def test_unconstrained_velocity_bounds_are_flat():
-    bounds = VelocityBoundProfiles.unconstrained(VELOCITY_LIMIT, PREDICTION_HORIZON)
+    bounds = VelocityBoundProfiles.unconstrained(
+        velocity_limit=VELOCITY_LIMIT, prediction_horizon=PREDICTION_HORIZON
+    )
 
     assert np.allclose(bounds.upper_bound.evaluate(), VELOCITY_LIMIT)
     assert np.allclose(bounds.lower_bound.evaluate(), -VELOCITY_LIMIT)
@@ -381,17 +387,25 @@ def test_relax_jerk_on_initial_steps_relaxes_only_when_needed():
 
 def test_detect_velocity_bound_violation():
     number_of_steps = 5
-    bounds = VelocityBoundProfiles.unconstrained(VELOCITY_LIMIT, number_of_steps)
+    bounds = VelocityBoundProfiles.unconstrained(
+        velocity_limit=VELOCITY_LIMIT, prediction_horizon=number_of_steps
+    )
     epsilon = 1e-5
 
     inside = sm.Vector([0.0] * number_of_steps)
-    assert not _truth_value(bounds.is_violated_by(inside, epsilon))
+    assert not _truth_value(
+        bounds.is_violated_by(velocity_profile=inside, epsilon=epsilon)
+    )
 
     exceeds_upper = sm.Vector([2 * VELOCITY_LIMIT] + [0.0] * (number_of_steps - 1))
-    assert _truth_value(bounds.is_violated_by(exceeds_upper, epsilon))
+    assert _truth_value(
+        bounds.is_violated_by(velocity_profile=exceeds_upper, epsilon=epsilon)
+    )
 
     nonzero_terminal = sm.Vector([0.0] * (number_of_steps - 1) + [VELOCITY_LIMIT / 2])
-    assert _truth_value(bounds.is_violated_by(nonzero_terminal, epsilon))
+    assert _truth_value(
+        bounds.is_violated_by(velocity_profile=nonzero_terminal, epsilon=epsilon)
+    )
 
 
 def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
@@ -401,7 +415,7 @@ def test_compute_horizon_bounds_flat_at_center(prismatic_bot):
 
     horizon_limits = profiler.compute_horizon_bounds(
         degree_of_freedom_symbols=degree_of_freedom.variables,
-        limits=profiler.resolve_limits(degree_of_freedom),
+        limits=profiler.resolve_limits(degree_of_freedom=degree_of_freedom),
     )
 
     assert np.allclose(
@@ -422,10 +436,12 @@ def test_final_braking_step_uses_exactly_the_jerk_limit(prismatic_bot):
     as narrow as a solver's tolerance.
     """
     profiler = DegreeOfFreedomLimitProfiler(
-        QPControllerConfig.create_with_simulation_defaults()
+        qp_controller_config=QPControllerConfig.create_with_simulation_defaults()
     )
     time_step = profiler.time_step.total_seconds()
-    upper_limits = profiler.resolve_limits(_single_dof(prismatic_bot)).upper
+    upper_limits = profiler.resolve_limits(
+        degree_of_freedom=_single_dof(prismatic_bot)
+    ).upper
     jerk_step = upper_limits.jerk * time_step**2
     approaching = _horizon_bounds_at(
         profiler, prismatic_bot, distance_to_lower_limit=0.01, velocity=-jerk_step
@@ -480,7 +496,9 @@ def _first_jerk_weight(world: World) -> float:
     """
     config = _default_config()
     degree_of_freedom = _single_dof(world)
-    config.set_dof_weight(degree_of_freedom.name, Derivatives.jerk, JERK_WEIGHT)
+    config.set_dof_weight(
+        dof_name=degree_of_freedom.name, derivative=Derivatives.jerk, weight=JERK_WEIGHT
+    )
     limits = DegreeOfFreedomDecisionVariables(
         degrees_of_freedom=world.active_degrees_of_freedom,
         qp_controller_config=config,

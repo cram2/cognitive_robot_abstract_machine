@@ -23,7 +23,12 @@ def test_removable_velocity_is_a_triangular_acceleration_ramp(number_of_steps):
         min(step, number_of_steps + 1 - step) for step in range(1, number_of_steps + 1)
     )
 
-    assert JerkLimitedBraking._removable_velocity_in_jerk_steps(number_of_steps) == tent
+    assert (
+        JerkLimitedBraking._removable_velocity_in_jerk_steps(
+            number_of_steps=number_of_steps
+        )
+        == tent
+    )
 
 
 # %% number of braking steps
@@ -42,10 +47,10 @@ def test_number_of_steps_is_the_fewest_that_remove_the_velocity(
     jerk_step = jerk_limit * time_step.total_seconds() ** 2
 
     removable = JerkLimitedBraking._removable_velocity_in_jerk_steps(
-        braking.number_of_steps
+        number_of_steps=braking.number_of_steps
     )
     removable_with_one_step_less = JerkLimitedBraking._removable_velocity_in_jerk_steps(
-        braking.number_of_steps - 1
+        number_of_steps=braking.number_of_steps - 1
     )
 
     assert removable * jerk_step >= velocity_limit * (
@@ -66,7 +71,9 @@ def test_braking_that_exactly_fills_its_steps_needs_no_extra_step(
     velocity_limit = 1.0
     jerk_limit = velocity_limit / (
         time_step.total_seconds() ** 2
-        * JerkLimitedBraking._removable_velocity_in_jerk_steps(number_of_steps)
+        * JerkLimitedBraking._removable_velocity_in_jerk_steps(
+            number_of_steps=number_of_steps
+        )
     )
     braking = JerkLimitedBraking(
         velocity_limit=velocity_limit, jerk_limit=jerk_limit, time_step=time_step
@@ -134,7 +141,9 @@ def test_braking_time_of_a_whole_number_of_steps_needs_exactly_those_steps(
         2
         * (time_step / timedelta.resolution)
         * math.sqrt(
-            JerkLimitedBraking._removable_velocity_in_jerk_steps(number_of_steps)
+            JerkLimitedBraking._removable_velocity_in_jerk_steps(
+                number_of_steps=number_of_steps
+            )
         )
     )
     braking_time = timedelta.resolution * math.floor(braking_time_in_resolution_units)
@@ -172,7 +181,7 @@ def test_acceleration_limit_lowers_a_jerk_limit_that_would_exceed_it(
     )
     acceleration_limit = _peak_acceleration_of_a_reversal(braking) / 2
 
-    limited = braking.limited_to_acceleration(acceleration_limit)
+    limited = braking.limited_to_acceleration(acceleration_limit=acceleration_limit)
 
     assert _peak_acceleration_of_a_reversal(limited) == pytest.approx(
         acceleration_limit
@@ -189,4 +198,7 @@ def test_acceleration_limit_keeps_a_jerk_limit_that_stays_within_it():
     )
     acceleration_limit = _peak_acceleration_of_a_reversal(braking) * 2
 
-    assert braking.limited_to_acceleration(acceleration_limit) == braking
+    assert (
+        braking.limited_to_acceleration(acceleration_limit=acceleration_limit)
+        == braking
+    )

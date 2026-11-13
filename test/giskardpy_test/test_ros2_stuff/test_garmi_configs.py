@@ -31,7 +31,7 @@ def test_garmi_giskard_weights_the_velocity_of_its_base(init_background_node):
     for degree_of_freedom in drive.active_dofs:
         assert (
             giskard.qp_controller_config.get_degree_of_freedom_weight(
-                degree_of_freedom.name, Derivatives.velocity
+                dof_name=degree_of_freedom.name, derivative=Derivatives.velocity
             )
             == giskard.base_velocity_weight
         )

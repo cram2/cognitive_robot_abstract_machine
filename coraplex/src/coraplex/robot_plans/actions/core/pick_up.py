@@ -114,7 +114,9 @@ class ReachAction(
         if self.open_gripper_at_pre_pose:
             children.append(
                 self.gripper_goal_type.moving_gripper_to(
-                    self.arm.end_effector.default_configuration(GripperState.OPEN)
+                    configuration=self.arm.end_effector.default_configuration(
+                        GripperState.OPEN
+                    )
                 )
             )
         children.append(
@@ -265,7 +267,7 @@ class GraspingAction(
             ),
             self.closing_step(
                 self.gripper_goal_type.moving_gripper_to(
-                    self.arm.end_effector.default_configuration(
+                    configuration=self.arm.end_effector.default_configuration(
                         GripperState.CLOSE, finger_velocity=self.grasp_closing_velocity
                     ),
                     stall_minimum_time=self.grasp_stall_minimum_time,

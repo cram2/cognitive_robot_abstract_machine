@@ -20,7 +20,7 @@ from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GarmiGiskard(Giskard):
     """
     Giskard for GARMI, with the velocity of its base weighted by
@@ -43,7 +43,9 @@ class GarmiGiskard(Giskard):
         drive = self.world.get_connections_by_type(OmniDrive)[0]
         for degree_of_freedom in drive.active_dofs:
             self.qp_controller_config.set_dof_weight(
-                degree_of_freedom.name, Derivatives.velocity, self.base_velocity_weight
+                dof_name=degree_of_freedom.name,
+                derivative=Derivatives.velocity,
+                weight=self.base_velocity_weight,
             )
 
 

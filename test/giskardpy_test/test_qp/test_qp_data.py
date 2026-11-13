@@ -417,71 +417,71 @@ def feasible_qp_with_a_loose_infeasibility_certificate() -> QPDataExplicit:
 
 def test_qp_data_inequality(simple_inequality_qp):
     qp_data, expected = simple_inequality_qp
-    result = QPSolverPIQP().solver_call(qp_data)
+    result = QPSolverPIQP().solver_call(qp_data=qp_data)
     assert np.allclose(result, expected)
 
 
 def test_qp_data_simple_eq_as_inequality_qp(simple_eq_as_inequality_qp):
     qp_data, expected = simple_eq_as_inequality_qp
-    result = QPSolverPIQP().solver_call(qp_data)
+    result = QPSolverPIQP().solver_call(qp_data=qp_data)
     assert np.allclose(result, expected)
 
 
 def test_pretty_print(simple_inequality_qp):
     qp_data, expected = simple_inequality_qp
     qp = eval(qp_data.pretty_print_problem())
-    result = QPSolverPIQP().solver_call(qp)
+    result = QPSolverPIQP().solver_call(qp_data=qp)
     assert np.allclose(result, expected)
 
 
 def test_qp_data_equality(simple_equality_qp):
     qp_data, expected = simple_equality_qp
-    result = QPSolverPIQP().solver_call(qp_data)
+    result = QPSolverPIQP().solver_call(qp_data=qp_data)
     assert np.allclose(result, expected)
 
 
 def test_qp_data_box_constraints(box_constraints_qp):
     qp_data, expected = box_constraints_qp
-    result = QPSolverPIQP().solver_call(qp_data)
+    result = QPSolverPIQP().solver_call(qp_data=qp_data)
     assert np.allclose(result, expected)
 
 
 def test_qp_data_linear_weights(linear_weights_qp):
     qp_data, expected = linear_weights_qp
-    result = QPSolverPIQP().solver_call(qp_data)
+    result = QPSolverPIQP().solver_call(qp_data=qp_data)
     assert np.allclose(result, expected)
 
 
 def test_qp_data_larger_qp(larger_qp):
     qp_data, expected = larger_qp
-    result = QPSolverPIQP().solver_call(qp_data)
+    result = QPSolverPIQP().solver_call(qp_data=qp_data)
     assert np.allclose(result, expected, atol=1e-5)
 
 
 def test_sadness_qp_raw(sadness_qp_raw):
     qp_data = sadness_qp_raw
-    QPSolverPIQP().solver_call(qp_data)
+    QPSolverPIQP().solver_call(qp_data=qp_data)
 
 
 def test_sadness_qp17(sadness_qp17):
     qp_data = sadness_qp17
-    QPSolverPIQP().solver_call(qp_data)
+    QPSolverPIQP().solver_call(qp_data=qp_data)
 
 
 def test_sadness_qp21(sadness_qp21):
     qp_data = sadness_qp21
-    QPSolverPIQP().solver_call(qp_data)
+    QPSolverPIQP().solver_call(qp_data=qp_data)
 
 
 def test_goal_pushing_into_position_limit_qp(goal_pushing_into_position_limit_qp):
     qp_data = goal_pushing_into_position_limit_qp
-    QPSolverPIQP().solver_call(qp_data)
+    QPSolverPIQP().solver_call(qp_data=qp_data)
 
 
 def test_nearly_parallel_active_rows_qp(nearly_parallel_active_rows_qp):
     qp_data = nearly_parallel_active_rows_qp
 
-    solution = QPSolverPIQP().solver_call(qp_data)
+    solution = QPSolverPIQP().solver_call(qp_data=qp_data)
 
     assert np.all(solution >= qp_data.box_lower_constraints - CONSTRAINT_TOLERANCE)
     assert np.all(solution <= qp_data.box_upper_constraints + CONSTRAINT_TOLERANCE)
@@ -499,7 +499,7 @@ def test_a_loose_infeasibility_certificate_does_not_reject_a_feasible_qp(
     """
     qp_data = feasible_qp_with_a_loose_infeasibility_certificate
 
-    solution = QPSolverPIQP().solver_call(qp_data)
+    solution = QPSolverPIQP().solver_call(qp_data=qp_data)
 
     assert np.all(solution >= qp_data.box_lower_constraints - CONSTRAINT_TOLERANCE)
     assert np.all(solution <= qp_data.box_upper_constraints + CONSTRAINT_TOLERANCE)
@@ -638,7 +638,9 @@ def test_without_variables_drops_the_constraints_left_without_coefficients() -> 
         num_inequality_slack_variables=0,
     )
 
-    reduced = qp_data.without_variables(np.array([True, False, False]))
+    reduced = qp_data.without_variables(
+        removed_variables=np.array([True, False, False])
+    )
 
     assert reduced.quadratic_weights.tolist() == [2.0, 3.0]
     assert reduced.linear_weights.tolist() == [0.2, 0.3]
@@ -656,7 +658,7 @@ def test_without_variables_keeps_matrices_without_constraints(
 ) -> None:
     qp_data, _ = simple_inequality_qp
 
-    reduced = qp_data.without_variables(np.array([True, False]))
+    reduced = qp_data.without_variables(removed_variables=np.array([True, False]))
 
     assert reduced.equality_matrix.shape[0] == 0
     assert reduced.equality_bounds.tolist() == []
@@ -792,7 +794,7 @@ def test_a_problem_in_any_format_can_be_reported_as_unsolvable(
     two_sided = qp_data.to_two_sided_inequality()
 
     with caplog.at_level(logging.WARNING):
-        QPController.report_unsolvable_problem(two_sided)
+        QPController.report_unsolvable_problem(qp_data=two_sided)
 
     assert type(two_sided).__name__ in caplog.text
 
@@ -801,7 +803,7 @@ def test_an_explicit_problem_is_reported_in_full(simple_inequality_qp, caplog):
     qp_data, _ = simple_inequality_qp
 
     with caplog.at_level(logging.WARNING):
-        QPController.report_unsolvable_problem(qp_data)
+        QPController.report_unsolvable_problem(qp_data=qp_data)
 
     assert qp_data.pretty_print_problem() in caplog.text
 

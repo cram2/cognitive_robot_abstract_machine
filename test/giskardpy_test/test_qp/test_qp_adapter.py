@@ -280,7 +280,7 @@ def test_integral_strategy_with_equality_constraints(prismatic_bot2):
     bounds = eq_constraint_model.create_equality_bounds()
     slack_variables = eq_constraint_model.create_slack_variables()
     assert bounds[0] == eq_constraint_model.reachable_change_of_constraint(
-        eq_constraint_model.constraints[0]
+        constraint=eq_constraint_model.constraints[0]
     )
     assert slack_variables.quadratic_weights[0] != 0
     assert slack_variables.linear_weights[0] == 0
@@ -365,7 +365,7 @@ def test_integral_strategy_caps_what_an_inequality_demands(prismatic_bot2):
         prismatic_bot2, bounds=[(1, np.inf), (-np.inf, -1)]
     )
     reachable_changes = [
-        strategy.reachable_change_of_constraint(c).to_np().item()
+        strategy.reachable_change_of_constraint(constraint=c).to_np().item()
         for c in strategy.constraints
     ]
 
@@ -504,7 +504,7 @@ def test_qp_data_symbolic(prismatic_bot2):
             target_frequency=20, prediction_horizon=10
         ),
     )
-    adapter = QPDataExplicitFactory(qp_data_symbolic)
+    adapter = QPDataExplicitFactory(qp_data=qp_data_symbolic)
     adapter.compile(
         world_state_symbols=prismatic_bot2.state.get_variables(),
         life_cycle_symbols=[],
@@ -516,7 +516,7 @@ def test_qp_data_symbolic(prismatic_bot2):
         float_variables=np.array([]),
     )
     qp_data_filtered = qp_data.apply_filters()
-    solution = QPSolverPIQP().solver_call(qp_data_filtered)
+    solution = QPSolverPIQP().solver_call(qp_data=qp_data_filtered)
     debugger = QuadraticProgramDebugger(
         qp_data_symbolic=qp_data_symbolic, current_solution=solution
     )
@@ -558,7 +558,7 @@ def _build_qp_data_symbolic(prismatic_bot2) -> QPDataSymbolic:
 
 def test_two_sided_factory_evaluate_returns_fresh_object(prismatic_bot2):
     qp_data_symbolic = _build_qp_data_symbolic(prismatic_bot2)
-    factory = QPDataTwoSidedInequalityFactory(qp_data_symbolic)
+    factory = QPDataTwoSidedInequalityFactory(qp_data=qp_data_symbolic)
     factory.compile(
         world_state_symbols=prismatic_bot2.state.get_variables(),
         life_cycle_symbols=[],
@@ -584,7 +584,7 @@ def test_get_factory_for_unregistered_type_raises():
             return self
 
     with pytest.raises(NoFactoryForQPDataTypeError):
-        QPDataFactory.get_factory_from_qp_data_type(UnregisteredQPData)
+        QPDataFactory.get_factory_from_qp_data_type(qp_data_type=UnregisteredQPData)
 
 
 def test_qp_data_type_is_a_classmethod():

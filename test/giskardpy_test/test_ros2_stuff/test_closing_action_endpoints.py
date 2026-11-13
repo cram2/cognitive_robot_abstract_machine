@@ -30,7 +30,7 @@ from .test_integration_stretch import StretchTester
 # %% the ROS graph as a test sees it
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObservedRosGraph:
     """
     The ROS graph as seen from one node, which takes in a change only after a moment.
@@ -46,7 +46,7 @@ class ObservedRosGraph:
     How long a change may take to show up in the view of :attr:`observer`.
     """
 
-    def served_actions(self, node_name: str) -> list[str]:
+    def served_actions(self, *, node_name: str) -> list[str]:
         """
         :return: The actions the node called ``node_name`` serves.
         """
@@ -57,7 +57,7 @@ class ObservedRosGraph:
             )
         ]
 
-    def client_actions(self, node_name: str) -> list[str]:
+    def client_actions(self, *, node_name: str) -> list[str]:
         """
         :return: The actions the node called ``node_name`` has a client for.
         """
@@ -68,7 +68,7 @@ class ObservedRosGraph:
             )
         ]
 
-    def wait_until(self, condition: Callable[[], bool]) -> None:
+    def wait_until(self, *, condition: Callable[[], bool]) -> None:
         """
         Return once ``condition`` holds or :attr:`settling_time` has passed.
         """
@@ -89,15 +89,22 @@ def test_a_closed_action_server_no_longer_serves_its_action(
         action_name="closed_server/command", action_type=JsonAction
     )
     graph.wait_until(
-        lambda: "/closed_server/command" in graph.served_actions(server_node_name)
+        condition=lambda: (
+            "/closed_server/command" in graph.served_actions(node_name=server_node_name)
+        )
     )
 
     action_server.close()
     graph.wait_until(
-        lambda: "/closed_server/command" not in graph.served_actions(server_node_name)
+        condition=lambda: (
+            "/closed_server/command"
+            not in graph.served_actions(node_name=server_node_name)
+        )
     )
 
-    assert "/closed_server/command" not in graph.served_actions(server_node_name)
+    assert "/closed_server/command" not in graph.served_actions(
+        node_name=server_node_name
+    )
 
 
 # %% closing an action client
@@ -121,30 +128,41 @@ def test_a_closed_action_client_no_longer_uses_its_action(
     graph = ObservedRosGraph(observer=background_node.get_node())
     client_node_name = background_node.get_node().get_name()
     action_client = GiskardActionClient(
-        background_node.get_node(), JsonAction, "closed_client/command"
+        node_handle=background_node.get_node(),
+        action_type=JsonAction,
+        action_name="closed_client/command",
     )
     graph.wait_until(
-        lambda: "/closed_client/command" in graph.client_actions(client_node_name)
+        condition=lambda: (
+            "/closed_client/command" in graph.client_actions(node_name=client_node_name)
+        )
     )
 
     action_client.close()
     graph.wait_until(
-        lambda: "/closed_client/command" not in graph.client_actions(client_node_name)
+        condition=lambda: (
+            "/closed_client/command"
+            not in graph.client_actions(node_name=client_node_name)
+        )
     )
 
-    assert "/closed_client/command" not in graph.client_actions(client_node_name)
+    assert "/closed_client/command" not in graph.client_actions(
+        node_name=client_node_name
+    )
 
 
 def test_a_closed_action_client_refuses_to_send_a_goal(
     closed_client_action_server: ActionServerHandler,
 ) -> None:
     action_client = GiskardActionClient(
-        background_node.get_node(), JsonAction, closed_client_action_server.action_name
+        node_handle=background_node.get_node(),
+        action_type=JsonAction,
+        action_name=closed_client_action_server.action_name,
     )
     action_client.close()
 
     with pytest.raises(ActionClientClosedError):
-        action_client.send_goal(JsonAction.Goal())
+        action_client.send_goal(goal=JsonAction.Goal())
 
 
 # %% closing a Giskard and its client
@@ -163,11 +181,13 @@ def test_a_closed_giskard_and_its_client_leave_the_graph(init_background_node) -
 
     tester.close()
     graph.wait_until(
-        lambda: (
+        condition=lambda: (
             client_node_name not in graph.observer.get_node_names()
-            and not graph.served_actions(giskard_node_name)
+            and not graph.served_actions(node_name=giskard_node_name)
         )
     )
 
     assert client_node_name not in graph.observer.get_node_names()
-    assert f"/{command_action_name}" not in graph.served_actions(giskard_node_name)
+    assert f"/{command_action_name}" not in graph.served_actions(
+        node_name=giskard_node_name
+    )

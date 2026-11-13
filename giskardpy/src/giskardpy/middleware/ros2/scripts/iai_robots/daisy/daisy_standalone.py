@@ -59,9 +59,9 @@ def main() -> None:
     # parse_known_args ignores ROS 2 arguments (--ros-args ...) that argparse does not know about.
     args, _ = parser.parse_known_args()
     if args.interactive_marker:
-        Giskard.launch(create_giskard_with_interactive_markers)
+        Giskard.launch(create_giskard=create_giskard_with_interactive_markers)
     else:
-        Giskard.launch(create_giskard)
+        Giskard.launch(create_giskard=create_giskard)
 
 
 if __name__ == "__main__":

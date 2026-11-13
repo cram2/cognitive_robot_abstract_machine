@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from cramph.statechart import Statechart
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpressionPublisher:
     """
     Visualizes the debug expressions registered by motion statechart nodes.
@@ -30,7 +30,9 @@ class DebugExpressionPublisher:
     """
 
     world: World
-    """The world whose state the debug expressions are evaluated against."""
+    """
+    The world whose state the debug expressions are evaluated against.
+    """
 
     node: Node
     """
@@ -42,13 +44,13 @@ class DebugExpressionPublisher:
     The underlying publisher that renders and republishes the debug expressions.
     """
 
-    def attach(self, statechart: Statechart) -> None:
+    def attach(self, *, statechart: Statechart) -> None:
         """
         Register the spatial debug expressions of every node for live visualization.
         """
         requests = [
-            self._to_request(debug_expression)
-            for debug_expression in DebugExpression.collect_from(statechart)
+            self._to_request(debug_expression=debug_expression)
+            for debug_expression in DebugExpression.collect_from(statechart=statechart)
             if isinstance(debug_expression.expression, SpatialType)
         ]
         if self._publisher is None:
@@ -56,13 +58,13 @@ class DebugExpressionPublisher:
         self._publisher.set_requests(requests)
 
     def _to_request(
-        self, debug_expression: DebugExpression
+        self, *, debug_expression: DebugExpression
     ) -> SpatialTypeVisualization:
         """
         Build a visualization request from a debug expression, anchoring vectors
         correctly.
         """
-        expression = self._anchored_expression(debug_expression.expression)
+        expression = self._anchored_expression(expression=debug_expression.expression)
         return SpatialTypeVisualization(
             spatial_type=expression,
             color=debug_expression.color,
@@ -70,7 +72,7 @@ class DebugExpressionPublisher:
             label=debug_expression.name,
         )
 
-    def _anchored_expression(self, expression: SpatialType) -> SpatialType:
+    def _anchored_expression(self, *, expression: SpatialType) -> SpatialType:
         """
         Express a vector in its visualisation frame so the rendered arrow points
         correctly.
@@ -122,4 +124,4 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         self.publisher = DebugExpressionPublisher(
             world=executor.context.world, node=self.ros_node
         )
-        self.publisher.attach(executor.statechart)
+        self.publisher.attach(statechart=executor.statechart)

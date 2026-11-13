@@ -110,14 +110,14 @@ class TestFeatureFunctions:
         ids=lambda task_type: task_type.__name__,
     )
     def test_a_feature_function_gives_way_to_collision_avoidance_by_default(
-        self, task_type: type[FeatureFunctionGoal]
+        self, *, task_type: type[FeatureFunctionGoal]
     ) -> None:
         weight = next(
             declared for declared in fields(task_type) if declared.name == "weight"
         )
         assert weight.default == DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
 
-    def test_height_goal_within_bounds(self, pr2_world_state_reset: World):
+    def test_height_goal_within_bounds(self, *, pr2_world_state_reset: World):
         """
         Test that HeightGoal successfully constrains the vertical distance between tip
         and reference points within specified bounds.
@@ -169,7 +169,7 @@ class TestFeatureFunctions:
             f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
         )
 
-    def test_height_goal_negative_bounds(self, pr2_world_state_reset: World):
+    def test_height_goal_negative_bounds(self, *, pr2_world_state_reset: World):
         """
         Test HeightGoal with negative height bounds (tip below reference).
         """
@@ -221,7 +221,7 @@ class TestFeatureFunctions:
         )
 
     def test_reach_point_drives_offset_point_onto_reference(
-        self, pr2_world_state_reset: World
+        self, *, pr2_world_state_reset: World
     ) -> None:
         """
         Test that ReachPoint drives a controlled tip point onto a reference point.
@@ -268,7 +268,7 @@ class TestFeatureFunctions:
             <= reach_point.threshold
         )
 
-    def test_distance_goal_within_bounds(self, pr2_world_state_reset: World):
+    def test_distance_goal_within_bounds(self, *, pr2_world_state_reset: World):
         """
         Test that DistanceGoal successfully constrains the horizontal distance (in x-y
         plane) between tip and reference points within specified bounds.
@@ -322,7 +322,7 @@ class TestFeatureFunctions:
             f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
         )
 
-    def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
+    def test_distance_goal_zero_distance(self, *, pr2_world_state_reset: World):
         """
         Test DistanceGoal with bounds that include zero (tip and reference at same x-y
         position).
@@ -376,7 +376,7 @@ class TestFeatureFunctions:
             f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
         )
 
-    def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
+    def test_distance_goal_ignores_z_axis(self, *, pr2_world_state_reset: World):
         """
         Test that DistanceGoal only considers x-y plane distance and ignores z-axis.
 
@@ -432,7 +432,7 @@ class TestFeatureFunctions:
             f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
         )
 
-    def test_height_and_distance_combined(self, pr2_world_state_reset: World):
+    def test_height_and_distance_combined(self, *, pr2_world_state_reset: World):
         """
         Test combining HeightGoal and DistanceGoal in parallel to constrain both
         vertical and horizontal distances simultaneously.
@@ -506,7 +506,7 @@ class TestFeatureFunctions:
         )
 
     def test_distance_height_angle_perpendicular_combined(
-        self, pr2_world_state_reset: World
+        self, *, pr2_world_state_reset: World
     ):
         """
         Test combining DistanceGoal, HeightGoal, and AlignPerpendicular to constrain
@@ -1068,7 +1068,7 @@ def test_angle_goal(pr2_world_state_reset: World):
 
 class TestArticulateGraspedMechanism:
     def test_the_mechanism_is_articulated_once_its_parts_reached_their_goals(
-        self, prismatic_bot2: World
+        self, *, prismatic_bot2: World
     ):
         """
         Both parts are created by the goal and end only when it ends, so it reads what
@@ -1094,7 +1094,7 @@ class TestArticulateGraspedMechanism:
             part.observation_variable for part in open_goal.nodes
         }
 
-    def test_open(self, pr2_world_copy, tmp_path):
+    def test_open(self, *, pr2_world_copy, tmp_path):
 
         world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
@@ -1195,7 +1195,9 @@ class TestArticulateGraspedMechanism:
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED
 
-    def test_a_drawer_faster_than_the_arm_stays_with_the_gripper(self, pr2_world_copy):
+    def test_a_drawer_faster_than_the_arm_stays_with_the_gripper(
+        self, *, pr2_world_copy
+    ):
         """
         A drawer that may move faster than the arm, with no acceleration or jerk limit,
         moves only as fast as the gripper holding it.
@@ -1270,7 +1272,7 @@ class TestArticulateGraspedMechanism:
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert largest_drift <= hold.translation_threshold
 
-    def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
+    def test_unscrew_and_tighten_bottle_cap(self, *, pr2_world_copy):
         screw_pitch = 0.03
         unscrew_goal = 2 * np.pi
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
@@ -1390,7 +1392,7 @@ class TestArticulateGraspedMechanism:
             world_T_cap_tightened[:3, 3], world_T_cap_before[:3, 3], atol=1e-3
         )
 
-    def _expanded_nodes(self, goal: ArticulateGraspedMechanism, world: World):
+    def _expanded_nodes(self, *, goal: ArticulateGraspedMechanism, world: World):
         """
         Expands a goal on a statechart of its own and returns the children it built.
         """
@@ -1400,7 +1402,7 @@ class TestArticulateGraspedMechanism:
         return goal.nodes
 
     def test_the_mechanism_yields_to_collision_avoidance_but_not_the_grasp_by_default(
-        self, prismatic_bot
+        self, *, prismatic_bot
     ):
         """
         A caller that asks for nothing in particular gets the weights the motion needs:
@@ -1414,7 +1416,7 @@ class TestArticulateGraspedMechanism:
             goal_joint_state=0.0,
         )
 
-        nodes = self._expanded_nodes(goal, prismatic_bot)
+        nodes = self._expanded_nodes(goal=goal, world=prismatic_bot)
 
         mechanism_node = next(
             node for node in nodes if isinstance(node, JointPositionList)
@@ -1423,7 +1425,7 @@ class TestArticulateGraspedMechanism:
         assert mechanism_node.weight == DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
         assert grasp_node.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
 
-    def test_mechanism_and_grasp_are_weighed_separately(self, prismatic_bot):
+    def test_mechanism_and_grasp_are_weighed_separately(self, *, prismatic_bot):
         """
         Driving the mechanism and holding the grasped part are separate goals, so a
         caller can let the mechanism yield to collision avoidance while the grasp keeps
@@ -1438,7 +1440,7 @@ class TestArticulateGraspedMechanism:
             grasp_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
 
-        nodes = self._expanded_nodes(goal, prismatic_bot)
+        nodes = self._expanded_nodes(goal=goal, world=prismatic_bot)
 
         mechanism_node = next(
             node for node in nodes if isinstance(node, JointPositionList)
@@ -1448,7 +1450,7 @@ class TestArticulateGraspedMechanism:
         assert grasp_node.weight == DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
 
     def test_the_end_effector_holding_the_grasped_part_may_touch_its_surroundings(
-        self, pr2_world_copy
+        self, *, pr2_world_copy
     ):
         """
         Holding on to the grasped part means touching it and what it is mounted on, so
@@ -1478,7 +1480,7 @@ class TestArticulateGraspedMechanism:
         ] == [(AllowCollisionForEndEffector, end_effector)]
 
     def test_without_an_end_effector_holding_the_grasped_part_nothing_is_let_off_collision_avoidance(
-        self, prismatic_bot
+        self, *, prismatic_bot
     ):
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
@@ -1498,7 +1500,7 @@ class TestArticulateGraspedMechanism:
             RigidCoupling,
         ]
 
-    def test_a_goal_within_the_limits_is_kept(self, prismatic_bot):
+    def test_a_goal_within_the_limits_is_kept(self, *, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")
         connection = grasped_part.get_first_parent_connection_of_type(
             ActiveConnection1DOF
@@ -1511,11 +1513,11 @@ class TestArticulateGraspedMechanism:
             goal_joint_state=within_limits,
         )
 
-        self._expanded_nodes(goal, prismatic_bot)
+        self._expanded_nodes(goal=goal, world=prismatic_bot)
 
         assert goal.goal_joint_state == within_limits
 
-    def test_a_goal_beyond_the_upper_limit_is_clamped_to_it(self, prismatic_bot):
+    def test_a_goal_beyond_the_upper_limit_is_clamped_to_it(self, *, prismatic_bot):
         """
         A commanded state the mechanism cannot reach is cut down to its upper limit,
         rather than left as a goal the solver can never observe as reached.
@@ -1527,11 +1529,11 @@ class TestArticulateGraspedMechanism:
             goal_joint_state=1e3,
         )
 
-        self._expanded_nodes(goal, prismatic_bot)
+        self._expanded_nodes(goal=goal, world=prismatic_bot)
 
         assert goal.goal_joint_state == goal.connection.dof.limits.upper.position
 
-    def test_a_goal_below_the_lower_limit_is_clamped_to_it(self, prismatic_bot):
+    def test_a_goal_below_the_lower_limit_is_clamped_to_it(self, *, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
@@ -1539,6 +1541,6 @@ class TestArticulateGraspedMechanism:
             goal_joint_state=-1e3,
         )
 
-        self._expanded_nodes(goal, prismatic_bot)
+        self._expanded_nodes(goal=goal, world=prismatic_bot)
 
         assert goal.goal_joint_state == goal.connection.dof.limits.lower.position

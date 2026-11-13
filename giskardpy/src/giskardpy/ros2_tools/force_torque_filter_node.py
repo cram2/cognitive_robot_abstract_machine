@@ -5,6 +5,7 @@ ROS 2 node and utilities to filter and differentiate force-torque signals.
 Provides a configurable low-pass filtering pipeline with optional offset
 removal and a smoothed first derivative for six-axis wrench data.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -17,9 +18,10 @@ from geometry_msgs.msg import WrenchStamped
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from scipy.signal import butter, sosfilt
+from krrood.patterns.called_positionally import called_positionally
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FilterConfig:
     """
     Config file for the force torque filter node.
@@ -142,7 +144,7 @@ class FilterConfig:
         )
 
     @classmethod
-    def from_ros2_params(cls, node: Node) -> FilterConfig:
+    def from_ros2_params(cls, *, node: Node) -> FilterConfig:
         """
         Build a configuration from ROS 2 node parameters.
 
@@ -152,11 +154,11 @@ class FilterConfig:
         :param node: ROS 2 node used to declare and read parameters.
         :return: New configuration populated from the node parameters.
         """
-        cls._declare_parameters_from_config(node)
-        return cls._read_parameters_to_config(node)
+        cls._declare_parameters_from_config(node=node)
+        return cls._read_parameters_to_config(node=node)
 
     @classmethod
-    def _declare_parameters_from_config(cls, node: Node) -> None:
+    def _declare_parameters_from_config(cls, *, node: Node) -> None:
         """
         Declare all configuration fields as ROS 2 parameters on the node.
 
@@ -169,7 +171,10 @@ class FilterConfig:
             # Compute a neutral default for required fields (no default provided)
             if f.default is not dataclasses.MISSING:
                 default_val = f.default
-            elif getattr(f, "default_factory", dataclasses.MISSING) is not dataclasses.MISSING:  # type: ignore[attr-defined]
+            elif (
+                getattr(f, "default_factory", dataclasses.MISSING)
+                is not dataclasses.MISSING
+            ):  # type: ignore[attr-defined]
                 default_val = f.default_factory()  # type: ignore[misc]
             else:
                 # Required without default: declare with neutral type-based default
@@ -185,7 +190,7 @@ class FilterConfig:
             node.declare_parameter(f.name, default_val)
 
     @classmethod
-    def _read_parameters_to_config(cls, node: Node) -> FilterConfig:
+    def _read_parameters_to_config(cls, *, node: Node) -> FilterConfig:
         """
         Read ROS 2 parameters into a new configuration instance.
 
@@ -223,7 +228,7 @@ class FilterConfig:
         return cls(**kwargs)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OffsetEstimator:
     """
     Estimates and removes a constant or slowly varying offset via EWMA.
@@ -244,7 +249,7 @@ class OffsetEstimator:
     Indicates whether the estimator has received its first sample.
     """
 
-    def update(self, x: float) -> float:
+    def update(self, *, x: float) -> float:
         """
         Update offset with new sample and return the offset estimate.
 
@@ -261,7 +266,7 @@ class OffsetEstimator:
         return self.current_value
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LowPassButterworthFilter:
     """
     Stateful Butterworth low-pass filter using Second-Order-Sections form for stability.
@@ -316,7 +321,7 @@ class LowPassButterworthFilter:
         # zi per SOS section: shape (n_sections, 2)
         self.filter_state = np.zeros((self.second_order_sections.shape[0], 2))
 
-    def step(self, x: float) -> float:
+    def step(self, *, x: float) -> float:
         """
         Process a single sample through the filter.
 
@@ -329,7 +334,7 @@ class LowPassButterworthFilter:
         return float(y[-1])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DerivativeEstimator:
     """
     First derivative via sample-to-sample difference using provided dt.
@@ -340,7 +345,7 @@ class DerivativeEstimator:
     Previous sample value used to compute the discrete derivative.
     """
 
-    def step(self, x: float, dt: float) -> float:
+    def step(self, *, x: float, dt: float) -> float:
         """
         Compute the first derivative using the previous sample and time step.
 
@@ -359,7 +364,7 @@ class DerivativeEstimator:
         return float(dx)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrenchProcessor:
     """
     Composes offset removal, main low-pass, derivative, and derivative smoothing for six axes.
@@ -402,25 +407,31 @@ class WrenchProcessor:
         fs = float(self.config.expected_rate_hz)
         self.remove_offset = self.config.offset_mode != "none"
         self.offset = [
-            OffsetEstimator(self.config.offset_alpha) if self.remove_offset else None
+            OffsetEstimator(alpha=self.config.offset_alpha)
+            if self.remove_offset
+            else None
             for _ in range(6)
         ]
         self.main = [
             LowPassButterworthFilter(
-                self.config.cutoff_main_hz, fs, self.config.order_main
+                cutoff_hz=self.config.cutoff_main_hz,
+                sampling_frequency=fs,
+                order=self.config.order_main,
             )
             for _ in range(6)
         ]
         self.diff = [DerivativeEstimator() for _ in range(6)]
         self.diff_smooth = [
             LowPassButterworthFilter(
-                self.config.cutoff_diff_hz, fs, self.config.order_diff
+                cutoff_hz=self.config.cutoff_diff_hz,
+                sampling_frequency=fs,
+                order=self.config.order_diff,
             )
             for _ in range(6)
         ]
 
     @staticmethod
-    def _axes_from_wrench(w: Wrench) -> list[float]:
+    def _axes_from_wrench(*, w: Wrench) -> list[float]:
         """
         Extract the six scalar components from a wrench message.
 
@@ -432,7 +443,7 @@ class WrenchProcessor:
         return [w.force.x, w.force.y, w.force.z, w.torque.x, w.torque.y, w.torque.z]
 
     @staticmethod
-    def _wrench_from_axes(a: list[float]) -> Wrench:
+    def _wrench_from_axes(*, a: list[float]) -> Wrench:
         """
         Build a wrench message from six scalar components.
 
@@ -445,7 +456,7 @@ class WrenchProcessor:
         t = Vector3(x=float(a[3]), y=float(a[4]), z=float(a[5]))
         return Wrench(force=f, torque=t)
 
-    def process(self, w: Wrench, dt: float) -> tuple[Wrench, Wrench]:
+    def process(self, *, w: Wrench, dt: float) -> tuple[Wrench, Wrench]:
         """
         Filter a wrench and compute its smoothed first derivative.
 
@@ -457,22 +468,22 @@ class WrenchProcessor:
         :param dt: Time step in seconds between samples.
         :return: Tuple of (filtered wrench, derivative wrench).
         """
-        axes = self._axes_from_wrench(w)
+        axes = self._axes_from_wrench(w=w)
         filtered = [0.0] * 6
         deriv = [0.0] * 6
         for i, x in enumerate(axes):
             x_in = float(x)
             if self.remove_offset and self.offset[i] is not None:
-                x_in = x_in - self.offset[i].update(x_in)
-            xf = self.main[i].step(x_in)
-            dxf = self.diff[i].step(xf, dt)
-            dxf_sm = self.diff_smooth[i].step(dxf)
+                x_in = x_in - self.offset[i].update(x=x_in)
+            xf = self.main[i].step(x=x_in)
+            dxf = self.diff[i].step(x=xf, dt=dt)
+            dxf_sm = self.diff_smooth[i].step(x=dxf)
             filtered[i] = xf
             deriv[i] = dxf_sm
-        return self._wrench_from_axes(filtered), self._wrench_from_axes(deriv)
+        return self._wrench_from_axes(a=filtered), self._wrench_from_axes(a=deriv)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ForceTorqueFilterNode(Node):
     """
     ROS 2 node: subscribes to a raw WrenchStamped and publishes filtered and derivative topics.
@@ -512,7 +523,7 @@ class ForceTorqueFilterNode(Node):
 
         # Declare parameters with defaults, then read actual values
         if self.config is None:
-            self.config = FilterConfig.from_ros2_params(self)
+            self.config = FilterConfig.from_ros2_params(node=self)
 
         qos = QoSProfile(
             reliability=(
@@ -524,7 +535,7 @@ class ForceTorqueFilterNode(Node):
             depth=self.config.qos_depth,
         )
 
-        self.processor = WrenchProcessor(self.config)
+        self.processor = WrenchProcessor(config=self.config)
 
         self.sub = self.create_subscription(
             WrenchStamped, self.config.topic_in, self._on_msg, qos
@@ -538,6 +549,7 @@ class ForceTorqueFilterNode(Node):
 
         self.get_logger().info("ForceTorqueFilterNode started")
 
+    @called_positionally
     def _on_msg(self, msg: WrenchStamped) -> None:
         """
         Callback that processes an incoming wrench sample.
@@ -559,7 +571,7 @@ class ForceTorqueFilterNode(Node):
         self.sample_count += 1
         dt_use = dt if dt > 0.0 else 1.0 / max(1e-6, self.config.expected_rate_hz)
 
-        filt_wrench, diff_wrench = self.processor.process(msg.wrench, dt_use)
+        filt_wrench, diff_wrench = self.processor.process(w=msg.wrench, dt=dt_use)
 
         # Warmup gate to avoid startup transients
         # Do not publish for the first `warmup_samples` messages, inclusive of the Nth sample

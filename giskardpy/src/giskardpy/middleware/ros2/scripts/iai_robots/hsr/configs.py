@@ -10,7 +10,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HSRVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Commands the arm, head and drive of the HSR through their velocity controllers.

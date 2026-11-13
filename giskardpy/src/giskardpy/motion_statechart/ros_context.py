@@ -36,7 +36,7 @@ class RosContextExtension(ContextExtension):
     """
 
     def get_or_create_action_client(
-        self, message_type: type, action_topic: str
+        self, *, message_type: type, action_topic: str
     ) -> ActionClient:
         """
         Returns the cached action client for ``action_topic``, creating and caching one
