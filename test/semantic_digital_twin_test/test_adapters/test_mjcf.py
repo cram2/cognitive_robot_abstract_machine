@@ -7,6 +7,10 @@ import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.multi_sim import MujocoLight, MujocoTendon
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 MJCF_DIR = os.path.join(
@@ -185,6 +189,31 @@ MIXED_GEOM_SCENE = os.path.join(DATASET_DIR, "mixed_geom_scene.xml")
 Scene whose single body carries one geom that takes part in contact and one that is
 excluded from it.
 """
+
+CONTACT_DIMENSIONALITY_SCENE = os.path.join(
+    DATASET_DIR, "contact_dimensionality_scene.xml"
+)
+"""
+Scene with two boxes declaring the same friction, one resolving its contacts in MuJoCo's
+default dimensions and one also resisting turning.
+"""
+
+
+@pytest.mark.parametrize(
+    "body_name, acting_friction",
+    [
+        ("sliding_box", ContactFriction(sliding=0.8, torsional=0.0, rolling=0.0)),
+        ("turning_box", ContactFriction(sliding=0.8, torsional=0.02, rolling=0.0)),
+    ],
+)
+def test_a_geom_offers_only_the_friction_its_contact_dimensions_let_act(
+    body_name, acting_friction
+):
+    world = MJCFParser.from_file(CONTACT_DIMENSIONALITY_SCENE).create_world()
+
+    [shape] = world.get_body_by_name(body_name).collision.shapes
+    contact = shape.get_simulator_property_of_type(ContactParameters)
+    assert contact.friction == pytest.approx(acting_friction)
 
 
 def test_visual_only_geom_is_not_a_collision_shape_by_default():

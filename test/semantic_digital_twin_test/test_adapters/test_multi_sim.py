@@ -60,6 +60,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
     MujocoActuator,
     MujocoBuilder,
+    MujocoContactDimensionality,
     MujocoGeom,
     MujocoLight,
     MujocoSynchronizer,
@@ -657,6 +658,58 @@ def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_
         GravityCompensation(fraction=0.5)
     )
     assert parsed_shape.get_simulator_property_of_type(ContactParameters) == contact
+
+
+def test_a_shape_with_contact_parameters_resolves_all_of_its_friction(tmp_path):
+    """
+    MuJoCo ignores the torsional and rolling friction of a contact resolved in fewer
+    dimensions, which would leave a held object free to pivot between the fingers.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        world.add_body(root)
+        link = Body(
+            name=PrefixedName("link"),
+            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+        )
+        ContactParameters.create_for_grasped_object().apply_to([link])
+        world.add_kinematic_structure_entity(link)
+        world.add_connection(FixedConnection(parent=root, child=link))
+
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    [geom] = [
+        geom
+        for body in builder.spec.bodies
+        for geom in body.geoms
+        if body.name == "link"
+    ]
+    assert geom.condim == MujocoContactDimensionality.SLIDING_TORSIONAL_AND_ROLLING
+
+
+def test_a_parsed_geom_resolves_its_contacts_in_the_dimensions_it_declared(tmp_path):
+    scene = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "dataset",
+        "contact_dimensionality_scene.xml",
+    )
+    declared = mujoco.MjSpec.from_file(scene)
+    builder = MujocoBuilder()
+    builder.build_world(
+        world=MJCFParser(scene).create_world(), file_path=str(tmp_path / "scene.xml")
+    )
+
+    assert {
+        body.name: [geom.condim for geom in body.geoms]
+        for body in builder.spec.bodies
+        if body.geoms
+    } == {
+        body.name: [geom.condim for geom in body.geoms]
+        for body in declared.bodies
+        if body.geoms
+    }
 
 
 def test_a_simulated_body_weighs_what_its_inertial_says_not_what_its_shapes_would():
