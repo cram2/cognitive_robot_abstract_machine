@@ -658,6 +658,9 @@ class Body(KinematicStructureEntity):
             visual=self.visual.copy_without_reference_frame(),
             collision=self.collision.copy_without_reference_frame(),
             inertial=deepcopy(self.inertial),
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
 
@@ -709,6 +712,9 @@ class Region(KinematicStructureEntity):
             name=self.name,
             id=self.id,
             area=self.area.copy_without_reference_frame(),
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
 
@@ -1251,6 +1257,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
             parent_T_connection_expression=parent_T_connection_expression,
             connection_T_child_expression=connection_T_child_expression,
             name=PrefixedName(self.name.name, prefix=self.name.prefix),
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     def copy_with_new_parent(
@@ -1272,6 +1281,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
             connection_T_child_expression=self.connection_T_child_expression,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     def copy_with_new_child(self, new_child: KinematicStructureEntity) -> Self:

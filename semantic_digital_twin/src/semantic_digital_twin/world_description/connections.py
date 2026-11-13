@@ -300,6 +300,9 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             offset=self.offset,
             raw_dof=world.get_degree_of_freedom_by_id(self.raw_dof.id),
             dynamics=self.dynamics,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     def copy_with_new_parent(
@@ -319,6 +322,9 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             offset=self.offset,
             raw_dof=self.raw_dof,
             dynamics=self.dynamics,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
 
@@ -473,6 +479,9 @@ class ScrewConnection(ActiveConnection1DOF):
             raw_dof=world.get_degree_of_freedom_by_id(self.raw_dof.id),
             screw_pitch=self.screw_pitch,
             dynamics=self.dynamics,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     def copy_with_new_parent(
@@ -493,6 +502,9 @@ class ScrewConnection(ActiveConnection1DOF):
             raw_dof=self.raw_dof,
             dynamics=self.dynamics,
             screw_pitch=self.screw_pitch,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
 
@@ -695,6 +707,9 @@ class Connection6DoF(Connection):
             qy=world.get_degree_of_freedom_by_id(self.qy.id),
             qz=world.get_degree_of_freedom_by_id(self.qz.id),
             qw=world.get_degree_of_freedom_by_id(self.qw.id),
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     def copy_with_new_parent(
@@ -716,6 +731,9 @@ class Connection6DoF(Connection):
             qy=self.qy,
             qz=self.qz,
             qw=self.qw,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
 
@@ -950,6 +968,9 @@ class OmniDrive(WheeledDrive):
             yaw=self.yaw,
             x_velocity=self.x_velocity,
             y_velocity=self.y_velocity,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     @property
@@ -1005,6 +1026,9 @@ class OmniDrive(WheeledDrive):
             yaw=world.get_degree_of_freedom_by_id(self.yaw.id),
             x_velocity=world.get_degree_of_freedom_by_id(self.x_velocity.id),
             y_velocity=world.get_degree_of_freedom_by_id(self.y_velocity.id),
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
 
@@ -1139,6 +1163,9 @@ class DifferentialDrive(WheeledDrive):
             pitch=self.pitch,
             yaw=self.yaw,
             x_velocity=self.x_velocity,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     @property
@@ -1191,4 +1218,7 @@ class DifferentialDrive(WheeledDrive):
             pitch=world.get_degree_of_freedom_by_id(self.pitch.id),
             yaw=world.get_degree_of_freedom_by_id(self.yaw.id),
             x_velocity=world.get_degree_of_freedom_by_id(self.x_velocity.id),
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
