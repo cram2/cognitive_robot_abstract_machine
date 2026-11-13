@@ -141,7 +141,8 @@ class StatechartModification:
     once, when the outermost of any nested modifications ends.
 
     If the block raises, the nodes added inside it are dropped again and the statechart
-    stays as it was.
+    stays as it was; nothing compiles then, so the exception the block raised is the one
+    that propagates.
     """
 
     statechart: Statechart
@@ -181,7 +182,11 @@ class StatechartModification:
         if statechart._open_modifications == 0:
             statechart._replaced_nodes.clear()
         compiler = statechart.compiler
-        if statechart._open_modifications > 0 or not compiler.is_compiled:
+        if (
+            exception is not None
+            or statechart._open_modifications > 0
+            or not compiler.is_compiled
+        ):
             return
         if not compiler.changed_since_compile:
             return

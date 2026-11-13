@@ -177,6 +177,7 @@ class MJCFParser(WorldModelParser):
     def create_world(self) -> World:
         self.world = World()
         worldbody: mujoco.MjsBody = self.spec.worldbody
+        self._name_unnamed_bodies()
         with self.world.modify_world():
             self.parse_equalities()
             self.parse_tendons()
@@ -201,6 +202,21 @@ class MJCFParser(WorldModelParser):
                 self.parse_actuator(mujoco_actuator=mujoco_actuator)
 
         return self.world
+
+    def _name_unnamed_bodies(self) -> None:
+        """
+        Name every unnamed body of the scene after its parent, uniquely, since the world
+        tells its bodies apart by name.
+        """
+        taken = {mujoco_body.name for mujoco_body in self.spec.bodies}
+        for mujoco_body in self.spec.bodies[1:]:
+            if mujoco_body.name:
+                continue
+            index = 0
+            while f"{mujoco_body.parent.name}_body_{index}" in taken:
+                index += 1
+            mujoco_body.name = f"{mujoco_body.parent.name}_body_{index}"
+            taken.add(mujoco_body.name)
 
     @staticmethod
     def _compose_frame_chain(

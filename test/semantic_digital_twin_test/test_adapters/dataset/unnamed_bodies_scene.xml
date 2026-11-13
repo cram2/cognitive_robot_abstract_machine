@@ -1,0 +1,11 @@
+<mujoco>
+  <worldbody>
+    <body>
+      <body name="object">
+        <body pos="0 -0.045 0">
+          <geom type="box" size="0.1 0.1 0.02"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

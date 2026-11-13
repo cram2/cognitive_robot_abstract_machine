@@ -277,6 +277,23 @@ def test_an_abandoned_modification_leaves_the_statechart_as_it_was(
     assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
 
 
+def test_an_abandoned_modification_compiles_nothing(
+    statechart_context: StatechartContext,
+) -> None:
+    counting = ExtensionCountingCompiles()
+    executor = StatechartExecutor(context=statechart_context, extensions=[counting])
+    _compile_and_run_one_node(executor)
+    statechart = executor.statechart
+    compiles_before = counting.compile_count
+
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("dropped"))
+            raise ModificationDeliberatelyFailed()
+
+    assert counting.compile_count == compiles_before
+
+
 def test_an_abandoned_inner_modification_keeps_the_outer_one_working(
     statechart_executor: StatechartExecutor,
 ) -> None:
