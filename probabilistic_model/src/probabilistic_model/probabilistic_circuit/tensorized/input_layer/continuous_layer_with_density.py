@@ -150,6 +150,10 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
     def parameters(self) -> list[BackendArray]:
         return [self.interval]
 
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        (interval,) = parameters
+        return dataclasses.replace(self, interval=interval)
+
     @property
     def lower(self) -> NodeValues:
         """

@@ -4,6 +4,7 @@ The layer of sum units of a layered probabilistic circuit.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 
 import numpy as np
@@ -101,7 +102,9 @@ class SumLayer(HasParameterArrays, InnerLayer):
         """
         number_of_child_nodes = sum(layer.number_of_nodes for layer in child_layers)
         edges = edge_matrix_type.from_edge_positions(
-            log_weights.rows, log_weights.columns, (number_of_nodes, number_of_child_nodes)
+            log_weights.rows,
+            log_weights.columns,
+            (number_of_nodes, number_of_child_nodes),
         )
         return cls(child_layers, edges, edges.stored_values(log_weights, -np.inf))
 
@@ -226,6 +229,10 @@ class SumLayer(HasParameterArrays, InnerLayer):
     @property
     def parameters(self) -> list[BackendArray]:
         return [self.log_weights]
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        (log_weights,) = parameters
+        return dataclasses.replace(self, log_weights=log_weights)
 
     def validate_own(self):
         super().validate_own()
