@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# %% Configuration
+set -euo pipefail
+deployment_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+export CRAM_REPOSITORY="$(cd -- "$deployment_directory/../.." && pwd)"
+cd "$deployment_directory"
+if [[ ! -f .env ]]; then
+    cp .env.example .env
+    printf 'Created %s/.env; review its settings before running again.\n' "$deployment_directory"
+    exit 1
+fi
+set -a
+source .env
+set +a
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+# %% Deployment command dispatch
+cd "$CRAM_REPOSITORY"
+exec python3 -m scripts.cramployer.launch "$deployment_directory" "$@"

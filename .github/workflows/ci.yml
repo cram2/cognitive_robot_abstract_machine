@@ -46,6 +46,7 @@ jobs:
           - lib: robokudo
           - lib: segmind
           - lib: experiments
+          - lib: cramployer
           - lib: krrood_spatial_math
           - lib: version
           - lib: cognitive_robot_abstract_machine

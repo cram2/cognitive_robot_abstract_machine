@@ -49,39 +49,17 @@ jobs:
 
       - name: Install dependencies
         env:
-          # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
-          # hardlink packages into site-packages instead of full-copying them. The default cache
-          # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
-          # forces a full copy of every wheel and stores each package twice -- exhausting the runner
-          # disk ("No space left on device") during install.
+          # Keep the cache on the venv filesystem so uv can hardlink installed wheels.
           UV_CACHE_DIR: /opt/ros/.uv_cache
+          CI_LIBRARY: ${{ inputs.lib }}
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
-          sudo apt-get update
-          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          uv sync --extra dev --active
-          uv tree --depth 1
-          python -c "import sys; print(sys.executable)"
-
-      - name: Install drake
-        if: ${{ inputs.lib == 'semantic_digital_twin' }}
-        env:
-          UV_CACHE_DIR: /opt/ros/.uv_cache
-        run: |
-          cd cognitive_robot_abstract_machine
-          source /opt/ros/cram-env/bin/activate
-          uv pip install drake
-
-      - name: Install robokudo optional requirements
-        if: ${{ inputs.lib == 'robokudo' }}
-        env:
-          UV_CACHE_DIR: /opt/ros/.uv_cache
-        run: |
-          cd cognitive_robot_abstract_machine
-          source /opt/ros/cram-env/bin/activate
-          # --no-sources keeps the editable workspace packages from being reinstalled from their paths.
-          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources
+          optional_packages=
+          case "$CI_LIBRARY" in
+            robokudo|semantic_digital_twin) optional_packages="$CI_LIBRARY" ;;
+          esac
+          bash scripts/install_dependencies.sh cpu "$optional_packages"
 
       - name: Restore cache
         uses: actions/cache/restore@v4
@@ -141,7 +119,12 @@ jobs:
           if [[ "${{ inputs.lib }}" == "semantic_digital_twin" ]]; then
             export MUJOCO_GL=egl
           fi
-          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          if [[ "${{ inputs.lib }}" == "cramployer" ]]; then
+            cd cognitive_robot_abstract_machine
+            python -m pytest --orm-build never test/cramployer_test scripts/cramployer/container_tests
+          else
+            python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          fi
 
       - name: Show runner resources after the job
         # Runs after a failure too, so a job that ran out of disk shows what filled it.
