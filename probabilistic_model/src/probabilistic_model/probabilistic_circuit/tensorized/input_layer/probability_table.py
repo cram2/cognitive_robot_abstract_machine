@@ -21,6 +21,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     StateValues,
     TableEntryValues,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    RowReduction,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )
@@ -292,17 +295,22 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     ) -> list[BackendArray]:
         """
         :param parameters: Log-probabilities in the shape of :attr:`log_probabilities`.
-        :return: The log-probabilities normalized per node.
+        :return: The log-probabilities normalized per node. A node whose
+            log-probabilities are all ``-inf`` has nothing to normalize and keeps them.
         """
         (log_probabilities,) = parameters
         namespace = self.namespace
-        largest = namespace.max(log_probabilities, axis=1, keepdims=True)
-        normalization = namespace.log(
-            namespace.sum(
-                namespace.exp(log_probabilities - largest), axis=1, keepdims=True
-            )
+        normalization = namespace.expand_dims(
+            RowReduction.LOG_SUM_EXP.reduce_last_axis(namespace, log_probabilities),
+            axis=1,
         )
-        return [log_probabilities - largest - normalization]
+        return [
+            namespace.where(
+                namespace.isfinite(normalization),
+                log_probabilities - normalization,
+                log_probabilities,
+            )
+        ]
 
     @classmethod
     def from_entries(
