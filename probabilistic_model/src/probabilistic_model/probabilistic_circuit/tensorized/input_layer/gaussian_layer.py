@@ -356,7 +356,7 @@ class TruncatedGaussianLayer(
     ) -> SampleNodeValues:
         column = self.float_column(values=values)
         left_included = self.namespace.where(
-            self.namespace.asarray(self.left_closed),
+            self.namespace.asarray(self.left_closed, device=self.device),
             self.lower <= column,
             self.lower < column,
         )

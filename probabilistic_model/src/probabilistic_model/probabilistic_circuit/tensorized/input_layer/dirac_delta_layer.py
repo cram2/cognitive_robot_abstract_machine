@@ -164,7 +164,9 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         """
         lower_of_window = self.location - self.tolerance
         upper_of_window = self.location + self.tolerance
-        inside = self.namespace.zeros(self.number_of_nodes, dtype=self.namespace.bool)
+        inside = self.namespace.zeros(
+            self.number_of_nodes, dtype=self.namespace.bool, device=self.device
+        )
         for simple_interval in assignment.simple_sets:
             left = (
                 simple_interval.lower <= upper_of_window
