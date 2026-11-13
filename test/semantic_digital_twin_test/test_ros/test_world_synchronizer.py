@@ -39,6 +39,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.adapters.ros.exceptions import (
+    SynchronizerDivergedError,
     WorldUpdateReferencesUnknownEntityError,
 )
 from semantic_digital_twin.exceptions import (
@@ -2689,7 +2690,11 @@ def test_a_model_modification_republishes_the_whole_state(rclpy_node):
             lambda: len(receiver_synchronizer.missed_messages) == 3
         ), "expected a state, a model and the model's state republish to be buffered"
 
-        republished_state = receiver_synchronizer.missed_messages[-1].state_update
+        republished_state = (
+            receiver_synchronizer.missed_messages[-1]
+            .to_message(world=receiver_world)
+            .state_update
+        )
 
         assert republished_state is not None
         assert (
@@ -3044,12 +3049,15 @@ def test_an_update_referencing_an_entity_this_world_never_received_says_so(rclpy
             sender_world, _make_simple_world_with_root("hanger"), post_root
         )
 
-        with pytest.raises(WorldUpdateReferencesUnknownEntityError) as raised:
-            sender.announce_model_change(receiver_synchronizer)
+        sender.announce_model_change(receiver_synchronizer)
+        with pytest.raises(SynchronizerDivergedError) as raised:
+            receiver_synchronizer.raise_unreported_divergence()
 
-        assert raised.value.publisher == sender.meta_data
-        assert raised.value.entity_id == post_root.id
-        assert raised.value.entity_name == post_root.name
+        unknown_entity = raised.value.raised_from
+        assert isinstance(unknown_entity, WorldUpdateReferencesUnknownEntityError)
+        assert unknown_entity.publisher == sender.meta_data
+        assert unknown_entity.entity_id == post_root.id
+        assert unknown_entity.entity_name == post_root.name
         assert receiver_world.kinematic_structure_entities == [sender_root]
     finally:
         receiver_synchronizer.close()
