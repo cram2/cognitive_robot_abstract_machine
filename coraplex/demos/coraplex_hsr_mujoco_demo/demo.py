@@ -189,7 +189,11 @@ class MilkTransportDemonstration(RobotDemonstration):
         ).homogeneous_matrix
 
     def build_context_extensions(self, world: World) -> list[ContextExtension]:
-        return [RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0])]
+        return [
+            RobotAccess(
+                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+            )
+        ]
 
     def build_statechart(self, context: StatechartContext) -> Statechart:
         """
@@ -197,7 +201,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         table and set it down there.
         """
         world = context.world
-        hsrb = context.require_extension(RobotAccess).robot
+        hsrb = context.require_extension(extension_type=RobotAccess).robot
         [milk] = world.get_semantic_annotations_by_type(Milk)
         [arm] = hsrb.all_arms
         taking_pose = self._standing_pose_facing(
@@ -206,7 +210,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         target = self._milk_pose_on(world.get_body_by_name(SceneBody.TABLE), milk)
         statechart = Statechart(context=context)
         statechart.add_node(
-            Sequence(
+            node=Sequence(
                 nodes=[
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     ParkArmsAction(arms=hsrb.all_arms),
@@ -274,7 +278,9 @@ class MilkTransportDemonstration(RobotDemonstration):
         :return: The milk's grasp closest to the robot standing there, raised
             :attr:`grasp_height` above the milk's origin.
         """
-        [closest] = GraspsByCloseness(milk, standing_pose, number_of_grasps=1)()
+        [closest] = GraspsByCloseness(
+            graspable=milk, standing_position=standing_pose, number_of_grasps=1
+        )()
         milk_T_raised_grasp = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=self.grasp_height, reference_frame=milk.root

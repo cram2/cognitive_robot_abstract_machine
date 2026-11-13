@@ -211,8 +211,11 @@ def _move_and_pick_up(world: World) -> MoveAndPickUpAction:
 
 
 def _move_and_place(world: World) -> MoveAndPlaceAction:
+    """
+    :return: A placing whose carry names the arm that picked the object up.
+    """
     return MoveAndPlaceAction(
-        carry=CarryAction(navigate=_navigate(world)),
+        carry=CarryAction(navigate=_navigate(world), holding_arms=[_arm(world)]),
         face_and_look_at=_face_and_look_at(world),
         place=_place(world),
     )
@@ -309,10 +312,16 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
 
 
 def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
+    """
+    :return: The cases of the actions that drive, look and perceive.
+    """
     return [
         ActionRoundTripCase(NavigateAction, lambda world: [_navigate(world)]),
         ActionRoundTripCase(
-            CarryAction, lambda world: [CarryAction(navigate=_navigate(world))]
+            CarryAction,
+            lambda world: [
+                CarryAction(navigate=_navigate(world), holding_arms=[_arm(world)])
+            ],
         ),
         ActionRoundTripCase(
             PathPlanningNavigateAction,

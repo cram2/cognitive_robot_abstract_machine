@@ -4,6 +4,7 @@ The input files of the development tools tests.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -15,6 +16,7 @@ from .dataset.missing_docstrings import (
     no_module_docstring,
     undocumented_definitions,
 )
+from .dataset.positional_parameters import positional_definitions
 from .dataset.prose_length import (
     comment_blocks,
     fields_and_literal_blocks,
@@ -62,9 +64,36 @@ class DatasetFile(PathEnumeration):
     A module declaring a repository's own rules.
     """
 
+    PROJECT_RULES_IMPORTING_REPOSITORY = (
+        Path(__file__).parent / "dataset" / "project_rules_importing_repository.py"
+    )
+    """
+    A module declaring a repository's own rules from the wording of another module of
+    that repository.
+    """
+
+    REPOSITORY_WORDING = Path(__file__).parent / "dataset" / "repository_wording.py"
+    """
+    The module of the repository that :attr:`PROJECT_RULES_IMPORTING_REPOSITORY` imports.
+    """
+
     PROJECT_RULES_PACKAGE = Path(__file__).parent / "dataset" / "project_rules_package"
     """
     A package declaring a repository's own rules in several modules.
+    """
+
+    PROJECT_SKILLS_MODULE = (
+        Path(__file__).parent / "dataset" / "project_skills_module.py"
+    )
+    """
+    A module declaring a repository's skills.
+    """
+
+    SKILL_TEXT = Path(__file__).parent / "dataset" / "skill_text.md"
+    """
+    The ``SKILL.md`` of the deploying skill of :attr:`PROJECT_SKILLS_MODULE`, with
+    ``{generate_command}`` and ``{source_path}`` standing for the command generating it
+    and the path of the module declaring it.
     """
 
     RULE_SECTIONS_TEXT = Path(__file__).parent / "dataset" / "rule_sections_text.md"
@@ -127,6 +156,115 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+
+class CoreBoundarySnippet(PathEnumeration):
+    """
+    The Python sources the core boundary checker reads, inside mimic distributions
+    whose ``pyproject.toml`` the checker finds above them.
+    """
+
+    DISTRIBUTION = Path(__file__).parent / "dataset" / "core_boundary_distribution"
+    """
+    The mimic distribution whose core may load only typing-extensions.
+    """
+
+    INSIDE_THE_BOUNDARY = (
+        DISTRIBUTION / "src" / "mimic_package" / "core" / "inside_the_boundary.py"
+    )
+    """
+    A core module loading only core modules, core dependencies and the standard library.
+    """
+
+    CROSSING_THE_BOUNDARY = INSIDE_THE_BOUNDARY.with_name("crossing_the_boundary.py")
+    """
+    A core module loading modules outside core, each such import marked with
+    :attr:`DatasetMarker.CROSSING_IMPORT`.
+    """
+
+    MODULE_OUTSIDE_CORE = INSIDE_THE_BOUNDARY.parents[1] / "drawing.py"
+    """
+    A module outside core loading matplotlib.
+    """
+
+    MODULE_OF_UNDECLARED_CORE = (
+        Path(__file__).parent
+        / "dataset"
+        / "undeclared_core_distribution"
+        / "src"
+        / "undeclared_package"
+        / "drawing.py"
+    )
+    """
+    A module loading matplotlib in a distribution declaring no core.
+    """
+
+    CORE_WITHOUT_DEPENDENCIES = (
+        Path(__file__).parent
+        / "dataset"
+        / "dependency_free_core_distribution"
+        / "src"
+        / "dependency_free_package"
+        / "__init__.py"
+    )
+    """
+    A core package in a distribution declaring no core dependencies, each import of a
+    distribution marked with :attr:`DatasetMarker.CROSSING_IMPORT`.
+    """
+
+
+class DatasetMarker(StrEnum):
+    """
+    Comments marking lines of the dataset files that a test expects a finding on.
+    """
+
+    CROSSING_IMPORT = "# crosses"
+    """
+    An import the core boundary checker reports.
+    """
+
+
+class MimicModule(StrEnum):
+    """
+    The dotted names of modules of the mimic distribution
+    :attr:`CoreBoundarySnippet.DISTRIBUTION`.
+    """
+
+    DRAWING = "mimic_package.drawing"
+    """
+    The module outside core that loads matplotlib.
+    """
+
+
+class MimicDistribution(StrEnum):
+    """
+    The distributions the mimic distribution's modules load.
+    """
+
+    MATPLOTLIB = "matplotlib"
+    """
+    The distribution only the mimic distribution's drawing extra requires.
+    """
+
+
+class PositionalParametersSnippet(PathEnumeration):
+    """
+    The Python sources the keyword-only checks read.
+    """
+
+    POSITIONAL_DEFINITIONS = Path(positional_definitions.__file__)
+    """
+    A module with positional and keyword-only dataclasses and methods, and the ones the
+    rules exempt.
+    """
+
+    UNIMPORTABLE_DEFINITIONS = Path(positional_definitions.__file__).with_name(
+        "unimportable_definitions.py"
+    )
+    """
+    A module that raises when imported, with a positional dataclass, a positional method
+    of a class without bases and one of a class with a base.
     """
 
 

@@ -44,10 +44,10 @@ except ModuleNotFoundError:
     robot_extensions = None
 
 try:
-    from semantic_digital_twin.adapters.ros import rospy
+    from semantic_digital_twin.adapters.ros import background_node
 except ModuleNotFoundError:
     # ROS dependencies.
-    rospy = None
+    background_node = None
 from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -231,7 +231,7 @@ def _session_class_diagram() -> ClassDiagram:
     # SymbolGraph singleton reset below only needs to drop per-test instance state, not
     # this class-level graph.
     return ClassDiagram(
-        recursive_subclasses(Symbol) + [World],
+        classes=recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
 
@@ -518,7 +518,7 @@ def world_with_urdf_factory(
     map -> odom_combined -> "urdf tree"
     """
     drive_connection_type = robot_semantic_annotation.get_type_of_generic_parameter(
-        TGenericMobileBase
+        parameter=TGenericMobileBase
     ).get_drive_connection_type()
     urdf_parser = URDFParser.from_file(
         file_path=robot_semantic_annotation.get_ros_file_path(),
@@ -1142,7 +1142,7 @@ def ros_publishers():
 
 
 @pytest.fixture(scope="function")
-def init_rospy():
+def init_background_node():
     """
     Gives a test the global Giskard ros node.
 
@@ -1150,16 +1150,16 @@ def init_rospy():
         This fixture drives the same global ros context as :func:`rclpy_node`, so the
         two cannot be used together.
     """
-    if rospy is None:
+    if background_node is None:
         pytest.skip("ROS not installed")
 
-    rospy.init_node("giskard")
+    background_node.init_node("giskard")
 
     try:
         yield None
     finally:
         # Cleanly reset TF and shutdown ROS2 node/executor
-        rospy.shutdown()
+        background_node.shutdown()
 
 
 @pytest.fixture(scope="function")

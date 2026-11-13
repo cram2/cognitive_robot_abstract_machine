@@ -131,8 +131,8 @@ always applied first.
 ## Where the robot description comes from
 
 - On a real robot, Giskard reads the description from `/robot_description` with
-  `get_robot_description()`, so it uses the same model as the robot. It waits until the
-  description is published.
+  `RosGraph(node).robot_description()`, so it uses the same model as the robot. It
+  waits until the description is published.
 - In standalone mode, there is no robot to publish it. Without a `urdf`,
   `RobotSpecification.specify_real_robot(Tracy)` reads the file the robot class
   declares instead.

@@ -12,25 +12,33 @@ from krrood.rustworkx_utils.visualization.interactive_graph_visualizer import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NamedPayload:
-    """A payload whose name is shown as the node label and detail line."""
+    """
+    A payload whose name is shown as the node label and detail line.
+    """
 
     name: str
-    """The identifier rendered for this node."""
+    """
+    The identifier rendered for this node.
+    """
 
 
 def chain_graph(names: list[str]) -> rx.PyDiGraph:
-    """Build a directed chain of :class:`NamedPayload` nodes."""
+    """
+    Build a directed chain of :class:`NamedPayload` nodes.
+    """
     graph = rx.PyDiGraph(multigraph=False)
-    indices = [graph.add_node(NamedPayload(name)) for name in names]
+    indices = [graph.add_node(NamedPayload(name=name)) for name in names]
     for parent, child in zip(indices, indices[1:]):
         graph.add_edge(parent, child, None)
     return graph
 
 
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> InteractiveGraphVisualizer:
-    """A visualizer that labels and describes nodes by their payload name."""
+    """
+    A visualizer that labels and describes nodes by their payload name.
+    """
     return InteractiveGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
@@ -41,7 +49,7 @@ def named_visualizer(graph: rx.PyDiGraph, **overrides) -> InteractiveGraphVisual
 
 class TestComputePositions:
     @pytest.mark.parametrize("layout", [GraphLayout.SPRING, GraphLayout.LAYERED])
-    def test_every_node_gets_a_two_dimensional_position(self, layout):
+    def test_every_node_gets_a_two_dimensional_position(self, *, layout):
         graph = chain_graph(["a", "b", "c"])
         visualizer = named_visualizer(graph, layout=layout)
 
@@ -51,7 +59,7 @@ class TestComputePositions:
         assert all(len(position) == 2 for position in positions.values())
 
     @pytest.mark.parametrize("layout", [GraphLayout.SPRING, GraphLayout.LAYERED])
-    def test_non_contiguous_indices_after_removal_are_handled(self, layout):
+    def test_non_contiguous_indices_after_removal_are_handled(self, *, layout):
         graph = chain_graph(["a", "b", "c"])
         graph.remove_node(1)
         visualizer = named_visualizer(graph, layout=layout)
@@ -75,26 +83,26 @@ class TestComputePositions:
 
 
 class TestBuildFigure:
-    def _node_trace(self, visualizer: InteractiveGraphVisualizer):
+    def _node_trace(self, *, visualizer: InteractiveGraphVisualizer):
         figure = visualizer.build_figure()
         return next(trace for trace in figure.data if trace.name == "nodes")
 
     def test_node_trace_has_one_point_per_node(self):
         visualizer = named_visualizer(chain_graph(["a", "b", "c"]))
 
-        assert len(self._node_trace(visualizer).x) == 3
+        assert len(self._node_trace(visualizer=visualizer).x) == 3
 
     def test_node_labels_come_from_the_label_getter(self):
         visualizer = named_visualizer(chain_graph(["pick", "place"]))
 
-        assert list(self._node_trace(visualizer).text) == ["pick", "place"]
+        assert list(self._node_trace(visualizer=visualizer).text) == ["pick", "place"]
 
     def test_customdata_carries_the_rustworkx_indices(self):
         graph = chain_graph(["a", "b", "c"])
         graph.remove_node(1)
         visualizer = named_visualizer(graph)
 
-        assert list(self._node_trace(visualizer).customdata) == [0, 2]
+        assert list(self._node_trace(visualizer=visualizer).customdata) == [0, 2]
 
     def test_marker_colors_come_from_the_color_getter(self):
         visualizer = named_visualizer(
@@ -102,7 +110,10 @@ class TestBuildFigure:
             color_getter=lambda payload: "red" if payload.name == "a" else "green",
         )
 
-        assert list(self._node_trace(visualizer).marker.color) == ["red", "green"]
+        assert list(self._node_trace(visualizer=visualizer).marker.color) == [
+            "red",
+            "green",
+        ]
 
     def test_edges_are_rendered_as_a_separate_trace(self):
         visualizer = named_visualizer(chain_graph(["a", "b"]))
@@ -117,11 +128,11 @@ class TestNodeDetails:
         graph = chain_graph(["a", "b", "c"])
         visualizer = named_visualizer(graph)
 
-        assert visualizer.node_details(2) == ["name: c"]
+        assert visualizer.node_details(node_index=2) == ["name: c"]
 
 
 class TestCheckDependencies:
-    def test_raises_when_a_visualization_library_is_missing(self, monkeypatch):
+    def test_raises_when_a_visualization_library_is_missing(self, *, monkeypatch):
         original_find_spec = importlib.util.find_spec
 
         def find_spec_without_dash(name, *args, **kwargs):

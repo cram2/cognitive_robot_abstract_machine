@@ -123,7 +123,7 @@ class ConditionEventTranslator:
         """
         quantifications = condition.quantifications()
         if quantifications:
-            raise WhereExpressionIsFirstOrder(quantifications[0])
+            raise WhereExpressionIsFirstOrder(where_expression=quantifications[0])
         names = []
         for proposition in condition.propositions():
             if proposition.variable_name not in names:
@@ -151,7 +151,7 @@ class ConditionEventTranslator:
         if isinstance(expression, Not):
             return self.event_of(expression._child_, variables).complement()
         if isinstance(expression, QuantifiedConditional):
-            raise WhereExpressionIsFirstOrder(expression)
+            raise WhereExpressionIsFirstOrder(where_expression=expression)
 
         constant = ConstantCondition.stated_by(expression)
         if constant is not None:

@@ -27,7 +27,7 @@ from krrood.entity_query_language.query.match import Match
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserRunningEveryCandidate(ChildChooser[StatementNode]):
     """
     Runs the next candidate of a statement node's statement as its child.
@@ -38,9 +38,10 @@ class ChooserRunningEveryCandidate(ChildChooser[StatementNode]):
     How many candidates a statement without a limit of its own yields.
     """
 
-    def choose_child(self, node: StatementNode) -> StatechartNode | None:
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         return node.next_candidate(
-            EntityQueryLanguageGenerativeBackend(), self.default_candidate_limit
+            query_backend=EntityQueryLanguageGenerativeBackend(),
+            default_candidate_limit=self.default_candidate_limit,
         )
 
 
@@ -73,11 +74,11 @@ def _run(
 
     :return: The statechart that ran.
     """
-    executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
     statechart = Statechart(context=executor.context)
-    statechart.add_node(goal)
-    statechart.add_node(EndStatechart.when_true(goal))
-    executor.compile(statechart)
+    statechart.add_node(node=goal)
+    statechart.add_node(node=EndStatechart.when_true(node=goal))
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=100)
     return statechart
 
@@ -103,7 +104,7 @@ def test_a_statement_added_to_a_sequence_becomes_a_statement_node() -> None:
     statement = _succeeding_statement("step")
     sequence = Sequence()
 
-    sequence.add_node(statement)
+    sequence.add_node(node=statement)
 
     [step] = sequence.nodes
     assert isinstance(step, StatementNode)
@@ -119,12 +120,12 @@ def test_a_statement_inserted_into_a_joined_sequence_runs_as_a_statement_node(
     statement = _succeeding_statement("inserted")
     sequence = Sequence(nodes=[first])
     statechart_executor.context.add_extension(
-        ChildChooserAccess(choosers=[ChooserRunningEveryCandidate()])
+        extension=ChildChooserAccess(choosers=[ChooserRunningEveryCandidate()])
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(sequence)
+    statechart.add_node(node=sequence)
 
-    sequence.insert_after(first, statement)
+    sequence.insert_after(reference=first, node=statement)
 
     inserted = sequence.nodes[1]
     assert isinstance(inserted, StatementNode)
@@ -141,12 +142,12 @@ def test_a_statement_replacing_a_step_runs_as_a_statement_node(
     statement = _succeeding_statement("replacement")
     sequence = Sequence(nodes=[replaced])
     statechart_executor.context.add_extension(
-        ChildChooserAccess(choosers=[ChooserRunningEveryCandidate()])
+        extension=ChildChooserAccess(choosers=[ChooserRunningEveryCandidate()])
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(sequence)
+    statechart.add_node(node=sequence)
 
-    statechart.replace(replaced, statement)
+    statechart.replace(node=replaced, replacement=statement)
 
     [replacement] = sequence.nodes
     assert isinstance(replacement, StatementNode)
@@ -174,19 +175,19 @@ def test_a_statement_yields_no_more_candidates_than_the_default_limit() -> None:
     node = StatementNode(statement=_statement_of_names(["first", "second"]))
     backend = EntityQueryLanguageGenerativeBackend()
 
-    first = node.next_candidate(backend, default_candidate_limit=1)
+    first = node.next_candidate(query_backend=backend, default_candidate_limit=1)
 
     assert first.name == "first"
-    assert node.next_candidate(backend, default_candidate_limit=1) is None
+    assert node.next_candidate(query_backend=backend, default_candidate_limit=1) is None
     assert node.reached_candidate_limit
 
 
 def test_the_limit_of_a_statement_outranks_the_default_limit() -> None:
-    statement = _statement_of_names(["first", "second"]).limit(2)
+    statement = _statement_of_names(["first", "second"]).limit(n=2)
     node = StatementNode(statement=statement)
 
     node.next_candidate(
-        EntityQueryLanguageGenerativeBackend(), default_candidate_limit=1
+        query_backend=EntityQueryLanguageGenerativeBackend(), default_candidate_limit=1
     )
 
     assert node.candidate_limit == statement._limit_
@@ -196,9 +197,9 @@ def test_a_statement_that_ran_out_of_candidates_did_not_reach_its_limit() -> Non
     node = StatementNode(statement=_statement_of_names(["only"]))
     backend = EntityQueryLanguageGenerativeBackend()
 
-    node.next_candidate(backend, default_candidate_limit=2)
+    node.next_candidate(query_backend=backend, default_candidate_limit=2)
 
-    assert node.next_candidate(backend, default_candidate_limit=2) is None
+    assert node.next_candidate(query_backend=backend, default_candidate_limit=2) is None
     assert not node.reached_candidate_limit
 
 
@@ -214,11 +215,14 @@ def test_a_statement_that_never_grounded_did_not_reach_its_limit() -> None:
 def test_grounding_again_after_stopping_starts_from_the_first_candidate() -> None:
     node = StatementNode(statement=_statement_of_names(["first", "second"]))
     backend = EntityQueryLanguageGenerativeBackend()
-    node.next_candidate(backend, default_candidate_limit=2)
+    node.next_candidate(query_backend=backend, default_candidate_limit=2)
 
     node.stop_grounding()
 
-    assert node.next_candidate(backend, default_candidate_limit=2).name == "first"
+    assert (
+        node.next_candidate(query_backend=backend, default_candidate_limit=2).name
+        == "first"
+    )
 
 
 # %% introspecting the node

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from geometry_msgs.msg import WrenchStamped
 
-from giskardpy.motion_statechart.ros2_nodes.topic_monitor import TopicSubscriberNode
+from giskardpy.motion_statechart.ros2_nodes.topics import TopicSubscriberNode
 from cramph.data_types import ObservationStateValues
 
 

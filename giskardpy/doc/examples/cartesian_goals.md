@@ -92,11 +92,11 @@ goal = CartesianPose(
     goal_pose=goal_pose
 )
 
-statechart.add_node(goal)
-statechart.add_node(EndMotion.when_true(goal))
+statechart.add_node(node=goal)
+statechart.add_node(node=EndMotion.when_true(node=goal))
 
 # 4. Compile and run the statechart
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.tick_until_end(timeout=100)
 print(f"Motion finished after {executor.tick_count} cycles.")
 ```

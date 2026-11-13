@@ -30,7 +30,7 @@ def test_failed_publisher_creation_leaves_the_node_usable(
     visualization = RvizVisualization(ros_node=rclpy_node)
     executor = an_executor(visualization)
     with pytest.raises(RuntimeError):
-        executor.compile(an_ending_statechart(executor.context))
+        executor.compile(statechart=an_ending_statechart(executor.context))
     assert rclpy_node.context.ok()
     assert not visualization.is_rendering
 
@@ -50,7 +50,7 @@ def test_collision_setup_failure_stops_the_publisher(
     visualization = RvizVisualization(ros_node=rclpy_node, collision_visualization=True)
     executor = an_executor(visualization)
     with pytest.raises(failure_type) as caught:
-        executor.compile(an_ending_statechart(executor.context))
+        executor.compile(statechart=an_ending_statechart(executor.context))
     assert caught.value is failure
     publisher.stop.assert_called_once_with()
     assert not visualization.is_rendering
@@ -67,7 +67,7 @@ def test_publisher_stop_failure_still_ends_the_visualization(
     )
     visualization = RvizVisualization(ros_node=rclpy_node)
     executor = an_executor(visualization)
-    executor.compile(an_ending_statechart(executor.context))
+    executor.compile(statechart=an_ending_statechart(executor.context))
     with pytest.raises(RuntimeError):
         visualization.stop()
     assert not visualization.is_rendering
@@ -79,7 +79,7 @@ def test_a_failed_run_still_stops_the_visualization() -> None:
     visualization = VisualizationRecordingItsRuns()
     executor = an_executor(visualization)
     statechart = an_ending_statechart(executor.context)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     with pytest.raises(TickLimitReachedError):
         executor.tick_until_end(timeout=0)

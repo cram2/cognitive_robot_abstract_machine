@@ -11,6 +11,8 @@ from __future__ import annotations
 # Built before anything reads a mapped datastructure: pytest imports every conftest of a
 # run before calling any hook, so a hook would fire too late. The build runs once per
 # process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.EXPERIMENTS)

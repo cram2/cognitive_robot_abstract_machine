@@ -31,7 +31,7 @@ A relation whose subject and object are both bodies.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SegmindContext(ContextExtension):
     """
     Context object shared across the statechart detectors.
@@ -139,7 +139,9 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         :return: ObservationStateValues.TRUE if events were triggered,
         otherwise ObservationStateValues.FALSE.
         """
-        segmind_context_extension = self.context.require_extension(SegmindContext)
+        segmind_context_extension = self.context.require_extension(
+            extension_type=SegmindContext
+        )
 
         objects_to_check = (
             [self.tracked_object]
@@ -292,7 +294,7 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
             for body in candidates:
                 if body is tracked_object:
                     continue
-                if relation.from_subject_object(tracked_object, body)():
+                if relation.from_subject_object(subject=tracked_object, object_=body)():
                     related_bodies.setdefault(tracked_object, set()).add(body)
         return related_bodies
 

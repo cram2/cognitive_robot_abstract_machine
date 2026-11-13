@@ -2,7 +2,7 @@ import json
 import time
 
 from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.goals.collision_avoidance import SelfCollisionAvoidance
+from giskardpy.motion_statechart.tasks.collision_avoidance import SelfCollisionAvoidance
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
@@ -40,7 +40,7 @@ def to_and_from_json(
     tracker = WorldEntityWithIDKwargsTracker.from_world(target_executor.context.world)
     kwargs = tracker.create_kwargs()
     return Statechart.from_json(
-        new_json_data, context=target_executor.context, **kwargs
+        data=new_json_data, context=target_executor.context, **kwargs
     )
 
 
@@ -69,7 +69,7 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
     )
     statechart = Statechart(context=client_executor.context)
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             nodes=[
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
@@ -101,8 +101,8 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
             ]
         )
     )
-    statechart.add_node(local_min := LocalMinimumReached())
-    statechart.add_node(EndMotion.when_true(local_min))
+    statechart.add_node(node=(local_min := LocalMinimumReached()))
+    statechart.add_node(node=EndMotion.when_true(node=local_min))
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_copy), extensions=[MotionControl()]
@@ -111,4 +111,4 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
 
     executor.compile(statechart=statechart_copy)
 
-    executor.tick_until_end(500)
+    executor.tick_until_end(timeout=500)

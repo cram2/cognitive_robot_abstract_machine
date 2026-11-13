@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 from time import sleep
@@ -16,7 +16,7 @@ from cramph.composites import ChildChooserAccess
 from cramph.context import ContextExtension, StatechartContext
 from cramph.executor import Executor, ExecutorExtension
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceClient,
     child_choices_topic,
@@ -27,7 +27,7 @@ from giskardpy.middleware.ros2.exceptions import (
     StatechartNotEndedByResultError,
 )
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
-from giskardpy.middleware.ros2.ros2_interface import MyActionClient
+from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_control import MotionControl
@@ -46,7 +46,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutor(Executor):
     """
     Executes a statechart by sending it to Giskard over ROS and waiting until it ended
@@ -78,7 +78,7 @@ class GiskardClientExecutor(Executor):
     _goal_result: JsonAction_Result | None = None
     _result_future: Future | None = None
     world: World = None
-    _client: MyActionClient = None
+    _client: GiskardActionClient = None
 
     world_updates: ClientWorldUpdates = field(init=False, default=None)
     """
@@ -112,14 +112,14 @@ class GiskardClientExecutor(Executor):
             WorldSynchronizer(_world=self.world, node=self.node_handle)
         if self.context is None:
             self.context = StatechartContext(world=self.world)
-            MotionControl().extend_context(self.context)
+            MotionControl().extend_context(context=self.context)
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
         if self.announces_presence:
             self.announce_presence()
         giskard_topic = f"{self.giskard_node_name}/command"
-        self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
+        self._client = GiskardActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
 
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -162,12 +162,12 @@ class GiskardClientExecutor(Executor):
     def robot(self) -> AbstractRobot:
         return self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Does what :meth:`Executor.compile` does, then tells every extension that the
         statechart is compiled.
         """
-        super().compile(statechart)
+        super().compile(statechart=statechart)
         self._notify_compiled()
 
     def execute_async(self) -> Future:
@@ -191,7 +191,9 @@ class GiskardClientExecutor(Executor):
         world model while the motion was running.
         """
         self.statechart.sanity_check()
-        child_chooser_access = self.context.get_extension(ChildChooserAccess)
+        child_chooser_access = self.context.get_extension(
+            extension_type=ChildChooserAccess
+        )
         try:
             if child_chooser_access is None:
                 result = self._client.send_goal(
@@ -258,7 +260,7 @@ class GiskardClientExecutor(Executor):
 
         :param result: result of a goal that succeeded or was aborted
         :raises Exception: The exception that made Giskard abort the goal, see
-            :meth:`MyActionClient.create_abort_exception`.
+            :meth:`GiskardActionClient.create_abort_exception`.
         :raises StatechartNotEndedByResultError: If a goal that succeeded leaves the
             statechart not ended.
         """
@@ -322,17 +324,19 @@ class GiskardClientExecutor(Executor):
 
     def close(self) -> None:
         """
-        Stop announcing this client's heartbeat to Giskard, if it announces one.
+        Withdraw the action client from the ROS graph and stop announcing this client's
+        heartbeat to Giskard, if it announces one.
 
         Does not touch :attr:`node_handle`: it was given to this executor by its caller,
         who owns its lifecycle.
         """
+        self._client.close()
         if self.heartbeat_publisher is None:
             return
         self.heartbeat_publisher.stop()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutorNode(GiskardClientExecutor):
     """
     A :class:`GiskardClientExecutor` that creates and owns its own ros node.
@@ -419,7 +423,7 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
             automatically_declare_parameters_from_overrides=self.automatically_declare_parameters_from_overrides,
             enable_logger_service=self.enable_logger_service,
         )
-        rospy.executor.add_node(self.node_handle)
+        background_node.executor.add_node(self.node_handle)
         super().__post_init__()
 
     def close(self) -> None:
@@ -430,5 +434,5 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
         destroyed node left registered there would break the next spin.
         """
         super().close()
-        rospy.executor.remove_node(self.node_handle)
+        background_node.executor.remove_node(self.node_handle)
         self.node_handle.destroy_node()

@@ -69,7 +69,7 @@ class CompositeNodeEndingItsChildren(
     comes out decides itself in turn, which is what lets one be a step of another.
     """
 
-    def _check_can_decide(self, node: StatechartNode) -> None:
+    def _check_can_decide(self, *, node: StatechartNode) -> None:
         """
         Rejects a child whose life cycle is not this goal's to decide.
 
@@ -79,8 +79,8 @@ class CompositeNodeEndingItsChildren(
         :raises ChildTransitionAlreadyWiredError: If the caller already wired one of the
             transitions of `node`.
         """
-        self._check_node_doesnt_belong_to_different_parent(node)
-        self._check_caller_wired_no_transitions(node)
+        self._check_node_doesnt_belong_to_different_parent(node=node)
+        self._check_caller_wired_no_transitions(node=node)
 
     def _succeed_children_at_their_goals(self) -> None:
         """
@@ -91,9 +91,9 @@ class CompositeNodeEndingItsChildren(
         """
         for child in self.nodes:
             if not isinstance(child, TerminalNode):
-                self._succeed_at_its_goal(child)
+                self._succeed_at_its_goal(child=child)
 
-    def _check_child_can_fail(self, child: StatechartNode) -> None:
+    def _check_child_can_fail(self, *, child: StatechartNode) -> None:
         """
         Rejects a child this goal only moves on from once it failed, if it has no way to
         fail.
@@ -130,10 +130,10 @@ class ControlStructureNode(CompositeNode, ABC):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self.nodes = [self._as_node(node) for node in self.nodes]
+        self.nodes = [self._as_node(node=node) for node in self.nodes]
 
     @staticmethod
-    def _as_node(node: StatechartNode | Match) -> StatechartNode:
+    def _as_node(*, node: StatechartNode | Match) -> StatechartNode:
         """
         :param node: A node this goal was handed, or a statement of one.
         :return: `node` itself, or a :class:`StatementNode` grounding the statement.
@@ -142,7 +142,7 @@ class ControlStructureNode(CompositeNode, ABC):
             return StatementNode(statement=node)
         return node
 
-    def add_node(self, node: StatechartNode) -> None:
+    def add_node(self, *, node: StatechartNode) -> None:
         """
         Hands this goal one more child, after all the others.
 
@@ -150,13 +150,13 @@ class ControlStructureNode(CompositeNode, ABC):
 
         :param node: The node to add as a child of this goal.
         """
-        node = self._as_node(node)
-        if self._has_child(node):
+        node = self._as_node(node=node)
+        if self._has_child(node=node):
             return
-        self._add_node_sanity_check(node)
-        self._insert_at(len(self.nodes), node)
+        self._add_node_sanity_check(node=node)
+        self._insert_at(position=len(self.nodes), node=node)
 
-    def insert_before(self, reference: StatechartNode, node: StatechartNode) -> None:
+    def insert_before(self, *, reference: StatechartNode, node: StatechartNode) -> None:
         """
         Hands this goal a child right before `reference`, or before the child holding
         it.
@@ -166,9 +166,9 @@ class ControlStructureNode(CompositeNode, ABC):
         :raises NodeIsNotAChildError: If `reference` is not below this goal.
         :raises NodeAlreadyAChildError: If `node` is a child of this goal already.
         """
-        self._insert_at(self._position_of(reference), node)
+        self._insert_at(position=self._position_of(reference=reference), node=node)
 
-    def insert_after(self, reference: StatechartNode, node: StatechartNode) -> None:
+    def insert_after(self, *, reference: StatechartNode, node: StatechartNode) -> None:
         """
         Hands this goal a child right after `reference`, or after the child holding it.
 
@@ -177,10 +177,10 @@ class ControlStructureNode(CompositeNode, ABC):
         :raises NodeIsNotAChildError: If `reference` is not below this goal.
         :raises NodeAlreadyAChildError: If `node` is a child of this goal already.
         """
-        self._insert_at(self._position_of(reference) + 1, node)
+        self._insert_at(position=self._position_of(reference=reference) + 1, node=node)
 
     @staticmethod
-    def closest_above(node: StatechartNode) -> ControlStructureNode:
+    def closest_above(*, node: StatechartNode) -> ControlStructureNode:
         """
         :param node: A node of a statechart.
         :return: The closest control structure node on the path from `node` up to the root,
@@ -192,7 +192,7 @@ class ControlStructureNode(CompositeNode, ABC):
             None
             if parent is None
             else parent.find_upwards(
-                lambda ancestor: isinstance(ancestor, ControlStructureNode)
+                predicate=lambda ancestor: isinstance(ancestor, ControlStructureNode)
             )
         )
         if holder is None:
@@ -200,7 +200,7 @@ class ControlStructureNode(CompositeNode, ABC):
         return holder
 
     @staticmethod
-    def step_holding(node: StatechartNode) -> StatechartNode:
+    def step_holding(*, node: StatechartNode) -> StatechartNode:
         """
         :param node: A node of a statechart.
         :return: `node`, or the node above it, that the closest control structure node
@@ -208,7 +208,9 @@ class ControlStructureNode(CompositeNode, ABC):
             control structure node is above it.
         """
         step = node.find_upwards(
-            lambda holder: isinstance(holder.parent_node, ControlStructureNode)
+            predicate=lambda holder: isinstance(
+                holder.parent_node, ControlStructureNode
+            )
         )
         if step is not None:
             return step
@@ -221,8 +223,8 @@ class ControlStructureNode(CompositeNode, ABC):
         """
         self._check_accepts_children()
         for node in list(self.nodes):
-            self._check_can_be_a_child(node)
-            self._place_child_in_statechart(node)
+            self._check_can_be_a_child(node=node)
+            self._place_child_in_statechart(node=node)
         self._wire_children()
 
     def check_children(self) -> None:
@@ -231,7 +233,7 @@ class ControlStructureNode(CompositeNode, ABC):
         """
         self._check_has_children()
 
-    def _check_can_be_a_child(self, node: StatechartNode) -> None:
+    def _check_can_be_a_child(self, *, node: StatechartNode) -> None:
         """
         Rejects a node that cannot be a child of this goal, before it joins the
         statechart. Accepts every node unless overridden.
@@ -248,7 +250,7 @@ class ControlStructureNode(CompositeNode, ABC):
         """
         return None
 
-    def _has_child(self, node: StatechartNode) -> bool:
+    def _has_child(self, *, node: StatechartNode) -> bool:
         """
         :param node: The node to look for.
         :return: Whether `node` itself is one of the children, whatever other child it
@@ -256,26 +258,28 @@ class ControlStructureNode(CompositeNode, ABC):
         """
         return any(child is node for child in self.nodes)
 
-    def _position_of(self, reference: StatechartNode) -> int:
+    def _position_of(self, *, reference: StatechartNode) -> int:
         """
         :param reference: A child of this goal, or a node below one.
         :return: The position of the child that is `reference` or holds it.
         :raises NodeIsNotAChildError: If no child is or holds `reference`.
         """
-        holder = reference.find_upwards(lambda candidate: candidate in self.nodes)
+        holder = reference.find_upwards(
+            predicate=lambda candidate: candidate in self.nodes
+        )
         if holder is None:
             raise NodeIsNotAChildError(node=self, child=reference)
         return self.nodes.index(holder)
 
-    def _check_is_not_a_child(self, node: StatechartNode) -> None:
+    def _check_is_not_a_child(self, *, node: StatechartNode) -> None:
         """
         :param node: The node about to become a child of this goal.
         :raises NodeAlreadyAChildError: If `node` is a child of this goal already.
         """
-        if self._has_child(node):
+        if self._has_child(node=node):
             raise NodeAlreadyAChildError(node=self, child=node)
 
-    def _insert_at(self, position: int, node: StatechartNode) -> None:
+    def _insert_at(self, *, position: int, node: StatechartNode) -> None:
         """
         Runs `node` at `position` among the children.
 
@@ -285,15 +289,15 @@ class ControlStructureNode(CompositeNode, ABC):
         :raises StatechartAlreadyCompiledError: If this goal accepts no children any
             more, see :meth:`_check_accepts_children`.
         """
-        node = self._as_node(node)
-        self._check_is_not_a_child(node)
+        node = self._as_node(node=node)
+        self._check_is_not_a_child(node=node)
         if not self.belongs_to_statechart():
             self.nodes.insert(position, node)
             return
-        self._check_can_be_a_child(node)
+        self._check_can_be_a_child(node=node)
         self._check_accepts_children()
         self.nodes.insert(position, node)
-        self._place_child_in_statechart(node)
+        self._place_child_in_statechart(node=node)
         self._wire_children()
 
 
@@ -306,8 +310,8 @@ class ControlStructureNodeRunningItsChildrenInTurn(
     in a way it defines.
     """
 
-    def _check_can_be_a_child(self, node: StatechartNode) -> None:
-        self._check_can_decide(node)
+    def _check_can_be_a_child(self, *, node: StatechartNode) -> None:
+        self._check_can_decide(node=node)
 
     def _wire_children(self) -> None:
         """
@@ -322,12 +326,12 @@ class ControlStructureNodeRunningItsChildrenInTurn(
             child.start_condition = (
                 Scalar.const_true()
                 if previous is None
-                else self._start_condition_after(previous)
+                else self._start_condition_after(previous=previous)
             )
             previous = child
 
     @abstractmethod
-    def _start_condition_after(self, previous: StatechartNode) -> Scalar:
+    def _start_condition_after(self, *, previous: StatechartNode) -> Scalar:
         """
         :param previous: The child that runs before the next one.
         :return: The condition that starts the child after `previous`.
@@ -346,17 +350,17 @@ class Sequence(ControlStructureNodeRunningItsChildrenInTurn):
     .. note:: corresponds to the RPL's SEQ. (McDermott, Drew. A reactive plan language, 1991)
     """
 
-    def _check_can_be_a_child(self, node: StatechartNode) -> None:
+    def _check_can_be_a_child(self, *, node: StatechartNode) -> None:
         """
         A node that ends the statechart may be a step although it belongs to no other
         node's life cycle, see :meth:`ControlStructureNode._check_can_be_a_child`.
         """
         if isinstance(node, TerminalNode):
-            self._check_caller_wired_no_transitions(node)
+            self._check_caller_wired_no_transitions(node=node)
             return
-        super()._check_can_be_a_child(node)
+        super()._check_can_be_a_child(node=node)
 
-    def _start_condition_after(self, previous: StatechartNode) -> Scalar:
+    def _start_condition_after(self, *, previous: StatechartNode) -> Scalar:
         """
         The next step waits for the outcome the previous one earned, because only an
         outcome outlasts the step that reached it.
@@ -416,19 +420,19 @@ class Parallel(EndedByOwner, ControlStructureNode):
             return len(self.nodes)
         return self.minimum_success
 
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+    def rebuilt_by(self, *, rebuild: NodeRebuild) -> Self | None:
         """
         Differs from :meth:`~cramph.node.StatechartNode.rebuilt_by` in needing one
         success fewer for every child left out that did not end without succeeding,
         which counts as having reached its goal.
         """
-        rebuilt = super().rebuilt_by(rebuild)
+        rebuilt = super().rebuilt_by(rebuild=rebuild)
         if rebuilt is None or self.minimum_success is None:
             return rebuilt
         counted_as_succeeded = [
             child
             for child in self.nodes
-            if rebuild.rebuilt(child) is None
+            if rebuild.rebuilt(node=child) is None
             and child.life_cycle_state
             not in (LifeCycleValues.FAILED, LifeCycleValues.INTERRUPTED)
         ]
@@ -552,10 +556,10 @@ class RepeatUntil(CompositeNodeEndingItsChildren):
         monitor that ends itself on reaching what it counts, and which a monitor that has
         not observed anything yet has not reached either.
         """
-        self._check_can_decide(self.task)
-        self._add_child_to_statechart(self.task)
-        self._succeed_at_its_goal(self.task)
-        self._add_child_to_statechart(self.stop_retry_monitor)
+        self._check_can_decide(node=self.task)
+        self._add_child_to_statechart(node=self.task)
+        self._succeed_at_its_goal(child=self.task)
+        self._add_child_to_statechart(node=self.stop_retry_monitor)
 
         retrying_stopped = self._retrying_stopped
         still_trying = logic_not(retrying_stopped)
@@ -570,7 +574,7 @@ class RepeatUntil(CompositeNodeEndingItsChildren):
         """
         Rejects a task that cannot fail, since it would never be retried.
         """
-        self._check_child_can_fail(self.task)
+        self._check_child_can_fail(child=self.task)
 
     @property
     def _retrying_stopped(self) -> Scalar:
@@ -590,7 +594,7 @@ class RepeatUntil(CompositeNodeEndingItsChildren):
         exhausted = CancelStatechart(
             name=f"{self.name}/exhausted", exception=self.exception
         )
-        self._add_child_to_statechart(exhausted)
+        self._add_child_to_statechart(node=exhausted)
         exhausted.start_condition = self._retrying_stopped
 
     def build_artifacts(self) -> NodeArtifacts:
@@ -624,8 +628,8 @@ class TryAll(ControlStructureNode, CompositeNodeEndingItsChildren):
     every one of them ended without doing so.
     """
 
-    def _check_can_be_a_child(self, node: StatechartNode) -> None:
-        self._check_can_decide(node)
+    def _check_can_be_a_child(self, *, node: StatechartNode) -> None:
+        self._check_can_decide(node=node)
 
     def _wire_children(self) -> None:
         """
@@ -679,7 +683,7 @@ class TryInOrder(ControlStructureNodeRunningItsChildrenInTurn):
     .. note:: corresponds to the RPL's TRY-IN-ORDER. (McDermott, Drew. A reactive plan language, 1991)
     """
 
-    def _start_condition_after(self, previous: StatechartNode) -> Scalar:
+    def _start_condition_after(self, *, previous: StatechartNode) -> Scalar:
         """
         The next alternative starts once the previous one ended without succeeding,
         which short-circuits on the first success.
@@ -693,7 +697,7 @@ class TryInOrder(ControlStructureNodeRunningItsChildrenInTurn):
         """
         super().check_children()
         for alternative in self.nodes[:-1]:
-            self._check_child_can_fail(alternative)
+            self._check_child_can_fail(child=alternative)
 
     def build_artifacts(self) -> NodeArtifacts:
         """
@@ -754,8 +758,8 @@ class MonitoredCompositeNode(EndedByOwner, CompositeNode, ABC):
         """
         Add the monitor and the monitored node, and wire the monitor.
         """
-        self._add_child_to_statechart(self.monitor)
-        self._add_child_to_statechart(self.monitored_node)
+        self._add_child_to_statechart(node=self.monitor)
+        self._add_child_to_statechart(node=self.monitored_node)
         self.wire_monitor()
 
     @property
@@ -883,7 +887,7 @@ class StoppedWhenTrue(MonitoredCompositeNode):
             it succeeded; false otherwise.
         """
         has_ended = LifeCyclePredicate.IS_TERMINATED.expression(
-            self.monitored_node.life_cycle_variable
+            life_cycle=self.monitored_node.life_cycle_variable
         )
         observing_true_while_running = trinary_logic_and(
             trinary_logic_not(has_ended),
@@ -919,7 +923,7 @@ class CancelledWhenTrue(StoppedWhenTrue):
         cancelled = CancelStatechart(
             name=f"{self.name}/cancelled", exception=self.exception
         )
-        self._add_child_to_statechart(cancelled)
+        self._add_child_to_statechart(node=cancelled)
         cancelled.start_condition = self.monitor.last_observed_true
 
 
@@ -931,7 +935,7 @@ GenericChoosingNode = TypeVar(
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
     """
     Decides which child the nodes of :attr:`node_type` run next.
@@ -943,9 +947,9 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
         :return: The kind of :class:`CompositeNodeChoosingItsChild` this chooser
             chooses the children of.
         """
-        return cls.get_type_of_generic_parameter(GenericChoosingNode)
+        return cls.get_type_of_generic_parameter(parameter=GenericChoosingNode)
 
-    def has_choice_for(self, node: GenericChoosingNode) -> bool:
+    def has_choice_for(self, *, node: GenericChoosingNode) -> bool:
         """
         :param node: The node asking for its next child.
         :return: Whether :meth:`choose_child` can answer `node` now; if not, `node`
@@ -954,7 +958,7 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
         return True
 
     @abstractmethod
-    def choose_child(self, node: GenericChoosingNode) -> StatechartNode | None:
+    def choose_child(self, *, node: GenericChoosingNode) -> StatechartNode | None:
         """
         :param node: The node asking for its next child.
         :return: The child `node` runs next, or None if no child is left.
@@ -962,6 +966,7 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
 
     def prepare_chosen_child(
         self,
+        *,
         node: GenericChoosingNode,
         child: StatechartNode,
     ) -> None:
@@ -976,6 +981,7 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
 
     def failure_monitors_for(
         self,
+        *,
         node: GenericChoosingNode,
         child: StatechartNode,
     ) -> list[StatechartNode]:
@@ -996,7 +1002,7 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildChooserAccess(ContextExtension):
     """
     Gives every :class:`CompositeNodeChoosingItsChild` of a statechart the chooser of
@@ -1009,7 +1015,7 @@ class ChildChooserAccess(ContextExtension):
     :attr:`~ChildChooser.node_type`.
     """
 
-    def chooser_for(self, node: CompositeNodeChoosingItsChild) -> ChildChooser:
+    def chooser_for(self, *, node: CompositeNodeChoosingItsChild) -> ChildChooser:
         """
         :param node: The node asking for its next child.
         :return: The chooser whose node type is the most specific one `node` is of.
@@ -1134,7 +1140,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
             return None
         return self._chosen_children[-1]
 
-    def failure_monitors_of(self, child: StatechartNode) -> list[StatechartNode]:
+    def failure_monitors_of(self, *, child: StatechartNode) -> list[StatechartNode]:
         """
         :param child: One of :attr:`chosen_children`.
         :return: The failure monitors the chooser handed `child`, which follow it among
@@ -1145,7 +1151,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
             takewhile(lambda node: node not in self._chosen_children, following)
         )
 
-    def failure_reasons_of(self, child: StatechartNode) -> list[StatechartNode]:
+    def failure_reasons_of(self, *, child: StatechartNode) -> list[StatechartNode]:
         """
         Which failure monitors gave up on `child`, which is what turns its failure into
         a reason.
@@ -1162,7 +1168,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
             return []
         return [
             monitor
-            for monitor in self.failure_monitors_of(child)
+            for monitor in self.failure_monitors_of(child=child)
             if monitor.last_observation_state == ObservationStateValues.TRUE
         ]
 
@@ -1175,7 +1181,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         return [
             monitor
             for child in self._chosen_children
-            for monitor in self.failure_reasons_of(child)
+            for monitor in self.failure_reasons_of(child=child)
         ]
 
     @property
@@ -1198,39 +1204,44 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         Ask the chooser of :attr:`context` for the next child and follow its answer.
         """
         self.choose_child_with(
-            self.context.require_extension(ChildChooserAccess).chooser_for(self)
+            chooser=self.context.require_extension(
+                extension_type=ChildChooserAccess
+            ).chooser_for(node=self)
         )
 
-    def choose_child_with(self, chooser: ChildChooser) -> bool:
+    def choose_child_with(self, *, chooser: ChildChooser) -> bool:
         """
         Run the child `chooser` chooses next, or fail if it has no child left.
 
         :param chooser: The chooser to ask.
         :return: Whether `chooser` answered, rather than having no choice yet.
         """
-        if not chooser.has_choice_for(self):
+        if not chooser.has_choice_for(node=self):
             return False
-        child = chooser.choose_child(self)
+        child = chooser.choose_child(node=self)
         if child is None:
             self.give_up()
             return True
-        self.adopt_chosen_child(child)
-        chooser.prepare_chosen_child(self, child)
-        self.give_up_on_child_when(child, chooser.failure_monitors_for(self, child))
+        self.adopt_chosen_child(child=child)
+        chooser.prepare_chosen_child(node=self, child=child)
+        self.give_up_on_child_when(
+            child=child,
+            failure_monitors=chooser.failure_monitors_for(node=self, child=child),
+        )
         return True
 
-    def adopt_chosen_child(self, child: StatechartNode) -> None:
+    def adopt_chosen_child(self, *, child: StatechartNode) -> None:
         """
         Run `child` next, succeeding once it succeeds.
 
         :param child: The child the chooser chose.
         """
-        self._add_child_to_statechart(child)
+        self._add_child_to_statechart(node=child)
         self._chosen_children.append(child)
         self.success_condition = logic_or(self.success_condition, child.is_succeeded)
-        self.statechart.request_rebuild(self)
+        self.statechart.request_rebuild(node=self)
 
-    def restore_chosen_children(self, children: list[StatechartNode]) -> None:
+    def restore_chosen_children(self, *, children: list[StatechartNode]) -> None:
         """
         Take `children` as the children this node chose, as written by the statechart it
         was sent from, whose conditions already wire them.
@@ -1240,7 +1251,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         self._chosen_children = list(children)
 
     def give_up_on_child_when(
-        self, child: StatechartNode, failure_monitors: list[StatechartNode]
+        self, *, child: StatechartNode, failure_monitors: list[StatechartNode]
     ) -> None:
         """
         Run `failure_monitors` beside `child`, failing it once one of them observes True
@@ -1254,7 +1265,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         if not failure_monitors:
             return
-        self._add_children_to_statechart(failure_monitors)
+        self._add_children_to_statechart(nodes=failure_monitors)
         child.fail_condition = logic_or(
             child.fail_condition,
             *[monitor.last_observed_true for monitor in failure_monitors],
@@ -1267,7 +1278,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         Fail, because no child is left to run.
         """
         self._out_of_children = True
-        self.statechart.request_rebuild(self)
+        self.statechart.request_rebuild(node=self)
 
     def on_reset(self) -> None:
         """
@@ -1288,7 +1299,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
             self._children_of_earlier_runs = len(self.nodes)
             self._chosen_before_latest_reset = len(self._chosen_children)
             self._out_of_children = False
-            self.statechart.request_rebuild(self)
+            self.statechart.request_rebuild(node=self)
 
     def build_artifacts(self) -> NodeArtifacts:
         """
@@ -1355,7 +1366,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
         return self._candidates_pulled >= self.candidate_limit
 
     def next_candidate(
-        self, query_backend: QueryBackend, default_candidate_limit: int
+        self, *, query_backend: QueryBackend, default_candidate_limit: int
     ) -> Any | None:
         """
         Grounds the statement into its next candidate, against the world as it is now.
@@ -1372,7 +1383,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
         if self._candidates is None:
             self._candidates_pulled = 0
             self.candidate_limit = self.statement._limit_ or default_candidate_limit
-            self._candidates = query_backend.evaluate(self.statement)
+            self._candidates = query_backend.evaluate(expression=self.statement)
         if self.reached_candidate_limit:
             self.stop_grounding()
             return None
@@ -1383,7 +1394,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
         self._candidates_pulled += 1
         return candidate
 
-    def go_on_after(self, read: list[Any], taken: Any) -> None:
+    def go_on_after(self, *, read: list[Any], taken: Any) -> None:
         """
         Lets the next candidates be the others of `read`, in their order, then those
         beyond them, as if only `taken` had been yielded so far.
@@ -1394,11 +1405,11 @@ class StatementNode(CompositeNodeChoosingItsChild):
         """
         others = [candidate for candidate in read if candidate is not taken]
         self._candidates_pulled -= len(others)
-        self._candidates = self._chained(others, self._candidates)
+        self._candidates = self._chained(first=others, rest=self._candidates)
 
     @staticmethod
     def _chained(
-        first: list[Any], rest: Generator[Any, None, None] | None
+        *, first: list[Any], rest: Generator[Any, None, None] | None
     ) -> Generator[Any, None, None]:
         """
         :param first: The candidates yielded first.
@@ -1459,7 +1470,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
 # %% grounding statements together
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatementsGroundedTogether:
     """
     Grounds several statements into combinations of their candidates, one candidate of
@@ -1493,8 +1504,8 @@ class StatementsGroundedTogether:
                 iter(
                     partial(
                         statement.next_candidate,
-                        self.query_backend,
-                        self.default_candidate_limit,
+                        query_backend=self.query_backend,
+                        default_candidate_limit=self.default_candidate_limit,
                     ),
                     None,
                 )
@@ -1511,7 +1522,7 @@ class StatementsGroundedTogether:
         for combination in self._product:
             yield dict(zip(self.statements, combination))
 
-    def take(self, combination: dict[StatementNode, Any]) -> None:
+    def take(self, *, combination: dict[StatementNode, Any]) -> None:
         """
         Lets every statement go on from the candidates read for the combinations so far
         that `combination` does not hold, once its candidate of `combination` failed,
@@ -1520,4 +1531,4 @@ class StatementsGroundedTogether:
         :param combination: The combination the statements run.
         """
         for statement, read in zip(self.statements, self._product.read):
-            statement.go_on_after(read, combination[statement])
+            statement.go_on_after(read=read, taken=combination[statement])

@@ -20,7 +20,7 @@ from giskardpy.middleware.ros2.franka_gripper_tasks import (
     GripperGraspTask,
     GripperMoveTask,
 )
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.garmi import GarmiLeftGripper, GarmiRightGripper
@@ -126,7 +126,9 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
                 width=plan_node.width,
                 speed=self.finger_speed,
             )
-        plan_node.statechart.replace(ControlStructureNode.step_holding(plan_node), task)
+        plan_node.statechart.replace(
+            node=ControlStructureNode.step_holding(node=plan_node), replacement=task
+        )
 
 
 @dataclass
@@ -142,13 +144,15 @@ class CloseGarmiFingersToWidthWithTheirFrankaDriver(
         return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
 
     def apply(self, plan_node: MoveFingersToWidthAction) -> None:
-        plan_node.statechart.replace(plan_node, self.grasp(plan_node.gripper))
+        plan_node.statechart.replace(
+            node=plan_node, replacement=self.grasp(plan_node.gripper)
+        )
 
 
 # %% running plans on the real GARMI
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealGarmiPlanExecutor(RealRobotPlanExecutor):
     """
     Runs plans on the real GARMI, whose grippers move through their Franka gripper

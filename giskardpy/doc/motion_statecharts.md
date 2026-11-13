@@ -54,7 +54,7 @@ True once every active degree of freedom with a velocity limit has come to rest 
 one second of trajectory time has passed since the start of the whole motion, not since the
 `EndMotion` started. In a world without active degrees of freedom it observes True as soon as
 it runs. `EndMotion` offers the same factory methods as `EndStatechart`, such as
-`EndMotion.when_true(node)`, and must be added at the top level of the statechart. A
+`EndMotion.when_true(node=node)`, and must be added at the top level of the statechart. A
 `CancelStatechart` node ends the motion by raising its exception at the end of the control
 cycle it starts in.
 
@@ -73,8 +73,8 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 # goal_state is a JointState of the robot's joints
 motion_statechart = Statechart(context=executor.context)
 plan = Sequence(nodes=[JointPositionList(goal_state=goal_state)])
-motion_statechart.add_node(plan)
-motion_statechart.add_node(EndMotion.when_true(plan))
+motion_statechart.add_node(node=plan)
+motion_statechart.add_node(node=EndMotion.when_true(node=plan))
 ```
 
 ## Running a motion statechart
@@ -94,7 +94,7 @@ executor = StatechartExecutor(
     extensions=[MotionControl()],
 )
 # ... build motion_statechart = Statechart(context=executor.context) as above
-executor.compile(motion_statechart)
+executor.compile(statechart=motion_statechart)
 executor.tick_until_end()
 ```
 

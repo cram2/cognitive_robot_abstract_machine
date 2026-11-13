@@ -8,10 +8,13 @@ be persisted or turned into a data access object until they have been generated 
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from functools import cached_property
+from enum import StrEnum
 from pathlib import Path
 
 from tqdm import tqdm
@@ -21,7 +24,10 @@ from cognitive_robot_abstract_machine import orm_generation
 from cognitive_robot_abstract_machine.exceptions import (
     OrmGenerationFailedError,
     MissingORMGeneratorError,
+    UnknownOrmPackageError,
+    UnorderableOrmInterfacesError,
 )
+from krrood.utils import module_level_imports
 from krrood.class_diagrams.progress_report import (
     ClassDiagramProgress,
     ProgressEnvironmentVariable,
@@ -169,10 +175,32 @@ class OrmInterface:
     Root of the checkout the package lives in.
     """
 
-    dependencies: tuple[str, ...] = ()
-    """
-    Names of the packages whose ORM model this interface builds on.
-    """
+    @cached_property
+    def dependencies(self) -> tuple[str, ...]:
+        """
+        :return: The names of the packages whose generated interface this interface's
+            generator imports with a module-level ``import`` statement, and so builds on.
+        """
+        tree = ast.parse(self.generator.read_text(encoding="utf-8"))
+        imported_modules = [
+            alias.name
+            for statement in module_level_imports(tree)
+            if isinstance(statement, ast.Import)
+            for alias in statement.names
+        ]
+        interface_module_suffix = f".orm.{Path(INTERFACE_FILE_NAME).stem}"
+        imported_interface_packages = [
+            module.removesuffix(interface_module_suffix)
+            for module in imported_modules
+            if module.endswith(interface_module_suffix)
+        ]
+        return tuple(
+            dict.fromkeys(
+                package_name
+                for package_name in imported_interface_packages
+                if "." not in package_name and package_name != self.package_name
+            )
+        )
 
     @property
     def generator(self) -> Path:
@@ -294,7 +322,7 @@ class GenerationOutput:
         if started is not None:
             self.start(started.package_name)
             return
-        report = ClassDiagramProgress.from_line(line)
+        report = ClassDiagramProgress.from_line(line=line)
         if report is None:
             self.written.append(line)
             return
@@ -331,8 +359,61 @@ class WorkspaceOrmInterfaces:
 
     interfaces: Sequence[OrmInterface]
     """
-    The interfaces in the order they are built, which follows their dependencies.
+    The interfaces, in any order.
     """
+
+    @cached_property
+    def interfaces_in_build_order(self) -> tuple[OrmInterface, ...]:
+        """
+        :return: The interfaces, each after every interface it builds on, and otherwise
+            in the order of :attr:`interfaces`.
+        :raises UnorderableOrmInterfacesError: If no such order exists.
+        """
+        ordered: list[OrmInterface] = []
+        placed_package_names: set[str] = set()
+        remaining = list(self.interfaces)
+        while remaining:
+            buildable = next(
+                (
+                    interface
+                    for interface in remaining
+                    if set(interface.dependencies) <= placed_package_names
+                ),
+                None,
+            )
+            if buildable is None:
+                raise UnorderableOrmInterfacesError(
+                    tuple(interface.package_name for interface in remaining)
+                )
+            ordered.append(buildable)
+            placed_package_names.add(buildable.package_name)
+            remaining.remove(buildable)
+        return tuple(ordered)
+
+    def interfaces_needed_by_package(self, package_name: str) -> WorkspaceOrmInterfaces:
+        """
+        :param package_name: The package whose ORM model is read.
+        :return: The package's interface and every interface it builds on.
+        :raises UnknownOrmPackageError: If no interface belongs to the package.
+        """
+        interfaces_by_package = {
+            interface.package_name: interface for interface in self.interfaces
+        }
+        if package_name not in interfaces_by_package:
+            raise UnknownOrmPackageError(package_name, tuple(interfaces_by_package))
+        needed_package_names = set()
+        unvisited_package_names = [package_name]
+        while unvisited_package_names:
+            visited = unvisited_package_names.pop()
+            needed_package_names.add(visited)
+            unvisited_package_names.extend(interfaces_by_package[visited].dependencies)
+        return WorkspaceOrmInterfaces(
+            tuple(
+                interface
+                for interface in self.interfaces
+                if interface.package_name in needed_package_names
+            )
+        )
 
     @property
     def is_outdated(self) -> bool:
@@ -381,7 +462,7 @@ class WorkspaceOrmInterfaces:
             "-P",
             "-m",
             orm_generation.__name__,
-            *(str(interface.generator) for interface in self.interfaces),
+            *(str(interface.generator) for interface in self.interfaces_in_build_order),
         ]
 
     def run_writing_to_the_terminal(self) -> None:
@@ -434,25 +515,59 @@ class WorkspaceOrmInterfaces:
         A generator writes its interface last, so the first one missing is the one that
         gave up.
         """
-        for interface in self.interfaces:
+        for interface in self.interfaces_in_build_order:
             if not interface.path.exists():
                 return interface.package_name
-        return self.interfaces[-1].package_name
+        return self.interfaces_in_build_order[-1].package_name
 
 
-# Every generator runs in the same interpreter, which imports each package once for the
-# whole build instead of once per generator. The order therefore has to satisfy two
-# constraints: a package follows the packages whose ORM model it builds on, and it
-# precedes every package it does not build on that defines alternative mappings, because
-# ORMatic collects those from all imported subclasses.
+# %% the packages of this repository that generate an ORM interface
+
+
+class OrmPackage(StrEnum):
+    """
+    The packages of this repository that generate an ORM interface.
+    """
+
+    SEMANTIC_DIGITAL_TWIN = "semantic_digital_twin"
+    """
+    Its interface builds on no other one.
+    """
+
+    SEGMIND = "segmind"
+    """
+    Its interface builds on :attr:`CRAMPH`'s.
+    """
+
+    CRAMPH = "cramph"
+    """
+    Its interface builds on :attr:`SEMANTIC_DIGITAL_TWIN`'s.
+    """
+
+    GISKARDPY = "giskardpy"
+    """
+    Its interface builds on :attr:`CRAMPH`'s.
+    """
+
+    CORAPLEX = "coraplex"
+    """
+    Its interface builds on :attr:`GISKARDPY`'s.
+    """
+
+    EXPERIMENTS = "experiments"
+    """
+    Its interface builds on :attr:`CORAPLEX`'s.
+    """
+
+
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
-        OrmInterface("semantic_digital_twin", REPOSITORY_ROOT),
-        OrmInterface("segmind", REPOSITORY_ROOT, ("semantic_digital_twin",)),
-        OrmInterface("cramph", REPOSITORY_ROOT, ("semantic_digital_twin",)),
-        OrmInterface("giskardpy", REPOSITORY_ROOT, ("cramph",)),
-        OrmInterface("coraplex", REPOSITORY_ROOT, ("giskardpy",)),
-        OrmInterface("experiments", REPOSITORY_ROOT, ("coraplex",)),
+        OrmInterface(OrmPackage.SEMANTIC_DIGITAL_TWIN, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.CRAMPH, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.SEGMIND, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.GISKARDPY, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.CORAPLEX, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.EXPERIMENTS, REPOSITORY_ROOT),
     )
 )
 """

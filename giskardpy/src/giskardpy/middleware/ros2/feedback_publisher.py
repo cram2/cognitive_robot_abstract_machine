@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 import time
 from dataclasses import dataclass, field
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class MotionStatechartPayloadKey(StrEnum):
     """
     The keys of the motion statechart feedback sent to the action client on top of the
-    :class:`~cramph.data_types.StatechartPayloadKey`.
+    :class:`~cramph.reported_statechart.StatechartPayloadKey`.
     """
 
     WAITING_FOR_CHILD = "waiting_for_child"
@@ -129,7 +129,7 @@ class ActionFeedbackPublisher:
         return [
             node
             for node in self.executor.statechart.get_nodes_by_type(
-                CompositeNodeChoosingItsChild
+                node_type=CompositeNodeChoosingItsChild
             )
             if node.is_waiting_for_a_child
         ]

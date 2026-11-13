@@ -96,8 +96,8 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
         return {**super().to_json(**kwargs), "is_paused": self._is_paused}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        instance = super()._from_json(data, **kwargs)
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        instance = super()._from_json(data=data, **kwargs)
         instance._is_paused = data.get("is_paused", False)
         return instance
 

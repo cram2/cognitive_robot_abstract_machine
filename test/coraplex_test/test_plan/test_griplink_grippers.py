@@ -19,7 +19,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
 )
 from cramph.context import ContextExtension, StatechartContext
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkActionServerTask,
     GriplinkFlexActionServerTask,
@@ -57,7 +57,9 @@ def real_daisy_executor(extensions: list[ContextExtension]) -> RealDAiSyPlanExec
     :return: An executor sending plans to the real DAiSy.
     """
     return RealDAiSyPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions)
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        )
     )
 
 

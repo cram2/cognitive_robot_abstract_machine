@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import scipy.special
 from random_events.interval import (
     Bound,
     SimpleInterval,
@@ -16,7 +17,6 @@ from random_events.interval import (
     singleton,
 )
 from random_events.product_algebra import SimpleEvent
-from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 
 from krrood.adapters.json_serializer import from_json, to_json
@@ -50,10 +50,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
     SampleRowsOfNode,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
-    InnerLayerEdge,
-    InnerLayerEdges,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
     ProductLayer,
@@ -90,16 +86,17 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
+    InnerLayerEdges,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    RowReduction,
+    SparseEdgeMatrix,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
     LogProbabilitiesOfLayers,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.utils import (
-    embedded_logsumexp,
 )
 from probabilistic_model.utils import MissingDict
 
@@ -126,24 +123,65 @@ def event_bounds(request) -> tuple[Bound, Bound]:
     return request.param
 
 
-# %% log-sum-exp
+# %% reduction of the entries of every row of a sparse array
 
 
-def test_embedded_logsumexp():
+def test_entry_positions_by_rank_list_the_kth_entry_of_every_row(uneven_rows):
+    np.testing.assert_array_equal(uneven_rows.rows_by_entry_count, [2, 0, 1, 3])
+    assert [
+        positions.tolist() for positions in uneven_rows.entry_positions_by_rank
+    ] == [
+        [0, 1, 3],
+        [2, 5],
+        [4],
+    ]
+
+
+def test_reduce_by_row_with_logaddexp_is_the_logsumexp_of_every_row(uneven_rows):
+    values = np.random.normal(size=(2, 5, uneven_rows.number_of_edges))
+    values[0, 0, [1, 5]] = -np.inf
+    expected = np.stack(
+        [
+            scipy.special.logsumexp(values[..., uneven_rows.rows == row], axis=-1)
+            for row in range(uneven_rows.shape[0])
+        ],
+        axis=-1,
+    )
     np.testing.assert_allclose(
-        embedded_logsumexp(
-            np.array([[np.log(0.2), np.log(0.3)], [np.log(0.5), -np.inf]]), axis=1
-        ),
-        np.array([np.log(0.5), np.log(0.5)]),
+        uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP), expected
     )
 
 
-def test_logsumexp_of_only_minus_infinity_is_minus_infinity():
-    # the padding of the edge gather is -inf, so a node without edges reduces to a
-    # whole row of -inf and does not turn into a nan
+def test_reduce_by_row_with_add_is_the_sum_of_every_row(uneven_rows):
+    values = np.random.normal(size=(2, 5, uneven_rows.number_of_edges))
+    expected = np.stack(
+        [
+            values[..., uneven_rows.rows == row].sum(axis=-1)
+            for row in range(uneven_rows.shape[0])
+        ],
+        axis=-1,
+    )
+    np.testing.assert_allclose(
+        uneven_rows.reduce_by_row(values, RowReduction.SUM), expected
+    )
+
+
+def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
+    uneven_rows,
+):
+    values = np.full((3, uneven_rows.number_of_edges), -np.inf)
+    with np.errstate(all="raise"):
+        result = uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP)
+    np.testing.assert_array_equal(result, np.full((3, uneven_rows.shape[0]), -np.inf))
+
+
+@pytest.mark.parametrize("reduction", [RowReduction.SUM, RowReduction.LOG_SUM_EXP])
+def test_reduce_by_row_gives_a_row_without_entries_the_identity(uneven_rows, reduction):
+    values = np.random.normal(size=(3, uneven_rows.number_of_edges))
+    row_without_entries = 3
     np.testing.assert_array_equal(
-        embedded_logsumexp(np.array([[-np.inf, -np.inf]]), axis=1),
-        np.array([-np.inf]),
+        uneven_rows.reduce_by_row(values, reduction)[:, row_without_entries],
+        reduction.identity,
     )
 
 
@@ -155,14 +193,63 @@ def test_decomposability_is_decided_per_node():
     other_leaf_x = uniform_layer_of(0, [(1, 2)])
     leaf_y = uniform_layer_of(1, [(0, 1)])
     # node 0 multiplies x and y, node 1 multiplies x twice
-    edges = coo_array(
-        (np.zeros(4, dtype=np.int64), ([0, 1, 0, 2], [0, 0, 1, 1])), shape=(3, 2)
+    edges = InnerLayerEdges(
+        np.array([0, 0, 1, 1]), np.array([0, 1, 0, 2]), np.zeros(4, dtype=np.int64)
     )
-    layer = ProductLayer([leaf_x, leaf_y, other_leaf_x], edges)
+    layer = ProductLayer.from_edges([leaf_x, leaf_y, other_leaf_x], edges, 2)
     np.testing.assert_array_equal(
         layer.is_decomposable_of_nodes(), np.array([True, False])
     )
     assert not layer.is_decomposable()
+
+
+# %% structure fixed at construction
+
+
+def test_sparsity_stores_every_column_once_in_order_only_for_identity_columns():
+    identity = SparseEdgeMatrix(np.array([0, 0, 1]), np.array([0, 1, 2]), (2, 3))
+    permuted = SparseEdgeMatrix(np.array([0, 0, 1]), np.array([1, 0, 2]), (2, 3))
+    assert identity.stores_every_column_once_in_order
+    assert not permuted.stores_every_column_once_in_order
+
+
+@pytest.fixture
+def product_with_two_factors_in_one_child_layer() -> ProductLayer:
+    """
+    A product layer whose single node multiplies both nodes of one uniform layer.
+    """
+    leaf = uniform_layer_of(0, [(0, 2), (0, 4)])
+    edges = InnerLayerEdges(np.array([0, 0]), np.array([0, 0]), np.array([0, 1]))
+    return ProductLayer.from_edges([leaf], edges, 1)
+
+
+def test_product_layer_stores_each_factor_of_a_node(
+    product_with_two_factors_in_one_child_layer,
+):
+    factors = product_with_two_factors_in_one_child_layer.edges
+    assert (factors.rows.tolist(), factors.columns.tolist()) == ([0, 0], [0, 1])
+
+
+def test_product_layer_adds_the_log_likelihoods_of_factors_in_one_child_layer(
+    product_with_two_factors_in_one_child_layer,
+):
+    events = np.array([[1.0]])
+    [leaf] = product_with_two_factors_in_one_child_layer.child_layers
+    np.testing.assert_array_equal(
+        product_with_two_factors_in_one_child_layer.log_likelihood_of_nodes(events),
+        leaf.log_likelihood_of_nodes(events).sum(axis=1, keepdims=True),
+    )
+
+
+def test_attaching_a_child_layer_stores_its_factors(
+    product_with_two_factors_in_one_child_layer,
+):
+    other_leaf = uniform_layer_of(1, [(0, 1)])
+    product_with_two_factors_in_one_child_layer.attach_child_layer(
+        other_leaf, np.array([0]), np.array([0])
+    )
+    factors = product_with_two_factors_in_one_child_layer.edges
+    assert (factors.rows.tolist(), factors.columns.tolist()) == ([0, 0, 0], [0, 1, 2])
 
 
 # %% truncation of input layers in a circuit
@@ -204,11 +291,10 @@ def test_truncating_to_a_singleton(x):
 
 
 def test_an_impossible_node_is_removed_but_its_siblings_survive(x):
-    root = SumLayer(
+    root = SumLayer.from_entries(
         [uniform_layer_of(0, [(0, 1), (2, 3)])],
-        RowGroupedSparseArray.from_entries(
-            SparseEntries(np.log([0.25, 0.75]), [0, 0], [0, 1]), (1, 2)
-        ),
+        SparseEntries(np.log([0.25, 0.75]), [0, 0], [0, 1]),
+        1,
     )
     circuit = LayeredProbabilisticCircuit(SortedSet([x]), root)
     event = SimpleEvent.from_data({x: closed(2.0, 3.0)}).as_composite_set()
@@ -743,36 +829,14 @@ def test_mixture_of_rejects_a_wrong_number_of_weights(leaf_x):
 # %% datastructures of the queries
 
 
-def test_edges_into_one_child_layer():
-    edges = InnerLayerEdges(
-        np.array([0, 0, 1, 1]), np.array([0, 1, 0, 0]), np.array([2, 0, 1, 3])
-    )
-    into_first = edges.into_child_layer(0)
-    assert list(into_first) == [
-        InnerLayerEdge(0, 0, 2),
-        InnerLayerEdge(1, 0, 1),
-        InnerLayerEdge(1, 0, 3),
-    ]
-    assert not into_first.every_node_at_most_once
-    assert edges.into_child_layer(1).every_node_at_most_once
-
-
-def test_product_layer_edges_per_child_layer():
-    layer = ProductLayer.product_of(
-        [uniform_layer_of(0, [(0, 1)]), uniform_layer_of(1, [(0, 1)])]
-    )
-    assert [list(edges) for edges in layer.edges_per_child_layer] == [
-        [InnerLayerEdge(0, 0, 0)],
-        [InnerLayerEdge(0, 1, 0)],
-    ]
-
-
 def test_sparse_entries_concatenate_into_one_array():
     entries = SparseEntries.concatenate(
         [SparseEntries([1.0], [0], [1]), SparseEntries([2.0], [1], [0])]
     )
-    np.testing.assert_array_equal(
-        entries.to_coo_array((2, 2)).toarray(), np.array([[0.0, 1.0], [2.0, 0.0]])
+    assert (entries.data.tolist(), entries.rows.tolist(), entries.columns.tolist()) == (
+        [1.0, 2.0],
+        [0, 1],
+        [1, 0],
     )
 
 
@@ -1009,11 +1073,8 @@ def test_a_discrete_node_without_mass_samples_nothing(integer_layer, count):
 
 def test_the_support_of_a_sum_does_not_alter_the_support_of_its_children(x):
     child = uniform_layer_of(0, [(0, 1), (2, 3)])
-    root = SumLayer(
-        [child],
-        RowGroupedSparseArray.from_entries(
-            SparseEntries(np.log([0.5, 0.5]), [0, 0], [0, 1]), (1, 2)
-        ),
+    root = SumLayer.from_entries(
+        [child], SparseEntries(np.log([0.5, 0.5]), [0, 0], [0, 1]), 1
     )
     variables = SortedSet([x])
     [support] = root.support_of_nodes(variables)

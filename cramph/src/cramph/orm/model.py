@@ -26,7 +26,7 @@ from semantic_digital_twin.world import World
 # %% the history of a statechart's state
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeStatesAtTick:
     """
     The life cycle and observation value of every node of a statechart at one tick, as a
@@ -56,8 +56,14 @@ class NodeStatesAtTick:
     None if they did not end it.
     """
 
+    cancellation_error: Exception | None = None
+    """
+    The exception the cancellation ended the statechart with, None if the values did not
+    end it.
+    """
+
     @classmethod
-    def from_item(cls, item: StateHistoryItem) -> Self:
+    def from_item(cls, *, item: StateHistoryItem) -> Self:
         """
         :param item: A snapshot of a statechart's state.
         :return: The values the snapshot holds.
@@ -69,9 +75,10 @@ class NodeStatesAtTick:
             cancelling_node_index=(
                 None if item.cancelled_by is None else item.cancelled_by.index
             ),
+            cancellation_error=item.cancellation_error,
         )
 
-    def item_of(self, statechart: Statechart) -> StateHistoryItem:
+    def item_of(self, *, statechart: Statechart) -> StateHistoryItem:
         """
         :param statechart: The statechart whose nodes the values belong to.
         :return: The snapshot holding the values.
@@ -89,15 +96,16 @@ class NodeStatesAtTick:
             cancelled_by=(
                 None
                 if self.cancelling_node_index is None
-                else statechart.get_node_by_index(self.cancelling_node_index)
+                else statechart.get_node_by_index(index=self.cancelling_node_index)
             ),
+            cancellation_error=self.cancellation_error,
         )
 
 
 # %% a statechart
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StatechartMapping(AlternativeMapping[Statechart]):
     """
     A statechart with its nodes, the conditions of their transitions and the history of
@@ -132,21 +140,22 @@ class StatechartMapping(AlternativeMapping[Statechart]):
     """
 
     @classmethod
-    def from_domain_object(cls, obj: Statechart) -> Self:
+    def from_domain_object(cls, *, obj: Statechart) -> Self:
         return cls(
             context=obj.context,
             pass_limit=obj.pass_limit,
             passes_per_nesting_level=obj.passes_per_nesting_level,
             structure=json.dumps(obj.to_json()),
             state_history=[
-                NodeStatesAtTick.from_item(item) for item in obj.state_history.items
+                NodeStatesAtTick.from_item(item=item)
+                for item in obj.state_history.items
             ],
         )
 
     def to_domain_object(self) -> Statechart:
         world = self.context.world
         statechart = Statechart.from_json(
-            json.loads(self.structure),
+            data=json.loads(self.structure),
             context=self.context,
             world=world,
             **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
@@ -154,7 +163,9 @@ class StatechartMapping(AlternativeMapping[Statechart]):
         statechart.pass_limit = self.pass_limit
         statechart.passes_per_nesting_level = self.passes_per_nesting_level
         for states in self.state_history:
-            statechart.state_history.append(states.item_of(statechart))
+            statechart.state_history.append(
+                next_item=states.item_of(statechart=statechart)
+            )
         latest = statechart.state_history.latest_item
         if latest is not None:
             statechart.life_cycle_state.data = (

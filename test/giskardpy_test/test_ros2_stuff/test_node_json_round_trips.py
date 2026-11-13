@@ -16,7 +16,7 @@ from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 from typing_extensions import Any, Iterator
-
+from control_msgs.action import ParallelGripperCommand
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
@@ -30,8 +30,11 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkFlexActionServerTask,
     GriplinkPresetActionServerTask,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
-from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
+from giskardpy.motion_statechart.ros2_nodes.action_servers import (
+    NavigateActionServerTask,
+    RobotiqGripperActionServerTask,
+)
+from giskardpy.motion_statechart.ros2_nodes.topics import (
     PublishOnStart,
     TopicNode,
     TopicPublisherNode,
@@ -60,6 +63,7 @@ class RosName(StrEnum):
     NAVIGATION_ACTION = "navigate"
     GRIP_ACTION = "grip"
     FLEXGRIP_ACTION = "flexgrip"
+    ROBOTIQ_ACTION = "robotiq_gripper"
 
 
 def _cases() -> list[NodeRoundTripCase]:
@@ -115,6 +119,18 @@ def _cases() -> list[NodeRoundTripCase]:
                     action_topic=RosName.FLEXGRIP_ACTION,
                     message_type=Flexgrip,
                     grip_position=0.05,
+                )
+            ],
+        ),
+        NodeRoundTripCase(
+            RobotiqGripperActionServerTask,
+            lambda world: [
+                RobotiqGripperActionServerTask(
+                    action_topic=RosName.ROBOTIQ_ACTION,
+                    message_type=ParallelGripperCommand,
+                    target_position=0.04,
+                    target_velocity=10.0,
+                    target_effort=50.0,
                 )
             ],
         ),
@@ -200,7 +216,7 @@ def sending_context(
     context = create_context_with_motion_control(
         request.getfixturevalue(case.world_fixture)
     )
-    RosNodeAccess(rclpy_node).extend_context(context)
+    RosNodeAccess(ros_node=rclpy_node).extend_context(context=context)
     return context
 
 
@@ -210,8 +226,23 @@ def receiving_executor(
 ) -> StatechartExecutor:
     return StatechartExecutor(
         context=StatechartContext(world=request.getfixturevalue(case.world_fixture)),
-        extensions=[RosNodeAccess(rclpy_node), MotionControl()],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl()],
     )
+
+
+@pytest.fixture(autouse=True)
+def robotiq_action_server(rclpy_node: Node) -> Iterator[ActionServer]:
+    """
+    :return: The action server the robotiq task waits for before it is built.
+    """
+    server = ActionServer(
+        rclpy_node,
+        ParallelGripperCommand,
+        RosName.ROBOTIQ_ACTION,
+        partial(_finish_the_goal_at_once, ParallelGripperCommand),
+    )
+    yield server
+    server.destroy()
 
 
 # %% round trips

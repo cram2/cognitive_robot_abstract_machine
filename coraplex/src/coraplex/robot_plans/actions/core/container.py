@@ -1,3 +1,7 @@
+"""
+The actions that open and close a container by moving its handle.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -6,7 +10,7 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import (
     a,
-    flat_variable,
+    variable_from,
     variable,
 )
 from krrood.entity_query_language.query.match import Match
@@ -20,7 +24,7 @@ from coraplex.robot_plans.mixins import (
     OperatesGripper,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
@@ -73,8 +77,12 @@ class MovesContainerByItsHandle(
             Pose, domain=[Pose(reference_frame=arm._robot.root)]
         )
         return a(cls)(
-            grasp=flat_variable(
-                GraspsByCloseness(handle, where_the_robot_stands, number_of_grasps=None)
+            grasp=variable_from(
+                GraspsByCloseness(
+                    graspable=handle,
+                    standing_position=where_the_robot_stands,
+                    number_of_grasps=None,
+                )
             ),
             arm=arm,
         )

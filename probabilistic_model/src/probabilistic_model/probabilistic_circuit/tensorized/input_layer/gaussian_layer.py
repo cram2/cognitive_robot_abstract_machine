@@ -9,7 +9,7 @@ from random_events.interval import SimpleInterval, reals
 from random_events.variable import Variable
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Self
+from typing_extensions import Self
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -17,6 +17,7 @@ from probabilistic_model.distributions.gaussian import (
 )
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
@@ -31,6 +32,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base impor
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous_layer_with_density import (
     ContinuousLayerWithDensity,
     ContinuousLayerWithConstrainedSupport,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.normal_distribution_functions import (
+    NormalDistributionFunctions,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
@@ -54,6 +58,13 @@ class HasLocationAndScale:
     The standard deviation of the Gaussian of every node.
     """
 
+    @property
+    def parameters(self) -> list[BackendArray]:
+        """
+        :return: The location and the scale of every node.
+        """
+        return [self.location, self.scale]
+
     def validate_own(self):
         """
         :raises ShapeMismatchError: If there is not one scale per location.
@@ -65,6 +76,27 @@ class HasLocationAndScale:
         non_positive = ~(self.scale > 0)
         if non_positive.any():
             raise NonPositiveScaleError(self.scale[non_positive])
+
+    def normal_log_density(self, *, column: BackendArray) -> SampleNodeValues:
+        """
+        :param column: The values with shape (#events, 1).
+        :return: The log-density of the Gaussian of every node at every value, shape
+            (#events, #nodes).
+        """
+        return NormalDistributionFunctions.from_arrays(
+            self.location, self.scale
+        ).log_density(column, self.location, self.scale)
+
+    def normal_cumulative_distribution(self, values: NodeValues) -> NodeValues:
+        """
+        :param values: Values that broadcast against the nodes, such as one per node or
+            a column of shape (#events, 1).
+        :return: The cumulative distribution function of the Gaussian of every node at
+            the values.
+        """
+        return NormalDistributionFunctions.from_arrays(
+            self.location, self.scale
+        ).cumulative_distribution(values, self.location, self.scale)
 
     def has_equal_parameters(self, other: Self) -> bool:
         """
@@ -93,14 +125,12 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
-        return norm.logpdf(column, loc=self.location, scale=self.scale)
+        return self.normal_log_density(column=self.float_column(values=values))
 
     def cumulative_distribution_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
-        return norm.cdf(column, loc=self.location, scale=self.scale)
+        return self.normal_cumulative_distribution(self.float_column(values=values))
 
     def raw_moments(self, order: int) -> list[NodeValues]:
         r"""
@@ -116,9 +146,9 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         """
         result = []
         for current_order in range(order + 1):
-            raw_moment = np.zeros(self.number_of_nodes)
+            raw_moment = self.namespace.zeros_like(self.location)
             for j in range(math.floor(current_order / 2) + 1):
-                raw_moment += (
+                raw_moment = raw_moment + (
                     math.comb(current_order, 2 * j)
                     * self.location ** (current_order - 2 * j)
                     * self.scale ** (2 * j)
@@ -131,10 +161,15 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
     ) -> NodeValues:
+        """
+        Like :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.ba
+        se.UnivariateInputLayer.moment_of_nodes_own`, in closed form from the raw
+        moments of :meth:`raw_moments`.
+        """
         raw_moments = self.raw_moments(order)
-        result = np.zeros(self.number_of_nodes)
+        result = self.namespace.zeros_like(self.location)
         for current_order in range(order + 1):
-            result += (
+            result = result + (
                 math.comb(order, current_order)
                 * raw_moments[current_order]
                 * (-center) ** (order - current_order)
@@ -242,6 +277,13 @@ class TruncatedGaussianLayer(
     produces.
     """
 
+    @property
+    def parameters(self) -> list[BackendArray]:
+        """
+        :return: The supports, the locations and the scales of the nodes.
+        """
+        return [self.interval, self.location, self.scale]
+
     def validate_own(self):
         HasLocationAndScale.validate_own(self)
         ContinuousLayerWithConstrainedSupport.validate_own(self)
@@ -261,7 +303,7 @@ class TruncatedGaussianLayer(
         :return: The untruncated cumulative distribution at the lower bound of every
             node.
         """
-        return norm.cdf(self.lower, loc=self.location, scale=self.scale)
+        return self.normal_cumulative_distribution(self.lower)
 
     @property
     def normalizing_constant(self) -> NodeValues:
@@ -270,32 +312,35 @@ class TruncatedGaussianLayer(
             Gaussian.
         """
         return (
-            norm.cdf(self.upper, loc=self.location, scale=self.scale)
+            self.normal_cumulative_distribution(self.upper)
             - self.cumulative_distribution_to_lower
         )
 
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
         with np.errstate(divide="ignore"):
-            density = norm.logpdf(column, loc=self.location, scale=self.scale) - np.log(
-                self.normalizing_constant
-            )
-        return np.where(self.included_condition(values), density, -np.inf)
+            density = self.normal_log_density(
+                column=self.float_column(values=values)
+            ) - self.namespace.log(self.normalizing_constant)
+        return self.namespace.where(self.included_condition(values), density, -np.inf)
 
     def cumulative_distribution_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
-        left_included = np.where(
-            self.left_closed, self.lower <= column, self.lower < column
+        column = self.float_column(values=values)
+        left_included = self.namespace.where(
+            self.namespace.asarray(self.left_closed),
+            self.lower <= column,
+            self.lower < column,
         )
-        untruncated = norm.cdf(column, loc=self.location, scale=self.scale)
+        untruncated = self.normal_cumulative_distribution(column)
         result = (
             untruncated - self.cumulative_distribution_to_lower
         ) / self.normalizing_constant
-        return np.minimum(1.0, np.where(left_included, result, 0.0))
+        return self.namespace.minimum(
+            1.0, self.namespace.where(left_included, result, 0.0)
+        )
 
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         location, scale = self.location[nodes], self.scale[nodes]

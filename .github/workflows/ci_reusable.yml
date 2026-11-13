@@ -117,6 +117,15 @@ jobs:
           cd cognitive_robot_abstract_machine
           krrood agents-md --check
 
+      - name: Check the generated skills
+        # Every SKILL.md of a skill declared in agent_skills.py is generated; a hand edit
+        # or a forgotten regeneration fails here.
+        if: ${{ inputs.lib == 'krrood' }}
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          cd cognitive_robot_abstract_machine
+          krrood skills --check
+
       - name: Run tests
         run: |
           source /opt/ros/cram-env/bin/activate

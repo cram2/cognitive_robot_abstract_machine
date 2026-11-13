@@ -103,7 +103,7 @@ def get_default_value(dataclass_type, field_name):
         elif f.default_factory is not MISSING:  # handles mutable defaults
             return f.default_factory()
         else:
-            raise NoDefaultValueFound(dataclass_type, field_name)
+            raise NoDefaultValueFound(clazz=dataclass_type, field_name=field_name)
     return None
 
 
@@ -350,7 +350,7 @@ def get_path_starting_from_latest_encounter_of(
     """
     path_parts = path.split(os.path.sep)
     if package_name not in path_parts:
-        raise PackageNameNotFoundError(package_name, path)
+        raise PackageNameNotFoundError(package_name=package_name, path=path)
     idx = path_parts.index(package_name)
     prev_idx = idx
     while all(sc in path_parts[idx:] for sc in should_contain):
@@ -363,7 +363,7 @@ def get_path_starting_from_latest_encounter_of(
         path_parts = path_parts[prev_idx:]
         return os.path.join(*path_parts)
     else:
-        raise PathMissingRequiredPartsError(should_contain, path)
+        raise PathMissingRequiredPartsError(required_parts=should_contain, path=path)
 
 
 def get_generic_type_parameters(
@@ -473,7 +473,7 @@ def get_scope_from_imports(
         attributes.
     """
     if tree is None and file_path is None and source is None:
-        raise SourceDataNotProvided(file_path, tree, source)
+        raise SourceDataNotProvided(file_path=file_path, tree=tree, source_code=source)
 
     # Ensure we have source and a parsed AST
     if file_path and source is None:

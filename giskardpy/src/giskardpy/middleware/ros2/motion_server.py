@@ -12,7 +12,7 @@ from json_msgs.action import JsonAction
 
 from cramph.executor import StatechartExecutor
 from cramph.executor import RealTimePacer
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.control_loop import ControlLoop
@@ -148,13 +148,15 @@ class MotionServer:
         whether that happens while idle or while a goal is running. Either way the robot
         is stopped before the interrupt is allowed to propagate further.
         """
-        rospy.get_node().get_logger().info("giskard is ready")
+        background_node.get_node().get_logger().info("giskard is ready")
         try:
             while rclpy.ok() and not self._stop_requested.is_set():
                 self.run_idle_cycle()
                 self.idle_pacer.sleep()
         except KeyboardInterrupt:
-            rospy.get_node().get_logger().info("Interrupted, stopping the robot.")
+            background_node.get_node().get_logger().info(
+                "Interrupted, stopping the robot."
+            )
             self.control_loop.stop()
             raise
 
@@ -211,7 +213,9 @@ class MotionServer:
         self.outgoing_world_updates.start_goal()
         error: Exception | None = None
         try:
-            goal = MotionGoal.from_json(json.loads(self.action_server.goal_msg.goal))
+            goal = MotionGoal.from_json(
+                data=json.loads(self.action_server.goal_msg.goal)
+            )
             self.client_watchdog.watch(goal.client)
             self.wait_for_required_world_updates(goal.required_position)
             self.compile_goal(goal)
@@ -262,7 +266,7 @@ class MotionServer:
         """
         Turn the goal message into a compiled motion statechart.
         """
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"Parsing goal #{self.action_server.goal_id} message."
         )
         tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
@@ -271,9 +275,9 @@ class MotionServer:
         motion_statechart = goal.parse_motion_statechart(
             context=self.executor.context, **kwargs
         )
-        self.executor.compile(motion_statechart)
+        self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
-        rospy.get_node().get_logger().info("Done parsing goal message.")
+        background_node.get_node().get_logger().info("Done parsing goal message.")
 
     def finish_goal(self, error: Exception | None) -> None:
         """
@@ -305,13 +309,15 @@ class MotionServer:
         match error:
             case ExecutionCanceledException():
                 self.action_server.set_canceled()
-                rospy.get_node().get_logger().warning("Goal canceled by user.")
+                background_node.get_node().get_logger().warning(
+                    "Goal canceled by user."
+                )
             case None:
                 self.action_server.set_succeeded()
-                rospy.get_node().get_logger().info("Goal succeeded.")
+                background_node.get_node().get_logger().info("Goal succeeded.")
             case _:
                 self.action_server.set_aborted()
-                rospy.get_node().get_logger().error(f"Goal aborted: {error}")
+                background_node.get_node().get_logger().error(f"Goal aborted: {error}")
         states = self.create_states()
         if error is not None:
             states["error"] = self.serialize_error(error)
@@ -330,7 +336,7 @@ class MotionServer:
         try:
             return to_json(error)
         except JSONSerializationError as serialization_error:
-            rospy.get_node().get_logger().error(
+            background_node.get_node().get_logger().error(
                 f"Cannot send {type(error).__name__} to the client: "
                 f"{serialization_error}"
             )
@@ -365,7 +371,7 @@ class MotionServer:
             try:
                 plotter.plot(self.action_server.goal_id)
             except Exception:
-                rospy.get_node().get_logger().error(
+                background_node.get_node().get_logger().error(
                     f"{type(plotter).__name__} failed to plot goal "
                     f"#{self.action_server.goal_id}:\n{traceback.format_exc()}"
                 )

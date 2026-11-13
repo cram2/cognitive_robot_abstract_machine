@@ -703,7 +703,7 @@ class ConditionExtractor:
             )
         if not value_written_first:
             operation = self.reversed_comparisons[operation]
-        return Comparator(value, compared_against, operation)
+        return Comparator(left=value, right=compared_against, operation=operation)
 
     @staticmethod
     def bound_written_as(operand: ast.expr) -> Any:

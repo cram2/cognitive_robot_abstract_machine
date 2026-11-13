@@ -6,10 +6,9 @@ from cramph.data_types import ObservationStateValues
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianOrientation,
     CartesianPose,
     CartesianPosition,
@@ -18,6 +17,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianRotationVelocityLimit,
     CartesianVelocityLimit,
 )
+from giskardpy.motion_statechart.graph_node import EndMotion
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -45,13 +45,17 @@ def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        pose := CartesianPose(
-            root_link=cylinder_bot_world.root,
-            tip_link=tip,
-            goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
+        node=(
+            pose := CartesianPose(
+                root_link=cylinder_bot_world.root,
+                tip_link=tip,
+                goal_pose=Pose.from_xyz_rpy(
+                    x=0.1, reference_frame=cylinder_bot_world.root
+                ),
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(pose))
+    statechart.add_node(node=EndMotion.when_true(node=pose))
     executor.compile(statechart=statechart)
 
     assert isinstance(pose, Parallel)
@@ -79,9 +83,9 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     speed_cap = CartesianPositionVelocityLimit(
         root_link=cylinder_bot_world.root, tip_link=tip
     )
-    pose.add_node(speed_cap)
-    statechart.add_node(pose)
-    statechart.add_node(EndMotion.when_true(pose))
+    pose.add_node(node=speed_cap)
+    statechart.add_node(node=pose)
+    statechart.add_node(node=EndMotion.when_true(node=pose))
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
@@ -101,13 +105,17 @@ def test_cartesian_pose_observes_its_goal_reached(
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        pose := CartesianPose(
-            root_link=cylinder_bot_world.root,
-            tip_link=tip,
-            goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
+        node=(
+            pose := CartesianPose(
+                root_link=cylinder_bot_world.root,
+                tip_link=tip,
+                goal_pose=Pose.from_xyz_rpy(
+                    x=0.1, reference_frame=cylinder_bot_world.root
+                ),
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(pose))
+    statechart.add_node(node=EndMotion.when_true(node=pose))
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
@@ -125,13 +133,17 @@ def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        pose := CartesianPoseStraight(
-            root_link=cylinder_bot_world.root,
-            tip_link=tip,
-            goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
+        node=(
+            pose := CartesianPoseStraight(
+                root_link=cylinder_bot_world.root,
+                tip_link=tip,
+                goal_pose=Pose.from_xyz_rpy(
+                    x=0.1, reference_frame=cylinder_bot_world.root
+                ),
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(pose))
+    statechart.add_node(node=EndMotion.when_true(node=pose))
     executor.compile(statechart=statechart)
 
     assert isinstance(pose, Parallel)
@@ -149,13 +161,13 @@ def test_velocity_limit_has_its_two_limits_after_a_json_round_trip(
         context=create_context_with_motion_control(cylinder_bot_world)
     )
     statechart.add_node(
-        CartesianVelocityLimit(root_link=cylinder_bot_world.root, tip_link=tip)
+        node=CartesianVelocityLimit(root_link=cylinder_bot_world.root, tip_link=tip)
     )
     json_data = json.loads(json.dumps(statechart.to_json()))
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
     executor = _create_executor(cylinder_bot_world)
     statechart_copy = Statechart.from_json(
-        json_data, context=executor.context, **tracker.create_kwargs()
+        data=json_data, context=executor.context, **tracker.create_kwargs()
     )
     (limit_copy,) = statechart_copy.top_level_nodes
     executor.compile(statechart=statechart_copy)
@@ -176,16 +188,18 @@ def test_differential_drive_goal_runs_its_steps_in_one_sequence(
     executor = _create_executor(cylinder_bot_diff_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        goal := DifferentialDriveBaseGoal(
-            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                MobileBase
-            )[0],
-            goal_pose=Pose.from_xyz_rpy(
-                x=1, reference_frame=cylinder_bot_diff_world.root
-            ),
+        node=(
+            goal := DifferentialDriveBaseGoal(
+                mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                    MobileBase
+                )[0],
+                goal_pose=Pose.from_xyz_rpy(
+                    x=1, reference_frame=cylinder_bot_diff_world.root
+                ),
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(goal))
+    statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=statechart)
 
     assert not isinstance(goal, Sequence)
@@ -200,20 +214,22 @@ def test_differential_drive_goal_is_a_step_without_an_attempt(
     executor = _create_executor(cylinder_bot_diff_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        plan := Sequence(
-            nodes=[
-                goal := DifferentialDriveBaseGoal(
-                    mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
-                    )[0],
-                    goal_pose=Pose.from_xyz_rpy(
-                        x=1, reference_frame=cylinder_bot_diff_world.root
-                    ),
-                )
-            ]
+        node=(
+            plan := Sequence(
+                nodes=[
+                    goal := DifferentialDriveBaseGoal(
+                        mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                            MobileBase
+                        )[0],
+                        goal_pose=Pose.from_xyz_rpy(
+                            x=1, reference_frame=cylinder_bot_diff_world.root
+                        ),
+                    )
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(plan))
+    statechart.add_node(node=EndMotion.when_true(node=plan))
     executor.compile(statechart=statechart)
 
     assert plan.nodes == [goal]

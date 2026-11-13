@@ -1,3 +1,7 @@
+"""
+Demonstrations of the HSRB acting in the scenes of the Sage10k dataset.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field
@@ -141,7 +145,9 @@ class Sage10kAbstractDemoHSRB:
         probabilistic backend its statements are grounded with.
         """
         return [
-            RobotAccess(self.world.get_semantic_annotations_by_type(AbstractRobot)[0]),
+            RobotAccess(
+                robot=self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
+            ),
             StatementGrounding(query_backend=ProbabilisticBackend()),
         ]
 
@@ -199,7 +205,11 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         return main_entrance
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, drives to the bottle, picks it up and places it in the
+        bin.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -242,6 +252,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
             ]
@@ -283,10 +294,10 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
             entity(v)
             .where(
                 contains(v.type_description, "book"),
-                SupportedBy(v.root, couch_table.root),
+                SupportedBy(supported=v.root, supporting=couch_table.root),
             )
             .ordered_by(
-                v,
+                variable=v,
                 key=lambda x: closes_to_border(
                     x.root,
                 ),
@@ -358,10 +369,10 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
             entity(v)
             .where(
                 contains(v.type_description, "book"),
-                SupportedBy(v.root, couch_table.root),
+                SupportedBy(supported=v.root, supporting=couch_table.root),
             )
             .ordered_by(
-                v,
+                variable=v,
                 key=lambda x: closes_to_border(
                     x.root,
                 ),
@@ -371,7 +382,10 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
         return target.first()
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks the book up and places it next to the couch.
+        """
         target_pose = Pose.from_xyz_rpy(
             x=5.48, y=7.46, z=0.8, yaw=-np.pi / 2, reference_frame=self.world.root
         )
@@ -387,6 +401,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
             ),
             target_location=target_pose,
             object_designator=self.book_to_pick,
+            arm=self.arm,
         )
 
         return Sequence(nodes=[open_door, mpu, mpp])
@@ -507,6 +522,9 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks the target up and places it.
+        """
         mpu = MoveAndPickUpAction.from_standing_position(
             standing_position=self.pickup_navigation_pose,
             grasp=self.target_to_pick.grasp_candidates()[0],
@@ -524,6 +542,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
             ),
             target_location=place_target_pose,
             object_designator=self.target_to_pick,
+            arm=self.arm,
         )
 
         return Sequence(
@@ -613,10 +632,17 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
+    """
+    Move an object within the southwestern store.
+    """
+
     scene_url = Sage10kActionableScenes.SOUTHWESTERN_STORE
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, moves the object of interest and drives on.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -643,6 +669,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
@@ -728,10 +755,17 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
+    """
+    Move an object within the brutalist store.
+    """
+
     scene_url = Sage10kActionableScenes.BRUTALIST_STORE
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, moves the object of interest and drives on.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -753,6 +787,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
                 NavigateAction(
@@ -825,10 +860,17 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
+    """
+    Move an object within the American buffet restaurant.
+    """
+
     scene_url = Sage10kActionableScenes.AMERICAN_BUFFET_RESTAURANT
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance and moves the object of interest.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
         navigate = Pose.from_xyz_rpy(x=5.14, y=2.85, reference_frame=self.world.root)
@@ -847,6 +889,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
             ]
@@ -880,7 +923,11 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
         cup = (
             an(entity(v_cup)).where(
                 contains(v_cup.type_description, "cup"),
-                SupportedBy(v_cup.root, table.root, 0.05),
+                SupportedBy(
+                    supported=v_cup.root,
+                    supporting=table.root,
+                    maximum_intersection_height=0.05,
+                ),
             )
         ).first()
         return cup

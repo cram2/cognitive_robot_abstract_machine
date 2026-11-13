@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 
+import numpy as np
 import pytest
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
-from giskardpy.middleware.ros2.utils.utils_for_tests import compare_poses, GiskardTester
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import CancelStatechart
@@ -21,6 +21,8 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
+
+from ...pytest_environment import runs_in_continuous_integration
 
 # %% trajectory length limit
 
@@ -39,10 +41,16 @@ def add_trajectory_length_limit(motion_statechart: Statechart) -> None:
     :data:`MAX_TRAJECTORY_LENGTH_SECONDS`.
     """
     motion_statechart.add_node(
-        max_length := CountSimulationTimeSeconds(seconds=MAX_TRAJECTORY_LENGTH_SECONDS)
+        node=(
+            max_length := CountSimulationTimeSeconds(
+                seconds=MAX_TRAJECTORY_LENGTH_SECONDS
+            )
+        )
     )
     motion_statechart.add_node(
-        CancelStatechart.when_true(max_length, MaxTrajectoryLengthException())
+        node=CancelStatechart.when_true(
+            node=max_length, exception=MaxTrajectoryLengthException()
+        )
     )
 
 
@@ -57,16 +65,13 @@ def default_joint_state(default_daisy_pose: dict[str, float]) -> dict[str, float
 @dataclass
 class DAiSyTester(GiskardTester):
     def setup_giskard(self) -> Giskard:
-        robot_desc = load_xacro(
-            "package://iai_daisy_description/robots/daisy.urdf.xacro"
-        )
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(DAiSy, urdf=robot_desc)]
+                robots=[RobotSpecification.specify_real_robot(DAiSy)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
-                debug_mode=True,
+                debug_mode=not runs_in_continuous_integration(),
                 plot_gantt_chart=True,
                 plot_trajectory=True,
             ),
@@ -90,20 +95,22 @@ def robot():
 def test_joints1(giskard: DAiSyTester) -> None:
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                {
-                    "left_wrist_1_joint": 1.23,
-                    "left_wrist_2_joint": 1.23,
-                    "left_wrist_3_joint": 1.23,
-                },
-                giskard.api.world,
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    {
+                        "left_wrist_1_joint": 1.23,
+                        "left_wrist_2_joint": 1.23,
+                        "left_wrist_3_joint": 1.23,
+                    },
+                    giskard.api.world,
+                )
             )
         ),
     )
-    statechart.add_node(EndMotion.when_true(joint_goal))
+    statechart.add_node(node=EndMotion.when_true(node=joint_goal))
     add_trajectory_length_limit(statechart)
-    giskard.api.compile(statechart)
+    giskard.api.compile(statechart=statechart)
     giskard.api.execute()
 
     base = giskard.world.get_kinematic_structure_entity_by_name("left_base_link")
@@ -123,4 +130,4 @@ def test_joints1(giskard: DAiSyTester) -> None:
         quat_w=-0.0767,
         reference_frame=base,
     )
-    compare_poses(base_T_finger_current, base_T_finger_expected)
+    assert np.allclose(base_T_finger_current, base_T_finger_expected, atol=1e-2)

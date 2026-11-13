@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import cached_property
 from inspect import isclass
 from types import ModuleType
 
+import sqlalchemy
+
+from krrood.ormatic.base import Base
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.utils import classes_of_module
 
+# %% what an interface holds
 
-@dataclass
+
+@dataclass(kw_only=True)
 class OrmaticInterfaceInformation:
     """
     Classes, alternative mappings, type mappings, and externally-mapped classes read
@@ -33,10 +39,83 @@ class OrmaticInterfaceInformation:
 
     externally_mapped_classes: dict[type, type] = field(default_factory=dict)
     """
-    Maps every domain class already mapped anywhere in this interface's dependency
-    chain to the :class:`DataAccessObject` subclass that maps it, so a dependent
-    interface can import and reuse that DAO instead of regenerating it.
+    Maps every domain class already mapped anywhere in this interface's dependency chain
+    to the :class:`DataAccessObject` subclass that maps it, so a dependent interface can
+    import and reuse that DAO instead of regenerating it.
     """
+
+
+# %% what an interface builds on
+
+
+@dataclass(kw_only=True)
+class OrmaticInterfaceChain:
+    """
+    Loaded ormatic interfaces together with every loaded interface they build on.
+
+    An interface builds on another when one of its tables inherits from, or relates
+    to, a table of the other.
+    """
+
+    interfaces: list[ModuleType]
+    """
+    The interfaces the chain starts from.
+    """
+
+    @cached_property
+    def module_names(self) -> set[str]:
+        """
+        :return: The names of the modules of the interfaces and of every interface they
+            build on, directly or through other interfaces.
+        """
+        mapped_classes_by_module: dict[str, list[type]] = {}
+        for mapper in Base.registry.mappers:
+            mapped_classes_by_module.setdefault(mapper.class_.__module__, []).append(
+                mapper.class_
+            )
+        module_names = {interface.__name__ for interface in self.interfaces}
+        pending = list(module_names)
+        while pending:
+            for mapped_class in mapped_classes_by_module.get(pending.pop(), []):
+                mapper = sqlalchemy.inspect(mapped_class)
+                referenced_classes = [
+                    ancestor.class_ for ancestor in mapper.iterate_to_root()
+                ] + [
+                    relationship.mapper.class_ for relationship in mapper.relationships
+                ]
+                for referenced_class in referenced_classes:
+                    if referenced_class.__module__ in module_names:
+                        continue
+                    module_names.add(referenced_class.__module__)
+                    pending.append(referenced_class.__module__)
+        return module_names
+
+    @cached_property
+    def data_access_objects(self) -> list[type[DataAccessObject]]:
+        """
+        :return: The data access objects of the interfaces in the chain.
+        """
+        return [
+            mapper.class_
+            for mapper in Base.registry.mappers
+            if issubclass(mapper.class_, DataAccessObject)
+            and mapper.class_.__module__ in self.module_names
+        ]
+
+    @cached_property
+    def alternative_mappings(self) -> list[type[AlternativeMapping]]:
+        """
+        :return: The alternative mappings the interfaces in the chain map.
+        """
+        return [
+            data_access_object.original_class()
+            for data_access_object in self.data_access_objects
+            if isclass(data_access_object.original_class())
+            and issubclass(data_access_object.original_class(), AlternativeMapping)
+        ]
+
+
+# %% reading an interface
 
 
 def get_classes_of_ormatic_interface(
@@ -66,14 +145,11 @@ def get_classes_of_ormatic_interface(
         else:
             information.classes.append(original_class)
 
-    # every interface in the chain shares one Base, so its registry already
-    # transitively includes every DAO mapped anywhere upstream
-    for mapper in interface.Base.registry.mappers:
-        dao_class = mapper.class_
-        if issubclass(dao_class, DataAccessObject):
-            ORMatic.register_externally_mapped_class(
-                dao_class, information.externally_mapped_classes
-            )
+    for dao_class in OrmaticInterfaceChain(interfaces=[interface]).data_access_objects:
+        ORMatic.register_externally_mapped_class(
+            dao_class=dao_class,
+            externally_mapped_classes=information.externally_mapped_classes,
+        )
 
     # every interface shares one Base, so its type_mappings already include everything upstream
     information.type_mappings.update(interface.Base.type_mappings)

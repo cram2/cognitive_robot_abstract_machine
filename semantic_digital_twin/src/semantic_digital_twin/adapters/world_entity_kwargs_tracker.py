@@ -26,13 +26,13 @@ class WorldEntityReference(ObjectReference):
     How a serialized object points at a world entity.
     """
 
-    def resolve(self, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
+    def resolve(self, *, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
         """
         :raises WorldEntityWithIDNotInKwargs: If nothing known carries that id.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return tracker.get(
-            from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
+            key=from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
         )
 
 
@@ -68,13 +68,13 @@ class WorldEntityWithIDKwargsTracker(
         tracker._world = world
         return tracker
 
-    def _has_untracked(self, key: UUID) -> bool:
+    def _has_untracked(self, *, key: UUID) -> bool:
         if self._world is None:
             return False
         return self._world.find_world_entity_with_id(key) is not None
 
     def _get_untracked(
-        self, key: UUID, name: PrefixedName | None = None
+        self, *, key: UUID, name: PrefixedName | None = None
     ) -> WorldEntityWithID:
         """
         :raises MissingWorldError: If the tracker has no world to look the entity up in.

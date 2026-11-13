@@ -21,7 +21,7 @@ from cramph.compiled_tick import LifeCycleChange
 # %% recording how the state of a statechart changed
 
 
-@dataclass(repr=False, eq=False)
+@dataclass(kw_only=True, repr=False, eq=False)
 class StateHistoryItem:
     """
     A snapshot of a :class:`~cramph.statechart.Statechart`'s life cycle and observation
@@ -49,6 +49,12 @@ class StateHistoryItem:
     with this snapshot, None for a snapshot that did not end it.
     """
 
+    cancellation_error: Exception | None = field(default=None, kw_only=True)
+    """
+    The exception :attr:`cancelled_by` ended the statechart with, which says why it was
+    cancelled; None for a snapshot that did not end it.
+    """
+
     def __post_init__(self) -> None:
         """
         Snapshots the given states, so later mutation of the live states does not affect
@@ -57,7 +63,7 @@ class StateHistoryItem:
         self.life_cycle_state = self.life_cycle_state.snapshot()
         self.observation_state = self.observation_state.snapshot()
 
-    def records(self, node: StatechartNode) -> bool:
+    def records(self, *, node: StatechartNode) -> bool:
         """
         :param node: The node to look up.
         :return: Whether `node` had joined the statechart when this snapshot was taken.
@@ -75,6 +81,7 @@ class StateHistoryItem:
             other.life_cycle_state == self.life_cycle_state
             and other.observation_state == self.observation_state
             and other.cancelled_by is self.cancelled_by
+            and other.cancellation_error is self.cancellation_error
         )
 
     def __repr__(self) -> str:
@@ -88,12 +95,12 @@ class StateHistoryItem:
                 f"{self.life_cycle_state[node].name}"
             )
             for node in self.life_cycle_state.keys()
-            if self.records(node)
+            if self.records(node=node)
         }
         return str(merged)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RunTicks:
     """
     The tick a node's run started and, once it has ended, the tick it ended on.
@@ -110,14 +117,14 @@ class RunTicks:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateHistoryObserver(ABC):
     """
     Observes the snapshots a :class:`StateHistory` records.
     """
 
     @abstractmethod
-    def on_state_change(self, history: StateHistory) -> None:
+    def on_state_change(self, *, history: StateHistory) -> None:
         """
         Observe the newest snapshot after it has been appended.
 
@@ -125,7 +132,7 @@ class StateHistoryObserver(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateHistory:
     """
     The recorded sequence of :class:`StateHistoryItem` snapshots of a
@@ -145,7 +152,7 @@ class StateHistory:
     The observers subscribed to newly recorded snapshots.
     """
 
-    def add_observer(self, observer: StateHistoryObserver) -> None:
+    def add_observer(self, *, observer: StateHistoryObserver) -> None:
         """
         Subscribe an observer once by identity.
 
@@ -155,7 +162,7 @@ class StateHistory:
             return
         self.observers.append(observer)
 
-    def remove_observer(self, observer: StateHistoryObserver) -> None:
+    def remove_observer(self, *, observer: StateHistoryObserver) -> None:
         """
         Remove an observer's subscription if it is present.
 
@@ -165,7 +172,7 @@ class StateHistory:
             registered for registered in self.observers if registered is not observer
         ]
 
-    def append(self, next_item: StateHistoryItem) -> None:
+    def append(self, *, next_item: StateHistoryItem) -> None:
         """
         Appends `next_item` and notifies the observers, unless it is equal to the last
         recorded item, in which case it is dropped to avoid storing consecutive
@@ -178,7 +185,7 @@ class StateHistory:
             return
         self.items.append(next_item)
         for observer in tuple(self.observers):
-            observer.on_state_change(self)
+            observer.on_state_change(history=self)
 
     @property
     def latest_item(self) -> StateHistoryItem | None:
@@ -234,7 +241,7 @@ class StateHistory:
         for node in current.life_cycle_state.keys():
             previous_state = (
                 previous.life_cycle_state[node]
-                if previous is not None and previous.records(node)
+                if previous is not None and previous.records(node=node)
                 else LifeCycleValues.NOT_STARTED
             )
             current_state = current.life_cycle_state[node]
@@ -249,7 +256,7 @@ class StateHistory:
         return changes
 
     def get_life_cycle_history_of_node(
-        self, node: StatechartNode
+        self, *, node: StatechartNode
     ) -> list[LifeCycleValues]:
         """
         :param node: The node to fetch the recorded life cycle state for.
@@ -258,11 +265,11 @@ class StateHistory:
         """
         return [
             history_item.life_cycle_state[node]
-            for history_item in self.items_recording(node)
+            for history_item in self.items_recording(node=node)
         ]
 
     def get_observation_history_of_node(
-        self, node: StatechartNode
+        self, *, node: StatechartNode
     ) -> list[ObservationStateValues]:
         """
         :param node: The node to fetch the recorded observation state for.
@@ -271,26 +278,28 @@ class StateHistory:
         """
         return [
             history_item.observation_state[node]
-            for history_item in self.items_recording(node)
+            for history_item in self.items_recording(node=node)
         ]
 
-    def items_recording(self, node: StatechartNode) -> list[StateHistoryItem]:
+    def items_recording(self, *, node: StatechartNode) -> list[StateHistoryItem]:
         """
         :param node: The node to look up.
         :return: The snapshots taken since `node` joined the statechart, in order.
         """
         return [
-            history_item for history_item in self.items if history_item.records(node)
+            history_item
+            for history_item in self.items
+            if history_item.records(node=node)
         ]
 
-    def get_current_run_ticks_of_node(self, node: StatechartNode) -> RunTicks | None:
+    def get_current_run_ticks_of_node(self, *, node: StatechartNode) -> RunTicks | None:
         """
         :param node: The node to look up.
         :return: The start and, once reached, end tick of `node`'s most recent run
             since its last reset, or None if it has not started since then (or
             this history is still empty).
         """
-        history = self.items_recording(node)
+        history = self.items_recording(node=node)
         if not history:
             return None
         current_state = history[-1].life_cycle_state[node]

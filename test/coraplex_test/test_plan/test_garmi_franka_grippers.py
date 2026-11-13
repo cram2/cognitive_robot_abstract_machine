@@ -25,7 +25,7 @@ from giskardpy.middleware.ros2.franka_gripper_tasks import (
     GripperGraspTask,
     GripperMoveTask,
 )
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.garmi import GarmiLeftGripper, GarmiRightGripper
 
@@ -42,7 +42,9 @@ def real_garmi_executor(extensions: list[ContextExtension]) -> RealGarmiPlanExec
     :return: An executor sending plans to the real GARMI.
     """
     return RealGarmiPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions)
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        )
     )
 
 

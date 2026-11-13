@@ -40,7 +40,7 @@ def test_velocity_controlled_joints_exist_in_the_world(stretch_world_copy):
 
 
 def test_velocity_interface_sets_up_against_the_robot_description(
-    init_rospy, stretch_world_specification
+    init_background_node, stretch_world_specification
 ):
     """
     The configuration the robot actually runs comes up against the robot description:
@@ -67,7 +67,7 @@ def test_velocity_interface_sets_up_against_the_robot_description(
 
 
 def test_velocity_interface_reads_the_localization_relative_to_the_odometry_frame_of_its_mobile_base(
-    init_rospy, stretch_world_specification, monkeypatch
+    init_background_node, stretch_world_specification, monkeypatch
 ):
     """
     The localization is read from tf as the frame the mobile base reports its odometry
