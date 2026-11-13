@@ -1,3 +1,8 @@
+"""
+Actions that move a robot's base or point it at something: driving to a pose, along a
+planned path or by elevator, and looking or facing at a target.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -285,12 +290,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
             target's.
         """
         base_pose = self.robot.root.global_pose
-        free_space = self._floor.planar_free_space(
-            max_height=self.robot.as_bounding_box_collection_in_frame(self.robot.root)
-            .bounding_box()
-            .scale.z,
-            bloat_obstacles=self.robot.mobile_base.base_radius,
-        )
+        free_space = self._floor.navigable_space(robot=self.robot, margin=0.0)
         return free_space.path_from_to(
             Point2.from_pose(base_pose), Point2.from_pose(self.target)
         )

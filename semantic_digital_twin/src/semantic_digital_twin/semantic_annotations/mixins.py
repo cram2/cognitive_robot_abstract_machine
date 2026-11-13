@@ -1,3 +1,8 @@
+"""
+Mixins that give semantic annotations shared parts and abilities, such as a supporting
+surface, handles or doors.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -1420,13 +1425,13 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         )
 
         return PlanarGraphOfBoundingBoxes.free_space_from_semantic_annotation(
-            search_space,
-            semantic_obstacle_annotation,
-            semantic_wall_annotation,
-            tolerance,
-            bloat_obstacles,
-            bloat_walls,
-            obstacle_height_clearance,
+            search_space=search_space,
+            semantic_obstacle_annotation=semantic_obstacle_annotation,
+            semantic_wall_annotation=semantic_wall_annotation,
+            tolerance=tolerance,
+            bloat_obstacles=bloat_obstacles,
+            bloat_walls=bloat_walls,
+            obstacle_height_clearance=obstacle_height_clearance,
         )
 
 
