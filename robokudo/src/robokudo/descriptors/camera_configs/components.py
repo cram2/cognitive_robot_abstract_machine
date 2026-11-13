@@ -79,7 +79,7 @@ class TfComponent:
     Whether to lookup the viewpoint between the camera and the world.
     """
 
-    camera_pose_timeout: timedelta = timedelta(seconds=0.5)
+    camera_pose_timeout: timedelta = timedelta(seconds=0.1)
     """
     How long to wait for TF to provide the camera pose at the acquisition time of a
     frame; a frame without one by then is dropped.
