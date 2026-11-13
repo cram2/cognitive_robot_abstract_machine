@@ -450,55 +450,11 @@ class LiveKernel:
             command=f"tail -n +1 -F {self.exchange_on_server / f'{name}.log'} "
             "2>/dev/null"
         )
-        exit_status = self.log_output_until_exit(output=tail.stdout, name=name)
+        exit_status = RunOutputFollower(
+            kernel=self, output=tail.stdout, name=name
+        ).follow()
         tail.terminate()
         return exit_status
-
-    def log_output_until_exit(self, *, output: BinaryIO, name: str) -> int:
-        """
-        :param output: The run's output as it is written, unbuffered.
-        :param name: The name of the run.
-        :return: The run's exit status, or how following it ended.
-        """
-        readable = selectors.DefaultSelector()
-        readable.register(output, selectors.EVENT_READ)
-        started = time.monotonic()
-        last_output = started
-        while (
-            remaining := self.wait.total_seconds() - (time.monotonic() - started)
-        ) > 0:
-            until_silence = self.silence.total_seconds() - (
-                time.monotonic() - last_output
-            )
-            if readable.select(timeout=max(min(remaining, until_silence), 0)):
-                line = output.readline()
-                if not line:
-                    logger.warning("The connection to the server closed.")
-                    return RunEndExitStatus.CONNECTION_LOST
-                text = line.decode(errors="replace").rstrip("\n")
-                logger.info(text)
-                if text.startswith(LogMarker.EXIT):
-                    return int(text.removeprefix(LogMarker.EXIT))
-                last_output = time.monotonic()
-            silent = timedelta(seconds=time.monotonic() - last_output)
-            if silent < self.silence:
-                continue
-            process_id = self.process_id
-            if process_id is None:
-                logger.warning("The kernel no longer runs.")
-                return RunEndExitStatus.KERNEL_GONE
-            if self.is_sleeping(process_id=process_id):
-                logger.warning(
-                    "The kernel sleeps without output for %s: probably deadlocked; "
-                    "'interrupt' shows where.",
-                    silent,
-                )
-                return RunEndExitStatus.DEADLOCKED
-            last_output = time.monotonic()
-        logger.warning(
-            "Still running after %s; continue with 'wait %s'.", self.wait, name
-        )
-        return RunEndExitStatus.STILL_RUNNING
 
     def is_sleeping(self, *, process_id: int) -> bool:
         """
@@ -523,6 +479,133 @@ class LiveKernel:
                 f"-f {self.connection_file}')"
             )
         )
+
+
+# %% following a run
+
+
+@dataclass(kw_only=True)
+class RunOutputFollower:
+    """
+    Logs a run's output as it is written, until the run ends, the kernel's
+    :attr:`~LiveKernel.wait` passes, or the kernel sleeps through its
+    :attr:`~LiveKernel.silence` without output.
+    """
+
+    kernel: LiveKernel
+    """
+    The kernel performing the run.
+    """
+
+    output: BinaryIO
+    """
+    The run's output as it is written, unbuffered.
+    """
+
+    name: str
+    """
+    The name of the run.
+    """
+
+    started: float = field(default_factory=time.monotonic)
+    """
+    When following began, on the :func:`time.monotonic` clock.
+    """
+
+    last_output: float = field(default_factory=time.monotonic)
+    """
+    When the run last printed or the kernel was last seen computing, on the
+    :func:`time.monotonic` clock.
+    """
+
+    readable: selectors.DefaultSelector = field(
+        default_factory=selectors.DefaultSelector
+    )
+    """
+    Tells when :attr:`output` has a line to read.
+    """
+
+    def __post_init__(self) -> None:
+        self.readable.register(self.output, selectors.EVENT_READ)
+
+    @property
+    def remaining_wait(self) -> timedelta:
+        """
+        How long following goes on before the run is left running.
+        """
+        return self.kernel.wait - timedelta(seconds=time.monotonic() - self.started)
+
+    @property
+    def silent(self) -> timedelta:
+        """
+        How long the run has printed nothing.
+        """
+        return timedelta(seconds=time.monotonic() - self.last_output)
+
+    def follow(self) -> int:
+        """
+        :return: The run's exit status, or how following it ended.
+        """
+        while self.remaining_wait > timedelta():
+            if self.line_arrives():
+                exit_status = self.log_next_line()
+            else:
+                exit_status = self.check_silent_kernel()
+            if exit_status is not None:
+                return exit_status
+        logger.warning(
+            "Still running after %s; continue with 'wait %s'.",
+            self.kernel.wait,
+            self.name,
+        )
+        return RunEndExitStatus.STILL_RUNNING
+
+    def line_arrives(self) -> bool:
+        """
+        :return: Whether a line arrives before the wait or the silence is over.
+        """
+        timeout = min(self.remaining_wait, self.kernel.silence - self.silent)
+        return bool(self.readable.select(timeout=max(timeout.total_seconds(), 0)))
+
+    def log_next_line(self) -> int | None:
+        """
+        :return: The run's exit status if the line ends the run, or
+            :attr:`RunEndExitStatus.CONNECTION_LOST` if the output closed; none if the
+            run goes on.
+        """
+        line = self.output.readline()
+        if not line:
+            logger.warning("The connection to the server closed.")
+            return RunEndExitStatus.CONNECTION_LOST
+        text = line.decode(errors="replace").rstrip("\n")
+        logger.info(text)
+        if text.startswith(LogMarker.EXIT):
+            return int(text.removeprefix(LogMarker.EXIT))
+        self.last_output = time.monotonic()
+        return None
+
+    def check_silent_kernel(self) -> int | None:
+        """
+        :return: How following ends if the run was silent for the kernel's
+            :attr:`~LiveKernel.silence` and the kernel is gone or sleeps; none if the
+            run goes on.
+        """
+        silent = self.silent
+        if silent < self.kernel.silence:
+            return None
+        process_id = self.kernel.process_id
+        if process_id is None:
+            logger.warning("The kernel no longer runs.")
+            return RunEndExitStatus.KERNEL_GONE
+        if self.kernel.is_sleeping(process_id=process_id):
+            logger.warning(
+                "The kernel sleeps without output for %s: probably deadlocked; "
+                "'interrupt' shows where.",
+                silent,
+            )
+            return RunEndExitStatus.DEADLOCKED
+        self.last_output = time.monotonic()
+        return None
 
 
 # %% the command line
