@@ -236,6 +236,26 @@ def test_visual_geometry_is_left_out_where_the_body_already_collides():
     ]
 
 
+# %% unnamed bodies
+
+UNNAMED_BODIES_SCENE = os.path.join(DATASET_DIR, "unnamed_bodies_scene.xml")
+"""
+Scene shaped like a RoboCasa object: an unnamed body wrapping the body named ``object``,
+which holds the geometry in an unnamed body of its own.
+"""
+
+
+def test_unnamed_bodies_each_become_a_body_of_their_own():
+    world = MJCFParser.from_file(UNNAMED_BODIES_SCENE).create_world()
+
+    [geometry] = world.bodies_with_collision
+    assert geometry.parent_connection.parent.name.name == "object"
+    assert geometry.parent_connection.origin.to_np()[:3, 3] == pytest.approx(
+        [0.0, -0.045, 0.0]
+    )
+    assert len({body.name for body in world.bodies}) == len(world.bodies)
+
+
 TEXTURED_BOX_MJCF_TEMPLATE = """
 <mujoco>
   <asset>
