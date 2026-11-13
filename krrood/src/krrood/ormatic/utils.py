@@ -1,3 +1,7 @@
+"""
+Helpers for ORMatic: class discovery, database engines and column types.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -8,7 +12,7 @@ import pkgutil
 import types
 from contextlib import suppress
 from functools import lru_cache
-from typing_extensions import TypeVar, Iterable, Any, Callable, Generic, get_type_hints
+from typing_extensions import TypeVar, Iterable, Any, Callable, get_type_hints
 
 import sqlalchemy
 from sqlalchemy import (
@@ -22,30 +26,8 @@ from sqlalchemy import (
 
 from krrood.adapters.json_serializer import to_json, from_json
 from krrood.ormatic.exceptions import UnsupportedColumnType
+from krrood.patterns.classproperty import classproperty as classproperty
 from krrood.utils import T
-
-
-class classproperty(Generic[T]):
-    """
-    A decorator that allows a class method to be accessed as a property.
-    """
-
-    def __init__(self, fget: Callable[[type[Any]], T]) -> None:
-        """
-        Stores the accessor function invoked when the property is read on the owning
-        class.
-        """
-        self.fget = fget
-        """
-        The underlying accessor; receives the owning class and returns the property
-        value.
-        """
-
-    def __get__(self, instance: Any, owner: type[Any] | None = None) -> T:
-        """
-        Returns the property value by invoking the accessor with the owning class.
-        """
-        return self.fget(owner)
 
 
 def classes_of_module(module: types.ModuleType) -> list[type]:

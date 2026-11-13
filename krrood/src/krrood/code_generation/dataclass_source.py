@@ -9,14 +9,17 @@ fields are scalars, enum members or further dataclasses.
 from __future__ import annotations
 
 import dataclasses
-import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from typing_extensions import Any
 
+from krrood.code_generation.ast_helpers import ast_unparse_expression
 from krrood.code_generation.exceptions import ObjectNotSerializableError
-from krrood.code_generation.type_hints import value_to_source
+from krrood.code_generation.source_emission import (
+    SourceEmissionContext,
+    ValueSourceEmitter,
+)
 from krrood.ormatic.utils import classproperty
 
 # %% ObjectSource
@@ -78,35 +81,13 @@ class DataclassConstructorSerializer(ObjectSourceSerializer):
         """
         The scalar types emitted directly as field values.
         """
-        return bool, int, float, str, enum.Enum
+        return ValueSourceEmitter.supported_scalar_types
 
     def to_source(self, instance: Any) -> ObjectSource:
         if not dataclasses.is_dataclass(instance) or isinstance(instance, type):
             raise ObjectNotSerializableError(instance, self.supported_scalar_types)
-        referenced_types: set[type] = {type(instance)}
-        field_parts = []
-        for instance_field in dataclasses.fields(instance):
-            value = getattr(instance, instance_field.name)
-            value_source = self._emit_value(value)
-            referenced_types.update(value_source.referenced_types)
-            field_parts.append(f"{instance_field.name}={value_source.source}")
-        source = f"{type(instance).__name__}({', '.join(field_parts)})"
-        return ObjectSource(source, referenced_types)
-
-    def _emit_value(self, value: Any) -> ObjectSource:
-        """
-        Emit a single field value as source, recursing into nested dataclasses.
-
-        :param value: The value of one field of an instance.
-        :return: The value's constructor source and the types it references.
-        :raises ObjectNotSerializableError: When ``value`` is neither ``None``, a
-            supported scalar, nor a dataclass instance.
-        """
-        if dataclasses.is_dataclass(value) and not isinstance(value, type):
-            return self.to_source(value)
-        if value is not None and not isinstance(value, self.supported_scalar_types):
-            raise ObjectNotSerializableError(value, self.supported_scalar_types)
-        referenced_types: set[type] = set()
-        if isinstance(value, enum.Enum):
-            referenced_types.add(type(value))
-        return ObjectSource(value_to_source(value), referenced_types)
+        context = SourceEmissionContext()
+        expression = ValueSourceEmitter.emit_source(subject=instance, context=context)
+        return ObjectSource(
+            ast_unparse_expression(expression), context.referenced_types
+        )

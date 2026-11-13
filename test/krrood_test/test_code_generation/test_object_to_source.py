@@ -1,11 +1,11 @@
-"""Tests for type-hint serialisation in ``krrood.code_generation.type_hints``."""
+"""Tests for source-code creation from live objects in ``krrood.code_generation.object_to_source``."""
 
 from __future__ import annotations
 
 import enum
 from typing import List, Optional, Union
 
-from krrood.code_generation.type_hints import stringify_type_hint, value_to_source
+from krrood.code_generation.object_to_source import stringify_type_hint, value_to_source
 
 
 class TestStringifyTypeHint:

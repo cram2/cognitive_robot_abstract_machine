@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import Any
+
 from krrood.exceptions import DataclassException
 
 
@@ -142,3 +144,41 @@ class UndeclaredInferenceTarget(DataclassException):
             f"Make {self.case_type.__name__} a dataclass that declares "
             f"{self.attribute_name} as a field."
         )
+
+
+# %% rule-tree serialization
+
+
+@dataclass
+class EmptyRuleTreeError(DataclassException):
+    """
+    Raised when serializing an RDR that has no rules yet.
+    """
+
+    def error_message(self) -> str:
+        return "Cannot serialize an empty RDR (no rules have been added)."
+
+    def suggest_correction(self) -> str:
+        return "Fit at least one rule before saving."
+
+
+# %% serialization
+
+
+@dataclass(kw_only=True)
+class MissingAddConclusionError(DataclassException):
+    """
+    Raised when saving a rule whose condition holds no ``Add`` conclusion, so the saved
+    module has no value for the rule to conclude.
+    """
+
+    condition: Any
+    """
+    The rule's condition.
+    """
+
+    def error_message(self) -> str:
+        return f"The rule condition {self.condition!r} holds no add(...) conclusion."
+
+    def suggest_correction(self) -> str:
+        return "Conclude every rule with an add(...) before saving the rule tree."

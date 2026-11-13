@@ -1809,7 +1809,7 @@ def encapsulate_code_lines_into_a_function(
 from krrood.code_generation.naming import (  # noqa: E402, F401
     to_snake_case as str_to_snake_case,
 )
-from krrood.code_generation.type_hints import (  # noqa: E402, F401
+from krrood.code_generation.object_to_source import (  # noqa: E402, F401
     value_to_source,
     get_types_to_import_from_type_hints,
 )

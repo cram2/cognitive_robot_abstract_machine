@@ -24,7 +24,7 @@ from krrood.code_generation.formatting import (
 )
 from krrood.code_generation.generator import CodeGenerator
 from krrood.code_generation.imports import get_imports_from_types
-from krrood.code_generation.type_hints import value_to_source
+from krrood.code_generation.object_to_source import value_to_source
 from krrood.entity_query_language.predicate import SymbolicCallable
 from krrood.entity_query_language.testing.result_verification import (
     VerbalizationResultsOfPackage,
