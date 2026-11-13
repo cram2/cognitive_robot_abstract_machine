@@ -150,22 +150,10 @@ class UndeclaredInferenceTarget(DataclassException):
 
 
 @dataclass
-class UnsupportedNodeForSerialization(DataclassException):
-    """Raised when the rule-tree DAG contains a node the serializer cannot emit."""
-
-    node: Any
-    """The node (or leaf value) the serializer does not know how to emit as Python source."""
-
-    def error_message(self) -> str:
-        return f"Cannot serialize node of type {type(self.node).__name__!r} to Python source."
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
 class EmptyRuleTreeError(DataclassException):
-    """Raised when serializing an RDR that has no rules yet."""
+    """
+    Raised when serializing an RDR that has no rules yet.
+    """
 
     def error_message(self) -> str:
         return "Cannot serialize an empty RDR (no rules have been added)."

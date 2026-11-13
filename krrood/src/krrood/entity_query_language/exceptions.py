@@ -1567,3 +1567,21 @@ class NoLearnedCausalStructure(DataclassException):
             "Learn the structure of the class and give it to the ProbabilisticBackend "
             "in causal_structures."
         )
+
+
+# %% source emission
+
+
+@dataclass(kw_only=True)
+class UnsupportedNodeForSerialization(DataclassException):
+    """Raised when no source emitter can rebuild a node of a condition or a
+    rule tree."""
+
+    node: Any
+    """The node (or leaf value) the serializer does not know how to emit as Python source."""
+
+    def error_message(self) -> str:
+        return f"Cannot serialize node of type {type(self.node).__name__!r} to Python source."
+
+    def suggest_correction(self) -> str:
+        return "Add a source emitter for the node's type to the emitter family."
