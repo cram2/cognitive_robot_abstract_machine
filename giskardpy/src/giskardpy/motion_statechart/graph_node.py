@@ -89,12 +89,12 @@ class DebugExpression:
         """
         return [
             debug_expression
-            for node in statechart.get_nodes_by_type(MotionStatechartNode)
+            for node in statechart.get_nodes_by_type(node_type=MotionStatechartNode)
             for debug_expression in node.debug_expressions
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionNodeArtifacts(NodeArtifacts):
     """
     The artifacts of a node that takes part in motion control.
@@ -156,10 +156,10 @@ class MotionStatechartNode(StatechartNode):
     def artifacts(self) -> MotionNodeArtifacts:
         return super().artifacts
 
-    def apply_artifacts(self, artifacts: NodeArtifacts) -> None:
+    def apply_artifacts(self, *, artifacts: NodeArtifacts) -> None:
         motion_artifacts = MotionNodeArtifacts.from_node_artifacts(artifacts)
         motion_artifacts.constraints.link_to_motion_statechart_node(self)
-        super().apply_artifacts(motion_artifacts)
+        super().apply_artifacts(artifacts=motion_artifacts)
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -246,7 +246,7 @@ def velocity_convergence_expression(
         symbols.append(dof.variables.velocity)
 
     time_step = context.require_extension(
-        MotionControlContext
+        extension_type=MotionControlContext
     ).qp_controller_config.control_time_step.total_seconds()
     elapsed_cycles = context.tick_variable
     if reference_cycle_variable is not None:

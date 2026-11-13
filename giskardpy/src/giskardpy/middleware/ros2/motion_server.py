@@ -275,7 +275,7 @@ class MotionServer:
         motion_statechart = goal.parse_motion_statechart(
             context=self.executor.context, **kwargs
         )
-        self.executor.compile(motion_statechart)
+        self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
         background_node.get_node().get_logger().info("Done parsing goal message.")
 

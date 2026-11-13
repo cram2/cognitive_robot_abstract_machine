@@ -13,11 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
+import cramph.orm.ormatic_interface
 import segmind
-
-# imported for its alternative mappings, which are collected through a global subclass
-# scan: without it segmind's spatial fields degrade to JSON columns
-import semantic_digital_twin.orm.model
 from krrood.ormatic.custom_types import NumpyType
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
@@ -31,7 +28,7 @@ ignored_classes = {
     NoSemanticAnnotationToWatch,
 }
 
-dependencies = []
+dependencies = [cramph.orm.ormatic_interface]
 
 type_mappings = {np.ndarray: NumpyType}
 

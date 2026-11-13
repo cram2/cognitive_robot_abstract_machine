@@ -47,16 +47,16 @@ def statechart_for(plan):
         statechart of its context holding `plan`.
     """
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(
-            world,
-            [
-                RobotAccess(pr2),
+        context=StatechartContext.with_extensions(
+            world=world,
+            extensions=[
+                RobotAccess(robot=pr2),
                 PlanRewriting(transformations=plan_transformations),
             ],
         ),
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
+    statechart.add_node(node=plan)
     return executor, statechart
 ```
 
@@ -276,7 +276,7 @@ navigate = Sequence(
 )
 
 executor, statechart = statechart_for(navigate)
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 
 print(navigate.life_cycle_state)

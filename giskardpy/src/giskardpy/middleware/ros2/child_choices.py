@@ -174,14 +174,14 @@ class ChildChoiceMessage(SubclassJSONSerializer):
             )
         world = statechart.context.world
         kwargs = WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs()
-        statechart.add_nodes_from_json(self.nodes, world=world, **kwargs)
-        return statechart.get_node_by_index(self.first_node_index)
+        statechart.add_nodes_from_json(data=self.nodes, world=world, **kwargs)
+        return statechart.get_node_by_index(index=self.first_node_index)
 
 
 # %% Giskard's side
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Lets every node of a running goal run the child the client sent for it, and wait
@@ -221,7 +221,7 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
         with self._lock:
             self._received[message.node_index] = message
 
-    def has_choice_for(self, node: CompositeNodeChoosingItsChild) -> bool:
+    def has_choice_for(self, *, node: CompositeNodeChoosingItsChild) -> bool:
         """
         A choice for another goal is dropped.
 
@@ -256,13 +256,13 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
         return any(
             earlier.goal_id == message.goal_id
             and earlier.first_node_index < message.first_node_index
-            and statechart.get_node_by_index(earlier.node_index).life_cycle_state
+            and statechart.get_node_by_index(index=earlier.node_index).life_cycle_state
             in (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED)
             for earlier in self._received.values()
         )
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         """
         Add the nodes the client sent for `node`.
@@ -386,7 +386,8 @@ class ChildChoiceClient:
             if request in self._answered:
                 continue
             messages += self._choose(
-                request.goal_id, self.statechart.get_node_by_index(request.node_index)
+                request.goal_id,
+                self.statechart.get_node_by_index(index=request.node_index),
             )
         return messages
 
@@ -406,7 +407,7 @@ class ChildChoiceClient:
             every node it left without a child; empty if the choice is pending.
         """
         choosing_nodes = self.statechart.get_nodes_by_type(
-            CompositeNodeChoosingItsChild
+            node_type=CompositeNodeChoosingItsChild
         )
         children_before = {
             choosing_node: len(choosing_node.children)
@@ -417,7 +418,9 @@ class ChildChoiceClient:
             for choosing_node in choosing_nodes
             if choosing_node.ran_out_of_children
         }
-        if not node.choose_child_with(self.child_chooser_access.chooser_for(node)):
+        if not node.choose_child_with(
+            chooser=self.child_chooser_access.chooser_for(node=node)
+        ):
             return []
         given_a_child = sorted(
             (
@@ -472,7 +475,7 @@ class ChildChoiceClient:
                 node_index=answered.index,
                 first_node_index=chosen_child_index,
                 nodes=self.statechart.nodes_from_to_json(
-                    chosen_child_index, stop_node_index
+                    first_node_index=chosen_child_index, stop_node_index=stop_node_index
                 ),
                 required_position=self.required_position,
             )

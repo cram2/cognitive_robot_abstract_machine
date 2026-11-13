@@ -13,8 +13,6 @@ from krrood.ormatic.utils import classes_of_package
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the giskardpy package.
-# ..warning:: Do not import coraplex here. Alternative mappings are collected through a global
-# subclass scan, so importing a downstream package leaks its mappings into this interface.
 # ----------------------------------------------------------------------------------------------------------------------
 
 

@@ -201,14 +201,17 @@ def test_a_joint_goal_moves_the_mock_robot(robot: ControllerManagerRobotTester) 
 
     motion_statechart = Statechart(context=robot.api.context)
     motion_statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                {UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal}, robot.api.world
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    {UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal},
+                    robot.api.world,
+                )
             )
         )
     )
-    motion_statechart.add_node(EndMotion.when_true(joint_goal))
-    robot.api.compile(motion_statechart)
+    motion_statechart.add_node(node=EndMotion.when_true(node=joint_goal))
+    robot.api.compile(statechart=motion_statechart)
     robot.api.execute()
 
     np.testing.assert_allclose(shoulder_pan.position, shoulder_pan_goal, atol=1e-2)

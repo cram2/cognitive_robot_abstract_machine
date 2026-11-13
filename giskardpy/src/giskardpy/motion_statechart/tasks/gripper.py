@@ -131,10 +131,10 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
         """
         Create the finger goal and the speed cap, after the nodes this goal was handed.
         """
-        self.add_node(self._finger_goal())
+        self.add_node(node=self._finger_goal())
         if self.finger_velocity is not None:
             self.add_node(
-                JointVelocityLimit(
+                node=JointVelocityLimit(
                     connections=self.finger_connections,
                     max_velocity=self.finger_velocity,
                 )

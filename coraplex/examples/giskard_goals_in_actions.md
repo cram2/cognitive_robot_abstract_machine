@@ -75,16 +75,16 @@ class MoveToolCenterPointAction(GoalAction):
 world = setup_world()
 pr2 = PR2.from_world(world)
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
 statechart = Statechart(context=executor.context)
 statechart.add_node(
-    MoveToolCenterPointAction(
+    node=MoveToolCenterPointAction(
         arm=pr2.left_arm,
         target=Pose.from_xyz_rpy(0.6, 0.3, 0.9, reference_frame=pr2.root),
     )
 )
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 

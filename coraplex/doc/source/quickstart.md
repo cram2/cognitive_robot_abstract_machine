@@ -122,7 +122,7 @@ from cramph.statechart import Statechart
 
 pr2 = PR2.from_world(world)
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
 milk_body = world.get_body_by_name("milk.stl")
 
@@ -154,7 +154,7 @@ plan = Sequence(
     ]
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(plan)
+statechart.add_node(node=plan)
 ```
 
 What did we just do here?
@@ -167,7 +167,7 @@ another in the order they are defined, and put it into a statechart of the execu
 To execute the plan, the executor compiles the statechart and executes it.
 
 ```python
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 

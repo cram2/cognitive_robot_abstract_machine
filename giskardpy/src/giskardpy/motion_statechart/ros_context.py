@@ -16,7 +16,7 @@ from cramph.executor import ExecutorExtension
 from giskardpy.motion_statechart.exceptions import ActionClientTypeMismatchError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RosContextExtension(ContextExtension):
     ros_node: Node
 
@@ -61,7 +61,7 @@ class RosContextExtension(ContextExtension):
         return action_client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RosNodeAccess(ExecutorExtension):
     """
     Gives the nodes of the executed statecharts access to a ROS2 node through a
@@ -73,5 +73,5 @@ class RosNodeAccess(ExecutorExtension):
     The ROS2 node the statechart nodes communicate through.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
-        context.ensure_extension(RosContextExtension(self.ros_node))
+    def extend_context(self, *, context: StatechartContext) -> None:
+        context.ensure_extension(extension=RosContextExtension(ros_node=self.ros_node))
