@@ -549,10 +549,9 @@ class TestFactories(unittest.TestCase):
             door.add(handle)
 
         # handle at z=0.5. Hinge should be at z=-1.0
-        with world.modify_world():
-            handle.root.parent_connection.update_parent_T_connection(
-                parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5)
-            )
+        handle.root.parent_connection.parent_T_connection_expression = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5)
+        )
         door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),

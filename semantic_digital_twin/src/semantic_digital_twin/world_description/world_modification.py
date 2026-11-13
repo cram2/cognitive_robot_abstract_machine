@@ -643,8 +643,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
                 obj = self._resolve_item(
                     world, from_json(diff.added_values[0], **kwargs)
                 )
-                with world.unlock_model_attributes():
-                    setattr(entity, diff.attribute_name, obj)
+                setattr(entity, diff.attribute_name, obj)
         world._model_manager.current_model_modification_block.append(self)
 
     def revert(self, world: World):
@@ -735,8 +734,7 @@ def synchronized_attribute_modification(func):
             raise MissingWorldModificationContextError(func)
 
         object_before_change = to_json(self)
-        with self._world.unlock_model_attributes():
-            result = func(self, *args, **kwargs)
+        result = func(self, *args, **kwargs)
         object_after_change = to_json(self)
 
         tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)

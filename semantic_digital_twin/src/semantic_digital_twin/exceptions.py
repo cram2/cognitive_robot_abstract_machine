@@ -1318,48 +1318,6 @@ class MissingWorldModificationContextError(UsageError):
 
 
 @dataclass
-class ModelAttributeAssignedInWorldError(UsageError):
-    """
-    Raised when a field the compiled world model is built from is assigned directly
-    while its entity belongs to a world, where only a recorded change may alter it.
-    """
-
-    entity: Any
-    """
-    The entity whose field was assigned.
-    """
-
-    attribute_name: str
-    """
-    The name of the assigned field.
-    """
-
-    recorded_change: Callable | None
-    """
-    The method that changes the field and records the change, or ``None`` if the field
-    cannot change once its entity is in a world.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.attribute_name}' of {self.entity.name} was assigned directly while "
-            f"it belongs to a world, so the change would be neither recorded, published "
-            f"nor rolled back."
-        )
-
-    def suggest_correction(self) -> str:
-        if self.recorded_change is None:
-            return (
-                f"'{self.attribute_name}' cannot change in a world: replace the entity "
-                f"with one built with the new value, inside a modify_world block."
-            )
-        return (
-            f"call {self.recorded_change.__qualname__}(...) inside a modify_world "
-            f"block instead."
-        )
-
-
-@dataclass
 class MismatchingPublishChangesAttribute(UsageError):
     """
     Raised when trying to enter a nested world modification or state batch context with

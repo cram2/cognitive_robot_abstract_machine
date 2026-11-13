@@ -1,5 +1,3 @@
-from dataclasses import replace
-
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.testing import (
     StateChangeCounter,
@@ -26,11 +24,9 @@ def test_applying_a_joint_state_announces_one_state_change(two_arm_robot_world):
 
 def test_applying_a_joint_state_respects_multiplier_and_offset(world_setup):
     world, l1, l2, _, _, _ = world_setup
-    with world.modify_world():
-        original_connection = world.get_connection(l1, l2)
-        world.remove_connection(original_connection)
-        prismatic_connection = replace(original_connection, multiplier=2.0, offset=0.5)
-        world.add_connection(prismatic_connection)
+    prismatic_connection = world.get_connection(l1, l2)
+    prismatic_connection.multiplier = 2.0
+    prismatic_connection.offset = 0.5
 
     JointState.from_mapping({prismatic_connection: 1.5}).apply_to(world)
 

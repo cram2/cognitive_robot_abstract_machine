@@ -2,7 +2,7 @@
 Tests of what opening and closing :meth:`World.modify_world` blocks does to the world:
 
 which degrees of freedom survive a nested block, what a block that modifies nothing
-leaves behind, and that the fields the model is built from change only by record.
+leaves behind, and how the fields the model is built from are changed by record.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import ModelAttributeAssignedInWorldError
+from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -118,48 +118,19 @@ def test_rollback_of_connection_origin_update_restores_it(mini_world: World):
     )
 
 
-# %% fields the model is built from
+# %% recorded changes of model fields
 
 
-@pytest.mark.parametrize(
-    "attribute_name",
-    [
-        "parent_T_connection_expression",
-        "connection_T_child_expression",
-        "axis",
-        "multiplier",
-        "offset",
-    ],
-)
-def test_assigning_connection_field_in_world_raises(
-    mini_world: World, attribute_name: str
-):
+def test_updating_connection_origin_in_another_frame_raises(mini_world: World):
     connection = mini_world.connections[0]
 
-    with pytest.raises(ModelAttributeAssignedInWorldError):
+    with pytest.raises(ReferenceFrameMismatchError):
         with mini_world.modify_world():
-            setattr(connection, attribute_name, getattr(connection, attribute_name))
-
-
-def test_assigning_hardware_interface_in_world_raises(mini_world: World):
-    [degree_of_freedom] = mini_world.degrees_of_freedom
-
-    with pytest.raises(ModelAttributeAssignedInWorldError):
-        with mini_world.modify_world():
-            degree_of_freedom.has_hardware_interface = True
-
-
-def test_assigning_connection_field_before_world_is_allowed():
-    connection = RevoluteConnection(
-        parent=Body(name=PrefixedName("parent")),
-        child=Body(name=PrefixedName("child")),
-        axis=Vector3.Z(),
-        raw_dof=DegreeOfFreedom(name=PrefixedName("hinge")),
-    )
-
-    connection.multiplier = 2.0
-
-    assert connection.multiplier == 2.0
+            connection.update_parent_T_connection(
+                parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=1.0, reference_frame=connection.child
+                )
+            )
 
 
 def test_setting_hardware_interface_is_recorded(mini_world: World):

@@ -97,7 +97,6 @@ from semantic_digital_twin.world_description.world_entity import (
     WorldEntity,
     GenericWorldEntity,
     Actuator,
-    RecordedModelAttribute,
 )
 from semantic_digital_twin.world_description.world_modification import (
     WorldModification,
@@ -384,8 +383,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
             recorded_modification = modification.from_kwargs(bound_args)
 
             try:
-                with current_world.unlock_model_attributes():
-                    result = func(current_world, *args, **kwargs)
+                result = func(current_world, *args, **kwargs)
             finally:
                 current_world._current_active_atomic_world_modification = None
             # only record the modification after the function succeeded, otherwise a
@@ -653,12 +651,6 @@ class World(HasSimulatorProperties):
 
     This acts like a flag that indicates if an atomic world operation is currently being
     executed. See `atomic_world_modification` for more information.
-    """
-
-    _model_attribute_unlock_depth: int = field(init=False, default=0, repr=False)
-    """
-    How many recorded modifications are currently changing model attributes, see
-    :meth:`unlock_model_attributes`.
     """
 
     _id: UUID = field(init=False, default_factory=uuid.uuid4)
@@ -1329,26 +1321,6 @@ class World(HasSimulatorProperties):
                 self.remove_connection(connection)
             for kinematic_structure_entity in kinematic_structure_entities:
                 self.remove_kinematic_structure_entity(kinematic_structure_entity)
-
-    @property
-    def model_attributes_unlocked(self) -> bool:
-        """
-        Whether a recorded modification is currently changing the fields that a
-        :class:`RecordedModelAttribute` guards.
-        """
-        return self._model_attribute_unlock_depth > 0
-
-    @contextmanager
-    def unlock_model_attributes(self) -> Iterator[None]:
-        """
-        Let the recorded modification running inside the context assign the fields that
-        a :class:`RecordedModelAttribute` guards.
-        """
-        self._model_attribute_unlock_depth += 1
-        try:
-            yield
-        finally:
-            self._model_attribute_unlock_depth -= 1
 
     # %% Other Atomic World Modifications
     @atomic_world_modification(modification=SetDofHasHardwareInterface)
@@ -2866,9 +2838,3 @@ class World(HasSimulatorProperties):
                 case _:
                     pass
         self.notify_state_change()
-
-
-DegreeOfFreedom.has_hardware_interface = RecordedModelAttribute(
-    attribute_name="has_hardware_interface",
-    recorded_change=World.set_dofs_has_hardware_interface,
-)

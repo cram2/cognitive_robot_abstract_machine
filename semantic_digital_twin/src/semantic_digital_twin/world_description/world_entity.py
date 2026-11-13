@@ -15,7 +15,7 @@ import numpy as np
 import trimesh
 import trimesh.boolean
 from typing_extensions import TYPE_CHECKING
-from typing_extensions import TypeVar, Any, Self, ClassVar, Callable
+from typing_extensions import TypeVar, Any, Self, ClassVar
 
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.adapters.json_serializer import (
@@ -28,7 +28,6 @@ from krrood.adapters.json_serializer import (
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
 from krrood.patterns.caching import memoize
-from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
 from krrood.patterns.identifier_and_name import HasID, HasName
@@ -39,10 +38,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import (
-    AlreadyBelongsToAWorldError,
-    ModelAttributeAssignedInWorldError,
-)
+from semantic_digital_twin.exceptions import AlreadyBelongsToAWorldError
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
 from semantic_digital_twin.world_description.connection_properties import (
@@ -71,44 +67,6 @@ if TYPE_CHECKING:
         DegreeOfFreedom,
     )
     from semantic_digital_twin.world import World, GenericSemanticAnnotation
-
-
-@dataclass(kw_only=True, eq=False)
-class RecordedModelAttribute(DataclassFieldDescriptor):
-    """
-    A field of a world entity that the compiled world model is built from.
-
-    It can be assigned freely until its entity belongs to a world. From then on only a
-    recorded modification may change it, so that every change is versioned, published
-    and can be rolled back; assigning it directly raises.
-    """
-
-    attribute_name: str
-    """
-    The name of the field this descriptor manages.
-    """
-
-    recorded_change: Callable[..., Any] | None = None
-    """
-    The method that changes the field and records the change, or ``None`` if the field
-    cannot change once its entity is in a world.
-    """
-
-    def read(self, *, instance: WorldEntity) -> Any:
-        return instance.__dict__[self.attribute_name]
-
-    def write(self, *, instance: WorldEntity, value: Any) -> None:
-        if (
-            self.attribute_name in instance.__dict__
-            and instance._world is not None
-            and not instance._world.model_attributes_unlocked
-        ):
-            raise ModelAttributeAssignedInWorldError(
-                entity=instance,
-                attribute_name=self.attribute_name,
-                recorded_change=self.recorded_change,
-            )
-        instance.__dict__[self.attribute_name] = value
 
 
 @dataclass(eq=False)
@@ -1016,6 +974,13 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     parent_T_connection_expression: HomogeneousTransformationMatrix = field(
         default=None
     )
+    """
+    The constant pose of the connection relative to its parent.
+
+    .. warning:: In a world, change it only through :meth:`update_parent_T_connection`:
+        a direct assignment is not recorded, published or rolled back.
+    """
+
     _kinematics: HomogeneousTransformationMatrix = field(
         default_factory=HomogeneousTransformationMatrix, init=False
     )
@@ -1031,6 +996,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
     This split is necessary for copying Connections, because they need parent_T_connection as an input parameter and 
     connection_T_child is generated in the __post_init__ method.
+
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     def __post_init__(self):
@@ -1054,15 +1022,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 f"connection_T_child must be constant for connection. This one contains free variables: {self.parent_T_connection_expression.free_variables()}"
             )
 
-        if (
-            self.parent_T_connection_expression.reference_frame is not None
-            and self.parent_T_connection_expression.reference_frame != self.parent
-        ):
-            raise ReferenceFrameMismatchError(
-                expected_frame=self.parent,
-                actual_frame=self.parent_T_connection_expression.reference_frame,
-                context=f"parent_T_connection_expression of connection '{self.name}'",
-            )
+        self._express_relative_to_parent(
+            parent_T_connection=self.parent_T_connection_expression
+        )
         if (
             self.connection_T_child_expression.child_frame is not None
             and self.connection_T_child_expression.child_frame != self.child
@@ -1073,7 +1035,6 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 context=f"child frame of connection_T_child_expression of connection '{self.name}'",
             )
 
-        self.parent_T_connection_expression.reference_frame = self.parent
         self.connection_T_child_expression.child_frame = self.child
 
     @synchronized_attribute_modification
@@ -1086,9 +1047,33 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
         :param parent_T_connection: The new pose of the connection relative to its
             parent; it must be constant.
+        :raises ReferenceFrameMismatchError: If the pose is expressed relative to
+            another frame than the parent.
         """
+        self._express_relative_to_parent(parent_T_connection=parent_T_connection)
         self.parent_T_connection_expression = parent_T_connection
-        self.parent_T_connection_expression.reference_frame = self.parent
+
+    def _express_relative_to_parent(
+        self, *, parent_T_connection: HomogeneousTransformationMatrix
+    ) -> None:
+        """
+        Make the parent the reference frame of a pose of this connection relative to its
+        parent.
+
+        :param parent_T_connection: The pose, without a reference frame or with the parent.
+        :raises ReferenceFrameMismatchError: If the pose is expressed relative to
+            another frame than the parent.
+        """
+        if (
+            parent_T_connection.reference_frame is not None
+            and parent_T_connection.reference_frame != self.parent
+        ):
+            raise ReferenceFrameMismatchError(
+                expected_frame=self.parent,
+                actual_frame=parent_T_connection.reference_frame,
+                context=f"parent_T_connection_expression of connection '{self.name}'",
+            )
+        parent_T_connection.reference_frame = self.parent
 
     @classmethod
     def _serialized_fields(cls) -> list[Field]:
@@ -1432,15 +1417,6 @@ def _attr_values(
             continue
         if _is_entity_semantic_annotation_or_iterable(v, aggregation_type):
             yield v
-
-
-Connection.parent_T_connection_expression = RecordedModelAttribute(
-    attribute_name="parent_T_connection_expression",
-    recorded_change=Connection.update_parent_T_connection,
-)
-Connection.connection_T_child_expression = RecordedModelAttribute(
-    attribute_name="connection_T_child_expression"
-)
 
 
 @dataclass(eq=False)
