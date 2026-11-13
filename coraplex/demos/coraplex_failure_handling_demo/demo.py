@@ -4,12 +4,13 @@ handling a failure.
 
 - Its gripper is closed when the plan needs it open. A plan transformation inserts the
   missing step into the running plan, and the step that failed runs again after it.
-- Its grasp fails because a reading of the gripper joints is lost. The whole pick-up runs
-  again, up to a limited number of attempts.
+- The milk is nudged away while its gripper closes, so the gripper closes beside it and a
+  check finds nothing between the fingers. The whole pick-up runs again, up to a limited
+  number of attempts, and reaches for the milk where it now stands.
 
 Runs in kinematic simulation against the apartment, so nothing on the network is needed.
 Lower :attr:`FailureHandlingDemonstration.maximum_attempts` below
-:attr:`FailureHandlingDemonstration.lost_readings` to see the plan give up.
+:attr:`FailureHandlingDemonstration.nudges` to see the plan give up.
 """
 
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from coraplex.datastructures.enums import InsertionPosition
 from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from coraplex.plans.plan_transformation import (
+    ParallelInsertion,
     PlanRewriting,
     RecoveryByInsertion,
     SequentialInsertion,
@@ -38,13 +40,23 @@ from cramph.data_types import ObservationStateValues
 from cramph.failure_handling import HandledOnFailure, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
 from cramph.statechart import Statechart
+from giskardpy.motion_statechart.goals.gripper import MoveFingers
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood.patterns.path_enumeration import PathEnumeration
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose2D,
+    Vector3,
+)
+from semantic_digital_twin.reasoning.robot_predicates import bodies_in_gripper
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
+from semantic_digital_twin.specifications.connections import (
+    Connection6DoFSpecification,
+)
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
 )
@@ -54,6 +66,7 @@ from semantic_digital_twin.specifications.semantic_annotations import (
 )
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 # %% what the scene is built from
 
@@ -120,15 +133,57 @@ class JointReading(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNod
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class UnreliableJointReading(JointReading):
+class GraspCheck(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNode):
     """
-    A :class:`JointReading` whose first :attr:`lost_readings` runs fail, whatever the
-    joints stand at, as they do when a reading never arrives.
+    Checks once it runs whether :attr:`body` lies between the fingers of
+    :attr:`gripper`, and succeeds if it does or fails otherwise.
     """
 
-    lost_readings: int
+    body: Body
     """
-    How many runs fail before the joints are read.
+    The body that should be held.
+    """
+
+    gripper: HasTwoFingers
+    """
+    The gripper whose fingers should be around :attr:`body`.
+    """
+
+    def on_tick(self) -> ObservationStateValues:
+        if self.body in bodies_in_gripper(self.gripper):
+            return ObservationStateValues.TRUE
+        return ObservationStateValues.FALSE
+
+
+# %% disturbances
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class Nudge(SucceedsOnObservingTrue, StatechartNode):
+    """
+    Slides :attr:`body` by :attr:`displacement` once it runs, as a push would, and
+    succeeds once the body stands there. Only its first :attr:`nudged_runs` runs move
+    the body; later ones succeed at once.
+    """
+
+    body: Body
+    """
+    The body that is pushed, which hangs off a connection with six degrees of freedom.
+    """
+
+    displacement: Vector3
+    """
+    How far and which way the body slides, in the frame of its parent.
+    """
+
+    nudged_runs: int
+    """
+    How many runs of this node move the body.
+    """
+
+    duration_in_ticks: int = 10
+    """
+    Over how many ticks the body slides.
     """
 
     _runs: int = field(default=0, init=False, repr=False)
@@ -136,50 +191,107 @@ class UnreliableJointReading(JointReading):
     How often this node started.
     """
 
+    _ticks_slid: int = field(default=0, init=False, repr=False)
+    """
+    How many ticks of the current run moved the body.
+    """
+
     def on_start(self) -> None:
         self._runs += 1
+        self._ticks_slid = 0
 
     def on_tick(self) -> ObservationStateValues:
-        if self._runs <= self.lost_readings:
-            return ObservationStateValues.FALSE
-        return super().on_tick()
+        if self._runs > self.nudged_runs or self._ticks_slid >= self.duration_in_ticks:
+            return ObservationStateValues.TRUE
+        x, y, z = self.displacement.to_np()[:3] / self.duration_in_ticks
+        connection = self.body.parent_connection
+        connection.origin = (
+            HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=x, y=y, z=z, reference_frame=connection.parent
+            )
+            @ connection.origin
+        )
+        self._ticks_slid += 1
+        return ObservationStateValues.UNKNOWN
 
 
 # %% plan transformations
 
 
 @dataclass(kw_only=True)
-class ConfirmGraspAfterClosing(SequentialInsertion[GraspingAction]):
+class CheckGraspBeforeAttaching(SequentialInsertion[PickUpAction]):
     """
-    Reads the closed gripper right after a grasp closed it, unreliably.
+    Checks that the object of a pick-up is between the fingers once its grasp closed.
 
     A pick-up moves the object under the gripper only after its grasp, so a failed
-    reading leaves the object where it stands and the pick-up can simply run again.
-    """
-
-    lost_readings: int
-    """
-    How many readings are lost before one arrives.
+    check leaves the object where it stands and the pick-up can simply run again.
     """
 
     @property
     def position(self) -> InsertionPosition:
         return InsertionPosition.AFTER
 
+    def is_applicable(self, plan_node: PickUpAction) -> bool:
+        return True
+
+    def anchor(self, plan_node: PickUpAction) -> StatechartNode:
+        """
+        :return: The grasp of the pick-up.
+        """
+        return next(
+            node for node in plan_node.nodes if isinstance(node, GraspingAction)
+        )
+
+    def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
+        return [
+            GraspCheck(
+                name="grasp check",
+                body=plan_node.grasp.graspable.root,
+                gripper=plan_node.arm.end_effector,
+            )
+        ]
+
+
+@dataclass(kw_only=True)
+class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
+    """
+    Pushes the grasped object away along the direction the gripper approached it from,
+    while the gripper closes, so that it closes beside the object.
+    """
+
+    nudges: int
+    """
+    How many closings of the gripper the object is pushed away during.
+    """
+
+    distance: float
+    """
+    How far the object is pushed, in meters.
+    """
+
     def is_applicable(self, plan_node: GraspingAction) -> bool:
         return True
 
     def anchor(self, plan_node: GraspingAction) -> StatechartNode:
-        return plan_node
+        """
+        :return: The goal closing the gripper, the last finger goal of the grasp.
+        """
+        return [
+            node for node in plan_node.descendants if isinstance(node, MoveFingers)
+        ][-1]
 
     def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
+        approach = plan_node.grasp.world_T_grasp.to_np()[:3, 0]
+        body = plan_node.grasp.graspable.root
         return [
-            UnreliableJointReading(
-                name="grasp reading",
-                joint_state=plan_node.arm.end_effector.default_configuration(
-                    GripperState.CLOSE
-                ).joint_state,
-                lost_readings=self.lost_readings,
+            Nudge(
+                name="nudge",
+                body=body,
+                displacement=Vector3.from_iterable(
+                    approach * self.distance,
+                    reference_frame=body.parent_connection.parent,
+                ),
+                nudged_runs=self.nudges,
             )
         ]
 
@@ -230,9 +342,15 @@ class FailureHandlingDemonstration(RobotDemonstration):
 
     event_segmentation: bool = False
 
-    lost_readings: int = 2
+    nudges: int = 1
     """
-    How many readings of the closed gripper are lost, each of which fails the pick-up.
+    How many closings of the gripper the milk is nudged away during, each of which
+    fails the pick-up.
+    """
+
+    nudge_distance: float = 0.08
+    """
+    How far the milk is nudged away from the closing gripper, in meters.
     """
 
     maximum_attempts: int = 2
@@ -259,7 +377,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
     """
 
     counter_stand: Pose2D = field(
-        default_factory=lambda: Pose2D.from_xy_yaw(x=1.5, y=2.4)
+        default_factory=lambda: Pose2D.from_xy_yaw(x=1.65, y=2.4)
     )
     """
     Where the PR2 stands to pick up the milk, on the floor of the world.
@@ -294,13 +412,17 @@ class FailureHandlingDemonstration(RobotDemonstration):
 
     def populate_scene(self, world: World) -> None:
         """
-        Put the milk on the counter.
+        Put the milk on the counter, free to be pushed.
         """
         name = Milk.__name__
         SemanticAnnotationWithRootSpecification(
             name=name,
             semantic_annotation_type=Milk,
-            root_specification=BodySpecification.mesh(name, str(SceneFile.MILK)),
+            root_specification=BodySpecification.mesh(
+                name,
+                str(SceneFile.MILK),
+                connection_specification=Connection6DoFSpecification(),
+            ),
         ).spawn(world, parent=None, parent_T_self=self.milk_start)
 
     def build_context_extensions(self, world: World) -> list[ContextExtension]:
@@ -309,7 +431,8 @@ class FailureHandlingDemonstration(RobotDemonstration):
             StatementGrounding(),
             PlanRewriting(
                 transformations=[
-                    ConfirmGraspAfterClosing(lost_readings=self.lost_readings)
+                    CheckGraspBeforeAttaching(),
+                    NudgeWhileClosing(nudges=self.nudges, distance=self.nudge_distance),
                 ]
             ),
         ]
@@ -385,6 +508,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         print("Life cycle of the nodes that failed and recovered:")
         for node in [
             *self.statechart.get_nodes_by_type(JointReading),
+            *self.statechart.get_nodes_by_type(GraspCheck),
             *self.statechart.get_nodes_by_type(PickUpAction),
         ]:
             history = self.statechart.state_history.get_life_cycle_history_of_node(node)
