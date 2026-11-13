@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from types import NoneType
 
-from typing_extensions import Any, Generic, TypeVar
+from typing_extensions import Any, Callable, Generic, TypeVar
 
 from krrood.code_generation.ast_helpers import (
     ast_call,
@@ -22,11 +22,10 @@ from krrood.code_generation.exceptions import (
     ObjectNotSerializableError,
 )
 from krrood.ormatic.utils import classproperty
-from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.patterns.specificity_ranking import (
+    SpecificityRankedAlternative,
     concrete_subclasses,
     mro_depth,
-    sole_maximum,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -48,7 +47,9 @@ class SourceEmissionContext:
 
 
 @dataclass(kw_only=True)
-class SourceEmitter(Generic[EmittedType], SubClassSafeGeneric, ABC):
+class SourceEmitter(
+    Generic[EmittedType], SubClassSafeGeneric, SpecificityRankedAlternative, ABC
+):
     """Builds the expression that rebuilds a subject of its bound type, within
     a family of emitters that :meth:`emit_source` chooses from."""
 
@@ -68,15 +69,27 @@ class SourceEmitter(Generic[EmittedType], SubClassSafeGeneric, ABC):
             ancestor for ancestor in cls.__mro__ if SourceEmitter in ancestor.__bases__
         )
 
-    @classproperty
-    def family_members(cls) -> list[type[SourceEmitter]]:
-        """The emitters of :attr:`family`: its concrete subclasses that bind
-        the emitted type."""
+    @classmethod
+    def alternatives(cls) -> list[type[SourceEmitter]]:
+        """Like :meth:`SpecificityRankedAlternative.alternatives`, but the
+        concrete subclasses of :attr:`family` that bind the emitted type."""
         return [
             emitter
             for emitter in concrete_subclasses(cls.family)
             if not isinstance(emitter.get_generic_type_parameters()[0], TypeVar)
         ]
+
+    @classproperty
+    def guard(cls) -> Callable[..., bool]:
+        """:meth:`can_emit_source_for_object`."""
+        return cls.can_emit_source_for_object
+
+    @classproperty
+    def specificity(cls) -> int:
+        """Like :attr:`SpecificityRankedAlternative.specificity`, but the class
+        depth of :attr:`emitted_type`, so the emitter of the most specific type
+        that applies wins."""
+        return mro_depth(cls.emitted_type)
 
     @classmethod
     def unsupported_subject_error(cls, *, subject: Any) -> Exception:
@@ -108,18 +121,7 @@ class SourceEmitter(Generic[EmittedType], SubClassSafeGeneric, ABC):
         :param context: The shared emission state.
         :return: The expression that rebuilds ``subject``.
         """
-        applicable_emitters = [
-            emitter
-            for emitter in cls.family_members
-            if emitter.can_emit_source_for_object(subject=subject, context=context)
-        ]
-        emitter = sole_maximum(
-            applicable_emitters,
-            key=lambda candidate: mro_depth(candidate.emitted_type),
-            collision_error=lambda tied: AmbiguousRuleError(
-                subject=subject, candidates=tied
-            ),
-        )
+        emitter = cls.most_applicable(subject=subject, context=context)
         if emitter is None:
             raise cls.unsupported_subject_error(subject=subject)
         return emitter(context=context).emit(subject=subject)
@@ -147,7 +149,7 @@ class ValueSourceEmitter(SourceEmitter[EmittedType], ABC):
         instances."""
         return tuple(
             emitter.emitted_type
-            for emitter in ValueSourceEmitter.family_members
+            for emitter in ValueSourceEmitter.alternatives()
             if issubclass(emitter, (ConstantSourceEmitter, EnumSourceEmitter))
             and emitter is not NoneSourceEmitter
         )

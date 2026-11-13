@@ -85,5 +85,5 @@ def test_every_conclusion_selector_has_a_branch_emitter():
     }
 
     assert {
-        emitter.emitted_type for emitter in BranchSourceEmitter.family_members
+        emitter.emitted_type for emitter in BranchSourceEmitter.alternatives()
     } == eql_conclusion_selectors
