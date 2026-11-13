@@ -1,3 +1,7 @@
+"""
+Graphs of convex sets whose nodes are convex polytopes grown by IRIS around seed points.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -373,7 +377,9 @@ class GraphOfConvexPolygons(
         semantic_annotation = SemanticEnvironmentAnnotation(
             root=world.root, _world=world
         )
-        obstacle_entities = semantic_annotation.obstacle_entities(result.search_space)
+        obstacle_entities = semantic_annotation.obstacle_entities(
+            search_space=result.search_space
+        )
         result.obstacles = [
             _shape_to_convex_set(shape, world.root, bloat_obstacles, bloat_obstacles)
             for entity in obstacle_entities

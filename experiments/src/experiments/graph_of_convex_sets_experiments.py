@@ -403,9 +403,12 @@ class GraphOfConvexSetsFreespaceBenchmark:
             _compute_connectivity, repetitions=3
         )
 
-        def _construct_box_graph_from_loaded_world():
+        def _construct_box_graph_from_loaded_world() -> VolumetricGraphOfBoundingBoxes:
+            """
+            :return: The volumetric graph of the loaded world's free space.
+            """
             return VolumetricGraphOfBoundingBoxes.free_space_from_world(
-                world, search_space
+                world=world, search_space=search_space
             )
 
         _, box_construction_elapsed = self._measure(
