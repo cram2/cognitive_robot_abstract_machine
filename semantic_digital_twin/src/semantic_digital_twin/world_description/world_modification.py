@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import wraps
 
 import numpy as np
+import numpy.typing as npt
 from typing_extensions import Any, Self, TYPE_CHECKING
 
 from krrood.class_diagrams.collection_kind import CollectionKind
@@ -311,7 +312,9 @@ class RemoveDegreeOfFreedomModification(WorldModification):
     The degree of freedom that was removed, kept so this modification can be reverted.
     """
 
-    state_before_removal: np.ndarray | None = field(default=None, repr=False)
+    state_before_removal: npt.NDArray[np.float64] | None = field(
+        default=None, repr=False
+    )
     """
     The position and derivatives the degree of freedom had when it was removed, given
     back to it when this modification is reverted.

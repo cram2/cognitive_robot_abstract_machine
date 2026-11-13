@@ -14,6 +14,7 @@ from itertools import chain
 from uuid import UUID
 
 import numpy as np
+import numpy.typing as npt
 import rustworkx as rx
 import rustworkx.visualization
 from PIL.Image import Image
@@ -146,7 +147,7 @@ class ResetStateContextManager:
     The world whose state is reset.
     """
 
-    state_on_entering: dict[UUID, np.ndarray] = field(
+    state_on_entering: dict[UUID, npt.NDArray[np.float64]] = field(
         default_factory=dict, init=False, repr=False
     )
     """
