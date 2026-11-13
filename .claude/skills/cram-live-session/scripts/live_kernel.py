@@ -10,8 +10,9 @@ Drive the live session kernel in a container on a remote server from this machin
     live_kernel.py interrupt                 raise KeyboardInterrupt in the kernel
 
 Commands run detached inside the container and write their output to the exchange
-directory, because an attached ``docker exec`` can hang on exit. Every option defaults
-to the ``LIVE_*`` environment variable of the same name.
+directory, because an attached ``docker exec`` can hang on exit; that output streams
+back as it is written. Every call to the server shares one ssh connection. Every option
+defaults to the ``LIVE_*`` environment variable of the same name.
 """
 
 from __future__ import annotations
@@ -19,14 +20,17 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import selectors
 import shlex
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum, StrEnum
 from pathlib import Path, PurePosixPath
+
+from typing_extensions import BinaryIO
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +137,32 @@ class RunEndExitStatus(IntEnum):
     The kernel stopped running during the run.
     """
 
+    CONNECTION_LOST = 5
+    """
+    The connection streaming the run's output closed before the run ended.
+    """
+
+
+class SshOption(StrEnum):
+    """
+    The ssh client options this script sets.
+    """
+
+    CONTROL_MASTER = "ControlMaster"
+    """
+    Whether a call opens a connection later calls share.
+    """
+
+    CONTROL_PATH = "ControlPath"
+    """
+    The socket of the shared connection.
+    """
+
+    CONTROL_PERSIST = "ControlPersist"
+    """
+    How long the shared connection stays open after its last call.
+    """
+
 
 # %% the remote container
 
@@ -153,33 +183,68 @@ class RemoteContainer:
     The name of the container.
     """
 
-    def run_on_server(self, *, command: str) -> str:
+    shared_connection_socket: Path = field(
+        default_factory=lambda: Path.home() / ".ssh" / "live-kernel-%C"
+    )
+    """
+    The socket of the ssh connection every call shares; ``%C`` stands for a hash of the
+    destination. Its path must stay shorter than a Unix socket's limit of 107 bytes.
+    """
+
+    shared_connection_lifetime: timedelta = timedelta(minutes=10)
+    """
+    How long the shared connection stays open after its last call.
+    """
+
+    @property
+    def ssh_command(self) -> list[str]:
+        """
+        The ssh call to the server, sharing its connection, before the remote command.
+        """
+        options = {
+            SshOption.CONTROL_MASTER: "auto",
+            SshOption.CONTROL_PATH: self.shared_connection_socket,
+            SshOption.CONTROL_PERSIST: int(
+                self.shared_connection_lifetime.total_seconds()
+            ),
+        }
+        arguments = ["ssh"]
+        for option, value in options.items():
+            arguments += ["-o", f"{option}={value}"]
+        return [*arguments, self.server]
+
+    def run_on_server(self, *, command: str, standard_input: str = "") -> str:
         """
         :param command: A shell command for the server.
+        :param standard_input: What the command reads from its standard input.
         :return: What the command printed.
         """
         return subprocess.run(
-            ["ssh", self.server, command], capture_output=True, text=True
+            [*self.ssh_command, command],
+            input=standard_input,
+            capture_output=True,
+            text=True,
         ).stdout
 
-    def copy_to_server(self, *, local_path: Path, server_path: PurePosixPath) -> None:
+    def start_on_server(self, *, command: str) -> subprocess.Popen[bytes]:
         """
-        :param local_path: A file on this machine.
-        :param server_path: Where it goes on the server.
+        :param command: A shell command for the server.
+        :return: The running command, its output unbuffered, to read as it is printed.
         """
-        subprocess.run(
-            ["scp", "-q", str(local_path), f"{self.server}:{server_path}"], check=True
+        return subprocess.Popen(
+            [*self.ssh_command, command],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            bufsize=0,
         )
 
-    def start_in_container(self, *, command: str) -> None:
+    def detached_container_command(self, *, command: str) -> str:
         """
-        Start a shell command inside the container without waiting for it.
-
-        :param command: The command.
+        :param command: A shell command for inside the container.
+        :return: The server's shell command starting it inside the container without
+            waiting for it.
         """
-        self.run_on_server(
-            command=f"docker exec -d {self.container} bash -c {shlex.quote(command)}"
-        )
+        return f"docker exec -d {self.container} bash -c {shlex.quote(command)}"
 
     def process_id_on_server(self, *, command_line_part: str) -> int | None:
         """
@@ -259,14 +324,15 @@ class LiveKernel:
     How long the kernel may sleep without output before it counts as deadlocked.
     """
 
-    poll_period: timedelta = timedelta(seconds=5)
+    busy_check_period: timedelta = timedelta(seconds=5)
     """
-    How often a run's output is read.
+    How long the kernel's CPU use is counted to tell whether it computes or sleeps.
     """
 
     busy_cpu_ticks: int = 20
     """
-    The fewest CPU ticks in a poll period of a kernel that computes rather than sleeps.
+    The fewest CPU ticks in a :attr:`busy_check_period` of a kernel that computes rather
+    than sleeps.
     """
 
     @property
@@ -304,9 +370,11 @@ class LiveKernel:
             "LIVE_SESSION_DIRECTORY": self.session_directory,
         }
         assignments = " ".join(f"{name}={value}" for name, value in settings.items())
-        self.container.start_in_container(
-            command=f"{assignments} bash "
-            f"{self.repository_in_container / SkillPath.START_SESSION}"
+        self.container.run_on_server(
+            command=self.container.detached_container_command(
+                command=f"{assignments} bash "
+                f"{self.repository_in_container / SkillPath.START_SESSION}"
+            )
         )
         kernel_start = self.run_detached(
             name="kernel_start",
@@ -325,9 +393,6 @@ class LiveKernel:
         :return: The run's exit status, or how following it ended.
         """
         name = script.stem
-        self.container.copy_to_server(
-            local_path=script, server_path=self.exchange_on_server / f"{name}.py"
-        )
         arguments = [
             str(self.exchange_in_container / f"{name}.py"),
             *perform_arguments,
@@ -340,74 +405,110 @@ class LiveKernel:
             f"source {self.environment_script} && python -u "
             f"{self.repository_in_container / SkillPath.PERFORM_CELLS} "
             f"{shlex.join(arguments)}",
+            script=script,
         )
 
-    def run_detached(self, *, name: str, command: str) -> int:
+    def run_detached(
+        self, *, name: str, command: str, script: Path | None = None
+    ) -> int:
         """
         Run a command in the container, its output going to the exchange directory, and
         follow that output.
 
-        :param name: The name of the run, which names its output file.
+        :param name: The name of the run, which names its output file and its script.
         :param command: The command.
+        :param script: A file on this machine copied to the exchange directory before
+            the command starts.
         :return: The run's exit status, or how following it ended.
         """
         output = self.exchange_in_container / f"{name}.log"
-        self.container.run_on_server(
-            command=f"rm -f {self.exchange_on_server / f'{name}.log'}"
+        steps = [f"rm -f {self.exchange_on_server / f'{name}.log'}"]
+        if script is not None:
+            steps.append(f"cat > {self.exchange_on_server / f'{name}.py'}")
+        steps.append(
+            self.container.detached_container_command(
+                command=f"({command}) > {output} 2>&1; "
+                f"echo {LogMarker.EXIT}$? >> {output}"
+            )
         )
-        self.container.start_in_container(
-            command=f"({command}) > {output} 2>&1; echo {LogMarker.EXIT}$? >> {output}"
+        self.container.run_on_server(
+            command=" && ".join(steps),
+            standard_input="" if script is None else script.read_text(),
         )
         return self.follow(name=name)
 
     def follow(self, *, name: str) -> int:
         """
-        Log a run's output as it grows, until the run ends, :attr:`wait` passes, or the
-        kernel sleeps through :attr:`silence` without output.
+        Log a run's output as it is written, until the run ends, :attr:`wait` passes, or
+        the kernel sleeps through :attr:`silence` without output.
 
         :param name: The name of the run.
         :return: The run's exit status, or how following it ended.
         """
-        output = self.exchange_on_server / f"{name}.log"
-        logged_lines = 0
-        silent = timedelta()
-        waited = timedelta()
-        while waited < self.wait:
-            lines = self.container.run_on_server(
-                command=f"tail -n +{logged_lines + 1} {output} 2>/dev/null || true"
-            ).splitlines()
-            logged_lines += len(lines)
-            for line in lines:
-                logger.info(line)
-                if line.startswith(LogMarker.EXIT):
-                    return int(line.removeprefix(LogMarker.EXIT))
-            silent = timedelta() if lines else silent + self.poll_period
-            if silent >= self.silence:
-                process_id = self.process_id
-                if process_id is None:
-                    logger.warning("The kernel no longer runs.")
-                    return RunEndExitStatus.KERNEL_GONE
-                if self.is_sleeping(process_id=process_id):
-                    logger.warning(
-                        "The kernel sleeps without output for %s: probably deadlocked; "
-                        "'interrupt' shows where.",
-                        silent,
-                    )
-                    return RunEndExitStatus.DEADLOCKED
-                silent = timedelta()
-            time.sleep(self.poll_period.total_seconds())
-            waited += self.poll_period
-        logger.warning("Still running after %s; continue with 'wait %s'.", waited, name)
+        tail = self.container.start_on_server(
+            command=f"tail -n +1 -F {self.exchange_on_server / f'{name}.log'} "
+            "2>/dev/null"
+        )
+        exit_status = self.log_output_until_exit(output=tail.stdout, name=name)
+        tail.terminate()
+        return exit_status
+
+    def log_output_until_exit(self, *, output: BinaryIO, name: str) -> int:
+        """
+        :param output: The run's output as it is written, unbuffered.
+        :param name: The name of the run.
+        :return: The run's exit status, or how following it ended.
+        """
+        readable = selectors.DefaultSelector()
+        readable.register(output, selectors.EVENT_READ)
+        started = time.monotonic()
+        last_output = started
+        while (
+            remaining := self.wait.total_seconds() - (time.monotonic() - started)
+        ) > 0:
+            until_silence = self.silence.total_seconds() - (
+                time.monotonic() - last_output
+            )
+            if readable.select(timeout=max(min(remaining, until_silence), 0)):
+                line = output.readline()
+                if not line:
+                    logger.warning("The connection to the server closed.")
+                    return RunEndExitStatus.CONNECTION_LOST
+                text = line.decode(errors="replace").rstrip("\n")
+                logger.info(text)
+                if text.startswith(LogMarker.EXIT):
+                    return int(text.removeprefix(LogMarker.EXIT))
+                last_output = time.monotonic()
+            silent = timedelta(seconds=time.monotonic() - last_output)
+            if silent < self.silence:
+                continue
+            process_id = self.process_id
+            if process_id is None:
+                logger.warning("The kernel no longer runs.")
+                return RunEndExitStatus.KERNEL_GONE
+            if self.is_sleeping(process_id=process_id):
+                logger.warning(
+                    "The kernel sleeps without output for %s: probably deadlocked; "
+                    "'interrupt' shows where.",
+                    silent,
+                )
+                return RunEndExitStatus.DEADLOCKED
+            last_output = time.monotonic()
+        logger.warning(
+            "Still running after %s; continue with 'wait %s'.", self.wait, name
+        )
         return RunEndExitStatus.STILL_RUNNING
 
     def is_sleeping(self, *, process_id: int) -> bool:
         """
         :param process_id: The server's id of the kernel's process.
-        :return: Whether the kernel used fewer than :attr:`busy_cpu_ticks` in a poll
-            period.
+        :return: Whether the kernel used fewer than :attr:`busy_cpu_ticks` in a
+            :attr:`busy_check_period`.
         """
         return (
-            self.container.cpu_ticks(process_id=process_id, duration=self.poll_period)
+            self.container.cpu_ticks(
+                process_id=process_id, duration=self.busy_check_period
+            )
             < self.busy_cpu_ticks
         )
 
@@ -415,9 +516,11 @@ class LiveKernel:
         """
         Raise :class:`KeyboardInterrupt` in the kernel.
         """
-        self.container.start_in_container(
-            command=f"kill -INT $(pgrep -f '^[^ ]*python[^ ]* -m ipykernel_launcher "
-            f"-f {self.connection_file}')"
+        self.container.run_on_server(
+            command=self.container.detached_container_command(
+                command=f"kill -INT $(pgrep -f '^[^ ]*python[^ ]* -m ipykernel_launcher "
+                f"-f {self.connection_file}')"
+            )
         )
 
 
@@ -530,13 +633,13 @@ def main() -> None:
                 logger.info("The kernel does not run.")
                 return
             ticks = kernel.container.cpu_ticks(
-                process_id=process_id, duration=kernel.poll_period
+                process_id=process_id, duration=kernel.busy_check_period
             )
             logger.info(
                 "Kernel process %s on the server: %s CPU ticks in %s",
                 process_id,
                 ticks,
-                kernel.poll_period,
+                kernel.busy_check_period,
             )
         case Command.INTERRUPT:
             kernel.interrupt()
