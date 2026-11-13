@@ -12,7 +12,7 @@ from cramph.composites import (
     TryAll,
     TryInOrder,
 )
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart, StatechartNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
@@ -53,7 +53,7 @@ def _succeeding_statement(name: str) -> Match[NodeSucceedingOnObservingTrue]:
     :return: A statement of a node that succeeds as soon as it observes.
     """
     return a(NodeSucceedingOnObservingTrue)(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -62,7 +62,7 @@ def _statement_of_names(names: list[str]) -> Match[NodeSucceedingOnObservingTrue
     :return: A statement with one candidate per name in `names`.
     """
     return a(NodeSucceedingOnObservingTrue)(
-        name=variable(str, domain=names), observation=ObservationStateValues.TRUE
+        name=variable(str, domain=names), observation=ObservationStateValue.TRUE
     )
 
 
@@ -115,7 +115,7 @@ def test_a_statement_inserted_into_a_joined_sequence_runs_as_a_statement_node(
     statechart_executor: StatechartExecutor,
 ) -> None:
     first = NodeSucceedingOnObservingTrue(
-        name="first", observation=ObservationStateValues.TRUE
+        name="first", observation=ObservationStateValue.TRUE
     )
     statement = _succeeding_statement("inserted")
     sequence = Sequence(nodes=[first])
@@ -137,7 +137,7 @@ def test_a_statement_replacing_a_step_runs_as_a_statement_node(
     statechart_executor: StatechartExecutor,
 ) -> None:
     replaced = NodeSucceedingOnObservingTrue(
-        name="replaced", observation=ObservationStateValues.TRUE
+        name="replaced", observation=ObservationStateValue.TRUE
     )
     statement = _succeeding_statement("replacement")
     sequence = Sequence(nodes=[replaced])
@@ -164,8 +164,8 @@ def test_a_sequence_runs_the_node_its_statement_grounds_to(
     [step] = sequence.nodes
     [grounded] = step.grounded_nodes
     assert isinstance(grounded, NodeSucceedingOnObservingTrue)
-    assert grounded.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert grounded.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% the candidates of a statement

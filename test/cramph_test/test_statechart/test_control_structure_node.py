@@ -10,7 +10,7 @@ from cramph.composites import (
     TryAll,
     TryInOrder,
 )
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import (
     NodeAlreadyAChildError,
     NodeAlreadyBelongsToDifferentNodeError,
@@ -39,7 +39,7 @@ def _succeeding(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds as soon as it observes, which it does right away.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -48,7 +48,7 @@ def _failing(name: str) -> NodeFailingOnObservingFalse:
     :return: A node that fails as soon as it observes, which it does right away.
     """
     return NodeFailingOnObservingFalse(
-        name=name, observation=ObservationStateValues.FALSE
+        name=name, observation=ObservationStateValue.FALSE
     )
 
 
@@ -75,7 +75,7 @@ def _start_order(
         started = [
             tick
             for tick, state in enumerate(history)
-            if state != LifeCycleValues.NOT_STARTED
+            if state != LifeCycleValue.NOT_STARTED
         ]
         if started:
             first_running_tick[node] = started[0]
@@ -97,7 +97,7 @@ def test_a_step_inserted_before_another_runs_right_before_it(
     _run(statechart_executor, statechart, sequence)
 
     assert _start_order(statechart, [third, second, first]) == [first, second, third]
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_step_inserted_before_the_first_one_runs_first(
@@ -170,7 +170,7 @@ def test_a_replaced_node_of_a_step_no_longer_decides_when_the_step_succeeds(
     _run(statechart_executor, statechart, sequence)
 
     assert replaced not in statechart.nodes
-    assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_sequence_that_did_not_join_yet_only_changes_its_list(
@@ -199,7 +199,7 @@ def test_an_inserted_alternative_starts_once_the_one_before_it_failed(
     _run(statechart_executor, statechart, alternatives)
 
     assert _start_order(statechart, [third, second, first]) == [first, second, third]
-    assert alternatives.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert alternatives.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% children running side by side
@@ -215,24 +215,24 @@ def test_an_alternative_inserted_into_try_all_can_decide_it(
     alternatives.insert_after(reference=failing, node=_succeeding("works"))
     _run(statechart_executor, statechart, alternatives)
 
-    assert alternatives.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert alternatives.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_inserted_into_a_parallel_counts_towards_its_observation(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    at_goal = NodeObservingAFixedValue(observation=ObservationStateValues.TRUE)
+    at_goal = NodeObservingAFixedValue(observation=ObservationStateValue.TRUE)
     statechart.add_node(node=(parallel := Parallel(nodes=[at_goal])))
 
     parallel.insert_after(
         reference=at_goal,
-        node=NodeObservingAFixedValue(observation=ObservationStateValues.FALSE),
+        node=NodeObservingAFixedValue(observation=ObservationStateValue.FALSE),
     )
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
 
-    assert parallel.observation_state == ObservationStateValues.FALSE
+    assert parallel.observation_state == ObservationStateValue.FALSE
 
 
 def test_a_parallel_can_still_arrive_through_a_node_inserted_after_it_joined(
@@ -244,15 +244,15 @@ def test_a_parallel_can_still_arrive_through_a_node_inserted_after_it_joined(
 
     parallel.insert_after(
         reference=failing,
-        node=NodeObservingAFixedValue(observation=ObservationStateValues.TRUE),
+        node=NodeObservingAFixedValue(observation=ObservationStateValue.TRUE),
     )
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
     statechart_executor.tick()
 
-    assert failing.life_cycle_state == LifeCycleValues.FAILED
-    assert parallel.life_cycle_state == LifeCycleValues.RUNNING
-    assert parallel.observation_state == ObservationStateValues.TRUE
+    assert failing.life_cycle_state == LifeCycleValue.FAILED
+    assert parallel.life_cycle_state == LifeCycleValue.RUNNING
+    assert parallel.observation_state == ObservationStateValue.TRUE
 
 
 # %% replacing a node by one holding it
@@ -262,7 +262,7 @@ def _at_goal(name: str) -> NodeObservingAFixedValue:
     """
     :return: A node that observes being at its goal and leaves ending it to its parent.
     """
-    return NodeObservingAFixedValue(name=name, observation=ObservationStateValues.TRUE)
+    return NodeObservingAFixedValue(name=name, observation=ObservationStateValue.TRUE)
 
 
 def test_a_step_replaced_by_a_node_holding_it_stays_in_the_statechart_below_that_node(
@@ -287,7 +287,7 @@ def test_a_step_replaced_by_a_node_holding_it_stays_in_the_statechart_below_that
         replacement,
         third,
     ]
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_held_step_keeps_its_position_among_the_children_of_its_new_parent(
@@ -324,7 +324,7 @@ def test_a_held_step_is_no_longer_ended_by_its_former_parent(
         node=held,
         replacement=Parallel(
             nodes=[
-                NodeObservingAFixedValue(observation=ObservationStateValues.FALSE),
+                NodeObservingAFixedValue(observation=ObservationStateValue.FALSE),
                 held,
             ]
         ),
@@ -334,7 +334,7 @@ def test_a_held_step_is_no_longer_ended_by_its_former_parent(
     statechart_executor.tick()
     statechart_executor.tick()
 
-    assert held.life_cycle_state == LifeCycleValues.RUNNING
+    assert held.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_replacing_a_step_of_a_compiled_statechart_is_rejected_and_changes_nothing(
@@ -373,7 +373,7 @@ def test_a_top_level_node_replaced_by_a_node_holding_it_stays_below_that_node(
     assert statechart.top_level_nodes[0] is replacement
     assert replacement.nodes == [held, beside]
     assert held.parent_node is replacement
-    assert replacement.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert replacement.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_replaced_top_level_node_leaves_the_statechart(

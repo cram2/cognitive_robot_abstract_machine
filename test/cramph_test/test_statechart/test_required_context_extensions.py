@@ -6,7 +6,7 @@ import pytest
 
 from cramph.node import SucceedsOnObservingTrue
 from cramph.context import ContextExtension, StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.exceptions import NodesMissingContextExtensionsError
 from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode
@@ -106,7 +106,7 @@ class CompositeReadingAnExtensionWhileExpanding(SucceedsOnObservingTrue, Composi
         self.expanded = True
         self._add_child_to_statechart(
             node=NodeSucceedingOnObservingTrue(
-                name="child", observation=ObservationStateValues.TRUE
+                name="child", observation=ObservationStateValue.TRUE
             )
         )
 
@@ -141,7 +141,7 @@ def test_compiling_raises_for_a_node_missing_a_required_extension(
     statechart.add_node(
         node=(
             node := NodeRequiringAnExtension(
-                name="requiring", observation=ObservationStateValues.TRUE
+                name="requiring", observation=ObservationStateValue.TRUE
             )
         )
     )
@@ -159,14 +159,14 @@ def test_compiling_reports_every_missing_extension_at_once(
     statechart.add_node(
         node=(
             first := NodeRequiringAnExtension(
-                name="first", observation=ObservationStateValues.TRUE
+                name="first", observation=ObservationStateValue.TRUE
             )
         )
     )
     statechart.add_node(
         node=(
             second := SpecializedNodeRequiringAnotherExtension(
-                name="second", observation=ObservationStateValues.TRUE
+                name="second", observation=ObservationStateValue.TRUE
             )
         )
     )
@@ -187,7 +187,7 @@ def test_compiling_succeeds_once_the_required_extension_is_registered(
     statechart = Statechart(context=statechart_context)
     statechart.add_node(
         node=NodeRequiringAnExtension(
-            name="requiring", observation=ObservationStateValues.TRUE
+            name="requiring", observation=ObservationStateValue.TRUE
         )
     )
 
@@ -202,7 +202,7 @@ def test_a_node_joining_a_compiled_statechart_is_checked(
     statechart = Statechart(context=statechart_executor.context)
     statechart.add_node(
         node=NodeSucceedingOnObservingTrue(
-            name="first", observation=ObservationStateValues.TRUE
+            name="first", observation=ObservationStateValue.TRUE
         )
     )
     statechart_executor.compile(statechart=statechart)
@@ -211,7 +211,7 @@ def test_a_node_joining_a_compiled_statechart_is_checked(
         statechart.add_node(
             node=(
                 node := NodeRequiringAnExtension(
-                    name="joining", observation=ObservationStateValues.TRUE
+                    name="joining", observation=ObservationStateValue.TRUE
                 )
             )
         )

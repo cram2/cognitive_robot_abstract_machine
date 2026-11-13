@@ -1,7 +1,7 @@
 import pytest
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.cartesian_monitors import (
     PoseReached,
@@ -70,7 +70,7 @@ def test_position_reached(pr2_world_state_reset: World):
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 @pytest.mark.parametrize(
@@ -109,7 +109,7 @@ def test_position_reached_binding_policies(
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_orientation_reached(pr2_world_state_reset: World):
@@ -138,7 +138,7 @@ def test_orientation_reached(pr2_world_state_reset: World):
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_pose_reached(pr2_world_state_reset: World):
@@ -164,7 +164,7 @@ def test_pose_reached(pr2_world_state_reset: World):
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_pointing_at(pr2_world_state_reset: World):
@@ -188,7 +188,7 @@ def test_pointing_at(pr2_world_state_reset: World):
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_vectors_aligned(pr2_world_state_reset: World):
@@ -212,7 +212,7 @@ def test_vectors_aligned(pr2_world_state_reset: World):
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_distance_to_line(pr2_world_state_reset: World):
@@ -238,4 +238,4 @@ def test_distance_to_line(pr2_world_state_reset: World):
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE

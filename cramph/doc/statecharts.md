@@ -607,7 +607,7 @@ A node class inherits `EndedByOwner` or `SucceedsOnObservingTrue` (see
 - `build_artifacts()` returns `NodeArtifacts` whose `observation` is a symbolic
   expression. It is compiled into the tick, so it costs no Python call per tick.
 - `on_tick()` is called every tick the node was running at the start of, and may
-  return an `ObservationStateValues`, which takes precedence over the expression. Returning
+  return an `ObservationStateValue`, which takes precedence over the expression. Returning
   None keeps the expression's value, or, for a node without one, the observation of its
   last tick.
 

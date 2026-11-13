@@ -3,8 +3,8 @@ import json
 import numpy as np
 
 from cramph.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import (
@@ -147,17 +147,17 @@ def test_executing_json_parsed_statechart(tmp_path):
 
     task1_copy = statechart_copy.get_node_by_index(index=task1.index)
     end_copy = statechart_copy.get_node_by_index(index=end.index)
-    assert task1_copy.observation_state == ObservationStateValues.UNKNOWN
-    assert end_copy.observation_state == ObservationStateValues.UNKNOWN
-    assert task1_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert task1_copy.observation_state == ObservationStateValue.UNKNOWN
+    assert end_copy.observation_state == ObservationStateValue.UNKNOWN
+    assert task1_copy.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end_copy.life_cycle_state == LifeCycleValue.NOT_STARTED
     statechart.draw(file_name=str(tmp_path / "muh.pdf"))
     executor.tick_until_end()
     statechart.draw(file_name=str(tmp_path / "muh.pdf"))
-    assert task1_copy.observation_state == ObservationStateValues.TRUE
-    assert end_copy.observation_state == ObservationStateValues.TRUE
-    assert task1_copy.life_cycle_state == LifeCycleValues.RUNNING
-    assert end_copy.life_cycle_state == LifeCycleValues.RUNNING
+    assert task1_copy.observation_state == ObservationStateValue.TRUE
+    assert end_copy.observation_state == ObservationStateValue.TRUE
+    assert task1_copy.life_cycle_state == LifeCycleValue.RUNNING
+    assert end_copy.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_cart_goal_simple(pr2_world_state_reset: World):
@@ -284,7 +284,7 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
     assert [step.name for step in goal_copy.sequence.nodes] == [
         step.name for step in goal.sequence.nodes
     ]
-    assert goal_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert goal_copy.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_round_trip(
@@ -335,7 +335,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     executor.compile(statechart=statechart_copy)
     executor.tick_until_end(timeout=2000)
 
-    assert second_leg_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert second_leg_copy.life_cycle_state == LifeCycleValue.SUCCEEDED
     np.testing.assert_allclose(
         cylinder_bot_diff_world.compute_forward_kinematics_np(
             cylinder_bot_diff_world.root, bot

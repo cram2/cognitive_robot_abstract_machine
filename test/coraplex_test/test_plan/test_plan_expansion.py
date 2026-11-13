@@ -21,7 +21,7 @@ from cramph.composites import (
     TryAll,
     TryInOrder,
 )
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import CancelStatechart, StatechartNode
 from cramph.nodes_for_testing import ConstFalseNode
 from cramph.statechart import Statechart
@@ -261,7 +261,7 @@ def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
 
     run_plan(reach, extensions)
 
-    assert reach.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert reach.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_pick_up_moves_the_object_to_the_gripper_between_closing_and_lifting(
@@ -319,7 +319,7 @@ def test_a_transport_runs_with_its_underspecified_steps(
 
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% perception

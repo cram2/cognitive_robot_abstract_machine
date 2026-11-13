@@ -9,7 +9,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import (
     DuplicateNameException,
 )
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from giskardpy.motion_statechart.exceptions import (
     InvalidConstraintExpressionShapeError,
 )
@@ -136,7 +136,7 @@ class ConstraintCollection:
         for constraint in self._constraints:
             is_running = sm.if_eq(
                 node.life_cycle_variable,
-                LifeCycleValues.RUNNING,
+                LifeCycleValue.RUNNING,
                 if_result=sm.Scalar(1),
                 else_result=sm.Scalar(0),
             )

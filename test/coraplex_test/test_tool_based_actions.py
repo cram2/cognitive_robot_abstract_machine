@@ -26,7 +26,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
 )
 from cramph.composites import PausedUntilTrue, Sequence
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.ormatic.data_access_objects.helper import to_dao
@@ -426,7 +426,7 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     run_plan(plan, extensions)
 
     [tool_path] = [node for node in wiping.nodes if _trajectory_of(node) is not None]
-    assert tool_path.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert tool_path.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% accepting a stalled wipe
@@ -499,7 +499,7 @@ def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
     [final_waypoint_check] = [
         node for node in wiping.nodes if isinstance(node, PausedUntilTrue)
     ]
-    assert final_waypoint_check.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert final_waypoint_check.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_wipe_stalled_beyond_its_tolerance_of_the_final_waypoint_is_not_done(

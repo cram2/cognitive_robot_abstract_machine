@@ -6,7 +6,7 @@ import pytest
 
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import StatechartAlreadyCompiledError
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
@@ -68,7 +68,7 @@ def _node_arriving_at_once(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -84,7 +84,7 @@ def _compile_and_run_one_node(
     statechart.add_node(node=(first := _node_arriving_at_once("first")))
     executor.compile(statechart=statechart)
     executor.tick()
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
     return first
 
 
@@ -97,7 +97,7 @@ def _tick_until_succeeded(
     """
     executor.tick()
     executor.tick()
-    assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% growing
@@ -114,10 +114,10 @@ def test_a_node_added_in_a_modification_runs_after_the_node_it_waits_for(
     with statechart.modify():
         statechart.add_node(node=second)
     statechart_executor.tick()
-    assert second.life_cycle_state == LifeCycleValues.RUNNING
+    assert second.life_cycle_state == LifeCycleValue.RUNNING
     statechart_executor.tick()
 
-    assert second.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert second.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_added_outside_a_modification_is_compiled_right_away(
@@ -139,7 +139,7 @@ def test_growing_keeps_the_outcome_of_the_nodes_already_there(
     statechart_executor.statechart.add_node(node=_node_arriving_at_once("second"))
     statechart_executor.tick()
 
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_growing_does_not_restart_the_tick_count(
@@ -274,7 +274,7 @@ def test_an_abandoned_modification_leaves_the_statechart_as_it_was(
 
     assert statechart.nodes == nodes_before
     statechart_executor.tick()
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_abandoned_inner_modification_keeps_the_outer_one_working(

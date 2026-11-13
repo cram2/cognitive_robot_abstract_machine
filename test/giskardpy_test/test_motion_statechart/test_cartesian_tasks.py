@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
-from cramph.data_types import ObservationStateValues, LifeCycleValues
+from cramph.data_types import ObservationStateValue, LifeCycleValue
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.tasks.drive_tasks import (
@@ -183,7 +183,7 @@ class TestHoldPose:
         executor.compile(statechart=motion_statechart)
         executor.tick()
 
-        assert hold.observation_state == ObservationStateValues.TRUE
+        assert hold.observation_state == ObservationStateValue.TRUE
 
     def test_a_link_moved_away_from_its_held_pose_is_observed_as_not_held(
         self, cylinder_bot_world: World
@@ -217,7 +217,7 @@ class TestHoldPose:
         for _ in range(100):
             executor.tick()
 
-        assert hold.observation_state == ObservationStateValues.FALSE
+        assert hold.observation_state == ObservationStateValue.FALSE
 
     def test_a_link_held_in_its_orientation_still_moves_but_does_not_turn(
         self, cylinder_bot_world: World
@@ -377,12 +377,12 @@ def record_tip_path(
         return world.compute_forward_kinematics_np(root_link, tip_link)[:3, 3].copy()
 
     path = []
-    if life_cycle_state[task] == LifeCycleValues.RUNNING:
+    if life_cycle_state[task] == LifeCycleValue.RUNNING:
         path.append(tip_position())
     for _ in range(maximum_ticks):
         position_before_tick = tip_position()
         executor.tick()
-        if not path and life_cycle_state[task] == LifeCycleValues.RUNNING:
+        if not path and life_cycle_state[task] == LifeCycleValue.RUNNING:
             path.append(position_before_tick)
         if path:
             path.append(tip_position())
@@ -769,8 +769,8 @@ class TestCartesianTasks:
         loose_orientation = next(
             node for node in loose.nodes if isinstance(node, CartesianOrientation)
         )
-        assert strict_orientation.observation_state == ObservationStateValues.FALSE
-        assert loose_orientation.observation_state == ObservationStateValues.TRUE
+        assert strict_orientation.observation_state == ObservationStateValue.FALSE
+        assert loose_orientation.observation_state == ObservationStateValue.TRUE
 
     def test_end_motion_waits_for_convergence(self, cylinder_bot_world: World):
         """
@@ -810,7 +810,7 @@ class TestCartesianTasks:
             if (
                 goal_reached_tick is None
                 and motion_statechart.observation_state[goal]
-                == ObservationStateValues.TRUE
+                == ObservationStateValue.TRUE
             ):
                 goal_reached_tick = i
             if motion_statechart.is_ended():
@@ -880,7 +880,7 @@ class TestCartesianTasks:
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end(timeout=1_000_000)
 
-        assert cart_goal.observation_state == ObservationStateValues.TRUE
+        assert cart_goal.observation_state == ObservationStateValue.TRUE
 
     def test_cart_goal_1eef(self, pr2_world_state_reset: World):
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -950,8 +950,8 @@ class TestCartesianTasks:
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end()
 
-        assert local_min.observation_state == ObservationStateValues.TRUE
-        assert cart_goal.observation_state == ObservationStateValues.FALSE
+        assert local_min.observation_state == ObservationStateValue.TRUE
+        assert cart_goal.observation_state == ObservationStateValue.FALSE
 
     def test_cart_goal_orientation_singularity(
         self, pr2_world_state_reset: World, default_pr2_pose: dict[str, float]
@@ -1004,7 +1004,7 @@ class TestCartesianTasks:
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end()
 
-        assert both_grippers.observation_state == ObservationStateValues.TRUE
+        assert both_grippers.observation_state == ObservationStateValue.TRUE
 
     def test_cart_goal_left_right_chain(
         self, pr2_world_state_reset: World, default_pr2_pose: dict[str, float]
@@ -1234,7 +1234,7 @@ class TestCartesianTasks:
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end()
 
-        assert goal.observation_state == ObservationStateValues.TRUE
+        assert goal.observation_state == ObservationStateValue.TRUE
 
     def test_cart_goal_sequence_at_build(self, pr2_world_state_reset: World):
         """
@@ -1691,7 +1691,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         # Verify goal was achieved
-        assert cart_straight.observation_state == ObservationStateValues.TRUE
+        assert cart_straight.observation_state == ObservationStateValue.TRUE
 
     def test_cartesian_pose_straight(self, pr2_world_state_reset: World):
         """
@@ -1724,7 +1724,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         # Verify task detected completion
-        assert cart_straight.observation_state == ObservationStateValues.TRUE
+        assert cart_straight.observation_state == ObservationStateValue.TRUE
 
         assert np.allclose(
             cart_straight.goal_pose.to_np(), goal_pose.to_np(), atol=0.015
@@ -2026,7 +2026,7 @@ class PositionWhileRunning(TickingExecutorExtension):
     """
 
     def after_tick(self, *, executor: StatechartExecutor) -> None:
-        if self.node.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.node.life_cycle_state != LifeCycleValue.RUNNING:
             return
         world = executor.context.world
         self.positions.append(

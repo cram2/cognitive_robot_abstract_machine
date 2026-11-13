@@ -6,7 +6,7 @@ import pytest
 
 from cramph.node import EndedByOwner
 from cramph.composites import Parallel, Sequence
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import (
     PrerequisiteNotExpandedError,
 )
@@ -18,7 +18,7 @@ from cramph.nodes_for_testing import (
     NodeObservingAFixedValue,
     NodeSucceedingOnObservingTrue,
 )
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.statechart import Statechart
 
 # %% mimics
@@ -65,8 +65,8 @@ def test_a_composite_node_expands_when_it_joins_a_statechart(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    first = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
-    second = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+    first = NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
+    second = NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
     statechart.add_node(node=Sequence(nodes=[first, second]))
 
     assert statechart.nodes[1:] == [first, second]
@@ -77,7 +77,7 @@ def test_a_nested_composite_node_expands_with_its_parent(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    step = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+    step = NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
     statechart.add_node(node=Sequence(nodes=[inner := Sequence(nodes=[step])]))
 
     assert inner in statechart.nodes
@@ -89,7 +89,7 @@ def test_a_control_structure_node_expanding_on_its_own_adopts_the_nodes_it_was_h
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    handed = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+    handed = NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
     statechart.add_node(node=(sequence := SequenceAddingAStepOfItsOwn(nodes=[handed])))
 
     [own_step] = sequence.nodes[1:]
@@ -105,14 +105,14 @@ def test_a_node_handed_to_a_joined_composite_node_joins_right_away(
     sequence.add_node(
         node=(
             first := NodeSucceedingOnObservingTrue(
-                observation=ObservationStateValues.TRUE
+                observation=ObservationStateValue.TRUE
             )
         )
     )
     sequence.add_node(
         node=(
             second := NodeSucceedingOnObservingTrue(
-                observation=ObservationStateValues.TRUE
+                observation=ObservationStateValue.TRUE
             )
         )
     )
@@ -172,17 +172,17 @@ def test_a_parallel_keeps_failing_on_its_children_after_its_fail_condition_is_se
             parallel := Parallel(
                 nodes=[
                     NodeFailingOnObservingFalse(
-                        observation=ObservationStateValues.FALSE
+                        observation=ObservationStateValue.FALSE
                     ),
-                    NodeObservingAFixedValue(observation=ObservationStateValues.TRUE),
+                    NodeObservingAFixedValue(observation=ObservationStateValue.TRUE),
                 ]
             )
         )
     )
-    never = NodeObservingAFixedValue(observation=ObservationStateValues.FALSE)
+    never = NodeObservingAFixedValue(observation=ObservationStateValue.FALSE)
     statechart.add_node(node=never)
     parallel.fail_condition = never.observes_true
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
 
-    assert parallel.life_cycle_state == LifeCycleValues.FAILED
+    assert parallel.life_cycle_state == LifeCycleValue.FAILED

@@ -12,7 +12,7 @@ import pytest
 
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.node import DerivedConditionVariable
 from cramph.node import StatechartNode
 from cramph.composites import (
@@ -39,7 +39,7 @@ SETTLE_TICKS = 6
 Ticks after which the templates ticked below have settled on an outcome.
 """
 
-UNFINISHED_OBSERVATIONS = [ObservationStateValues.FALSE, ObservationStateValues.UNKNOWN]
+UNFINISHED_OBSERVATIONS = [ObservationStateValue.FALSE, ObservationStateValue.UNKNOWN]
 """
 The observations of a monitored node that has not reached its goal.
 """
@@ -63,10 +63,10 @@ def create_goal(
 
 def observation_for(
     goal: MonitoredCompositeNode,
-    monitored_observation: ObservationStateValues,
-    monitor_observation: ObservationStateValues,
-    monitored_life_cycle: LifeCycleValues = LifeCycleValues.RUNNING,
-) -> ObservationStateValues:
+    monitored_observation: ObservationStateValue,
+    monitor_observation: ObservationStateValue,
+    monitored_life_cycle: LifeCycleValue = LifeCycleValue.RUNNING,
+) -> ObservationStateValue:
     """
     Evaluate the observation a goal builds for one pair of input observations.
 
@@ -102,19 +102,19 @@ def observation_for(
             monitor_observation,
         ],
     )
-    return ObservationStateValues(float(substituted))
+    return ObservationStateValue(float(substituted))
 
 
 # %% pausing leaves the outcome to the monitored node
 
 
 @pytest.mark.parametrize("goal_type", [PausedWhileTrue, PausedUntilTrue])
-@pytest.mark.parametrize("monitored_observation", list(ObservationStateValues))
-@pytest.mark.parametrize("monitor_observation", list(ObservationStateValues))
+@pytest.mark.parametrize("monitored_observation", list(ObservationStateValue))
+@pytest.mark.parametrize("monitor_observation", list(ObservationStateValue))
 def test_pausing_templates_observe_the_monitored_node(
     goal_type: type[MonitoredCompositeNode],
-    monitored_observation: ObservationStateValues,
-    monitor_observation: ObservationStateValues,
+    monitored_observation: ObservationStateValue,
+    monitor_observation: ObservationStateValue,
 ) -> None:
     """
     A monitor that only pauses never changes the outcome, so the goal reports exactly
@@ -131,9 +131,9 @@ def test_pausing_templates_observe_the_monitored_node(
 # %% stopping a monitored node
 
 
-@pytest.mark.parametrize("monitor_observation", list(ObservationStateValues))
+@pytest.mark.parametrize("monitor_observation", list(ObservationStateValue))
 def test_stopped_when_true_succeeds_once_the_monitored_node_succeeded(
-    monitor_observation: ObservationStateValues,
+    monitor_observation: ObservationStateValue,
 ) -> None:
     """
     A monitored node that reached its goal makes the template succeed, whatever the
@@ -142,14 +142,14 @@ def test_stopped_when_true_succeeds_once_the_monitored_node_succeeded(
     goal = create_goal(StoppedWhenTrue)
 
     assert (
-        observation_for(goal, ObservationStateValues.TRUE, monitor_observation)
-        is ObservationStateValues.TRUE
+        observation_for(goal, ObservationStateValue.TRUE, monitor_observation)
+        is ObservationStateValue.TRUE
     )
 
 
 @pytest.mark.parametrize("monitored_observation", UNFINISHED_OBSERVATIONS)
 def test_stopped_when_true_fails_when_it_stopped_an_unfinished_node(
-    monitored_observation: ObservationStateValues,
+    monitored_observation: ObservationStateValue,
 ) -> None:
     """
     A monitor that fires before the monitored node reached its goal ends it as a
@@ -158,14 +158,14 @@ def test_stopped_when_true_fails_when_it_stopped_an_unfinished_node(
     goal = create_goal(StoppedWhenTrue)
 
     assert (
-        observation_for(goal, monitored_observation, ObservationStateValues.TRUE)
-        is ObservationStateValues.FALSE
+        observation_for(goal, monitored_observation, ObservationStateValue.TRUE)
+        is ObservationStateValue.FALSE
     )
 
 
-@pytest.mark.parametrize("monitor_observation", list(ObservationStateValues))
+@pytest.mark.parametrize("monitor_observation", list(ObservationStateValue))
 def test_stopped_when_true_keeps_succeeding_once_the_monitored_node_succeeded(
-    monitor_observation: ObservationStateValues,
+    monitor_observation: ObservationStateValue,
 ) -> None:
     """
     A monitored node that succeeded observes nothing any more, so its outcome is what
@@ -176,11 +176,11 @@ def test_stopped_when_true_keeps_succeeding_once_the_monitored_node_succeeded(
     assert (
         observation_for(
             goal,
-            ObservationStateValues.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
             monitor_observation,
-            monitored_life_cycle=LifeCycleValues.SUCCEEDED,
+            monitored_life_cycle=LifeCycleValue.SUCCEEDED,
         )
-        is ObservationStateValues.TRUE
+        is ObservationStateValue.TRUE
     )
 
 
@@ -194,19 +194,19 @@ def test_stopped_when_true_fails_when_it_stopped_a_node_observing_true() -> None
     assert (
         observation_for(
             goal,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            monitored_life_cycle=LifeCycleValues.INTERRUPTED,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            monitored_life_cycle=LifeCycleValue.INTERRUPTED,
         )
-        is ObservationStateValues.FALSE
+        is ObservationStateValue.FALSE
     )
 
 
 @pytest.mark.parametrize("monitored_observation", UNFINISHED_OBSERVATIONS)
 @pytest.mark.parametrize("monitor_observation", UNFINISHED_OBSERVATIONS)
 def test_stopped_when_true_stays_unknown_while_the_monitored_node_runs(
-    monitored_observation: ObservationStateValues,
-    monitor_observation: ObservationStateValues,
+    monitored_observation: ObservationStateValue,
+    monitor_observation: ObservationStateValue,
 ) -> None:
     """
     Neither a monitored node that has not succeeded yet nor a monitor that has not fired
@@ -216,7 +216,7 @@ def test_stopped_when_true_stays_unknown_while_the_monitored_node_runs(
 
     assert (
         observation_for(goal, monitored_observation, monitor_observation)
-        is ObservationStateValues.UNKNOWN
+        is ObservationStateValue.UNKNOWN
     )
 
 
@@ -267,7 +267,7 @@ def test_a_template_fails_once_its_monitored_node_failed_on_its_own(
     The monitor lets the monitored node run and never stops it.
     """
     monitored_node = NodeFailingOnObservingFalse(
-        name="monitored", observation=ObservationStateValues.FALSE
+        name="monitored", observation=ObservationStateValue.FALSE
     )
     goal = goal_type(
         monitor=monitor_type(name="monitor"), monitored_node=monitored_node
@@ -275,8 +275,8 @@ def test_a_template_fails_once_its_monitored_node_failed_on_its_own(
 
     tick_compiled(goal)
 
-    assert monitored_node.life_cycle_state == LifeCycleValues.FAILED
-    assert goal.life_cycle_state == LifeCycleValues.FAILED
+    assert monitored_node.life_cycle_state == LifeCycleValue.FAILED
+    assert goal.life_cycle_state == LifeCycleValue.FAILED
 
 
 @pytest.mark.parametrize("goal_type", [PausedWhileTrue, StoppedWhenTrue])
@@ -296,8 +296,8 @@ def test_a_template_whose_monitored_node_failed_observing_true_fails_its_sequenc
 
     tick_compiled(sequence)
 
-    assert goal.life_cycle_state == LifeCycleValues.FAILED
-    assert sequence.life_cycle_state == LifeCycleValues.FAILED
+    assert goal.life_cycle_state == LifeCycleValue.FAILED
+    assert sequence.life_cycle_state == LifeCycleValue.FAILED
 
 
 # %% pausing from the start
@@ -323,8 +323,8 @@ def test_paused_until_true_never_runs_its_node_before_the_monitor_observed_true(
         executor.tick()
         life_cycles.append(monitored_node.life_cycle_state)
 
-    assert LifeCycleValues.PAUSED in life_cycles
-    assert LifeCycleValues.RUNNING not in life_cycles
+    assert LifeCycleValue.PAUSED in life_cycles
+    assert LifeCycleValue.RUNNING not in life_cycles
 
 
 # %% starting once the monitor observed True
@@ -344,8 +344,8 @@ def test_started_when_true_never_starts_its_node_before_the_monitor_observed_tru
 
     tick_compiled(goal)
 
-    assert goal.life_cycle_state == LifeCycleValues.RUNNING
-    assert monitored_node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert goal.life_cycle_state == LifeCycleValue.RUNNING
+    assert monitored_node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 def test_started_when_true_runs_its_node_from_when_the_monitor_observed_true() -> None:
@@ -365,6 +365,6 @@ def test_started_when_true_runs_its_node_from_when_the_monitor_observed_true() -
         executor.tick()
         life_cycles.append(monitored_node.life_cycle_state)
 
-    assert life_cycles[0] == LifeCycleValues.NOT_STARTED
-    assert life_cycles[-1] == LifeCycleValues.RUNNING
-    assert LifeCycleValues.PAUSED not in life_cycles
+    assert life_cycles[0] == LifeCycleValue.NOT_STARTED
+    assert life_cycles[-1] == LifeCycleValue.RUNNING
+    assert LifeCycleValue.PAUSED not in life_cycles

@@ -6,7 +6,7 @@ import pytest
 
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import (
     ConflictingTickDurationError,
     NodesMissingContextExtensionsError,
@@ -120,8 +120,8 @@ def test_motion_nodes_and_nodes_of_other_modules_run_in_one_statechart(
     executor.tick_until_end()
 
     assert statechart.is_ended()
-    assert goal.life_cycle_state == LifeCycleValues.RUNNING
-    assert other_node.life_cycle_state == LifeCycleValues.RUNNING
+    assert goal.life_cycle_state == LifeCycleValue.RUNNING
+    assert other_node.life_cycle_state == LifeCycleValue.RUNNING
     assert tick_counter.ticks == executor.tick_count
     assert (
         executor.require_extension(extension_type=MotionControl).qp_controller
@@ -162,7 +162,7 @@ class StateRecordedWhileNodeRuns(TickingExecutorExtension):
     """
 
     def after_tick(self, *, executor: StatechartExecutor) -> None:
-        if self.node.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.node.life_cycle_state != LifeCycleValue.RUNNING:
             return
         state = executor.context.world.state[self.degree_of_freedom.id]
         self.positions.append(float(state.position))

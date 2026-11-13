@@ -27,7 +27,7 @@ from cramph.composites import (
     ChildChooserAccess,
     CompositeNodeChoosingItsChild,
 )
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
@@ -257,7 +257,7 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
             earlier.goal_id == message.goal_id
             and earlier.first_node_index < message.first_node_index
             and statechart.get_node_by_index(index=earlier.node_index).life_cycle_state
-            in (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED)
+            in (LifeCycleValue.RUNNING, LifeCycleValue.PAUSED)
             for earlier in self._received.values()
         )
 

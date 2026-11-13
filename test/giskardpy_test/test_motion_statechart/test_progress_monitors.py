@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from cramph.node import EndedByOwner
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.error_signals import (
     time_derivative_from_joint_motion,
 )
@@ -233,7 +233,7 @@ class TestStallDetection:
         executor.compile(statechart=motion_statechart)
         recorded = tick_until_end_recording(executor, motion_statechart, [progressing])
 
-        assert set(recorded[progressing]) == {ObservationStateValues.TRUE}
+        assert set(recorded[progressing]) == {ObservationStateValue.TRUE}
 
     def test_momentary_stall_shorter_than_the_timeout_is_tolerated(
         self, cylinder_bot_diff_world: World
@@ -276,9 +276,9 @@ class TestStallDetection:
             executor, motion_statechart, not_approaching + [progressing]
         )
 
-        assert ObservationStateValues.FALSE not in recorded[progressing]
+        assert ObservationStateValue.FALSE not in recorded[progressing]
         assert any(
-            ObservationStateValues.TRUE in recorded[monitor]
+            ObservationStateValue.TRUE in recorded[monitor]
             for monitor in not_approaching
         ), "no task ever paused, so the timeout was never what prevented the cancel"
 
@@ -420,8 +420,8 @@ class TestStallDetection:
         ):
             executor.tick()
 
-        assert arrived.observation_state == ObservationStateValues.TRUE
-        assert progressing.observation_state == ObservationStateValues.TRUE
+        assert arrived.observation_state == ObservationStateValue.TRUE
+        assert progressing.observation_state == ObservationStateValue.TRUE
 
     def test_stall_time_does_not_accumulate_before_the_goal_starts(
         self, cylinder_bot_world: World
@@ -455,7 +455,7 @@ class TestStallDetection:
 
         assert (
             motion_statechart.observation_state[progressing]
-            == ObservationStateValues.TRUE
+            == ObservationStateValue.TRUE
         )
 
     def test_the_stall_timer_counts_the_whole_timeout(self, cylinder_bot_world: World):
@@ -549,7 +549,7 @@ class TestStallDetection:
         executor.tick()
 
         assert arrived.error_signal.evaluate()[0] == pytest.approx(0)
-        assert monitor.observation_state == ObservationStateValues.TRUE
+        assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 # %% the rule that decides whether a task approaches its goal
@@ -649,7 +649,7 @@ class ScriptedErrorRun:
 
     def observations_while_the_error_is(
         self, errors: list[float]
-    ) -> list[ObservationStateValues]:
+    ) -> list[ObservationStateValue]:
         """
         :param errors: The first task's error on each control cycle, the bot being
             short of its goal.
@@ -661,7 +661,7 @@ class ScriptedErrorRun:
 
     def observations_while_the_bot_is_at(
         self, positions: list[float]
-    ) -> list[ObservationStateValues]:
+    ) -> list[ObservationStateValue]:
         """
         :param positions: The bot's x position on each control cycle.
         :return: What the monitor observes on each of those control cycles.
@@ -679,7 +679,7 @@ class ScriptedErrorRun:
 class TestConvergenceRule:
     @pytest.mark.parametrize(
         "fall_factor, observed",
-        [(0.8, ObservationStateValues.TRUE), (1.2, ObservationStateValues.FALSE)],
+        [(0.8, ObservationStateValue.TRUE), (1.2, ObservationStateValue.FALSE)],
         ids=["too-slow", "fast-enough"],
     )
     def test_an_error_has_to_fall_by_the_minimum_rate(
@@ -692,7 +692,7 @@ class TestConvergenceRule:
             [start, start - fall_factor * run.required_fall_per_cycle]
         )
 
-        assert observations == [ObservationStateValues.FALSE, observed]
+        assert observations == [ObservationStateValue.FALSE, observed]
 
     def test_falling_back_after_a_detour_is_not_progress_until_it_beats_the_start(
         self, cylinder_bot_world: World
@@ -710,10 +710,10 @@ class TestConvergenceRule:
         )
 
         assert observations == [
-            ObservationStateValues.FALSE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.FALSE,
         ]
 
     def test_a_restarted_task_is_judged_afresh(self, cylinder_bot_world: World):
@@ -722,14 +722,14 @@ class TestConvergenceRule:
         """
         run = ScriptedErrorRun(cylinder_bot_world)
         assert run.observations_while_the_error_is([1.0, 1.0]) == [
-            ObservationStateValues.FALSE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.TRUE,
         ]
 
         run.monitor.on_start()
 
         assert run.observations_while_the_error_is([5.0]) == [
-            ObservationStateValues.FALSE
+            ObservationStateValue.FALSE
         ]
 
     def test_a_task_cycling_through_its_goal_makes_no_progress(
@@ -751,7 +751,7 @@ class TestConvergenceRule:
         run.observations_while_the_bot_is_at(cycle)
         later_cycles = run.observations_while_the_bot_is_at(cycle + cycle)
 
-        assert later_cycles == [ObservationStateValues.TRUE] * len(later_cycles)
+        assert later_cycles == [ObservationStateValue.TRUE] * len(later_cycles)
 
     def test_several_tasks_are_stalled_only_while_none_of_them_approaches(
         self, cylinder_bot_world: World
@@ -767,11 +767,11 @@ class TestConvergenceRule:
         standing = run.observations_while_the_bot_is_at([2 * step])
 
         assert moving == [
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
         ]
-        assert standing == [ObservationStateValues.TRUE]
+        assert standing == [ObservationStateValue.TRUE]
 
     def test_the_stalled_tasks_are_those_not_approaching_their_goal(
         self, cylinder_bot_world: World
@@ -965,7 +965,7 @@ class TestTaskAtItsGoal:
             executor, motion_statechart, [not_approaching]
         )
 
-        assert ObservationStateValues.FALSE not in recorded[not_approaching]
+        assert ObservationStateValue.FALSE not in recorded[not_approaching]
 
 
 # %% nodes with nothing converging beneath them
@@ -1000,7 +1000,7 @@ class TestNothingToConverge:
         # measurable on the tick after it.
         executor.tick()
         executor.tick()
-        assert progressing.observation_state == ObservationStateValues.TRUE
+        assert progressing.observation_state == ObservationStateValue.TRUE
 
         for _ in range(
             ceil(
@@ -1009,7 +1009,7 @@ class TestNothingToConverge:
             )
         ):
             executor.tick()
-        assert progressing.observation_state == ObservationStateValues.FALSE
+        assert progressing.observation_state == ObservationStateValue.FALSE
 
 
 # %% dependency ordering
@@ -1124,4 +1124,4 @@ class TestTrajectoryProgress:
         executor.compile(statechart=motion_statechart)
 
         recorded = tick_until_end_recording(executor, motion_statechart, [progressing])
-        assert ObservationStateValues.FALSE not in recorded[progressing]
+        assert ObservationStateValue.FALSE not in recorded[progressing]

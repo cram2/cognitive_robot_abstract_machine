@@ -19,7 +19,7 @@ from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -83,7 +83,7 @@ class MockRobotiqActionServer:
 
 def run_statechart_until_observed(
     task: RobotiqGripperActionServerTask,
-    target_observation: ObservationStateValues,
+    target_observation: ObservationStateValue,
     rclpy_node: Node,
 ) -> None:
     """
@@ -92,7 +92,7 @@ def run_statechart_until_observed(
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(node=task)
 
-    if target_observation == ObservationStateValues.TRUE:
+    if target_observation == ObservationStateValue.TRUE:
         statechart.add_node(node=EndMotion.when_true(node=task))
     else:
         statechart.add_node(node=EndMotion.when_false(node=task))
@@ -112,16 +112,16 @@ def run_statechart_until_observed(
 @pytest.mark.parametrize(
     "reached_goal, stalled, expected_observation",
     [
-        (True, False, ObservationStateValues.TRUE),
-        (False, True, ObservationStateValues.TRUE),
-        (False, False, ObservationStateValues.FALSE),
+        (True, False, ObservationStateValue.TRUE),
+        (False, True, ObservationStateValue.TRUE),
+        (False, False, ObservationStateValue.FALSE),
     ],
     ids=["reached_goal", "stalled_on_contact", "failed_movement"],
 )
 def test_robotiq_task_observes_result(
     reached_goal: bool,
     stalled: bool,
-    expected_observation: ObservationStateValues,
+    expected_observation: ObservationStateValue,
     rclpy_node: Node,
 ) -> None:
     topic = unique_topic()
@@ -155,10 +155,10 @@ def test_robotiq_task_handles_goal_rejection(rclpy_node: Node) -> None:
     )
 
     try:
-        run_statechart_until_observed(task, ObservationStateValues.FALSE, rclpy_node)
+        run_statechart_until_observed(task, ObservationStateValue.FALSE, rclpy_node)
         assert task._done is True
         assert task._goal_accepted is False
-        assert task.on_tick() == ObservationStateValues.FALSE
+        assert task.on_tick() == ObservationStateValue.FALSE
     finally:
         server.destroy()
 
@@ -180,7 +180,7 @@ def test_robotiq_task_builds_and_sends_correct_goal_message(rclpy_node: Node) ->
     )
 
     try:
-        run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+        run_statechart_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
         assert len(mock_server.received_goals) == 1
         received_cmd = mock_server.received_goals[0]
         # Convert array.array to list for comparison
@@ -202,7 +202,7 @@ def test_robotiq_task_uses_default_values(rclpy_node: Node) -> None:
     )
 
     try:
-        run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+        run_statechart_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
         assert len(mock_server.received_goals) == 1
         received_cmd = mock_server.received_goals[0]
         assert list(received_cmd.position) == [0.07]

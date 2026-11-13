@@ -4,7 +4,7 @@ import numpy as np
 from geometry_msgs.msg import WrenchStamped
 
 from giskardpy.motion_statechart.ros2_nodes.topics import TopicSubscriberNode
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -49,10 +49,10 @@ class ForceImpactMonitor(ForceTorqueNode):
 
     threshold: float
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         super().on_tick()
         if not self.has_msg():
-            return ObservationStateValues.UNKNOWN
+            return ObservationStateValue.UNKNOWN
         if self.force_magnitude() > self.threshold:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE

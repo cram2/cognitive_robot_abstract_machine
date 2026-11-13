@@ -7,8 +7,8 @@ import pytest
 from giskardpy.data_types.exceptions import DuplicateNameException
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from cramph.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.exceptions import (
@@ -194,7 +194,7 @@ def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: W
         "was capped far too low to traverse the distance within the timeout, "
         "this test is only meaningful if it stayed far away"
     )
-    assert statechart.observation_state[joint_goal] == ObservationStateValues.FALSE, (
+    assert statechart.observation_state[joint_goal] == ObservationStateValue.FALSE, (
         "the goal task's own observation must still mean 'goal reached' -- it must "
         "not be the thing that turned true here, only the surrounding Parallel"
     )
@@ -271,7 +271,7 @@ def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
     # "when did this specific monitor become true".
     for _ in range(10):
         executor.tick()
-    assert statechart.observation_state[local_min] == ObservationStateValues.TRUE, (
+    assert statechart.observation_state[local_min] == ObservationStateValue.TRUE, (
         "the scoped monitor should have settled almost immediately -- torso_joint "
         "never moves"
     )
@@ -493,16 +493,16 @@ class TestTemplates:
         executor.tick_until_end()
         statechart.draw(file_name="/tmp/muh.pdf")
 
-        assert done.observation_state == ObservationStateValues.TRUE
+        assert done.observation_state == ObservationStateValue.TRUE
         cut_life_cycle = statechart.state_history.get_life_cycle_history_of_node(
             node=cut
         )
-        assert LifeCycleValues.PAUSED in cut_life_cycle
+        assert LifeCycleValue.PAUSED in cut_life_cycle
         restarts = sum(
             1
             for previous, current in zip(cut_life_cycle, cut_life_cycle[1:])
-            if current == LifeCycleValues.NOT_STARTED
-            and previous != LifeCycleValues.NOT_STARTED
+            if current == LifeCycleValue.NOT_STARTED
+            and previous != LifeCycleValue.NOT_STARTED
         )
         assert restarts >= 1
 

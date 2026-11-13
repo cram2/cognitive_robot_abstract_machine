@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from cramph.composites import Sequence
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import (
     RemovedNodeStillReferencedError,
     StatechartAlreadyCompiledError,
@@ -155,7 +155,7 @@ def test_a_compiled_statechart_runs_after_a_joining_node_was_removed_again(
         statechart.remove_node(node=removed)
     statechart_executor.tick_until_end()
 
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_statechart_runs_after_a_node_was_removed(
@@ -170,4 +170,4 @@ def test_a_statechart_runs_after_a_node_was_removed(
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end()
 
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED

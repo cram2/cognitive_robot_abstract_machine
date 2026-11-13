@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from cramph.composites import Parallel
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart, StatechartNode
 from cramph.nodes_for_testing import ConstTrueNode, NodeSucceedingOnObservingTrue
@@ -116,7 +116,7 @@ def test_a_node_is_drawn_in_the_color_of_its_current_state(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     node = NodeSucceedingOnObservingTrue(
-        name="node", observation=ObservationStateValues.TRUE
+        name="node", observation=ObservationStateValue.TRUE
     )
     statechart.add_node(node=node)
     statechart.add_node(node=EndStatechart.when_true(node=node))
@@ -127,8 +127,8 @@ def test_a_node_is_drawn_in_the_color_of_its_current_state(
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=100)
 
-    assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert (
         visualizer.node_color(node_index=node.index)
-        == LifeCycleValues.SUCCEEDED.color.to_hex()
+        == LifeCycleValue.SUCCEEDED.color.to_hex()
     )

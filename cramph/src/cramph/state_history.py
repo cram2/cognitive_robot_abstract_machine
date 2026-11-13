@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from cramph.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from cramph.node import (
     StatechartNode,
@@ -214,7 +214,7 @@ class StateHistory:
         return [
             change.node
             for change in self._life_cycle_changes_of_latest_item()
-            if change.previous_state == LifeCycleValues.NOT_STARTED
+            if change.previous_state == LifeCycleValue.NOT_STARTED
         ]
 
     def nodes_ended_in_latest_item(self) -> list[StatechartNode]:
@@ -242,7 +242,7 @@ class StateHistory:
             previous_state = (
                 previous.life_cycle_state[node]
                 if previous is not None and previous.records(node=node)
-                else LifeCycleValues.NOT_STARTED
+                else LifeCycleValue.NOT_STARTED
             )
             current_state = current.life_cycle_state[node]
             if previous_state != current_state:
@@ -257,7 +257,7 @@ class StateHistory:
 
     def get_life_cycle_history_of_node(
         self, *, node: StatechartNode
-    ) -> list[LifeCycleValues]:
+    ) -> list[LifeCycleValue]:
         """
         :param node: The node to fetch the recorded life cycle state for.
         :return: The recorded life cycle state of `node` at every tick since it
@@ -270,7 +270,7 @@ class StateHistory:
 
     def get_observation_history_of_node(
         self, *, node: StatechartNode
-    ) -> list[ObservationStateValues]:
+    ) -> list[ObservationStateValue]:
         """
         :param node: The node to fetch the recorded observation state for.
         :return: The recorded observation state of `node` at every tick since it
@@ -303,13 +303,13 @@ class StateHistory:
         if not history:
             return None
         current_state = history[-1].life_cycle_state[node]
-        if current_state == LifeCycleValues.NOT_STARTED:
+        if current_state == LifeCycleValue.NOT_STARTED:
             return None
         start_index = len(history) - 1
         while (
             start_index > 0
             and history[start_index - 1].life_cycle_state[node]
-            != LifeCycleValues.NOT_STARTED
+            != LifeCycleValue.NOT_STARTED
         ):
             start_index -= 1
         if not current_state.is_terminal:

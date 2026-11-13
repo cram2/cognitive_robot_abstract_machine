@@ -40,7 +40,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
 )
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import EmptyStatechartError
 from cramph.executor import (
     Executor,
@@ -353,7 +353,7 @@ class PlanExecutor(Executor, ABC):
         """
         return any(
             plan_node.life_cycle_state.is_terminal
-            and plan_node.life_cycle_state != LifeCycleValues.SUCCEEDED
+            and plan_node.life_cycle_state != LifeCycleValue.SUCCEEDED
             for plan_node in self.plan_nodes
         )
 
@@ -374,7 +374,7 @@ class PlanExecutor(Executor, ABC):
                 for node in self.statechart.nodes
                 if not isinstance(node, TerminalNode)
                 and node.life_cycle_state
-                not in [LifeCycleValues.SUCCEEDED, LifeCycleValues.NOT_STARTED]
+                not in [LifeCycleValue.SUCCEEDED, LifeCycleValue.NOT_STARTED]
             ]
         )
         logger.error(motion_did_not_finish.error_message())
@@ -499,7 +499,7 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
             self.statechart.is_ended()
             or self._plan_failed()
             or all(
-                plan_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+                plan_node.life_cycle_state == LifeCycleValue.SUCCEEDED
                 for plan_node in self.plan_nodes
             )
         )

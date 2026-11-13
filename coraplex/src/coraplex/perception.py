@@ -9,7 +9,7 @@ import numpy as np
 from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner, FailsOnObservingFalse
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.ros_context import RosContextExtension
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
@@ -465,7 +465,7 @@ class PerceptionTask(EndedByOwner, FailsOnObservingFalse, StatechartNode):
     The source answering the query, resolved during :meth:`set_up`.
     """
 
-    _observation: ObservationStateValues | None = field(
+    _observation: ObservationStateValue | None = field(
         init=False, default=None, repr=False
     )
     """
@@ -494,12 +494,12 @@ class PerceptionTask(EndedByOwner, FailsOnObservingFalse, StatechartNode):
     def on_start(self) -> None:
         self._observation = None
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         if self._observation is None:
             self._observation = self._answer_query()
         return self._observation
 
-    def _answer_query(self) -> ObservationStateValues:
+    def _answer_query(self) -> ObservationStateValue:
         """
         Answer the query and write what was seen into the world.
 
@@ -509,8 +509,8 @@ class PerceptionTask(EndedByOwner, FailsOnObservingFalse, StatechartNode):
             self.query, self.accept_first_if_multiple
         )
         if detection is None:
-            return ObservationStateValues.FALSE
+            return ObservationStateValue.FALSE
         detection.apply_to(
             self.query.world, trust_orientation=self.query.trust_detected_orientation
         )
-        return ObservationStateValues.TRUE
+        return ObservationStateValue.TRUE

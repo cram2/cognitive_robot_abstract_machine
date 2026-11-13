@@ -16,8 +16,8 @@ from typing_extensions import (
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.utils import classproperty
 from cramph.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from cramph.node import (
     LastObservationVariable,
@@ -204,23 +204,23 @@ class LifeCycleState(State):
     """
 
     @classproperty
-    def default_value(cls) -> LifeCycleValues:
+    def default_value(cls) -> LifeCycleValue:
         """
         :return: Not started, which every node starts out as.
         """
-        return LifeCycleValues.NOT_STARTED
+        return LifeCycleValue.NOT_STARTED
 
-    def __getitem__(self, node: StatechartNode) -> LifeCycleValues:
+    def __getitem__(self, node: StatechartNode) -> LifeCycleValue:
         """
         :param node: The node to look up.
-        :return: The life cycle state of `node`, as a :class:`LifeCycleValues` member.
+        :return: The life cycle state of `node`, as a :class:`LifeCycleValue` member.
         """
-        return LifeCycleValues(super().__getitem__(node))
+        return LifeCycleValue(super().__getitem__(node))
 
     def __str__(self) -> str:
         return str(
             {
-                str(symbol.name): LifeCycleValues(value).name
+                str(symbol.name): LifeCycleValue(value).name
                 for symbol, value in self.items()
             }
         )
@@ -234,18 +234,18 @@ class ObservationState(State):
     """
 
     @classproperty
-    def default_value(cls) -> ObservationStateValues:
+    def default_value(cls) -> ObservationStateValue:
         """
         :return: Unknown, because a node that is not running is not observing.
         """
-        return ObservationStateValues.UNKNOWN
+        return ObservationStateValue.UNKNOWN
 
-    def __getitem__(self, node: StatechartNode) -> ObservationStateValues:
+    def __getitem__(self, node: StatechartNode) -> ObservationStateValue:
         """
         :param node: The node to look up.
-        :return: What `node` observes, as an :class:`ObservationStateValues` member.
+        :return: What `node` observes, as an :class:`ObservationStateValue` member.
         """
-        return ObservationStateValues(super().__getitem__(node))
+        return ObservationStateValue(super().__getitem__(node))
 
 
 @dataclass(kw_only=True, repr=False, eq=False)
@@ -257,16 +257,16 @@ class LastObservationState(State):
     """
 
     @classproperty
-    def default_value(cls) -> ObservationStateValues:
+    def default_value(cls) -> ObservationStateValue:
         """
         :return: Unknown, because a node that has not started has not observed anything.
         """
-        return ObservationStateValues.UNKNOWN
+        return ObservationStateValue.UNKNOWN
 
-    def __getitem__(self, node: StatechartNode) -> ObservationStateValues:
+    def __getitem__(self, node: StatechartNode) -> ObservationStateValue:
         """
         :param node: The node to look up.
         :return: What `node` observed most recently, as an
-            :class:`ObservationStateValues` member.
+            :class:`ObservationStateValue` member.
         """
-        return ObservationStateValues(super().__getitem__(node))
+        return ObservationStateValue(super().__getitem__(node))

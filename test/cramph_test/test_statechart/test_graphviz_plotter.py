@@ -4,9 +4,9 @@ import pytest
 from cramph.context import StatechartContext
 from cramph.data_types import (
     LifeCyclePredicate,
-    LifeCycleValues,
+    LifeCycleValue,
     ObservationPredicate,
-    ObservationStateValues,
+    ObservationStateValue,
     TransitionKind,
 )
 from cramph.node import CancelStatechart, CompositeNode
@@ -331,7 +331,7 @@ def test_reset_dependency_points_at_the_node_reading_it() -> None:
 # %% every observation has to be drawable
 
 
-@pytest.mark.parametrize("observation_state", list(ObservationStateValues))
+@pytest.mark.parametrize("observation_state", list(ObservationStateValue))
 def test_every_observation_state_has_a_drawing_style(observation_state) -> None:
     """
     The lookup is total, so a state missing from it only shows up as a KeyError while
@@ -359,12 +359,12 @@ def test_arrow_takes_the_line_width_of_the_observation_it_carries() -> None:
     statechart = build_dependency_statechart(observed, owner)
     owner.start_condition = observed.last_observed_true
     expand(statechart)
-    statechart.observation_state[observed] = ObservationStateValues.UNKNOWN
+    statechart.observation_state[observed] = ObservationStateValue.UNKNOWN
 
     edge = find_edge(draw(statechart), observed, owner)
 
     expected = ObservationDrawingStyle.of_observation(
-        observation=ObservationStateValues.UNKNOWN
+        observation=ObservationStateValue.UNKNOWN
     )
     assert float(edge.get("penwidth")) == expected.line_width(metrics=DrawingMetrics())
 
@@ -400,13 +400,13 @@ def test_condition_term_is_colored_by_the_value_of_the_term() -> None:
     statechart = build_dependency_statechart(observed, owner)
     owner.start_condition = observed.is_succeeded
     expand(statechart)
-    statechart.observation_state[observed] = ObservationStateValues.TRUE
-    statechart.life_cycle_state[observed] = LifeCycleValues.RUNNING
+    statechart.observation_state[observed] = ObservationStateValue.TRUE
+    statechart.life_cycle_state[observed] = LifeCycleValue.RUNNING
 
     label = find_node(draw(statechart), owner).get_label()
 
     term_value = LifeCyclePredicate.IS_SUCCEEDED.truth_value(
-        life_cycle_value=LifeCycleValues.RUNNING
+        life_cycle_value=LifeCycleValue.RUNNING
     )
     term_color = ObservationDrawingStyle.of_observation(
         observation=term_value
@@ -425,8 +425,8 @@ def test_condition_term_is_colored_when_its_node_name_reads_as_an_operator() -> 
     statechart = build_dependency_statechart(observed, owner)
     owner.start_condition = observed.last_observed_true
     expand(statechart)
-    statechart.observation_state[observed] = ObservationStateValues.TRUE
-    statechart.life_cycle_state[observed] = LifeCycleValues.RUNNING
+    statechart.observation_state[observed] = ObservationStateValue.TRUE
+    statechart.life_cycle_state[observed] = LifeCycleValue.RUNNING
 
     label = find_node(draw(statechart), owner).get_label()
 
@@ -451,7 +451,7 @@ def test_condition_without_terms_is_spelled_out() -> None:
     expand(statechart)
 
     true_color = ObservationDrawingStyle.of_observation(
-        observation=ObservationStateValues.TRUE
+        observation=ObservationStateValue.TRUE
     ).color.to_hex()
     disabled_color = StatechartGraphviz(
         statechart=statechart
@@ -475,10 +475,10 @@ def test_condition_boolean_constants_coloring_in_running_state() -> None:
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(node=owner)
     expand(statechart)
-    statechart.life_cycle_state[owner] = LifeCycleValues.RUNNING
+    statechart.life_cycle_state[owner] = LifeCycleValue.RUNNING
 
     false_color = ObservationDrawingStyle.of_observation(
-        observation=ObservationStateValues.FALSE
+        observation=ObservationStateValue.FALSE
     ).color.to_hex()
     disabled_color = StatechartGraphviz(
         statechart=statechart
@@ -549,9 +549,9 @@ def test_edge_targeting_terminal_node_clips_to_outer_cluster() -> None:
 # %% condition graying based on lifecycle state
 
 
-@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
 def test_conditions_are_grayed_out_when_not_triggerable(
-    life_cycle_state: LifeCycleValues,
+    life_cycle_state: LifeCycleValue,
 ) -> None:
     """
     Conditions that cannot legally trigger a transition from the node's current
@@ -569,7 +569,7 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     node.reset_condition = observed.is_running
     expand(statechart)
     statechart.life_cycle_state[node] = life_cycle_state
-    statechart.observation_state[observed] = ObservationStateValues.TRUE
+    statechart.observation_state[observed] = ObservationStateValue.TRUE
 
     label = find_node(draw(statechart), node).get_label()
     disabled_color = StatechartGraphviz(
@@ -633,9 +633,9 @@ def test_conditions_are_grayed_out_when_not_triggerable(
         lambda: CancelStatechart(exception=Exception("test exception")),
     ],
 )
-@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
 def test_terminal_node_condition_graying(
-    node_factory, life_cycle_state: LifeCycleValues
+    node_factory, life_cycle_state: LifeCycleValue
 ) -> None:
     """
     Terminal nodes render only the start condition, grayed out when not in NOT_STARTED.

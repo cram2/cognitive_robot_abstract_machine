@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.node import StatechartNode
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -28,7 +28,7 @@ class StateSpan:
     A stretch of ticks over which a node kept one state.
     """
 
-    state: LifeCycleValues | ObservationStateValues
+    state: LifeCycleValue | ObservationStateValue
     """
     The state the node kept.
     """
@@ -143,7 +143,7 @@ class HistoryGanttChartPlotter:
         self,
         *,
         ticks: list[int],
-        states: list[LifeCycleValues] | list[ObservationStateValues],
+        states: list[LifeCycleValue] | list[ObservationStateValue],
     ) -> list[StateSpan]:
         """
         :param ticks: The tick of every snapshot recording a node, in order.

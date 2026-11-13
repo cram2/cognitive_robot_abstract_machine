@@ -4,7 +4,7 @@ import pytest
 
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.composites import Sequence
 from cramph.node import EndStatechart, StatechartNode
 from cramph.statechart import Statechart
@@ -107,4 +107,4 @@ def test_many_alternative_branches_scale(branch_length: int):
     assert executor.tick_count == branch_length + 1
     for dead_branch in dead_branches:
         for node in dead_branch:
-            assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+            assert node.life_cycle_state == LifeCycleValue.NOT_STARTED

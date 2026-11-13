@@ -18,7 +18,7 @@ from cramph.composites import (
     StatementNode,
 )
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import MissingExecutorExtensionError
 from cramph.monitors import CountTicks
 from cramph.node import StatechartNode
@@ -359,7 +359,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert isinstance(plan.grounded_nodes[-1], NavigateAction)
 
 
@@ -385,7 +385,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert isinstance(plan.grounded_nodes[-1], NavigateAction)
 
 
@@ -446,7 +446,7 @@ def test_isolation_rejected_candidate_never_touches_real_world(
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert len(plan.chosen_children) == 1
     assert plan.grounded_nodes[0].fail_on_attempt_number is None
 
@@ -517,7 +517,7 @@ def test_real_failure_keeps_state_and_next_trial_reflects_it(
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     # Both the failed and the accepted candidate are attached to the tree - a real
     # failure is not undone, only worked around by trying the next candidate.
     assert [action.fail_on_attempt_number for action in plan.grounded_nodes] == [
@@ -740,7 +740,7 @@ def test_a_step_keeps_its_own_limit_over_the_contexts(
     executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_step_that_runs_out_of_candidates_below_its_limit_says_it_is_empty(
@@ -1039,7 +1039,7 @@ def test_a_candidate_that_cannot_keep_its_clearance_is_discarded(
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert plan.grounded_nodes[-1].fail_on_attempt_number is None
 
 
@@ -1646,7 +1646,7 @@ def test_a_failed_statement_out_of_candidates_fails_its_parallel(
     assert type(failure.value) is EmptyUnderspecified
     assert failure.value.node.statement is failing
     [grounding] = plan.nodes
-    assert grounding.life_cycle_state == LifeCycleValues.FAILED
+    assert grounding.life_cycle_state == LifeCycleValue.FAILED
     assert len(_registered_probes[succeeding_probe].calls) == 2
 
 
@@ -1685,7 +1685,7 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
 
     [parallel] = plan.nodes
     [statement] = _statements_of(plan)
-    assert parallel.life_cycle_state == LifeCycleValues.FAILED
+    assert parallel.life_cycle_state == LifeCycleValue.FAILED
     assert len(statement.chosen_children) == 1
     assert len(_registered_probes[statement_probe].calls) == 2
 
@@ -1712,5 +1712,5 @@ def test_a_trial_keeps_a_start_condition_wired_to_a_node_beside_it(
 
     run_plan(plan, extensions)
 
-    assert statement.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert statement.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert _registered_probes[fallback_probe].calls == []

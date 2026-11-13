@@ -11,7 +11,7 @@ from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
@@ -162,7 +162,7 @@ class _CancelBecauseCollisionViolated(CancelStatechart):
             violated_collisions=[
                 violation
                 for task in self.tasks
-                if task.observation_state == ObservationStateValues.FALSE
+                if task.observation_state == ObservationStateValue.FALSE
                 for violation in task.collision_variable_manager.violated_collisions(
                     task.avoided_contacts
                 )

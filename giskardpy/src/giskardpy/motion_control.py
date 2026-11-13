@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.exceptions import WorldStateArrayReplacedError
@@ -134,7 +134,7 @@ class MotionControl(TickingExecutorExtension):
         life_cycle_state = executor.statechart.life_cycle_state.data
         if not self._holding_still:
             return life_cycle_state
-        return np.full_like(life_cycle_state, LifeCycleValues.NOT_STARTED)
+        return np.full_like(life_cycle_state, LifeCycleValue.NOT_STARTED)
 
     def after_run(self, *, executor: StatechartExecutor) -> None:
         self.set_velocity_acceleration_jerk_to_zero(executor.context.world)

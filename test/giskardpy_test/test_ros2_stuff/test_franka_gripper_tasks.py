@@ -19,7 +19,7 @@ from rclpy.node import Node
 from typing_extensions import Any, Iterator
 
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
@@ -94,7 +94,7 @@ class RecordingGripper:
 
 def run_until_observed(
     task: FrankaGripperTask,
-    observation: ObservationStateValues,
+    observation: ObservationStateValue,
     rclpy_node: Node,
 ) -> None:
     """
@@ -102,7 +102,7 @@ def run_until_observed(
     """
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(node=task)
-    if observation == ObservationStateValues.TRUE:
+    if observation == ObservationStateValue.TRUE:
         statechart.add_node(node=EndMotion.when_true(node=task))
     else:
         statechart.add_node(node=EndMotion.when_false(node=task))
@@ -133,9 +133,9 @@ def test_task_observes_the_success_the_gripper_reports(
 ) -> None:
     task = GripperHomingTask(action_topic=GripperActionName.HOMING)
     expected = (
-        ObservationStateValues.TRUE
+        ObservationStateValue.TRUE
         if homing_gripper.succeeds
-        else ObservationStateValues.FALSE
+        else ObservationStateValue.FALSE
     )
 
     run_until_observed(task, expected, rclpy_node)
@@ -151,7 +151,7 @@ def test_move_task_sends_its_width_and_speed(rclpy_node: Node) -> None:
     server = gripper.serve(rclpy_node, GripperActionName.MOVE)
     task = GripperMoveTask(action_topic=GripperActionName.MOVE, width=0.04, speed=0.1)
 
-    run_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+    run_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
     server.destroy()
 
     assert [(goal.width, goal.speed) for goal in gripper.received_goals] == [
@@ -171,7 +171,7 @@ def test_grasp_task_sends_its_parameters(rclpy_node: Node) -> None:
         outer_tolerance=0.01,
     )
 
-    run_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+    run_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
     server.destroy()
 
     assert [

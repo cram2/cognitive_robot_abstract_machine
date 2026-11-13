@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from typing_extensions import Never
 
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 
 from coraplex.datastructures.enums import DetectionTechnique
 
@@ -125,7 +125,7 @@ def test_perform_parallel(pr2_apartment_context):
     run_plan(plan, extensions)
 
     assert [node.life_cycle_state for node in plan.children] == [
-        LifeCycleValues.SUCCEEDED
+        LifeCycleValue.SUCCEEDED
     ] * 3
 
 
@@ -156,7 +156,7 @@ def test_perform_repeat_runs_a_succeeding_motion_once(pr2_apartment_context):
     assert world.state[
         world.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position == pytest.approx(0.3, abs=0.05)
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_exception_sequential(pr2_apartment_context):
@@ -178,7 +178,7 @@ def test_exception_sequential(pr2_apartment_context):
     with pytest.raises(PlanFailure):
         perform_plan()
     assert len(plan.children) == 2
-    assert plan.life_cycle_state == LifeCycleValues.FAILED
+    assert plan.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_exception_try_in_order(pr2_apartment_context):
@@ -195,7 +195,7 @@ def test_exception_try_in_order(pr2_apartment_context):
     plan = TryInOrder(nodes=[act, act2])
     run_plan(plan, extensions)
     assert len(plan.children) == 2
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_exception_try_all(pr2_apartment_context):
@@ -213,7 +213,7 @@ def test_exception_try_all(pr2_apartment_context):
     run_plan(plan, extensions)
 
     assert type(plan) is TryAll
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% children run only as part of the chart
@@ -240,7 +240,7 @@ def test_try_in_order_recovers_from_a_failing_code_step(pr2_apartment_context) -
         robot_view.get_torso().get_joint_state_by_type(TorsoState.HIGH).target_values
     )
     assert _torso_position(world) == pytest.approx(torso_up, abs=0.05)
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_children_report_the_outcome_of_the_chart_they_ran_in(
@@ -260,8 +260,8 @@ def test_children_report_the_outcome_of_the_chart_they_ran_in(
     run_plan(root, extensions)
 
     assert [child.life_cycle_state for child in root.children] == [
-        LifeCycleValues.SUCCEEDED,
-        LifeCycleValues.SUCCEEDED,
+        LifeCycleValue.SUCCEEDED,
+        LifeCycleValue.SUCCEEDED,
     ]
 
 
@@ -353,4 +353,4 @@ def test_never_firing_cancel_monitor_leaves_the_motion_alone(pr2_apartment_conte
     run_plan(plan, extensions)
 
     assert _torso_position(world) == pytest.approx(0.3, abs=0.05)
-    assert plan.last_observation_state == ObservationStateValues.TRUE
+    assert plan.last_observation_state == ObservationStateValue.TRUE

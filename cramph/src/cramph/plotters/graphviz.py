@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import pydot
 from typing_extensions import TYPE_CHECKING
 
-from cramph.data_types import ObservationStateValues, TransitionKind
+from cramph.data_types import ObservationStateValue, TransitionKind
 from cramph.node import StatechartNode, TerminalNode
 from cramph.node import CompositeNode, TransitionCondition
 from cramph.plotters.styles import (
@@ -318,7 +318,7 @@ class StatechartGraphviz:
             for part in terms.split(text)
         )
 
-    def _color_term(self, *, term: str, value: ObservationStateValues) -> str:
+    def _color_term(self, *, term: str, value: ObservationStateValue) -> str:
         """
         :param term: The term as it is written in the condition, quotes included.
         :param value: The value that term takes.

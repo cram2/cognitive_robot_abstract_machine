@@ -14,7 +14,7 @@ from typing_extensions import ClassVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.composites import Parallel
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.binding_policy import (
     GoalBindingPolicy,
@@ -483,7 +483,7 @@ class CartesianPositionTrajectory(CartesianTask):
         # which creates a vector that pulls the robot back to the path AND forward.
         return p_projected + unit_tangent * self.look_ahead_distance
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         """
         Update the target point on the trajectory and the distance left to travel.
 
