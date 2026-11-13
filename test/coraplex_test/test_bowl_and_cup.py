@@ -24,6 +24,8 @@ from cramph.composites import Parallel, Sequence
 from cramph.context import ContextExtension
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
+from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -194,9 +196,24 @@ def kitchen_with_filled_drawer(
 # %% taking both objects out of the drawer and setting them down
 
 
-def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
+def pick_ups_from_above(kitchen: KitchenWithFilledDrawer) -> list[PickUpAction]:
     """
     :param kitchen: The kitchen the plan is performed in.
+    :return: The pick-up of the bowl with the left arm and of the cup with the right
+        arm, each coming down onto it from above.
+    """
+    return [
+        PickUpAction.from_above(kitchen.bowl, kitchen.robot.left_arm),
+        PickUpAction.from_above(kitchen.cup, kitchen.robot.right_arm),
+    ]
+
+
+def transport_plan(
+    kitchen: KitchenWithFilledDrawer, *, pick_ups: list[PickUpAction | Match]
+) -> Sequence:
+    """
+    :param kitchen: The kitchen the plan is performed in.
+    :param pick_ups: The pick-up of the bowl and of the cup, run at once.
     :return: The plan that opens the drawer, takes the bowl with the left arm and the
         cup with the right arm at once, and sets both down on the kitchen island at
         once.
@@ -224,8 +241,7 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
                     HoldPose(
                         root_link=kitchen.world.root, tip_link=robot.mobile_base.root
                     ),
-                    PickUpAction.from_above(kitchen.bowl, robot.left_arm),
-                    PickUpAction.from_above(kitchen.cup, robot.right_arm),
+                    *pick_ups,
                 ]
             ),
             ParkArmsAction(arms=robot.all_arms),
@@ -237,10 +253,12 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
                         root_link=kitchen.world.root, tip_link=robot.mobile_base.root
                     ),
                     PlaceAction(
+                        arm=robot.left_arm,
                         object_designator=kitchen.bowl,
                         target_location=kitchen.world_T_bowl_goal,
                     ),
                     PlaceAction(
+                        arm=robot.right_arm,
                         object_designator=kitchen.cup,
                         target_location=kitchen.world_T_cup_goal,
                     ),
@@ -277,7 +295,31 @@ def test_bowl_and_cup_are_moved_from_the_drawer_onto_the_kitchen_island(
     kitchen = kitchen_with_filled_drawer
 
     run_plan(
-        transport_plan(kitchen), kitchen.context_extensions, collision_avoidance=True
+        transport_plan(kitchen, pick_ups=pick_ups_from_above(kitchen)),
+        kitchen.context_extensions,
+        collision_avoidance=True,
+    )
+
+    assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
+
+
+def test_bowl_and_cup_picked_up_as_statements_are_moved_onto_the_kitchen_island(
+    kitchen_with_filled_drawer: KitchenWithFilledDrawer,
+) -> None:
+    """
+    A pick-up described by a statement is grounded only once it starts, so the places
+    after it are built before anything says how the objects will be held.
+    """
+    kitchen = kitchen_with_filled_drawer
+    pick_ups = [
+        a(PickUpAction)(grasp=pick_up.grasp, arm=pick_up.arm)
+        for pick_up in pick_ups_from_above(kitchen)
+    ]
+
+    run_plan(
+        transport_plan(kitchen, pick_ups=pick_ups),
+        kitchen.context_extensions,
+        collision_avoidance=True,
     )
 
     assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
@@ -292,7 +334,9 @@ def test_the_drawer_stays_open_while_its_contents_are_carried_away(
     ).parent_connection
 
     run_plan(
-        transport_plan(kitchen), kitchen.context_extensions, collision_avoidance=True
+        transport_plan(kitchen, pick_ups=pick_ups_from_above(kitchen)),
+        kitchen.context_extensions,
+        collision_avoidance=True,
     )
 
     # Opening ends once the goal driving the drawer to the joint's limit is within its

@@ -217,7 +217,9 @@ class MilkTransportDemonstration(RobotDemonstration):
                     NavigateAction(target_location=taking_pose),
                     PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
                     NavigateAction(target_location=self._standing_pose_facing(target)),
-                    PlaceAction(object_designator=milk, target_location=target),
+                    PlaceAction(
+                        arm=arm, object_designator=milk, target_location=target
+                    ),
                     ParkArmsAction(arms=hsrb.all_arms),
                 ]
             )

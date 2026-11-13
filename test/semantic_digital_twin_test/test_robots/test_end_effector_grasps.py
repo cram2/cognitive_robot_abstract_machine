@@ -300,6 +300,38 @@ def test_the_held_grasp_can_be_read_at_any_point_of_the_gripper(pr2_gripper):
     )
 
 
+def test_the_grasp_on_a_body_not_below_the_tool_frame_is_read_the_same(pr2_gripper):
+    """
+    Where contact carries a body, it never hangs off the tool frame, yet the gripper
+    holds it all the same.
+    """
+    world = pr2_gripper._world
+    carried = Body(name=PrefixedName("carried_body"))
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=world.root,
+                child=carried,
+                parent_T_connection_expression=world.transform(
+                    pr2_gripper.tool_frame.global_transform @ HELD_BODY_OFFSET,
+                    world.root,
+                ),
+            )
+        )
+    held = hold_body(pr2_gripper)
+
+    np.testing.assert_allclose(
+        pr2_gripper.body_T_grasp(body=carried).to_np(),
+        pr2_gripper.body_T_grasp(body=held).to_np(),
+        atol=1e-9,
+    )
+    np.testing.assert_allclose(
+        pr2_gripper.body_T_grasp(body=held).to_np(),
+        pr2_gripper.held_body_T_grasp.to_np(),
+        atol=1e-9,
+    )
+
+
 # %% where a two-finger gripper's fingers meet
 
 

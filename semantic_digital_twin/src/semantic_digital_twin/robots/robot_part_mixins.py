@@ -478,6 +478,19 @@ class HasTwoFingers(
         """
         return self.held_body_T_grasp_at(self.tool_P_grasp_when_closed)
 
+    def body_T_grasp(self, *, body: Body) -> Pose:
+        """
+        The grasp this gripper has on `body` where it stands, whether or not `body`
+        hangs off the tool frame, read at the point :meth:`tool_frame_goal_for_grasp`
+        aims at.
+
+        :param body: The body the grasp is on.
+        :return: The grasp frame, in the frame of `body`.
+        """
+        return self.body_T_grasp_at(
+            body=body, tool_P_point=self.tool_P_grasp_when_closed
+        )
+
 
 @dataclass(eq=False)
 class HasSensors(

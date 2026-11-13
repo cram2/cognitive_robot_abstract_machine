@@ -1,18 +1,19 @@
 import numpy as np
 import pytest
 
-from coraplex.exceptions import ObjectIsNotHeld
+from krrood.entity_query_language.factories import a
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import Pose
 
 from ..conftest import SAMPLING_SEED
-from .conftest import expand
+from ..plan_running import expand, simulated_executor, statechart_of
 
 # %% fixtures
 
@@ -55,6 +56,19 @@ def _tool_goals_of(place: PlaceAction) -> list[CartesianPose]:
     return [node for node in place.descendants if isinstance(node, CartesianPose)]
 
 
+def _start(place: PlaceAction, extensions) -> PlaceAction:
+    """
+    Compile `place` in a statechart of its own and start it, which measures the grasp
+    its goals release.
+
+    :return: `place`, started.
+    """
+    executor = simulated_executor(extensions)
+    executor.compile(statechart=statechart_of(executor, Sequence(nodes=[place])))
+    place.on_start()
+    return place
+
+
 # %% releasing what is actually held
 
 
@@ -69,19 +83,18 @@ def test_a_place_puts_the_held_object_on_the_target_however_it_is_held(
     """
     world, robot, milk, extensions = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, yaw=np.pi / 4, reference_frame=world.root)
-    place = PlaceAction(object_designator=milk, target_location=target)
-    expand(Sequence(nodes=[place]), extensions)
-
-    end_effector = robot.left_arm.end_effector
-    tool_goal = end_effector.tool_frame_goal_for_grasp(
-        place._grasp_on_the_held_object().moved_to(target)
+    place = _start(
+        PlaceAction(arm=robot.left_arm, object_designator=milk, target_location=target),
+        extensions,
     )
 
+    end_effector = robot.left_arm.end_effector
     tool_T_milk = world.transform(milk.root.global_transform, end_effector.tool_frame)
-    placed_milk = tool_goal.homogeneous_matrix @ tool_T_milk
+    descent = _tool_goals_of(place)[1]
+    placed_milk = descent.goal_pose.evaluate() @ tool_T_milk.to_np()
 
     np.testing.assert_allclose(
-        placed_milk.to_np(), target.homogeneous_matrix.to_np(), atol=1e-9
+        placed_milk, target.homogeneous_matrix.to_np(), atol=1e-9
     )
 
 
@@ -92,12 +105,13 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     """
     world, robot, milk, extensions = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    place = PlaceAction(object_designator=milk, target_location=target)
-    expand(Sequence(nodes=[place]), extensions)
-    grasp = place._grasp_on_the_held_object()
-    poses = place.grasp_pose_sequence(
-        grasp.moved_to(target), robot.left_arm.end_effector, grasp
+    place = _start(
+        PlaceAction(arm=robot.left_arm, object_designator=milk, target_location=target),
+        extensions,
     )
+    end_effector = robot.left_arm.end_effector
+    grasp = GraspCandidate(milk, end_effector.held_body_T_grasp)
+    poses = place.grasp_pose_sequence(grasp.moved_to(target), end_effector, grasp)
 
     tool_goals = [goal.goal_pose for goal in _tool_goals_of(place)]
 
@@ -107,46 +121,30 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     for expected, actual in zip(
         [poses.retreat, poses.grasp, poses.grasp, poses.pre_grasp], tool_goals
     ):
-        np.testing.assert_allclose(expected.to_np(), actual.to_np(), atol=1e-9)
+        np.testing.assert_allclose(expected.to_np(), actual.evaluate(), atol=1e-9)
 
 
 # %% releasing what has not been picked up yet
 
 
-def test_place_uses_the_grasp_its_pick_up_will_take(pr2_apartment_context):
+def test_a_place_after_an_underspecified_pick_up_joins_the_statechart(
+    pr2_apartment_context,
+):
     """
-    A plan is built before it runs, so a place that follows a pick-up in the same plan
-    is expanded while the object is still on its shelf, nowhere near the gripper. The
-    grasp then has to come from the pick-up that is going to take it, not from where
-    the object happens to lie.
+    An underspecified pick-up is grounded only once it starts, so while the plan is
+    built nothing holds the object and no pick-up says how it will be held.
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
-    place = PlaceAction(object_designator=milk, target_location=target)
+    pick_up = a(PickUpAction)(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    place = PlaceAction(
+        arm=robot.left_arm, object_designator=milk, target_location=target
+    )
     expand(Sequence(nodes=[pick_up, place]), extensions)
 
-    np.testing.assert_allclose(
-        place._grasp_on_the_held_object().grasp_pose.to_np(),
-        pick_up.grasp.grasp_pose.to_np(),
-        atol=1e-9,
-    )
-
-
-def test_a_place_of_an_object_nothing_holds_is_refused(pr2_apartment_context):
-    """
-    Nothing in the gripper and no pick-up before it leaves no arm to place with.
-    """
-    world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-
-    place = PlaceAction(object_designator=milk, target_location=target)
-
-    with pytest.raises(ObjectIsNotHeld):
-        expand(Sequence(nodes=[place]), extensions)
+    assert _arms_moved_by(place, robot) == {robot.left_arm}
 
 
 # %% the arm that places
@@ -160,25 +158,13 @@ def _arms_moved_by(place: PlaceAction, robot) -> set[Arm]:
     return {arm for arm in robot.all_arms if arm.end_effector.tool_frame in moved_tips}
 
 
-def test_place_takes_the_arm_that_holds_the_object(pr2_holding_milk):
-    world, robot, milk, extensions = pr2_holding_milk
-    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    place = PlaceAction(object_designator=milk, target_location=target)
-    expand(Sequence(nodes=[place]), extensions)
-
-    assert _arms_moved_by(place, robot) == {robot.left_arm}
-
-
-def test_place_takes_the_arm_its_pick_up_will_use(pr2_apartment_context):
-    """
-    A plan is built before it runs, so a place that follows a pick-up in the same plan
-    places with the arm that pick-up is going to hold the object in.
-    """
+def test_place_moves_only_the_arm_it_is_given(pr2_apartment_context):
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.right_arm)
-    place = PlaceAction(object_designator=milk, target_location=target)
-    expand(Sequence(nodes=[pick_up, place]), extensions)
+    place = PlaceAction(
+        arm=robot.right_arm, object_designator=milk, target_location=target
+    )
+    expand(Sequence(nodes=[place]), extensions)
 
     assert _arms_moved_by(place, robot) == {robot.right_arm}
