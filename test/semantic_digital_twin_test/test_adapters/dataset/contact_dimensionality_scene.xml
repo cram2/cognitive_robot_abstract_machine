@@ -1,0 +1,10 @@
+<mujoco>
+  <worldbody>
+    <body name="sliding_box">
+      <geom type="box" size="0.1 0.1 0.1" friction="0.8 0.02 0.003"/>
+    </body>
+    <body name="turning_box" pos="1 0 0">
+      <geom type="box" size="0.1 0.1 0.1" friction="0.8 0.02 0.003" condim="4"/>
+    </body>
+  </worldbody>
+</mujoco>
