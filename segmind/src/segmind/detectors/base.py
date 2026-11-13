@@ -282,7 +282,8 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         :param candidates: The bodies a tracked object may be related to; every
             collidable body of the world when not given. The bodies
             :meth:`bodies_left_out` names are left out of them.
-        :return: Dictionary mapping bodies to sets of related bodies.
+        :return: Dictionary mapping bodies to sets of related bodies; a tracked body
+            without collision geometry is related to none.
         """
 
         related_bodies: dict[Body, set[Body]] = {}
@@ -291,6 +292,8 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         left_out = self.bodies_left_out(self.context.world)
         candidates = [body for body in candidates if body not in left_out]
         for tracked_object in tracked_objects:
+            if not tracked_object.has_collision():
+                continue
             for body in candidates:
                 if body is tracked_object:
                     continue
