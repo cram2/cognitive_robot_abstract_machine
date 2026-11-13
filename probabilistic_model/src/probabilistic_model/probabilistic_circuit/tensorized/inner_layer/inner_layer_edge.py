@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from dataclasses import dataclass
 
 import numpy as np
@@ -60,6 +59,18 @@ class InnerLayerEdges:
     The child node of every edge, see :attr:`InnerLayerEdge.child_node`.
     """
 
+    @classmethod
+    def concatenate(cls, parts: list[InnerLayerEdges]) -> Self:
+        """
+        :param parts: The edges to join, in order.
+        :return: All edges of the parts.
+        """
+        return cls(
+            np.concatenate([part.nodes for part in parts]),
+            np.concatenate([part.child_layer_indices for part in parts]),
+            np.concatenate([part.child_nodes for part in parts]),
+        )
+
     def __len__(self) -> int:
         return len(self.nodes)
 
@@ -68,22 +79,3 @@ class InnerLayerEdges:
             self.nodes, self.child_layer_indices, self.child_nodes
         ):
             yield InnerLayerEdge(int(node), int(child_layer_index), int(child_node))
-
-    def into_child_layer(self, child_layer_index: int) -> Self:
-        """
-        :param child_layer_index: The index of a child layer.
-        :return: The edges that point into that child layer.
-        """
-        mask = self.child_layer_indices == child_layer_index
-        return self.__class__(
-            self.nodes[mask], self.child_layer_indices[mask], self.child_nodes[mask]
-        )
-
-    @functools.cached_property
-    def every_node_at_most_once(self) -> bool:
-        """
-        :return: Whether no two edges start at the same node, in which case a value per
-            edge can be written to its node by plain indexing instead of
-            :func:`numpy.add.at`.
-        """
-        return len(np.unique(self.nodes)) == len(self.nodes)

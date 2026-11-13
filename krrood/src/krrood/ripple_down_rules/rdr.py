@@ -1,3 +1,7 @@
+"""
+Ripple down rules classifiers for single-class, multi-class and general cases.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -71,7 +75,7 @@ from krrood.ripple_down_rules.utils import (
     copy_case,
 )
 from krrood.code_generation.imports import get_imports_from_types
-from krrood.code_generation.source_extraction_utils import extract_function_source
+from krrood.source_analysis.source_extraction import extract_function_source
 from krrood.utils import (
     get_import_path_from_path,
     get_scope_from_imports,

@@ -21,13 +21,16 @@ from krrood.entity_query_language.factories import (
     RuntimeType,
 )
 from krrood.entity_query_language.predicate import HasType, HasTypes, Is, Length
+from krrood.entity_query_language.role_predicates import (
+    IsSameSemanticEntity,
+    IsSubClassOrRole,
+)
 from krrood.entity_query_language.testing.result_verification import VerbalizationResult
 from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
     WorksIn,
 )
 from krrood.inheritance_path_length import InheritancePathLength
-from krrood.patterns.role_predicates import IsSameSemanticEntity, IsSubClassOrRole
 
 results: tuple[VerbalizationResult, ...] = (
     VerbalizationResult(
@@ -47,15 +50,15 @@ results: tuple[VerbalizationResult, ...] = (
     VerbalizationResult(HasTypes, "a variable is of type Integer or Text"),
     VerbalizationResult(Is, "a first entity is the same object as a second entity"),
     VerbalizationResult(Length, "the length of an iterable"),
+    VerbalizationResult(
+        IsSameSemanticEntity,
+        "a first entity is the same semantic entity as a second entity",
+    ),
+    VerbalizationResult(IsSubClassOrRole, "a type is a subclass or role of object"),
     VerbalizationResult(IsReachable, "a location is reachable for a body"),
     VerbalizationResult(WorksIn, "an employee works in a department"),
     VerbalizationResult(
         InheritancePathLength,
         "the inheritance path length between a child class and a parent class",
     ),
-    VerbalizationResult(
-        IsSameSemanticEntity,
-        "a first entity is the same semantic entity as a second entity",
-    ),
-    VerbalizationResult(IsSubClassOrRole, "a type is a subclass or role of object"),
 )

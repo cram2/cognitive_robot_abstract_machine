@@ -27,6 +27,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignm
     ForwardSampleAssignment,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    InnerLayer,
     Layer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
@@ -59,8 +60,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import QueryCache
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    EdgeMatrix,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -211,11 +212,12 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         :param events: Events whose symbolic values are hashes of domain elements.
         :return: The events with every symbolic value replaced by the position of its
-            element in the domain, which the symbolic layers read.
+            element in the domain, which the symbolic layers read, as a numpy array.
+            Without symbolic variables, the events themselves, of their own backend.
         """
         encodings = self.symbolic_encodings
         if not encodings:
-            return np.asarray(events)
+            return events
         events = np.array(events, dtype=float)
         for column, encoding in encodings.items():
             events[:, column] = encoding.indices_of_hashes(events[:, column])
@@ -264,6 +266,20 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         for layer in self.layers:
             if isinstance(layer, DiscreteLayer):
                 layer.table = table_type.of(layer.table)
+        return self
+
+    def store_edges_as(self, edge_matrix_type: type[EdgeMatrix]) -> Self:
+        """
+        Store the edges of every inner layer in a matrix of the given type, in place.
+
+        :param edge_matrix_type: The type of edge matrix, for instance
+            :class:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix.DenseEdgeMatrix`
+            for layers whose nodes are connected to most child nodes.
+        :return: This circuit.
+        """
+        for layer in self.layers:
+            if isinstance(layer, InnerLayer):
+                layer.store_edges_as(edge_matrix_type)
         return self
 
     # %% queries
@@ -473,16 +489,14 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         # mix the copy of the root that belongs to each event by the probability of that
         # event, which turns the replicated root into the single root of the result
         number_of_copies = len(node_log_probabilities)
-        mixture = SumLayer(
+        mixture = SumLayer.from_entries(
             [replicated.layer],
-            RowGroupedSparseArray.from_entries(
-                SparseEntries(
-                    node_log_probabilities,
-                    np.zeros(number_of_copies, dtype=np.int64),
-                    np.arange(number_of_copies),
-                ),
-                (1, number_of_copies),
+            SparseEntries(
+                node_log_probabilities,
+                np.zeros(number_of_copies, dtype=np.int64),
+                np.arange(number_of_copies),
             ),
+            1,
         )
         query.log_probabilities.record(
             LayerWithLogProbabilities(mixture, np.array([total_log_probability]))

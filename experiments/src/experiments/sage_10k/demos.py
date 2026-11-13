@@ -145,7 +145,9 @@ class Sage10kAbstractDemoHSRB:
         probabilistic backend its statements are grounded with.
         """
         return [
-            RobotAccess(self.world.get_semantic_annotations_by_type(AbstractRobot)[0]),
+            RobotAccess(
+                robot=self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
+            ),
             StatementGrounding(query_backend=ProbabilisticBackend()),
         ]
 

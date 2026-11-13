@@ -68,7 +68,7 @@ from ...plan_running import (
 # %% counting the waits between ticks
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WaitCountingPacer(Pacer):
     """
     Counts how often a loop waited for its next cycle, without waiting.
@@ -93,11 +93,11 @@ def test_compiling_puts_the_plan_and_its_end_in_one_statechart(
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(extensions)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
 
     statechart = plan.statechart
     assert plan in statechart.top_level_nodes
-    assert len(statechart.get_nodes_by_type(EndMotion)) == 1
+    assert len(statechart.get_nodes_by_type(node_type=EndMotion)) == 1
 
 
 def test_executing_before_compiling_is_refused(pr2_apartment_context) -> None:
@@ -115,7 +115,7 @@ def test_executing_runs_the_plan_until_it_succeeded(pr2_apartment_context) -> No
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(extensions)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -127,7 +127,7 @@ def test_a_plan_that_fails_raises_motion_did_not_finish(pr2_apartment_context) -
     executor = simulated_executor(extensions)
 
     with pytest.raises(MotionDidNotFinish):
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
 
@@ -156,7 +156,7 @@ def test_a_plan_of_several_top_level_nodes_ends_once_all_of_them_succeeded(
     arms = ParkArmsAction(arms=robot_view.all_arms)
     executor = simulated_executor(extensions)
 
-    executor.compile(statechart_of(executor, torso, arms))
+    executor.compile(statechart=statechart_of(executor, torso, arms))
     executor.execute()
 
     assert executor.plan_nodes == [torso, arms]
@@ -169,7 +169,7 @@ def test_a_statechart_without_a_plan_is_refused(pr2_apartment_context) -> None:
     executor = simulated_executor(extensions)
 
     with pytest.raises(EmptyStatechartError):
-        executor.compile(statechart_of(executor))
+        executor.compile(statechart=statechart_of(executor))
 
 
 def test_a_statechart_of_another_context_is_refused(pr2_apartment_context) -> None:
@@ -179,7 +179,7 @@ def test_a_statechart_of_another_context_is_refused(pr2_apartment_context) -> No
     )
 
     with pytest.raises(StatechartOfDifferentContextError):
-        simulated_executor(extensions).compile(statechart)
+        simulated_executor(extensions).compile(statechart=statechart)
 
 
 # %% how long a plan may take
@@ -194,11 +194,11 @@ def test_compiling_watches_the_plan_for_progress(pr2_apartment_context) -> None:
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(extensions)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
 
-    [progress_monitor] = plan.statechart.get_nodes_by_type(StillProgressing)
+    [progress_monitor] = plan.statechart.get_nodes_by_type(node_type=StillProgressing)
     assert progress_monitor.monitored_node is plan
-    assert len(plan.statechart.get_nodes_by_type(CancelStatechart)) == 1
+    assert len(plan.statechart.get_nodes_by_type(node_type=CancelStatechart)) == 1
 
 
 @pytest.fixture
@@ -218,7 +218,7 @@ def executor_reaching_out_of_range(
         grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
     )
     executor = simulated_executor(extensions)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     return executor
 
 
@@ -269,7 +269,9 @@ def test_a_plan_that_outlasts_the_simulation_time_limit_is_given_up_on(
 
     with pytest.raises(MotionExceededSimulationTimeLimit):
         executor.compile(
-            statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+            statechart=statechart_of(
+                executor, MoveTorsoAction(torso_state=TorsoState.HIGH)
+            )
         )
         executor.execute()
 
@@ -284,7 +286,9 @@ def test_a_plan_is_given_up_on_at_the_simulation_time_limit_of_its_own_executor(
 
     with pytest.raises(MotionExceededSimulationTimeLimit) as error:
         executor.compile(
-            statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+            statechart=statechart_of(
+                executor, MoveTorsoAction(torso_state=TorsoState.HIGH)
+            )
         )
         executor.execute()
 
@@ -320,10 +324,10 @@ def test_the_simulation_time_limit_grows_when_an_action_joins(
     world, robot_view, extensions = pr2_apartment_context
     executor = simulated_executor(extensions)
     statechart = statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     with statechart.modify():
-        statechart.add_node(MoveTorsoAction(torso_state=TorsoState.LOW))
+        statechart.add_node(node=MoveTorsoAction(torso_state=TorsoState.LOW))
 
     assert executor.simulation_time_limit == 2 * executor.simulation_time_per_action
 
@@ -336,7 +340,7 @@ def test_a_simulated_plan_waits_for_its_pacer_after_every_tick(
     executor = simulated_executor(extensions, pacer=pacer)
 
     executor.compile(
-        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
     )
     executor.execute()
 
@@ -359,13 +363,53 @@ def test_a_plan_that_violates_collision_avoidance_fails_as_a_plan_failure(
 
     executor = simulated_executor(extensions)
     executor.compile(
-        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
     )
     monkeypatch.setattr(StatechartExecutor, "tick", violate_collision_avoidance)
     with pytest.raises(MotionViolatedCollisionAvoidance) as failure:
         executor.execute()
 
     assert failure.value.violation is violation
+
+
+# %% the outcome of an attempted plan
+
+
+def test_an_attempted_plan_that_succeeds_reports_no_failure(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+
+    outcome = executor.attempt()
+
+    assert outcome.succeeded
+    assert outcome.failure is None
+
+
+def test_an_attempted_plan_that_fails_reports_its_failure_instead_of_raising_it(
+    pr2_apartment_context, monkeypatch
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    violation = CollisionViolatedError(violated_collisions=[])
+
+    def violate_collision_avoidance(executor: StatechartExecutor) -> None:
+        raise violation
+
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+    monkeypatch.setattr(StatechartExecutor, "tick", violate_collision_avoidance)
+
+    outcome = executor.attempt()
+
+    assert not outcome.succeeded
+    assert isinstance(outcome.failure, MotionViolatedCollisionAvoidance)
+    assert outcome.failure.violation is violation
 
 
 # %% avoiding collisions in a world with several robots
@@ -390,13 +434,15 @@ def test_collision_avoidance_is_compiled_for_the_robot_performing_the_plan(
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(robot_extensions(tiago), collision_avoidance=True)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
 
     statechart = plan.statechart
     [external_collision_avoidance] = statechart.get_nodes_by_type(
-        ExternalCollisionAvoidance
+        node_type=ExternalCollisionAvoidance
     )
-    [self_collision_avoidance] = statechart.get_nodes_by_type(SelfCollisionAvoidance)
+    [self_collision_avoidance] = statechart.get_nodes_by_type(
+        node_type=SelfCollisionAvoidance
+    )
     assert external_collision_avoidance.robot is tiago
     assert self_collision_avoidance.robot is tiago
 
@@ -408,7 +454,7 @@ def test_a_plan_avoiding_collisions_succeeds_in_a_world_with_another_robot(
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(robot_extensions(tiago), collision_avoidance=True)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -429,12 +475,12 @@ def test_a_physically_simulated_plan_steps_the_physics_one_control_period_per_ti
     executor = physically_simulated_executor(extensions)
 
     executor.compile(
-        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
     )
     executor.execute()
 
     control_time_step = executor.require_extension(
-        MotionControl
+        extension_type=MotionControl
     ).qp_controller_config.control_time_step
     assert executor.pacer.simulation.steps == [control_time_step] * executor.tick_count
 
@@ -453,7 +499,9 @@ def test_a_physically_simulated_plan_is_given_the_same_time_limit(
 
     with pytest.raises(MotionExceededSimulationTimeLimit):
         executor.compile(
-            statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+            statechart=statechart_of(
+                executor, MoveTorsoAction(torso_state=TorsoState.HIGH)
+            )
         )
         executor.execute()
 
@@ -474,7 +522,7 @@ def test_a_plan_is_adapted_after_the_transformations_it_was_given(
         [*extensions, PlanRewriting(transformations=[detecting])]
     )
 
-    rewriting = executor.context.require_extension(PlanRewriting)
+    rewriting = executor.context.require_extension(extension_type=PlanRewriting)
 
     assert rewriting.transformations == [
         *executor.robot_adaptations,
@@ -489,7 +537,7 @@ def test_a_plan_given_no_transformations_is_still_adapted(
     world, robot_view, extensions = pr2_apartment_context
     executor = physically_simulated_executor(extensions)
 
-    rewriting = executor.context.require_extension(PlanRewriting)
+    rewriting = executor.context.require_extension(extension_type=PlanRewriting)
 
     assert rewriting.transformations == [
         *executor.robot_adaptations,
@@ -518,13 +566,13 @@ def test_a_second_executor_on_a_context_leaves_the_rewriting_of_the_first_alone(
 ) -> None:
     world, robot_view, extensions = pr2_apartment_context
     first = simulated_executor(extensions)
-    rewriting = first.context.require_extension(PlanRewriting)
+    rewriting = first.context.require_extension(extension_type=PlanRewriting)
     transformations = list(rewriting.transformations)
 
     with pytest.raises(DuplicateContextExtensionError):
         KinematicallySimulatedPlanExecutor(
-            first.context, plan_adaptations=[DetectBeforeGrasp()]
+            context=first.context, plan_adaptations=[DetectBeforeGrasp()]
         )
 
-    assert first.context.require_extension(PlanRewriting) is rewriting
+    assert first.context.require_extension(extension_type=PlanRewriting) is rewriting
     assert rewriting.transformations == transformations

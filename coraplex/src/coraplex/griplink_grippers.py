@@ -41,7 +41,7 @@ class DriveGriplinkGrippersThroughTheirActionServers(
 # %% running plans on the real DAiSy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealDAiSyPlanExecutor(RealRobotPlanExecutor):
     """
     Runs plans on the real DAiSy, whose grippers move through their griplink action

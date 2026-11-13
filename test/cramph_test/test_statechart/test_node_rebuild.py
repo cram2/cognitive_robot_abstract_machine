@@ -48,8 +48,8 @@ def _parallel_with_a_child_of_each_outcome(
         minimum_success=minimum_success,
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(parallel)
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=parallel)
+    statechart_executor.compile(statechart=statechart)
     succeeded, failed, running = parallel.nodes
     for _ in range(maximum_ticks):
         if (
@@ -74,7 +74,7 @@ def test_a_sequence_is_built_anew_holding_its_children_built_anew() -> None:
     sequence = Sequence(name="sequence", nodes=[first, second])
     rebuild = RebuildLeavingNodesOut()
 
-    rebuilt = rebuild.rebuilt(sequence)
+    rebuilt = rebuild.rebuilt(node=sequence)
 
     assert rebuilt is not sequence
     assert rebuilt.name == sequence.name
@@ -86,13 +86,13 @@ def test_a_sequence_holding_no_child_built_anew_is_left_out() -> None:
     child = _succeeding("child")
     rebuild = RebuildLeavingNodesOut(left_out=[child])
 
-    assert rebuild.rebuilt(Sequence(nodes=[child])) is None
+    assert rebuild.rebuilt(node=Sequence(nodes=[child])) is None
 
 
 def test_a_parallel_built_anew_needs_as_many_successes() -> None:
     parallel = Parallel(nodes=[_succeeding("a"), _succeeding("b")], minimum_success=1)
 
-    rebuilt = RebuildLeavingNodesOut().rebuilt(parallel)
+    rebuilt = RebuildLeavingNodesOut().rebuilt(node=parallel)
 
     assert rebuilt.minimum_success == parallel.minimum_success
 
@@ -103,7 +103,7 @@ def test_a_parallel_needs_one_success_fewer_without_a_child_that_succeeded(
     parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 2)
     succeeded, _, _ = parallel.nodes
 
-    rebuilt = RebuildLeavingNodesOut(left_out=[succeeded]).rebuilt(parallel)
+    rebuilt = RebuildLeavingNodesOut(left_out=[succeeded]).rebuilt(node=parallel)
 
     assert rebuilt.minimum_success == parallel.minimum_success - 1
 
@@ -114,7 +114,7 @@ def test_a_parallel_needs_as_many_successes_without_a_child_that_failed(
     parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 2)
     _, failed, _ = parallel.nodes
 
-    rebuilt = RebuildLeavingNodesOut(left_out=[failed]).rebuilt(parallel)
+    rebuilt = RebuildLeavingNodesOut(left_out=[failed]).rebuilt(node=parallel)
 
     assert rebuilt.minimum_success == parallel.minimum_success
 
@@ -125,7 +125,7 @@ def test_a_parallel_needs_one_success_fewer_without_a_child_still_running(
     parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 2)
     _, _, running = parallel.nodes
 
-    rebuilt = RebuildLeavingNodesOut(left_out=[running]).rebuilt(parallel)
+    rebuilt = RebuildLeavingNodesOut(left_out=[running]).rebuilt(node=parallel)
 
     assert rebuilt.minimum_success == parallel.minimum_success - 1
 
@@ -136,7 +136,9 @@ def test_a_parallel_needs_no_success_once_more_children_are_left_out_than_it_nee
     parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 1)
     succeeded, _, running = parallel.nodes
 
-    rebuilt = RebuildLeavingNodesOut(left_out=[succeeded, running]).rebuilt(parallel)
+    rebuilt = RebuildLeavingNodesOut(left_out=[succeeded, running]).rebuilt(
+        node=parallel
+    )
 
     assert rebuilt.minimum_success == 0
 
@@ -146,7 +148,7 @@ def test_a_monitored_node_is_built_anew_with_its_monitor_built_anew() -> None:
     rebuild = RebuildLeavingNodesOut()
 
     rebuilt = rebuild.rebuilt(
-        StartedWhenTrue(monitor=monitor, monitored_node=monitored_node)
+        node=StartedWhenTrue(monitor=monitor, monitored_node=monitored_node)
     )
 
     assert rebuilt.monitor is rebuild.built[monitor]
@@ -158,7 +160,9 @@ def test_a_monitored_node_without_its_monitored_node_is_left_out() -> None:
     rebuild = RebuildLeavingNodesOut(left_out=[monitored_node])
 
     rebuilt = rebuild.rebuilt(
-        StartedWhenTrue(monitor=_succeeding("monitor"), monitored_node=monitored_node)
+        node=StartedWhenTrue(
+            monitor=_succeeding("monitor"), monitored_node=monitored_node
+        )
     )
 
     assert rebuilt is None
@@ -168,7 +172,7 @@ def test_a_monitor_counting_resets_counts_those_of_the_node_built_anew() -> None
     counted = _succeeding("counted")
     rebuild = RebuildLeavingNodesOut()
 
-    rebuilt = rebuild.rebuilt(CountNodeResets(node=counted, target=2))
+    rebuilt = rebuild.rebuilt(node=CountNodeResets(node=counted, target=2))
 
     assert rebuilt.node is rebuild.built[counted]
     assert rebuilt.target == 2
@@ -182,7 +186,7 @@ def test_a_repeated_task_is_built_anew_with_its_stop_monitor_built_anew() -> Non
     rebuild = RebuildLeavingNodesOut()
 
     rebuilt = rebuild.rebuilt(
-        RepeatUntil(task=task, stop_retry_monitor=stop_retry_monitor)
+        node=RepeatUntil(task=task, stop_retry_monitor=stop_retry_monitor)
     )
 
     assert rebuilt.task is rebuild.built[task]
@@ -194,7 +198,7 @@ def test_a_repeated_task_without_its_stop_monitor_is_left_out() -> None:
     rebuild = RebuildLeavingNodesOut(left_out=[stop_retry_monitor])
 
     rebuilt = rebuild.rebuilt(
-        RepeatUntil(
+        node=RepeatUntil(
             task=NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE),
             stop_retry_monitor=stop_retry_monitor,
         )
@@ -207,7 +211,9 @@ def test_a_node_reading_another_node_reads_it_built_anew() -> None:
     watched_node = _succeeding("watched")
     rebuild = RebuildLeavingNodesOut()
 
-    rebuilt = rebuild.rebuilt(NodeObservingLastObservation(watched_node=watched_node))
+    rebuilt = rebuild.rebuilt(
+        node=NodeObservingLastObservation(watched_node=watched_node)
+    )
 
     assert rebuilt.watched_node is rebuild.built[watched_node]
 
@@ -216,7 +222,7 @@ def test_a_sequence_keeps_its_children_that_are_not_left_out() -> None:
     first, second = _succeeding("first"), _succeeding("second")
     rebuild = RebuildLeavingNodesOut(left_out=[first])
 
-    rebuilt = rebuild.rebuilt(Sequence(nodes=[first, second]))
+    rebuilt = rebuild.rebuilt(node=Sequence(nodes=[first, second]))
 
     assert rebuilt.nodes == [rebuild.built[second]]
 
@@ -228,7 +234,7 @@ def test_a_condition_reads_the_counterpart_of_a_node_it_reads() -> None:
     read, counterpart = _succeeding("read"), _succeeding("counterpart")
 
     carried_over = DerivedConditionVariable.reading_counterparts(
-        read.is_succeeded, lambda node: counterpart
+        condition=read.is_succeeded, counterpart_of=lambda node: counterpart
     )
 
     assert carried_over.free_variables() == [counterpart.is_succeeded]
@@ -239,17 +245,17 @@ def test_a_condition_reads_a_node_without_counterpart_as_it_is_now(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     ended = _succeeding("ended")
-    statechart.add_node(ended)
-    statechart.add_node(EndStatechart.when_true(ended))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=ended)
+    statechart.add_node(node=EndStatechart.when_true(node=ended))
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
     assert ended.life_cycle_state == LifeCycleValues.SUCCEEDED
 
     succeeded = DerivedConditionVariable.reading_counterparts(
-        ended.is_succeeded, lambda node: None
+        condition=ended.is_succeeded, counterpart_of=lambda node: None
     )
     failed = DerivedConditionVariable.reading_counterparts(
-        ended.is_failed, lambda node: None
+        condition=ended.is_failed, counterpart_of=lambda node: None
     )
 
     assert succeeded.is_constant_true()

@@ -48,7 +48,6 @@ from krrood.entity_query_language.operators.causal import (
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
-    FlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
 )
@@ -62,8 +61,13 @@ from krrood.entity_query_language.exceptions import (
     NoAttributeWithAccessPathName,
     UnboundPatternVariable,
 )
+from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    chained_logic,
+)
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
+from krrood.entity_query_language.query.query import MatchedEntity
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
@@ -357,6 +361,19 @@ class Match(
         """
         return name.startswith("_")
 
+    def _quantifier_operands_(
+        self, *, condition: ConditionType
+    ) -> tuple[Variable[T], ConditionType]:
+        """
+        Overrides :meth:`Operand._quantifier_operands_`: a quantifier over a match
+        ranges over the variable it describes, and states the pattern and the
+        :meth:`where` conditions of each value together with *condition*.
+        """
+        self.resolve()
+        return self._variable_, chained_logic(
+            AND, *self._conditions_, *self._where_conditions_, condition
+        )
+
     @property
     def _symbolic_expression_(self) -> Entity[T]:
         """
@@ -369,14 +386,12 @@ class Match(
         own namespace - its modifiers, ``build``, ``evaluate`` - can stand in for a
         matched class's field of the same name.
         """
-        from krrood.entity_query_language.factories import entity
-
         if self._expression is not None:
             return self._expression
 
         if not self._resolved_:
             self.resolve()
-        entity_ = entity(self._variable_)
+        entity_ = MatchedEntity(_selected_variables_=(self._variable_,))
         if self._conditions_:
             entity_ = entity_.where(*self._conditions_)
         entity_._quantify_(quantifier_type=self._quantifier_type_)
@@ -843,6 +858,9 @@ class Match(
             replacing it, so a ``where`` recorded before this call keeps referencing the correct,
             now domain-scoped, variable.
 
+        An expression as ``domain`` ranges the match, for each binding of the expression,
+        over the instances of its type among the elements of the value it evaluates to.
+
         :param domain: The instances the match ranges over.
         :return: This match, for chaining.
         """
@@ -879,7 +897,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
     The value to assign to the attribute, which can be a Match instance or a Literal.
     """
 
-    _variable_: Attribute | FlatVariable = field(default=None, kw_only=True)
+    _variable_: Attribute = field(default=None, kw_only=True)
     """
     The symbolic variable representing the attribute.
     """

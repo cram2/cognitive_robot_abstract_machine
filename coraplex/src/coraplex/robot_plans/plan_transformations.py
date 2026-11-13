@@ -1,3 +1,8 @@
+"""
+The transformations that insert steps into a plan or change how its actions are carried
+out, such as opening a drawer before picking up what it holds.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -50,8 +55,11 @@ from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from krrood.entity_query_language.core.mapped_variable import FlatVariable
-from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
+from krrood.entity_query_language.core.variable import (
+    ExpressionDomain,
+    InstantiatedVariable,
+    Variable,
+)
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -293,7 +301,9 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if isinstance(plan_node, StatementNode):
             # The candidates are grounded after the opening, which leaves the arms at
             # the handle, where they would stand in collision at every standing pose.
-            robot = plan_node.context.require_extension(RobotAccess).robot
+            robot = plan_node.context.require_extension(
+                extension_type=RobotAccess
+            ).robot
             nodes.append(ParkArmsAction(arms=robot.all_arms))
         return nodes
 
@@ -329,11 +339,13 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if not isinstance(arm, Arm):
             return None
         if (
-            isinstance(grasp, FlatVariable)
-            and isinstance(grasp._child_, InstantiatedVariable)
-            and grasp._child_._factory_ is GraspsByCloseness
+            isinstance(grasp, Variable)
+            and isinstance(grasp._values_domain_, ExpressionDomain)
+            and isinstance(grasp._values_domain_.expression, InstantiatedVariable)
+            and grasp._values_domain_.expression._factory_ is GraspsByCloseness
         ):
-            return PickUpTarget(graspable=grasp._child_._kwargs_["graspable"], arm=arm)
+            ranked_grasps = grasp._values_domain_.expression
+            return PickUpTarget(graspable=ranked_grasps._kwargs_["graspable"], arm=arm)
         grasps = grasp._domain_ if isinstance(grasp, Variable) else [grasp]
         if not all(isinstance(candidate, GraspCandidate) for candidate in grasps):
             return None
@@ -360,9 +372,12 @@ class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
 
     def apply(self, plan_node: PickAndPlaceAction) -> None:
         for step in list(plan_node.nodes):
-            plan_node.insert_before(step, ParkArmsAction(arms=plan_node.robot.all_arms))
+            plan_node.insert_before(
+                reference=step, node=ParkArmsAction(arms=plan_node.robot.all_arms)
+            )
         plan_node.insert_after(
-            plan_node.nodes[-1], ParkArmsAction(arms=plan_node.robot.all_arms)
+            reference=plan_node.nodes[-1],
+            node=ParkArmsAction(arms=plan_node.robot.all_arms),
         )
 
 
@@ -397,7 +412,7 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
             alongside `plan_node` starts.
         """
         step = plan_node.find_upwards(
-            lambda holder: isinstance(holder.parent_node, Sequence)
+            predicate=lambda holder: isinstance(holder.parent_node, Sequence)
         )
         if step is not None:
             return step
@@ -458,8 +473,8 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
     def apply(self, plan_node: GraspingAction) -> None:
         closing_step = self.closing_step(plan_node)
         plan_node.statechart.replace(
-            closing_step,
-            plan_node.closing_step(
+            node=closing_step,
+            replacement=plan_node.closing_step(
                 MoveFingersToWidthAction(
                     gripper=plan_node.arm.end_effector,
                     width=plan_node.grasp.width_along_closing_axis,

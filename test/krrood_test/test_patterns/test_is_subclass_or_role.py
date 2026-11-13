@@ -6,7 +6,7 @@ whose role takers are.
 from __future__ import annotations
 
 from krrood.entity_query_language.factories import an, entity, variable_from
-from krrood.patterns.role_predicates import IsSubClassOrRole
+from krrood.entity_query_language.role_predicates import IsSubClassOrRole
 from ..dataset.role_and_ontology.university_ontology_like_classes import (
     CEOAsFirstRole,
     Company,

@@ -62,7 +62,7 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             :attr:`threshold`.
         """
         manager = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).get_or_create_external_collision_manager(self.context)
 
         manager.register_group_of_body(self.body)
@@ -120,7 +120,7 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             :attr:`threshold`.
         """
         manager = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).get_or_create_self_collision_manager(self.context)
 
         manager.register_groups_of_body_combination(self.body_a, self.body_b)

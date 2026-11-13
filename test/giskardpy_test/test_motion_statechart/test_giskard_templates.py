@@ -49,7 +49,7 @@ def _compile_and_tick(
         context=StatechartContext(world=World()), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(goal)
+    statechart.add_node(node=goal)
     executor.compile(statechart=statechart)
     for _ in range(ticks):
         executor.tick()
@@ -201,7 +201,7 @@ def test_a_try_all_without_nodes_is_rejected() -> None:
         context=StatechartContext(world=World()), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(TryAll(nodes=[]))
+    statechart.add_node(node=TryAll(nodes=[]))
 
     with pytest.raises(CompositeNodeWithoutChildrenError):
         executor.compile(statechart=statechart)
@@ -212,7 +212,7 @@ def test_a_try_in_order_without_nodes_is_rejected() -> None:
         context=StatechartContext(world=World()), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(TryInOrder(nodes=[]))
+    statechart.add_node(node=TryInOrder(nodes=[]))
 
     with pytest.raises(CompositeNodeWithoutChildrenError):
         executor.compile(statechart=statechart)

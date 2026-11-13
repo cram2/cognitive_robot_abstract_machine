@@ -151,9 +151,9 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
 
         executor = episode.executor
         statechart = Statechart(context=executor.context)
-        statechart.add_node(episode.action)
+        statechart.add_node(node=episode.action)
         try:
-            executor.compile(statechart)
+            executor.compile(statechart=statechart)
             executor.execute()
         except EmptyUnderspecified:
             # No working solution found in this episode
@@ -241,10 +241,10 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             query_backend = self.setup_backend(move_to_reach)
 
         executor = KinematicallySimulatedPlanExecutor(
-            StatechartContext.with_extensions(
-                world,
-                [
-                    RobotAccess(robot),
+            context=StatechartContext.with_extensions(
+                world=world,
+                extensions=[
+                    RobotAccess(robot=robot),
                     StatementGrounding(query_backend=query_backend),
                 ],
             ),

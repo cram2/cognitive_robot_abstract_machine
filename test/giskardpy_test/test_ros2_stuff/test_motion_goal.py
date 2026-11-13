@@ -23,8 +23,10 @@ def create_motion_statechart() -> Statechart:
     Build a motion statechart that ends after some simulated time.
     """
     motion_statechart = Statechart(context=StatechartContext(world=World()))
-    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=0.5))
-    motion_statechart.add_node(EndMotion.when_true(counter))
+    motion_statechart.add_node(
+        node=(counter := CountSimulationTimeSeconds(seconds=0.5))
+    )
+    motion_statechart.add_node(node=EndMotion.when_true(node=counter))
     return motion_statechart
 
 

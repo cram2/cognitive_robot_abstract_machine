@@ -1,3 +1,7 @@
+"""
+The actions that open and close a container by moving its handle.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -6,7 +10,7 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import (
     a,
-    flat_variable,
+    variable_from,
     variable,
 )
 from krrood.entity_query_language.query.match import Match
@@ -73,7 +77,7 @@ class MovesContainerByItsHandle(
             Pose, domain=[Pose(reference_frame=arm._robot.root)]
         )
         return a(cls)(
-            grasp=flat_variable(
+            grasp=variable_from(
                 GraspsByCloseness(
                     graspable=handle,
                     standing_position=where_the_robot_stands,

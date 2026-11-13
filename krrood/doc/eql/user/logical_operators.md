@@ -63,11 +63,11 @@ Negation can be particularly useful for "anti-joins" or excluding specific subse
 
 `for_all(x, condition)` holds when the condition holds for **every** value of `x`, and `exists(x, condition)` holds when
 it holds for **at least one** value of `x`. The values of `x` may depend on another variable, as when `x` ranges over a
-collection attribute with `flat_variable`:
+collection attribute with `variable_from`:
 
 ```python
 student = variable(Student, domain=students)
-course = flat_variable(student.takes_course)
+course = variable_from(student.takes_course)
 
 # Students none of whose courses is "Databases"
 query = an(entity(student).where(for_all(course, course.name != "Databases")))

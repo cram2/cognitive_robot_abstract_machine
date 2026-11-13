@@ -1,10 +1,16 @@
+"""
+The layers of a layered probabilistic circuit and their shared behaviour.
+"""
+
 from __future__ import annotations
 
 import dataclasses
+import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -12,6 +18,7 @@ from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
 
+from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
@@ -25,6 +32,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    EdgeMatrix,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
     InnerLayerEdge,
@@ -663,6 +673,14 @@ class InnerLayer(Layer, ABC):
     The list is not copied.
     """
 
+    edges: EdgeMatrix
+    """
+    The edges from the nodes of this layer to the nodes of its child layers.
+
+    The columns are the nodes of the child layers in order: the node ``j`` of the
+    ``i``-th child layer is the column ``column_offsets[i] + j``.
+    """
+
     _variables_cache: VariableIndices | None = field(
         default=None, init=False, repr=False
     )
@@ -670,8 +688,32 @@ class InnerLayer(Layer, ABC):
     Cached indices of the variables in the scope of this layer.
     """
 
+    @property
+    def number_of_nodes(self) -> int:
+        return self.edges.shape[0]
+
+    def validate_own(self):
+        expected_shape = (self.number_of_nodes, int(self.column_offsets[-1]))
+        if self.edges.shape != expected_shape:
+            raise ShapeMismatchError(expected_shape, self.edges.shape)
+
     def reset_variables(self):
         self._variables_cache = None
+
+    @property
+    def column_offsets(self) -> npt.NDArray[np.int64]:
+        """
+        :return: The first column of every child layer, followed by the number of
+            columns, where the columns are the nodes of all child layers in order.
+        """
+        return np.concatenate(
+            [
+                [0],
+                np.cumsum(
+                    [child_layer.number_of_nodes for child_layer in self.child_layers]
+                ),
+            ]
+        ).astype(np.int64)
 
     @memoized
     def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):
@@ -697,6 +739,19 @@ class InnerLayer(Layer, ABC):
             and np.array_equal(own.child_nodes, others.child_nodes)
         )
 
+    def store_edges_as(self, edge_matrix_type: type[EdgeMatrix]):
+        """
+        Store the edges of this layer in a matrix of the given type, in place.
+
+        :param edge_matrix_type: The type of edge matrix, for instance
+            :class:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix.DenseEdgeMatrix`
+            for a layer whose nodes are connected to most child nodes.
+        """
+        self.edges = edge_matrix_type.from_edge_positions(
+            self.edges.rows, self.edges.columns, self.edges.shape
+        )
+        self.__dict__.pop(InnerLayer.inner_layer_edges.attrname, None)
+
     @abstractmethod
     def with_edges(
         self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
@@ -711,14 +766,18 @@ class InnerLayer(Layer, ABC):
         """
         raise NotImplementedError
 
-    @property
-    @abstractmethod
+    @functools.cached_property
     def inner_layer_edges(self) -> InnerLayerEdges:
         """
         :return: Every edge from a node of this layer to a node of one of its child
-            layers.
+            layers, in the order of :attr:`edges`.
         """
-        raise NotImplementedError
+        offsets = self.column_offsets
+        columns = self.edges.columns
+        child_layer_indices = np.searchsorted(offsets, columns, side="right") - 1
+        return InnerLayerEdges(
+            self.edges.rows, child_layer_indices, columns - offsets[child_layer_indices]
+        )
 
     def iterate_edges(self) -> Iterator[InnerLayerEdge]:
         """

@@ -10,5 +10,5 @@ from ...cramph_test.test_statechart.keyword_only_constructors import (
 
 
 def test_every_motion_statechart_node_takes_keyword_arguments_only() -> None:
-    audit = KeywordOnlyConstructorAudit([giskardpy.motion_statechart])
+    audit = KeywordOnlyConstructorAudit(modules=[giskardpy.motion_statechart])
     assert audit.nodes_with_positional_parameters() == []

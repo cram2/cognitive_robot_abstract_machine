@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 from time import sleep
@@ -46,7 +46,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutor(Executor):
     """
     Executes a statechart by sending it to Giskard over ROS and waiting until it ended
@@ -112,7 +112,7 @@ class GiskardClientExecutor(Executor):
             WorldSynchronizer(_world=self.world, node=self.node_handle)
         if self.context is None:
             self.context = StatechartContext(world=self.world)
-            MotionControl().extend_context(self.context)
+            MotionControl().extend_context(context=self.context)
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
@@ -162,12 +162,12 @@ class GiskardClientExecutor(Executor):
     def robot(self) -> AbstractRobot:
         return self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Does what :meth:`Executor.compile` does, then tells every extension that the
         statechart is compiled.
         """
-        super().compile(statechart)
+        super().compile(statechart=statechart)
         self._notify_compiled()
 
     def execute_async(self) -> Future:
@@ -191,7 +191,9 @@ class GiskardClientExecutor(Executor):
         world model while the motion was running.
         """
         self.statechart.sanity_check()
-        child_chooser_access = self.context.get_extension(ChildChooserAccess)
+        child_chooser_access = self.context.get_extension(
+            extension_type=ChildChooserAccess
+        )
         try:
             if child_chooser_access is None:
                 result = self._client.send_goal(
@@ -334,7 +336,7 @@ class GiskardClientExecutor(Executor):
         self.heartbeat_publisher.stop()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutorNode(GiskardClientExecutor):
     """
     A :class:`GiskardClientExecutor` that creates and owns its own ros node.
