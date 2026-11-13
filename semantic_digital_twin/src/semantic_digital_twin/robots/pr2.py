@@ -401,7 +401,7 @@ class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         return []
@@ -488,7 +488,7 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         left_arm_park = JointState.from_mapping(
@@ -542,7 +542,7 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         right_arm_park = JointState.from_mapping(
@@ -598,7 +598,7 @@ class PR2Torso(
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections

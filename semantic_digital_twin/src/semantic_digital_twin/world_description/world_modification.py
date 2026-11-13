@@ -553,10 +553,13 @@ class SetDofHasHardwareInterface(WorldModification):
     """
 
     def apply(self, world: World):
-        for dof_id in self.degree_of_freedom_ids:
-            world.get_degree_of_freedom_by_id(
-                dof_id
-            ).has_hardware_interface = self.value
+        world.set_dofs_has_hardware_interface(
+            [
+                world.get_degree_of_freedom_by_id(dof_id)
+                for dof_id in self.degree_of_freedom_ids
+            ],
+            self.value,
+        )
 
     def revert(self, world: World):
         dofs_by_previous_value: dict[bool, list[DegreeOfFreedom]] = {}
@@ -640,7 +643,8 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
                 obj = self._resolve_item(
                     world, from_json(diff.added_values[0], **kwargs)
                 )
-                setattr(entity, diff.attribute_name, obj)
+                with world.unlock_model_attributes():
+                    setattr(entity, diff.attribute_name, obj)
         world._model_manager.current_model_modification_block.append(self)
 
     def revert(self, world: World):
@@ -731,7 +735,8 @@ def synchronized_attribute_modification(func):
             raise MissingWorldModificationContextError(func)
 
         object_before_change = to_json(self)
-        result = func(self, *args, **kwargs)
+        with self._world.unlock_model_attributes():
+            result = func(self, *args, **kwargs)
         object_after_change = to_json(self)
 
         tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)

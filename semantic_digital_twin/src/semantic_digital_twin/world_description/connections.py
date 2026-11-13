@@ -16,6 +16,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
+    RecordedModelAttribute,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
@@ -97,14 +98,10 @@ class ActiveConnection(Connection, ABC):
         controlled and a low level controller translates these commands to commands for
         the caster wheels.
 
-        A door hinge is also active but cannot be controlled.
+        A door hinge is also active but cannot be controlled. Change it through
+        :meth:`World.set_dofs_has_hardware_interface` with :attr:`active_dofs`.
         """
         return any(dof.has_hardware_interface for dof in self.active_dofs)
-
-    @has_hardware_interface.setter
-    def has_hardware_interface(self, value: bool) -> None:
-        for dof in self.active_dofs:
-            dof.has_hardware_interface = value
 
     @property
     def is_controlled(self):
@@ -322,6 +319,11 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         )
 
 
+ActiveConnection1DOF.axis = RecordedModelAttribute(attribute_name="axis")
+ActiveConnection1DOF.multiplier = RecordedModelAttribute(attribute_name="multiplier")
+ActiveConnection1DOF.offset = RecordedModelAttribute(attribute_name="offset")
+
+
 @dataclass(eq=False)
 class PrismaticConnection(ActiveConnection1DOF):
     """
@@ -494,6 +496,9 @@ class ScrewConnection(ActiveConnection1DOF):
             dynamics=self.dynamics,
             screw_pitch=self.screw_pitch,
         )
+
+
+ScrewConnection.screw_pitch = RecordedModelAttribute(attribute_name="screw_pitch")
 
 
 @dataclass(eq=False)

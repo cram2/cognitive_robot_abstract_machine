@@ -447,8 +447,15 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         self.command_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
         )
-        for connection in self.connections:
-            connection.has_hardware_interface = True
+        with self.world.modify_world():
+            self.world.set_dofs_has_hardware_interface(
+                [
+                    dof
+                    for connection in self.connections
+                    for dof in connection.active_dofs
+                ],
+                True,
+            )
         self.commands = JointVelocityCommand.for_connections(
             self.connections, self.minimum_velocities
         )
@@ -533,7 +540,10 @@ class DriveVelocityCommandPublisher(CommandPublisher):
         self.velocity_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
         )
-        self.connection.has_hardware_interface = True
+        with self.world.modify_world():
+            self.world.set_dofs_has_hardware_interface(
+                self.connection.active_dofs, True
+            )
         self.velocity_reader = StateVelocityReader(
             world=self.world,
             degrees_of_freedom=self.translation_degrees_of_freedom()

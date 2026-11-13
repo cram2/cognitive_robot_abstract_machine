@@ -2,18 +2,20 @@
 Tests of what opening and closing :meth:`World.modify_world` blocks does to the world:
 
 which degrees of freedom survive a nested block, what a block that modifies nothing
-leaves behind, and how moving a connection's origin is recorded.
+leaves behind, and that the fields the model is built from change only by record.
 """
 
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import ModelAttributeAssignedInWorldError
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -23,6 +25,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     AttributeUpdateModification,
+    SetDofHasHardwareInterface,
 )
 
 
@@ -97,3 +100,73 @@ def test_updating_connection_origin_moves_child(mini_world: World):
         mini_world.compute_forward_kinematics_np(connection.parent, connection.child),
         parent_T_connection.to_np(),
     )
+
+
+def test_rollback_of_connection_origin_update_restores_it(mini_world: World):
+    connection = mini_world.connections[0]
+    origin_before = connection.parent_T_connection_expression.to_np()
+    version = mini_world.get_world_model_manager().version
+    with mini_world.modify_world():
+        connection.update_parent_T_connection(
+            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+        )
+
+    mini_world.rollback_to_version(version)
+
+    np.testing.assert_allclose(
+        connection.parent_T_connection_expression.to_np(), origin_before
+    )
+
+
+# %% fields the model is built from
+
+
+@pytest.mark.parametrize(
+    "attribute_name",
+    [
+        "parent_T_connection_expression",
+        "connection_T_child_expression",
+        "axis",
+        "multiplier",
+        "offset",
+    ],
+)
+def test_assigning_connection_field_in_world_raises(
+    mini_world: World, attribute_name: str
+):
+    connection = mini_world.connections[0]
+
+    with pytest.raises(ModelAttributeAssignedInWorldError):
+        with mini_world.modify_world():
+            setattr(connection, attribute_name, getattr(connection, attribute_name))
+
+
+def test_assigning_hardware_interface_in_world_raises(mini_world: World):
+    [degree_of_freedom] = mini_world.degrees_of_freedom
+
+    with pytest.raises(ModelAttributeAssignedInWorldError):
+        with mini_world.modify_world():
+            degree_of_freedom.has_hardware_interface = True
+
+
+def test_assigning_connection_field_before_world_is_allowed():
+    connection = RevoluteConnection(
+        parent=Body(name=PrefixedName("parent")),
+        child=Body(name=PrefixedName("child")),
+        axis=Vector3.Z(),
+        raw_dof=DegreeOfFreedom(name=PrefixedName("hinge")),
+    )
+
+    connection.multiplier = 2.0
+
+    assert connection.multiplier == 2.0
+
+
+def test_setting_hardware_interface_is_recorded(mini_world: World):
+    with mini_world.modify_world():
+        mini_world.set_dofs_has_hardware_interface(mini_world.degrees_of_freedom, True)
+
+    last_block = mini_world.get_world_model_manager().model_modification_blocks[-1]
+    assert [type(modification) for modification in last_block] == [
+        SetDofHasHardwareInterface
+    ]

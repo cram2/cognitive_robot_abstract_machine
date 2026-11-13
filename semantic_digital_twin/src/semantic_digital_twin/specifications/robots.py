@@ -211,7 +211,7 @@ class RobotSpecification:
                 world=world, parent=odometry_body, child=cast(Body, robot_world.root)
             )
             world.merge_world(robot_world, root_connection=drive)
-            drive.has_hardware_interface = True
+            world.set_dofs_has_hardware_interface(drive.active_dofs, True)
             merged_robot = cast(
                 HasMobileBase, world.get_semantic_annotation_by_id(described_robot.id)
             )
