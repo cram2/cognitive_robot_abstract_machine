@@ -17,6 +17,7 @@ from robokudo.types.cv import ColorToDepthRatio
 from robokudo.cas import CAS
 from robokudo.types.image import ImageRotation
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.io.camera_interface import (
     CameraInterface,
@@ -495,6 +496,7 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
     interface.camera_info = camera_info
     interface.timestamp = Time(sec=10, nanosec=20)
+    interface._world_T_camera_timestamp = interface.timestamp
     interface.lock = Lock()
     cas = CAS()
 
@@ -530,6 +532,7 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
     interface.camera_info = camera_info
     interface.timestamp = Time(sec=10, nanosec=20)
+    interface._world_T_camera_timestamp = interface.timestamp
     interface.lock = Lock()
     cas = CAS()
 
@@ -792,14 +795,18 @@ def test_tf_binding_attaches_existing_camera_root_to_new_reference(
 @pytest.fixture
 def transform_camera() -> ROSCameraInterface:
     """
-    Provide an interface with a controlled TF buffer and no subscriptions.
+    Provide an interface with a controlled TF buffer and no subscriptions, whose buffer
+    has no sample unless a test gives it one.
     """
     camera = ROSCameraInterface.__new__(ROSCameraInterface)
     camera.lookup_viewpoint = True
     camera.tf_from = "camera_optical_frame"
     camera.tf_to = "map"
+    camera.camera_config = TfComponent(tf_from=camera.tf_from, tf_to=camera.tf_to)
     camera.tf_buffer = Mock()
+    camera.tf_buffer.can_transform.return_value = False
     camera._world_T_camera = None
+    camera._world_T_camera_timestamp = None
     return camera
 
 

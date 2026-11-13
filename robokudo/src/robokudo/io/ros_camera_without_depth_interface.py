@@ -20,9 +20,7 @@ from __future__ import annotations
 
 # %% Imports
 from collections.abc import Sequence
-from threading import Lock
 
-import builtin_interfaces.msg
 import cv2
 import message_filters
 import numpy as np
@@ -105,14 +103,6 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.color_to_depth_ratio: ColorToDepthRatio = ColorToDepthRatio()
         """
         Always (1.0, 1.0) since no depth data.
-        """
-        self.timestamp: builtin_interfaces.msg.Time | None = None
-        """
-        Timestamp of latest data.
-        """
-        self.lock: Lock = Lock()
-        """
-        Thread synchronization lock.
         """
         self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """
@@ -263,19 +253,19 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         """
         Process synchronized RGB image and camera info messages.
 
+        .. note:: A frame arriving while the previous frame is read is dropped.
+
         :param color_data: RGB image message
         :param camera_info: Camera calibration info message, defaults to None
         """
-        self.lock.acquire()
+        # Skip the frame instead of waiting, so that the executor delivering it keeps
+        # delivering TF while a frame is read.
+        if not self.lock.acquire(blocking=False):
+            return
         self.color = self.bridge.imgmsg_to_cv2(color_data, desired_encoding="bgr8")
         self.timestamp = color_data.header.stamp
 
         self.camera_info = camera_info
-
-        if not self.lookup_transform():
-            self._has_new_data = False
-            self.lock.release()
-            return
 
         self._has_new_data = True
         self.lock.release()
@@ -293,10 +283,10 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         :param cas: Common Analysis Structure to update
         :param world: The world perception perceives into
         """
-        if not self.has_new_data():
-            return
-
         with self.lock:
+            if not self._has_new_data:
+                return
+
             width = self.camera_info.width
             height = self.camera_info.height
 

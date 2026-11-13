@@ -439,15 +439,40 @@ class ROSCameraInterface(CameraInterface):
         """
         Camera pose from the most recent successful TF lookup.
         """
+        self._world_T_camera_timestamp: builtin_interfaces.msg.Time | None = None
+        """
+        Time TF provided :attr:`_world_T_camera` for.
+        """
+        self.timestamp: builtin_interfaces.msg.Time | None = None
+        """
+        Acquisition time of the latest frame.
+        """
+        self.lock: Lock = Lock()
+        """
+        Guards the latest frame against being replaced while it is read.
+        """
         if self.lookup_viewpoint:
             self.tf_buffer: Buffer = TFListenerProxy().buffer_for_node(self.node)
             """
             TF buffer populated by the per-node transform listener.
             """
 
+    def has_new_data(self) -> bool:
+        """
+        Check :meth:`CameraInterface.has_new_data`, dropping a new frame for which TF
+        provides no camera pose at its acquisition time as :meth:`lookup_transform`
+        waits for it.
+        """
+        with self.lock:
+            if not self._has_new_data:
+                return False
+            self._has_new_data = self.lookup_transform(Time.from_msg(self.timestamp))
+            return self._has_new_data
+
     def lookup_transform(self, timestamp: Time | None = None) -> bool:
         """
-        Cache a camera pose when the requested TF sample is available.
+        Cache a camera pose when the requested TF sample is available, waiting for it at
+        most the configured camera pose timeout.
 
         :param timestamp: Acquisition time, or the latest sample when omitted.
         :return: Whether lookup is disabled or a sample was available.
@@ -459,12 +484,15 @@ class ROSCameraInterface(CameraInterface):
             target_frame=self.tf_to,
             source_frame=self.tf_from,
             time=timestamp,
-            timeout=Duration(seconds=1.0 / 30.0),
+            timeout=Duration(
+                seconds=self.camera_config.camera_pose_timeout.total_seconds()
+            ),
         ):
             return False
         world_T_camera = self.tf_buffer.lookup_transform(
             target_frame=self.tf_to, source_frame=self.tf_from, time=timestamp
         )
+        self._world_T_camera_timestamp = world_T_camera.header.stamp
         translation = world_T_camera.transform.translation
         rotation = world_T_camera.transform.rotation
         self._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -482,15 +510,18 @@ class ROSCameraInterface(CameraInterface):
         self, *, world: World, timestamp: builtin_interfaces.msg.Time
     ) -> HomogeneousTransformationMatrix | None:
         """
-        Return the sampled TF camera pose bound to ``world``.
+        Return the camera pose TF provides at ``timestamp``, bound to ``world``.
 
         :param world: The world perception perceives into.
-        :param timestamp: Acquisition time associated with the cached TF sample.
+        :param timestamp: Acquisition time of the frame the camera pose is for.
         :return: Bound camera pose, or ``None`` when TF lookup is disabled.
+        :raises CameraPoseMissing: If TF provides no camera pose at ``timestamp``.
         """
         if not self.lookup_viewpoint:
             return None
-        if self._world_T_camera is None:
+        if self._world_T_camera_timestamp != timestamp and not self.lookup_transform(
+            Time.from_msg(timestamp)
+        ):
             raise CameraPoseMissing()
         return self.bind_world_T_camera(
             world=world,
@@ -638,14 +669,6 @@ class KinectCameraInterface(ROSCameraInterface):
         """
         Ratio between color and depth image sizes.
         """
-        self.timestamp: builtin_interfaces.msg.Time | None = None
-        """
-        Latest message timestamp.
-        """
-        self.lock: Lock = Lock()
-        """
-        Thread synchronization lock.
-        """
         self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """
         NumPy-compatible replacement for cv_bridge.
@@ -697,6 +720,8 @@ class KinectCameraInterface(ROSCameraInterface):
         This callback handles incoming color, depth, and camera info messages. It
         converts the data to OpenCV format and stores it for later use.
 
+        .. note:: A frame arriving while the previous frame is read is dropped.
+
         TODO make this generic. handle the encoding and order properly. For standard and
         compressed images. this might also depend on the fix of image_transport_plugins
         being published as a package. Startpoint can be found at the bottom of this
@@ -706,7 +731,10 @@ class KinectCameraInterface(ROSCameraInterface):
         :param depth_data: Depth image message
         :param camera_info: Camera calibration message
         """
-        self.lock.acquire()
+        # Skip the frame instead of waiting, so that the executor delivering it keeps
+        # delivering TF while a frame is read.
+        if not self.lock.acquire(blocking=False):
+            return
         if self.rk_logger.isEnabledFor(logging.DEBUG):
             self.rk_logger.debug("Received data:")
 
@@ -758,20 +786,14 @@ class KinectCameraInterface(ROSCameraInterface):
 
         self.camera_info = camera_info
 
-        # self.rk_logger.info("Callback processing done - Final steps")
-        if not self.lookup_transform():
-            self._has_new_data = False
-            self.lock.release()
-            return
-
         self._has_new_data = True
         self.lock.release()
 
     def set_data(self, *, cas: CAS, world: World) -> None:
-        if not self.has_new_data():
-            return
-
         with self.lock:
+            if not self._has_new_data:
+                return
+
             if self.camera_config.hi_res_mode:
                 self.color = self.color[0:960, 0:1280]
 
