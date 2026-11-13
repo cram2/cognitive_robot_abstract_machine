@@ -143,7 +143,7 @@ class RunEndExitStatus(IntEnum):
     """
 
 
-class SshOption(StrEnum):
+class SecureShellOption(StrEnum):
     """
     The ssh client options this script sets.
     """
@@ -197,14 +197,15 @@ class RemoteContainer:
     """
 
     @property
-    def ssh_command(self) -> list[str]:
+    def secure_shell_command(self) -> list[str]:
         """
-        The ssh call to the server, sharing its connection, before the remote command.
+        The call of the ssh program to the server, sharing its connection, before the
+        remote command.
         """
         options = {
-            SshOption.CONTROL_MASTER: "auto",
-            SshOption.CONTROL_PATH: self.shared_connection_socket,
-            SshOption.CONTROL_PERSIST: int(
+            SecureShellOption.CONTROL_MASTER: "auto",
+            SecureShellOption.CONTROL_PATH: self.shared_connection_socket,
+            SecureShellOption.CONTROL_PERSIST: int(
                 self.shared_connection_lifetime.total_seconds()
             ),
         }
@@ -220,7 +221,7 @@ class RemoteContainer:
         :return: What the command printed.
         """
         return subprocess.run(
-            [*self.ssh_command, command],
+            [*self.secure_shell_command, command],
             input=standard_input,
             capture_output=True,
             text=True,
@@ -232,7 +233,7 @@ class RemoteContainer:
         :return: The running command, its output unbuffered, to read as it is printed.
         """
         return subprocess.Popen(
-            [*self.ssh_command, command],
+            [*self.secure_shell_command, command],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             bufsize=0,
