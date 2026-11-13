@@ -15,10 +15,12 @@ from typing_extensions import Any, Generic, TypeVar
 
 from krrood.code_generation.ast_helpers import (
     ast_call,
-    ast_constant,
     ast_enum_member,
 )
-from krrood.code_generation.exceptions import ObjectNotSerializableError
+from krrood.code_generation.exceptions import (
+    NoApplicableSourceEmitterError,
+    ObjectNotSerializableError,
+)
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.patterns.specificity_ranking import (
@@ -59,10 +61,12 @@ class SourceEmitter(Generic[EmittedType], SubClassSafeGeneric, ABC):
         return cls.get_type_of_generic_parameter(parameter=EmittedType)
 
     @classproperty
-    @abstractmethod
     def family(cls) -> type[SourceEmitter]:
-        """The abstract base whose concrete subclasses :meth:`emit_source`
-        chooses from."""
+        """The direct subclass of :class:`SourceEmitter` this emitter descends
+        from, whose concrete subclasses :meth:`emit_source` chooses from."""
+        return next(
+            ancestor for ancestor in cls.__mro__ if SourceEmitter in ancestor.__bases__
+        )
 
     @classproperty
     def family_members(cls) -> list[type[SourceEmitter]]:
@@ -75,16 +79,18 @@ class SourceEmitter(Generic[EmittedType], SubClassSafeGeneric, ABC):
         ]
 
     @classmethod
-    @abstractmethod
     def unsupported_subject_error(cls, *, subject: Any) -> Exception:
         """The error raised when no emitter of the family applies to a subject.
 
         :param subject: The subject no emitter applies to.
         :return: The error to raise.
         """
+        return NoApplicableSourceEmitterError(subject=subject, family=cls.family)
 
     @classmethod
-    def applies(cls, *, subject: Any, context: SourceEmissionContext) -> bool:
+    def can_emit_source_for_object(
+        cls, *, subject: Any, context: SourceEmissionContext
+    ) -> bool:
         """Whether this emitter can rebuild ``subject``.
 
         :param subject: The object to rebuild.
@@ -105,7 +111,7 @@ class SourceEmitter(Generic[EmittedType], SubClassSafeGeneric, ABC):
         applicable_emitters = [
             emitter
             for emitter in cls.family_members
-            if emitter.applies(subject=subject, context=context)
+            if emitter.can_emit_source_for_object(subject=subject, context=context)
         ]
         emitter = sole_maximum(
             applicable_emitters,
@@ -136,11 +142,6 @@ class ValueSourceEmitter(SourceEmitter[EmittedType], ABC):
     and dataclass instances made of these."""
 
     @classproperty
-    def family(cls) -> type[SourceEmitter]:
-        """This family of value emitters."""
-        return ValueSourceEmitter
-
-    @classproperty
     def supported_scalar_types(cls) -> tuple[type, ...]:
         """The scalar types the family emits, besides ``None`` and dataclass
         instances."""
@@ -153,6 +154,9 @@ class ValueSourceEmitter(SourceEmitter[EmittedType], ABC):
 
     @classmethod
     def unsupported_subject_error(cls, *, subject: Any) -> Exception:
+        """Like :meth:`SourceEmitter.unsupported_subject_error`, but the
+        :class:`ObjectNotSerializableError` that names the supported scalar
+        types."""
         return ObjectNotSerializableError(subject, cls.supported_scalar_types)
 
 
@@ -161,16 +165,18 @@ class ConstantSourceEmitter(ValueSourceEmitter[EmittedType], ABC):
     """Emits a value that is written as a Python constant."""
 
     @classmethod
-    def applies(cls, *, subject: Any, context: SourceEmissionContext) -> bool:
-        """Like :meth:`SourceEmitter.applies`, but never for an enum member,
+    def can_emit_source_for_object(
+        cls, *, subject: Any, context: SourceEmissionContext
+    ) -> bool:
+        """Like :meth:`SourceEmitter.can_emit_source_for_object`, but never for an enum member,
         which :class:`EnumSourceEmitter` writes by its name even when it is
         also a constant, as an ``IntEnum`` member is."""
-        return super().applies(subject=subject, context=context) and not isinstance(
-            subject, enum.Enum
-        )
+        return super().can_emit_source_for_object(
+            subject=subject, context=context
+        ) and not isinstance(subject, enum.Enum)
 
     def emit(self, *, subject: EmittedType) -> ast.expr:
-        return ast_constant(subject)
+        return ast.Constant(value=subject)
 
 
 @dataclass(kw_only=True)
@@ -218,7 +224,9 @@ class DataclassSourceEmitter(ValueSourceEmitter[object]):
     """
 
     @classmethod
-    def applies(cls, *, subject: Any, context: SourceEmissionContext) -> bool:
+    def can_emit_source_for_object(
+        cls, *, subject: Any, context: SourceEmissionContext
+    ) -> bool:
         """Whether ``subject`` is a dataclass instance, not a dataclass
         type."""
         return dataclasses.is_dataclass(subject) and not isinstance(subject, type)

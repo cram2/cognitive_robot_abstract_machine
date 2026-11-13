@@ -1,7 +1,8 @@
 """
-Builders for the :mod:`ast` nodes used when generating Python source, so code
-generators read as *what* they emit rather than *how* the AST is spelled. Each name
-starts with ``ast_`` to say it builds or renders an AST node.
+Builders for the :mod:`ast` nodes used when generating Python source, so code generators
+read as *what* they emit rather than *how* the AST is spelled.
+
+Each name starts with ``ast_`` to say it builds or renders an AST node.
 """
 
 from __future__ import annotations
@@ -32,16 +33,6 @@ def ast_attribute_access(value: ast.expr, attribute_name: str) -> ast.Attribute:
     :return: An :class:`ast.Attribute` in load context.
     """
     return ast.Attribute(value=value, attr=attribute_name, ctx=ast.Load())
-
-
-def ast_constant(value: Any) -> ast.Constant:
-    """
-    Build a literal constant node.
-
-    :param value: The literal value to embed.
-    :return: An :class:`ast.Constant` wrapping *value*.
-    """
-    return ast.Constant(value=value)
 
 
 def ast_enum_member(member: enum.Enum) -> ast.Attribute:

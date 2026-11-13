@@ -122,3 +122,10 @@ def test_emitting_a_value_no_emitter_applies_to_raises():
     with pytest.raises(ObjectNotSerializableError) as error:
         ValueSourceEmitter.emit_source(subject=[1], context=SourceEmissionContext())
     assert error.value.value == [1]
+
+
+def test_value_emitter_belongs_to_the_value_family():
+    """
+    An emitter several levels below the family base still belongs to it.
+    """
+    assert IntSourceEmitter.family is ValueSourceEmitter

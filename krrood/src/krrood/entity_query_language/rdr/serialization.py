@@ -10,6 +10,7 @@ just importing that module and reading the rebuilt DAG.
 from __future__ import annotations
 
 import ast
+import inspect
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -25,21 +26,24 @@ from krrood.code_generation.ast_helpers import (
     ast_unparse_statements,
     ast_with_block,
 )
+from krrood.code_generation.formatting import remove_unused_imports
 from krrood.code_generation.generator import CodeGenerator
 from krrood.code_generation.imports import get_imports_from_types
 from krrood.code_generation.naming import camel_case_to_lower_camel_case
 from krrood.code_generation.object_to_source import render_dict_literal
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.factories import add, entity, variable
-from krrood.entity_query_language.rdr.exceptions import EmptyRuleTreeError
-from krrood.entity_query_language.exceptions import UnsupportedNodeForSerialization
+from krrood.entity_query_language import factories
+from krrood.entity_query_language.factories import add
+from krrood.entity_query_language.rdr.exceptions import (
+    EmptyRuleTreeError,
+    MissingAddConclusionError,
+)
 from krrood.entity_query_language.rules.conclusion import Add
 from krrood.entity_query_language.rules.decomposition import DecomposedRuleTree
 from krrood.entity_query_language.source_emission import (
     BranchSourceEmitter,
     ConditionEmissionContext,
     ConditionSourceEmitter,
-    FactoryCallSourceEmitter,
 )
 from krrood.ormatic.utils import classproperty
 
@@ -123,7 +127,7 @@ class RuleTreeSourceEmitter:
         for conclusion in condition._conclusions_:
             if isinstance(conclusion, Add):
                 return conclusion.right
-        raise UnsupportedNodeForSerialization(node=condition)
+        raise MissingAddConclusionError(condition=condition)
 
 
 # %% RDR <-> module
@@ -139,17 +143,17 @@ class RDRSerializer:
 
     @classproperty
     def rule_authoring_import(cls) -> str:
-        """The import statement for every factory the generated rule tree
-        calls."""
-        emitted_factories = [
-            emitter.factory
-            for emitter in ConditionSourceEmitter.family_members
-            + BranchSourceEmitter.family_members
-            if issubclass(emitter, (FactoryCallSourceEmitter, BranchSourceEmitter))
+        """The import statement for every public function of
+        :mod:`~krrood.entity_query_language.factories`, of which a saved module
+        keeps those it calls."""
+        authoring_functions = [
+            member
+            for member_name, member in vars(factories).items()
+            if inspect.isfunction(member)
+            and member.__module__ == factories.__name__
+            and not member_name.startswith("_")
         ]
-        return "\n".join(
-            get_imports_from_types([variable, entity, add, *emitted_factories])
-        )
+        return "\n".join(get_imports_from_types(authoring_functions))
 
     @classproperty
     def templates_directory(cls) -> Path:
@@ -205,17 +209,19 @@ class RDRSerializer:
         )
 
         generator = CodeGenerator(template_directory=str(self.templates_directory))
-        return generator.render(
-            template_name=self.module_template_name,
-            factory_import=self.rule_authoring_import,
-            type_imports=type_imports,
-            variable_name=variable_name,
-            case_type_name=case_type.__name__,
-            base_condition=base_condition,
-            body=body,
-            conclusion_attribute_name=self.rdr.conclusion_attribute_name,
-            corner_cases_dict_src=corner_cases,
-            module_attributes=RDRModuleAttribute,
+        return remove_unused_imports(
+            generator.render(
+                template_name=self.module_template_name,
+                factory_import=self.rule_authoring_import,
+                type_imports=type_imports,
+                variable_name=variable_name,
+                case_type_name=case_type.__name__,
+                base_condition=base_condition,
+                body=body,
+                conclusion_attribute_name=self.rdr.conclusion_attribute_name,
+                corner_cases_dict_src=corner_cases,
+                module_attributes=RDRModuleAttribute,
+            )
         )
 
     def _render_corner_cases(

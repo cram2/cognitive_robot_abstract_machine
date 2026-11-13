@@ -27,7 +27,6 @@ from krrood.code_generation.source_emission import (
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Literal, Variable
-from krrood.entity_query_language.exceptions import UnsupportedNodeForSerialization
 from krrood.entity_query_language.factories import (
     alternative,
     and_,
@@ -37,7 +36,12 @@ from krrood.entity_query_language.factories import (
     refinement,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
+from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    OR,
+    LogicalBinaryOperator,
+    Not,
+)
 from krrood.entity_query_language.rules.conclusion_selector import (
     Alternative,
     ConclusionSelector,
@@ -48,6 +52,8 @@ from krrood.entity_query_language.rules.decomposition import ConclusionSelectorB
 from krrood.ormatic.utils import classproperty
 
 NodeType = TypeVar("NodeType", bound=SymbolicExpression)
+
+ConnectiveType = TypeVar("ConnectiveType", bound=LogicalBinaryOperator)
 
 ConclusionSelectorType = TypeVar("ConclusionSelectorType", bound=ConclusionSelector)
 
@@ -80,17 +86,6 @@ class ConditionSourceEmitter(SourceEmitter[NodeType], ABC):
     The state shared by every emitter of the generated source.
     """
 
-    @classproperty
-    def family(cls) -> type[SourceEmitter]:
-        """
-        This family of condition emitters.
-        """
-        return ConditionSourceEmitter
-
-    @classmethod
-    def unsupported_subject_error(cls, *, subject: Any) -> Exception:
-        return UnsupportedNodeForSerialization(node=subject)
-
 
 @dataclass(kw_only=True)
 class LiteralSourceEmitter(ConditionSourceEmitter[Literal]):
@@ -111,13 +106,15 @@ class VariableSourceEmitter(ConditionSourceEmitter[Variable]):
     """
 
     @classmethod
-    def applies(cls, *, subject: Any, context: ConditionEmissionContext) -> bool:
+    def can_emit_source_for_object(
+        cls, *, subject: Any, context: ConditionEmissionContext
+    ) -> bool:
         """
-        Like :meth:`SourceEmitter.applies`, and only for a variable
+        Like :meth:`SourceEmitter.can_emit_source_for_object`, and only for a variable
         :attr:`ConditionEmissionContext.variable_names_by_id` names.
         """
         return (
-            super().applies(subject=subject, context=context)
+            super().can_emit_source_for_object(subject=subject, context=context)
             and subject._id_ in context.variable_names_by_id
         )
 
@@ -145,13 +142,15 @@ class ComparisonSourceEmitter(ConditionSourceEmitter[Comparator]):
     """
 
     @classmethod
-    def applies(cls, *, subject: Any, context: ConditionEmissionContext) -> bool:
+    def can_emit_source_for_object(
+        cls, *, subject: Any, context: ConditionEmissionContext
+    ) -> bool:
         """
-        Like :meth:`SourceEmitter.applies`, and only for a comparator whose operation
-        has a Python comparison operator.
+        Like :meth:`SourceEmitter.can_emit_source_for_object`, and only for a comparator
+        whose operation has a Python comparison operator.
         """
         return (
-            super().applies(subject=subject, context=context)
+            super().can_emit_source_for_object(subject=subject, context=context)
             and ast_comparison_operator_class(subject.operation) is not None
         )
 
@@ -196,17 +195,13 @@ class FactoryCallSourceEmitter(ConditionSourceEmitter[NodeType], ABC):
 
 
 @dataclass(kw_only=True)
-class ConnectiveSourceEmitter(FactoryCallSourceEmitter[NodeType], ABC):
+class ConnectiveSourceEmitter(FactoryCallSourceEmitter[ConnectiveType], ABC):
     """
-    Emits a logical connective, leaving out the ``Add`` conclusions attached to it as
-    children when it is a rule's whole condition.
+    Emits a binary logical connective as a factory call on its two operands.
     """
 
-    def factory_operands(self, *, subject: NodeType) -> list[SymbolicExpression]:
-        conclusion_ids = {conclusion._id_ for conclusion in subject._conclusions_}
-        return [
-            child for child in subject._children_ if child._id_ not in conclusion_ids
-        ]
+    def factory_operands(self, *, subject: ConnectiveType) -> list[SymbolicExpression]:
+        return [subject.left, subject.right]
 
 
 @dataclass(kw_only=True)
@@ -251,7 +246,7 @@ class NegationSourceEmitter(FactoryCallSourceEmitter[Not]):
         return not_
 
     def factory_operands(self, *, subject: Not) -> list[SymbolicExpression]:
-        return [subject._children_[0]]
+        return [subject._child_]
 
 
 # %% rule-tree branches
@@ -270,13 +265,6 @@ class BranchSourceEmitter(SourceEmitter[ConclusionSelectorType], ABC):
     """
 
     @classproperty
-    def family(cls) -> type[SourceEmitter]:
-        """
-        This family of branch emitters.
-        """
-        return BranchSourceEmitter
-
-    @classproperty
     @abstractmethod
     def factory(cls) -> Callable[..., SymbolicExpression]:
         """
@@ -284,11 +272,9 @@ class BranchSourceEmitter(SourceEmitter[ConclusionSelectorType], ABC):
         """
 
     @classmethod
-    def unsupported_subject_error(cls, *, subject: Any) -> Exception:
-        return UnsupportedNodeForSerialization(node=subject)
-
-    @classmethod
-    def applies(cls, *, subject: Any, context: SourceEmissionContext) -> bool:
+    def can_emit_source_for_object(
+        cls, *, subject: Any, context: SourceEmissionContext
+    ) -> bool:
         """
         Whether ``subject`` is a branch added by a conclusion selector of
         :attr:`emitted_type`.
