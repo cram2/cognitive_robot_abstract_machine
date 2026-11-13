@@ -22,9 +22,6 @@ from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from typing_extensions import Generic, TypeVar
 
-from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
-    BackendArray,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     UnsupportedArrayBackendError,
 )
@@ -153,15 +150,18 @@ class JaxNormalDistributionFunctions(NormalDistributionFunctions[jax.Array]):
 
 
 @dataclass
-class TorchNormalDistributionFunctions(NormalDistributionFunctions[BackendArray]):
+class TorchNormalDistributionFunctions(NormalDistributionFunctions[ArrayType]):
     """
     The normal distribution functions of torch tensors, computed by :mod:`torch.special`
     through the namespace, so that torch stays an optional dependency.
+
+    Naming
+    ``torch.Tensor`` would import torch, so the array type stays a parameter.
     """
 
     @classmethod
     def supports(cls, namespace: ModuleType) -> bool:
         return is_torch_namespace(namespace)
 
-    def standard_cumulative_distribution(self, values: BackendArray) -> BackendArray:
+    def standard_cumulative_distribution(self, values: ArrayType) -> ArrayType:
         return self.namespace.special.ndtr(values)

@@ -231,8 +231,17 @@ def test_projection_keeps_a_node_without_probability_mass_impossible():
 # %% training
 
 
+@pytest.fixture
+def minimum_improvement() -> float:
+    """
+    How much the average log-likelihood of the data must rise through training for the
+    trained circuit to count as sufficiently more likely than the one it started from.
+    """
+    return 0.1
+
+
 def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
-    mixture_of_products_case,
+    mixture_of_products_case, minimum_improvement
 ):
     """
     Maximizing the likelihood of data sampled from a circuit, starting from a circuit
@@ -252,11 +261,11 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
         after = float(
             jnp.mean(trained_root.log_likelihood_of_nodes(jnp.asarray(data))[:, 0])
         )
-    assert after > before + 0.1
+    assert after > before + minimum_improvement
 
 
 def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
-    mixture_of_products_case,
+    mixture_of_products_case, minimum_improvement
 ):
     """
     Maximizing the likelihood of data sampled from a circuit with torch, starting from a
@@ -282,7 +291,7 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
         circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize(200, events)
     after = float(trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
-    assert after > before + 0.1
+    assert after > before + minimum_improvement
     assert all(
         float(layer.scale.min()) >= GaussianLayer.minimum_scale
         for layer in trained_root.all_layers()

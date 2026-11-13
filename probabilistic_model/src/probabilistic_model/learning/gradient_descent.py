@@ -104,7 +104,9 @@ class TrainingState(eqx.Module):
 class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
     """
     Minimizes a loss of the circuit rooted at a layer by gradient descent with jax, one
-    compiled step per epoch.
+    compiled step per epoch. A circuit with torch parameters is trained the same way,
+    with the same losses, by
+    :class:`~probabilistic_model.learning.torch_gradient_descent.TorchGradientDescent`.
 
     The layer gives its parameters as the flat list ``circuit_parameters``, projects
     such a list onto valid parameters with ``projected_circuit_parameters`` and rebuilds
