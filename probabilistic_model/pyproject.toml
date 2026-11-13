@@ -70,6 +70,9 @@ include = ["probabilistic_model*"]
 version = {attr = "probabilistic_model._version.__version__"}
 
 [project.optional-dependencies]
+torch = [
+    "torch>=2.4",
+]
 dev = [
     "pytest",
     "pandas>=2.2.3",

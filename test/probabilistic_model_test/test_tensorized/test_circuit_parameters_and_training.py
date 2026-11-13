@@ -12,10 +12,14 @@ import numpy as np
 import optax
 import pytest
 import typing_extensions
+from array_api_compat import array_namespace
 from scipy.special import logsumexp
 from typing_extensions import Any
 
-from probabilistic_model.learning.gradient_descent import LikelihoodMaximization
+from probabilistic_model.learning.gradient_descent import (
+    AverageNegativeLogLikelihood,
+    GradientDescent,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )
@@ -211,11 +215,33 @@ def test_projected_log_probabilities_are_normalized_per_node():
     np.testing.assert_allclose(np.exp(log_probabilities), [[0.25, 0.75], [0.5, 0.5]])
 
 
+def test_projection_keeps_a_node_without_probability_mass_impossible():
+    """
+    A node whose log-probabilities are all ``-inf`` stays impossible under projection
+    instead of becoming nan, and the other nodes are still normalized.
+    """
+    table = DenseProbabilityTable(np.log(np.array([[0.2, 0.8], [0.5, 0.5]])))
+    with np.errstate(divide="ignore"):
+        log_probabilities = np.log(np.array([[1.0, 3.0], [0.0, 0.0]]))
+    (projected,) = table.projected_parameters([log_probabilities])
+    np.testing.assert_array_equal(projected[1], [-np.inf, -np.inf])
+    np.testing.assert_allclose(np.exp(projected[0]), [0.25, 0.75])
+
+
 # %% training
 
 
+@pytest.fixture
+def minimum_improvement() -> float:
+    """
+    How much the average log-likelihood of the data must rise through training for the
+    trained circuit to count as sufficiently more likely than the one it started from.
+    """
+    return 0.1
+
+
 def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
-    mixture_of_products_case,
+    mixture_of_products_case, minimum_improvement
 ):
     """
     Maximizing the likelihood of data sampled from a circuit, starting from a circuit
@@ -229,13 +255,48 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(moved).to_namespace(jnp)
         before = float(jnp.mean(circuit.log_likelihood(jnp.asarray(data))))
-        trained_root = LikelihoodMaximization(circuit.root, optax.adam(5e-2)).minimize(
-            200, jnp.asarray(data)
-        )
+        trained_root = GradientDescent(
+            circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+        ).minimize(200, jnp.asarray(data))
         after = float(
             jnp.mean(trained_root.log_likelihood_of_nodes(jnp.asarray(data))[:, 0])
         )
-    assert after > before + 0.1
+    assert after > before + minimum_improvement
+
+
+def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
+    mixture_of_products_case, minimum_improvement
+):
+    """
+    Maximizing the likelihood of data sampled from a circuit with torch, starting from a
+    circuit with moved locations, raises the average log-likelihood of the data and
+    keeps every Gaussian scale at least the minimum scale.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+
+    case = mixture_of_products_case
+    np.random.seed(0)
+    data = case.circuit(np).sample(500)
+    start = case.circuit(np)
+    namespace = array_namespace(torch.zeros(0))
+    circuit = start.copy_with_parameters(
+        parameters_shifted(start, GaussianLayer, 1.5)
+    ).to_namespace(namespace)
+    events = namespace.asarray(data)
+    before = float(circuit.log_likelihood(events).mean())
+    trained_root = torch_gradient_descent.TorchGradientDescent(
+        circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
+    ).minimize(200, events)
+    after = float(trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
+    assert after > before + minimum_improvement
+    assert all(
+        float(layer.scale.min()) >= GaussianLayer.minimum_scale
+        for layer in trained_root.all_layers()
+        if isinstance(layer, GaussianLayer)
+    )
 
 
 # %% typing
@@ -251,4 +312,4 @@ def test_parameter_arrays_and_gradient_descent_name_their_types():
         np.ndarray,
         np.dtype,
     )
-    assert typing_extensions.get_args(LikelihoodMaximization[Layer]) == (Layer,)
+    assert typing_extensions.get_args(GradientDescent[Layer]) == (Layer,)
