@@ -1572,7 +1572,7 @@ class Agent(HasRootBody):
 
 
 @dataclass(eq=False)
-class Human(Agent):
+class Human(Agent, IsPerceivable):
     """
     Represents a human agent in the environment.
 

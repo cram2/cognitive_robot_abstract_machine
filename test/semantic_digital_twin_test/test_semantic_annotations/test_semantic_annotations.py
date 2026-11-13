@@ -23,6 +23,7 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -711,3 +712,15 @@ def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
     assert type(received) is PerceivedObject
     assert received.root is body
     assert received.class_label == perceived_object.class_label
+
+
+def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
+    world = World()
+    body = Body(name=PrefixedName("human"))
+    with world.modify_world():
+        world.add_body(body)
+        human = Human(root=body, class_label="person")
+        world.add_semantic_annotation(human)
+
+    assert world.get_semantic_annotations_by_type(IsPerceivable) == [human]
+    assert human.class_label == "person"
