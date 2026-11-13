@@ -1,10 +1,9 @@
 """
 Corner-case provenance store for the EQL-native RDR.
 
-Every rule in an RDR is created to handle one specific exception case — the *corner
-case*. This module provides :class:`CornerCaseStore`, which records that case against
-the rule's condition node and survives the save/load round-trip via a stable positional
-index (see :meth:`~krrood.entity_query_language.rules.decomposition.DecomposedRuleTree.rule_conditions`).
+Every rule is created for one exception case, its *corner case*; :class:`CornerCaseStore`
+records it against the rule's condition, keyed for saving by the rule's position in
+:meth:`~krrood.entity_query_language.rules.decomposition.DecomposedRuleTree.rule_conditions`.
 """
 
 from __future__ import annotations
