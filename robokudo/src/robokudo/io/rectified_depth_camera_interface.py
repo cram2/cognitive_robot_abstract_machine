@@ -20,7 +20,7 @@ from message_filters import (
 )
 from rclpy.qos import QoSProfile
 from rclpy.time import Time
-from sensor_msgs.msg import CameraInfo, Image
+from sensor_msgs.msg import CameraInfo, Image as ROSImage
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.cas import CASViews
@@ -83,14 +83,14 @@ class CameraUnit(IntEnum):
 @dataclass(kw_only=True)
 class ColorDepthImages:
     """
-    A color image and depth inferred from that exact acquisition.
+    A ROS 2 acquisition with rectified color and depth inferred from that acquisition.
     """
 
-    color: Image
+    color: ROSImage
     """
     Rectified left color image.
     """
-    depth: Image
+    depth: ROSImage
     """
     Aligned metric depth image.
     """
@@ -292,7 +292,7 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         configuration = self.camera_config
         self.color_subscriber = Subscriber(
             self.node,
-            Image,
+            ROSImage,
             configuration.topic_color,
             qos_profile=QoSProfile(
                 depth=configuration.history_depth,
@@ -301,7 +301,7 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         )
         self.depth_subscriber = Subscriber(
             self.node,
-            Image,
+            ROSImage,
             configuration.topic_depth,
             qos_profile=QoSProfile(
                 depth=configuration.history_depth,
@@ -336,7 +336,7 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         self.calibration_synchronizer.registerCallback(self.receive_frame)
 
     @called_positionally
-    def receive_images(self, color: Image, depth: Image) -> None:
+    def receive_images(self, color: ROSImage, depth: ROSImage) -> None:
         """
         Associate an exact image pair with its per-frame calibration.
         """
