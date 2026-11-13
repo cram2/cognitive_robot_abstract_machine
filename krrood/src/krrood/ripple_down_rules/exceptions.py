@@ -1,3 +1,7 @@
+"""
+The errors raised while building, fitting and using ripple down rules.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -153,3 +157,17 @@ class OracleCannotInferConclusionWithoutTarget(InputError):
             "Provide a target value on the case query (CaseQuery._target), or use a "
             "different expert that can genuinely infer conclusions, such as Human or AI."
         )
+
+
+@dataclass(kw_only=True)
+class NoUserInputOrConclusionForCallableExpression(InputError):
+    """
+    Raised when a callable expression is given neither the expert's source code nor a
+    conclusion, so it has nothing to evaluate.
+    """
+
+    def error_message(self) -> str:
+        return "A callable expression needs either user_input or a conclusion."
+
+    def suggest_correction(self) -> str:
+        return "Pass the expert's source code as user_input, or a conclusion."

@@ -1,0 +1,12 @@
+# A distribution whose core may load only typing-extensions, read by the core boundary
+# checker's tests.
+[project]
+name = "mimic-distribution"
+version = "0.0.0"
+
+[project.optional-dependencies]
+drawing = ["matplotlib"]
+
+[tool.krrood.core-boundary]
+core = ["mimic_package.core"]
+dependencies = ["typing-extensions"]
