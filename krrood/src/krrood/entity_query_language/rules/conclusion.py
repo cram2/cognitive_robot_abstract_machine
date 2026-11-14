@@ -7,9 +7,11 @@ Add) during query evaluation.
 
 from __future__ import annotations
 
+import itertools
 from abc import ABC
 from dataclasses import dataclass
 from functools import cached_property
+from uuid import UUID
 
 from typing_extensions import Any, List, Iterable, TypeVar
 
@@ -21,7 +23,7 @@ from krrood.entity_query_language.core.base_expressions import (
     BinaryExpression,
 )
 from krrood.entity_query_language.core.helpers import unwrap_if_literal
-from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.core.variable import Literal, Variable
 
 
 @dataclass(kw_only=True, eq=False)
@@ -67,6 +69,18 @@ class Conclusion(BinaryExpression, ABC):
     @property
     def value(self) -> Any:
         return self.right
+
+    @cached_property
+    def variables_concluded_about(self) -> tuple[Variable, ...]:
+        """
+        The variables with a domain of their own that the concluded value is built from,
+        such as the child a label is inferred for.
+        """
+        variables: dict[UUID, Variable] = {}
+        for expression in itertools.chain([self.right], self.right._descendants_):
+            if isinstance(expression, Variable) and not isinstance(expression, Literal):
+                variables.setdefault(expression._id_, expression)
+        return tuple(variables.values())
 
     @property
     def unwrapped_value(self) -> Any:

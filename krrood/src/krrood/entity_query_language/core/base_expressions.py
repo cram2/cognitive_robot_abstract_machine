@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from collections import UserDict
 from contextlib import AbstractContextManager
 from copy import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import EllipsisType
 from uuid import UUID
@@ -40,7 +40,13 @@ from krrood.entity_query_language.evaluation_context import (
     get_evaluation_context,
 )
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
-from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
+from krrood.entity_query_language.utils import (
+    T,
+    cartesian_product_while_passing_the_bindings_around,
+    is_iterable,
+    make_list,
+    make_set,
+)
 from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
@@ -687,18 +693,61 @@ class SymbolicExpression(
                 evaluation_context.on_result_yielded(expression=self, result=result)
                 yield result
             else:
-                for result in map(
-                    lambda current_result: (
-                        self._evaluate_conclusions_and_update_bindings_(
-                            current_result=current_result
+                for current_result in self._evaluate__(sources=sources):
+                    for (
+                        concluded_about
+                    ) in self._results_for_every_value_concluded_about_(
+                        current_result=current_result
+                    ):
+                        result = self._evaluate_conclusions_and_update_bindings_(
+                            current_result=concluded_about
                         )
-                    ),
-                    self._evaluate__(sources=sources),
-                ):
-                    evaluation_context.on_result_yielded(expression=self, result=result)
-                    yield result
+                        evaluation_context.on_result_yielded(
+                            expression=self, result=result
+                        )
+                        yield result
         finally:
             evaluation_context.on_evaluate_exit(expression=self)
+
+    def _is_active_conditions_root_(self) -> bool:
+        """
+        :return: Whether this is the conditions root of the evaluation currently
+            running, where conclusions fire, or, outside of an evaluation, of its own
+            tree.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return self._conditions_root_ is self
+        return evaluation_context.active_conditions_root.is_active_root(node=self)
+
+    def _results_for_every_value_concluded_about_(
+        self, *, current_result: OperationResult
+    ) -> Iterator[OperationResult]:
+        """
+        :param current_result: A result of this expression.
+        :return: The result once per combination of values of the variables this
+            expression's conclusions are about that it leaves unbound, so that a
+            conclusion is reached for each of them.
+        """
+        unbound_variables = {
+            variable._id_: variable
+            for conclusion in self._conclusions_
+            for variable in conclusion.variables_concluded_about
+            if variable._id_ not in current_result.bindings
+        }
+        if (
+            not unbound_variables
+            or not self._is_active_conditions_root_()
+            or current_result.is_false
+        ):
+            yield current_result
+            return
+        for concluded_about in cartesian_product_while_passing_the_bindings_around(
+            tuple(unbound_variables.values()), current_result
+        ):
+            result = replace(current_result, bindings=concluded_about.bindings)
+            result._is_false_ = current_result._is_false_
+            yield result
 
     def _evaluate_conclusions_and_update_bindings_(
         self, *, current_result: OperationResult
@@ -719,13 +768,7 @@ class SymbolicExpression(
         # thread that never had one set up — contextvars.ContextVar values do not propagate into a
         # plain threading.Thread), fall back to the structural check: it is the only signal left.
         evaluation_context = get_evaluation_context()
-        if evaluation_context is not None:
-            is_active_root = evaluation_context.active_conditions_root.is_active_root(
-                node=self
-            )
-        else:
-            is_active_root = self._conditions_root_ is self
-        if not is_active_root:
+        if not self._is_active_conditions_root_():
             return current_result
         # Truth is only consulted where it decides something, since reading it can be
         # expensive (a bound predicate evaluates itself). The observers below apply the

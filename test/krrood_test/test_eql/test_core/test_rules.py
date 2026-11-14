@@ -1,3 +1,8 @@
+"""
+Tests of rule trees: conclusions attached to conditions, refinements, alternatives and
+next rules.
+"""
+
 import pytest
 
 from krrood.entity_query_language.factories import (
@@ -377,6 +382,10 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
 
 
 def test_rule_tree_with_an_alternative(doors_and_drawers_world):
+    """
+    An alternative concludes a door for the handle and body pairs the drawer rule does
+    not hold for.
+    """
     world = doors_and_drawers_world
     body = variable(Body, domain=world.bodies)
     handle = variable(Handle, domain=world.bodies)
@@ -401,18 +410,20 @@ def test_rule_tree_with_an_alternative(doors_and_drawers_world):
 
     all_solutions = list(query.evaluate())
     assert len(all_solutions) == 4, "Should generate 3 drawers, 1 door"
-    assert isinstance(all_solutions[0], Drawer)
-    assert all_solutions[0].handle.name == "Handle2"
-    assert all_solutions[0].container.name == "Body2"
-    assert isinstance(all_solutions[1], Door)
-    assert all_solutions[1].handle.name == "Handle3"
-    assert all_solutions[1].body.name == "Body3"
-    assert isinstance(all_solutions[2], Drawer)
-    assert all_solutions[2].handle.name == "Handle4"
-    assert all_solutions[2].container.name == "Body4"
-    assert isinstance(all_solutions[3], Drawer)
-    assert all_solutions[3].handle.name == "Handle1"
-    assert all_solutions[3].container.name == "Container1"
+    solution_set = {
+        (
+            type(solution),
+            solution.handle.name,
+            (solution.body if isinstance(solution, Door) else solution.container).name,
+        )
+        for solution in all_solutions
+    }
+    assert solution_set == {
+        (Drawer, "Handle2", "Body2"),
+        (Door, "Handle3", "Body3"),
+        (Drawer, "Handle4", "Body4"),
+        (Drawer, "Handle1", "Container1"),
+    }
 
 
 def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):

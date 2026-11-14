@@ -26,7 +26,11 @@ from krrood.entity_query_language.core.base_expressions import Selectable, Bindi
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
 )
-from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
+from krrood.entity_query_language.core.variable import (
+    InstantiatedVariable,
+    Literal,
+    Variable,
+)
 from krrood.entity_query_language.factories import (
     and_,
     contains,
@@ -45,9 +49,14 @@ from krrood.entity_query_language.factories import (
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
     LogicalOperator,
+    Not,
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query_graph import QueryGraph
+from krrood.entity_query_language.verbalization.fragments.base import (
+    flatten_fragment_to_plain_text,
+)
+from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
@@ -238,10 +247,31 @@ class ConditionAndBindings:
     """
 
     def __repr__(self):
+        """
+        A comparison shows each operand with the value it held, and a negation reads as
+        the sentence it states.
+        """
         if isinstance(self.condition, Comparator):
-            return f"({self.condition.left} {self.condition} {self.condition.right})"
-        else:
-            return f"{self.condition} ({','.join(str(child) for child in self.condition._children_)})"
+            left = self._operand_with_its_value_(operand=self.condition.left)
+            right = self._operand_with_its_value_(operand=self.condition.right)
+            return f"({left} {self.condition} {right})"
+        if isinstance(self.condition, Not):
+            return flatten_fragment_to_plain_text(
+                EQLVerbalizer().build(expression=self.condition)
+            )
+        return f"{self.condition} ({','.join(str(child) for child in self.condition._children_)})"
+
+    def _operand_with_its_value_(self, *, operand: SymbolicExpression) -> str:
+        """
+        :param operand: An operand of the condition.
+        :return: The operand followed by the value the bindings give it, or the value
+            alone for a literal.
+        """
+        if isinstance(operand, Literal):
+            return repr(operand._value_)
+        if operand._id_ not in self.bindings:
+            return str(operand)
+        return f"({operand} = {self.bindings[operand._id_]!r})"
 
 
 @dataclass(kw_only=True)
@@ -326,12 +356,12 @@ class InferenceExplanation(Symbol):
 
     def get_satisfied_conditions_and_their_bindings(self) -> list[ConditionAndBindings]:
         """
-        Retrieve the list of satisfied non-logical condition expressions along with
-        their bindings.
+        Retrieve the list of satisfied non-logical condition expressions and negations
+        along with their bindings.
 
         :return: A list of :class:`ConditionAndBindings` objects, each pairing a satisfied
             condition expression (excluding :class:`~krrood.entity_query_language.operators.core_logical_operators.LogicalOperator`
-            wrappers) with the full variable bindings from the evaluation. An empty list is
+            wrappers other than a negation) with the full variable bindings from the evaluation. An empty list is
             returned when no satisfaction data is available.
         """
         if (
@@ -343,7 +373,9 @@ class InferenceExplanation(Symbol):
         satisfied_conditions = []
         for condition_id in self.operation_result.satisfied_condition_ids:
             condition_expr = self.query_root._get_expression_by_id_(id_=condition_id)
-            if isinstance(condition_expr, (LogicalOperator,)):
+            if isinstance(condition_expr, LogicalOperator) and not isinstance(
+                condition_expr, Not
+            ):
                 continue
             satisfied_conditions.append(
                 ConditionAndBindings(

@@ -125,23 +125,45 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
         inside_this_quantifier: dict[uuid.UUID, SymbolicExpression] = {}
         ids_outside_this_quantifier = set()
         visited_occurrences = set()
-        stack = [(child, False) for child in reversed(scope._children_)]
+        no_quantified_variables: tuple[SymbolicExpression, ...] = ()
+        stack = [
+            (child, False, no_quantified_variables)
+            for child in reversed(scope._children_)
+        ]
         while stack:
-            expression, is_inside = stack.pop()
-            if (expression._id_, is_inside) in visited_occurrences:
+            expression, is_inside, quantified_by_others = stack.pop()
+            occurrence = (
+                expression._id_,
+                is_inside,
+                tuple(variable._id_ for variable in quantified_by_others),
+            )
+            if occurrence in visited_occurrences:
                 continue
-            visited_occurrences.add((expression._id_, is_inside))
+            visited_occurrences.add(occurrence)
             if expression._id_ == self._id_:
-                stack.extend([(self.condition, True), (self.variable, True)])
+                stack.extend(
+                    [
+                        (self.condition, True, quantified_by_others),
+                        (self.variable, True, quantified_by_others),
+                    ]
+                )
                 continue
             if is_inside:
                 inside_this_quantifier.setdefault(expression._id_, expression)
-            else:
+            elif not any(
+                expression._contains_(expression=variable)
+                for variable in quantified_by_others
+            ):
                 ids_outside_this_quantifier.add(expression._id_)
+            # Another quantifier binds its own variable, so what depends on that
+            # variable inside it does not occur outside this quantifier.
+            if isinstance(expression, QuantifiedConditional):
+                quantified_by_others = (*quantified_by_others, expression.variable)
             # A nested query is a scope of its own, so its variables are not entered.
             if not isinstance(expression, Query):
                 stack.extend(
-                    (child, is_inside) for child in reversed(expression._children_)
+                    (child, is_inside, quantified_by_others)
+                    for child in reversed(expression._children_)
                 )
         return tuple(
             expression

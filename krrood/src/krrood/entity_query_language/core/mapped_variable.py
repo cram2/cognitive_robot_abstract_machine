@@ -10,7 +10,7 @@ from __future__ import annotations
 import operator
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from functools import cached_property
 from inspect import isclass
 from typing_extensions import (
@@ -62,7 +62,10 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.math_operations import MathOperator
-from krrood.entity_query_language.utils import T
+from krrood.entity_query_language.utils import (
+    T,
+    cartesian_product_while_passing_the_bindings_around,
+)
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.symbol_graph.helpers import (
     get_field_type_endpoint,
@@ -188,8 +191,19 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
         )
 
     def __call__(self, *args, **kwargs) -> Call[T]:
+        """
+        Call the value with the given arguments, which reach the call as their values
+        where they are expressions.
+        """
+        call_type = (
+            CallWithExpressionArguments
+            if any(
+                isinstance(argument, Operand) for argument in (*args, *kwargs.values())
+            )
+            else CallWithValueArguments
+        )
         return self._symbolic_expression_._get_mapped_variable_(
-            type_=Call, _arguments_=CallArguments(positional=args, keyword=kwargs)
+            type_=call_type, _arguments_=CallArguments(positional=args, keyword=kwargs)
         )
 
     def __eq__(self, other) -> Comparator:
@@ -395,8 +409,64 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         return instance
 
 
+# %% domain fields named like expression methods
+
+
+@dataclass(kw_only=True)
+class ExpressionMethodOrDomainField:
+    """
+    A public method of a variable that steps aside for a dataclass field of the same
+    name on the variable's value type: on such a variable the name reads that field
+    symbolically, like any other attribute of the value type.
+    """
+
+    method: Callable
+    """
+    The method the name refers to when the value type declares no such field.
+    """
+
+    def __get__(
+        self, instance: CanBehaveLikeAVariable | None, owner: type
+    ) -> Callable | Attribute:
+        """
+        :return: The field of the instance's value type with the method's name where
+            that type declares one, otherwise the method.
+        """
+        if instance is None:
+            return self.method
+        value_type = instance._type_
+        if is_dataclass(value_type) and isclass(value_type):
+            if self.method.__name__ in {field_.name for field_ in fields(value_type)}:
+                return instance._get_mapped_variable_(
+                    type_=Attribute, _attribute_name_=self.method.__name__
+                )
+        return self.method.__get__(instance, owner)
+
+
+class DomainFieldsOverrideExpressionMethods:
+    """
+    A variable whose value type may declare dataclass fields named like the public
+    methods every expression has, such as ``first``; those names then read the field.
+    """
+
+    first = ExpressionMethodOrDomainField(method=SymbolicExpression.first)
+    tolist = ExpressionMethodOrDomainField(method=SymbolicExpression.tolist)
+    evaluate = ExpressionMethodOrDomainField(method=SymbolicExpression.evaluate)
+    conclusions_of_type = ExpressionMethodOrDomainField(
+        method=SymbolicExpression.conclusions_of_type
+    )
+
+
+# %% mapped variables
+
+
 @dataclass(kw_only=True, eq=False, repr=False)
-class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
+class MappedVariable(
+    DomainFieldsOverrideExpressionMethods,
+    UnaryExpression,
+    CanBehaveLikeAVariable[T],
+    ABC,
+):
     """
     A symbolic expression the maps the values of symbolic variables.
     """
@@ -859,22 +929,19 @@ class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class Call(SingleValueMapping[T, CallTerm]):
+class Call(MappedVariable[T], ABC):
     """
     A variable created through a function call operation on its child variable.
+
+    What the arguments are decides how many values the call reaches, so the two kinds
+    are separate: see :class:`CallWithValueArguments` and
+    :class:`CallWithExpressionArguments`.
     """
 
     _arguments_: CallArguments = field(default_factory=CallArguments)
     """
-    The arguments the called value is called with.
+    The arguments the called value is called with, as they were written.
     """
-
-    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
-        (callee,) = operand_values
-        return CallTerm.from_call(callee=callee, arguments=self._arguments_)
-
-    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
-        return child._get_mapped_variable_(type_=Call, _arguments_=self._arguments_)
 
     @property
     def _name_(self):
@@ -906,6 +973,170 @@ class Call(SingleValueMapping[T, CallTerm]):
             self._type_ = get_method_return_type(
                 self._child_._owner_class_, self._child_._attribute_name_
             )
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class CallWithValueArguments(Call[T], SingleValueMapping[T, CallTerm]):
+    """
+    A call whose arguments are all plain values, which reaches the one value the call
+    returns.
+    """
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
+        (callee,) = operand_values
+        return CallTerm.from_call(callee=callee, arguments=self._arguments_)
+
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(
+            type_=CallWithValueArguments, _arguments_=self._arguments_
+        )
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class CallWithExpressionArguments(Call[T], GroundTermExpression[CallTerm]):
+    """
+    A call some of whose arguments are expressions, which reaches one value per
+    combination of the values those expressions take in the current bindings.
+    """
+
+    _expression_arguments_: CallArguments = field(init=False)
+    """
+    The arguments as they are evaluated: :attr:`_arguments_` with each argument that
+    stands for an expression replaced by that expression's node in this call's graph.
+    """
+
+    def __post_init__(self):
+        """
+        Attach the expressions among the arguments as children of this call.
+        """
+        super().__post_init__()
+        self._expression_arguments_ = self._arguments_.apply_to_each_argument(
+            function=lambda argument: self._embedded_argument_(argument=argument)
+        )
+
+    def _embedded_argument_(self, *, argument: Any) -> Any:
+        """
+        :param argument: One argument as it was written.
+        :return: The node of the expression the argument stands for, attached as a child
+            of this call, or the argument itself when it is a plain value.
+        """
+        if not isinstance(argument, Operand):
+            return argument
+        (embedded,) = self._update_children_(argument)
+        return embedded
+
+    @property
+    def _argument_operands_(self) -> tuple[SymbolicExpression, ...]:
+        """
+        The expressions among the arguments, positional ones first.
+        """
+        return tuple(
+            argument
+            for argument in (
+                *self._expression_arguments_.positional,
+                *self._expression_arguments_.keyword.values(),
+            )
+            if isinstance(argument, SymbolicExpression)
+        )
+
+    def _argument_values_(self, *, bindings: Bindings) -> CallArguments:
+        """
+        :param bindings: Bindings that hold a value for every expression among the
+            arguments.
+        :return: The arguments with each expression replaced by its bound value.
+        """
+        return self._expression_arguments_.apply_to_each_argument(
+            function=lambda argument: (
+                bindings[argument._id_]
+                if isinstance(argument, SymbolicExpression)
+                else argument
+            )
+        )
+
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return self._child_, *self._argument_operands_
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
+        callee, *argument_values = operand_values
+        bindings = {
+            operand._id_: value
+            for operand, value in zip(self._argument_operands_, argument_values)
+        }
+        return CallTerm.from_call(
+            callee=callee, arguments=self._argument_values_(bindings=bindings)
+        )
+
+    def _values_returned_(self, *, callee: Any, bindings: Bindings) -> Iterable[T]:
+        """
+        :param callee: The value called.
+        :param bindings: Bindings that hold a value for every expression among the
+            arguments.
+        :return: The value the call returns with those arguments, or nothing when it
+            reaches none.
+        """
+        term_value = EvaluationContext.current_value_of_term(
+            term=CallTerm.from_call(
+                callee=callee, arguments=self._argument_values_(bindings=bindings)
+            )
+        )
+        if term_value is not None:
+            yield term_value.value
+
+    def _evaluate__(
+        self,
+        *,
+        sources: OperationResult,
+    ) -> Iterable[OperationResult]:
+        """
+        Overrides :meth:`MappedVariable._evaluate__`: the bindings the arguments take
+        are kept in each result.
+        """
+        for child_result in self._child_._evaluate_(sources=sources):
+            for argument_result in cartesian_product_while_passing_the_bindings_around(
+                self._argument_operands_, child_result
+            ):
+                for value in self._values_returned_(
+                    callee=child_result.value, bindings=argument_result.bindings
+                ):
+                    yield self._build_operation_result_(
+                        bindings=argument_result.bindings | {self._id_: value},
+                        child_result=argument_result,
+                    )
+
+    def _apply_mapping_(
+        self, *, value: Any, sources: OperationResult | None = None
+    ) -> Iterable[T]:
+        for argument_result in cartesian_product_while_passing_the_bindings_around(
+            self._argument_operands_, sources
+        ):
+            yield from self._values_returned_(
+                callee=value, bindings=argument_result.bindings
+            )
+
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(
+            type_=CallWithExpressionArguments, _arguments_=self._arguments_
+        )
+
+    def _replace_child_field_(
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
+    ):
+        """
+        Extends :meth:`UnaryExpression._replace_child_field_` to the expressions among
+        the arguments.
+        """
+        super()._replace_child_field_(old_child=old_child, new_child=new_child)
+        self._expression_arguments_ = (
+            self._expression_arguments_.apply_to_each_argument(
+                function=lambda argument: (
+                    new_child
+                    if isinstance(argument, SymbolicExpression)
+                    and argument._id_ == old_child._id_
+                    else argument
+                )
+            )
+        )
 
 
 @dataclass(kw_only=True, frozen=True)

@@ -7,11 +7,16 @@ such as ExceptIf, Alternative, and Next.
 
 from __future__ import annotations
 
+import itertools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing_extensions import Iterable, TYPE_CHECKING, Self
+from dataclasses import dataclass, field
+from typing_extensions import Any, Iterable, TYPE_CHECKING, Self
 
 from krrood.entity_query_language.exceptions import SelfReferentialInsertionError
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.utils import (
+    cartesian_product_while_passing_the_bindings_around,
+)
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.operators.set_operations import Union as EQLUnion
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -264,6 +269,51 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
         return cls(left=current_condition, right=new_condition)
 
 
+@dataclass(kw_only=True)
+class SubjectsConcludedAbout:
+    """
+    The combinations of values of the subject variables of an :class:`Alternative` that
+    one of its branches already concluded about, told apart by identity since a variable
+    ranges over the objects of its domain.
+    """
+
+    subject_variables: tuple[Variable, ...]
+    """
+    The variables whose values make up a subject.
+    """
+
+    values_by_identity: dict[tuple[int, ...], tuple[Any, ...]] = field(
+        default_factory=dict
+    )
+    """
+    Each subject's values, keyed by their identities; holding the values keeps those
+    identities from being reused while they are compared.
+    """
+
+    def _identities_(self, *, bindings: Bindings) -> tuple[int, ...]:
+        """
+        :param bindings: Bindings holding a value for every subject variable.
+        :return: The identities of those values.
+        """
+        return tuple(id(bindings[variable._id_]) for variable in self.subject_variables)
+
+    def add(self, *, bindings: Bindings) -> None:
+        """
+        :param bindings: Bindings holding a value for every subject variable, whose
+            subject is now concluded about.
+        """
+        self.values_by_identity[self._identities_(bindings=bindings)] = tuple(
+            bindings[variable._id_] for variable in self.subject_variables
+        )
+
+    def contains(self, *, bindings: Bindings) -> bool:
+        """
+        :param bindings: Bindings holding a value for every subject variable.
+        :return: Whether their subject was already concluded about.
+        """
+        return self._identities_(bindings=bindings) in self.values_by_identity
+
+
 @dataclass(kw_only=True, eq=False)
 class Alternative(OR, ConclusionSelector):
     """
@@ -277,6 +327,58 @@ class Alternative(OR, ConclusionSelector):
         *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
+        """
+        Overrides :meth:`OR._evaluate__`: the right branch concludes only for the values
+        of :attr:`_subject_variables_` that the left branch holds for none of, whatever
+        else either branch binds.
+
+        Branches that share no subject variable fall back to
+        :meth:`_evaluate_for_every_failing_binding_`.
+        """
+        subject_variables = self._subject_variables_
+        if not subject_variables:
+            yield from self._evaluate_for_every_failing_binding_(sources=sources)
+            return
+        concluded = SubjectsConcludedAbout(subject_variables=subject_variables)
+        for left_value in self._evaluate_child_as_condition_(
+            child=self.left, sources=sources
+        ):
+            if left_value.is_false:
+                continue
+            for subject in cartesian_product_while_passing_the_bindings_around(
+                subject_variables, left_value
+            ):
+                concluded.add(bindings=subject.bindings)
+                yield from self._result_with_conclusions_of_(
+                    branch_result=left_value, bindings=subject.bindings
+                )
+        for right_value in self._evaluate_child_as_condition_(
+            child=self.right, sources=sources
+        ):
+            if right_value.is_false:
+                yield self._build_operation_result_with_truth_(
+                    truth=False, bindings=right_value.bindings, child_result=right_value
+                )
+                continue
+            for subject in cartesian_product_while_passing_the_bindings_around(
+                subject_variables, right_value
+            ):
+                if concluded.contains(bindings=subject.bindings):
+                    continue
+                yield from self._result_with_conclusions_of_(
+                    branch_result=right_value, bindings=subject.bindings
+                )
+
+    def _evaluate_for_every_failing_binding_(
+        self, *, sources: OperationResult
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate as an :class:`OR`, with the right branch tried for every result of the
+        left branch that fails, from the bindings that result holds.
+
+        :param sources: The current bindings.
+        :return: The results, carrying the conclusions of the branch that holds.
+        """
         for output in OR._evaluate__(self, sources=sources):
             if output.is_true:
                 self._conclusions_.update(
@@ -285,17 +387,64 @@ class Alternative(OR, ConclusionSelector):
             yield output
             self._conclusions_.clear()
 
+    @property
+    def _subject_variables_(self) -> tuple[Variable, ...]:
+        """
+        The variables every conclusion of either branch is about, for whose values the
+        branches are alternatives to each other.
+        """
+        conclusions = [
+            conclusion
+            for node in itertools.chain([self], self._descendants_)
+            for conclusion in node._conclusions_
+        ]
+        if not conclusions:
+            return ()
+        shared_ids = set.intersection(
+            *(
+                {variable._id_ for variable in conclusion.variables_concluded_about}
+                for conclusion in conclusions
+            )
+        )
+        return tuple(
+            variable
+            for variable in conclusions[0].variables_concluded_about
+            if variable._id_ in shared_ids
+        )
+
+    def _result_with_conclusions_of_(
+        self, *, branch_result: OperationResult, bindings: Bindings
+    ) -> Iterable[OperationResult]:
+        """
+        :param branch_result: A result of one of the two branches that holds.
+        :param bindings: The bindings of that result, extended by the values of the
+            subject variables.
+        :return: This alternative's result for it, carrying the branch's conclusions.
+        """
+        self._conclusions_.update(branch_result.operand._conclusions_)
+        yield self._build_operation_result_with_truth_(
+            truth=True, bindings=bindings, child_result=branch_result
+        )
+        self._conclusions_.clear()
+
     @classmethod
     def _get_current_context_condition(
         cls,
     ) -> ConditionType:
+        """
+        :return: The refinement branch the current context belongs to, together with
+            the alternatives and refinements already attached to it, or the conditions
+            root outside of one.
+        """
         current_context = SymbolicExpression._current_parent_in_context_stack_()
-        current_context_parent = current_context._parent_
-        if (
-            isinstance(current_context_parent, Refinement)
-            and current_context is current_context_parent.right
+        branch = current_context
+        while (
+            isinstance(branch._parent_, (Alternative, Refinement))
+            and branch is branch._parent_.left
         ):
-            return current_context
+            branch = branch._parent_
+        if isinstance(branch._parent_, Refinement) and branch is branch._parent_.right:
+            return branch
         return current_context._conditions_root_
 
     @classmethod

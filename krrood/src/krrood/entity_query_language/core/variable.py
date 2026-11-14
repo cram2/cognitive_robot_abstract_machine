@@ -32,6 +32,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.core.mapped_variable import (
     CanBehaveLikeAVariable,
+    DomainFieldsOverrideExpressionMethods,
     HasSymbolicOperations,
 )
 from krrood.entity_query_language.evaluation_context import EvaluationContext
@@ -235,7 +236,9 @@ class ExpressionDomain(VariableDomain[T]):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
+class CanHaveDomainSource(
+    DomainFieldsOverrideExpressionMethods, CanBehaveLikeAVariable[T], ABC
+):
     """
     A superclass for variables that can have a domain source.
     """
