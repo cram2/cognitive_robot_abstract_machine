@@ -50,6 +50,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
+    SpatialType,
 )
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -269,17 +270,32 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
 
     def copy_for_world(self, world: World) -> Self:
         """
-        Copy the object, while updating all references to WorldEntityWithID objects to
-        point to the new world.
+        Copy the object, while updating all references to WorldEntityWithID objects,
+        including the frames of its spatial types, to point to the new world.
 
         This assumes that the referenced objects are already in the new world.
         """
+
+        def _resolve_frame(
+            frame: CartesianFrame3D | None, world: World
+        ) -> CartesianFrame3D | None:
+            if isinstance(frame, KinematicStructureEntity):
+                return world.get_kinematic_structure_entity_by_id(frame.id)
+            return frame
 
         def _resolve_item(item: Any, world: World) -> Any:
             if isinstance(item, WorldEntityWithID):
                 return world.get_world_entity_with_id_by_id(item.id)
             elif isinstance(item, JointState):
                 return item.copy_for_world(world)
+            elif isinstance(item, ShapeCollection):
+                return item.copy_without_reference_frame()
+            elif isinstance(item, SpatialType):
+                copied = deepcopy(item)
+                copied.reference_frame = _resolve_frame(item.reference_frame, world)
+                if isinstance(item, HomogeneousTransformationMatrix):
+                    copied.child_frame = _resolve_frame(item.child_frame, world)
+                return copied
             return deepcopy(item)
 
         result = {}
@@ -651,18 +667,6 @@ class Body(KinematicStructureEntity):
             filter(lambda sem: isinstance(sem, type_), self._semantic_annotations)
         )
 
-    def copy_for_world(self, new_world: World) -> Self:
-        return Body(
-            name=self.name,
-            id=self.id,
-            visual=self.visual.copy_without_reference_frame(),
-            collision=self.collision.copy_without_reference_frame(),
-            inertial=deepcopy(self.inertial),
-            simulator_additional_properties=deepcopy(
-                self.simulator_additional_properties
-            ),
-        )
-
 
 @dataclass(eq=False)
 class Region(KinematicStructureEntity):
@@ -706,16 +710,6 @@ class Region(KinematicStructureEntity):
             shape.origin.reference_frame = result
         result.area = area
         return result
-
-    def copy_for_world(self, new_world: World) -> Self:
-        return Region(
-            name=self.name,
-            id=self.id,
-            area=self.area.copy_without_reference_frame(),
-            simulator_additional_properties=deepcopy(
-                self.simulator_additional_properties
-            ),
-        )
 
 
 GenericKinematicStructureEntity = TypeVar(
@@ -1204,64 +1198,6 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
             connection.
         """
 
-    def _find_references_in_world(
-        self, world: World
-    ) -> tuple[
-        KinematicStructureEntity,
-        KinematicStructureEntity,
-        HomogeneousTransformationMatrix,
-        HomogeneousTransformationMatrix,
-    ]:
-        """
-        Finds the reference frames to this connection in the given world and returns
-        them as usable objects.
-
-        :param world: Reference to the world where the reference frames are searched.
-        :return: The other parent and child and new connection expressions with correct
-            reference frames.
-        """
-        other_parent = world.get_kinematic_structure_entity_by_id(self.parent.id)
-        other_child = world.get_kinematic_structure_entity_by_id(self.child.id)
-
-        parent_T_connection = deepcopy(self.parent_T_connection_expression)
-        parent_T_connection.reference_frame = (
-            world.get_kinematic_structure_entity_by_id(
-                parent_T_connection.reference_frame.id
-            )
-        )
-
-        connection_T_child = deepcopy(self.connection_T_child_expression)
-        connection_T_child.child_frame = world.get_kinematic_structure_entity_by_id(
-            connection_T_child.child_frame.id
-        )
-        return other_parent, other_child, parent_T_connection, connection_T_child
-
-    def copy_for_world(self, world: World) -> Self:
-        """
-        Copies this connection to the given world the parent and child references are
-        updated to the new world as well as the references from the expression.
-
-        :param world: World in which the connection should be copied.
-        :return: The copied connection.
-        """
-        (
-            other_parent,
-            other_child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-
-        return self.__class__(
-            other_parent,
-            other_child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            simulator_additional_properties=deepcopy(
-                self.simulator_additional_properties
-            ),
-        )
-
     def copy_with_new_parent(
         self,
         new_parent: KinematicStructureEntity,
@@ -1270,17 +1206,14 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         """
         Create a copy of this connection re-parented under ``new_parent``, using
         ``parent_T_connection_expression`` as the new parent offset and keeping the same
-        name, child and ``connection_T_child_expression``.
-
-        Subclasses carrying extra state (e.g. an active degree of freedom) override this
-        to preserve it. Used to move a branch without collapsing its connection.
+        name, child, degrees of freedom and everything else the connection was built
+        with. Used to move a branch without collapsing its connection.
         """
-        return self.__class__(
+        return replace(
+            self,
             name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
-            child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
             simulator_additional_properties=deepcopy(
                 self.simulator_additional_properties
             ),
@@ -1301,6 +1234,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
             child=new_child,
             connection_T_child_expression=connection_T_child_expression,
             name=None,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
         )
 
     def update_references_for_world(self, world: World):
@@ -1412,6 +1348,16 @@ class Actuator(WorldEntityWithSimulatorProperties):
         :param dof: The degree of freedom to add.
         """
         self._dofs.append(dof)
+
+    def copy_for_world(self, world: World) -> Self:
+        """
+        :meth:`WorldEntityWithID.copy_for_world`, where the copy also drives the degrees
+        of freedom of ``world`` with the ids of this actuator's.
+        """
+        copied = super().copy_for_world(world)
+        for degree_of_freedom in self.dofs:
+            copied.add_dof(world.get_degree_of_freedom_by_id(degree_of_freedom.id))
+        return copied
 
     @property
     def set_point(self) -> float:

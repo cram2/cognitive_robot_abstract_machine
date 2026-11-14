@@ -1809,9 +1809,12 @@ class World(HasSimulatorProperties):
         :param other: The world to be added.
         :param root_connection: If provided, this connection will be used to connect the
             two worlds. Otherwise, a new Connection6DoF will be created
-        :return: None
+        :raises DuplicateSimulatorPropertyError: If both worlds carry a
+            :class:`UniqueSimulatorProperty` of the same type; neither world is changed.
         """
         assert other is not self, "Cannot merge a world with itself."
+        for simulator_property in other.simulator_additional_properties:
+            self.check_simulator_property_attachable(simulator_property)
 
         with self.modify_world(), other.modify_world():
             self_root = self.root

@@ -98,11 +98,25 @@ class HasSimulatorProperties:
         :raises DuplicateSimulatorPropertyError: If the property is a
             :class:`UniqueSimulatorProperty` and one of its type is attached already.
         """
-        if isinstance(simulator_property, UniqueSimulatorProperty):
-            property_type = type(simulator_property)
-            if self.get_simulator_property_of_type(property_type) is not None:
-                raise DuplicateSimulatorPropertyError(property_type)
+        self.check_simulator_property_attachable(simulator_property)
         self.simulator_additional_properties.append(simulator_property)
+
+    def check_simulator_property_attachable(
+        self, simulator_property: SimulatorAdditionalProperty
+    ) -> None:
+        """
+        Check that :meth:`add_simulator_property` can attach a property to this entity,
+        without attaching it.
+
+        :param simulator_property: The property to check.
+        :raises DuplicateSimulatorPropertyError: If the property is a
+            :class:`UniqueSimulatorProperty` and one of its type is attached already.
+        """
+        if not isinstance(simulator_property, UniqueSimulatorProperty):
+            return
+        property_type = type(simulator_property)
+        if self.get_simulator_property_of_type(property_type) is not None:
+            raise DuplicateSimulatorPropertyError(property_type)
 
     def get_simulator_property_of_type(
         self, property_type: type[TUniqueSimulatorProperty]
