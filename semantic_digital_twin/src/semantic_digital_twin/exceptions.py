@@ -544,6 +544,52 @@ class InvalidRollbackVersionError(WorldValidationError):
         return "pass a version between 0 and the world's current version."
 
 
+@dataclass(kw_only=True)
+class RollbackBeforeClearError(WorldValidationError):
+    """
+    Raised when attempting to roll back to a version from before the world's history was
+    last cleared, which the history no longer holds the modifications to restore.
+    """
+
+    target_version: int
+    """
+    The version that was requested.
+    """
+
+    version_at_last_clear: int
+    """
+    The version the world was at when its history was last cleared.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot roll back to version {self.target_version}: the world's history "
+            f"was cleared at version {self.version_at_last_clear}, so no version up to "
+            f"it can be restored."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"pass a version after {self.version_at_last_clear}."
+
+
+@dataclass(kw_only=True)
+class WorldMergedWithItselfError(UsageError):
+    """
+    Raised when a world is asked to merge itself into itself.
+    """
+
+    world: World
+    """
+    The world that was to be merged with itself.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot merge the world {self.world} with itself."
+
+    def suggest_correction(self) -> str:
+        return "merge another world, or a copy of this one."
+
+
 @dataclass
 class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
     """
