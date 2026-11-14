@@ -14,6 +14,10 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import (
+    RollbackBeforeClearError,
+    WorldMergedWithItselfError,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -123,13 +127,37 @@ def test_rollback_of_merged_world_adds_nothing_back(mini_world: World):
     assert other.kinematic_structure_entities == []
 
 
-def test_rollback_after_replace_with_reverts_only_the_replacement(mini_world: World):
+def test_rollback_to_before_replace_with_raises(mini_world: World):
     replacement = World()
     with replacement.modify_world():
         replacement.add_kinematic_structure_entity(Body(name=PrefixedName("new_root")))
     version = mini_world.get_world_model_manager().version
 
     mini_world._replace_with(replacement)
+
+    with pytest.raises(RollbackBeforeClearError):
+        mini_world.rollback_to_version(version)
+
+
+def test_rollback_after_replace_with_reverts_later_blocks(mini_world: World):
+    replacement = World()
+    with replacement.modify_world():
+        replacement.add_kinematic_structure_entity(Body(name=PrefixedName("new_root")))
+    mini_world._replace_with(replacement)
+    version = mini_world.get_world_model_manager().version
+    entities = list(mini_world.kinematic_structure_entities)
+    with mini_world.modify_world():
+        mini_world.add_connection(
+            FixedConnection(
+                parent=mini_world.root, child=Body(name=PrefixedName("later"))
+            )
+        )
+
     mini_world.rollback_to_version(version)
 
-    assert mini_world.kinematic_structure_entities == []
+    assert mini_world.kinematic_structure_entities == entities
+
+
+def test_merging_world_with_itself_raises(mini_world: World):
+    with pytest.raises(WorldMergedWithItselfError):
+        mini_world.merge_world(mini_world)

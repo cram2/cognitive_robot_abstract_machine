@@ -58,6 +58,8 @@ from semantic_digital_twin.exceptions import (
     MismatchingWorld,
     InsufficientModificationHistoryError,
     InvalidRollbackVersionError,
+    RollbackBeforeClearError,
+    WorldMergedWithItselfError,
     WorldHasNoUniqueRootError,
     NoControlledConnectionInChainError,
 )
@@ -133,7 +135,7 @@ GenericSemanticAnnotation = TypeVar(
 FunctionStack = List[Tuple[Callable, Dict[str, Any]]]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ResetStateContextManager:
     """
     A context manager for resetting the state of a given `World` instance.
@@ -446,6 +448,14 @@ class WorldModelManager:
     outer lists indicates when to trigger the model/state change callbacks. The inner
     list is a block of modifications where change callbacks must not be called in
     between.
+    """
+
+    version_at_last_clear: int | None = field(default=None, kw_only=True)
+    """
+    The version the world was at when :meth:`World.clear` last emptied the history, or
+    ``None`` if it never did.
+
+    The history cannot roll back to it or any earlier version.
     """
 
     current_model_modification_block: WorldModelModificationBlock = field(
@@ -1804,7 +1814,7 @@ class World(HasSimulatorProperties):
     def merge_world(
         self,
         other: World,
-        root_connection: Connection = None,
+        root_connection: Connection | None = None,
         *,
         publish_changes: bool = True,
     ) -> None:
@@ -1816,9 +1826,10 @@ class World(HasSimulatorProperties):
         :param root_connection: If provided, this connection will be used to connect the
             two worlds. Otherwise, a new Connection6DoF will be created
         :param publish_changes: Whether the merge is published to synchronized worlds.
-        :return: None
+        :raises WorldMergedWithItselfError: If ``other`` is this world.
         """
-        assert other is not self, "Cannot merge a world with itself."
+        if other is self:
+            raise WorldMergedWithItselfError(world=self)
 
         with self.modify_world(publish_changes=publish_changes), other.modify_world():
             self_root = self.root
@@ -2596,6 +2607,7 @@ class World(HasSimulatorProperties):
         self._model_manager.current_model_modification_block = (
             WorldModelModificationBlock()
         )
+        self._model_manager.version_at_last_clear = self._model_manager.version
         clear_memoization_cache(self)
         self._model_manager.model_change_callbacks.clear()
         self.state.state_change_callbacks.clear()
@@ -2790,6 +2802,8 @@ class World(HasSimulatorProperties):
         :return: The modification blocks that were rolled back, most recent first.
         :raises InvalidRollbackVersionError: If ``version`` is not a version the world
             has already reached.
+        :raises RollbackBeforeClearError: If ``version`` is from before :meth:`clear`
+            last emptied the history.
         """
         current_version = self._model_manager.version
         if not 0 <= version <= current_version:
@@ -2797,6 +2811,16 @@ class World(HasSimulatorProperties):
                 world=self,
                 target_version=version,
                 current_version=current_version,
+            )
+        version_at_last_clear = self._model_manager.version_at_last_clear
+        if (
+            version_at_last_clear is not None
+            and version <= version_at_last_clear < current_version
+        ):
+            raise RollbackBeforeClearError(
+                world=self,
+                target_version=version,
+                version_at_last_clear=version_at_last_clear,
             )
         return self.rollback_modification_blocks(current_version - version)
 
