@@ -974,6 +974,13 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     parent_T_connection_expression: HomogeneousTransformationMatrix = field(
         default=None
     )
+    """
+    The constant pose of the connection relative to its parent.
+
+    .. warning:: In a world, change it only through :meth:`update_parent_T_connection`:
+        a direct assignment is not recorded, published or rolled back.
+    """
+
     _kinematics: HomogeneousTransformationMatrix = field(
         default_factory=HomogeneousTransformationMatrix, init=False
     )
@@ -989,6 +996,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
     This split is necessary for copying Connections, because they need parent_T_connection as an input parameter and 
     connection_T_child is generated in the __post_init__ method.
+
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     def __post_init__(self):
@@ -1012,15 +1022,10 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 f"connection_T_child must be constant for connection. This one contains free variables: {self.parent_T_connection_expression.free_variables()}"
             )
 
-        if (
-            self.parent_T_connection_expression.reference_frame is not None
-            and self.parent_T_connection_expression.reference_frame != self.parent
-        ):
-            raise ReferenceFrameMismatchError(
-                expected_frame=self.parent,
-                actual_frame=self.parent_T_connection_expression.reference_frame,
-                context=f"parent_T_connection_expression of connection '{self.name}'",
-            )
+        self._validate_parent_T_connection_frame(
+            parent_T_connection=self.parent_T_connection_expression
+        )
+        self.parent_T_connection_expression.reference_frame = self.parent
         if (
             self.connection_T_child_expression.child_frame is not None
             and self.connection_T_child_expression.child_frame != self.child
@@ -1031,8 +1036,48 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 context=f"child frame of connection_T_child_expression of connection '{self.name}'",
             )
 
-        self.parent_T_connection_expression.reference_frame = self.parent
         self.connection_T_child_expression.child_frame = self.child
+
+    @synchronized_attribute_modification
+    def update_parent_T_connection(
+        self, *, parent_T_connection: HomogeneousTransformationMatrix
+    ) -> None:
+        """
+        Replace the constant pose of this connection relative to its parent and record
+        the change in the world's modification history.
+
+        :param parent_T_connection: The new pose of the connection relative to its
+            parent; it must be constant.
+        :raises ReferenceFrameMismatchError: If the pose is expressed relative to
+            another frame than the parent.
+        """
+        self._validate_parent_T_connection_frame(
+            parent_T_connection=parent_T_connection
+        )
+        self.parent_T_connection_expression = (
+            parent_T_connection.copy_with_new_reference_frames(
+                new_reference_frame=self.parent,
+                new_child_frame=parent_T_connection.child_frame,
+            )
+        )
+
+    def _validate_parent_T_connection_frame(
+        self, *, parent_T_connection: HomogeneousTransformationMatrix
+    ) -> None:
+        """
+        :param parent_T_connection: A pose of this connection relative to its parent.
+        :raises ReferenceFrameMismatchError: If the pose is expressed relative to
+            another frame than the parent.
+        """
+        if (
+            parent_T_connection.reference_frame is not None
+            and parent_T_connection.reference_frame != self.parent
+        ):
+            raise ReferenceFrameMismatchError(
+                expected_frame=self.parent,
+                actual_frame=parent_T_connection.reference_frame,
+                context=f"parent_T_connection_expression of connection '{self.name}'",
+            )
 
     @classmethod
     def _serialized_fields(cls) -> list[Field]:

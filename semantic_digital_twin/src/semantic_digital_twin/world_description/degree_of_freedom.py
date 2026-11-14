@@ -198,9 +198,12 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled.
     Instead a the omni drive connection is directly controlled and a low level
-    controller translates these commands to commands for the caster wheels.
+    controller translates these commands to commands for the caster wheels. A door
+    hinge also has a dof that cannot be controlled.
 
-    A door hinge also has a dof that cannot be controlled.
+    .. warning:: In a world, change it only through
+        :meth:`World.set_dofs_has_hardware_interface`: a direct assignment is not
+        recorded, published or rolled back, and a block holding only it changes nothing.
     """
 
     def __post_init__(self):

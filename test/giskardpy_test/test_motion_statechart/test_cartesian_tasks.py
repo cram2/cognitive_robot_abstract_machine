@@ -2267,7 +2267,7 @@ class TestDiffDriveBaseGoal:
                 ),
             )
             world.add_connection(lift_connection)
-        lift_connection.has_hardware_interface = True
+            world.set_dofs_has_hardware_interface(lift_connection.active_dofs, True)
         lift_height = 1.0
         executor = StatechartExecutor(
             context=StatechartContext(world=world), extensions=[MotionControl()]

@@ -279,8 +279,9 @@ def test_external_collision_avoidance_battle():
         weak = world.get_kinematic_structure_entity_by_id(weak.id)
         weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
 
-        omni1.has_hardware_interface = True
-        omni2.has_hardware_interface = True
+        world.set_dofs_has_hardware_interface(
+            omni1.active_dofs + omni2.active_dofs, True
+        )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=world),

@@ -553,10 +553,13 @@ class SetDofHasHardwareInterface(WorldModification):
     """
 
     def apply(self, world: World):
-        for dof_id in self.degree_of_freedom_ids:
-            world.get_degree_of_freedom_by_id(
-                dof_id
-            ).has_hardware_interface = self.value
+        world.set_dofs_has_hardware_interface(
+            [
+                world.get_degree_of_freedom_by_id(dof_id)
+                for dof_id in self.degree_of_freedom_ids
+            ],
+            self.value,
+        )
 
     def revert(self, world: World):
         dofs_by_previous_value: dict[bool, list[DegreeOfFreedom]] = {}
@@ -747,7 +750,7 @@ def synchronized_attribute_modification(func):
         current_model_modification_block.append(
             AttributeUpdateModification.from_kwargs(
                 {
-                    "entity_id": object_after_change["id"],
+                    "entity_id": to_json(self.id),
                     "updated_kwargs": to_json(diff),
                     **tracker_kwargs,
                 }

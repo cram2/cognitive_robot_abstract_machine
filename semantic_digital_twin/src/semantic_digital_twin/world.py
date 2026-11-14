@@ -291,8 +291,13 @@ class WorldModelUpdateContextManager:
                         ) from exc_val
                 raise exc_val
 
-            self.world.delete_orphaned_dofs()
             model_manager = self.world._model_manager
+            # only the outermost block deletes orphans, as an outer block may still
+            # attach the degrees of freedom it added
+            if model_manager._active_world_model_update_context_manager_ids == [
+                self._id
+            ]:
+                self.world.delete_orphaned_dofs()
             model_manager._active_world_model_update_context_manager_ids.remove(
                 self._id
             )
@@ -300,7 +305,17 @@ class WorldModelUpdateContextManager:
             if model_manager._active_world_model_update_context_manager_ids:
                 return
 
-            # only clean up caches in the last modification block
+            # a block that modified nothing leaves the model as it was, but announces
+            # the state written inside it
+            if len(model_manager.current_model_modification_block) == 0:
+                try:
+                    self.world.notify_state_change(publish_changes=self.publish_changes)
+                    run_pending_publications = True
+                finally:
+                    self.world.world_is_being_modified = False
+                    model_manager._current_modifications_will_be_published = None
+                return
+
             clear_memoization_cache(self.world)
 
             model_manager.model_modification_blocks.append(
@@ -2694,6 +2709,17 @@ class World(HasSimulatorProperties):
     def modify_world(
         self, publish_changes: bool = True
     ) -> WorldModelUpdateContextManager:
+        """
+        Open a block of modifications that the world records, announces and publishes as
+        one when the outermost open block closes.
+
+        .. warning:: Memoized queries, such as :attr:`root` and the lookups by name,
+            keep the answer they first gave inside an open block until the outermost
+            block closes, so they may not reflect modifications made since.
+
+        :param publish_changes: Whether the modifications are published to synchronized
+            worlds.
+        """
         return WorldModelUpdateContextManager(
             world=self, publish_changes=publish_changes
         )
