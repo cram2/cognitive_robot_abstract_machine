@@ -15,10 +15,11 @@ import pytest
 import scipy.special
 from array_api_compat import array_namespace
 from random_events.variable import Symbolic
+from sortedcontainers import SortedSet
 
 from probabilistic_model.learning.gradient_descent import CrossEntropy
 from probabilistic_model.learning.region_graph.exceptions import (
-    ClassVariableMismatchError,
+    PredictedVariableInRegionGraphError,
 )
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
@@ -91,117 +92,133 @@ def test_fitting_a_layered_circuit_raises_the_log_likelihood_of_its_data(region_
 # %% classification
 
 
-def test_a_classifying_region_graph_needs_a_class_variable_of_its_classes(target):
+def test_a_region_graph_cannot_predict_one_of_its_own_variables(target):
     """
-    A region graph with two classes cannot build a circuit without a class variable with
-    two domain elements.
+    The predicted variable of a region graph circuit is not among the variables the
+    region graph partitions.
     """
     region_graph = RegionGraph(
-        variables=continuous_variables(4), depth=1, repetitions=2, classes=3
+        variables=continuous_variables(3) | SortedSet([target]), depth=1, repetitions=2
     ).create_random_region_graph()
-    with pytest.raises(ClassVariableMismatchError):
-        region_graph.to_probabilistic_circuit(class_variable=target)
+    with pytest.raises(PredictedVariableInRegionGraphError):
+        region_graph.to_probabilistic_circuit(predicted_variable=target)
+
+
+def test_the_root_region_has_a_sum_unit_per_category_of_the_predicted_variable(target):
+    """
+    The root mixes one category conditional unit per category of the predicted variable.
+    """
+    circuit = (
+        RegionGraph(variables=continuous_variables(4), depth=1, repetitions=2)
+        .create_random_region_graph()
+        .to_probabilistic_circuit(predicted_variable=target)
+    )
+    [category_conditionals] = circuit.root.child_layers
+    assert category_conditionals.number_of_nodes == len(target.domain.simple_sets)
 
 
 @dataclass(kw_only=True)
-class SeparatedClasses:
+class SeparatedCategories:
     """
     An untrained classifying region graph circuit and rows of two well separated
-    classes.
+    categories.
     """
 
     circuit: LayeredProbabilisticCircuit
     """
-    The circuit over the features and the class variable.
+    The circuit over the features and the predicted variable.
     """
 
     data: np.ndarray
     """
-    The rows, whose class column holds the hash of the class.
+    The rows, whose predicted column holds the hash of the category.
     """
 
     labels: np.ndarray
     """
-    The position of the class of every row in the domain of the class variable.
+    The position of the category of every row in the domain of the predicted variable.
     """
 
-    class_variable: Symbolic
+    predicted_variable: Symbolic
     """
-    The class variable.
+    The variable the circuit predicts.
     """
 
-    def joint_log_likelihoods_of_classes(self) -> np.ndarray:
+    def joint_log_likelihoods_of_categories(self) -> np.ndarray:
         """
-        :return: The joint log-likelihood of every row with every class, one column per
-            class.
+        :return: The joint log-likelihood of every row with every category, one column
+            per category.
         """
-        class_column = self.circuit.variables.index(self.class_variable)
-        hashes = SymbolicEncoding(self.class_variable).hashes
+        predicted_column = self.circuit.variables.index(self.predicted_variable)
+        hashes = SymbolicEncoding(self.predicted_variable).hashes
         joint = []
         for label in range(len(hashes)):
             candidate = self.data.copy()
-            candidate[:, class_column] = hashes[label]
+            candidate[:, predicted_column] = hashes[label]
             joint.append(np.asarray(self.circuit.log_likelihood(candidate)))
         return np.stack(joint, axis=1)
 
 
 @pytest.fixture
-def separated_classes(target) -> SeparatedClasses:
+def separated_categories(target) -> SeparatedCategories:
     """
-    A classifying circuit over four features and 400 rows of two classes centred at -1
-    and 1.
+    A classifying circuit over four features and 400 rows of two categories centred at
+    -1 and 1.
     """
     features = continuous_variables(4, prefix="x")
     circuit = (
-        RegionGraph(variables=features, partitions=2, depth=1, repetitions=4, classes=2)
+        RegionGraph(variables=features, partitions=2, depth=1, repetitions=4)
         .create_random_region_graph()
-        .to_probabilistic_circuit(input_units=3, sum_units=3, class_variable=target)
+        .to_probabilistic_circuit(input_units=3, sum_units=3, predicted_variable=target)
     )
     generator = np.random.default_rng(0)
     labels = generator.integers(0, 2, 400)
     rows = generator.normal(size=(400, 4)) * 0.3 + (2.0 * labels - 1.0)[:, None]
-    class_column = circuit.variables.index(target)
-    data = np.insert(rows, class_column, labels, axis=1)
+    predicted_column = circuit.variables.index(target)
+    data = np.insert(rows, predicted_column, labels, axis=1)
     # hashes do not survive single precision, so the rows stay numpy until encoded
-    data[:, class_column] = SymbolicEncoding(target).hashes[labels]
-    return SeparatedClasses(
-        circuit=circuit, data=data, labels=labels, class_variable=target
+    data[:, predicted_column] = SymbolicEncoding(target).hashes[labels]
+    return SeparatedCategories(
+        circuit=circuit, data=data, labels=labels, predicted_variable=target
     )
 
 
-def test_cross_entropy_is_the_negative_log_probability_of_the_class_given_the_rest(
-    separated_classes,
+def test_cross_entropy_is_the_negative_log_probability_of_the_category_given_the_rest(
+    separated_categories,
 ):
     """
-    The cross entropy is the average of ``-log p(class | features)``, by Bayes' rule
-    over the joint likelihoods of the classes.
+    The cross entropy is the average of ``-log p(category | features)``, by Bayes' rule
+    over the joint likelihoods of the categories.
     """
-    circuit = separated_classes.circuit
-    joint = separated_classes.joint_log_likelihoods_of_classes()
+    circuit = separated_categories.circuit
+    joint = separated_categories.joint_log_likelihoods_of_categories()
     rows = np.arange(len(joint))
     expected = np.mean(
-        scipy.special.logsumexp(joint, axis=1) - joint[rows, separated_classes.labels]
+        scipy.special.logsumexp(joint, axis=1)
+        - joint[rows, separated_categories.labels]
     )
-    loss = CrossEntropy.from_class_variable(
-        class_variable=separated_classes.class_variable, variables=circuit.variables
+    loss = CrossEntropy.from_predicted_variable(
+        predicted_variable=separated_categories.predicted_variable,
+        variables=circuit.variables,
     )
     assert float(
-        loss.evaluate(circuit.root, circuit.encoded(separated_classes.data))
+        loss.evaluate(circuit.root, circuit.encoded(separated_categories.data))
     ) == pytest.approx(float(expected), rel=1e-5)
 
 
 def test_the_cross_entropy_of_a_torch_circuit_is_the_one_of_its_jax_circuit(
-    separated_classes,
+    separated_categories,
 ):
     """
     The cross entropy computes the same value on torch parameters.
     """
     torch = pytest.importorskip("torch")
-    circuit = separated_classes.circuit
-    loss = CrossEntropy.from_class_variable(
-        class_variable=separated_classes.class_variable, variables=circuit.variables
+    circuit = separated_categories.circuit
+    loss = CrossEntropy.from_predicted_variable(
+        predicted_variable=separated_categories.predicted_variable,
+        variables=circuit.variables,
     )
-    encoded = circuit.encoded(separated_classes.data)
+    encoded = circuit.encoded(separated_categories.data)
     torch_circuit = circuit.to_namespace(array_namespace(torch.zeros(0)))
     assert float(
         loss.evaluate(torch_circuit.root, torch.asarray(encoded))
@@ -209,27 +226,29 @@ def test_the_cross_entropy_of_a_torch_circuit_is_the_one_of_its_jax_circuit(
 
 
 @pytest.mark.parametrize("trained_discriminatively", [False, True])
-def test_a_trained_classifying_circuit_separates_two_classes(
-    separated_classes, trained_discriminatively
+def test_a_trained_classifying_circuit_separates_two_categories(
+    separated_categories, trained_discriminatively
 ):
     """
-    Trained on the joint likelihood or by cross entropy, the class with the higher joint
-    likelihood of a row is its class for almost every row.
+    Trained on the joint likelihood or by cross entropy, the category with the higher
+    joint likelihood of a row is its category for almost every row.
     """
-    circuit = separated_classes.circuit
+    circuit = separated_categories.circuit
     loss = (
-        CrossEntropy.from_class_variable(
-            class_variable=separated_classes.class_variable,
+        CrossEntropy.from_predicted_variable(
+            predicted_variable=separated_categories.predicted_variable,
             variables=circuit.variables,
         )
         if trained_discriminatively
         else None
     )
     circuit.fit(
-        data=separated_classes.data,
+        data=separated_categories.data,
         epochs=150,
         optimizer=optax.adam(0.05),
         loss=loss,
     )
-    predicted = np.argmax(separated_classes.joint_log_likelihoods_of_classes(), axis=1)
-    assert (predicted == separated_classes.labels).mean() > 0.95
+    predicted = np.argmax(
+        separated_categories.joint_log_likelihoods_of_categories(), axis=1
+    )
+    assert (predicted == separated_categories.labels).mean() > 0.95

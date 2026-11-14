@@ -1,6 +1,7 @@
 """
 Tests for region graphs: their random partitions, as in Algorithm 1 of the RAT-SPN
-paper, and the structure, normalization and classes of the circuits they build.
+paper, and the structure, normalization and predicted variables of the circuits they
+build.
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 class Target(IntEnum):
     """
-    The classes a classification circuit predicts.
+    The categories of the variable a classifying circuit predicts.
     """
 
     A = 0
@@ -345,15 +346,15 @@ def test_learned_circuit_has_normalized_parameters(target):
 
 def test_classification_circuit_predicts_a_distribution_over_the_target(target):
     """
-    The marginal of a fitted classification circuit over its class variable is a
+    The marginal of a fitted classification circuit over its predicted variable is a
     distribution.
     """
     features = continuous_variables(4, prefix="x")
     region_graph = RegionGraph(
-        variables=features, partitions=2, depth=1, repetitions=6, classes=2
+        variables=features, partitions=2, depth=1, repetitions=6
     ).create_random_region_graph()
     model = region_graph.to_probabilistic_circuit(
-        input_units=5, sum_units=5, class_variable=target
+        input_units=5, sum_units=5, predicted_variable=target
     )
     assert isinstance(model, LayeredProbabilisticCircuit)
     assert model.variables == features | SortedSet([target])

@@ -64,54 +64,54 @@ class AverageNegativeLogLikelihood(Loss[LayerType]):
 @dataclass(kw_only=True)
 class CrossEntropy(Loss[LayerType]):
     """
-    The average negative log-probability of the class of each row given its other
-    values, by Bayes' rule over the joint likelihoods of the row with every class.
-
-    This is the discriminative loss of a RAT-SPN classifier (Peharz et al., 2019,
-    equation 4), with the class prior the circuit holds.
+    The average negative log-probability of the category of the predicted variable in
+    each row given its other values, the discriminative loss of a RAT-SPN classifier
+    (Peharz et al., 2019, equation 4) with the prior the circuit holds.
     """
 
-    class_column: int
+    predicted_column: int
     """
-    The column of the class variable in the encoded data.
+    The column of the predicted variable in the encoded data.
     """
 
-    number_of_classes: int
+    number_of_categories: int
     """
-    The number of classes, encoded as their positions in the domain of the class
-    variable.
+    The number of categories of the predicted variable, encoded as their positions in
+    its domain.
     """
 
     @classmethod
-    def from_class_variable(
-        cls, *, class_variable: Symbolic, variables: SortedSet
+    def from_predicted_variable(
+        cls, *, predicted_variable: Symbolic, variables: SortedSet
     ) -> Self:
         """
-        :param class_variable: The variable whose domain elements are the classes.
-        :param variables: The variables of the circuit, which include the class
+        :param predicted_variable: The symbolic variable the circuit classifies into.
+        :param variables: The variables of the circuit, which include the predicted
             variable.
-        :return: The cross entropy of the class variable of the circuit.
+        :return: The cross entropy of the predicted variable of the circuit.
         """
         return cls(
-            class_column=variables.index(class_variable),
-            number_of_classes=len(class_variable.domain.simple_sets),
+            predicted_column=variables.index(predicted_variable),
+            number_of_categories=len(predicted_variable.domain.simple_sets),
         )
 
     def evaluate(self, layer: LayerType, data: BackendArray) -> BackendArray:
         log_likelihoods = layer.log_likelihood_of_nodes(data)[:, 0]
         namespace = array_namespace(log_likelihoods)
         data = namespace.asarray(data, device=array_api_compat.device(log_likelihoods))
-        is_class_column = (
+        is_predicted_column = (
             namespace.arange(data.shape[1], device=array_api_compat.device(data))
-            == self.class_column
+            == self.predicted_column
         )
-        log_likelihoods_of_classes = [
+        log_likelihoods_of_categories = [
             layer.log_likelihood_of_nodes(
-                namespace.where(is_class_column, namespace.full_like(data, label), data)
+                namespace.where(
+                    is_predicted_column, namespace.full_like(data, category), data
+                )
             )[:, 0]
-            for label in range(self.number_of_classes)
+            for category in range(self.number_of_categories)
         ]
-        marginal = functools.reduce(namespace.logaddexp, log_likelihoods_of_classes)
+        marginal = functools.reduce(namespace.logaddexp, log_likelihoods_of_categories)
         return namespace.mean(marginal - log_likelihoods)
 
 

@@ -44,8 +44,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
     SymbolicEncoding,
 )
 from probabilistic_model.learning.region_graph.exceptions import (
-    ClassVariableMismatchError,
     MultipleRootsError,
+    PredictedVariableInRegionGraphError,
     UnsupportedRegionVariableError,
 )
 
@@ -149,13 +149,6 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
     A repetition is another partitioning on the set of variables.
     """
 
-    classes: int = 1
-    """
-    The number of classes.
-
-    If classes > 1, the circuit is a classifier, if 1 it is a generative model.
-    """
-
     seed: int = 69
     """
     The seed of :attr:`random_number_generator`, which fixes the graph.
@@ -238,34 +231,32 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         input_units: int = 5,
         sum_units: int = 5,
         key: jax.Array = jax.random.PRNGKey(69),
-        class_variable: Symbolic | None = None,
+        predicted_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
         Convert the region graph to a randomly initialized RAT-SPN with jax parameters.
-        With more than one class, the root mixes the class conditional sum units of the
-        root region, each multiplied by the indicator of its class, so that training the
-        joint likelihood trains a classifier.
+        With a predicted variable, the root region has one sum unit per category of it
+        and the root mixes them, each multiplied by the indicator of its category, so
+        that the circuit classifies; without one, the root region has a single sum unit.
 
         :param input_units: The number of input distributions of each leaf region.
         :param sum_units: The number of sum units of each inner region.
         :param key: The random key of every initial parameter.
-        :param class_variable: The variable whose domain elements are the classes, if
-            :attr:`classes` is more than one.
+        :param predicted_variable: The symbolic variable the circuit classifies into
+            its categories, if any.
         :return: The layered circuit.
-        :raises ClassVariableMismatchError: If the class variable does not fit
-            :attr:`classes`.
+        :raises PredictedVariableInRegionGraphError: If the predicted variable is one of
+            :attr:`variables`.
         """
-        if self.classes > 1 and (
-            class_variable is None
-            or len(class_variable.domain.simple_sets) != self.classes
-            or class_variable in self.variables
-        ):
-            raise ClassVariableMismatchError(
-                classes=self.classes, class_variable=class_variable
+        if predicted_variable in self.variables:
+            raise PredictedVariableInRegionGraphError(
+                predicted_variable=predicted_variable
             )
         variables = SortedSet(self.variables)
-        if self.classes > 1:
-            variables = variables | SortedSet([class_variable])
+        number_of_root_units = 1
+        if predicted_variable is not None:
+            variables = variables | SortedSet([predicted_variable])
+            number_of_root_units = len(predicted_variable.domain.simple_sets)
         keys = iter(jax.random.split(key, len(self.nodes()) + 1))
 
         for layer in reversed(rx.bfs_layers(self.graph, [self.index_of(self.root)])):
@@ -279,7 +270,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                     node.layer = self.fully_connected_sum_layer(
                         children=children,
                         number_of_nodes=(
-                            self.classes if self.in_degree(node) == 0 else sum_units
+                            number_of_root_units
+                            if self.in_degree(node) == 0
+                            else sum_units
                         ),
                         key=next(keys),
                     )
@@ -294,12 +287,14 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         root = self.root.layer
         if not self.successors(self.root):
             root = self.fully_connected_sum_layer(
-                children=[self.root], number_of_nodes=self.classes, key=next(keys)
+                children=[self.root],
+                number_of_nodes=number_of_root_units,
+                key=next(keys),
             )
-        if self.classes > 1:
-            root = self.mixture_of_classes(
-                class_conditionals=root,
-                class_variable=class_variable,
+        if predicted_variable is not None:
+            root = self.mixture_of_categories(
+                category_conditionals=root,
+                predicted_variable=predicted_variable,
                 variables=variables,
             )
         circuit = LayeredProbabilisticCircuit(variables, root)
@@ -413,34 +408,38 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             )
         raise UnsupportedRegionVariableError(variable=variable)
 
-    def mixture_of_classes(
-        self,
+    @staticmethod
+    def mixture_of_categories(
         *,
-        class_conditionals: Layer,
-        class_variable: Symbolic,
+        category_conditionals: Layer,
+        predicted_variable: Symbolic,
         variables: SortedSet,
     ) -> SumLayer:
         """
-        :param class_conditionals: The layer with one node per class.
-        :param class_variable: The variable whose domain elements are the classes.
+        :param category_conditionals: The layer with one node per category of the
+            predicted variable.
+        :param predicted_variable: The variable the circuit predicts.
         :param variables: The variables of the circuit.
-        :return: The root that mixes, with equal weights, the product of every class
-            conditional node with the indicator of its class.
+        :return: The root that mixes, with equal weights, the product of every category
+            conditional node with the indicator of its category.
         """
+        number_of_categories = len(predicted_variable.domain.simple_sets)
         with np.errstate(divide="ignore"):
             indicators = SymbolicLayer(
-                variables.index(class_variable),
-                np.arange(self.classes),
-                DenseProbabilityTable(np.log(np.eye(self.classes))),
-                SymbolicEncoding(class_variable).hashes,
+                variables.index(predicted_variable),
+                np.arange(number_of_categories),
+                DenseProbabilityTable(np.log(np.eye(number_of_categories))),
+                SymbolicEncoding(predicted_variable).hashes,
             )
-        products = ProductLayer.node_wise_product_of([class_conditionals, indicators])
+        products = ProductLayer.node_wise_product_of(
+            [category_conditionals, indicators]
+        )
         return SumLayer.from_entries(
             [products],
             SparseEntries(
-                np.full(self.classes, -np.log(self.classes)),
-                np.zeros(self.classes, dtype=np.int64),
-                np.arange(self.classes),
+                np.full(number_of_categories, -np.log(number_of_categories)),
+                np.zeros(number_of_categories, dtype=np.int64),
+                np.arange(number_of_categories),
             ),
             1,
             DenseEdgeMatrix,

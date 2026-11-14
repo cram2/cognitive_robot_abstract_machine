@@ -58,30 +58,22 @@ class UnsupportedRegionVariableError(ProbabilisticModelException, ValueError):
 
 
 @dataclass(kw_only=True)
-class ClassVariableMismatchError(ProbabilisticModelException, ValueError):
+class PredictedVariableInRegionGraphError(ProbabilisticModelException, ValueError):
     """
-    Exception raised when the class variable of a classifying region graph is missing or
-    has another number of classes than the graph.
-    """
-
-    classes: int
-    """
-    The number of classes of the region graph.
+    Exception raised when the variable a region graph circuit predicts is also one of
+    the variables the region graph partitions.
     """
 
-    class_variable: Variable | None
+    predicted_variable: Variable
     """
-    The class variable that was given, if any.
+    The variable the circuit predicts.
     """
 
     def error_message(self) -> str:
         return (
-            f"The region graph has {self.classes} classes, but the class variable is "
-            f"{self.class_variable}."
+            f"The predicted variable {self.predicted_variable.name} is one of the "
+            f"variables of the region graph."
         )
 
     def suggest_correction(self) -> str:
-        return (
-            "Pass a symbolic class variable with one domain element per class, which is "
-            "not among the variables of the region graph."
-        )
+        return "Build the region graph over the other variables only."
