@@ -21,6 +21,7 @@ from giskardpy.middleware.ros2.exceptions import (
     ClientDisconnectedError,
     ExecutionCanceledException,
     MotionServerThreadStillRunningError,
+    RequiredWorldUpdateNotAppliedError,
     RequiredWorldUpdateNotReceivedError,
     UnserializableGoalError,
 )
@@ -241,6 +242,8 @@ class MotionServer:
 
         :raises RequiredWorldUpdateNotReceivedError: If that change does not arrive
             within ``world_update_timeout``.
+        :raises RequiredWorldUpdateNotAppliedError: If an update of the client could not
+            be applied to the world.
         :raises ClientDisconnectedError: If the client of the goal disconnects while its
             change is awaited.
         """
@@ -251,6 +254,16 @@ class MotionServer:
             self.world_updates.apply_all()
             if self.world_updates.has_applied(required_position):
                 return
+            divergence = self.world_updates.divergence_from(
+                publisher=required_position.origin
+            )
+            if divergence is not None:
+                raise RequiredWorldUpdateNotAppliedError(
+                    publisher_name=required_position.origin.node_name,
+                    failed_sequence_number=divergence.sequence_number,
+                    awaited_sequence_number=required_position.sequence_number,
+                    raised_from=divergence,
+                )
             if self.client_watchdog.is_client_gone():
                 raise ClientDisconnectedError(client=self.client_watchdog.client)
             if time.monotonic() >= deadline:
