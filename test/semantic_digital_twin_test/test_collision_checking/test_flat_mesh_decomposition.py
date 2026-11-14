@@ -2,7 +2,6 @@
 Tests that a world accepts a body whose collision geometry is a flat, zero-volume mesh.
 """
 
-import numpy as np
 import trimesh
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -14,30 +13,21 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% flat mesh collision geometry
 
 
-def test_world_accepts_body_with_flat_mesh_collision():
+def test_world_builds_collision_object_for_flat_mesh(
+    millimetre_wall_strip: trimesh.Trimesh,
+):
     """
-    A one-millimetre-wide wall strip, as architectural USD scenes contain, is a planar
-    quad: VHACD finds no convex parts in it, which must not stop the world from building.
+    V-HACD finds no convex parts in the wall strip, which must not keep the collision
+    detector from building a collision object for its body.
     """
-    wall_strip = trimesh.Trimesh(
-        vertices=np.array(
-            [
-                [0.001, 0.0, 2.8],
-                [0.0, 0.0, 2.8],
-                [0.001, 0.0, 0.0],
-                [0.0, 0.0, 0.0],
-            ]
-        ),
-        faces=np.array([[2, 1, 0], [1, 2, 3]]),
-        process=False,
-    )
     body = Body(
         name=PrefixedName("wall_strip"),
-        collision=ShapeCollection([Mesh.from_trimesh(mesh=wall_strip)]),
+        collision=ShapeCollection([Mesh.from_trimesh(mesh=millimetre_wall_strip)]),
     )
     world = World()
 
     with world.modify_world():
         world.add_body(body)
 
-    assert world.bodies == [body]
+    collision_detector = world.collision_manager.collision_detector
+    assert list(collision_detector.body_to_bullet_object) == [body]
