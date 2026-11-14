@@ -25,8 +25,9 @@ import jax
 import jax.numpy as jnp
 
 from probabilistic_model.learning.gradient_descent import (
-    ClassConditionalLikelihoodMaximization,
-    LikelihoodMaximization,
+    AverageNegativeLogLikelihood,
+    ClassConditionalAverageNegativeLogLikelihood,
+    GradientDescent,
 )
 
 
@@ -84,7 +85,9 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
             learning rate of 1e-3 is used.
         """
-        self.root = LikelihoodMaximization(self.root, optimizer).minimize(epochs, data)
+        self.root = GradientDescent(
+            self.root, AverageNegativeLogLikelihood(), optimizer
+        ).minimize(epochs, data)
 
 
 @dataclass
@@ -183,6 +186,6 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
         :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
             learning rate of 1e-3 is used.
         """
-        self.root = ClassConditionalLikelihoodMaximization(
-            self.root, optimizer
+        self.root = GradientDescent(
+            self.root, ClassConditionalAverageNegativeLogLikelihood(), optimizer
         ).minimize(epochs, data, labels)
