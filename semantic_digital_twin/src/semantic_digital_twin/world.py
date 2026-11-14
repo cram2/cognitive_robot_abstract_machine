@@ -728,15 +728,22 @@ class World(HasSimulatorProperties):
         return True
 
     def _validate_dofs(self):
-        actual_dofs = {
-            dof for connection in self.connections for dof in connection.dofs
-        }
-        if actual_dofs != set(self.degrees_of_freedom):
+        used_dofs = self.used_degrees_of_freedom
+        if used_dofs != set(self.degrees_of_freedom):
             raise WorldContainsOrphanedDegreeOfFreedom(
-                world=self, actual_dofs=actual_dofs
+                world=self, actual_dofs=used_dofs
             )
 
     # %% Properties
+    @property
+    def used_degrees_of_freedom(self) -> set[DegreeOfFreedom]:
+        """
+        The degrees of freedom a connection uses or an actuator drives.
+        """
+        return {dof for connection in self.connections for dof in connection.dofs} | {
+            dof for actuator in self.actuators for dof in actuator.dofs
+        }
+
     @property
     @memoize
     def root(self) -> KinematicStructureEntity | None:
@@ -1802,9 +1809,12 @@ class World(HasSimulatorProperties):
         :param other: The world to be added.
         :param root_connection: If provided, this connection will be used to connect the
             two worlds. Otherwise, a new Connection6DoF will be created
-        :return: None
+        :raises DuplicateSimulatorPropertyError: If both worlds carry a
+            :class:`UniqueSimulatorProperty` of the same type; neither world is changed.
         """
         assert other is not self, "Cannot merge a world with itself."
+        for simulator_property in other.simulator_additional_properties:
+            self.check_simulator_property_attachable(simulator_property)
 
         with self.modify_world(), other.modify_world():
             self_root = self.root
@@ -1829,6 +1839,9 @@ class World(HasSimulatorProperties):
             if root_connection:
                 self.add_connection(root_connection)
 
+            for simulator_property in other.simulator_additional_properties:
+                self.add_simulator_property(simulator_property)
+            other.simulator_additional_properties.clear()
             other.clear()
 
     def _replace_with(self, other: World) -> None:
@@ -2121,12 +2134,12 @@ class World(HasSimulatorProperties):
 
         self.validate()
 
-    def delete_orphaned_dofs(self):
-        actual_dofs = {
-            dof for connection in self.connections for dof in connection.dofs
-        }
-
-        removed_dofs = set(self.degrees_of_freedom) - actual_dofs
+    def delete_orphaned_dofs(self) -> None:
+        """
+        Remove every degree of freedom that neither a connection uses nor an actuator
+        drives.
+        """
+        removed_dofs = set(self.degrees_of_freedom) - self.used_degrees_of_freedom
 
         for dof in removed_dofs:
             self.remove_degree_of_freedom(dof)
@@ -2649,7 +2662,12 @@ class World(HasSimulatorProperties):
         if me_id in memo:
             return memo[me_id]
 
-        new_world = World(name=self.name)
+        new_world = World(
+            name=self.name,
+            simulator_additional_properties=deepcopy(
+                self.simulator_additional_properties
+            ),
+        )
         memo[me_id] = new_world
 
         with new_world.modify_world():
