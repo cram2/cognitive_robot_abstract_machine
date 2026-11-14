@@ -101,16 +101,6 @@ class ActiveConnection(Connection, ABC):
         """
         return any(dof.has_hardware_interface for dof in self.active_dofs)
 
-    @has_hardware_interface.setter
-    def has_hardware_interface(self, value: bool) -> None:
-        """
-        .. warning:: In a world, use :meth:`World.set_dofs_has_hardware_interface`
-            with :attr:`active_dofs` instead: this assignment is not recorded,
-            published or rolled back, and a block holding only it changes nothing.
-        """
-        for dof in self.active_dofs:
-            dof.has_hardware_interface = value
-
     @property
     def is_controlled(self):
         return self.has_hardware_interface

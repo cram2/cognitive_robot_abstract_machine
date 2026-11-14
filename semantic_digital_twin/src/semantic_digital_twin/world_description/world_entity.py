@@ -1022,9 +1022,10 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 f"connection_T_child must be constant for connection. This one contains free variables: {self.parent_T_connection_expression.free_variables()}"
             )
 
-        self._express_relative_to_parent(
+        self._validate_parent_T_connection_frame(
             parent_T_connection=self.parent_T_connection_expression
         )
+        self.parent_T_connection_expression.reference_frame = self.parent
         if (
             self.connection_T_child_expression.child_frame is not None
             and self.connection_T_child_expression.child_frame != self.child
@@ -1050,17 +1051,21 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         :raises ReferenceFrameMismatchError: If the pose is expressed relative to
             another frame than the parent.
         """
-        self._express_relative_to_parent(parent_T_connection=parent_T_connection)
-        self.parent_T_connection_expression = parent_T_connection
+        self._validate_parent_T_connection_frame(
+            parent_T_connection=parent_T_connection
+        )
+        self.parent_T_connection_expression = (
+            parent_T_connection.copy_with_new_reference_frames(
+                new_reference_frame=self.parent,
+                new_child_frame=parent_T_connection.child_frame,
+            )
+        )
 
-    def _express_relative_to_parent(
+    def _validate_parent_T_connection_frame(
         self, *, parent_T_connection: HomogeneousTransformationMatrix
     ) -> None:
         """
-        Make the parent the reference frame of a pose of this connection relative to its
-        parent.
-
-        :param parent_T_connection: The pose, without a reference frame or with the parent.
+        :param parent_T_connection: A pose of this connection relative to its parent.
         :raises ReferenceFrameMismatchError: If the pose is expressed relative to
             another frame than the parent.
         """
@@ -1073,7 +1078,6 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 actual_frame=parent_T_connection.reference_frame,
                 context=f"parent_T_connection_expression of connection '{self.name}'",
             )
-        parent_T_connection.reference_frame = self.parent
 
     @classmethod
     def _serialized_fields(cls) -> list[Field]:

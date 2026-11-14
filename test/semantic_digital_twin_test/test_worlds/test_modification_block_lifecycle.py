@@ -28,6 +28,8 @@ from semantic_digital_twin.world_description.world_modification import (
     SetDofHasHardwareInterface,
 )
 
+from .test_world import StateChangeRecordingCallback
+
 
 # %% degrees of freedom across nested blocks
 
@@ -70,6 +72,16 @@ def test_empty_block_is_not_recorded(mini_world: World):
         pass
 
     assert mini_world.get_world_model_manager().model_modification_blocks == history
+
+
+def test_empty_block_announces_state_written_inside_it(mini_world: World):
+    callback = StateChangeRecordingCallback(_world=mini_world)
+    degree_of_freedom = mini_world.degrees_of_freedom[0]
+
+    with mini_world.modify_world():
+        mini_world.state[degree_of_freedom.id].position = 0.5
+
+    assert callback.notifications == [True]
 
 
 # %% moving the origin of a connection
@@ -119,6 +131,16 @@ def test_rollback_of_connection_origin_update_restores_it(mini_world: World):
 
 
 # %% recorded changes of model fields
+
+
+def test_updating_connection_origin_leaves_given_pose_unchanged(mini_world: World):
+    connection = mini_world.connections[0]
+    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+
+    with mini_world.modify_world():
+        connection.update_parent_T_connection(parent_T_connection=parent_T_connection)
+
+    assert parent_T_connection.reference_frame is None
 
 
 def test_updating_connection_origin_in_another_frame_raises(mini_world: World):
