@@ -4,47 +4,73 @@ Use this in scenarios where you do not have a world to camera transform publishe
 or when you develop the perception system in isolation.
 """
 
-# %% Imports
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
-from py_trees.common import Status
+from krrood.ormatic.utils import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.io.camera_interface import CameraInterface
 
+# %% StaticCameraTransform parameters
 
-# %% Static camera pose
-class StaticCameraTransformAnnotator(BaseAnnotator):
+
+@dataclass(kw_only=True)
+class StaticCameraTransformParameters(AnnotatorParameters):
+    """Settings specific to this annotation operation."""
+
+    world_frame: str = "map"
+    """Reference frame used for the camera-to-world transform."""
+
+    world_T_camera: HomogeneousTransformationMatrix = field(
+        default_factory=lambda: HomogeneousTransformationMatrix()
+    )
+    """Image-frame pose relative to the configured world frame."""
+
+
+# %% StaticCameraTransform descriptor
+
+
+@dataclass(kw_only=True)
+class StaticCameraTransformDescriptor(
+    AnnotatorDescriptor[StaticCameraTransformParameters]
+):
+    """Declarative configuration of :class:`StaticCameraTransformAnnotator`."""
+
+    parameters: StaticCameraTransformParameters = field(
+        default_factory=StaticCameraTransformParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% StaticCameraTransform annotator
+
+
+@dataclass(eq=False)
+class StaticCameraTransformAnnotator(BaseAnnotator[StaticCameraTransformDescriptor]):
     """
     Write a fixed camera-to-world transform to the current CAS.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self) -> None:
-                self.world_frame: str = "map"
-                """
-                Reference frame used for the camera-to-world transform.
-                """
+    name: str = "StaticCameraTransform"
+    """Name of this node in the behaviour tree."""
 
-                self.world_T_camera: HomogeneousTransformationMatrix = (
-                    HomogeneousTransformationMatrix()
-                )
-                """
-                Image-frame pose relative to the configured world frame.
-                """
+    descriptor: StaticCameraTransformDescriptor = field(
+        default_factory=StaticCameraTransformDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "StaticCameraTransform",
-        descriptor: StaticCameraTransformAnnotator.Descriptor | None = None,
-    ) -> None:
-        super().__init__(name=name, descriptor=descriptor)
+    @classproperty
+    def Descriptor(cls) -> type[StaticCameraTransformDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return StaticCameraTransformDescriptor
 
     def update(self) -> Status:
         """

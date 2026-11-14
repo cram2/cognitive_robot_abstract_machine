@@ -49,8 +49,8 @@ def test_contour_selection_keeps_the_largest_outer_contour(
     cv2.rectangle(mask, (2, 2), (22, 22), 255, cv2.FILLED)
     cv2.rectangle(mask, (5, 5), (18, 18), 0, cv2.FILLED)
     cv2.rectangle(mask, (30, 2), (40, 12), 255, cv2.FILLED)
-    cluster_extractor.descriptor.parameters.contour_min_size = 50
-    cluster_extractor.descriptor.parameters.num_of_objects = 1
+    cluster_extractor.descriptor.parameters.contour_minimum_size = 50
+    cluster_extractor.descriptor.parameters.number_of_objects = 1
 
     contours = cluster_extractor._select_contours(mask)
 
@@ -93,7 +93,7 @@ def test_cluster_annotation_requires_minimum_points(
     cluster_extractor.camera_intrinsics = open3d.camera.PinholeCameraIntrinsic(
         12, 12, 1.0, 1.0, 0.0, 0.0
     )
-    cluster_extractor.descriptor.parameters.min_points_threshold = minimum_points
+    cluster_extractor.descriptor.parameters.minimum_points_threshold = minimum_points
     contour = np.array([[[2, 2]], [[9, 2]], [[9, 9]], [[2, 9]]], dtype=np.int32)
     color_image = np.zeros((12, 12, 3), dtype=np.uint8)
 

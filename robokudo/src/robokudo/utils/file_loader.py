@@ -27,18 +27,18 @@ class FileLoader:
 
     .. code-block:: python
 
-        pkg_path = FileLoader.get_ros_pkg_path('my_package')
+        pkg_path = FileLoader.get_ros_package_path('my_package')
         file_path = FileLoader.get_path_to_file_in_ros_package('my_package', 'config/params.yaml')
     """
 
     @staticmethod
-    def get_ros_pkg_path(ros_pkg_name: str) -> Path:
+    def get_ros_package_path(ros_package_name: str) -> Path:
         """
         Get a Path object to a ROS2 package given the name
 
         Throws OSError if ROS2 package can't be found.
 
-        :param ros_pkg_name: name of a ros2 package
+        :param ros_package_name: name of a ros2 package
         :return: path object with the ros2 package path
         :raises OSError: If ROS package cannot be found
 
@@ -46,26 +46,28 @@ class FileLoader:
 
         .. code-block:: python
 
-            pkg_path = loader.get_ros_pkg_path('my_package')
+            pkg_path = loader.get_ros_package_path('my_package')
             assert pkg_path.exists()
         """
         try:
-            package_path = Path(get_package_share_directory(ros_pkg_name))
+            package_path = Path(get_package_share_directory(ros_package_name))
         except:
-            raise OSError(f"ROS2 package with name '{ros_pkg_name}' does not exist")
+            raise OSError(f"ROS2 package with name '{ros_package_name}' does not exist")
         else:
             return package_path
 
     @staticmethod
-    def get_path_to_file_in_ros_package(ros_pkg_name: str, relative_path: str) -> Path:
+    def get_path_to_file_in_ros_package(
+        ros_package_name: str, relative_path: str
+    ) -> Path:
         """
         Get a Path object to a given the filename inside a ROS package. Please note, that relative_path should NOT
         start with '/', because then it would be considered as an absolute path from pathlib.Path.joinpath()
 
         Throws OSError if ROS package can't be found or relative_path in ROS package doesn't exist.
 
-        :param ros_pkg_name: name of a ros package
-        :param relative_path: the filename of the desired file, relative to the path of ros_pkg_name
+        :param ros_package_name: name of a ros package
+        :param relative_path: the filename of the desired file, relative to the path of ros_package_name
         :return: path object to the desired file relative the ros package
         :raises OSError: If package or file cannot be found
 
@@ -80,9 +82,11 @@ class FileLoader:
             The relative_path should NOT start with '/' to avoid being treated
             as an absolute path by pathlib.Path.joinpath()
         """
-        ros_pkg_path = FileLoader.get_ros_pkg_path(ros_pkg_name=ros_pkg_name)
+        ros_package_path = FileLoader.get_ros_package_path(
+            ros_package_name=ros_package_name
+        )
 
-        full_path = ros_pkg_path.joinpath(relative_path)
+        full_path = ros_package_path.joinpath(relative_path)
         if not full_path.exists():
             raise OSError(f"The desired path {full_path} doesn't exist.")
 

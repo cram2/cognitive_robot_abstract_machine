@@ -11,12 +11,18 @@ This module provides an annotator for:
    The pipeline will remain in RUNNING state until triggered.
 """
 
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass
+
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 
 
+@dataclass(eq=False)
 class PipelineTrigger(BaseAnnotator):
     """
     Pipeline execution controller using triggers.
@@ -29,13 +35,10 @@ class PipelineTrigger(BaseAnnotator):
        The trigger is accessed via "pipeline_trigger" on the blackboard.
     """
 
-    def __init__(self, name: str = "PipelineTrigger") -> None:
-        """
-        Initialize the pipeline trigger.
-
-        :param name: Name of this annotator instance
-        """
-        super().__init__(name)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     def update(self) -> Status:
         """

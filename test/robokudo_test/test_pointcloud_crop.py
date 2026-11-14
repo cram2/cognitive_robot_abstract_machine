@@ -110,12 +110,12 @@ def crop_annotator_in_pipeline(cas_with_cloud_at_world_origin: CAS):
     """
     descriptor = PointcloudCropAnnotator.Descriptor()
     descriptor.parameters.relative_to_world = True
-    descriptor.parameters.min_x = -1.0
-    descriptor.parameters.max_x = 1.0
-    descriptor.parameters.min_y = -1.0
-    descriptor.parameters.max_y = 1.0
-    descriptor.parameters.min_z = 0.0
-    descriptor.parameters.max_z = 2.0
+    descriptor.parameters.minimum_x = -1.0
+    descriptor.parameters.maximum_x = 1.0
+    descriptor.parameters.minimum_y = -1.0
+    descriptor.parameters.maximum_y = 1.0
+    descriptor.parameters.minimum_z = 0.0
+    descriptor.parameters.maximum_z = 2.0
 
     pipeline = Pipeline("TestPipeline")
     pipeline.cas = cas_with_cloud_at_world_origin

@@ -1,74 +1,120 @@
 """
-Acquire sensor data from one camera interface and initialize the pipeline data structures.
+Acquire sensor data from one camera interface and initialize the pipeline data
+structures.
 """
 
 from __future__ import annotations
 
 # %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
+
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
-from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.exceptions import InvalidCollectionReaderParent
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.io.camera_interface import CameraInterface
 
-if TYPE_CHECKING:
-    from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
-    from robokudo.io.camera_interface import CameraInterface
+
+# %% Collection reader parameters
+@dataclass(kw_only=True)
+class CollectionReaderParameters(AnnotatorParameters):
+    """
+    Camera configuration independent of subscriptions and acquisition resources.
+    """
+
+    camera_configuration: BaseCameraConfig
+    """
+    Calibration, input source, and acquisition settings for the camera.
+    """
+
+    camera_interface_type: type[CameraInterface]
+    """
+    Acquisition implementation constructed from the camera configuration.
+    """
 
 
-class CollectionReaderAnnotator(BaseAnnotator):
+# %% Collection reader descriptor
+@dataclass(kw_only=True)
+class CollectionReaderDescriptor(AnnotatorDescriptor[CollectionReaderParameters]):
+    """
+    Declarative camera selection for a collection reader.
+    """
+
+
+# %% Collection reader annotator
+@dataclass(init=False, eq=False)
+class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     """
     Acquire sensor data and share it with other annotators.
+
     It is typically the first annotator in the pipeline.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
+    descriptor: CollectionReaderDescriptor
+    """
+    Configuration supplied to this annotator instance.
+    """
+
+    name: str = "CollectionReader"
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    camera_interface: CameraInterface | None = field(default=None, kw_only=True)
+    """
+    Acquisition interface owned by this reader.
+    """
+
+    start_timer: float | None = field(init=False, repr=False)
+    """
+    Start of the current wait for camera data.
+    """
+
+    iterations_since_last_data: int = field(init=False, repr=False)
+    """
+    Number of consecutive ticks waiting for camera data.
+    """
+
+    iterations_since_last_data_warning_threshold: int = field(init=False, repr=False)
+    """
+    Number of waiting ticks between camera availability warnings.
+    """
+
+    @classproperty
+    def Descriptor(cls) -> type[CollectionReaderDescriptor]:
         """
-        Configuration descriptor for collection reader.
+        Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`.
         """
-
-        def __init__(
-            self,
-            camera_config: BaseCameraConfig,
-            camera_interface: CameraInterface,
-        ) -> None:
-            """
-            Initialize descriptor with camera configuration.
-
-            :param camera_config: Configuration for camera interface
-            :param camera_interface: Interface for reading camera data
-            """
-
-            class Parameters:
-                """
-                Parameters for configuring collection reader.
-                """
-
-                def __init__(self) -> None:
-                    self.camera_config: BaseCameraConfig = camera_config
-                    """
-                    Configuration for camera interface
-                    """
-
-                    self.camera_interface: CameraInterface = camera_interface
-                    """
-                    Interface for reading camera data
-                    """
-
-            self.parameters = Parameters()
+        return CollectionReaderDescriptor
 
     def __init__(
         self,
-        descriptor: CollectionReaderAnnotator.Descriptor,
+        descriptor: CollectionReaderDescriptor,
         name: str = "CollectionReader",
+        *,
+        camera_interface: CameraInterface | None = None,
     ) -> None:
         """
         Initialize the configured camera reader and its acquisition state.
         """
         super().__init__(name, descriptor)
+        self.camera_interface = (
+            descriptor.parameters.camera_interface_type(
+                descriptor.parameters.camera_configuration
+            )
+            if camera_interface is None
+            else camera_interface
+        )
+        """
+        Runtime camera interface owned by this reader.
+        """
         self.start_timer: float | None = None
         """
         Start of the current wait for camera data.
@@ -77,7 +123,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
         """
         Number of consecutive ticks waiting for camera data.
         """
-        self.iterations_since_last_data_warn_threshold: int = 40
+        self.iterations_since_last_data_warning_threshold: int = 40
         """
         Number of waiting ticks between camera availability warnings.
         """
@@ -95,20 +141,21 @@ class CollectionReaderAnnotator(BaseAnnotator):
 
     def update(self) -> Status:
         """
-        Main method that acquires sensor data and places it into the central pipeline data structures.
+        Main method that acquires sensor data and places it into the central pipeline
+        data structures.
 
         Return failure when available data has no owning pipeline.
         """
         if self.start_timer is None:
             self.start_timer = default_timer()
 
-        camera_interface = self.descriptor.parameters.camera_interface
+        camera_interface = self.camera_interface
         if not camera_interface.has_new_data():
             self.iterations_since_last_data += 1
             self.feedback_message = "Waiting for incoming sensor data ..."
             if (
                 self.iterations_since_last_data
-                >= self.iterations_since_last_data_warn_threshold
+                >= self.iterations_since_last_data_warning_threshold
             ):
                 self.rk_logger.warning(
                     "Didn't receive sensor data since %s iterations.",

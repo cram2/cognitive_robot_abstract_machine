@@ -19,13 +19,52 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
+
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Callable
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+
+# %% LambdaFunction parameters
 
 
-class LambdaFunctionAnnotator(BaseAnnotator):
+@dataclass(kw_only=True)
+class LambdaFunctionParameters(AnnotatorParameters):
+    """Parameter container for function configuration."""
+
+    function: Callable | None = None
+    """Configured callable, or None to perform no operation."""
+
+    function_arguments: tuple | None = None
+    """Positional arguments passed to the configured callable."""
+
+    function_keyword_arguments: dict | None = None
+    """Keyword arguments passed to the configured callable."""
+
+
+# %% LambdaFunction descriptor
+
+
+@dataclass(kw_only=True)
+class LambdaFunctionDescriptor(AnnotatorDescriptor[LambdaFunctionParameters]):
+    """Declarative configuration of :class:`LambdaFunctionAnnotator`."""
+
+    parameters: LambdaFunctionParameters = field(
+        default_factory=LambdaFunctionParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% LambdaFunction annotator
+
+
+@dataclass(eq=False)
+class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     """
     Annotator for executing arbitrary functions.
 
@@ -33,41 +72,18 @@ class LambdaFunctionAnnotator(BaseAnnotator):
     for dynamic behavior definition without creating new annotator classes.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for lambda function annotator.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameter container for function configuration.
+    descriptor: LambdaFunctionDescriptor = field(
+        default_factory=LambdaFunctionDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            :type func: callable
-            :type func_args: tuple
-            :type func_kwargs: dict
-            """
-
-            def __init__(self) -> None:
-                self.func: Callable | None = None
-                self.func_args: tuple | None = None
-                self.func_kwargs: dict | None = None
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "LambdaFunctionAnnotator",
-        descriptor: LambdaFunctionAnnotator.Descriptor | None = None,
-    ):
-        """
-        Initialize the lambda function annotator.
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
+    @classproperty
+    def Descriptor(cls) -> type[LambdaFunctionDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return LambdaFunctionDescriptor
 
     def update(self) -> Status:
         """
@@ -78,12 +94,14 @@ class LambdaFunctionAnnotator(BaseAnnotator):
 
         :return: SUCCESS status
         """
-        func = self.descriptor.parameters.func
+        function = self.descriptor.parameters.function
 
-        if func:
-            func_args = self.descriptor.parameters.func_args or []
-            func_kwargs = self.descriptor.parameters.func_kwargs or {}
+        if function:
+            function_arguments = self.descriptor.parameters.function_arguments or []
+            function_keyword_arguments = (
+                self.descriptor.parameters.function_keyword_arguments or {}
+            )
 
-            func(self, *func_args, **func_kwargs)
+            function(self, *function_arguments, **function_keyword_arguments)
 
         return Status.SUCCESS

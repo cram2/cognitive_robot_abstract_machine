@@ -6,11 +6,14 @@ This annotator visualizes predefined objects and regions from a world descriptor
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
 import open3d
 import py_trees
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 import robokudo.annotators.core
@@ -19,29 +22,59 @@ import robokudo.utils.error_handling
 import robokudo.utils.o3d_helper
 import robokudo.world as rk_world
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.utils.region import region_obb_in_camera_coordinates
 from robokudo.world_descriptor import PredefinedObject
 
+# %% WorldVisualizer parameters
 
+
+@dataclass(kw_only=True)
+class WorldVisualizerParameters(AnnotatorParameters):
+    """Settings specific to this annotation operation."""
+
+    visualize_objects: bool = True
+    """Whether predefined object bounds are drawn in camera coordinates."""
+
+    visualize_regions: bool = True
+    """Whether semantic region bounds are drawn in camera coordinates."""
+
+
+# %% WorldVisualizer descriptor
+
+
+@dataclass(kw_only=True)
+class WorldVisualizerDescriptor(AnnotatorDescriptor[WorldVisualizerParameters]):
+    """Declarative configuration of :class:`WorldVisualizer`."""
+
+    parameters: WorldVisualizerParameters = field(
+        default_factory=WorldVisualizerParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% WorldVisualizer annotator
+
+
+@dataclass(eq=False)
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     """
     Visualize predefined objects and regions from the shared world.
     """
 
-    class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self) -> None:
-                self.visualize_objects: bool = True
-                self.visualize_regions: bool = True
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        parameters = Parameters()
+    descriptor: WorldVisualizerDescriptor = field(
+        default_factory=WorldVisualizerDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-    def __init__(
-        self,
-        name: str = "WorldVisualizer",
-        descriptor: WorldVisualizer.Descriptor | None = None,
-    ) -> None:
-        super().__init__(name=name, descriptor=descriptor)
+    @classproperty
+    def Descriptor(cls) -> type[WorldVisualizerDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return WorldVisualizerDescriptor
 
     @staticmethod
     def _body_size(body: Body) -> np.ndarray | None:

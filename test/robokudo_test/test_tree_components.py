@@ -82,7 +82,7 @@ class TestTreeComponents:
                 "detect": par1,
                 "track": par2,
             },
-            filter_fn=lambda query: query["query"],
+            filter_function=lambda query: query["query"],
         )
         pipe = Pipeline("Seq", memory=True, children=[scheduler])
 

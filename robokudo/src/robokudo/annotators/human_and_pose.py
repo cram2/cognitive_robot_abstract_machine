@@ -12,7 +12,8 @@ clearly visible keypoint.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+# %% Imports
+from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
 
@@ -27,6 +28,8 @@ from ultralytics import YOLO
 from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.annotators.exceptions import NotAPoseModelException
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.defs import PACKAGE_NAME
 from robokudo.types.annotation import Classification, CloudAnnotation
 from robokudo.types.cv import Rect
@@ -47,10 +50,10 @@ from robokudo.utils.o3d_helper import (
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
     from ultralytics.engine.results import Results
 
     from robokudo.types.cv import ColorToDepthRatio
-    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 # %% body keypoints
 
@@ -115,12 +118,14 @@ class DepthFrame:
         """
         return 255
 
-    def box_cloud(self, box: Rect, depth_truncate: float) -> open3d.geometry.PointCloud:
+    def box_cloud(
+        self, box: Rect, depth_truncation: float
+    ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a box.
 
         :param box: The box in color image pixels.
-        :param depth_truncate: Distance in meters beyond which measurements are left
+        :param depth_truncation: Distance in meters beyond which measurements are left
             out.
         :return: The colored point cloud of the depth measurements inside the box.
         """
@@ -129,7 +134,7 @@ class DepthFrame:
         ).get_corner_points()
         mask = np.zeros_like(self.depth_image, dtype=np.uint8)
         mask[top:bottom, left:right] = self.mask_foreground
-        return self._masked_cloud(mask, depth_truncate=depth_truncate)
+        return self._masked_cloud(mask, depth_truncation=depth_truncation)
 
     def disc_cloud(self, x: float, y: float, radius: int) -> open3d.geometry.PointCloud:
         """
@@ -173,117 +178,93 @@ class DepthFrame:
         )
 
 
-# %% annotator
+# %% HumanAndPose parameters
 
 
-class HumanAndPoseAnnotator(ThreadedAnnotator):
+@dataclass(kw_only=True)
+class HumanAndPoseParameters(AnnotatorParameters):
+    """Parameters for the HumanAndPoseAnnotator."""
+
+    models_directory: Path = field(
+        default_factory=lambda: ModuleLoader.get_module_path(PACKAGE_NAME) / "models"
+    )
+    """Directory the pose model weights are loaded from."""
+
+    pretrained_model: str = "yolov8n-pose.pt"
+    """File name of the YOLO pose model weights inside :attr:`models_directory`."""
+
+    person_class_name: str = "person"
+    """Class name the human hypotheses are classified as."""
+
+    confidence_threshold: float = 0.7
+    """Minimum confidence of a human detection to be annotated."""
+
+    non_maximum_suppression_overlap: float = 0.5
+    """Intersection over union above which the model merges overlapping detections."""
+
+    global_with_depth: bool = False
+    """Whether to build point clouds from the depth image."""
+
+    shrink_bounding_box: float | None = None
+    """Fraction in [0, 1] of its width and height the bounding box of each human is shrunk by around its center, or None to keep it."""
+
+    shrink_as_annotation: bool = False
+    """Whether, with depth, the shrunk box only yields a cloud annotation instead of replacing the region of the human hypothesis."""
+
+    generate_clouds_for_keypoints: bool = False
+    """Whether, with depth, to build a point cloud around every keypoint."""
+
+    keypoint_confidence_threshold_for_clouds: float = 0.6
+    """Minimum confidence of a keypoint to get a non-empty point cloud."""
+
+    keypoint_masking_radius: int = 6
+    """Radius in depth image pixels around each keypoint its cloud is built from."""
+
+    warmup_annotator: bool = True
+    """Whether setup runs the model once, so that the first real detection is not slowed down by its initialization."""
+
+    warmup_image_shape: tuple[int, int, int] = (512, 512, 3)
+    """Shape (height, width, channels) of the blank image the model is warmed up on."""
+
+    depth_truncation: float = 3.5
+    """Distance in meters beyond which depth measurements are left out of the box clouds, removing background from the human detection."""
+
+
+# %% HumanAndPose descriptor
+
+
+@dataclass(kw_only=True)
+class HumanAndPoseDescriptor(AnnotatorDescriptor[HumanAndPoseParameters]):
+    """Declarative configuration of :class:`HumanAndPoseAnnotator`."""
+
+    parameters: HumanAndPoseParameters = field(
+        default_factory=HumanAndPoseParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% HumanAndPose annotator
+
+
+@dataclass(eq=False)
+class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
     """
     Detects humans with a YOLO pose model and annotates them with their keypoints.
     """
 
-    class Descriptor(ThreadedAnnotator.Descriptor):
-        """
-        Descriptor for the HumanAndPoseAnnotator.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for the HumanAndPoseAnnotator.
-            """
+    descriptor: HumanAndPoseDescriptor = field(default_factory=HumanAndPoseDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.models_directory: Path = (
-                    ModuleLoader.get_module_path(PACKAGE_NAME) / "models"
-                )
-                """
-                Directory the pose model weights are loaded from.
+    model: YOLO | None = field(default=None, init=False, repr=False)
+    """The YOLO pose model, loaded during setup."""
 
-                Created during setup if it does not exist.
-                """
-                self.pretrained_model: str = "yolov8n-pose.pt"
-                """
-                File name of the YOLO pose model weights inside
-                :attr:`models_directory`.
-
-                A model ultralytics provides is downloaded there on first use; custom
-                trained weights must already be there.
-
-                .. note::
-                   The model must report body keypoints, otherwise
-                   :meth:`HumanAndPoseAnnotator.compute` raises
-                   :class:`~robokudo.annotators.exceptions.NotAPoseModelException`.
-                """
-                self.person_class_name: str = "person"
-                """
-                Class name the human hypotheses are classified as.
-                """
-                self.confidence_threshold: float = 0.7
-                """
-                Minimum confidence of a human detection to be annotated.
-                """
-                self.non_maximum_suppression_overlap: float = 0.5
-                """
-                Intersection over union above which the model merges overlapping
-                detections.
-                """
-                self.global_with_depth: bool = False
-                """
-                Whether to build point clouds from the depth image.
-                """
-                self.shrink_bounding_box: float | None = None
-                """
-                Fraction in [0, 1] of its width and height the bounding box of each
-                human is shrunk by around its center, or None to keep it.
-
-                Shrinking may interfere with activity recognition.
-                """
-                self.shrink_as_annotation: bool = False
-                """
-                Whether, with depth, the shrunk box only yields a cloud annotation
-                instead of replacing the region of the human hypothesis.
-                """
-                self.generate_clouds_for_keypoints: bool = False
-                """
-                Whether, with depth, to build a point cloud around every keypoint.
-
-                .. warning::
-                   This is computationally expensive.
-                """
-                self.keypoint_confidence_threshold_for_clouds: float = 0.6
-                """
-                Minimum confidence of a keypoint to get a non-empty point cloud.
-                """
-                self.keypoint_masking_radius: int = 6
-                """
-                Radius in depth image pixels around each keypoint its cloud is built
-                from.
-                """
-                self.warmup_annotator: bool = True
-                """
-                Whether setup runs the model once, so that the first real detection is
-                not slowed down by its initialization.
-                """
-                self.warmup_image_shape: tuple[int, int, int] = (512, 512, 3)
-                """
-                Shape (height, width, channels) of the blank image the model is warmed
-                up on.
-                """
-                self.depth_truncate: float = 3.5
-                """
-                Distance in meters beyond which depth measurements are left out of the
-                box clouds, removing background from the human detection.
-                """
-
-    def __init__(
-        self,
-        name: str = "HumanAndPoseAnnotator",
-        descriptor: HumanAndPoseAnnotator.Descriptor | None = None,
-    ) -> None:
-        super().__init__(name, descriptor)
-        self.model: YOLO | None = None
-        """
-        The YOLO pose model, loaded during setup.
-        """
+    @classproperty
+    def Descriptor(cls) -> type[HumanAndPoseDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return HumanAndPoseDescriptor
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -291,9 +272,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         :attr:`Descriptor.Parameters.models_directory`, creating that directory if it
         does not exist, and, if configured, warming the model up.
         """
-        parameters: HumanAndPoseAnnotator.Descriptor.Parameters = (
-            self.descriptor.parameters
-        )
+        parameters = self.descriptor.parameters
         parameters.models_directory.mkdir(parents=True, exist_ok=True)
         self.model = YOLO(
             str(parameters.models_directory / parameters.pretrained_model)
@@ -311,9 +290,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         :return: The humans the model detects in the image, with their bounding boxes,
             confidences and keypoints.
         """
-        parameters: HumanAndPoseAnnotator.Descriptor.Parameters = (
-            self.descriptor.parameters
-        )
+        parameters = self.descriptor.parameters
         return self.model.predict(
             image,
             conf=parameters.confidence_threshold,
@@ -332,9 +309,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         :raises NotAPoseModelException: If the model reports no keypoints for a
             detection.
         """
-        parameters: HumanAndPoseAnnotator.Descriptor.Parameters = (
-            self.descriptor.parameters
-        )
+        parameters = self.descriptor.parameters
         depth_frame = self._depth_frame() if parameters.global_with_depth else None
         result = self._predict(self.get_cas().get(CASViews.COLOR_IMAGE))
 
@@ -385,9 +360,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         :return: The human hypothesis of the detection.
         :raises NotAPoseModelException: If the model reports no keypoints.
         """
-        parameters: HumanAndPoseAnnotator.Descriptor.Parameters = (
-            self.descriptor.parameters
-        )
+        parameters = self.descriptor.parameters
         if result.keypoints is None:
             raise NotAPoseModelException(
                 annotator_name=self.name, model=parameters.pretrained_model
@@ -425,13 +398,15 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             return hypothesis
 
         hypothesis.points = depth_frame.box_cloud(
-            hypothesis.roi.roi, parameters.depth_truncate
+            hypothesis.roi.roi, parameters.depth_truncation
         )
         if parameters.shrink_bounding_box is not None and keeps_full_box:
             hypothesis.annotations.append(
                 CloudAnnotation(
                     source=self.name,
-                    points=depth_frame.box_cloud(shrunk_box, parameters.depth_truncate),
+                    points=depth_frame.box_cloud(
+                        shrunk_box, parameters.depth_truncation
+                    ),
                 )
             )
         if parameters.generate_clouds_for_keypoints:
@@ -474,9 +449,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         :return: The cloud around each keypoint, empty for keypoints below
             :attr:`Descriptor.Parameters.keypoint_confidence_threshold_for_clouds`.
         """
-        parameters: HumanAndPoseAnnotator.Descriptor.Parameters = (
-            self.descriptor.parameters
-        )
+        parameters = self.descriptor.parameters
         return [
             BodyKeypointCloud(
                 keypoint=keypoint,

@@ -1,7 +1,9 @@
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
@@ -40,7 +42,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
                 ClusterColorHistogramAnnotator(),
-                ClusterPoseBBAnnotator(),
+                ClusterPoseBoundingBoxAnnotator(),
                 SemanticDigitalTwinConnector(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
             ]

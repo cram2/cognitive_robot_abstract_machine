@@ -18,19 +18,24 @@ from __future__ import annotations
 # %% Imports
 import copy
 import logging
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
 import numpy as np
 import open3d
+from krrood.ormatic.utils import classproperty
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from scipy.spatial.transform import Rotation as R
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from typing_extensions import TYPE_CHECKING
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.annotators.exceptions import InvalidAnalysisData
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.exceptions import (
     EmptyPointCloud,
     PlaneModelMissing,
@@ -43,7 +48,6 @@ from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypo
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import concatenate_clouds, place_bounding_box_on_target
 from robokudo.utils.transform import get_transform_matrix
-from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -107,7 +111,7 @@ def generate_roi_with_mask_from_points(
 
 def cluster_points(
     input_cloud: open3d.geometry.PointCloud,
-    eps: float,
+    clustering_epsilon: float,
     min_points: int,
     rk_logger: logging.Logger,
 ) -> list[int]:
@@ -115,7 +119,7 @@ def cluster_points(
     Cluster points using DBSCAN algorithm.
 
     :param input_cloud: Point cloud to cluster
-    :param eps: DBSCAN epsilon parameter (density threshold)
+    :param clustering_epsilon: DBSCAN epsilon parameter (density threshold)
     :param min_points: Minimum points for a cluster
     :param rk_logger: Logger instance for progress reporting
     :return: List of point indices for each cluster
@@ -130,7 +134,7 @@ def cluster_points(
         print_progress = False
     labels = np.array(
         input_cloud.cluster_dbscan(
-            eps=eps, min_points=min_points, print_progress=print_progress
+            eps=clustering_epsilon, min_points=min_points, print_progress=print_progress
         )
     )
 
@@ -146,7 +150,48 @@ def cluster_points(
     return all_cluster_indices
 
 
-class PointCloudClusterExtractor(ThreadedAnnotator):
+# %% PointCloudClusterExtractor parameters
+
+
+@dataclass(kw_only=True)
+class PointCloudClusterExtractorParameters(AnnotatorParameters):
+    """Parameters for configuring cluster extraction."""
+
+    clustering_minimum_point_count: int = 90
+    """Minimum points for DBSCAN cluster"""
+
+    minimum_cluster_point_count: int = 1000
+    """Minimum total points for valid cluster"""
+
+    minimum_on_plane_point_count: int = 90
+    """Minimum points above plane"""
+
+    clustering_epsilon: float = 0.04
+    """DBSCAN epsilon parameter (density threshold)"""
+
+
+# %% PointCloudClusterExtractor descriptor
+
+
+@dataclass(kw_only=True)
+class PointCloudClusterExtractorDescriptor(
+    AnnotatorDescriptor[PointCloudClusterExtractorParameters]
+):
+    """Declarative configuration of :class:`PointCloudClusterExtractor`."""
+
+    parameters: PointCloudClusterExtractorParameters = field(
+        default_factory=PointCloudClusterExtractorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% PointCloudClusterExtractor annotator
+
+
+@dataclass(eq=False)
+class PointCloudClusterExtractor(
+    ThreadedAnnotator[PointCloudClusterExtractorDescriptor]
+):
     """
     Annotator for object detection.
 
@@ -159,52 +204,18 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
        Requires a Plane annotation in the CAS to function.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for point cloud clustering.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for configuring cluster extraction.
-            """
+    descriptor: PointCloudClusterExtractorDescriptor = field(
+        default_factory=PointCloudClusterExtractorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.dbscan_min_cluster_count: int = 90
-                """
-                Minimum points for DBSCAN cluster
-                """
-
-                self.min_cluster_count: int = 1000
-                """
-                Minimum total points for valid cluster
-                """
-
-                self.min_on_plane_point_count: int = 90
-                """
-                Minimum points above plane
-                """
-
-                self.eps: float = 0.04
-                """
-                DBSCAN epsilon parameter (density threshold)
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "PointCloudClusterExtractor",
-        descriptor: PointCloudClusterExtractor.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the cluster extractor.
-
-        :param name: The name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    @classproperty
+    def Descriptor(cls) -> type[PointCloudClusterExtractorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return PointCloudClusterExtractorDescriptor
 
     def points_and_indices_from_plane(
         self,
@@ -288,16 +299,19 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
                 actual_type=type(on_plane_cloud),
             )
         on_plane_point_count = len(on_plane_cloud.points)
-        if on_plane_point_count < self.descriptor.parameters.min_on_plane_point_count:
+        if (
+            on_plane_point_count
+            < self.descriptor.parameters.minimum_on_plane_point_count
+        ):
             self.feedback_message = (
                 f"above plane point cloud has not enough "
                 f"points ({on_plane_point_count} "
-                f"< {self.descriptor.parameters.min_on_plane_point_count}). Skipping"
+                f"< {self.descriptor.parameters.minimum_on_plane_point_count}). Skipping"
             )
             raise PointCloudTooSmallForClustering(
                 point_count=on_plane_point_count,
                 minimum_point_count=(
-                    self.descriptor.parameters.min_on_plane_point_count
+                    self.descriptor.parameters.minimum_on_plane_point_count
                 ),
                 context="above-plane point cloud clustering",
             )
@@ -356,8 +370,8 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         # Cluster the points above the plane to get a list of point indices for each cluster
         all_cluster_indices = cluster_points(
             input_cloud=on_plane_cloud,
-            eps=self.descriptor.parameters.eps,
-            min_points=self.descriptor.parameters.dbscan_min_cluster_count,
+            clustering_epsilon=self.descriptor.parameters.clustering_epsilon,
+            min_points=self.descriptor.parameters.clustering_minimum_point_count,
             rk_logger=self.rk_logger,
         )
 
@@ -367,7 +381,10 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         object_hypotheses = []
         cluster_idx = 0
         for cluster_indices in all_cluster_indices:
-            if len(cluster_indices) < self.descriptor.parameters.min_cluster_count:
+            if (
+                len(cluster_indices)
+                < self.descriptor.parameters.minimum_cluster_point_count
+            ):
                 self.rk_logger.debug(
                     f"Skipping cluster {cluster_idx} with {len(cluster_indices)} points"
                 )
@@ -466,7 +483,48 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         return Status.SUCCESS
 
 
-class NaivePointCloudClusterExtractor(ThreadedAnnotator):
+# %% NaivePointCloudClusterExtractor parameters
+
+
+@dataclass(kw_only=True)
+class NaivePointCloudClusterExtractorParameters(AnnotatorParameters):
+    """Parameters for configuring cluster extraction."""
+
+    clustering_minimum_point_count: int = 90
+    """Minimum points for DBSCAN cluster"""
+
+    minimum_cluster_point_count: int = 1000
+    """Minimum total points for valid cluster"""
+
+    minimum_on_plane_point_count: int = 90
+    """Minimum points above plane"""
+
+    clustering_epsilon: float = 0.04
+    """DBSCAN epsilon parameter (density threshold)"""
+
+
+# %% NaivePointCloudClusterExtractor descriptor
+
+
+@dataclass(kw_only=True)
+class NaivePointCloudClusterExtractorDescriptor(
+    AnnotatorDescriptor[NaivePointCloudClusterExtractorParameters]
+):
+    """Declarative configuration of :class:`NaivePointCloudClusterExtractor`."""
+
+    parameters: NaivePointCloudClusterExtractorParameters = field(
+        default_factory=NaivePointCloudClusterExtractorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% NaivePointCloudClusterExtractor annotator
+
+
+@dataclass(eq=False)
+class NaivePointCloudClusterExtractor(
+    ThreadedAnnotator[NaivePointCloudClusterExtractorDescriptor]
+):
     """
     Annotator for object detection. Simply takes an input cloud and clusters it.
 
@@ -474,52 +532,18 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
        Unlike PointCloudClusterExtractor, this does not require a plane model.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for naive point cloud clustering.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for configuring cluster extraction.
-            """
+    descriptor: NaivePointCloudClusterExtractorDescriptor = field(
+        default_factory=NaivePointCloudClusterExtractorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.dbscan_min_cluster_count: int = 90
-                """
-                Minimum points for DBSCAN cluster
-                """
-
-                self.min_cluster_count: int = 1000
-                """
-                Minimum total points for valid cluster
-                """
-
-                self.min_on_plane_point_count: int = 90
-                """
-                Minimum points above plane
-                """
-
-                self.eps: float = 0.04
-                """
-                DBSCAN epsilon parameter (density threshold)
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "NaivePointCloudClusterExtractor",
-        descriptor: NaivePointCloudClusterExtractor.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the naive cluster extractor.
-
-        :param name: The name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    @classproperty
+    def Descriptor(cls) -> type[NaivePointCloudClusterExtractorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return NaivePointCloudClusterExtractorDescriptor
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:
@@ -553,8 +577,8 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         # Cluster the points above the plane to get a list of point indices for each cluster
         all_cluster_indices = cluster_points(
             input_cloud=cloud,
-            eps=self.descriptor.parameters.eps,
-            min_points=self.descriptor.parameters.dbscan_min_cluster_count,
+            clustering_epsilon=self.descriptor.parameters.clustering_epsilon,
+            min_points=self.descriptor.parameters.clustering_minimum_point_count,
             rk_logger=self.rk_logger,
         )
 
@@ -564,7 +588,10 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         object_hypotheses = []
         cluster_idx = 0
         for cluster_indices in all_cluster_indices:
-            if len(cluster_indices) < self.descriptor.parameters.min_cluster_count:
+            if (
+                len(cluster_indices)
+                < self.descriptor.parameters.minimum_cluster_point_count
+            ):
                 self.rk_logger.debug(
                     f"Skipping cluster {cluster_idx} with {len(cluster_indices)} points"
                 )

@@ -15,8 +15,9 @@ class, that carries the detected class as a classification. Optionally:
 
 from __future__ import annotations
 
+# %% Imports
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -31,6 +32,8 @@ from ultralytics.utils.plotting import colors
 
 from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import DetectionModelNotConfigured
 from robokudo.types.annotation import Classification
@@ -48,8 +51,8 @@ from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.o3d_helper import get_cloud_from_rgb_depth_and_mask
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
     import numpy.typing as npt
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 # %% detections
 
@@ -93,127 +96,135 @@ class AnnotatedDetection:
     """
 
 
-# %% annotator
+# %% Yolo parameters
 
 
-class YoloAnnotator(ThreadedAnnotator):
+@dataclass(kw_only=True)
+class YoloParameters(AnnotatorParameters):
+    """Parameters for the YoloAnnotator."""
+
+    models_directory: Path = field(
+        default_factory=lambda: ModuleLoader.get_module_path(PACKAGE_NAME) / "models"
+    )
+    """Directory the pretrained models are loaded from, and downloaded into on first use."""
+
+    pretrained_model: str | None = None
+    """Pretrained model inside :attr:`models_directory`, taking precedence over custom ROS-package weights."""
+
+    ros_package_name: str | None = None
+    """Name of the ROS package holding custom weights."""
+
+    weights_path: str | None = None
+    """Path of the custom weights, relative to the ROS package."""
+
+    class_names_path: str = "data/json/id2name.json"
+    """Class-id mapping relative to the ROS package, read only for custom weights."""
+
+    threshold: float = 0.9
+    """Minimum confidence of a detection to be annotated."""
+
+    person_class_name: str = "person"
+    """Class name of the detections that become human hypotheses."""
+
+    ignored_class_names: list[str] = field(default_factory=list)
+    """Classes whose detections are neither annotated nor visualized."""
+
+    precision_mode: bool = False
+    """Whether SAM segments each detection instead of its mask filling the bounding box."""
+
+    segmentation_model: str = "mobile_sam.pt"
+    """Name of the SAM model ultralytics provides, inside :attr:`models_directory`, loaded in precision mode."""
+
+    precision_mode_apply_erosion: bool = False
+    """Whether to erode the SAM masks in precision mode."""
+
+    precision_mode_erosion_kernel_size: int = 2
+    """Edge length in pixels of the square kernel the SAM masks are eroded with."""
+
+    depth_truncation: float = 3.5
+    """Distance in meters beyond which depth measurements are left out of the hypothesis point clouds."""
+
+    classify_existing_hypotheses: bool = False
+    """Whether a detection overlapping an existing object hypothesis classifies that hypothesis instead of creating a new one."""
+
+    minimum_hypothesis_overlap: float = 0.65
+    """Intersection over union a detection must exceed with an existing object hypothesis to classify it."""
+
+    def model_location(self, annotator_name: str) -> str:
+        """
+        :param annotator_name: Name of the annotator loading the model, for the
+            error.
+        :return: The path of the pretrained model inside
+            :attr:`models_directory`, or else the path of the custom weights.
+        :raises DetectionModelNotConfigured: If neither is configured.
+        """
+        if self.pretrained_model is not None:
+            return str(self.models_directory / self.pretrained_model)
+        if self.ros_package_name is None or self.weights_path is None:
+            raise DetectionModelNotConfigured(annotator_name=annotator_name)
+        return str(self.file_in_ros_package(self.weights_path))
+
+    def file_in_ros_package(self, relative_path: str) -> Path:
+        """
+        :param relative_path: Path of a file, relative to the configured ROS
+            package.
+        :return: The absolute path of the file.
+        """
+        return FileLoader.get_path_to_file_in_ros_package(
+            ros_package_name=self.ros_package_name, relative_path=relative_path
+        )
+
+
+# %% Yolo descriptor
+
+
+@dataclass(kw_only=True)
+class YoloDescriptor(AnnotatorDescriptor[YoloParameters]):
+    """Declarative configuration of :class:`YoloAnnotator`."""
+
+    parameters: YoloParameters = field(default_factory=YoloParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Yolo annotator
+
+
+@dataclass(eq=False)
+class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
     """
     Detects objects with a YOLO model and annotates them as classified hypotheses.
     """
 
-    class Descriptor(ThreadedAnnotator.Descriptor):
-        """
-        Descriptor for the YoloAnnotator.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for the YoloAnnotator.
-            """
+    descriptor: YoloDescriptor = field(default_factory=YoloDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.models_directory: Path = (
-                    ModuleLoader.get_module_path(PACKAGE_NAME) / "models"
-                )
-                """
-                Directory the pretrained models are loaded from, and downloaded into on
-                first use.
+    model_location: str = field(init=False, repr=False)
+    """Where the YOLO model is loaded from."""
 
-                Created during setup if it does not exist.
-                """
-                self.pretrained_model: str | None = None
-                """
-                Name of a model ultralytics provides, e.g. ``yolov8m.pt``, inside
-                :attr:`models_directory`.
+    model: YOLO | None = field(default=None, init=False, repr=False)
+    """The YOLO detection model, loaded during setup."""
 
-                Takes precedence over weights inside a ROS package.
-                """
-                self.ros_package_name: str | None = None
-                """
-                Name of the ROS package holding custom weights.
-                """
-                self.weights_path: str | None = None
-                """
-                Path of the custom weights, relative to the ROS package.
-                """
-                self.class_names_path: str = "data/json/id2name.json"
-                """
-                Path of a JSON file mapping class ids to class names, relative to the
-                ROS package.
+    class_names: dict[int, str] = field(default_factory=dict, init=False, repr=False)
+    """Name of each class the model detects, by class id, loaded during setup."""
 
-                Only read for custom weights, since pretrained models carry their class
-                names.
-                """
-                self.threshold: float = 0.9
-                """
-                Minimum confidence of a detection to be annotated.
-                """
-                self.person_class_name: str = "person"
-                """
-                Class name of the detections that become human hypotheses.
-                """
-                self.ignored_class_names: list[str] = []
-                """
-                Classes whose detections are neither annotated nor visualized.
-                """
-                self.precision_mode: bool = False
-                """
-                Whether SAM segments each detection instead of its mask filling the
-                bounding box.
-                """
-                self.segmentation_model: str = "mobile_sam.pt"
-                """
-                Name of the SAM model ultralytics provides, inside
-                :attr:`models_directory`, loaded in precision mode.
-                """
-                self.precision_mode_apply_erosion: bool = False
-                """
-                Whether to erode the SAM masks in precision mode.
-                """
-                self.precision_mode_erosion_kernel_size: int = 2
-                """
-                Edge length in pixels of the square kernel the SAM masks are eroded
-                with.
-                """
-                self.depth_truncate: float = 3.5
-                """
-                Distance in meters beyond which depth measurements are left out of the
-                hypothesis point clouds.
-                """
-                self.classify_existing_hypotheses: bool = False
-                """
-                Whether a detection overlapping an existing object hypothesis classifies
-                that hypothesis instead of creating a new one.
-                """
-                self.minimum_hypothesis_overlap: float = 0.65
-                """
-                Intersection over union a detection must exceed with an existing object
-                hypothesis to classify it.
-                """
+    segmentation_model: SAM | None = field(default=None, init=False, repr=False)
+    """The SAM model refining the hypothesis masks in precision mode, loaded during setup."""
 
-            def model_location(self, annotator_name: str) -> str:
-                """
-                :param annotator_name: Name of the annotator loading the model, for the
-                    error.
-                :return: The path of the pretrained model inside
-                    :attr:`models_directory`, or else the path of the custom weights.
-                :raises DetectionModelNotConfigured: If neither is configured.
-                """
-                if self.pretrained_model is not None:
-                    return str(self.models_directory / self.pretrained_model)
-                if self.ros_package_name is None or self.weights_path is None:
-                    raise DetectionModelNotConfigured(annotator_name=annotator_name)
-                return str(self.file_in_ros_package(self.weights_path))
+    camera_model: PinholeCameraModel | None = field(
+        default=None, init=False, repr=False
+    )
+    """Projection model at the depth image resolution."""
 
-            def file_in_ros_package(self, relative_path: str) -> Path:
-                """
-                :param relative_path: Path of a file, relative to the configured ROS
-                    package.
-                :return: The absolute path of the file.
-                """
-                return FileLoader.get_path_to_file_in_ros_package(
-                    ros_pkg_name=self.ros_package_name, relative_path=relative_path
-                )
+    image_region_comparator: RoiComparator = field(init=False, repr=False)
+    """Comparator measuring how much a detection overlaps an existing hypothesis."""
+
+    @classproperty
+    def Descriptor(cls) -> type[YoloDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return YoloDescriptor
 
     @classproperty
     def mask_foreground(cls) -> int:
@@ -222,44 +233,18 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         return 255
 
-    def __init__(
-        self,
-        name: str = "YoloAnnotator",
-        descriptor: YoloAnnotator.Descriptor | None = None,
-    ) -> None:
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.model_location: str = self.descriptor.parameters.model_location(self.name)
-        """
-        Where the YOLO model is loaded from.
-        """
-        self.model: YOLO | None = None
-        """
-        The YOLO detection model, loaded during setup.
-        """
-        self.class_names: dict[int, str] = {}
-        """
-        Name of each class the model detects, by class id, loaded during setup.
-        """
-        self.segmentation_model: SAM | None = None
-        """
-        The SAM model refining the hypothesis masks in precision mode, loaded during
-        setup.
-        """
-        self.camera_model: PinholeCameraModel | None = None
-        """
-        Projection model at the depth image resolution.
-        """
-        self.roi_comparator = RoiComparator(weight=1.0)
-        """
-        Comparator measuring how much a detection overlaps an existing hypothesis.
-        """
+        self.image_region_comparator = RoiComparator(weight=1.0)
 
     def setup(self, **kwargs: Any) -> bool:
         """
         Load the models, so that building a pipeline does not download them.
         """
-        parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         parameters.models_directory.mkdir(parents=True, exist_ok=True)
         self.model = YOLO(self.model_location)
         self.class_names = self._load_class_names()
@@ -273,7 +258,7 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         :return: Name of each class the model detects, by class id.
         """
-        parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if parameters.pretrained_model is not None:
             return dict(self.model.names)
         class_names_file = parameters.file_in_ros_package(parameters.class_names_path)
@@ -285,7 +270,7 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         Detect objects and annotate them as classified object hypotheses.
         """
-        parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if parameters.global_with_depth:
             cas = self.get_cas()
             color_to_depth_ratio = cas.color_to_depth_ratio
@@ -419,11 +404,11 @@ class YoloAnnotator(ThreadedAnnotator):
             return None
         most_overlapped = max(
             hypotheses,
-            key=lambda hypothesis: self.roi_comparator.compute_similarity(
+            key=lambda hypothesis: self.image_region_comparator.compute_similarity(
                 hypothesis.roi.roi, region
             ),
         )
-        overlap = self.roi_comparator.compute_similarity(
+        overlap = self.image_region_comparator.compute_similarity(
             most_overlapped.roi.roi, region
         )
         if overlap <= self.descriptor.parameters.minimum_hypothesis_overlap:
@@ -465,7 +450,7 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         :return: The mask of the detected object on the detection image.
         """
-        parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if not parameters.precision_mode:
             x1, y1, x2, y2 = detection.bounding_box.get_corner_points()
             mask = np.zeros(detection_image.shape[:2], dtype=np.uint8)
@@ -500,7 +485,7 @@ class YoloAnnotator(ThreadedAnnotator):
             depth_image=self.get_cas().get(CASViews.DEPTH_IMAGE),
             mask=detection_mask,
             camera_model=self.camera_model,
-            depth_truncate=self.descriptor.parameters.depth_truncate,
+            depth_truncation=self.descriptor.parameters.depth_truncation,
             mask_true_value=self.mask_foreground,
         )
 
@@ -509,7 +494,7 @@ class YoloAnnotator(ThreadedAnnotator):
         Draw the annotated hypotheses into the color image, together with their masks in
         precision mode, and output the point clouds of the new hypotheses.
         """
-        parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         visualization_image = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
         for index, annotated in enumerate(annotated_detections):
             if parameters.precision_mode and annotated.is_new:

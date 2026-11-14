@@ -5,6 +5,10 @@ This module provides an annotator for visualizing the poses of detected objects 
 2D (image overlays) and 3D (coordinate frames) representations.
 """
 
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass
 from timeit import default_timer
 
 import numpy as np
@@ -19,6 +23,7 @@ from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.transform import get_transform_matrix_from_q
 
 
+@dataclass(eq=False)
 class ObjectPoseVisualizer(BaseAnnotator):
     """
     Annotator for visualizing object poses in the CAS.
@@ -30,14 +35,10 @@ class ObjectPoseVisualizer(BaseAnnotator):
     * Displaying the coordinate frames alongside the point cloud
     """
 
-    def __init__(self, name: str = "ObjectPoseVisualizer"):
-        """
-        Initialize the object pose visualizer.
-
-        :param name: Name of the annotator instance
-        """
-        super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

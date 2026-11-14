@@ -19,17 +19,16 @@ The pipeline implements the following functionality:
 """
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.pipeline_trigger import PipelineTrigger
 from robokudo.annotators.testing import SlowAnnotator
-from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
-from robokudo.pipeline import Pipeline
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.pipeline import Pipeline
+from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -91,8 +90,8 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 # py_trees.behaviours.Count(name="Annotator A", fail_until=-1, running_until=30, success_until=1000),
                 # py_trees.behaviours.Count(name="Annotator B", fail_until=-1, running_until=15, success_until=1000)
-                SlowAnnotator("Slow1Annotator", sleep_in_s=4),
-                SlowAnnotator("Slow2Annotator", sleep_in_s=2),
+                SlowAnnotator("Slow1Annotator", sleep_duration_seconds=4),
+                SlowAnnotator("Slow2Annotator", sleep_duration_seconds=2),
             ]
         )
 
@@ -101,9 +100,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
             ImagePreprocessorAnnotator("ImagePreprocessor"),
-            SlowAnnotator("FastAnnotator", sleep_in_s=1),
+            SlowAnnotator("FastAnnotator", sleep_duration_seconds=1),
             parallel,
-            SlowAnnotator("Slow3Annotator", sleep_in_s=2),
+            SlowAnnotator("Slow3Annotator", sleep_duration_seconds=2),
         ]:
             seq.add_child(annotator)
 

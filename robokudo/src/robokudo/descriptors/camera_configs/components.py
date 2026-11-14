@@ -114,12 +114,12 @@ class StableViewpointComponent:
     Flag to use only stable viewpoints
     """
 
-    max_viewpoint_distance: float = 0.01
+    maximum_viewpoint_distance: float = 0.01
     """
     Maximum allowed distance for viewpoint changes
     """
 
-    max_viewpoint_rotation: float = 1.0
+    maximum_viewpoint_rotation: float = 1.0
     """
     Maximum allowed rotation for viewpoint changes
     """
@@ -149,7 +149,7 @@ class RGBDComponent(DepthComponent, ColorComponent):
     axes for a 640x480 depth image next to a 1280x960 color image.
     """
 
-    hi_res_mode: bool = False
+    high_resolution_mode: bool = False
     """
     Setting this to true will apply some workarounds to match the depth data to RGB on the Kinect.
     """

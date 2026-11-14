@@ -1,4 +1,9 @@
+from __future__ import annotations
+
 import copy
+
+# %% Imports
+from dataclasses import dataclass
 from timeit import default_timer
 
 import cv2
@@ -11,15 +16,15 @@ from robokudo.cas import CASViews
 from robokudo.types.cv import BoundingBox3D
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
-    transform_cloud_from_camera_to_world,
     get_world_to_camera_transform_matrix,
+    transform_cloud_from_camera_to_world,
 )
 from robokudo.utils.transform import get_transform_matrix
 
 """
 Robokudo Size Annotator on Bounding Boxes 3D
 
-:class:`SizeBBAnnotator` performs an analysis of the 3D point cloud from any object hypothesis to 
+:class:`SizeBoundingBoxAnnotator` performs an analysis of the 3D point cloud from any object hypothesis to 
 derive the size of the objects from 3D oriented bounding boxes and annotates
 the information found for later processing steps.
 
@@ -36,7 +41,8 @@ Processing steps:
 """
 
 
-class SizeBBAnnotator(BaseAnnotator):
+@dataclass(eq=False)
+class SizeBoundingBoxAnnotator(BaseAnnotator):
     """
     A class to analyze 3D point clouds and compute oriented bounding box sizes.
 
@@ -45,14 +51,10 @@ class SizeBBAnnotator(BaseAnnotator):
     transformations and uses minimum area rectangles to determine object dimensions.
     """
 
-    def __init__(self, name: str = "SizeBBAnnotator") -> None:
-        """
-        Default construction.
-
-        Minimal one-time init!
-        """
-        super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     def update(self) -> Status:
         """
@@ -87,7 +89,7 @@ class SizeBBAnnotator(BaseAnnotator):
                 )
             except Exception as e:
                 self.rk_logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS." f"Fail. Error: {e}"
+                    f"Couldn't find camera viewpoint in the CAS.Fail. Error: {e}"
                 )
                 return Status.FAILURE
 

@@ -11,7 +11,9 @@ using HSV color space segmentation.
 
 from __future__ import annotations
 
+# %% Imports
 import copy
+from dataclasses import dataclass, field
 from enum import Enum
 from timeit import default_timer
 
@@ -19,11 +21,15 @@ import cv2
 import numba
 import numpy as np
 import numpy.ma
+from krrood.ormatic.utils import classproperty
+from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import SemanticColor
 from robokudo.types.cv import Rect
 from robokudo.types.scene import AnalyzableAnnotation
@@ -54,7 +60,65 @@ class Color(Enum):
     # COUNT # Use len(Color) instead
 
 
-class ClusterColorAnnotator(BaseAnnotator):
+# %% ClusterColor parameters
+
+
+@dataclass(kw_only=True)
+class ClusterColorParameters(AnnotatorParameters):
+    """Parameters for color analysis configuration."""
+
+    number_of_colors: int = 6
+    """Number of chromatic categories dividing the hue interval."""
+
+    color_range: float = field(
+        init=False, metadata=JSONMetadata(serialize=True).as_dict()
+    )
+    """Hue interval assigned to each chromatic category."""
+
+    just_in_time_compile_on_initialization: bool = False
+    """Whether to compile the pixel-counting kernel during construction."""
+
+    minimum_value_color: int = 60
+    """Value threshold a pixel must exceed to be classified as chromatic."""
+
+    minimum_saturation_color: int = 60
+    """Saturation threshold a pixel must exceed to be classified as chromatic."""
+
+    maximum_value_black: int = 60
+    """Largest pixel value classified as black."""
+
+    minimum_value_white: int = 120
+    """Value threshold an achromatic pixel must exceed to be classified as white."""
+
+    ratio_annotation_threshold: float = 0.2
+    """Minimum fraction of classified pixels required for a color annotation."""
+
+    analysis_scope: type = AnalyzableAnnotation
+    """Annotation type whose image regions are analyzed."""
+
+    def __post_init__(self) -> None:
+        """Initialize values derived from the configured processing settings."""
+        self.color_range: float = 256 / self.number_of_colors
+
+
+# %% ClusterColor descriptor
+
+
+@dataclass(kw_only=True)
+class ClusterColorDescriptor(AnnotatorDescriptor[ClusterColorParameters]):
+    """Declarative configuration of :class:`ClusterColorAnnotator`."""
+
+    parameters: ClusterColorParameters = field(
+        default_factory=ClusterColorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ClusterColor annotator
+
+
+@dataclass(eq=False)
+class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     """
     Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB
     ROI and a Mask.
@@ -73,64 +137,48 @@ class ClusterColorAnnotator(BaseAnnotator):
     * Value thresholds for black/white/grey
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for the ClusterColorAnnotator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        Defines parameters that control the color analysis behavior:
+    descriptor: ClusterColorDescriptor = field(default_factory=ClusterColorDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-        * Number of color divisions in hue space
-        * Thresholds for color classification
-        * Minimum ratio for color annotation
-        """
+    color_hue_positions: dict[Color, float] = field(init=False, repr=False)
+    """Representative hue of each named color."""
 
-        class Parameters:
-            """
-            Parameters for color analysis configuration.
-            """
+    cluster_color_statistics: list[list[tuple[Color, int, float]]] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """Color proportions calculated for the current object hypotheses."""
 
-            def __init__(self) -> None:
-                self.num_of_colors: int = 6
-                self.color_range: float = 256 / self.num_of_colors
-                self.jit_compile_on_init: bool = False
-                self.min_value_color: int = 60
-                self.min_saturation_color: int = 60
-                self.max_value_black: int = 60
-                self.min_value_white: int = 120
-                self.ratio_annotation_threshold: float = 0.2
-                self.analysis_scope: type = AnalyzableAnnotation
+    cluster_image_regions: list[Rect] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """Image regions used for the current color calculation."""
 
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ClusterColorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ClusterColorDescriptor
 
-    # To easily define this, we use RGB here and then flip it. OpenCV in python uses BGR per default.
-    # Please note, that this color will not be used for the segmentation!
-    # The segmentation is mainly done with self.color_hue_positions
-    color_name_to_bgr_values: dict[Color, tuple[int, ...]] = {
-        Color.RED: tuple(reversed((255, 0, 0))),
-        Color.YELLOW: tuple(reversed((255, 255, 0))),
-        Color.GREEN: tuple(reversed((0, 255, 0))),
-        Color.CYAN: tuple(reversed((0, 255, 255))),
-        Color.BLUE: tuple(reversed((0, 0, 255))),
-        Color.MAGENTA: tuple(reversed((255, 0, 255))),
-        Color.WHITE: tuple(reversed((255, 255, 255))),
-        Color.BLACK: tuple(reversed((0, 0, 0))),
-        Color.GREY: tuple(reversed((127, 127, 127))),
-    }
+    @classproperty
+    def color_name_to_bgr_values(cls) -> dict[Color, tuple[int, ...]]:
+        """Display colors in OpenCV channel order, independent of segmentation thresholds."""
+        return {
+            Color.RED: tuple(reversed((255, 0, 0))),
+            Color.YELLOW: tuple(reversed((255, 255, 0))),
+            Color.GREEN: tuple(reversed((0, 255, 0))),
+            Color.CYAN: tuple(reversed((0, 255, 255))),
+            Color.BLUE: tuple(reversed((0, 0, 255))),
+            Color.MAGENTA: tuple(reversed((255, 0, 255))),
+            Color.WHITE: tuple(reversed((255, 255, 255))),
+            Color.BLACK: tuple(reversed((0, 0, 0))),
+            Color.GREY: tuple(reversed((127, 127, 127))),
+        }
 
-    def __init__(
-        self,
-        name: str = "ClusterColorAnnotator",
-        descriptor: ClusterColorAnnotator.Descriptor | None = None,
-    ) -> None:
-        """
-        Default construction.
-
-        Minimal one-time init!
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # This list defines the range of a certain color.
@@ -138,7 +186,7 @@ class ClusterColorAnnotator(BaseAnnotator):
             i * self.descriptor.parameters.color_range
             + self.descriptor.parameters.color_range / 2
             + 0.5
-            for i in range(0, self.descriptor.parameters.num_of_colors)
+            for i in range(0, self.descriptor.parameters.number_of_colors)
         ]
 
         self.color_hue_positions = {
@@ -150,11 +198,8 @@ class ClusterColorAnnotator(BaseAnnotator):
             Color.MAGENTA: hue_intervals[5],
         }
 
-        self.cluster_color_info: list[list[tuple[Color, int, float]]] = []
-        self.cluster_rois: list[Rect] = []
-
         # Trigger JIT by calling method first time with empty data
-        if self.descriptor.parameters.jit_compile_on_init:
+        if self.descriptor.parameters.just_in_time_compile_on_initialization:
             start_timer_jit = default_timer()
             hsv_image = np.array([[[0, 0, 0]]])
             mask = np.array([[0]])
@@ -182,11 +227,11 @@ class ClusterColorAnnotator(BaseAnnotator):
             hsv_image,
             mask,
             len(Color),
-            self.descriptor.parameters.min_saturation_color,
-            self.descriptor.parameters.min_value_color,
-            self.descriptor.parameters.max_value_black,
-            self.descriptor.parameters.min_value_white,
-            self.descriptor.parameters.num_of_colors,
+            self.descriptor.parameters.minimum_saturation_color,
+            self.descriptor.parameters.minimum_value_color,
+            self.descriptor.parameters.maximum_value_black,
+            self.descriptor.parameters.minimum_value_white,
+            self.descriptor.parameters.number_of_colors,
             self.descriptor.parameters.color_range,
         )
 
@@ -202,10 +247,10 @@ class ClusterColorAnnotator(BaseAnnotator):
         hsv_image: npt.NDArray,
         mask: npt.NDArray,
         total_amount_of_colors: int,
-        min_saturation_color: int,
-        min_value_color: int,
-        max_value_black: int,
-        min_value_white: int,
+        minimum_saturation_color: int,
+        minimum_value_color: int,
+        maximum_value_black: int,
+        minimum_value_white: int,
         number_of_colors: int,
         color_range: float,
     ) -> tuple[int, npt.NDArray]:
@@ -217,10 +262,10 @@ class ClusterColorAnnotator(BaseAnnotator):
         :param hsv_image: Image in HSV color space.
         :param mask: Binary mask indicating pixels to analyze.
         :param total_amount_of_colors: Total number of color categories.
-        :param min_saturation_color: Minimum saturation for chromatic colors.
-        :param min_value_color: Minimum value for chromatic colors.
-        :param max_value_black: Maximum value for black classification.
-        :param min_value_white: Minimum value for white classification.
+        :param minimum_saturation_color: Minimum saturation for chromatic colors.
+        :param minimum_value_color: Minimum value for chromatic colors.
+        :param maximum_value_black: Maximum value for black classification.
+        :param minimum_value_white: Minimum value for white classification.
         :param number_of_colors: Number of hue divisions.
         :param color_range: Size of each hue division.
         :return: A tuple with the number of analyzed pixels (given by the mask) as well
@@ -244,7 +289,7 @@ class ClusterColorAnnotator(BaseAnnotator):
                 counted_pixel_sum += 1
                 hue, sat, val = hsv_image[i, j]
                 # Assume check is done in the right order to not mix up indices
-                if sat > min_saturation_color and val > min_value_color:
+                if sat > minimum_saturation_color and val > minimum_value_color:
                     if hue < hue_intervals[Color.RED.value[0]]:
                         color_count[Color.RED.value[0]] += 1
                     elif hue < hue_intervals[Color.YELLOW.value[0]]:
@@ -259,9 +304,9 @@ class ClusterColorAnnotator(BaseAnnotator):
                         color_count[Color.MAGENTA.value[0]] += 1
                     else:
                         color_count[Color.RED.value[0]] += 1
-                elif val <= max_value_black:
+                elif val <= maximum_value_black:
                     color_count[Color.BLACK.value[0]] += 1
-                elif val > min_value_white:
+                elif val > minimum_value_white:
                     color_count[Color.WHITE.value[0]] += 1
                 else:
                     color_count[Color.GREY.value[0]] += 1
@@ -304,17 +349,18 @@ class ClusterColorAnnotator(BaseAnnotator):
         pl_color, pl_bw_range = split(
             im,
             np.logical_and(
-                im[:, 1] > self.descriptor.parameters.min_saturation_color,
-                im[:, 2] > self.descriptor.parameters.min_value_color,
+                im[:, 1] > self.descriptor.parameters.minimum_saturation_color,
+                im[:, 2] > self.descriptor.parameters.minimum_value_color,
             ),
         )
 
         pl_black, pl_grey_white = split(
-            pl_bw_range, pl_bw_range[:, 2] <= self.descriptor.parameters.max_value_black
+            pl_bw_range,
+            pl_bw_range[:, 2] <= self.descriptor.parameters.maximum_value_black,
         )
         pl_white, pl_grey = split(
             pl_grey_white,
-            pl_grey_white[:, 2] > self.descriptor.parameters.min_value_white,
+            pl_grey_white[:, 2] > self.descriptor.parameters.minimum_value_white,
         )
 
         # Check on the HUE channel the color and reduce the list of pixels piece-by-piece
@@ -373,8 +419,8 @@ class ClusterColorAnnotator(BaseAnnotator):
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
 
         # List for visualization purposes
-        self.cluster_color_info = []
-        self.cluster_rois = []
+        self.cluster_color_statistics = []
+        self.cluster_image_regions = []
 
         self.create_color_annotations(color)
 
@@ -479,8 +525,8 @@ class ClusterColorAnnotator(BaseAnnotator):
                     break
 
             # Prepare visualization
-            self.cluster_color_info.append(color_count_result_sorted_by_count)
-            self.cluster_rois.append(roi)
+            self.cluster_color_statistics.append(color_count_result_sorted_by_count)
+            self.cluster_image_regions.append(roi)
 
     def draw_visualization(self, visualization_img: npt.NDArray) -> npt.NDArray:
         """
@@ -495,8 +541,8 @@ class ClusterColorAnnotator(BaseAnnotator):
         :param visualization_img: Image to draw visualization on
         :return: Image with visualization overlays
         """
-        for i, roi in enumerate(self.cluster_rois):
-            cci = self.cluster_color_info[i]
+        for i, roi in enumerate(self.cluster_image_regions):
+            cci = self.cluster_color_statistics[i]
             dominant_color = cci[0][0]
             assert isinstance(dominant_color, Color)
             dominant_color_value = self.color_name_to_bgr_values[dominant_color]

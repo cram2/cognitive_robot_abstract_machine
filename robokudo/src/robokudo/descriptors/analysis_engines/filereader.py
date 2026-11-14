@@ -92,14 +92,14 @@ class AnalysisEngine(AnalysisEngineInterface):
             "file_reader",
             loop=True,
             target_ros_package="robokudo_test_data",
-            target_dir="data",
+            target_directory="data",
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
         )
 
         # Restrict FOV of pointcloud to robustly get only one object
         pc_crop_config = PointcloudCropAnnotator.Descriptor()
-        pc_crop_config.parameters.min_x = -0.3
-        pc_crop_config.parameters.max_x = 0.3
+        pc_crop_config.parameters.minimum_x = -0.3
+        pc_crop_config.parameters.maximum_x = 0.3
 
         seq = Pipeline("FileReaderPipeline")
         seq.add_children(

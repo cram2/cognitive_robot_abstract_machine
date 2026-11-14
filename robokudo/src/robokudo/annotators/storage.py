@@ -23,18 +23,52 @@ from __future__ import annotations
 # %% Imports
 import copy
 import json
+from dataclasses import dataclass, field
 from timeit import default_timer
 
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from typing_extensions import Any
 
 import robokudo.world
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.io.storage import Storage, StorageDocumentField
 
+# %% StorageWriter parameters
 
-class StorageWriter(BaseAnnotator):
+
+@dataclass(kw_only=True)
+class StorageWriterParameters(AnnotatorParameters):
+    """Parameter container for storage configuration."""
+
+    database_name: str = "rk_scenes"
+    """Database name"""
+
+    drop_database_on_storage: bool = True
+    """Whether to clear database before recording"""
+
+
+# %% StorageWriter descriptor
+
+
+@dataclass(kw_only=True)
+class StorageWriterDescriptor(AnnotatorDescriptor[StorageWriterParameters]):
+    """Declarative configuration of :class:`StorageWriter`."""
+
+    parameters: StorageWriterParameters = field(
+        default_factory=StorageWriterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% StorageWriter annotator
+
+
+@dataclass(eq=False)
+class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     """
     Annotator for storing sensor data in MongoDB.
 
@@ -42,48 +76,28 @@ class StorageWriter(BaseAnnotator):
     allowing for data recording and offline processing without using ROS bag files.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for storage writer.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameter container for storage configuration.
-            """
+    descriptor: StorageWriterDescriptor = field(default_factory=StorageWriterDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.db_name: str = "rk_scenes"
-                """
-                Database name
-                """
+    storage: Storage = field(init=False, repr=False)
+    """Storage connection used to persist pipeline data."""
 
-                self.drop_database_on_storage: bool = True
-                """
-                Whether to clear database before recording
-                """
+    storage_preparation_completed: bool = field(default=False, init=False, repr=False)
+    """Whether storage setup has already run for this writer."""
 
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[StorageWriterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return StorageWriterDescriptor
 
-    def __init__(
-        self,
-        name: str = "StorageWriter",
-        descriptor: StorageWriter.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the storage writer. Minimal one-time init!
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.storage = Storage(self.descriptor.parameters.db_name)
-        self.storage_preparation_completed: bool = False
-        """
-        Whether storage setup has already run for this writer.
-        """
+        self.storage = Storage(self.descriptor.parameters.database_name)
 
     def setup(self, **kwargs: Any) -> bool:
         """

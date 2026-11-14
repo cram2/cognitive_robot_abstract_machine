@@ -22,25 +22,30 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections import defaultdict  # noqa: B027ons import defaultdict
+from collections import defaultdict
 from concurrent.futures import Future
+from dataclasses import dataclass, field
 
+from krrood.ormatic.utils import classproperty
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.time import Time
 from sensor_msgs.msg import JointState
-from typing_extensions import Any, Callable
+from typing_extensions import Any, Callable, Generic, TypeVar
 
 import robokudo.pipeline  # Work around circular import
+from robokudo.annotators.exceptions import EmptyAnalysisScope
 from robokudo.annotators.outputs import (
-    AnnotatorOutputPerPipelineMap,
     AnnotatorOutputs,
     AnnotatorOutputStruct,
 )
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
-from robokudo.annotators.exceptions import InvalidAnalysisData, EmptyAnalysisScope
 from robokudo.cas import CAS, CASViews
+from robokudo.datastructures.annotator_descriptor import (
+    AnnotatorDescriptor,
+    BaseAnnotatorDescriptor,
+)
 from robokudo.defs import PACKAGE_NAME
 from robokudo.types.core import Annotation
 from robokudo.utils.tree import find_parent_of_type
@@ -53,7 +58,14 @@ The threaded annotator provides functionality to call long-running annotators wi
 """
 
 
-class BaseAnnotator(Behaviour):
+# %% Annotator configuration types
+DescriptorType = TypeVar("DescriptorType", bound=AnnotatorDescriptor)
+"""Concrete descriptor carried by an annotator family member."""
+
+
+# %% Base annotator
+@dataclass(init=False, eq=False)
+class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """
     Base class for all RoboKudo annotators.
 
@@ -67,74 +79,27 @@ class BaseAnnotator(Behaviour):
     context.
     """
 
-    class Descriptor:
-        """
-        Configuration descriptor for annotator parameters and capabilities.
+    name: str = field(init=False)
+    """Name of this node in the behaviour tree."""
 
-        This class defines the structure for specifying annotator parameters and
-        capabilities.
-        """
+    descriptor: DescriptorType = field(
+        default_factory=BaseAnnotatorDescriptor, init=False, repr=False
+    )
+    """Configuration supplied to this annotator instance."""
 
-        class Parameters:
-            """
-            Container for annotator parameters.
+    rk_logger: logging.Logger = field(init=False, repr=False)
+    """Logger for annotator processing and lifecycle messages."""
 
-            Subclasses declare the parameters of their annotation operation.
-            """
-
-            None
-
-        class Capabilities:
-            """
-            Defines the input and output capabilities of an annotator.
-            """
-
-            def __init__(self) -> None:
-                """
-                Initialize capabilities with empty input/output definitions.
-                """
-                self.inputs = None
-                """
-                Input types accepted by the annotator.
-                """
-                self.outputs = None
-                """
-                Output types produced by the annotator.
-                """
-
-        def __init__(self) -> None:
-            """
-            Initialize the descriptor with parameters and capabilities.
-            """
-            param_class = self.Parameters
-
-            # overwrite __getattr__ in current 'Parameters' class
-            def get_attr_with_predefined_parameters(self, name: str) -> Any:
-                """
-                Custom attribute getter for accessing global parameters.
-
-                :param name: Name of the parameter to access
-                :return: Value of the global parameter
-                :raises AttributeError: If parameter name is unknown
-                """
-                if name.startswith("global_"):
-                    return getattr(
-                        AnnotatorPredefinedParameters,
-                        name,
-                    )
-                else:
-                    raise AttributeError(f"Unknown parameter with name <{name}>.")
-
-            param_class.__getattr__ = get_attr_with_predefined_parameters
-
-            self.parameters = param_class()
-            self.capabilities = self.Capabilities()
+    @classproperty
+    def Descriptor(cls) -> type[AnnotatorDescriptor]:
+        """Configuration constructor for annotators with common parameters only."""
+        return BaseAnnotatorDescriptor
 
     def __init__(
         self,
         name: str = "Annotator",
-        descriptor: BaseAnnotator.Descriptor | None = None,
-        ros_pkg_name: str = PACKAGE_NAME,
+        descriptor: DescriptorType | None = None,
+        ros_package_name: str = PACKAGE_NAME,
     ) -> None:
         """
         Initialize the BaseAnnotator.
@@ -143,18 +108,23 @@ class BaseAnnotator(Behaviour):
 
         :param name: Name of the annotator instance
         :param descriptor: Configuration descriptor
-        :param ros_pkg_name: Name of the ROS package
+        :param ros_package_name: Name of the ROS package
         """
         super().__init__(name)
         if descriptor is None:
             descriptor = self.Descriptor()
 
-        # self.rk_logger = get_logger(ros_pkg_name)
-        self.rk_logger = logging.getLogger(ros_pkg_name)
+        # self.rk_logger = get_logger(ros_package_name)
+        self.rk_logger = logging.getLogger(ros_package_name)
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         # self.rk_logger.debug("%s" % (get_line_context(self)))
         self.descriptor = descriptor
+        """Concrete configuration supplied to this annotator instance."""
+
+    def __post_init__(self) -> None:
+        """Initialize behaviour-tree identity and the annotator logger."""
+        BaseAnnotator.__init__(self, name=self.name, descriptor=self.descriptor)
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -459,16 +429,16 @@ class Worker(object):
     execute a callback when the function completes.
     """
 
-    def __init__(self, fn: Callable, args: tuple = ()) -> None:
+    def __init__(self, function: Callable, arguments: tuple = ()) -> None:
         """
         Initialize the worker.
 
-        :param fn: The function to execute
-        :param args: Arguments to pass to the function
+        :param function: The function to execute
+        :param arguments: Arguments to pass to the function
         """
         self.future: Future = Future()
-        self._fn: Callable = fn
-        self._args: tuple = args
+        self._function: Callable = function
+        self._arguments: tuple = arguments
 
     def start(self, callback: Callable | None = None) -> threading.Thread:
         """
@@ -487,7 +457,7 @@ class Worker(object):
         Execute the function and store its result in the future object.
         """
         try:
-            self.future.set_result(self._fn(*self._args))
+            self.future.set_result(self._function(*self._arguments))
         except BaseException as e:
             self.future.set_exception(e)
 
@@ -495,7 +465,9 @@ class Worker(object):
             self._callback(self.future.result())
 
 
-class ThreadedAnnotator(BaseAnnotator):
+# %% Threaded annotator
+@dataclass(init=False, eq=False)
+class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     """
     Base class for annotators that perform long-running operations.
 
@@ -504,10 +476,21 @@ class ThreadedAnnotator(BaseAnnotator):
     their results.
     """
 
+    compute_worker: Worker | None = field(default=None, init=False, repr=False)
+    """Computation scheduled for the current processing iteration."""
+
+    compute_worker_started: bool = field(default=False, init=False, repr=False)
+    """Whether the current computation has been started."""
+
+    compute_worker_thread: threading.Thread | None = field(
+        default=None, init=False, repr=False
+    )
+    """Thread running the current computation."""
+
     def __init__(
         self,
-        name: str = "ThreadedAnnotator",
-        descriptor: BaseAnnotator.Descriptor | None = None,
+        name: str = __qualname__,
+        descriptor: DescriptorType | None = None,
     ) -> None:
         """
         Initialize the ThreadedAnnotator.
@@ -520,6 +503,10 @@ class ThreadedAnnotator(BaseAnnotator):
         self.compute_worker: Worker | None = None
         self.compute_worker_started: bool = False
         self.compute_worker_thread: threading.Thread | None = None
+
+    def __post_init__(self) -> None:
+        """Initialize worker state in addition to :meth:`BaseAnnotator.__post_init__`."""
+        ThreadedAnnotator.__init__(self, name=self.name, descriptor=self.descriptor)
 
     def initialise(self) -> None:
         """

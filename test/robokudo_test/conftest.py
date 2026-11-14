@@ -71,7 +71,7 @@ class MongoStoragePreservationCheck:
             port=int(os.getenv("RK_MONGO_PORT", 27017)),
             serverSelectionTimeoutMS=self.connection_timeout_milliseconds,
         )
-        database_name = MongoCameraConfig().db_name
+        database_name = MongoCameraConfig().database_name
         try:
             if database_name not in mongo_client.list_database_names():
                 return MongoStorageSnapshot(

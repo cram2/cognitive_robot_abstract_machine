@@ -19,20 +19,30 @@ Authors:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
+
 
 """
 This module implements a statistical outlierremoval based on the standard deviation and
@@ -52,7 +62,51 @@ _PYTYPE_TO_ROS_FIELD: dict[type, str] = {
 }
 
 
-class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
+# %% OutlierRemovalOnObjectHypothesis parameters
+
+
+@dataclass(kw_only=True)
+class OutlierRemovalOnObjectHypothesisParameters(AnnotatorParameters):
+    """Parameter container for outlier removal configuration."""
+
+    clustering_minimum_point_count: int = 90
+    """Minimum points to form a cluster (DBSCAN min_samples)"""
+
+    clustering_epsilon: float = 0.02
+    """DBSCAN neighborhood size"""
+
+    statistical_neighbor_count: int = 200
+    """Number of neighbors for statistical analysis"""
+
+    statistical_standard_deviation_ratio: float = 0.5
+    """Standard deviation threshold for outlier removal"""
+
+    skip_removal_on_classes: list[str] = field(default_factory=list)
+    """List of class names to skip processing If you want to skip the complete outlier removal process on certain classes, you can add a list of strings here. The values are case-sensitive!"""
+
+
+# %% OutlierRemovalOnObjectHypothesis descriptor
+
+
+@dataclass(kw_only=True)
+class OutlierRemovalOnObjectHypothesisDescriptor(
+    AnnotatorDescriptor[OutlierRemovalOnObjectHypothesisParameters]
+):
+    """Declarative configuration of :class:`OutlierRemovalOnObjectHypothesisAnnotator`."""
+
+    parameters: OutlierRemovalOnObjectHypothesisParameters = field(
+        default_factory=OutlierRemovalOnObjectHypothesisParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% OutlierRemovalOnObjectHypothesis annotator
+
+
+@dataclass(eq=False)
+class OutlierRemovalOnObjectHypothesisAnnotator(
+    BaseAnnotator[OutlierRemovalOnObjectHypothesisDescriptor]
+):
     """Annotator for statistical outlier removal and clustering refinement.
 
     This annotator processes object hypotheses by:
@@ -66,46 +120,25 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
     The processing can be selectively disabled for specific object classes.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for outlier removal and clustering."""
+    name: str = "OutlierRemovalOnObjectHypothesis"
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """Parameter container for outlier removal configuration."""
+    descriptor: OutlierRemovalOnObjectHypothesisDescriptor = field(
+        default_factory=OutlierRemovalOnObjectHypothesisDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                # TODO Rename the dbscan_neighbors parameter. It is not about neighbors, but it is the MINIMUM
-                self.dbscan_neighbors: int = 90
-                """Minimum points to form a cluster (DBSCAN min_samples)"""
+    node: Node = field(init=False, repr=False)
+    """ROS node owning the annotator parameter declarations."""
 
-                self.dbscan_epsilon: float = 0.02
-                """DBSCAN neighborhood size"""
+    @classproperty
+    def Descriptor(cls) -> type[OutlierRemovalOnObjectHypothesisDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return OutlierRemovalOnObjectHypothesisDescriptor
 
-                self.stat_neighbors: int = 200
-                """Number of neighbors for statistical analysis"""
-
-                self.stat_std: float = 0.5
-                """Standard deviation threshold for outlier removal"""
-
-                self.skip_removal_on_classes: list[str] = []
-                """List of class names to skip processing
-                
-                If you want to skip the complete outlier removal process on certain classes, you can add a list of
-                strings here. The values are case-sensitive!
-                """
-
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "OutlierRemovalOnObjectHypothesis",
-        descriptor: OutlierRemovalOnObjectHypothesisAnnotator.Descriptor | None = None,
-    ):
-        """Initialize the outlier removal annotator.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.node = ROSNodeRegistry().get()
@@ -178,8 +211,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
             pcd = annotation.points
             cl, ind = pcd.remove_statistical_outlier(
-                nb_neighbors=self.descriptor.parameters.stat_neighbors,
-                std_ratio=self.descriptor.parameters.stat_std,
+                nb_neighbors=self.descriptor.parameters.statistical_neighbor_count,
+                std_ratio=self.descriptor.parameters.statistical_standard_deviation_ratio,
             )
 
             pcd = pcd.select_by_index(ind)
@@ -189,8 +222,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
             ) as cm:
                 labels = np.array(
                     pcd.cluster_dbscan(
-                        eps=self.descriptor.parameters.dbscan_epsilon,
-                        min_points=self.descriptor.parameters.dbscan_neighbors,
+                        eps=self.descriptor.parameters.clustering_epsilon,
+                        min_points=self.descriptor.parameters.clustering_minimum_point_count,
                         print_progress=True,
                     )
                 )

@@ -8,20 +8,20 @@ without downloading model weights.
 
 from __future__ import annotations
 
+# %% Imports
 import math
 from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
+import robokudo.annotators.clip_annotator
 import torch
 from PIL import Image
+from robokudo.annotators.clip_annotator import CLIPAnnotator, CLIPDescriptor
+from robokudo.types.annotation import Classification
 from transformers import BatchEncoding
 from transformers.modeling_outputs import BaseModelOutputWithPooling
 from typing_extensions import Sequence
-
-import robokudo.annotators.clip_annotator
-from robokudo.annotators.clip_annotator import CLIPAnnotator
-from robokudo.types.annotation import Classification
 
 from ._color_scenes import COLOR_BY_WORD, COLOR_VOCABULARY, rgb, solid_image
 
@@ -213,14 +213,14 @@ def color_embedding_clip(monkeypatch) -> ColorEmbeddingClip:
 # %% classification setup
 
 
-def _color_descriptor() -> CLIPAnnotator.Descriptor:
+def _color_descriptor() -> CLIPDescriptor:
     """
     :return: A descriptor classifying against the color vocabulary on the CPU.
     """
     descriptor = CLIPAnnotator.Descriptor()
     descriptor.parameters.device = torch.device("cpu")
     descriptor.parameters.vocabulary = COLOR_VOCABULARY
-    descriptor.parameters.save_top_k = len(COLOR_VOCABULARY)
+    descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY)
     return descriptor
 
 
@@ -298,12 +298,12 @@ def test_each_image_of_a_batch_is_classified_by_its_own_color(color_embedding_cl
 
 def test_classification_keeps_save_top_k_classifications(color_embedding_clip):
     descriptor = _color_descriptor()
-    descriptor.parameters.save_top_k = 2
+    descriptor.parameters.maximum_saved_classifications = 2
     annotator = CLIPAnnotator(descriptor=descriptor)
 
     classifications = _classify_solid_image(annotator, COLOR_BY_WORD["red"])
 
-    assert len(classifications) == descriptor.parameters.save_top_k
+    assert len(classifications) == descriptor.parameters.maximum_saved_classifications
 
 
 def test_classifications_name_the_annotator_as_source(color_embedding_clip):
@@ -359,7 +359,7 @@ def test_save_top_k_beyond_vocabulary_without_softmax_reports_each_word_once(
 ):
     descriptor = _color_descriptor()
     descriptor.parameters.use_softmax = False
-    descriptor.parameters.save_top_k = len(COLOR_VOCABULARY) + 2
+    descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY) + 2
     annotator = CLIPAnnotator(descriptor=descriptor)
 
     classifications = _classify_solid_image(annotator, COLOR_BY_WORD["blue"])

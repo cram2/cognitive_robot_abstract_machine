@@ -18,13 +18,18 @@ The module is used for:
 * Asynchronous data exchange
 """
 
+from __future__ import annotations
+
+# %% Imports
 import logging
 import queue
 import time
+from dataclasses import dataclass, field
 from threading import Event
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
+from krrood.ormatic.utils import classproperty
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.action import CancelResponse, GoalResponse
@@ -32,10 +37,12 @@ from rclpy.action.server import ActionServer, ServerGoalHandle
 from rclpy.node import Node
 from robokudo_msgs.action import Query
 from robokudo_msgs.msg import ObjectDesignator
-from typing_extensions import Any
+from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.defs import LOGGING_IDENTIFIER_QUERY, PACKAGE_NAME
 from robokudo.identifier import BBIdentifier
 from robokudo.types.annotation import (
@@ -75,7 +82,11 @@ from robokudo.utils.error_handling import (
 )
 from robokudo.utils.query import ObjectHypothesisQueryMatcher, QueryHandler
 
+if TYPE_CHECKING:
+    from robokudo.utils.annotation_conversion import Annotation2ODConverter
 
+
+@dataclass(eq=False)
 class QueryAnnotator(BaseAnnotator):
     """
     Handle external queries through ROS action server.
@@ -86,21 +97,24 @@ class QueryAnnotator(BaseAnnotator):
     to a specific type of query. You can pass these from your AE to this QueryAnnotator.
     """
 
-    def __init__(self, name: str = "QueryAnnotator") -> None:
-        """
-        Initialize the query annotator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        :param name: Annotator name
-        """
-        super().__init__(name=name)
+    feedback_instance: Query.Feedback = field(init=False, repr=False)
+    """Feedback message prepared for the active query."""
+
+    result_instance: Query.Result = field(init=False, repr=False)
+    """Result message prepared for the active query."""
+
+    action_server: ActionServer | None = field(default=None, init=False, repr=False)
+    """Action server placeholder."""
+
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.feedback_instance = Query.Feedback()
         self.result_instance = Query.Result()
-
-        self.action_server = None
-        """
-        Action server placeholder.
-        """
 
     def setup(self, **kwargs: Any) -> None:
         """
@@ -136,9 +150,9 @@ class QueryAnnotator(BaseAnnotator):
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert (
-            self.action_server is not None
-        ), "Action server should be initialized by now."
+        assert self.action_server is not None, (
+            "Action server should be initialized by now."
+        )
         query = self.action_server.new_query
         self.rk_logger.debug(f"self.action_server.new_query: {query}")
 
@@ -154,32 +168,26 @@ class QueryAnnotator(BaseAnnotator):
         return Status.RUNNING
 
 
+@dataclass(eq=False)
 class QueryFeedback(BaseAnnotator):
     """
     A test class which simply generates a fixed-string feedback.
     """
 
-    def __init__(self, name: str = "QueryFeedback", feedback_str: str = "") -> None:
-        """
-        Initialize query feedback generator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        :param name: Annotator name
-        :param feedback_str: Feedback string to send to the client
-        """
-        super().__init__(name=name)
-
-        self.feedback_str = feedback_str
-        """
-        Feedback string to send to the client.
-        """
+    feedback_text: str = ""
+    """Feedback text sent to the active query client."""
 
     def update(self) -> Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
-        QueryHandler.send_feedback_str(self.feedback_str)
+        QueryHandler.send_feedback_str(self.feedback_text)
 
         return Status.SUCCESS
 
 
+@dataclass(eq=False)
 class QueryFeedbackAndCount(BaseAnnotator):
     """
     A test class which simply counts up until a fixed number.
@@ -187,45 +195,30 @@ class QueryFeedbackAndCount(BaseAnnotator):
     Until this number is reached, a pre-defined status is returned.
     """
 
-    def __init__(
-        self,
-        name: str = "QueryFeedback",
-        count_until: int = 20,
-        return_code: Status = Status.RUNNING,
-    ) -> None:
-        """
-        Initialize query feedback generator.
+    name: str = "QueryFeedback"
+    """Name of this node in the behaviour tree."""
 
-        :param name: Annotator name
-        :param count_until: Number until which to count before stopping
-        :param return_code: The return code to return while still counting
-        """
-        super().__init__(name=name)
+    count_until: int = 20
+    """Number of updates before the feedback node finishes."""
 
-        self.i = 0
-        """
-        The current count.
-        """
-        self.count_until = count_until
-        """
-        The number until which to count.
-        """
-        self.return_code = return_code
-        """
-        The return code to return while still counting.
-        """
+    return_code: Status = Status.RUNNING
+    """Status returned while the feedback counter is still running."""
+
+    current_count: int = field(default=0, init=False, repr=False)
+    """The current count."""
 
     def update(self) -> Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
-        QueryHandler.send_feedback_str(f"Count: {self.i}")
-        self.i = self.i + 1
-        if self.i > self.count_until:
-            self.i = 0
+        QueryHandler.send_feedback_str(f"Count: {self.current_count}")
+        self.current_count = self.current_count + 1
+        if self.current_count > self.count_until:
+            self.current_count = 0
             return Status.SUCCESS
         else:
             return self.return_code
 
 
+@dataclass(eq=False)
 class QueryReply(BaseAnnotator):
     """
     A test class which simply generates an empty Query Answer to check if the Action
@@ -234,13 +227,8 @@ class QueryReply(BaseAnnotator):
     Create a single, empty Object Designator that will be sent to the caller.
     """
 
-    def __init__(self, name: str = "QueryReply"):
-        """
-        Initialize query reply generator.
-
-        :param name: Annotator name
-        """
-        super().__init__(name=name)
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
     def initialise(self) -> None:
         """
@@ -280,7 +268,35 @@ class QueryReply(BaseAnnotator):
         return Status.SUCCESS
 
 
-class GenerateQueryResult(BaseAnnotator):
+# %% GenerateQueryResult parameters
+
+
+@dataclass(kw_only=True)
+class GenerateQueryResultParameters(AnnotatorParameters):
+    """Settings specific to this annotation operation."""
+
+    filter_by_query: bool = False
+    """Only return ObjectHypotheses matching requested query attributes."""
+
+
+# %% GenerateQueryResult descriptor
+
+
+@dataclass(kw_only=True)
+class GenerateQueryResultDescriptor(AnnotatorDescriptor[GenerateQueryResultParameters]):
+    """Declarative configuration of :class:`GenerateQueryResult`."""
+
+    parameters: GenerateQueryResultParameters = field(
+        default_factory=GenerateQueryResultParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% GenerateQueryResult annotator
+
+
+@dataclass(eq=False)
+class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
     """
     This class reads in the annotations done by the previous Annotators and generates
     Object Designators from them.
@@ -289,22 +305,67 @@ class GenerateQueryResult(BaseAnnotator):
     pick the information up and send it as a query reply.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self) -> None:
-                self.filter_by_query: bool = False
-                """Only return ObjectHypotheses matching requested query attributes."""
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        parameters = Parameters()
+    descriptor: GenerateQueryResultDescriptor = field(
+        default_factory=GenerateQueryResultDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-    def __init__(
-        self, name: str = "GenerateQueryResult", descriptor: Descriptor | None = None
-    ) -> None:
-        """Initialize query result generator.
+    color_converter: SemanticColor2ODConverter = field(init=False, repr=False)
+    """Converts semantic colors into query result properties."""
 
-        :param name: Annotator name
-        :param descriptor: Annotator configuration descriptor
-        """
+    class_converter: Classification2ODConverter = field(init=False, repr=False)
+    """Converts classifications into query result properties."""
+
+    position_converter: Position2ODConverter = field(init=False, repr=False)
+    """Converts positions into query result properties."""
+
+    stamped_position_converter: StampedPosition2ODConverter = field(
+        init=False, repr=False
+    )
+    """Converts stamped positions into query result properties."""
+
+    pose_converter: Pose2ODConverter = field(init=False, repr=False)
+    """Converts poses into query result properties."""
+
+    stamped_pose_converter: StampedPose2ODConverter = field(init=False, repr=False)
+    """Converts stamped poses into query result properties."""
+
+    shape_converter: Shape2ODConverter = field(init=False, repr=False)
+    """Converts shape annotations into query result properties."""
+
+    cuboid_converter: Cuboid2ODConverter = field(init=False, repr=False)
+    """Converts cuboid geometry into query result properties."""
+
+    cylinder_converter: Cylinder2ODConverter = field(init=False, repr=False)
+    """Converts cylinder geometry into query result properties."""
+
+    sphere_converter: Sphere2ODConverter = field(init=False, repr=False)
+    """Converts sphere geometry into query result properties."""
+
+    location_converter: Location2ODConverter = field(init=False, repr=False)
+    """Converts locations into query result properties."""
+
+    bounding_box_size_converter: BoundingBox3DForShapeSizeConverter = field(
+        init=False, repr=False
+    )
+    """Converts bounding-box dimensions into query result properties."""
+
+    type_converter: dict[type, Annotation2ODConverter] = field(init=False, repr=False)
+    """Conversion of each annotation type into query result properties."""
+
+    query_matcher: ObjectHypothesisQueryMatcher = field(init=False, repr=False)
+    """Matches object hypotheses against the active query."""
+
+    @classproperty
+    def Descriptor(cls) -> type[GenerateQueryResultDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return GenerateQueryResultDescriptor
+
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
 
         self.color_converter = SemanticColor2ODConverter()
@@ -318,7 +379,7 @@ class GenerateQueryResult(BaseAnnotator):
         self.cylinder_converter = Cylinder2ODConverter()
         self.sphere_converter = Sphere2ODConverter()
         self.location_converter = Location2ODConverter()
-        self.bb_size_converter = BoundingBox3DForShapeSizeConverter()
+        self.bounding_box_size_converter = BoundingBox3DForShapeSizeConverter()
 
         self.type_converter = {
             SemanticColor: self.color_converter,
@@ -332,12 +393,12 @@ class GenerateQueryResult(BaseAnnotator):
             Cylinder: self.cylinder_converter,
             Sphere: self.sphere_converter,
             LocationAnnotation: self.location_converter,
-            BoundingBox3D: self.bb_size_converter,
-            BoundingBox3DAnnotation: self.bb_size_converter,
+            BoundingBox3D: self.bounding_box_size_converter,
+            BoundingBox3DAnnotation: self.bounding_box_size_converter,
         }
         self.query_matcher = ObjectHypothesisQueryMatcher()
 
-        super().__init__(name=name, descriptor=descriptor)
+        super().__post_init__()
 
     def update(self) -> Status:
         """

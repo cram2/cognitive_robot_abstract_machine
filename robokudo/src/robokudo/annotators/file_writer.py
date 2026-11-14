@@ -23,18 +23,52 @@ from __future__ import annotations
 
 # %% Imports
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from timeit import default_timer
 
 import cv2
+from krrood.adapters.json_serializer import to_json
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
-from krrood.adapters.json_serializer import to_json
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+
+# %% FileWriter parameters
 
 
-class FileWriter(BaseAnnotator):
+@dataclass(kw_only=True)
+class FileWriterParameters(AnnotatorParameters):
+    """Parameters for configuring file storage."""
+
+    target_directory: str = "/tmp/"
+    """Directory to store files in"""
+
+    filename_prefix: str = "rk_"
+    """Prefix for generated filenames, make sure that this matches the FileReader filename_prefix"""
+
+
+# %% FileWriter descriptor
+
+
+@dataclass(kw_only=True)
+class FileWriterDescriptor(AnnotatorDescriptor[FileWriterParameters]):
+    """Declarative configuration of :class:`FileWriter`."""
+
+    parameters: FileWriterParameters = field(
+        default_factory=FileWriterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% FileWriter annotator
+
+
+@dataclass(eq=False)
+class FileWriter(BaseAnnotator[FileWriterDescriptor]):
     """
     Sensor data storage to filesystem.
 
@@ -46,58 +80,40 @@ class FileWriter(BaseAnnotator):
        Target directory must exist and be writable.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for file writer.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for configuring file storage.
+    descriptor: FileWriterDescriptor = field(default_factory=FileWriterDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-            .. note::
-               filename_prefix should match FileReader configuration.
-            """
+    initialized: bool = field(default=False, init=False, repr=False)
+    """Whether the configured output directory is available."""
 
-            def __init__(self) -> None:
-                self.target_dir: str = "/tmp/"
-                """
-                Directory to store files in
-                """
+    target_directory_path: Path = field(init=False, repr=False)
+    """Resolved directory receiving the generated files."""
 
-                self.filename_prefix: str = "rk_"
-                """
-                Prefix for generated filenames, make sure that this matches the FileReader filename_prefix
-                """
+    @classproperty
+    def Descriptor(cls) -> type[FileWriterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return FileWriterDescriptor
 
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "FileWriter",
-        descriptor: FileWriter.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the file writer.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.initialized = False
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.rk_logger.debug(
-            f"Writing files to {self.descriptor.parameters.target_dir}"
+            f"Writing files to {self.descriptor.parameters.target_directory}"
         )
-        self.target_dir_path: Path = Path(self.descriptor.parameters.target_dir)
+        self.target_directory_path: Path = Path(
+            self.descriptor.parameters.target_directory
+        )
 
-        if self.target_dir_path.exists() and self.target_dir_path.is_dir():
+        if self.target_directory_path.exists() and self.target_directory_path.is_dir():
             self.initialized = True
         else:
             self.rk_logger.error(
-                f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
+                f"{self.descriptor.parameters.target_directory} is not existing or not a directory"
             )
 
     def generate_full_file_path_(self, data_type: CASViews, file_extension: str) -> str:
@@ -118,7 +134,7 @@ class FileWriter(BaseAnnotator):
         fn_prefix = self.descriptor.parameters.filename_prefix
         timestamp = self.get_cas().timestamp
         return str(
-            self.target_dir_path.joinpath(
+            self.target_directory_path.joinpath(
                 f"{fn_prefix}{str(timestamp)}_{data_type}.{file_extension}"
             )
         )

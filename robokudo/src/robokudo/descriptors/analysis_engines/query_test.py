@@ -11,12 +11,15 @@ Features:
 - Uses a feedback mechanism to report progress dynamically.
 """
 
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass, field
 from queue import Queue
 
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
-from py_trees.composites import Selector
-from py_trees.composites import Sequence
+from py_trees.composites import Selector, Sequence
 from py_trees.decorators import Inverter
 from robokudo_msgs.action import Query
 
@@ -30,13 +33,32 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
+@dataclass(eq=False)
 class PrintNumbers(BaseAnnotator):
-    def __init__(self, name: str = "PrintNumbers") -> None:
-        super().__init__(name)
-        self.current_number: int = 1
-        self.completed: bool = False
-        self.result: list[int] = []
-        self.result_string: str = ""
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    current_number: int = field(default=1, init=False, repr=False)
+    """
+    Number emitted by the next query-demo update.
+    """
+
+    completed: bool = field(default=False, init=False, repr=False)
+    """
+    Whether the current query-demo sequence has finished.
+    """
+
+    result: list[int] = field(default_factory=list, init=False, repr=False)
+    """
+    Numbers collected during the current query-demo sequence.
+    """
+
+    result_string: str = field(default="", init=False, repr=False)
+    """
+    Text representation of the current query-demo result.
+    """
 
     def initialise(self) -> None:
         self.result = []
@@ -70,13 +92,16 @@ class PrintNumbers(BaseAnnotator):
             return Status.SUCCESS
 
 
+@dataclass(eq=False)
 class CheckQueryType(BaseAnnotator):
     """
     Checks if the query type on the CAS is 'numbers'.
     """
 
-    def __init__(self, name: str = "CheckQueryType") -> None:
-        super().__init__(name)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     def update(self) -> Status:
         # Retrieve the query from the CAS

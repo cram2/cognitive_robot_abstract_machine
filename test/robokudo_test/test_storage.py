@@ -4,25 +4,24 @@ import os
 import uuid
 from dataclasses import dataclass
 
-import open3d
-import pytest
-import pymongo
 import numpy as np
-
+import open3d
+import pymongo
+import pytest
 import robokudo.cas
-from robokudo import world as rk_world
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
 from robokudo.cas import CAS, CASViews
-from robokudo.io.storage import Storage
 from robokudo.io.sensor_world import RecordedCameraWorld
+from robokudo.io.storage import Storage
 from robokudo.types.camera import CameraObservation
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
-from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+
+from robokudo import world as rk_world
 
 # %% Camera behavior
 
@@ -41,8 +40,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def storage_instance():
-    db_name = "ONLY_UNITTESTS_test_db"
-    storage = Storage(db_name)
+    database_name = "ONLY_UNITTESTS_test_db"
+    storage = Storage(database_name)
     yield storage
     # Cleanup after tests
     storage.drop_database()
@@ -103,7 +102,7 @@ def create_camera_model() -> PinholeCameraModel:
 
 class TestStorage:
     def test_drop_database(self, storage_instance):
-        db_name = storage_instance.db_name
+        database_name = storage_instance.database_name
         storage_instance.drop_database()
 
         # Verify the database no longer exists
@@ -114,7 +113,7 @@ class TestStorage:
         mongo_host = os.getenv("RK_MONGO_HOST", "localhost")
         mongo_port = int(os.getenv("RK_MONGO_PORT", 27017))
         client = pymongo.MongoClient(host=mongo_host, port=mongo_port)
-        assert db_name not in client.list_database_names()
+        assert database_name not in client.list_database_names()
 
     def test_store_and_retrieve_cas(self, storage_instance, cas_data):
         result = store_cas_in_storage(storage_instance, cas_data)
@@ -132,7 +131,9 @@ class TestStorage:
         assert result.acknowledged
 
         # Retrieve the stored CAS
-        retrieved_cas = storage_instance.db.cas.find_one({"_id": result.inserted_id})
+        retrieved_cas = storage_instance.database.cas.find_one(
+            {"_id": result.inserted_id}
+        )
         assert retrieved_cas is not None
         assert retrieved_cas["timestamp"] == cas_data.timestamp
         assert retrieved_cas["timestamp_readable"] == cas_data.timestamp_readable
@@ -166,7 +167,7 @@ class TestStorage:
         assert result.acknowledged
 
         # Retrieve the stored CAS
-        retrieved_cas_record = storage_instance.db.cas.find_one(
+        retrieved_cas_record = storage_instance.database.cas.find_one(
             {"_id": result.inserted_id}
         )
         assert retrieved_cas_record is not None
@@ -219,7 +220,7 @@ class TestStorage:
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
 
-        retrieved_cas_record = storage_instance.db.cas.find_one(
+        retrieved_cas_record = storage_instance.database.cas.find_one(
             {"_id": result.inserted_id}
         )
         assert retrieved_cas_record is not None
@@ -237,7 +238,7 @@ class TestStorage:
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
 
-        retrieved_cas_record = storage_instance.db.cas.find_one(
+        retrieved_cas_record = storage_instance.database.cas.find_one(
             {"_id": result.inserted_id}
         )
         assert retrieved_cas_record is not None
@@ -274,7 +275,7 @@ class TestStorage:
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
 
-        retrieved_cas_record = storage_instance.db.cas.find_one(
+        retrieved_cas_record = storage_instance.database.cas.find_one(
             {"_id": result.inserted_id}
         )
         assert retrieved_cas_record is not None
@@ -343,7 +344,7 @@ class TestStorage:
         result = store_cas_in_storage(storage_instance, cas_data)
         assert result.acknowledged
 
-        retrieved_cas_record = storage_instance.db.cas.find_one(
+        retrieved_cas_record = storage_instance.database.cas.find_one(
             {"_id": result.inserted_id}
         )
         assert retrieved_cas_record is not None

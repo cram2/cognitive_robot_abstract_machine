@@ -53,14 +53,14 @@ def query_simple_pipeline(node, recording_directory: Path):
     cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=True,
-        target_dir=recording_directory,
+        target_directory=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
 
     # Restrict FOV of pointcloud to robustly get only one object
     pc_crop_config = PointcloudCropAnnotator.Descriptor()
-    pc_crop_config.parameters.min_x = -0.3
-    pc_crop_config.parameters.max_x = 0.3
+    pc_crop_config.parameters.minimum_x = -0.3
+    pc_crop_config.parameters.maximum_x = 0.3
 
     seq = Pipeline("TestPipeline")
     seq.add_children(

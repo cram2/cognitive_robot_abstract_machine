@@ -1,10 +1,15 @@
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass, field
+
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
-    ColorHistogram,
     Classification,
+    ColorHistogram,
     PoseAnnotation,
 )
 from robokudo.types.cv import ImageROI
@@ -12,19 +17,39 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 
 
+@dataclass(eq=False)
 class ObjectAssociator(BaseAnnotator):
     """
     An annotator that associates the objects of the current iteration with the objects
     of the last iteration.
     """
 
-    def __init__(self, name: str = "ObjectAssociator") -> None:
-        super().__init__(name)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    tracked_objects: list[ObjectHypothesis] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    Object state retained between processing iterations.
+    """
+
+    object_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
+    """
+    Compares current hypotheses with tracked objects.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Initialize annotator resources after
+        :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
+        """
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.tracked_objects: list[ObjectHypothesis] = []
-
-        self.obj_comparator = (
+        self.object_comparator = (
             ObjectHypothesisComparator(self.get_cas)
             .with_comparator_for(PoseAnnotation, 0.3, max_distance=0.5)
             .with_comparator_for(Classification, 0.3)
@@ -50,7 +75,7 @@ class ObjectAssociator(BaseAnnotator):
             best_similarity = 0.0
 
             for oh_id, prev_oh in enumerate(self.tracked_objects):
-                similarity = self.obj_comparator.compute_similarity(prev_oh, new_oh)
+                similarity = self.object_comparator.compute_similarity(prev_oh, new_oh)
                 if similarity > 0.5 and similarity > best_similarity:
                     best_match_id = oh_id
                     best_similarity = similarity

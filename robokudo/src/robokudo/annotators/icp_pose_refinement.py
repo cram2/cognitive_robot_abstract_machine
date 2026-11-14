@@ -21,17 +21,22 @@ The module uses:
 
 from __future__ import annotations
 
+# %% Imports
 import copy
 import math
+from dataclasses import dataclass, field
 from pathlib import Path
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.file_loader import FileLoader
@@ -42,8 +47,38 @@ from robokudo.utils.transform import (
     get_translation_from_transform_matrix,
 )
 
+# %% ICPPoseRefinement parameters
 
-class ICPPoseRefinementAnnotator(ThreadedAnnotator):
+
+@dataclass(kw_only=True)
+class ICPPoseRefinementParameters(AnnotatorParameters):
+    """Parameters for configuring model loading."""
+
+    ros_package_name: str | None = None
+    """If set, use use data_path as a relative path to self.ros_package_name"""
+
+    data_path: str | None = None
+    """Relative Path to the folder containing the models"""
+
+
+# %% ICPPoseRefinement descriptor
+
+
+@dataclass(kw_only=True)
+class ICPPoseRefinementDescriptor(AnnotatorDescriptor[ICPPoseRefinementParameters]):
+    """Declarative configuration of :class:`ICPPoseRefinementAnnotator`."""
+
+    parameters: ICPPoseRefinementParameters = field(
+        default_factory=ICPPoseRefinementParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ICPPoseRefinement annotator
+
+
+@dataclass(eq=False)
+class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor]):
     """Pose refinement using iterative closest point (ICP).
 
     This annotator:
@@ -62,33 +97,30 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
        Currently limited to refining against a single pre-loaded model.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for ICP refinement."""
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """Parameters for configuring model loading."""
+    descriptor: ICPPoseRefinementDescriptor = field(
+        default_factory=ICPPoseRefinementDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.ros_pkg_path: str | None = None
-                """If set, use use data_path as a relative path to self.ros_pkg_path"""
+    class_name_to_ply_model: dict[str, o3d.geometry.PointCloud] = field(
+        init=False, repr=False
+    )
+    """Reference point cloud loaded for each configured object class."""
 
-                self.data_path: str | None = None
-                """Relative Path to the folder containing the models"""
+    annotator_deactivated: bool = field(init=False, repr=False)
+    """Whether unavailable model data prevents pose refinement."""
 
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ICPPoseRefinementDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ICPPoseRefinementDescriptor
 
-    def __init__(
-        self,
-        name: str = "ICPPoseRefinementAnnotator",
-        descriptor: ICPPoseRefinementAnnotator.Descriptor | None = None,
-    ) -> None:
-        """Initialize the ICP pose refiner.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # Data structure for available classes -> PLY files
@@ -116,12 +148,12 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
         :param class_name: Name of object class to load model for
         :return: Path to PLY file or None if not found
         """
-        if self.descriptor.parameters.ros_pkg_path is not None:
-            # if using ros_pkg_path, data_path has to be set as well!
+        if self.descriptor.parameters.ros_package_name is not None:
+            # if using ros_package_name, data_path has to be set as well!
             assert self.descriptor.parameters.data_path is not None
 
             data_folder_path = FileLoader.get_path_to_file_in_ros_package(
-                ros_pkg_name=self.descriptor.parameters.ros_pkg_path,
+                ros_package_name=self.descriptor.parameters.ros_package_name,
                 relative_path=self.descriptor.parameters.data_path,
             )
         elif self.descriptor.parameters.data_path is not None:

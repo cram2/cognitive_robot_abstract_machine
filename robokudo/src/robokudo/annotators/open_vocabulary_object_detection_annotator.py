@@ -4,6 +4,7 @@ Open-vocabulary object detection with optional Segment Anything masks.
 
 from __future__ import annotations
 
+# %% Imports
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from timeit import default_timer
@@ -12,7 +13,9 @@ import cv2
 import numpy
 import py_trees
 import torch
-from transformers import Owlv2Processor, Owlv2ForObjectDetection
+from krrood.ormatic.utils import classproperty
+from semantic_digital_twin.world_description.geometry import Color
+from transformers import Owlv2ForObjectDetection, Owlv2Processor
 from typing_extensions import TYPE_CHECKING
 from ultralytics import SAM as SegmentAnythingModel
 
@@ -23,9 +26,10 @@ import robokudo.types.scene
 import robokudo.utils.annotator_helper
 import robokudo.utils.cv_helper
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
     import numpy.typing as numpy_typing
@@ -91,64 +95,74 @@ def get_box_text(object_hypothesis: ObjectHypothesis) -> str:
         return f"{object_hypothesis.id}: {best_classification.classname}, {best_classification.confidence:.2f}"
 
 
-# %% Open-vocabulary object detection
+# %% OpenVocabularyObjectDetection parameters
+
+
+@dataclass(kw_only=True)
+class OpenVocabularyObjectDetectionParameters(AnnotatorParameters):
+    """Settings specific to this annotation operation."""
+
+    classes: list[str] = field(default_factory=lambda: ["Cat", "Dog"])
+    """Text labels to detect in the color image."""
+
+    detection_model: str = "google/owlv2-base-patch16-ensemble"
+    """Pretrained OWLv2 model name or local checkpoint directory."""
+
+    detection_processor: str = "google/owlv2-base-patch16-ensemble"
+    """Pretrained OWLv2 processor name or local checkpoint directory."""
+
+    detection_threshold: float = 0.2
+    """Confidence threshold for retaining detections."""
+
+    segment_anything_model_path: str = "mobile_sam.pt"
+    """Checkpoint for the Segment Anything model."""
+
+    precision_mode: bool = False
+    """Whether to predict object masks with Segment Anything."""
+
+    refine_bounding_boxes: bool = False
+    """Whether to refine boxes when ``precision_mode`` is enabled."""
+
+
+# %% OpenVocabularyObjectDetection descriptor
+
+
+@dataclass(kw_only=True)
+class OpenVocabularyObjectDetectionDescriptor(
+    AnnotatorDescriptor[OpenVocabularyObjectDetectionParameters]
+):
+    """Declarative configuration of :class:`OpenVocabularyObjectDetectionAnnotator`."""
+
+    parameters: OpenVocabularyObjectDetectionParameters = field(
+        default_factory=OpenVocabularyObjectDetectionParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% OpenVocabularyObjectDetection annotator
 
 
 @dataclass(eq=False)
 class OpenVocabularyObjectDetectionAnnotator(
-    robokudo.annotators.core.ThreadedAnnotator
+    robokudo.annotators.core.ThreadedAnnotator[OpenVocabularyObjectDetectionDescriptor]
 ):
     """
     Detect configured text classes and optionally segment their image regions.
     """
 
-    class Descriptor(robokudo.annotators.core.BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self):
-                """
-                Set default detection and segmentation settings.
-                """
-                self.classes = ["Cat", "Dog"]
-                """
-                Text labels to detect in the color image.
-                """
-                self.detection_model = "google/owlv2-base-patch16-ensemble"
-                """
-                Pretrained OWLv2 model name or local checkpoint directory.
-                """
-                self.detection_processor = "google/owlv2-base-patch16-ensemble"
-                """
-                Pretrained OWLv2 processor name or local checkpoint directory.
-                """
-                self.detection_threshold = 0.2
-                """
-                Confidence threshold for retaining detections.
-                """
-
-                self.segment_anything_model_path = "mobile_sam.pt"
-                """
-                Checkpoint for the Segment Anything model.
-                """
-                self.precision_mode = False
-                """
-                Whether to predict object masks with Segment Anything.
-                """
-                self.refine_bounding_boxes = False
-                """
-                Whether to refine boxes when ``precision_mode`` is enabled.
-                """
-
-        parameters = Parameters()
-        """
-        Detection and segmentation configuration defaults.
-        """
+    @classproperty
+    def Descriptor(cls) -> type[OpenVocabularyObjectDetectionDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return OpenVocabularyObjectDetectionDescriptor
 
     name: str = __qualname__
     """
     Name of the behaviour-tree node.
     """
 
-    descriptor: Descriptor = field(default_factory=Descriptor)
+    descriptor: OpenVocabularyObjectDetectionDescriptor = field(
+        default_factory=OpenVocabularyObjectDetectionDescriptor
+    )
     """
     Detection and segmentation configuration.
     """

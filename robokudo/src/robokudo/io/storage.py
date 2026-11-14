@@ -23,20 +23,20 @@ import os
 from enum import StrEnum
 
 from pymongo import MongoClient
-from typing_extensions import Any, TYPE_CHECKING
-from robokudo import world
+from typing_extensions import TYPE_CHECKING, Any
 
+from robokudo import world
 from robokudo.cas import CAS
 from robokudo.io.cas_annotation_codecs import (
-    serialize_annotations,
     deserialize_annotations,
+    serialize_annotations,
 )
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
 from robokudo.io.exceptions import (
-    RecordedViewMissing,
     CASViewCodecMissing,
-    ViewStorageFailed,
+    RecordedViewMissing,
     RecordedViewNameMismatch,
+    ViewStorageFailed,
 )
 
 if TYPE_CHECKING:
@@ -114,15 +114,15 @@ class Storage:
         better compatibility across pymongo versions and simpler cursor management.
         """
 
-        def __init__(self, db_name: str) -> None:
+        def __init__(self, database_name: str) -> None:
             """
             Initialize the list reader.
 
-            :param db_name: Name of the MongoDB database
+            :param database_name: Name of the MongoDB database
             """
             client = Storage.instantiate_mongo_client()
 
-            self.db_reader = client[db_name]
+            self.database_reader = client[database_name]
             """
             MongoDB database instance.
             """
@@ -143,7 +143,7 @@ class Storage:
             Clears and reloads all documents from the database.
             """
             self.data.clear()
-            for data in self.db_reader.cas.find():
+            for data in self.database_reader.cas.find():
                 self.data.append(data)
             self.index = 0 if self.data else None
 
@@ -167,13 +167,13 @@ class Storage:
             self.index += 1
             return data
 
-    def __init__(self, db_name: str) -> None:
+    def __init__(self, database_name: str) -> None:
         """
         Initialize the storage interface.
 
-        :param db_name: Name of the MongoDB database
+        :param database_name: Name of the MongoDB database
         """
-        self.db_name = db_name
+        self.database_name = database_name
         """
         Name of the MongoDB database.
         """
@@ -181,7 +181,7 @@ class Storage:
         """
         MongoDB client connection.
         """
-        self.db: Database = self.client[db_name]
+        self.database: Database = self.client[database_name]
         """
         MongoDB database instance.
         """
@@ -190,7 +190,7 @@ class Storage:
         """
         Drop the entire database.
         """
-        self.client.drop_database(self.db_name)
+        self.client.drop_database(self.database_name)
 
     @staticmethod
     def encode_view_document(view_name: str, view_value: Any) -> dict[str, Any]:
@@ -232,7 +232,9 @@ class Storage:
                 view_name=view_name,
                 view_value=view_value,
             )
-            result = self.db[Storage.VIEW_COLLECTION_NAME].insert_one(view_document)
+            result = self.database[Storage.VIEW_COLLECTION_NAME].insert_one(
+                view_document
+            )
             if not result.acknowledged:
                 raise ViewStorageFailed(view_name=view_name)
 
@@ -291,7 +293,9 @@ class Storage:
         :raises RecordedViewMissing: If the referenced view document does not exist.
         """
         view_id = cas_document[StorageDocumentField.VIEW_IDS][view_name]
-        document = self.db[Storage.VIEW_COLLECTION_NAME].find_one({"_id": view_id})
+        document = self.database[Storage.VIEW_COLLECTION_NAME].find_one(
+            {"_id": view_id}
+        )
         if document is None:
             raise RecordedViewMissing(view_name=view_name, view_id=view_id)
         return document
@@ -353,4 +357,4 @@ class Storage:
         :param cas_dict: Dictionary representation of a CAS
         :return: MongoDB ObjectId of the stored CAS document
         """
-        return self.db.cas.insert_one(cas_dict)
+        return self.database.cas.insert_one(cas_dict)

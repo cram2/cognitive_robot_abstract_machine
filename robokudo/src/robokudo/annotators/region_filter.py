@@ -12,15 +12,20 @@ This module provides an annotator for:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 
 import robokudo.world as rk_world
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.scene import RegionHypothesis
 from robokudo.utils.annotator_helper import get_world_to_camera_transform_matrix
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
@@ -29,47 +34,68 @@ from robokudo.utils.region import (
     region_pose_annotation,
 )
 
+# %% RegionFilter parameters
 
-class RegionFilter(ThreadedAnnotator):
+
+@dataclass(kw_only=True)
+class RegionFilterParameters(AnnotatorParameters):
+    """Parameters for configuring region filtering."""
+
+    world_frame_name: str = "map"
+    """Name of the world coordinate frame"""
+
+    active_region: str = ""
+    """Name of active region to filter. Does not define a specific region but can be used to check the active regions."""
+
+
+# %% RegionFilter descriptor
+
+
+@dataclass(kw_only=True)
+class RegionFilterDescriptor(AnnotatorDescriptor[RegionFilterParameters]):
+    """Declarative configuration of :class:`RegionFilter`."""
+
+    parameters: RegionFilterParameters = field(
+        default_factory=RegionFilterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% RegionFilter annotator
+
+
+@dataclass(eq=False)
+class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     """Point cloud filtering using world regions.
 
     The RegionFilter can be used to filter point clouds based on an environment model
     that provides semantic_digital_twin Regions via a shared World.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for region filtering."""
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """Parameters for configuring region filtering."""
+    descriptor: RegionFilterDescriptor = field(default_factory=RegionFilterDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.world_frame_name: str = "map"
-                """Name of the world coordinate frame"""
+    world_frame_name: str = field(init=False, repr=False)
+    """Name of the world coordinate frame read from parameters"""
 
-                self.active_region: str = ""
-                """Name of active region to filter. Does not define a specific region but can be used to check the active regions."""
+    active_region: str = field(init=False, repr=False)
+    """Name of the active region to filter read from parameters"""
 
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[RegionFilterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return RegionFilterDescriptor
 
-    def __init__(
-        self,
-        name: str = "RegionFilter",
-        descriptor: RegionFilter.Descriptor | None = None,
-    ) -> None:
-        """Initialize the region filter.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name=name, descriptor=descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.world_frame_name: str = self.descriptor.parameters.world_frame_name
-        """Name of the world coordinate frame read from parameters"""
 
         self.active_region = self.descriptor.parameters.active_region
-        """Name of the active region to filter read from parameters"""
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:

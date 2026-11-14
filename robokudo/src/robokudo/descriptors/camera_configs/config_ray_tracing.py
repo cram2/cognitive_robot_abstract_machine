@@ -101,7 +101,9 @@ class RayTracingCameraConfiguration(BaseCameraConfig):
     Scale factor from RGB image to depth image resolution.
     """
 
-    rgb_mode: ColorRenderingMode = field(default_factory=BodyColorRenderingMode)
+    color_rendering_mode: ColorRenderingMode = field(
+        default_factory=BodyColorRenderingMode
+    )
     """
     Method used to create the rendered color image.
     """

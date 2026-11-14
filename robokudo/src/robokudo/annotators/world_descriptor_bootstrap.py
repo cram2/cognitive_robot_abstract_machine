@@ -4,15 +4,19 @@ Bootstrap static world descriptor content into the shared world.
 
 from __future__ import annotations
 
+# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
-from typing_extensions import Any
 from uuid import UUID
 
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
+from typing_extensions import Any
 
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.exceptions import WorldDescriptorBootstrapError
 from robokudo.utils.world_descriptor import load_world_descriptor
 from robokudo.world_descriptor import BaseWorldDescriptor
@@ -62,38 +66,73 @@ class _MergedDescriptorEntities:
         )
 
 
-class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
+# %% WorldDescriptorBootstrap parameters
+
+
+@dataclass(kw_only=True)
+class WorldDescriptorBootstrapParameters(AnnotatorParameters):
+    """Parameters for world descriptor bootstrap."""
+
+    world_descriptor_ros_package: str = "robokudo"
+    """ROS package containing the world descriptor to load."""
+
+    world_descriptor_name: str = "world_iai_kitchen20"
+    """Module identifying the predefined world to load."""
+
+    reload_on_update: bool = False
+    """Whether each update reloads and reapplies the predefined world."""
+
+
+# %% WorldDescriptorBootstrap descriptor
+
+
+@dataclass(kw_only=True)
+class WorldDescriptorBootstrapDescriptor(
+    AnnotatorDescriptor[WorldDescriptorBootstrapParameters]
+):
+    """Declarative configuration of :class:`WorldDescriptorBootstrapAnnotator`."""
+
+    parameters: WorldDescriptorBootstrapParameters = field(
+        default_factory=WorldDescriptorBootstrapParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% WorldDescriptorBootstrap annotator
+
+
+@dataclass(eq=False)
+class WorldDescriptorBootstrapAnnotator(
+    BaseAnnotator[WorldDescriptorBootstrapDescriptor]
+):
     """
     Augment the current shared world with descriptor-defined entities.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for world descriptor bootstrap.
-        """
+    name: str = "WorldDescriptorBootstrap"
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for world descriptor bootstrap.
-            """
+    descriptor: WorldDescriptorBootstrapDescriptor = field(
+        default_factory=WorldDescriptorBootstrapDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.world_descriptor_ros_package: str = "robokudo"
-                self.world_descriptor_name: str = "world_iai_kitchen20"
-                self.reload_on_update: bool = False
+    _last_augmented_world_id: int | None = field(default=None, init=False, repr=False)
+    """Identity of the world most recently augmented with descriptor entities."""
 
-        parameters = Parameters()
+    _merged_descriptor_entities: _MergedDescriptorEntities = field(
+        init=False, repr=False
+    )
+    """Descriptor entities retained for replacing a previous augmentation."""
 
-    def __init__(
-        self,
-        name: str = "WorldDescriptorBootstrap",
-        descriptor: WorldDescriptorBootstrapAnnotator.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the world descriptor bootstrap annotator.
-        """
-        super().__init__(name=name, descriptor=descriptor)
-        self._last_augmented_world_id: int | None = None
+    @classproperty
+    def Descriptor(cls) -> type[WorldDescriptorBootstrapDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return WorldDescriptorBootstrapDescriptor
+
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self._merged_descriptor_entities = _MergedDescriptorEntities()
 
     def _update_tracker_if_active(self) -> None:

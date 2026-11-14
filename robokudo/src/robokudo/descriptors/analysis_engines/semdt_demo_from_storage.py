@@ -1,4 +1,6 @@
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
@@ -46,7 +48,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 ClusterColorHistogramAnnotator(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
-                ClusterPoseBBAnnotator(),
+                ClusterPoseBoundingBoxAnnotator(),
                 SemanticDigitalTwinConnector(),
             ]
         )

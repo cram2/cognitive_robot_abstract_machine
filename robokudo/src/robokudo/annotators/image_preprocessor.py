@@ -15,18 +15,21 @@ This module provides an annotator for:
 from __future__ import annotations
 
 # %% Imports
+from dataclasses import dataclass, field
 from enum import StrEnum
 from timeit import default_timer
 
 import cv2
 import numpy
 import open3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.exceptions import ColorToDepthRatioMissing
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
@@ -34,7 +37,35 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class ImagePreprocessorAnnotator(BaseAnnotator):
+# %% ImagePreprocessor parameters
+
+
+@dataclass(kw_only=True)
+class ImagePreprocessorParameters(AnnotatorParameters):
+    """Parameters for configuring preprocessing."""
+
+    depth_truncation: float = 9.0
+    """Maximum depth distance in meters, points beyond are discarded from cloud creation"""
+
+
+# %% ImagePreprocessor descriptor
+
+
+@dataclass(kw_only=True)
+class ImagePreprocessorDescriptor(AnnotatorDescriptor[ImagePreprocessorParameters]):
+    """Declarative configuration of :class:`ImagePreprocessorAnnotator`."""
+
+    parameters: ImagePreprocessorParameters = field(
+        default_factory=ImagePreprocessorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ImagePreprocessor annotator
+
+
+@dataclass(eq=False)
+class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
     """
     RGB-D image preprocessor and point cloud generator.
 
@@ -49,6 +80,23 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
        Requires properly configured camera intrinsics and color-to-depth ratio.
     """
 
+    name: str = "ImagePreprocessor"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ImagePreprocessorDescriptor = field(
+        default_factory=ImagePreprocessorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    color: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Optional color image currently being worked with"""
+
+    depth: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Optional depth image currently being worked with"""
+
+    display_mode: ImagePreprocessorAnnotator.ViewMode = field(init=False, repr=False)
+    """The display mode to use (color or depth)"""
+
     class ViewMode(StrEnum):
         """
         Visualization mode enumeration.
@@ -57,53 +105,17 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         COLOR = "color"
         DEPTH = "depth"
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for image preprocessing.
-        """
+    @classproperty
+    def Descriptor(cls) -> type[ImagePreprocessorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ImagePreprocessorDescriptor
 
-        class Parameters:
-            """
-            Parameters for configuring preprocessing.
-            """
-
-            def __init__(self) -> None:
-                self.depth_trunc: float = 9.0
-                """
-                Maximum depth distance in meters, points beyond are discarded from cloud creation
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "ImagePreprocessor",
-        descriptor: ImagePreprocessorAnnotator.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the image preprocessor.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.color: npt.NDArray | None = None
-        """
-        Optional color image currently being worked with
-        """
-
-        self.depth: npt.NDArray | None = None
-        """
-        Optional depth image currently being worked with
-        """
-
         self.display_mode: ImagePreprocessorAnnotator.ViewMode = self.ViewMode.COLOR
-        """
-        The display mode to use (color or depth)
-        """
 
     def update(self) -> Status:
         """
@@ -157,7 +169,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
             open3d_color_image,
             open3d_depth_image,
             convert_rgb_to_intensity=False,
-            depth_trunc=self.descriptor.parameters.depth_trunc,
+            depth_trunc=self.descriptor.parameters.depth_truncation,
         )
 
         cloud = open3d.geometry.PointCloud.create_from_rgbd_image(

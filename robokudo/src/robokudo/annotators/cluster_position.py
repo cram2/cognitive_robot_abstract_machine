@@ -23,19 +23,52 @@ The module uses:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types import annotation, scene
 
-# %% position estimation
+# %% ClusterPosition parameters
 
 
-class ClusterPositionAnnotator(BaseAnnotator):
+@dataclass(kw_only=True)
+class ClusterPositionParameters(AnnotatorParameters):
+    """Parameters for configuring position estimation."""
+
+    analysis_scope: type = scene.ObjectHypothesis
+    """Type of data to perform position estimation on(e.g. ObjectHypothesis or CloudAnnotation)"""
+
+    visualizer_point_radius: float = 0.04
+    """Radius of centroid sphere markers in meters."""
+
+
+# %% ClusterPosition descriptor
+
+
+@dataclass(kw_only=True)
+class ClusterPositionDescriptor(AnnotatorDescriptor[ClusterPositionParameters]):
+    """Declarative configuration of :class:`ClusterPositionAnnotator`."""
+
+    parameters: ClusterPositionParameters = field(
+        default_factory=ClusterPositionParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ClusterPosition annotator
+
+
+@dataclass(eq=False)
+class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
     """
     3D position estimation for object hypotheses.
 
@@ -51,40 +84,18 @@ class ClusterPositionAnnotator(BaseAnnotator):
        Can process either ObjectHypothesis or CloudAnnotation data.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for position estimation.
-        """
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        class Parameters:
-            """
-            Parameters for configuring position estimation.
-            """
+    descriptor: ClusterPositionDescriptor = field(
+        default_factory=ClusterPositionDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-            def __init__(self) -> None:
-                self.analysis_scope: type = scene.ObjectHypothesis
-                """
-                Type of data to perform position estimation on(e.g. ObjectHypothesis or
-                CloudAnnotation)
-                """
-                self.visualizer_point_radius: float = 0.04
-                """
-                Radius of centroid sphere markers in meters.
-                """
-
-    def __init__(
-        self,
-        name: str = "ClusterPositionAnnotator",
-        descriptor: ClusterPositionAnnotator.Descriptor | None = None,
-    ) -> None:
-        """
-        Initialize the position estimator.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+    @classproperty
+    def Descriptor(cls) -> type[ClusterPositionDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ClusterPositionDescriptor
 
     def update(self) -> Status:
         """

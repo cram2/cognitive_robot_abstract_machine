@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-# %% Imports
 import colorsys
+
+# %% Imports
+from dataclasses import dataclass, field
 
 import cv2
 import numpy
 import open3d
 from py_trees.common import Status
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from typing_extensions import TYPE_CHECKING, Sequence
 
 from robokudo.annotators.core import ThreadedAnnotator
@@ -14,7 +17,6 @@ from robokudo.cas import CASViews
 from robokudo.types.annotation import SIFTAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
-from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 if TYPE_CHECKING:
     import numpy.typing as numpy_types
@@ -23,21 +25,30 @@ if TYPE_CHECKING:
 
 
 # %% Feature extraction
+@dataclass(eq=False)
 class SIFTAnnotator(ThreadedAnnotator):
     """
     Annotator for SIFT feature extraction and matching using OpenCV.
     """
 
-    def __init__(
-        self,
-        name: str = "SIFTAnnotator",
-    ) -> None:
-        super().__init__(name)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    _feature_extractor: cv2.SIFT = field(init=False, repr=False)
+    """
+    SIFT feature extractor.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Initialize annotator resources after
+        :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
+        """
+        super().__post_init__()
 
         self._feature_extractor: cv2.SIFT = cv2.SIFT_create()
-        """
-        SIFT feature extractor.
-        """
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:

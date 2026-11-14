@@ -59,25 +59,25 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
     rotation with proper intrinsics adjustment.
     """
 
-    def __init__(self, camera_config: Any) -> None:
+    def __init__(self, camera_configuration: Any) -> None:
         """
         Initialize the RGB-only camera interface.
 
         Sets up ROS subscribers and synchronization for RGB image and camera info
         topics. Also initializes internal data structures and thread safety.
 
-        :param camera_config: Configuration for the camera interface
+        :param camera_configuration: Configuration for the camera interface
         """
-        super().__init__(camera_config)
+        super().__init__(camera_configuration)
 
         self.color_subscriber: Subscriber = message_filters.Subscriber(
-            camera_config.topic_color, Image
+            camera_configuration.topic_color, Image
         )
         """
         Subscriber for RGB image topic.
         """
         self.camera_info_subscriber: Subscriber = message_filters.Subscriber(
-            camera_config.topic_camera_info, CameraInfo
+            camera_configuration.topic_camera_info, CameraInfo
         )
         """
         Subscriber for camera info topic.
@@ -90,8 +90,8 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         synchronizer.registerCallback(self.callback)
 
         self.rk_logger.info("Subscribed to: ")
-        self.rk_logger.info(f"  {camera_config.topic_color}")
-        self.rk_logger.info(f"  {camera_config.topic_camera_info}")
+        self.rk_logger.info(f"  {camera_configuration.topic_color}")
+        self.rk_logger.info(f"  {camera_configuration.topic_camera_info}")
 
         self.color: tuple[npt.NDArray] | None = None
         """
@@ -303,7 +303,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         principal_point_x = self.camera_info.k[2]
         focal_length_y = self.camera_info.k[4]
         principal_point_y = self.camera_info.k[5]
-        if self.camera_config.rotate_image is not None:
+        if self.camera_configuration.rotate_image is not None:
             intrinsic_matrix = np.array(
                 [
                     [focal_length_x, 0, principal_point_x],
@@ -315,7 +315,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
                 self.rotate_image_and_intrinsics(
                     self.color,
                     intrinsic_matrix=intrinsic_matrix,
-                    rotation=self.camera_config.rotate_image,
+                    rotation=self.camera_configuration.rotate_image,
                 )
             )
             self.color = rotated_image
@@ -339,7 +339,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
             self.camera_info.d = self.rotate_camera_distortion(
                 coefficients=self.camera_info.d,
                 distortion_model=self.camera_info.distortion_model,
-                rotation=self.camera_config.rotate_image,
+                rotation=self.camera_configuration.rotate_image,
             )
 
         self.camera_info.width = width
@@ -348,7 +348,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, None)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
-        camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
+        camera_frame = (
+            self.camera_info.header.frame_id or self.camera_configuration.tf_from
+        )
         self.validate_camera_frame_for_tf(camera_frame)
         world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         self.store_camera_observation(

@@ -19,13 +19,50 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
+
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Callable
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+
+# %% Filter parameters
 
 
-class FilterAnnotator(BaseAnnotator):
+@dataclass(kw_only=True)
+class FilterParameters(AnnotatorParameters):
+    """Parameter container for filter configuration."""
+
+    function: Callable | None = None
+    """Filter function to apply"""
+
+    function_arguments: tuple | None = None
+    """Positional arguments for filter function"""
+
+    function_keyword_arguments: dict | None = None
+    """Keyword arguments for filter function"""
+
+
+# %% Filter descriptor
+
+
+@dataclass(kw_only=True)
+class FilterDescriptor(AnnotatorDescriptor[FilterParameters]):
+    """Declarative configuration of :class:`FilterAnnotator`."""
+
+    parameters: FilterParameters = field(default_factory=FilterParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Filter annotator
+
+
+@dataclass(eq=False)
+class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     """
     Annotator for applying filter conditions to annotations.
 
@@ -33,42 +70,16 @@ class FilterAnnotator(BaseAnnotator):
     annotations, modifying the annotation list in-place based on the filter results.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for filter annotator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        :ivar parameters: Filter parameters
-        :type parameters: FilterAnnotator.Descriptor.Parameters
-        """
+    descriptor: FilterDescriptor = field(default_factory=FilterDescriptor)
+    """Configuration supplied to this annotator instance."""
 
-        class Parameters:
-            """Parameter container for filter configuration."""
-
-            def __init__(self) -> None:
-                self.func: Callable | None = None
-                """Filter function to apply"""
-
-                self.func_args: tuple | None = None
-                """Positional arguments for filter function"""
-
-                self.func_kwargs: dict | None = None
-                """Keyword arguments for filter function"""
-
-        # overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
-
-    def __init__(
-        self,
-        name: str = "FilterAnnotator",
-        descriptor: FilterAnnotator.Descriptor | None = None,
-    ) -> None:
-        """Initialize the filter annotator.
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
+    @classproperty
+    def Descriptor(cls) -> type[FilterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return FilterDescriptor
 
     def update(self) -> Status:
         """
@@ -79,17 +90,21 @@ class FilterAnnotator(BaseAnnotator):
 
         :return: SUCCESS status
         """
-        func = self.descriptor.parameters.func
+        function = self.descriptor.parameters.function
 
-        if func:
-            func_args = self.descriptor.parameters.func_args or []
-            func_kwargs = self.descriptor.parameters.func_kwargs or {}
+        if function:
+            function_arguments = self.descriptor.parameters.function_arguments or []
+            function_keyword_arguments = (
+                self.descriptor.parameters.function_keyword_arguments or {}
+            )
 
             temporary_annotations = self.get_cas().annotations
             temporary_annotations = [
                 annotation
                 for annotation in temporary_annotations
-                if func(annotation, *func_args, **func_kwargs)
+                if function(
+                    annotation, *function_arguments, **function_keyword_arguments
+                )
             ]
             self.get_cas().annotations = temporary_annotations
 

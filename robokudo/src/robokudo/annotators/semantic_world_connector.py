@@ -1,16 +1,22 @@
+"""Semantic world connector configuration and annotation behavior."""
+
 from __future__ import annotations
 
 # %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
-from rclpy.time import Time
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
+from rclpy.time import Time
 from scipy.optimize import linear_sum_assignment
 
 from robokudo import world
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CAS, CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     PoseAnnotation,
@@ -26,34 +32,62 @@ from robokudo.utils.annotator_helper import (
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 from robokudo.world import world_instance
 
+# %% SemanticDigitalTwinConnector parameters
 
-class SemanticDigitalTwinConnector(ThreadedAnnotator):
+
+@dataclass(kw_only=True)
+class SemanticDigitalTwinConnectorParameters(AnnotatorParameters):
+    """Settings specific to this annotation operation."""
+
+    confidence_threshold: float = 0.05
+    """Similarity threshold for associating a hypothesis with an existing belief."""
+
+
+# %% SemanticDigitalTwinConnector descriptor
+
+
+@dataclass(kw_only=True)
+class SemanticDigitalTwinConnectorDescriptor(
+    AnnotatorDescriptor[SemanticDigitalTwinConnectorParameters]
+):
+    """Declarative configuration of :class:`SemanticDigitalTwinConnector`."""
+
+    parameters: SemanticDigitalTwinConnectorParameters = field(
+        default_factory=SemanticDigitalTwinConnectorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% SemanticDigitalTwinConnector annotator
+
+
+@dataclass(eq=False)
+class SemanticDigitalTwinConnector(
+    ThreadedAnnotator[SemanticDigitalTwinConnectorDescriptor]
+):
     """
     An annotator that synchronizes the current state of the world with the semdt.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self) -> None:
-                """
-                Initialize a new set of parameters for the descriptor.
-                """
-                self.confidence_threshold = 0.05
+    name: str = "SemanticDigitalTwinSynchronization"
+    """Name of this node in the behaviour tree."""
 
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    descriptor: SemanticDigitalTwinConnectorDescriptor = field(
+        default_factory=SemanticDigitalTwinConnectorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
 
-    def __init__(
-        self,
-        name: str = "SemanticDigitalTwinSynchronization",
-        descriptor: SemanticDigitalTwinConnector.Descriptor | None = None,
-    ) -> None:
-        """
-        Default construction.
+    object_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
+    """Compares perception hypotheses with semantic-world objects."""
 
-        Minimal one-time init!
-        """
-        super().__init__(name, descriptor)
+    @classproperty
+    def Descriptor(cls) -> type[SemanticDigitalTwinConnectorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return SemanticDigitalTwinConnectorDescriptor
+
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.object_comparator = (

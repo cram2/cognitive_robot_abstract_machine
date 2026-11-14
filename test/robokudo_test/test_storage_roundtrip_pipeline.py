@@ -1,34 +1,33 @@
 from __future__ import annotations
 
+import json
+
 # %% Imports
 import os
-from pathlib import Path
-import json
 import uuid
-import pytest
+from pathlib import Path
 
 import numpy as np
 import py_trees
-from rclpy.node import Node
-
-from robokudo.types.cv import ColorToDepthRatio
+import pytest
 import robokudo.defs
-from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
+import robokudo.utils.tree_execution
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from rclpy.node import Node
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.storage import StorageWriter
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.cas import CASViews
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.io.storage import Storage, StorageDocumentField
-import robokudo.utils.tree_execution
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-
-from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from robokudo.types.cv import ColorToDepthRatio
+
+from robokudo import world as rk_world
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -36,16 +35,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
+def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pipeline:
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
-        target_dir=recording_directory,
+        target_directory=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
-    camera_config = file_reader_descriptor.parameters.camera_config
-    camera_config.static_camera_transform_enabled = True
-    camera_config.static_world_T_camera = (
+    camera_configuration = file_reader_descriptor.parameters.camera_configuration
+    camera_configuration.static_camera_transform_enabled = True
+    camera_configuration.static_world_T_camera = (
         HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
@@ -58,7 +57,7 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
     )
 
     writer_descriptor = StorageWriter.Descriptor()
-    writer_descriptor.parameters.db_name = db_name
+    writer_descriptor.parameters.database_name = database_name
     writer_descriptor.parameters.drop_database_on_storage = True
 
     pipeline = Pipeline("WriterPipeline")
@@ -72,9 +71,9 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
     return pipeline
 
 
-def _build_reader_pipeline(db_name: str) -> Pipeline:
+def _build_reader_pipeline(database_name: str) -> Pipeline:
     mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-        "mongo", loop=False, db_name=db_name
+        "mongo", loop=False, database_name=database_name
     )
     pipeline = Pipeline("ReaderPipeline")
     pipeline.add_children(
@@ -91,8 +90,8 @@ class TestStorageRoundtripPipeline:
         self, cup_on_counter_directory: Path
     ) -> None:
         rk_world.init_world_with_entity_tracker()
-        db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
-        storage = Storage(db_name)
+        database_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
+        storage = Storage(database_name)
         writer_node = Node(
             f"{robokudo.defs.TEST_ROS_NODE_NAME}_writer_{uuid.uuid4().hex}"
         )
@@ -100,13 +99,15 @@ class TestStorageRoundtripPipeline:
             f"{robokudo.defs.TEST_ROS_NODE_NAME}_reader_{uuid.uuid4().hex}"
         )
         try:
-            writer_pipeline = _build_writer_pipeline(db_name, cup_on_counter_directory)
+            writer_pipeline = _build_writer_pipeline(
+                database_name, cup_on_counter_directory
+            )
             writer_status = robokudo.utils.tree_execution.run_tree_once(
                 writer_pipeline, writer_node
             )
             assert writer_status is py_trees.common.Status.SUCCESS
-            assert storage.db.cas.count_documents({}) == 1
-            stored_record = storage.db.cas.find_one({})
+            assert storage.database.cas.count_documents({}) == 1
+            stored_record = storage.database.cas.find_one({})
             assert stored_record is not None
             assert "world" in stored_record
 
@@ -119,13 +120,13 @@ class TestStorageRoundtripPipeline:
                 CASViews.QUERY, {"recorded": True}
             )
             query_id = (
-                storage.db[Storage.VIEW_COLLECTION_NAME]
+                storage.database[Storage.VIEW_COLLECTION_NAME]
                 .insert_one(query_document)
                 .inserted_id
             )
             view_ids = dict(stored_record[StorageDocumentField.VIEW_IDS])
             view_ids[CASViews.QUERY] = query_id
-            storage.db.cas.update_one(
+            storage.database.cas.update_one(
                 {"_id": stored_record["_id"]},
                 {"$set": {StorageDocumentField.VIEW_IDS: view_ids}},
             )
@@ -133,7 +134,7 @@ class TestStorageRoundtripPipeline:
             rk_world.init_world_with_entity_tracker()
             assert rk_world.world_instance().is_empty()
 
-            reader_pipeline = _build_reader_pipeline(db_name)
+            reader_pipeline = _build_reader_pipeline(database_name)
             reader_status = robokudo.utils.tree_execution.run_tree_once(
                 reader_pipeline, reader_node
             )
