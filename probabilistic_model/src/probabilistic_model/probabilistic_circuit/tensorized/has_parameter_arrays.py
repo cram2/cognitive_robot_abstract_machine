@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from types import ModuleType
 
 import numpy as np
+import array_api_compat
 from array_api_compat import array_namespace, is_cupy_array, is_torch_array
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -72,6 +73,14 @@ class HasParameterArrays(
             compute in.
         """
         return self.namespace.result_type(*self.parameters)
+
+    @functools.cached_property
+    def device(self) -> Any:
+        """
+        :return: The device of the parameters, which the arrays a numeric query
+            creates are placed on.
+        """
+        return array_api_compat.device(self.parameters[0])
 
     @staticmethod
     def host_copy(array: ArrayType) -> np.ndarray:
