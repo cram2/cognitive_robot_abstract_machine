@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 # %% exceptions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultipleRootsError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a region graph has more than one node without parents.
@@ -35,7 +35,7 @@ class MultipleRootsError(ProbabilisticModelException, ValueError):
         return "Connect every region to the single root region of the graph."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedRegionVariableError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a leaf region holds a variable that no input layer of a region
@@ -57,7 +57,7 @@ class UnsupportedRegionVariableError(ProbabilisticModelException, ValueError):
         return "Use continuous or symbolic variables."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassVariableMismatchError(ProbabilisticModelException, ValueError):
     """
     Exception raised when the class variable of a classifying region graph is missing or

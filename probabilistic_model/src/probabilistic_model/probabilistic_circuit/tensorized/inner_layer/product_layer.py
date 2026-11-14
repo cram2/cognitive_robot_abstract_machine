@@ -451,7 +451,8 @@ class ProductLayer(InnerLayer):
             np.tile(edges.nodes, number_of_events) + blocks * self.number_of_nodes,
             np.tile(edges.child_layer_indices, number_of_events),
             np.tile(edges.child_nodes, number_of_events)
-            + blocks * np.tile(node_counts[edges.child_layer_indices], number_of_events),
+            + blocks
+            * np.tile(node_counts[edges.child_layer_indices], number_of_events),
         )
         result = self.from_edges(
             [child_result.layer for child_result in child_results],

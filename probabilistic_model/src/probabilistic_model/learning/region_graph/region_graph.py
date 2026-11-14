@@ -227,7 +227,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         """
         possible_roots = [node for node in self.nodes() if self.in_degree(node) == 0]
         if len(possible_roots) > 1:
-            raise MultipleRootsError(possible_roots)
+            raise MultipleRootsError(roots=possible_roots)
         return possible_roots[0]
 
     # %% circuits
@@ -241,14 +241,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         class_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a randomly initialized RAT-SPN, a layered circuit
-        with jax parameters in the floating point type jax computes in by default.
-
-        Every leaf region holds ``input_units`` fully factorized distributions, every
-        partition the cross products of the units of its regions and every other region
-        ``sum_units`` sum units over all products of its partitions, stored densely.
-        The root region has one sum unit per class; with more than one class, the root
-        mixes them, each multiplied by the indicator of its class, so that training the
+        Convert the region graph to a randomly initialized RAT-SPN with jax parameters.
+        With more than one class, the root mixes the class conditional sum units of the
+        root region, each multiplied by the indicator of its class, so that training the
         joint likelihood trains a classifier.
 
         :param input_units: The number of input distributions of each leaf region.
@@ -265,7 +260,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             or len(class_variable.domain.simple_sets) != self.classes
             or class_variable in self.variables
         ):
-            raise ClassVariableMismatchError(self.classes, class_variable)
+            raise ClassVariableMismatchError(
+                classes=self.classes, class_variable=class_variable
+            )
         variables = SortedSet(self.variables)
         if self.classes > 1:
             variables = variables | SortedSet([class_variable])
@@ -414,7 +411,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                 DenseProbabilityTable(np.log(probabilities)),
                 SymbolicEncoding(variable).hashes,
             )
-        raise UnsupportedRegionVariableError(variable)
+        raise UnsupportedRegionVariableError(variable=variable)
 
     def mixture_of_classes(
         self,
