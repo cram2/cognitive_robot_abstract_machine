@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing_extensions import ClassVar
+from typing_extensions import Callable, ClassVar
 from uuid import UUID
 
 import numpy as np
@@ -92,7 +92,8 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     each other what to catch up with without comparing world models they cannot compare.
     A message that does not follow the one received from its publisher before reveals
     that messages in between were lost, which is logged. A message this world cannot
-    apply is logged too, and its publisher no longer counts as caught up with.
+    apply is logged too, and its publisher no longer counts as caught up with until
+    :meth:`forget_divergence_from` is called for it.
     """
 
     node: RosNode = field(kw_only=True)
@@ -160,20 +161,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     The position of the message received last, per publisher.
     """
 
-    _diverged_publishers: set[MetaData] = field(
-        default_factory=set, init=False, repr=False
+    _divergences: dict[MetaData, SynchronizerDivergedError] = field(
+        default_factory=dict, init=False, repr=False
     )
     """
-    The publishers a message of which this world could not apply, so that it may differ
-    from their worlds for good.
-    """
-
-    _unreported_divergence: SynchronizerDivergedError | None = field(
-        default=None, init=False, repr=False
-    )
-    """
-    The first failure to apply a received message that was not raised on the thread that
-    owns the world yet.
+    The first failure to apply a message of a publisher, per publisher this world may
+    differ from since.
     """
 
     _sequence_number_lock: threading.Lock = field(
@@ -257,56 +250,61 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         if received.publisher == self.meta_data:
             return
         self._notice_lost_messages(received)
-        try:
-            self._subscription_callback(received)
-        except DataclassException as error:
-            self._report_divergence(received=received, error=error)
+        self._handle_reporting_divergence(
+            received=received, handle=self._subscription_callback
+        )
 
-    def _report_divergence(
+    def _handle_reporting_divergence(
         self,
         *,
         received: ReceivedMessage,
-        error: DataclassException,
+        handle: Callable[[ReceivedMessage], None],
         error_throttle_period: float = 1.0,
     ) -> None:
         """
-        Log that a message could not be applied, stop counting its publisher as caught
-        up with, and keep the failure for :meth:`raise_unreported_divergence`, instead
-        of ending the spinning of the node.
+        Handle a received message; if it cannot be applied, log that, and stop counting
+        its publisher as caught up with, instead of ending the spinning of the node or
+        the batch the message is applied in.
 
-        :param received: The message that could not be applied.
-        :param error: Why it could not be applied.
+        :param received: The message to handle.
+        :param handle: What to do with the message.
         :param error_throttle_period: The fewest seconds between two logged errors.
         """
-        divergence = SynchronizerDivergedError(
-            publisher=received.publisher,
-            sequence_number=received.sequence_number,
-            raised_from=error,
-        )
-        with self._sequence_number_lock:
-            self._diverged_publishers.add(received.publisher)
-            if self._unreported_divergence is None:
-                self._unreported_divergence = divergence
-        self.node.get_logger().error(
-            f"Update #{received.sequence_number} of '{received.publisher.node_name}' "
-            f"could not be applied, so this world may differ from the one of the "
-            f"publisher from now on: {error}",
-            throttle_duration_sec=error_throttle_period,
-        )
+        try:
+            handle(received)
+        except (DataclassException, KeyError, ValueError) as error:
+            divergence = SynchronizerDivergedError(
+                publisher=received.publisher,
+                sequence_number=received.sequence_number,
+                raised_from=error,
+            )
+            with self._sequence_number_lock:
+                self._divergences.setdefault(received.publisher, divergence)
+            self.node.get_logger().error(
+                f"{divergence.error_message()} Cause: {error}",
+                throttle_duration_sec=error_throttle_period,
+            )
 
-    def raise_unreported_divergence(self) -> None:
+    def divergence_from(
+        self, *, publisher: MetaData
+    ) -> SynchronizerDivergedError | None:
         """
-        Raise, on the calling thread, the first failure to apply a received message that
-        was not raised yet; each failure is raised once.
-
-        :raises SynchronizerDivergedError: If a message could not be applied since the
-            last call.
+        :param publisher: Another synchronizer.
+        :return: The first failure to apply a message of ``publisher`` since this world
+            last caught up with it in full, or ``None`` if every message was applied.
         """
         with self._sequence_number_lock:
-            divergence = self._unreported_divergence
-            self._unreported_divergence = None
-        if divergence is not None:
-            raise divergence
+            return self._divergences.get(publisher)
+
+    def forget_divergence_from(self, *, publisher: MetaData) -> None:
+        """
+        Count ``publisher`` as caught up with again, once this world was made equal to
+        its world, for example by fetching or reloading it.
+
+        :param publisher: The synchronizer whose world this world now equals.
+        """
+        with self._sequence_number_lock:
+            self._divergences.pop(publisher, None)
 
     def _notice_lost_messages(
         self, message: ReceivedMessage, warning_throttle_period: float = 1.0
@@ -351,14 +349,10 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
 
         A publisher this world never heard from is treated as being at the start of its
         stream, so its first message is still awaited. A publisher a message of which
-        could not be applied is never caught up with.
-
-        :raises SynchronizerDivergedError: If a message could not be applied since the
-            last time this was reported, see :meth:`raise_unreported_divergence`.
+        could not be applied is not caught up with, see :meth:`divergence_from`.
         """
-        self.raise_unreported_divergence()
         with self._sequence_number_lock:
-            if position.origin in self._diverged_publishers:
+            if position.origin in self._divergences:
                 return False
             applied = self._applied_sequence_numbers.get(position.origin, 0)
         return applied >= position.sequence_number
@@ -509,6 +503,7 @@ class ModelReloadSynchronizer(Synchronizer):
         new_world = self.session.scalars(query).one().from_dao()
         self._world._replace_with(new_world)
         self.record_applied(msg)
+        self.forget_divergence_from(publisher=msg.meta_data)
 
 
 @dataclass(eq=False)
@@ -807,14 +802,14 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         messages (``compiled_all_fks`` must exist before ``notify_state_change`` is
         called).
 
+        A message that cannot be applied is reported as in :meth:`subscription_callback`
+        and does not keep the messages after it from being applied.
+
         :raises ApplyMissedMessagesWhileWorldIsBeingModifiedError: If called while a
             ``modify_world`` context is active on this synchronizer's world.
-        :raises SynchronizerDivergedError: If a message could not be applied since the
-            last time this was reported, see :meth:`raise_unreported_divergence`.
         """
         if self._world.world_is_being_modified:
             raise ApplyMissedMessagesWhileWorldIsBeingModifiedError()
-        self.raise_unreported_divergence()
         with self._missed_message_lock:
             pending_messages = self.missed_messages[:count]
             if not pending_messages:
@@ -826,7 +821,12 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         # concurrent modify_world on another thread serializes behind it instead of interleaving.
         with self._world._world_lock:
             for message in pending_messages:
-                self.apply_message(message.to_message(world=self._world))
+                self._handle_reporting_divergence(
+                    received=message,
+                    handle=lambda received: self.apply_message(
+                        received.to_message(world=self._world)
+                    ),
+                )
 
     def resume(self):
         """

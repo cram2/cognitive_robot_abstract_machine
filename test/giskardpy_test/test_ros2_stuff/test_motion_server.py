@@ -14,6 +14,7 @@ from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.exceptions import (
     ClientDisconnectedError,
     ExecutionCanceledException,
+    RequiredWorldUpdateNotAppliedError,
     RequiredWorldUpdateNotReceivedError,
     UnserializableGoalError,
     WorldModelModifiedDuringMotionError,
@@ -39,6 +40,7 @@ from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import from_json
 from krrood.utils import get_full_class_name
+from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
@@ -188,6 +190,11 @@ class WorldUpdatesMimic:
     Whether a motion statechart was already compiled, per position asked about.
     """
 
+    divergences: dict[MetaData, SynchronizerDivergedError] = field(default_factory=dict)
+    """
+    The first failure to apply an update, per publisher.
+    """
+
     def apply_all(self) -> None:
         self.applied_batches += 1
         self.pending_model_change = False
@@ -203,6 +210,11 @@ class WorldUpdatesMimic:
         if self.drains_until_caught_up is None:
             return False
         return self.applied_batches >= self.drains_until_caught_up
+
+    def divergence_from(
+        self, *, publisher: MetaData
+    ) -> SynchronizerDivergedError | None:
+        return self.divergences.get(publisher)
 
     @property
     def has_pending_model_change(self) -> bool:
@@ -1442,6 +1454,26 @@ class TestWaitingForTheWorldOfTheClient:
         assert isinstance(error, RequiredWorldUpdateNotReceivedError)
         assert error.publisher_name == "client"
         assert error.awaited_sequence_number == 4
+
+    def test_a_change_that_cannot_be_applied_aborts_the_goal_at_once(
+        self, motion_server: MotionServerFixture
+    ):
+        client = MetaData(node_name="client", process_id=1)
+        motion_server.world_updates.divergences[client] = SynchronizerDivergedError(
+            publisher=client, sequence_number=2
+        )
+        motion_server.motion_server.world_update_timeout = 5.0
+        motion_server.action_server.goal_json = create_goal_json(
+            required_position=StreamPosition(origin=client, sequence_number=4)
+        )
+
+        motion_server.motion_server.run_idle_cycle()
+
+        assert motion_server.action_server.outcome == GoalOutcome.ABORTED
+        result = json.loads(motion_server.action_server.sent_results[0].result)
+        assert isinstance(
+            from_json(result["error"]), RequiredWorldUpdateNotAppliedError
+        )
 
 
 # %% the client of the goal leaving

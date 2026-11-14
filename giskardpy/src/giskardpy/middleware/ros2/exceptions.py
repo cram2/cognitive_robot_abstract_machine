@@ -271,6 +271,44 @@ class RequiredWorldUpdateNotReceivedError(ExecutionException):
 
 
 @dataclass
+class RequiredWorldUpdateNotAppliedError(ExecutionException):
+    """
+    Raised when a goal names a change of the client's world, and an update of the client
+    could not be applied to Giskard's world, which may differ from it since.
+    """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
+
+    publisher_name: str
+    """
+    The node whose change was waited for.
+    """
+
+    failed_sequence_number: int
+    """
+    The position in that node's stream of the update that could not be applied.
+    """
+
+    awaited_sequence_number: int
+    """
+    The position in that node's stream that was waited for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Update #{self.failed_sequence_number} of '{self.publisher_name}' could "
+            f"not be applied to Giskard's world, so update "
+            f"#{self.awaited_sequence_number} the goal requires cannot be relied on."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Make Giskard's world equal to the client's again, for example by "
+            "reloading it, then send the goal again."
+        )
+
+
+@dataclass
 class GiskardWorldUpdateNotReceivedError(ExecutionException):
     """
     Raised when the changes Giskard made during a goal never reached the client.

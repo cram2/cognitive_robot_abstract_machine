@@ -7,7 +7,8 @@ from time import sleep
 from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json
-from semantic_digital_twin.adapters.ros.messages import StreamPosition
+from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
+from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
     PublicationProgress,
@@ -81,6 +82,16 @@ class IncomingWorldUpdates:
         the world.
         """
         return self.world_synchronizer.has_applied(position)
+
+    def divergence_from(
+        self, *, publisher: MetaData
+    ) -> SynchronizerDivergedError | None:
+        """
+        :param publisher: Another process.
+        :return: The first failure to apply an update of ``publisher`` to the world, or
+            ``None`` if every update of it was applied.
+        """
+        return self.world_synchronizer.divergence_from(publisher=publisher)
 
 
 @dataclass

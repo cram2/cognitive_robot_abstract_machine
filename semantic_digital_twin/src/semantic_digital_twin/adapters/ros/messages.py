@@ -1,13 +1,14 @@
 import uuid
 from abc import ABC
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from krrood.patterns.caching import memoize
 from uuid import UUID
 
-from typing_extensions import Any, Self
+from typing_extensions import Any, Self, get_args, get_type_hints
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.ros.exceptions import (
     WorldUpdateReferencesUnknownEntityError,
 )
@@ -144,6 +145,20 @@ class WorldUpdate(Message):
     state_update: WorldStateUpdate | None = None
     """The state values to apply, if any."""
 
+    @classproperty
+    def modification_block_json_key(cls) -> str:
+        """
+        The key under which a serialized world update holds its model modification: the
+        name of the one field that holds a :class:`ModificationBlock`.
+        """
+        type_hints = get_type_hints(cls)
+        [key] = [
+            field_.name
+            for field_ in fields(cls)
+            if ModificationBlock in get_args(type_hints[field_.name])
+        ]
+        return key
+
 
 @dataclass
 class LoadModel(Message):
@@ -165,9 +180,6 @@ class MessageField(StrEnum):
 
     SEQUENCE_NUMBER = "sequence_number"
     """The position of the message in the stream of its publisher."""
-
-    MODIFICATION_BLOCK = "modification_block"
-    """The model modification a world update carries, if any."""
 
 
 @dataclass
@@ -205,7 +217,7 @@ class ReceivedMessage:
         """
         Whether the message is a world update that modifies the model.
         """
-        return self.content.get(MessageField.MODIFICATION_BLOCK) is not None
+        return self.content.get(WorldUpdate.modification_block_json_key) is not None
 
     def to_message(self, *, world: World) -> Message:
         """
