@@ -61,23 +61,6 @@ class AverageNegativeLogLikelihood(Loss[LayerType]):
         return -array_namespace(log_likelihoods).mean(log_likelihoods)
 
 
-@dataclass
-class ClassConditionalAverageNegativeLogLikelihood(Loss[LayerType]):
-    """
-    The negative average log-likelihood of each row under the node of its class.
-    """
-
-    def evaluate(
-        self, layer: LayerType, data: BackendArray, labels: BackendArray
-    ) -> BackendArray:
-        log_likelihoods = layer.log_likelihood_of_nodes(data)
-        namespace = array_namespace(log_likelihoods)
-        rows = namespace.arange(
-            labels.shape[0], device=array_api_compat.device(log_likelihoods)
-        )
-        return -namespace.mean(log_likelihoods[rows, labels])
-
-
 @dataclass(kw_only=True)
 class CrossEntropy(Loss[LayerType]):
     """
