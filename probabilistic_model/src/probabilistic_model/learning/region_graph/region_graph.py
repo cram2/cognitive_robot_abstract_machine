@@ -6,7 +6,6 @@ product networks (RAT-SPNs) are built from.
 from __future__ import annotations
 
 from abc import ABC
-from collections import deque
 from dataclasses import dataclass, field
 
 import jax.numpy as jnp
@@ -47,7 +46,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
 from probabilistic_model.learning.region_graph.exceptions import (
     ClassVariableMismatchError,
     MultipleRootsError,
-    UnequalFactorSizesError,
     UnsupportedRegionVariableError,
 )
 
@@ -55,7 +53,7 @@ from probabilistic_model.learning.region_graph.exceptions import (
 # %% nodes
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RegionGraphNode(ABC):
     """
     A node of a region graph, compared by identity.
@@ -64,12 +62,13 @@ class RegionGraphNode(ABC):
     layer: Layer | None = field(default=None, init=False, repr=False)
     """
     The layer that models this node in the circuit of the region graph, once
-    :meth:`RegionGraph.to_probabilistic_circuit` built it: an input or sum layer for a
-    region, a product layer for a partition.
+    :meth:`RegionGraph.to_probabilistic_circuit` built it: the fully factorized input
+    distributions of a leaf region, the sum layer of any other region and the cross
+    products of a partition.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Region(RegionGraphNode):
     """
     A region in a region graph.
@@ -85,18 +84,21 @@ class Region(RegionGraphNode):
     """
 
     def random_partition(
-        self, random_number_generator: np.random.Generator, number_of_parts: int = 2
+        self, *, random_number_generator: np.random.Generator, number_of_parts: int = 2
     ) -> list[Self]:
         """
         :param random_number_generator: The generator that shuffles the variables.
-        :param number_of_parts: The number of regions to split this region into.
-        :return: Regions of nearly equal size whose variables partition the variables of
-            this region at random.
+        :param number_of_parts: The number of regions to split this region into, at
+            most one per variable.
+        :return: Non-empty regions of nearly equal size whose variables partition the
+            variables of this region at random.
         """
         indices = random_number_generator.permutation(len(self.variables))
         return [
-            Region(SortedSet([self.variables[index] for index in split]))
-            for split in np.array_split(indices, number_of_parts)
+            Region(variables=SortedSet([self.variables[index] for index in split]))
+            for split in np.array_split(
+                indices, min(number_of_parts, len(self.variables))
+            )
         ]
 
     def __repr__(self) -> str:
@@ -106,7 +108,7 @@ class Region(RegionGraphNode):
         return "{" + ", ".join([v.name for v in self.variables]) + "}"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Partition(RegionGraphNode):
     """
     A partition in a region graph.
@@ -116,13 +118,12 @@ class Partition(RegionGraphNode):
 # %% region graph
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
     """
     A region graph is a directed acyclic bipartite graph that represents a (potentially
-    repeated) partition of variables.
-
-    Bluntly speaking, a region graph is an ensemble of random Latent-Variable trees.
+    repeated) partition of variables, built as in Algorithm 1 of
+    https://ml-research.github.io/papers/peharz2019uai_ratspns.pdf .
     """
 
     variables: SortedSet
@@ -132,12 +133,13 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
 
     partitions: int = 2
     """
-    The number of partitions to create in each region.
+    The number of regions every partition splits its region into.
     """
 
     depth: int = 2
     """
-    The depth of each repetition of the region graph.
+    The number of times each repetition splits the root region and the regions it
+    produces.
     """
 
     repetitions: int = 2
@@ -164,7 +166,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
     The generator that draws the random partitions.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         Seed :attr:`random_number_generator` with :attr:`seed`.
         """
@@ -172,14 +174,14 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
 
     def create_random_region_graph(self) -> Self:
         """
-        Create a random region graph according to the classes parameters in-place.
+        Split the root region :attr:`repetitions` times, in place.
 
         :return: This region graph.
         """
-        root = Region(self.variables)
+        root = Region(variables=self.variables)
         self.add_node(root)
         for repetition in range(self.repetitions):
-            self.recursive_split(root)
+            self.split(region=root, depth=self.depth)
         return self
 
     def regions(self) -> Iterable[Region]:
@@ -198,32 +200,25 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             if isinstance(node, Partition):
                 yield node
 
-    def recursive_split(self, node: Region) -> None:
+    def split(self, *, region: Region, depth: int) -> None:
         """
-        Recursively split a region into partitions.
+        Add a random partition of a region and split its regions again, until
+        ``depth`` splits are made or a region holds a single variable, which stays a
+        leaf.
 
-        :param node: The node to start inducing from.
+        :param region: The region to split.
+        :param depth: The number of splits left.
         """
-        root_partition = Partition()
-        self.add_edge(node, root_partition)
-        remaining_regions = deque([(node, self.depth, root_partition)])
-
-        while remaining_regions:
-            region, depth, partition = remaining_regions.popleft()
-
-            if depth == 0 or len(region.variables) == 1:
-                for variable in region.variables:
-                    self.add_edge(partition, Region(SortedSet([variable])))
-                continue
-
-            new_regions = region.random_partition(
-                self.random_number_generator, self.partitions
-            )
-            for new_region in new_regions:
-                self.add_edge(partition, new_region)
-                new_partition = Partition()
-                self.add_edge(new_region, new_partition)
-                remaining_regions.append((new_region, depth - 1, new_partition))
+        if depth < 1 or len(region.variables) < 2:
+            return
+        partition = Partition()
+        self.add_edge(region, partition)
+        for part in region.random_partition(
+            random_number_generator=self.random_number_generator,
+            number_of_parts=self.partitions,
+        ):
+            self.add_edge(partition, part)
+            self.split(region=part, depth=depth - 1)
 
     @property
     def root(self) -> Region:
@@ -239,21 +234,24 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
 
     def to_probabilistic_circuit(
         self,
+        *,
         input_units: int = 5,
         sum_units: int = 5,
         key: jax.Array = jax.random.PRNGKey(69),
         class_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a layered circuit with jax parameters, in the
-        floating point type jax computes in by default.
+        Convert the region graph to a randomly initialized RAT-SPN, a layered circuit
+        with jax parameters in the floating point type jax computes in by default.
 
-        Every sum layer is fully connected and stores its edges densely. With more than
-        one class, the root mixes one class conditional circuit per class, each
-        multiplied by the indicator of its class, so that training the joint likelihood
-        trains a classifier.
+        Every leaf region holds ``input_units`` fully factorized distributions, every
+        partition the cross products of the units of its regions and every other region
+        ``sum_units`` sum units over all products of its partitions, stored densely.
+        The root region has one sum unit per class; with more than one class, the root
+        mixes them, each multiplied by the indicator of its class, so that training the
+        joint likelihood trains a classifier.
 
-        :param input_units: The number of input units of each leaf region.
+        :param input_units: The number of input distributions of each leaf region.
         :param sum_units: The number of sum units of each inner region.
         :param key: The random key of every initial parameter.
         :param class_variable: The variable whose domain elements are the classes, if
@@ -275,48 +273,48 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
 
         for layer in reversed(rx.bfs_layers(self.graph, [self.index_of(self.root)])):
             for node in map(self.graph.__getitem__, layer):
-                children = list(self.successors(node))
+                children = self.successors(node)
                 if isinstance(node, Partition):
-                    node.layer = self.product_of_children(children)
-                elif children:
-                    number_of_nodes = (
-                        self.classes if self.in_degree(node) == 0 else sum_units
+                    node.layer = ProductLayer.cross_product(
+                        child_layers=[child.layer for child in children]
                     )
+                elif children:
                     node.layer = self.fully_connected_sum_layer(
-                        children, number_of_nodes, next(keys)
+                        children=children,
+                        number_of_nodes=(
+                            self.classes if self.in_degree(node) == 0 else sum_units
+                        ),
+                        key=next(keys),
                     )
                 else:
-                    node.layer = self.input_layer(
-                        node.variables[0], variables, input_units, next(keys)
+                    node.layer = self.fully_factorized_input_layer(
+                        region=node,
+                        variables=variables,
+                        input_units=input_units,
+                        key=next(keys),
                     )
 
         root = self.root.layer
+        if not self.successors(self.root):
+            root = self.fully_connected_sum_layer(
+                children=[self.root], number_of_nodes=self.classes, key=next(keys)
+            )
         if self.classes > 1:
-            root = self.mixture_of_classes(root, class_variable, variables)
+            root = self.mixture_of_classes(
+                class_conditionals=root,
+                class_variable=class_variable,
+                variables=variables,
+            )
         circuit = LayeredProbabilisticCircuit(variables, root)
         return circuit.to_namespace(jnp, floating_point_type=jnp.result_type(float))
 
     @staticmethod
-    def product_of_children(children: list[RegionGraphNode]) -> ProductLayer:
-        """
-        :param children: The regions a partition multiplies, all with as many units.
-        :return: The product layer whose node ``i`` multiplies node ``i`` of every
-            child.
-        :raises UnequalFactorSizesError: If the children have different numbers of
-            units.
-        """
-        node_lengths = [child.layer.number_of_nodes for child in children]
-        if len(set(node_lengths)) != 1:
-            raise UnequalFactorSizesError(node_lengths)
-        return ProductLayer.node_wise_product_of([child.layer for child in children])
-
-    @staticmethod
     def fully_connected_sum_layer(
-        children: list[RegionGraphNode], number_of_nodes: int, key: jax.Array
+        *, children: list[RegionGraphNode], number_of_nodes: int, key: jax.Array
     ) -> SumLayer:
         """
-        :param children: The partitions a region mixes.
-        :param number_of_nodes: The number of sum units of the region.
+        :param children: The nodes whose layers the sum units mix.
+        :param number_of_nodes: The number of sum units.
         :param key: The random key of the initial weights.
         :return: The sum layer that connects every unit to every unit of every child,
             with dense edges and weights drawn uniformly from [0.1, 1].
@@ -334,8 +332,40 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             DenseEdgeMatrix,
         )
 
+    def fully_factorized_input_layer(
+        self,
+        *,
+        region: Region,
+        variables: SortedSet,
+        input_units: int,
+        key: jax.Array,
+    ) -> Layer:
+        """
+        :param region: A leaf region.
+        :param variables: The variables of the circuit.
+        :param input_units: The number of input distributions.
+        :param key: The random key of the initial parameters.
+        :return: The layer whose unit ``i`` is the product of the ``i``-th univariate
+            input distribution of every variable of the region.
+        """
+        univariate_layers = [
+            self.input_layer(
+                variable=variable,
+                variables=variables,
+                input_units=input_units,
+                key=variable_key,
+            )
+            for variable, variable_key in zip(
+                region.variables, jax.random.split(key, len(region.variables))
+            )
+        ]
+        if len(univariate_layers) == 1:
+            return univariate_layers[0]
+        return ProductLayer.node_wise_product_of(univariate_layers)
+
     @staticmethod
     def input_layer(
+        *,
         variable: Variable,
         variables: SortedSet,
         input_units: int,
@@ -387,7 +417,11 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         raise UnsupportedRegionVariableError(variable)
 
     def mixture_of_classes(
-        self, class_conditionals: Layer, class_variable: Symbolic, variables: SortedSet
+        self,
+        *,
+        class_conditionals: Layer,
+        class_variable: Symbolic,
+        variables: SortedSet,
     ) -> SumLayer:
         """
         :param class_conditionals: The layer with one node per class.

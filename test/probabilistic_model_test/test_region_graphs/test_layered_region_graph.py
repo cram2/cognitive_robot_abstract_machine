@@ -36,7 +36,7 @@ def region_graph() -> RegionGraph:
     A random region graph over six continuous variables.
     """
     return RegionGraph(
-        continuous_variables(6), partitions=2, depth=2, repetitions=3
+        variables=continuous_variables(6), partitions=2, depth=2, repetitions=3
     ).create_random_region_graph()
 
 
@@ -88,7 +88,7 @@ def test_a_classifying_region_graph_needs_a_class_variable_of_its_classes(target
     two domain elements.
     """
     region_graph = RegionGraph(
-        continuous_variables(4), depth=1, repetitions=2, classes=3
+        variables=continuous_variables(4), depth=1, repetitions=2, classes=3
     ).create_random_region_graph()
     with pytest.raises(ClassVariableMismatchError):
         region_graph.to_probabilistic_circuit(class_variable=target)
@@ -101,7 +101,7 @@ def test_a_trained_classifying_circuit_separates_two_classes(target):
     """
     features = continuous_variables(4, prefix="x")
     region_graph = RegionGraph(
-        features, partitions=2, depth=1, repetitions=4, classes=2
+        variables=features, partitions=2, depth=1, repetitions=4, classes=2
     ).create_random_region_graph()
     circuit = region_graph.to_probabilistic_circuit(
         input_units=3, sum_units=3, class_variable=target

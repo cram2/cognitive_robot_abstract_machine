@@ -95,6 +95,24 @@ class ProductLayer(InnerLayer):
         return cls.from_edges(child_layers, edges, number_of_nodes)
 
     @classmethod
+    def cross_product(cls, *, child_layers: list[Layer]) -> Self:
+        """
+        :param child_layers: The child layers.
+        :return: A product layer with a node for every combination of one node of each
+            child layer, the combinations in row-major order of the child layers.
+        """
+        combinations = np.indices(
+            [child_layer.number_of_nodes for child_layer in child_layers]
+        ).reshape(len(child_layers), -1)
+        number_of_nodes = combinations.shape[1]
+        edges = InnerLayerEdges(
+            np.tile(np.arange(number_of_nodes), len(child_layers)),
+            np.repeat(np.arange(len(child_layers)), number_of_nodes),
+            combinations.reshape(-1),
+        )
+        return cls.from_edges(child_layers, edges, number_of_nodes)
+
+    @classmethod
     def from_edges(
         cls,
         child_layers: list[Layer],

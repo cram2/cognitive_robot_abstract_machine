@@ -126,7 +126,7 @@ def test_region_graph_circuit_converts_into_the_same_rustworkx_distribution(
 ):
     variables = SortedSet(Continuous(name) for name in "wxyz")
     layered = (
-        RegionGraph(variables, partitions=2, depth=1, repetitions=2)
+        RegionGraph(variables=variables, partitions=2, depth=1, repetitions=2)
         .create_random_region_graph()
         .to_probabilistic_circuit()
         .to_namespace(np)
