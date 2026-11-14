@@ -170,7 +170,9 @@ circuit with PyTorch parameters with `TorchGradientDescent` from
 `probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
 builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with JAX
 parameters: fully factorized input distributions in every leaf region, the cross products
-of the regions of every partition and fully connected sum layers in every other region.
+of the regions of every partition and fully connected sum layers in every other region. A
+classifying RAT-SPN is trained generatively on the joint likelihood with `fit`, or
+discriminatively with `fit(..., loss=CrossEntropy.from_class_variable(...))`.
 
 ## Which One to Use
 

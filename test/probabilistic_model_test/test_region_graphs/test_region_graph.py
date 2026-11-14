@@ -329,7 +329,7 @@ def test_learned_circuit_has_normalized_parameters(target):
     data[:, target_column] = SymbolicEncoding(target).hashes[
         np.random.randint(2, size=len(data))
     ]
-    model.fit(data, epochs=10, optimizer=optax.adamw(0.01))
+    model.fit(data=data, epochs=10, optimizer=optax.adamw(0.01))
 
     circuit = CircuitRepresentations().convert(
         model.to_namespace(np), ProbabilisticCircuit
@@ -363,7 +363,7 @@ def test_classification_circuit_predicts_a_distribution_over_the_target(target):
     data[:, target_column] = SymbolicEncoding(target).hashes[
         np.random.randint(2, size=len(data))
     ]
-    model.fit(data, epochs=10, optimizer=optax.adamw(0.01))
+    model.fit(data=data, epochs=10, optimizer=optax.adamw(0.01))
 
     circuit = CircuitRepresentations().convert(
         model.to_namespace(np), ProbabilisticCircuit
