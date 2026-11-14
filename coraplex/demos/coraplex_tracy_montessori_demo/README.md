@@ -27,9 +27,8 @@ folder**:
 
 | File | Role |
 |---|---|
-| `demo.py` | What every run shares: `MontessoriScene` — every hardcoded pose and size as a field, with the pieces (`ShapeSortingPieceSet`), how solid the bodies are (`SolidContact`) and how low a piece is gripped (`PieceGrip`) — the plan that sorts the pieces (`ShapeSortingPlan`), and `DemoRunner`, the base of the runners. |
-| `montessori_board.py` | The board: its holes read off the mesh (`BoardGeometry`), and the body with the mesh to look at and boxes to collide with (`ShapeSortingBoard`). |
-| `resources/board.stl` | The board's mesh. |
+| `demo.py` | What every run shares: `MontessoriScene` — every hardcoded pose and size as a field, with the pieces (`semantic_digital_twin`'s `PieceSet`), how solid the bodies are (`SolidContact`) and how low a piece is gripped (`PieceGrip`) — the plan that sorts the pieces (`ShapeSortingPlan`), and `DemoRunner`, the base of the runners. |
+| `montessori_board.py` | The board as a `ShapeSortingBoard` with a `ShapeSortingHole` for each hole, its mesh to look at and boxes to collide with (`ShapeSortingBoardModel`), built from the holes `semantic_digital_twin`'s `ShapeSortingBoardMesh` reads off the mesh. |
 | `mujoco_demo.py` | `MujocoRunner`: physics run, controller and physics stepped in lockstep. |
 | `rviz_demo.py` | `RvizRunner`: kinematic run, published for RViz. |
 | `real_demo.py` | `RealRunner`: real robot, through giskard. |
@@ -56,8 +55,8 @@ along the piece's own x, the closed fingers meeting `grasp_height` above its bot
 `PieceGrip` reads that height off the gripper: the closed pads reach past the point the
 closed fingers meet by the gripper's `travel_when_closing` plus how far that point lies
 behind the tool frame (the open pads end at the tool frame), and they are to stay 5 mm
-above the table. Which hole each piece goes into is a plain mapping the scene keeps as it
-makes the pieces. The left arm sorts, as in every Tracy demo in this repository.
+above the table. Each piece goes into the hole the board's `hole_for` finds for it: the
+smallest hole cut for its kind that it fits through. The left arm sorts, as in every Tracy demo in this repository.
 
 ## Where the numbers come from
 

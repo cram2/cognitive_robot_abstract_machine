@@ -9,7 +9,7 @@ import re
 import shutil
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field, fields, Field
+from dataclasses import dataclass, field, fields, Field, replace
 from enum import StrEnum, auto
 from functools import cached_property
 from pathlib import Path
@@ -165,6 +165,16 @@ class Color:
             round(self.saturation * self.opencv_maximum_channel_value),
             round(self.value * self.opencv_maximum_channel_value),
         )
+
+    def hue_distance(self, *, hues: npt.ArrayLike) -> npt.NDArray[np.float64]:
+        """
+        How far the given hues lie from this color's, the short way round the hue wheel.
+
+        :param hues: Positions around the hue wheel, from zero to one, of any shape.
+        :return: The distances, element by element, at most half a turn each.
+        """
+        apart = np.abs(np.asarray(hues, dtype=float) - self.hue) % 1.0
+        return np.minimum(apart, 1.0 - apart)
 
     def to_hex(self, prefix: str = "#") -> str:
         """
@@ -1067,35 +1077,6 @@ class Mesh(Shape):
             origin=origin,
             scale=scale,
         )
-
-    @classmethod
-    def triangular_prism(
-        cls,
-        side: float,
-        height: float,
-        origin: HomogeneousTransformationMatrix | None = None,
-    ) -> Mesh:
-        """
-        Create an upright prism of equilateral cross-section, its apex pointing along +x.
-
-        The prism is centred on the middle of its bounding box rather than on its
-        centroid, so its flat face and its apex stand equally far from its origin.
-
-        :param side: Side of the triangular cross-section.
-        :param height: Height of the prism along z.
-        :param origin: Origin of the mesh.
-        :return: Mesh wrapping the prism.
-        """
-        circumradius = side / math.sqrt(3)
-        inradius = side / (2 * math.sqrt(3))
-        outline = np.array(
-            [[circumradius, 0.0], [-inradius, side / 2], [-inradius, -side / 2]]
-        )
-        solid = trimesh.creation.extrude_triangulation(
-            vertices=outline, faces=np.array([[0, 1, 2]]), height=height
-        )
-        solid.apply_translation([-(circumradius - inradius) / 2, 0.0, -height / 2])
-        return cls.from_trimesh(mesh=solid, origin=origin)
 
     @classmethod
     def from_vertices_and_faces(
@@ -2108,3 +2089,293 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             and np.isclose(self.max_y, other.max_y)
             and np.allclose(self.origin, other.origin)
         )
+
+
+# %% Planar polygons
+
+
+@dataclass(eq=False, kw_only=True)
+class Polygon2D:
+    """
+    A simple closed polygon in the x-y plane.
+    """
+
+    vertices: npt.NDArray[np.float64]
+    """
+    The polygon's corners in order, as ``(n, 2)`` ``(x, y)`` points; a closing corner
+    that repeats the first is dropped.
+    """
+
+    alignment_angle_step: float = math.radians(1.0)
+    """
+    How finely, in radians, :meth:`turn_onto` tries turns: a degree moves a corner of a
+    polygon a few centimetres across by under half a millimetre.
+    """
+
+    corner_match_tolerance: float = 1e-9
+    """
+    How far a corner may lie from another, in the polygon's own units, and still be
+    taken for the same corner when the polygon is compared with itself turned.
+    """
+
+    def __post_init__(self):
+        self.vertices = np.asarray(self.vertices, dtype=float)
+        if len(self.vertices) > 1 and np.allclose(self.vertices[0], self.vertices[-1]):
+            self.vertices = self.vertices[:-1]
+
+    @classmethod
+    def rectangle(cls, *, width: float, length: float) -> Self:
+        """
+        A rectangle centred on the origin, its length along +y.
+
+        :param width: The rectangle's side along x.
+        :param length: The rectangle's side along y.
+        """
+        return cls(
+            vertices=np.array(
+                [
+                    [-width / 2, -length / 2],
+                    [width / 2, -length / 2],
+                    [width / 2, length / 2],
+                    [-width / 2, length / 2],
+                ]
+            )
+        )
+
+    @classmethod
+    def circle(cls, *, diameter: float, corner_count: int = 64) -> Self:
+        """
+        A regular polygon standing in for a circle centred on the origin.
+
+        :param diameter: The circle's diameter.
+        :param corner_count: How many corners to draw the circle with; the default puts
+            every corner of a circle a few centimetres across within a tenth of a
+            millimetre of the true circle.
+        """
+        angles = np.linspace(0.0, 2 * math.pi, corner_count, endpoint=False)
+        return cls(
+            vertices=np.stack([np.cos(angles), np.sin(angles)], axis=1) * diameter / 2
+        )
+
+    @classmethod
+    def equilateral_triangle(cls, *, side: float) -> Self:
+        """
+        An equilateral triangle centred on its own centroid, its apex along +y.
+
+        :param side: Length of each of the triangle's three sides.
+        """
+        circumradius = side / math.sqrt(3)
+        inradius = side / (2 * math.sqrt(3))
+        return cls(
+            vertices=np.array(
+                [
+                    [0.0, circumradius],
+                    [-side / 2, -inradius],
+                    [side / 2, -inradius],
+                ]
+            )
+        )
+
+    @property
+    def _shoelace_terms(
+        self,
+    ) -> tuple[
+        npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]
+    ]:
+        """
+        Each corner's coordinates paired with the next corner's, and the cross product
+        of the two, which the shoelace formula sums.
+        """
+        x, y = self.vertices[:, 0], self.vertices[:, 1]
+        x_next, y_next = np.roll(x, -1), np.roll(y, -1)
+        return x + x_next, y + y_next, x * y_next - x_next * y
+
+    @property
+    def _signed_area(self) -> float:
+        """
+        The enclosed area, positive when the corners run counter-clockwise.
+        """
+        _, _, cross = self._shoelace_terms
+        return float(cross.sum() / 2.0)
+
+    @property
+    def area(self) -> float:
+        """
+        The area the polygon encloses, however its corners are wound.
+        """
+        return abs(self._signed_area)
+
+    @property
+    def centroid(self) -> Point2:
+        """
+        The point the enclosed area balances about, which for an asymmetric outline is
+        not the middle of its bounding box.
+        """
+        x_sums, y_sums, cross = self._shoelace_terms
+        six_times_area = 6 * self._signed_area
+        return Point2(
+            float((x_sums * cross).sum() / six_times_area),
+            float((y_sums * cross).sum() / six_times_area),
+        )
+
+    @property
+    def bounding_box(self) -> PlanarBoundingBox:
+        """
+        The smallest axis-aligned box that holds every corner.
+        """
+        minimum, maximum = self.vertices.min(axis=0), self.vertices.max(axis=0)
+        return PlanarBoundingBox(
+            min_x=float(minimum[0]),
+            min_y=float(minimum[1]),
+            max_x=float(maximum[0]),
+            max_y=float(maximum[1]),
+            origin=HomogeneousTransformationMatrix(),
+        )
+
+    @property
+    def aspect_ratio(self) -> float:
+        """
+        How many times longer the polygon's bounding box is than wide.
+        """
+        dimensions = self.bounding_box.dimensions
+        return max(dimensions) / min(dimensions)
+
+    @property
+    def fill_ratio(self) -> float:
+        """
+        How much of its bounding box the polygon fills.
+        """
+        return self.area / self.bounding_box.area
+
+    def centered(self) -> Polygon2D:
+        """
+        This polygon moved so that its :attr:`centroid` lies on the origin.
+        """
+        return replace(self, vertices=self.vertices - self.centroid.to_np())
+
+    def translated(self, *, offset: Point2) -> Polygon2D:
+        """
+        This polygon moved by an offset.
+
+        :param offset: How far to move every corner.
+        """
+        return replace(self, vertices=self.vertices + offset.to_np())
+
+    def turned(self, *, angle: float) -> Polygon2D:
+        """
+        This polygon turned about the origin.
+
+        :param angle: How far to turn it, in radians, counter-clockwise.
+        """
+        cosine, sine = math.cos(angle), math.sin(angle)
+        return replace(
+            self, vertices=self.vertices @ np.array([[cosine, sine], [-sine, cosine]])
+        )
+
+    def distance_to_boundary(
+        self, *, points: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
+        """
+        How far points lie from this polygon's nearest edge, inside or out.
+
+        :param points: The points, as ``(n, 2)`` ``(x, y)`` pairs.
+        :return: Each point's distance to the boundary.
+        """
+        starts = self.vertices
+        edges = np.roll(starts, -1, axis=0) - starts
+        offsets = np.asarray(points, dtype=float)[:, None, :] - starts[None, :, :]
+        along = np.clip(
+            np.einsum("pek,ek->pe", offsets, edges)
+            / np.einsum("ek,ek->e", edges, edges),
+            0.0,
+            1.0,
+        )
+        nearest = starts[None, :, :] + along[..., None] * edges[None, :, :]
+        return np.linalg.norm(
+            np.asarray(points, dtype=float)[:, None, :] - nearest, axis=-1
+        ).min(axis=1)
+
+    def turn_onto(self, *, other: Polygon2D) -> float:
+        """
+        The turn about its centroid, in radians, at which this polygon best follows
+        another's shape, the two compared at equal area.
+
+        :param other: The polygon to line this one up with.
+        :return: The turn, between zero and this polygon's
+            :meth:`rotational_symmetry_angle`.
+        """
+        own = self.centered()
+        target = other.centered()
+        target = Polygon2D(vertices=target.vertices * math.sqrt(own.area / target.area))
+        turns = np.arange(
+            0.0, own.rotational_symmetry_angle(), self.alignment_angle_step
+        )
+        mismatches = []
+        for turn in turns:
+            turned = own.turned(angle=turn)
+            mismatches.append(
+                max(
+                    target.distance_to_boundary(points=turned.vertices).max(),
+                    turned.distance_to_boundary(points=target.vertices).max(),
+                )
+            )
+        return float(turns[int(np.argmin(mismatches))])
+
+    def rotational_symmetry_angle(self) -> float:
+        """
+        The smallest turn about the centroid, in radians, after which this polygon
+        covers exactly the area it did.
+
+        A polygon without rotational symmetry returns a full turn.
+        """
+        centered = self.centered()
+        corner_count = len(centered.vertices)
+        for order in range(corner_count, 1, -1):
+            if corner_count % order:
+                continue
+            turned = centered.turned(angle=math.tau / order).vertices
+            apart = np.linalg.norm(
+                turned[:, None, :] - centered.vertices[None, :, :], axis=-1
+            )
+            if (apart.min(axis=1) <= self.corner_match_tolerance).all():
+                return math.tau / order
+        return math.tau
+
+    def points_along(self, *, spacing: float) -> npt.NDArray[np.float64]:
+        """
+        Points spread evenly along the polygon's edges, corners included.
+
+        :param spacing: How far apart to place the points.
+        :return: The points, as ``(m, 2)`` ``(x, y)`` points.
+        """
+        corners = np.vstack([self.vertices, self.vertices[:1]])
+        walked = []
+        for start, end in zip(corners[:-1], corners[1:]):
+            steps = max(1, int(round(float(np.linalg.norm(end - start)) / spacing)))
+            walked.append(start + np.outer(np.arange(steps) / steps, end - start))
+        return np.vstack(walked)
+
+    def extrude(self, *, thickness: float) -> trimesh.Trimesh:
+        """
+        This polygon extruded into a solid centred on the x-y plane.
+
+        .. note::
+            The polygon must be star-shaped about the mean of its corners, since its
+            faces are fanned out from that point.
+
+        :param thickness: The solid's extent along z.
+        """
+        center_index = len(self.vertices)
+        faces = np.array(
+            [
+                [index, (index + 1) % center_index, center_index]
+                for index in range(center_index)
+            ]
+        )
+        solid = trimesh.creation.extrude_triangulation(
+            vertices=np.vstack([self.vertices, self.vertices.mean(axis=0)]),
+            faces=faces,
+            height=thickness,
+        )
+        solid.apply_translation([0.0, 0.0, -thickness / 2])
+        return solid

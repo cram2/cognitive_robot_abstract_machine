@@ -49,9 +49,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Mug,
     Rim,
-    ShapeSortingPiece,
     Spoon,
     Table,
+)
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
+    ShapeSortingPiece,
 )
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
