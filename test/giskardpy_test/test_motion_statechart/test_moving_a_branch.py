@@ -68,27 +68,29 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
     statechart = Statechart(context=executor.context)
     goal_pose = Pose.from_xyz_rpy(x=1.5, reference_frame=world.root)
     statechart.add_node(
-        carry := Sequence(
-            nodes=[
-                CartesianPose(
-                    root_link=world.root,
-                    tip_link=robot,
-                    goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
-                    name="approach",
-                ),
-                MoveBranch(branch_root=box, new_parent=robot),
-                CartesianPose(
-                    root_link=world.root,
-                    tip_link=box,
-                    goal_pose=goal_pose,
-                    name="carry",
-                ),
-            ]
+        node=(
+            carry := Sequence(
+                nodes=[
+                    CartesianPose(
+                        root_link=world.root,
+                        tip_link=robot,
+                        goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+                        name="approach",
+                    ),
+                    MoveBranch(branch_root=box, new_parent=robot),
+                    CartesianPose(
+                        root_link=world.root,
+                        tip_link=box,
+                        goal_pose=goal_pose,
+                        name="carry",
+                    ),
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(carry))
+    statechart.add_node(node=EndMotion.when_true(node=carry))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.tick_until_end()
 
     assert carry.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -108,13 +110,13 @@ def test_building_the_nodes_again_registers_no_further_variables(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        CartesianPose(
+        node=CartesianPose(
             root_link=world.root,
             tip_link=robot,
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     variable_count = len(executor.context.float_variable_data.data)
 
     world.move_branch(box, robot)
@@ -131,7 +133,7 @@ How many ticks a test waits for the robot to come to rest before it gives up.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserNotingTheSpeed(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Chooses one prepared child, noting how fast the robot was moving when it was asked.
@@ -153,7 +155,7 @@ class ChooserNotingTheSpeed(ChildChooser[CompositeNodeChoosingItsChild]):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.speeds_when_asked.append(_fastest_velocity(self.world))
         return self.child
@@ -180,19 +182,21 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
         context=StatechartContext(world=world), extensions=[motion_control]
     )
     chooser = ChooserNotingTheSpeed(world=world, child=ConstTrueNode())
-    executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        CartesianPose(
+        node=CartesianPose(
             root_link=world.root,
             tip_link=robot,
             goal_pose=Pose.from_xyz_rpy(x=5, reference_frame=world.root),
         )
     )
-    statechart.add_node(driving_a_while := CountTicks(ticks=20))
-    statechart.add_node(choosing := CompositeNodeChoosingItsChild(name="choosing"))
+    statechart.add_node(node=(driving_a_while := CountTicks(ticks=20)))
+    statechart.add_node(
+        node=(choosing := CompositeNodeChoosingItsChild(name="choosing"))
+    )
     choosing.start_condition = driving_a_while.observes_true
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     speeds_while_holding = []
     for _ in range(MAXIMUM_TICKS):
@@ -235,16 +239,16 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        CartesianPose(
+        node=CartesianPose(
             root_link=world.root,
             tip_link=robot,
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     world.state[free_connection.dofs[0].id].velocity = 1.0
 
-    assert motion_control.before_recompile(executor)
+    assert motion_control.before_recompile(executor=executor)
 
 
 def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_at_rest(
@@ -258,17 +262,17 @@ def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_a
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        CartesianPose(
+        node=CartesianPose(
             root_link=world.root,
             tip_link=robot,
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     commanded = motion_control.qp_controller.active_degrees_of_freedom[0]
 
     world.state[commanded.id].velocity = motion_control.speed_at_rest / 2
-    assert motion_control.before_recompile(executor)
+    assert motion_control.before_recompile(executor=executor)
 
     world.state[commanded.id].velocity = motion_control.speed_at_rest * 2
-    assert not motion_control.before_recompile(executor)
+    assert not motion_control.before_recompile(executor=executor)

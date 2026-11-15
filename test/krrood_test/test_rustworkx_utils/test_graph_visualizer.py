@@ -33,7 +33,7 @@ def test_raising_module_not_found_error_on_missing_libraries_1(missing_viz_libra
     import krrood.rustworkx_utils.graph_visualizer as gv_reloaded
 
     with pytest.raises(ModuleNotFoundError):
-        gv_reloaded.GraphVisualizer(RWXNode("Root", rx.PyDAG())).render()
+        gv_reloaded.GraphVisualizer(RWXNode(name="Root", graph=rx.PyDAG())).render()
 
 
 def test_raising_module_not_found_error_on_missing_libraries_2():
@@ -45,7 +45,7 @@ def test_raising_module_not_found_error_on_missing_libraries_2():
     gv.mpl = None
     gv.np = None
     with pytest.raises(ModuleNotFoundError):
-        gv.GraphVisualizer(RWXNode("Root", rx.PyDAG())).render()
+        gv.GraphVisualizer(RWXNode(name="Root", graph=rx.PyDAG())).render()
     # restore original values
     gv.mpl = original_mpl
     gv.np = original_np
@@ -54,10 +54,10 @@ def test_raising_module_not_found_error_on_missing_libraries_2():
 def test_create_and_visualize_graph(tmp_path):
     # Build a small DAG using RWXNode
     graph = rx.PyDAG()
-    root = RWXNode("Root", graph, enclosed=True)
-    a = RWXNode("A", graph, color=ColorLegend(name="A", color="red"))
-    b = RWXNode("B", graph, color=ColorLegend(name="B", color="green"))
-    c = RWXNode("C", graph, color=ColorLegend(name="C", color="blue"))
+    root = RWXNode(name="Root", graph=graph, enclosed=True)
+    a = RWXNode(name="A", graph=graph, color=ColorLegend(name="A", color="red"))
+    b = RWXNode(name="B", graph=graph, color=ColorLegend(name="B", color="green"))
+    c = RWXNode(name="C", graph=graph, color=ColorLegend(name="C", color="blue"))
 
     # Establish primary parent relationships
     a.parent = root
@@ -65,7 +65,7 @@ def test_create_and_visualize_graph(tmp_path):
     c.parent = a
 
     # Add an additional non-primary edge to test multi-parent
-    c.add_parent(b)
+    c.add_parent(parent=b)
 
     # Visualize (should save a pdf called pdf_graph.pdf in CWD)
     # Change CWD to tmp to avoid cluttering repo root

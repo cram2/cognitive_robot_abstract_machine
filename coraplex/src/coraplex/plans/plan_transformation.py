@@ -38,7 +38,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
         """
         :return: The type this selects its nodes by.
         """
-        return type(self).get_type_of_generic_parameter(MatchedType)
+        return type(self).get_type_of_generic_parameter(parameter=MatchedType)
 
     def matches_node(self, plan_node: StatechartNode) -> bool:
         """
@@ -150,15 +150,15 @@ class SequentialInsertion(
         """
 
     def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
-        step = ControlStructureNode.step_holding(anchor)
+        step = ControlStructureNode.step_holding(node=anchor)
         if not isinstance(step.parent_node, Sequence):
-            step.statechart.replace(step, Sequence(nodes=[step]))
+            step.statechart.replace(node=step, replacement=Sequence(nodes=[step]))
         match self.position:
             case InsertionPosition.BEFORE:
-                step.parent_node.insert_before(step, node)
+                step.parent_node.insert_before(reference=step, node=node)
                 return anchor
             case InsertionPosition.AFTER:
-                step.parent_node.insert_after(step, node)
+                step.parent_node.insert_after(reference=step, node=node)
                 return node
 
 
@@ -173,17 +173,17 @@ class ParallelInsertion(
     """
 
     def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
-        step = ControlStructureNode.step_holding(anchor)
+        step = ControlStructureNode.step_holding(node=anchor)
         if not isinstance(step.parent_node, Parallel):
-            step.statechart.replace(step, Parallel(nodes=[step]))
-        step.parent_node.add_node(node)
+            step.statechart.replace(node=step, replacement=Parallel(nodes=[step]))
+        step.parent_node.add_node(node=node)
         return anchor
 
 
 # %% rewriting a plan
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanRewriting(ContextExtension):
     """
     Offers the nodes of a plan to the transformations that may rewrite it.
@@ -332,14 +332,14 @@ class RecoveryByInsertion(LimitedRecovery):
     The transformation inserting the nodes that recover the plan.
     """
 
-    def recover(self, failed_node: StatechartNode) -> None:
+    def recover(self, *, failed_node: StatechartNode) -> None:
         if not self.transformation.matches_node(
             failed_node
         ) or not self.transformation.is_applicable(failed_node):
             return
-        step = ControlStructureNode.step_holding(failed_node)
+        step = ControlStructureNode.step_holding(node=failed_node)
         self.transformation.apply(failed_node)
-        rewriting = failed_node.context.get_extension(PlanRewriting)
+        rewriting = failed_node.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
             rewriting.rewrite(step.parent_node)
         failed_node.statechart.request_reset(node=step)

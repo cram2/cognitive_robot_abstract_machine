@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from cramph.context import StatechartContext
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionControlContext(ContextExtension):
     """
     What motion statechart nodes need from motion control while they are built and

@@ -23,7 +23,7 @@ from .episode_player import EpisodePlayer
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EpisodeSegmentation(TickingExecutorExtension):
     """
     Segments an episode into events by running detector nodes against a shared
@@ -37,10 +37,10 @@ class EpisodeSegmentation(TickingExecutorExtension):
     by someone else.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
-        context.ensure_extension(SegmindContext())
+    def extend_context(self, *, context: StatechartContext) -> None:
+        context.ensure_extension(extension=SegmindContext())
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.detect_holes(executor.context)
         if self.player:
             self.player.start()
@@ -53,7 +53,7 @@ class EpisodeSegmentation(TickingExecutorExtension):
 
         :param context: The context holding the world and the segmind context.
         """
-        segmind_context = context.require_extension(SegmindContext)
+        segmind_context = context.require_extension(extension_type=SegmindContext)
         segmind_context.holes.clear()
         for body in context.world.bodies:
             if "hole" in body.name.name:

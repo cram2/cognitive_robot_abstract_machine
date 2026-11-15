@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing_extensions import Dict, List, Type
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StorageLeaf:
     """
     A mapped class that other fields refer to.
@@ -22,7 +22,7 @@ class StorageLeaf:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldsOfEveryStorage:
     """
     Holds one field for each way ORMatic can store a field.

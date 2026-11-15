@@ -1,3 +1,7 @@
+"""
+Tests of running checkers over files, alone or restricted to a staged change.
+"""
+
 from __future__ import annotations
 
 import shutil
@@ -41,14 +45,19 @@ def repository(tmp_path: Path) -> Path:
 
 
 def test_only_code_the_staged_change_touches_is_reported(repository: Path) -> None:
+    """
+    A violation in committed code is left out; one in appended, staged code is reported.
+    """
     path = repository / "module.py"
     committed_lines = len(path.read_text().splitlines())
     with path.open("a") as source:
         source.write(f"\n{ProseSnippet.OVERLONG_ATTRIBUTE_DOCSTRING.read_text()}")
     git(repository, "add", "module.py")
-    check = CodeRulesCheck((ProseLengthChecker(),), StagedLines(repository))
+    check = CodeRulesCheck(
+        checkers=(ProseLengthChecker(),), staged=StagedLines(repository=repository)
+    )
 
-    violations = check.violations([path])
+    violations = check.violations(paths=[path])
 
     assert [violation.first_line > committed_lines for violation in violations] == [
         True
@@ -58,11 +67,18 @@ def test_only_code_the_staged_change_touches_is_reported(repository: Path) -> No
 def test_every_violation_is_reported_without_a_staged_change(
     repository: Path,
 ) -> None:
-    check = CodeRulesCheck((ProseLengthChecker(),))
+    """
+    Without a staged change, the violations of committed code are reported too.
+    """
+    check = CodeRulesCheck(checkers=(ProseLengthChecker(),))
 
-    assert len(check.violations([repository / "module.py"])) == 1
+    assert len(check.violations(paths=[repository / "module.py"])) == 1
 
 
 def test_listing_the_staged_change_outside_a_repository_fails(tmp_path: Path) -> None:
+    """
+    Listing a staged change where git finds no repository raises
+    :class:`GitCommandFailed`.
+    """
     with pytest.raises(GitCommandFailed):
-        StagedLines(tmp_path).find_changed_lines(tmp_path / "module.py")
+        StagedLines(repository=tmp_path).find_changed_lines(path=tmp_path / "module.py")

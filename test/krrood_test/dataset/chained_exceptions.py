@@ -12,7 +12,7 @@ from krrood.exceptions import DataclassException
 # %% chained exceptions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExceptionWithOwnField(DataclassException):
     """
     An exception with a field of its own next to the inherited chaining fields.

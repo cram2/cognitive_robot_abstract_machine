@@ -9,7 +9,7 @@ from krrood.patterns.cartesian_product import CartesianProductByRankSum
 # %% a factor recording how far it was read
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedValues:
     """
     A one-off source of values that records how many of them were read.

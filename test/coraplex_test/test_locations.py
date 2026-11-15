@@ -468,7 +468,7 @@ def test_a_plan_without_a_seed_of_its_own_samples_the_same_candidates_every_run(
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    context = context_of([RobotAccess(robot), StatementGrounding()])
+    context = context_of([RobotAccess(robot=robot), StatementGrounding()])
 
     runs = [
         [

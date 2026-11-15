@@ -95,7 +95,7 @@ class DebugExpressionPublisher:
             self._publisher.stop()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpressionPublishing(TickingExecutorExtension):
     """
     Visualizes the debug expressions of every compiled statechart as RViz markers.
@@ -116,7 +116,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     compile.
     """
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         if self.publisher is not None:
             self.publisher.stop()
         self.publisher = DebugExpressionPublisher(

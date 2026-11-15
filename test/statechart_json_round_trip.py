@@ -64,7 +64,7 @@ class StatechartSentThroughJSON:
         sent_text = json.dumps(sent.to_json())
         tracker = WorldEntityWithIDKwargsTracker.from_world(context.world)
         received = Statechart.from_json(
-            json.loads(sent_text),
+            data=json.loads(sent_text),
             context=context,
             world=context.world,
             **tracker.create_kwargs(),
@@ -167,7 +167,7 @@ class NodeRoundTripCase:
             :attr:`node_type`.
         """
         statechart = Statechart(context=context)
-        statechart.add_nodes(self.build_nodes(context.world))
+        statechart.add_nodes(nodes=self.build_nodes(context.world))
         if self.node_type not in {type(node) for node in statechart.nodes}:
             raise NodeTypeMissingFromCaseError(case=self)
         return statechart
@@ -236,7 +236,7 @@ class NodeRoundTripTests:
         round_trip: StatechartSentThroughJSON,
         receiving_executor: StatechartExecutor,
     ) -> None:
-        receiving_executor.compile(round_trip.received)
+        receiving_executor.compile(statechart=round_trip.received)
 
         assert receiving_executor.statechart is round_trip.received
 

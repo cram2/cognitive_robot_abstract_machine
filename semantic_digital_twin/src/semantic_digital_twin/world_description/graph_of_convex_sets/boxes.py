@@ -425,7 +425,7 @@ class GraphOfBoundingBoxes(
         selected_variable = GraphOfBoundingBoxes._selected_variable_of(chain_root)
         if selected_variable is not None:
             variable = (
-                variable._reroot_on_(selected_variable, chain_root)
+                variable._reroot_on_(root=selected_variable, replaced=chain_root)
                 if isinstance(variable, MappedVariable)
                 else selected_variable
             )

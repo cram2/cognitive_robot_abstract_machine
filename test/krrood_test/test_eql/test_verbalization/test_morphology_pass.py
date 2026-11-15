@@ -41,20 +41,20 @@ def test_pass_pluralises_only_plural_tagged_leaves():
             RoleFragment(text="Cabinet", role=SemanticRole.VARIABLE),  # singular
         ]
     )
-    assert _text(MorphologyProcessor().process(tree)) == "Robots of Cabinet"
+    assert _text(MorphologyProcessor().process(fragment=tree)) == "Robots of Cabinet"
 
 
 def test_pass_leaves_singular_untouched():
     leaf = RoleFragment(text="Robot", role=SemanticRole.VARIABLE)
-    assert _text(MorphologyProcessor().process(leaf)) == "Robot"
+    assert _text(MorphologyProcessor().process(fragment=leaf)) == "Robot"
 
 
 def test_pass_is_idempotent():
     leaf = RoleFragment(
         text="task", role=SemanticRole.ATTRIBUTE, number=GrammaticalNumber.PLURAL
     )
-    once = MorphologyProcessor().process(leaf)
-    twice = MorphologyProcessor().process(once)
+    once = MorphologyProcessor().process(fragment=leaf)
+    twice = MorphologyProcessor().process(fragment=once)
     assert _text(twice) == "tasks"
     assert once.number is GrammaticalNumber.SINGULAR  # reset after inflection
 
@@ -70,7 +70,7 @@ def test_pass_preserves_block_structure():
             ),
         ]
     )
-    assert _text(MorphologyProcessor().process(block)) == "the containers"
+    assert _text(MorphologyProcessor().process(fragment=block)) == "the containers"
 
 
 def test_realize_subtree_runs_pass_then_flattens():

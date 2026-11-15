@@ -84,7 +84,7 @@ def build_cram_world():
     ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     hsrb = hsrb_world.get_semantic_annotations_by_type(HSRB)[0]
     extensions = [
-        RobotAccess(hsrb),
+        RobotAccess(robot=hsrb),
         StatementGrounding(query_backend=ProbabilisticBackend()),
     ]
     return hsrb_world, hsrb, extensions
@@ -105,7 +105,7 @@ def _random_navigate_action(world: World):
             reference_frame=world.root,
         ),
     )
-    action.limit(10)
+    action.limit(n=10)
     return action
 
 
@@ -225,11 +225,11 @@ def reliability_experiment(
 
     t0 = time.perf_counter()
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, extensions)
+        context=StatechartContext.with_extensions(world=world, extensions=extensions)
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    executor.compile(statechart=statechart)
     executor.execute()
     plan_execution_duration = time.perf_counter() - t0
 

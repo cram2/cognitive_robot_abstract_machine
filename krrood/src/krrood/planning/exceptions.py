@@ -15,7 +15,7 @@ from krrood.exceptions import DataclassException
 # %% facts
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConditionIsNotAFact(DataclassException):
     """
     A condition that does not fix the value of a ground term was given as a fact.
@@ -36,7 +36,7 @@ class ConditionIsNotAFact(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ComparisonIsNotAnEquality(ConditionIsNotAFact):
     """
     A fact compares a ground term by other than equality, which constrains its value
@@ -62,7 +62,7 @@ class ComparisonIsNotAnEquality(ConditionIsNotAFact):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FactValueIsNotConstant(DataclassException):
     """
     A fact compares a ground term with an expression instead of with a value.
@@ -80,7 +80,7 @@ class FactValueIsNotConstant(DataclassException):
         return "Compare the ground term with a plain value."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingGroundTerm(DataclassException):
     """
     A fact gives a value to a ground term that does not exist, such as an attribute the
@@ -99,7 +99,7 @@ class MissingGroundTerm(DataclassException):
         return "Assign only attributes the instance has and keys the container stores."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AssignmentBypassesSetter(DataclassException):
     """
     A fact gives a value to a ground term that live objects set through code of their

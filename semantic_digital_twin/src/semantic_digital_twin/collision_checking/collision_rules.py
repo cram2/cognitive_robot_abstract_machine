@@ -224,13 +224,13 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
-        robot = tracker.get(from_json(data["robot"], **kwargs))
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
+        robot = tracker.get(key=from_json(data["robot"], **kwargs))
         body_subset_ids = from_json(data["body_subset"], **kwargs)
         body_subset = None
         if body_subset_ids is not None:
-            body_subset = {tracker.get(body_id) for body_id in body_subset_ids}
+            body_subset = {tracker.get(key=body_id) for body_id in body_subset_ids}
         return cls(
             robot=robot,
             body_subset=body_subset,
@@ -831,10 +831,10 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         allowed_body_ids = from_json(data["allowed_body_ids"], **kwargs)
-        allowed_bodies = {tracker.get(_id) for _id in allowed_body_ids}
+        allowed_bodies = {tracker.get(key=_id) for _id in allowed_body_ids}
         self = cls()
         self.allowed_collision_bodies = allowed_bodies
         self.allowed_collision_pairs = set(

@@ -76,7 +76,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
             world.kinematic_structure_entities, world.kinematic_structure_entities
         ):
             if kse != other:
-                is_inside = InsideOf(kse, other)
+                is_inside = InsideOf(body=kse, other=other)
                 if is_inside.compute_containment_ratio() > 0.0:
                     dao = to_dao(is_inside, state=state)
                     daos.append(dao)

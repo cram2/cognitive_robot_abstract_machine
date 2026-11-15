@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .example_classes import KRROODPose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseAnnotation(Symbol):
     name: str
     pose: Optional["KRROODPose"] = field(default=None, repr=False, kw_only=True)

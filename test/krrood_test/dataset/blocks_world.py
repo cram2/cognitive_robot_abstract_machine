@@ -23,7 +23,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 # %% blocks, the table and the shelf
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Table:
     """
     The surface every tower stands on.
@@ -37,7 +37,7 @@ class Table:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Block:
     """
     A block resting on another block or on the table.
@@ -56,7 +56,7 @@ class Block:
     What the block rests on.
     """
 
-    def rests_on(self, support: Block | Table, directly: bool = True) -> bool:
+    def rests_on(self, *, support: Block | Table, directly: bool = True) -> bool:
         """
         :param support: The block or table to check.
         :param directly: Whether *support* must be what this block rests on, rather than
@@ -67,10 +67,10 @@ class Block:
             return True
         if directly or not isinstance(self.support, Block):
             return False
-        return self.support.rests_on(support, directly=False)
+        return self.support.rests_on(support=support, directly=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Shelf:
     """
     A shelf whose slots each hold a block.
@@ -119,7 +119,7 @@ def is_table(support: Block | Table) -> bool:
     return isinstance(support, Table)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsOn(Predicate):
     """
     A block resting directly on a support.
@@ -139,16 +139,16 @@ class IsOn(Predicate):
         return self.block.support is self.support
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["block"]),
-            Verb("rest"),
+            Noun(content=fields["block"]),
+            Verb(lemma="rest"),
             Prepositions.ON,
-            Noun(fields["support"]),
+            Noun(content=fields["support"]),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SupportName(SymbolicFunction):
     """
     The name of what a block rests on.
@@ -163,5 +163,5 @@ class SupportName(SymbolicFunction):
         return self.block.support.name
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return FunctionVerbalizationTemplates.possessive(cls, *fields.values())

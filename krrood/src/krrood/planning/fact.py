@@ -27,7 +27,7 @@ from krrood.planning.exceptions import (
 # %% facts
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Fact:
     """
     The value of the ground term an expression reads, for every binding of the
@@ -45,7 +45,7 @@ class Fact:
     """
 
     @classmethod
-    def from_condition(cls, condition: SymbolicExpression) -> Fact:
+    def from_condition(cls, *, condition: SymbolicExpression) -> Fact:
         """
         :param condition: ``expression == value``, a predicate, which holds, or
             :func:`~krrood.entity_query_language.factories.not_` of a predicate, which
@@ -57,23 +57,25 @@ class Fact:
         :raises FactValueIsNotConstant: If *condition* compares with an expression
             instead of a value.
         """
-        if cls._is_predicate(condition):
-            return cls(condition, True)
-        if isinstance(condition, Not) and cls._is_predicate(condition._child_):
-            return cls(condition._child_, False)
+        if cls._is_predicate(condition=condition):
+            return cls(expression=condition, value=True)
+        if isinstance(condition, Not) and cls._is_predicate(
+            condition=condition._child_
+        ):
+            return cls(expression=condition._child_, value=False)
         if not (
             isinstance(condition, Comparator)
             and isinstance(condition.left, GroundTermExpression)
         ):
-            raise ConditionIsNotAFact(condition)
+            raise ConditionIsNotAFact(condition=condition)
         if condition.operation is not operator.eq:
-            raise ComparisonIsNotAnEquality(condition)
+            raise ComparisonIsNotAnEquality(condition=condition)
         if not isinstance(condition.right, Literal):
-            raise FactValueIsNotConstant(condition)
-        return cls(condition.left, condition.right._value_)
+            raise FactValueIsNotConstant(condition=condition)
+        return cls(expression=condition.left, value=condition.right._value_)
 
     @staticmethod
-    def _is_predicate(condition: SymbolicExpression) -> bool:
+    def _is_predicate(*, condition: SymbolicExpression) -> bool:
         """
         :param condition: A condition given as a fact.
         :return: Whether *condition* applies a predicate.
@@ -96,11 +98,11 @@ class Fact:
         assignments = {}
         for row in set_of(*operands).tolist():
             term = self.expression._ground_term_(
-                *(row[operand] for operand in operands)
+                operand_values=tuple(row[operand] for operand in operands)
             )
             if not term.has_live_value():
-                raise MissingGroundTerm(term)
+                raise MissingGroundTerm(term=term)
             if term.setting_runs_code():
-                raise AssignmentBypassesSetter(term)
+                raise AssignmentBypassesSetter(term=term)
             assignments[term] = self.value
         return assignments

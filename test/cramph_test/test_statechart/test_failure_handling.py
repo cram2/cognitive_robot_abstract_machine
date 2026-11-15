@@ -99,7 +99,7 @@ class StrategyGivingUp(FailureHandlingStrategy):
     The node this strategy was given on every call, in order.
     """
 
-    def handle_failure(self, failed_node: StatechartNode) -> None:
+    def handle_failure(self, *, failed_node: StatechartNode) -> None:
         self.failed_nodes.append(failed_node)
 
 
@@ -109,8 +109,8 @@ class StrategyRetrying(StrategyGivingUp):
     A failure handling strategy that records the failed node and runs it again.
     """
 
-    def handle_failure(self, failed_node: StatechartNode) -> None:
-        super().handle_failure(failed_node)
+    def handle_failure(self, *, failed_node: StatechartNode) -> None:
+        super().handle_failure(failed_node=failed_node)
         failed_node.statechart.request_reset(node=failed_node)
 
 
@@ -126,9 +126,9 @@ class StrategyInsertingBeforeTheFailedStep(FailureHandlingStrategy):
     The step to insert.
     """
 
-    def handle_failure(self, failed_node: StatechartNode) -> None:
-        step = ControlStructureNode.step_holding(failed_node)
-        step.parent_node.insert_before(step, self.inserted_step)
+    def handle_failure(self, *, failed_node: StatechartNode) -> None:
+        step = ControlStructureNode.step_holding(node=failed_node)
+        step.parent_node.insert_before(reference=step, node=self.inserted_step)
         failed_node.statechart.request_reset(node=step)
 
 
@@ -175,7 +175,7 @@ def _life_cycle_changes_of(
     """
     :return: The life cycle states recorded for `node`, without consecutive repetitions.
     """
-    history = statechart.state_history.get_life_cycle_history_of_node(node)
+    history = statechart.state_history.get_life_cycle_history_of_node(node=node)
     return [life_cycle for life_cycle, _ in groupby(history)]
 
 
@@ -186,8 +186,8 @@ def _compile_with_nodes(
     :return: A statechart holding `nodes`, compiled by `executor`, which ticks it once.
     """
     statechart = Statechart(context=executor.context)
-    statechart.add_nodes(nodes)
-    executor.compile(statechart)
+    statechart.add_nodes(nodes=nodes)
+    executor.compile(statechart=statechart)
     return statechart
 
 
@@ -311,8 +311,8 @@ def test_a_requested_reset_waits_while_a_recompile_is_held_back(
     statechart = _compile_with_nodes(statechart_executor, [node])
     statechart_executor.tick()
     holding_back = CallbackHoldingBackRecompiles()
-    statechart.compiler.add_recompile_callback(holding_back)
-    statechart.add_node(_node_arriving_at_once("joined"))
+    statechart.compiler.add_recompile_callback(callback=holding_back)
+    statechart.add_node(node=_node_arriving_at_once("joined"))
 
     statechart.request_reset(node=node)
     statechart_executor.tick()
@@ -418,7 +418,7 @@ def test_a_sequence_rejects_a_handler_as_a_step(
     statechart = Statechart(context=statechart_executor.context)
 
     with pytest.raises(ChildTransitionAlreadyWiredError):
-        statechart.add_node(Sequence(nodes=[node, handler]))
+        statechart.add_node(node=Sequence(nodes=[node, handler]))
 
 
 def test_a_handler_cannot_observe_a_node_that_is_not_its_sibling(
@@ -429,10 +429,10 @@ def test_a_handler_cannot_observe_a_node_that_is_not_its_sibling(
         observed_node=step, failure_handling_strategy=StrategyGivingUp()
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_nodes([Sequence(nodes=[step]), handler])
+    statechart.add_nodes(nodes=[Sequence(nodes=[step]), handler])
 
     with pytest.raises(ConditionScopeError):
-        statechart_executor.compile(statechart)
+        statechart_executor.compile(statechart=statechart)
 
 
 # %% handling the failure of a step
@@ -532,10 +532,10 @@ def test_a_node_that_cannot_fail_is_rejected(
         handled_node=node, failure_handling_strategy=StrategyGivingUp()
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(handled)
+    statechart.add_node(node=handled)
 
     with pytest.raises(ChildCannotFailError) as error:
-        statechart_executor.compile(statechart)
+        statechart_executor.compile(statechart=statechart)
 
     assert error.value.node is handled
     assert error.value.child is node
@@ -552,7 +552,7 @@ def test_a_structure_copy_holds_the_handler_below_a_composite_stand_in(
 
     structure_copy = statechart.create_structure_copy()
 
-    stand_in = structure_copy.get_node_by_index(handled.index)
+    stand_in = structure_copy.get_node_by_index(index=handled.index)
     assert isinstance(stand_in, StructureCopyCompositeNode)
     assert [child.index for child in stand_in.nodes] == [
         child.index for child in handled.nodes
@@ -630,7 +630,7 @@ def test_a_rewriting_modification_lets_a_compiled_sequence_take_a_step(
     second = _node_arriving_at_once("second")
 
     with statechart.modify(rewrites_compiled_nodes=True):
-        sequence.add_node(second)
+        sequence.add_node(node=second)
 
     assert sequence.nodes == [first, second]
     assert second.parent_node is sequence
@@ -642,10 +642,10 @@ def test_a_compiled_sequence_rejects_steps_again_after_a_rewriting_modification(
     sequence = Sequence(nodes=[_node_arriving_at_once("first")])
     statechart = _compile_with_nodes(statechart_executor, [sequence])
     with statechart.modify(rewrites_compiled_nodes=True):
-        sequence.add_node(_node_arriving_at_once("second"))
+        sequence.add_node(node=_node_arriving_at_once("second"))
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        sequence.add_node(_node_arriving_at_once("third"))
+        sequence.add_node(node=_node_arriving_at_once("third"))
 
 
 def test_a_compiled_sequence_rejects_steps_after_an_abandoned_rewriting_modification(
@@ -659,7 +659,7 @@ def test_a_compiled_sequence_rejects_steps_after_an_abandoned_rewriting_modifica
             raise ModificationDeliberatelyFailed()
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        sequence.add_node(_node_arriving_at_once("rejected"))
+        sequence.add_node(node=_node_arriving_at_once("rejected"))
 
 
 def test_a_modification_nested_in_a_rewriting_one_may_rewrite_too(
@@ -671,7 +671,7 @@ def test_a_modification_nested_in_a_rewriting_one_may_rewrite_too(
 
     with statechart.modify(rewrites_compiled_nodes=True):
         with statechart.modify():
-            sequence.add_node(second)
+            sequence.add_node(node=second)
 
     assert second.parent_node is sequence
 

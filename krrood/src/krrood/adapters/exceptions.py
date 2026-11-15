@@ -11,14 +11,14 @@ if TYPE_CHECKING:
     import numpy as np
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JSONSerializationError(DataclassException):
     """
     Base exception for JSON (de)serialization errors.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingTypeError(JSONSerializationError):
     """
     Raised when :attr:`JSONField.TYPE` is missing in the JSON data.
@@ -31,7 +31,7 @@ class MissingTypeError(JSONSerializationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidTypeFormatError(JSONSerializationError):
     """
     Raised when the value of :attr:`JSONField.TYPE` is not a fully qualified class name.
@@ -46,7 +46,7 @@ class InvalidTypeFormatError(JSONSerializationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownModuleError(JSONSerializationError):
     """
     Raised when the module named by :attr:`JSONField.TYPE` cannot be imported.
@@ -61,7 +61,7 @@ class UnknownModuleError(JSONSerializationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassNotFoundError(JSONSerializationError):
     """
     Raised when the class named by :attr:`JSONField.TYPE` cannot be found in the module.
@@ -77,7 +77,7 @@ class ClassNotFoundError(JSONSerializationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassNotSerializableError(JSONSerializationError):
     """
     Raised when the class specified cannot be JSON-serialized.
@@ -92,7 +92,7 @@ class ClassNotSerializableError(JSONSerializationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassNotDeserializableError(JSONSerializationError):
     """
     Raised when the class specified cannot be JSON-deserialized.
@@ -107,7 +107,7 @@ class ClassNotDeserializableError(JSONSerializationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UntrackedObjectError(JSONSerializationError):
     """
     Raised when a JSON document refers to an object by a key that no object was
@@ -137,7 +137,7 @@ class UntrackedObjectError(JSONSerializationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArrayElementTypeSerializationError(JSONSerializationError, ABC):
     """
     Raised when a numpy array is serialized whose element type the serializer cannot
@@ -153,7 +153,7 @@ class ArrayElementTypeSerializationError(JSONSerializationError, ABC):
         return f"Serializing a numpy array of element type {self.element_type} is not supported."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectArraySerializationError(ArrayElementTypeSerializationError):
     """
     Raised when a numpy array of Python objects is serialized, whose bytes are
@@ -164,7 +164,7 @@ class ObjectArraySerializationError(ArrayElementTypeSerializationError):
         return "Consider converting the array to a list first and serializing that."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StructuredArraySerializationError(ArrayElementTypeSerializationError):
     """
     Raised when a numpy array of records is serialized, whose field names its element

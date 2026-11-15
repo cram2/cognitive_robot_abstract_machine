@@ -1,3 +1,7 @@
+"""
+Tests of the check finding docstrings and comment blocks with too much prose.
+"""
+
 from __future__ import annotations
 
 from krrood.development_tools.agents.prose_length import (
@@ -21,7 +25,8 @@ def overlong_first_lines(snippet: ProseSnippet) -> list[int]:
     :return: The first line of each overlong block of *snippet*.
     """
     return [
-        violation.first_line for violation in ProseLengthChecker().violations(snippet)
+        violation.first_line
+        for violation in ProseLengthChecker().violations(path=snippet)
     ]
 
 
@@ -32,7 +37,12 @@ def test_a_docstring_over_its_limit_is_reported() -> None:
 
 
 def test_field_lists_and_literal_blocks_are_not_prose() -> None:
-    (block,) = SourceProse(ProseSnippet.FIELDS_AND_LITERAL_BLOCKS.read_text()).blocks
+    """
+    Only the prose of a docstring counts towards its limit.
+    """
+    (block,) = SourceProse(
+        source=ProseSnippet.FIELDS_AND_LITERAL_BLOCKS.read_text()
+    ).blocks
 
     assert block.prose_lines == ProseLineCount.FIELDS_AND_LITERAL_BLOCKS
 
@@ -52,8 +62,11 @@ def test_a_comment_block_over_its_limit_is_reported_and_section_headers_are_not_
 
 
 def test_a_raised_limit_lets_the_block_through() -> None:
+    """
+    A docstring within a raised limit is not reported.
+    """
     checker = ProseLengthChecker(
         docstring_lines=ProseLineCount.OVERLONG_MODULE_DOCSTRING
     )
 
-    assert list(checker.violations(ProseSnippet.OVERLONG_MODULE_DOCSTRING)) == []
+    assert list(checker.violations(path=ProseSnippet.OVERLONG_MODULE_DOCSTRING)) == []

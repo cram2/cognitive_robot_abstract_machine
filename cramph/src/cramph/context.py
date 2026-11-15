@@ -19,7 +19,7 @@ from semantic_digital_twin.world import World
 # %% context extensions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContextExtension:
     """
     Data or a service that the nodes of a statechart read from their
@@ -44,7 +44,7 @@ GenericContextExtension = TypeVar("GenericContextExtension", bound=ContextExtens
 # %% statechart context
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartContext:
     """
     Context handed to every node of a statechart while it is built and ticked.
@@ -82,7 +82,9 @@ class StatechartContext:
     """
 
     @classmethod
-    def with_extensions(cls, world: World, extensions: list[ContextExtension]) -> Self:
+    def with_extensions(
+        cls, *, world: World, extensions: list[ContextExtension]
+    ) -> Self:
         """
         :param world: The world in which the statechart is executed.
         :param extensions: The extensions the new context holds.
@@ -93,10 +95,10 @@ class StatechartContext:
         """
         context = cls(world=world)
         for extension in extensions:
-            context.add_extension(extension)
+            context.add_extension(extension=extension)
         return context
 
-    def set_tick_duration(self, tick_duration: float) -> None:
+    def set_tick_duration(self, *, tick_duration: float) -> None:
         """
         Sets how many seconds one tick stands for.
 
@@ -126,23 +128,23 @@ class StatechartContext:
         :return: The number of ticks run since the statechart started, as held by
             :attr:`tick_variable`.
         """
-        return int(self.float_variable_data.get_value(self.tick_variable))
+        return int(self.float_variable_data.get_value(variable=self.tick_variable))
 
     def require_extension(
-        self, extension_type: type[GenericContextExtension]
+        self, *, extension_type: type[GenericContextExtension]
     ) -> GenericContextExtension:
         """
         :param extension_type: The type of the requested extension.
         :return: The extension :meth:`get_extension` finds for `extension_type`.
         :raises MissingContextExtensionError: If there is none.
         """
-        extension = self.get_extension(extension_type)
+        extension = self.get_extension(extension_type=extension_type)
         if extension is None:
             raise MissingContextExtensionError(expected_extension=extension_type)
         return extension
 
     def get_extension(
-        self, extension_type: type[GenericContextExtension]
+        self, *, extension_type: type[GenericContextExtension]
     ) -> GenericContextExtension | None:
         """
         :param extension_type: The type of the requested extension.
@@ -162,7 +164,7 @@ class StatechartContext:
             )
         return matching_extensions[0] if matching_extensions else None
 
-    def add_extension(self, extension: ContextExtension) -> None:
+    def add_extension(self, *, extension: ContextExtension) -> None:
         """
         :param extension: The extension to add under its own type.
         :raises DuplicateContextExtensionError: If this context already holds an
@@ -174,7 +176,7 @@ class StatechartContext:
         self.extensions[extension_type] = extension
 
     def ensure_extension(
-        self, extension: GenericContextExtension
+        self, *, extension: GenericContextExtension
     ) -> GenericContextExtension:
         """
         Adds `extension` unless this context already holds one of its very type.

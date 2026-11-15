@@ -18,7 +18,7 @@ from giskardpy.motion_statechart.error_signals import (
 )
 from cramph.exceptions import CyclicNodeDependencyError, PrerequisiteNotExpandedError
 from giskardpy.motion_statechart.exceptions import NoProgressError
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from cramph.node import NodeArtifacts
@@ -152,18 +152,18 @@ class TestStallDetection:
         )
         motion_statechart = Statechart(context=executor.context)
         goal = unreachable_arm_goal(pr2_world_state_reset)
-        motion_statechart.add_node(goal)
-        motion_statechart.add_node(EndMotion.when_true(goal))
+        motion_statechart.add_node(node=goal)
+        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
         progressing = StillProgressing(
             monitored_node=goal, timeout=timedelta(seconds=1)
         )
-        motion_statechart.add_node(progressing)
-        motion_statechart.add_node(progressing.cancel_motion())
+        motion_statechart.add_node(node=progressing)
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
         executor.compile(statechart=motion_statechart)
 
         with pytest.raises(NoProgressError) as exception_info:
-            executor.tick_until_end(2000)
+            executor.tick_until_end(timeout=2000)
 
         assert goal.unique_name in str(exception_info.value)
 
@@ -184,9 +184,9 @@ class TestStallDetection:
             extensions=[motion_control],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([goal, progressing])
-        motion_statechart.add_node(EndMotion.when_true(goal))
-        motion_statechart.add_node(progressing.cancel_motion())
+        motion_statechart.add_nodes(nodes=[goal, progressing])
+        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
         executor.compile(statechart=motion_statechart)
         drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
@@ -223,12 +223,12 @@ class TestStallDetection:
             tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
             goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
         )
-        motion_statechart.add_node(goal)
-        motion_statechart.add_node(EndMotion.when_true(goal))
+        motion_statechart.add_node(node=goal)
+        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
         progressing = StillProgressing(
             monitored_node=goal, timeout=timedelta(seconds=1)
         )
-        motion_statechart.add_node(progressing)
+        motion_statechart.add_node(node=progressing)
 
         executor.compile(statechart=motion_statechart)
         recorded = tick_until_end_recording(executor, motion_statechart, [progressing])
@@ -258,13 +258,13 @@ class TestStallDetection:
                 x=1, y=1, reference_frame=cylinder_bot_diff_world.root
             ),
         )
-        motion_statechart.add_node(goal)
-        motion_statechart.add_node(EndMotion.when_true(goal))
+        motion_statechart.add_node(node=goal)
+        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
         progressing = StillProgressing(
             monitored_node=goal, timeout=timedelta(seconds=100)
         )
-        motion_statechart.add_node(progressing)
-        motion_statechart.add_node(progressing.cancel_motion())
+        motion_statechart.add_node(node=progressing)
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
         executor.compile(statechart=motion_statechart)
         not_approaching = [
@@ -313,20 +313,20 @@ class TestStallDetection:
         )
         motion_statechart = Statechart(context=executor.context)
         sequence = Sequence(nodes=[reachable, unreachable])
-        motion_statechart.add_node(sequence)
-        motion_statechart.add_node(EndMotion.when_true(sequence))
+        motion_statechart.add_node(node=sequence)
+        motion_statechart.add_node(node=EndMotion.when_true(node=sequence))
         progressing = StillProgressing(
             monitored_node=sequence, timeout=timedelta(seconds=1)
         )
-        motion_statechart.add_node(progressing)
-        motion_statechart.add_node(progressing.cancel_motion())
+        motion_statechart.add_node(node=progressing)
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
         executor.compile(statechart=motion_statechart)
 
         assert progressing.monitored_tasks == [reachable, unreachable]
 
         with pytest.raises(NoProgressError) as exception_info:
-            executor.tick_until_end(2000)
+            executor.tick_until_end(timeout=2000)
 
         assert exception_info.value.stalled_tasks == [unreachable]
         assert unreachable.unique_name in str(exception_info.value)
@@ -366,18 +366,18 @@ class TestStallDetection:
         )
         motion_statechart = Statechart(context=executor.context)
         parallel = Parallel(nodes=[holding, unreachable])
-        motion_statechart.add_node(parallel)
-        motion_statechart.add_node(EndMotion.when_true(parallel))
+        motion_statechart.add_node(node=parallel)
+        motion_statechart.add_node(node=EndMotion.when_true(node=parallel))
         progressing = StillProgressing(
             monitored_node=parallel, timeout=timedelta(seconds=1)
         )
-        motion_statechart.add_node(progressing)
-        motion_statechart.add_node(progressing.cancel_motion())
+        motion_statechart.add_node(node=progressing)
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
         executor.compile(statechart=motion_statechart)
 
         with pytest.raises(NoProgressError) as exception_info:
-            executor.tick_until_end(2000)
+            executor.tick_until_end(timeout=2000)
 
         assert exception_info.value.stalled_tasks == [unreachable]
         assert holding.unique_name not in str(exception_info.value)
@@ -407,8 +407,8 @@ class TestStallDetection:
             extensions=[motion_control],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([arrived, progressing])
-        motion_statechart.add_node(progressing.cancel_motion())
+        motion_statechart.add_nodes(nodes=[arrived, progressing])
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
         executor.compile(statechart=motion_statechart)
         for _ in range(
@@ -441,13 +441,13 @@ class TestStallDetection:
             goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
         )
         blocker = ConstFalseNode()
-        motion_statechart.add_nodes([goal, blocker])
+        motion_statechart.add_nodes(nodes=[goal, blocker])
         # The goal only starts once the blocker is true, which never happens.
         goal.start_condition = blocker.observes_true
         progressing = StillProgressing(
             monitored_node=goal, timeout=timedelta(seconds=0.5)
         )
-        motion_statechart.add_node(progressing)
+        motion_statechart.add_node(node=progressing)
 
         executor.compile(statechart=motion_statechart)
         for _ in range(200):
@@ -475,7 +475,7 @@ class TestStallDetection:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([goal, progressing])
+        motion_statechart.add_nodes(nodes=[goal, progressing])
 
         executor.compile(statechart=motion_statechart)
 
@@ -509,8 +509,8 @@ class TestStallDetection:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([sequence, progressing])
-        motion_statechart.add_node(EndMotion.when_true(sequence))
+        motion_statechart.add_nodes(nodes=[sequence, progressing])
+        motion_statechart.add_node(node=EndMotion.when_true(node=sequence))
 
         executor.compile(statechart=motion_statechart)
 
@@ -540,9 +540,9 @@ class TestStallDetection:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(arrived)
-        motion_statechart.add_node(monitor)
-        motion_statechart.add_node(EndMotion())
+        motion_statechart.add_node(node=arrived)
+        motion_statechart.add_node(node=monitor)
+        motion_statechart.add_node(node=EndMotion())
 
         executor.compile(statechart=motion_statechart)
         executor.tick()
@@ -630,8 +630,8 @@ class ScriptedErrorRun:
         )
         self.context = self.executor.context
         motion_statechart = Statechart(context=self.context)
-        motion_statechart.add_nodes([*self.tasks, self.monitor])
-        motion_statechart.add_node(EndMotion.when_all_true(self.tasks))
+        motion_statechart.add_nodes(nodes=[*self.tasks, self.monitor])
+        motion_statechart.add_node(node=EndMotion.when_all_true(nodes=self.tasks))
         self.executor.compile(statechart=motion_statechart)
 
     @property
@@ -643,7 +643,7 @@ class ScriptedErrorRun:
             CONVERGENCE_RATE
             * TASK_THRESHOLD
             * self.context.require_extension(
-                MotionControlContext
+                extension_type=MotionControlContext
             ).qp_controller_config.control_time_step.total_seconds()
         )
 
@@ -874,8 +874,8 @@ class TestErrorDrivesObservation:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(goal)
-        motion_statechart.add_node(EndMotion.when_true(goal))
+        motion_statechart.add_node(node=goal)
+        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
         executor.compile(statechart=motion_statechart)
 
         raw_error = goal.error_signal.evaluate()[0]
@@ -953,12 +953,12 @@ class TestTaskAtItsGoal:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(task)
+        motion_statechart.add_node(node=task)
         not_approaching = NoMonitoredTaskApproachingItsGoal(monitored_tasks=[task])
-        motion_statechart.add_node(not_approaching)
+        motion_statechart.add_node(node=not_approaching)
         timer = CountSimulationTimeSeconds(seconds=MOTION_DURATION.total_seconds())
-        motion_statechart.add_node(timer)
-        motion_statechart.add_node(EndMotion.when_true(timer))
+        motion_statechart.add_node(node=timer)
+        motion_statechart.add_node(node=EndMotion.when_true(node=timer))
 
         executor.compile(statechart=motion_statechart)
         recorded = tick_until_end_recording(
@@ -990,9 +990,9 @@ class TestNothingToConverge:
             extensions=[motion_control],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(limit)
-        motion_statechart.add_node(progressing)
-        motion_statechart.add_node(EndMotion())
+        motion_statechart.add_node(node=limit)
+        motion_statechart.add_node(node=progressing)
+        motion_statechart.add_node(node=EndMotion())
 
         executor.compile(statechart=motion_statechart)
 
@@ -1034,9 +1034,9 @@ class TestNodeDependencies:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(dependent)
-        motion_statechart.add_node(dependency)
-        motion_statechart.add_node(EndMotion())
+        motion_statechart.add_node(node=dependent)
+        motion_statechart.add_node(node=dependency)
+        motion_statechart.add_node(node=EndMotion())
 
         executor.compile(statechart=motion_statechart)
 
@@ -1067,7 +1067,7 @@ class TestNodeDependencies:
         motion_statechart = Statechart(context=executor.context)
 
         with pytest.raises(PrerequisiteNotExpandedError):
-            motion_statechart.add_node(progressing)
+            motion_statechart.add_node(node=progressing)
 
     def test_a_dependency_cycle_is_reported(self, cylinder_bot_world: World):
         """
@@ -1082,8 +1082,8 @@ class TestNodeDependencies:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([first, second])
-        motion_statechart.add_node(EndMotion())
+        motion_statechart.add_nodes(nodes=[first, second])
+        motion_statechart.add_node(node=EndMotion())
 
         with pytest.raises(CyclicNodeDependencyError):
             executor.compile(statechart=motion_statechart)
@@ -1114,12 +1114,12 @@ class TestTrajectoryProgress:
             extensions=[MotionControl()],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(trajectory)
-        motion_statechart.add_node(EndMotion.when_true(trajectory))
+        motion_statechart.add_node(node=trajectory)
+        motion_statechart.add_node(node=EndMotion.when_true(node=trajectory))
         progressing = StillProgressing(
             monitored_node=trajectory, timeout=timedelta(seconds=1)
         )
-        motion_statechart.add_node(progressing)
+        motion_statechart.add_node(node=progressing)
 
         executor.compile(statechart=motion_statechart)
 

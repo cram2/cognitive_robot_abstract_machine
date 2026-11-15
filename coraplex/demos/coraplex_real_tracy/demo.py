@@ -149,7 +149,10 @@ executor_type: type[PlanExecutor] = (
     RealRobotPlanExecutor if controls_real_robot else KinematicallySimulatedPlanExecutor
 )
 executor = executor_type(
-    StatechartContext.with_extensions(world, [RobotAccess(tracy)]), ros_node=node
+    context=StatechartContext.with_extensions(
+        world=world, extensions=[RobotAccess(robot=tracy)]
+    ),
+    ros_node=node,
 )
 
 plan = Sequence(
@@ -193,8 +196,8 @@ plan = Sequence(
 try:
     print("Perform Plan")
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    executor.compile(statechart=statechart)
     executor.execute()
 finally:
     executor.close()

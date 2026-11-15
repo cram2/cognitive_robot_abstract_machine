@@ -20,14 +20,14 @@ def test_class_diagram_visualization():
         is_dataclass,
         classes_of_module(example_classes),
     )
-    diagram = ClassDiagram(classes)
+    diagram = ClassDiagram(classes=classes)
     assert len(diagram.wrapped_classes) > 0
     assert len(diagram._dependency_graph.edges()) > 0
     associations = diagram.associations
 
-    wrapped_pose = diagram.get_wrapped_class(example_classes.KRROODPose)
-    wrapped_position = diagram.get_wrapped_class(example_classes.KRROODPosition)
-    wrapped_positions = diagram.get_wrapped_class(example_classes.KRROODPositions)
+    wrapped_pose = diagram.get_wrapped_class(clazz=example_classes.KRROODPose)
+    wrapped_position = diagram.get_wrapped_class(clazz=example_classes.KRROODPosition)
+    wrapped_positions = diagram.get_wrapped_class(clazz=example_classes.KRROODPositions)
 
     assert (
         len(
@@ -52,7 +52,7 @@ def test_class_diagram_visualization():
     )
 
     wrapped_positions_subclass = diagram.get_wrapped_class(
-        example_classes.KRROODPositionsSubclassWithAnotherKRROODPosition
+        clazz=example_classes.KRROODPositionsSubclassWithAnotherKRROODPosition
     )
     inheritances = diagram.inheritance_relations
 
@@ -75,20 +75,20 @@ def test_underspecified_classes():
         is_dataclass,
         classes_of_module(example_classes),
     )
-    diagram = ClassDiagram(classes)
+    diagram = ClassDiagram(classes=classes)
 
-    r = diagram.get_wrapped_class(example_classes.UnderspecifiedTypesContainer)
+    r = diagram.get_wrapped_class(clazz=example_classes.UnderspecifiedTypesContainer)
     assert r.clazz is example_classes.UnderspecifiedTypesContainer
 
 
 def test_create_nodes_for_specialized_generic():
     classes = [KRROODPosition, GenericClassAssociation, GenericClass]
-    diagram = ClassDiagram(classes)
+    diagram = ClassDiagram(classes=classes)
 
-    wrapped_generic_class = diagram.get_wrapped_class(GenericClass)
+    wrapped_generic_class = diagram.get_wrapped_class(clazz=GenericClass)
 
     generic_float: WrappedSpecializedGeneric = diagram.get_wrapped_class(
-        GenericClass[float]
+        clazz=GenericClass[float]
     )
 
     assert len(generic_float.fields) == 3
@@ -96,7 +96,7 @@ def test_create_nodes_for_specialized_generic():
     float_field = generic_float.fields[0]
     assert float_field.type_endpoint is float
 
-    generic_position = diagram.get_wrapped_class(GenericClass[KRROODPosition])
+    generic_position = diagram.get_wrapped_class(clazz=GenericClass[KRROODPosition])
     assert len(generic_position.fields) == 3
     position_field = generic_position.fields[0]
     assert position_field.type_endpoint is KRROODPosition

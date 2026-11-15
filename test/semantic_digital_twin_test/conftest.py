@@ -3,9 +3,11 @@
 # Built before the imports below, which read a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
 
 import os
@@ -29,7 +31,7 @@ def pytest_configure(config):
     # Build the symbol graph
     SymbolGraph.clear()
     class_diagram = ClassDiagram(
-        recursive_subclasses(Symbol) + [World],
+        classes=recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
     SymbolGraph(_class_diagram=class_diagram)

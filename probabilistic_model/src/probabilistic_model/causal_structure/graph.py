@@ -409,7 +409,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         graph = cls.from_edges(
             from_json(data[CausalGraphJSONKey.NODES], **kwargs),
             from_json(data[CausalGraphJSONKey.EDGES], **kwargs),

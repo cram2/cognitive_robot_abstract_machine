@@ -41,10 +41,10 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from cramph.statechart import Statechart
 
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(NavigateAction(target_location=pose))
-executor.compile(statechart)
+statechart.add_node(node=NavigateAction(target_location=pose))
+executor.compile(statechart=statechart)
 executor.execute()
 ```

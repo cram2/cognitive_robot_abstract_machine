@@ -21,14 +21,14 @@ if TYPE_CHECKING:
 TReading = TypeVar("TReading")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Reading:
     """
     The value a sensor produces.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SensorWithGenericReading(Generic[TReading], SubClassSafeGeneric):
     """
     A sensor whose reading type is bound by its subclasses.
@@ -46,7 +46,7 @@ class SensorWithGenericReading(Generic[TReading], SubClassSafeGeneric):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SensorBindingItsReading(SensorWithGenericReading[Reading]):
     """
     A sensor that binds its reading type while this module is still being imported.

@@ -53,8 +53,10 @@ def _ticking(world: World, *detectors: AbstractDetector):
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    segmind_context = executor.context.require_extension(SegmindContext)
-    executor.compile(DetectorStatechartBuilder(list(detectors)).build(executor.context))
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
+    executor.compile(
+        statechart=DetectorStatechartBuilder(list(detectors)).build(executor.context)
+    )
     executor.tick()
     return executor, segmind_context
 

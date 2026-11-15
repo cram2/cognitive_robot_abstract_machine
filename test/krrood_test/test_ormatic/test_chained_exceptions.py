@@ -21,10 +21,12 @@ def chained_exception() -> ExceptionWithOwnField:
     An exception raised from a plain exception, itself raised from another plain
     exception, while handling a dataclass exception.
     """
-    context = ExceptionWithOwnField(1)
+    context = ExceptionWithOwnField(offending_value=1)
     cause = ValueError("the cause")
     cause.__cause__ = KeyError("the cause of the cause")
-    return ExceptionWithOwnField(2, raised_from=cause, raised_while_handling=context)
+    return ExceptionWithOwnField(
+        offending_value=2, raised_from=cause, raised_while_handling=context
+    )
 
 
 @pytest.fixture

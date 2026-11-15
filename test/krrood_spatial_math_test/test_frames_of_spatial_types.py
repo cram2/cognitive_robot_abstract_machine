@@ -139,7 +139,7 @@ def test_a_deserialized_point_refers_to_the_readers_frame(table_frame):
     point = Point3(1, 2, 3, reference_frame=table_frame)
     data = json.loads(json.dumps(to_json(point)))
     known_frames = KnownFrames()
-    known_frames.add(table_frame.id, table_frame)
+    known_frames.add(key=table_frame.id, tracked_object=table_frame)
 
     point_copy = from_json(data, **known_frames.create_kwargs())
 
@@ -152,8 +152,8 @@ def test_a_transformation_keeps_both_of_its_frames(table_frame, camera_frame):
         x=1, reference_frame=table_frame, child_frame=camera_frame
     )
     known_frames = KnownFrames()
-    known_frames.add(table_frame.id, table_frame)
-    known_frames.add(camera_frame.id, camera_frame)
+    known_frames.add(key=table_frame.id, tracked_object=table_frame)
+    known_frames.add(key=camera_frame.id, tracked_object=camera_frame)
 
     copy = from_json(to_json(table_T_camera), **known_frames.create_kwargs())
 

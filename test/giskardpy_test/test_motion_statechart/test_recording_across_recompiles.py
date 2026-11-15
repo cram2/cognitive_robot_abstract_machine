@@ -92,8 +92,8 @@ def _compile_recorded(world: World, tips: list[Body]) -> StatechartExecutor:
     )
     statechart = Statechart(context=executor.context)
     for tip in tips:
-        statechart.add_node(_position_goal(world, tip, name=str(tip.name)))
-    executor.compile(statechart)
+        statechart.add_node(node=_position_goal(world, tip, name=str(tip.name)))
+    executor.compile(statechart=statechart)
     return executor
 
 
@@ -132,7 +132,7 @@ def _world_state_trajectory(executor: StatechartExecutor) -> WorldStateTrajector
     :return: The world state trajectory `executor` recorded.
     """
     return executor.require_extension(
-        WorldStateTrajectoryRecording
+        extension_type=WorldStateTrajectoryRecording
     ).plotter.world_state_trajectory
 
 
@@ -143,7 +143,7 @@ def _debug_expression_trajectory(
     :return: The debug expression trajectory `executor` recorded.
     """
     return executor.require_extension(
-        DebugExpressionRecording
+        extension_type=DebugExpressionRecording
     ).plotter.debug_expression_trajectory
 
 
@@ -190,7 +190,7 @@ def test_the_world_state_recorded_before_a_node_joined_is_kept(
     state_at_compile = cylinder_bot_world.state._data.copy()
     _tick(executor, ticks.before)
 
-    executor.statechart.add_node(ConstTrueNode())
+    executor.statechart.add_node(node=ConstTrueNode())
     _tick(executor, ticks.after)
 
     trajectory = _world_state_trajectory(executor)
@@ -210,7 +210,7 @@ def test_the_debug_expressions_recorded_before_a_node_joined_are_kept(
     )
     _tick(executor, ticks.before)
 
-    executor.statechart.add_node(ConstTrueNode())
+    executor.statechart.add_node(node=ConstTrueNode())
     _tick(executor, ticks.after)
 
     trajectory = _debug_expression_trajectory(executor)
@@ -232,7 +232,9 @@ def test_a_debug_expression_of_a_joined_node_has_no_value_before_it_joined(
     executor = _compile_a_recorded_drive(world)
     _tick(executor, ticks.before)
 
-    executor.statechart.add_node(_position_goal(world, _robot(world), name="joined"))
+    executor.statechart.add_node(
+        node=_position_goal(world, _robot(world), name="joined")
+    )
     _tick(executor, ticks.after)
 
     joined = _recorded(executor, "joined/current")

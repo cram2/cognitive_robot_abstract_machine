@@ -44,10 +44,10 @@ def test_the_mappings_of_each_dimension_extend_the_base_mapping():
 
 def test_interface_typed_fields_round_trip_to_their_implementations(session, database):
     holder = HolderOfLabelledPositions(
-        position=LabelledPosition3D(1.0, 2.0, 3.0, "map"),
+        position=LabelledPosition3D(x=1.0, y=2.0, z=3.0, origin_name="map"),
         route=[
-            LabelledPosition2D(4.0, 5.0, "floor"),
-            LabelledPosition3D(6.0, 7.0, 8.0, "map"),
+            LabelledPosition2D(x=4.0, y=5.0, origin_name="floor"),
+            LabelledPosition3D(x=6.0, y=7.0, z=8.0, origin_name="map"),
         ],
     )
 

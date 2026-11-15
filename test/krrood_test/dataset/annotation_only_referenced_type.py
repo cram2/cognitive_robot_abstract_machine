@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeReferencedOnlyInAnnotations:
     """
     A type that is referenced solely from another class's field annotations.

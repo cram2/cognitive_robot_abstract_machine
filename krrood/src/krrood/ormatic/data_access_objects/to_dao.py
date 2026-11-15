@@ -37,7 +37,7 @@ def _get_alternative_mapping_class(
     return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToDataAccessObjectWorkItem(DataAccessObjectWorkItem):
     """
     Work item for converting an object to a Data Access Object.
@@ -47,7 +47,7 @@ class ToDataAccessObjectWorkItem(DataAccessObjectWorkItem):
     alternative_base: type[DataAccessObject] | None = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem]):
     """
     State for converting objects to Data Access Objects.
@@ -60,6 +60,7 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
 
     def push_work_item(
         self,
+        *,
         source_object: Any,
         dao_instance: DataAccessObject,
         alternative_base: type[DataAccessObject] | None = None,
@@ -80,7 +81,7 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
         )
 
     def apply_alternative_mapping_if_needed(
-        self, dao_clazz: type[DataAccessObject], source_object: Any
+        self, *, dao_clazz: type[DataAccessObject], source_object: Any
     ) -> Any:
         """
         Apply an alternative mapping if the DAO class requires it.
@@ -91,15 +92,17 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
         """
         alternative_mapping_class = _get_alternative_mapping_class(dao_clazz)
         if alternative_mapping_class is not None:
-            return alternative_mapping_class.to_dao(source_object, state=self)
+            return alternative_mapping_class.to_dao(
+                source_object=source_object, state=self
+            )
         return source_object
 
-    def register(self, source_object: Any, dao_instance: DataAccessObject) -> None:
+    def register(self, *, source: Any, target: DataAccessObject) -> None:
         """
         Register a partially built DAO in the memoization stores.
 
         :param source_object: The object being converted.
         :param dao_instance: The partially built DAO.
         """
-        super().register(source_object, dao_instance)
-        self.keep_alive[id(source_object)] = source_object
+        super().register(source=source, target=target)
+        self.keep_alive[id(source)] = source

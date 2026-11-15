@@ -40,7 +40,7 @@ from cramph.data_types import ObservationStateValues
 from cramph.failure_handling import HandledOnFailure, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
 from cramph.statechart import Statechart
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
@@ -427,7 +427,9 @@ class FailureHandlingDemonstration(RobotDemonstration):
 
     def build_context_extensions(self, world: World) -> list[ContextExtension]:
         return [
-            RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0]),
+            RobotAccess(
+                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+            ),
             StatementGrounding(),
             PlanRewriting(
                 transformations=[
@@ -443,7 +445,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         pick up the milk.
         """
         world = context.world
-        robot = context.require_extension(RobotAccess).robot
+        robot = context.require_extension(extension_type=RobotAccess).robot
         arm = robot.right_arm
         end_effector = arm.end_effector
         milk = world.get_semantic_annotations_by_type(Milk)[0]
@@ -493,7 +495,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
             ],
         )
         self.statechart = Statechart(context=context)
-        self.statechart.add_node(self.plan)
+        self.statechart.add_node(node=self.plan)
         return self.statechart
 
     def print_what_happened(self) -> None:
@@ -507,11 +509,13 @@ class FailureHandlingDemonstration(RobotDemonstration):
             print(f"  {step.name}: {step.life_cycle_state.name}")
         print("Life cycle of the nodes that failed and recovered:")
         for node in [
-            *self.statechart.get_nodes_by_type(JointReading),
-            *self.statechart.get_nodes_by_type(GraspCheck),
-            *self.statechart.get_nodes_by_type(PickUpAction),
+            *self.statechart.get_nodes_by_type(node_type=JointReading),
+            *self.statechart.get_nodes_by_type(node_type=GraspCheck),
+            *self.statechart.get_nodes_by_type(node_type=PickUpAction),
         ]:
-            history = self.statechart.state_history.get_life_cycle_history_of_node(node)
+            history = self.statechart.state_history.get_life_cycle_history_of_node(
+                node=node
+            )
             changes = [life_cycle.name for life_cycle, _ in groupby(history)]
             print(f"  {node.name}: {' -> '.join(changes)}")
 

@@ -220,13 +220,17 @@ class StatedRelation(Predicate, ABC):
         raise ConditionIsNotObservable(stated_under=self.stated_under)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :return: The clause *"<objects> satisfies <relation>"*, which is all a relation read
             from source says: the suite names the requirement and the objects meet it.
         """
         return clause(
-            Noun(fields["objects"]), Verb("satisfy"), Noun(fields["stated_under"])
+            Noun(content=fields["objects"]),
+            Verb(lemma="satisfy"),
+            Noun(content=fields["stated_under"]),
         )
 
 
@@ -302,13 +306,15 @@ class MeasuredValue(SymbolicFunction, ABC):
         raise ConditionIsNotObservable(stated_under=self.stated_under)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :return: The noun phrase naming the value, as *"the <kind> value of <measure> and
             <objects>"*.
         """
         return FunctionVerbalizationTemplates.possessive(
-            cls, fields["stated_under"], fields["objects"]
+            fields["stated_under"], fields["objects"], function_class=cls
         )
 
 
@@ -379,11 +385,17 @@ class UnreadCondition(Predicate):
         raise ConditionIsNotObservable(stated_under=self.description._value_)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :return: The clause *"<description> stays unread"*.
         """
-        return clause(Noun(fields["description"]), Verb("stay"), Noun.bare("unread"))
+        return clause(
+            Noun(content=fields["description"]),
+            Verb(lemma="stay"),
+            Noun.bare(head="unread"),
+        )
 
 
 # %% a condition that holds always or never

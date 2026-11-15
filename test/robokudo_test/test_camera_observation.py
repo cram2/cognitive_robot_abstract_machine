@@ -271,7 +271,7 @@ def test_decoded_observation_rejects_invalid_pose_frames(
         timestamp_nanoseconds=observation.timestamp_nanoseconds,
     )
     invalid_payload = replace(
-        payload, payload=DataclassJSONSerializer.to_json(recorded)
+        payload, payload=DataclassJSONSerializer.to_json(instance=recorded)
     )
     with pytest.raises(InvalidCameraObservation):
         codec.decode_with_tracker(invalid_payload, tracker)

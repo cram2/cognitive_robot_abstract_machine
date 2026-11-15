@@ -8,6 +8,7 @@ import numpy as np
 
 import pytest
 
+from krrood.patterns.called_positionally import called_positionally
 from cramph.exceptions import NonPositiveRealTimeFactorError
 from cramph.executor import (
     NoPacing,
@@ -118,7 +119,7 @@ def test_stepped_simulation_pacer_advances_the_physics_one_cycle_per_sleep() -> 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        pacer = SteppedSimulationPacer(simulation)
+        pacer = SteppedSimulationPacer(simulation=simulation)
         pacer.target_frequency = frequency
         for _ in range(cycles):
             pacer.sleep()
@@ -133,7 +134,7 @@ def test_stepped_simulation_pacer_advances_the_physics_one_cycle_per_sleep() -> 
 # %% waiting for the robot to come to a standstill
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointThatStopsAfterAWhile:
     """
     A joint that travels a fixed distance per step for a while and then stays put, the
@@ -165,7 +166,7 @@ class JointThatStopsAfterAWhile:
         self.steps_still_moving -= 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActuatorLengthsRead:
     """
     What a simulator answers a bulk read of actuator lengths with.
@@ -177,7 +178,7 @@ class ActuatorLengthsRead:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationOfSettlingJoints:
     """
     Stands in for a stepped simulation, reporting joints that come to a standstill
@@ -216,6 +217,7 @@ class SimulationOfSettlingJoints:
         """
         return self
 
+    @called_positionally
     def step_simulation(self, duration: timedelta) -> None:
         """
         :param duration: Ignored; every call is one step of this stand-in.
@@ -224,6 +226,7 @@ class SimulationOfSettlingJoints:
         for joint in self.joints.values():
             joint.step()
 
+    @called_positionally
     def get_actuators_lengths(self, actuator_names: list[str]) -> ActuatorLengthsRead:
         """
         :param actuator_names: The servos to read, each named after its joint.
@@ -249,7 +252,7 @@ def settling_pacer(
     :return: A pacer driving that simulation.
     """
     pacer = SteppedSimulationPacer(
-        simulation, standstill_time_limit=timedelta(seconds=seconds)
+        simulation=simulation, standstill_time_limit=timedelta(seconds=seconds)
     )
     pacer.target_frequency = frequency
     return pacer

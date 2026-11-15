@@ -1,5 +1,7 @@
 import argparse
 
+from rclpy.node import Node
+
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyInteractiveMarkerChain,
@@ -13,10 +15,13 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
-def create_giskard() -> Giskard:
+def create_giskard(node: Node) -> Giskard:
     """
     Build a Giskard that simulates DAiSy, described by the file its robot class
     declares.
+
+    :param node: The node Giskard runs on, unused because the robot is described by a
+        file.
     """
     return Giskard.standalone(
         world_source=WorldSpecification(
@@ -26,12 +31,14 @@ def create_giskard() -> Giskard:
     )
 
 
-def create_giskard_with_interactive_markers() -> Giskard:
+def create_giskard_with_interactive_markers(node: Node) -> Giskard:
     """
     Build the Giskard :func:`create_giskard` builds and start the interactive marker
     server that moves DAiSy's grippers through it from RViz.
+
+    :param node: The node Giskard runs on.
     """
-    giskard = create_giskard()
+    giskard = create_giskard(node)
     InteractiveMarkerNode.start_in_background_thread(
         chains=[chain.value for chain in DAiSyInteractiveMarkerChain]
     )

@@ -21,7 +21,7 @@ from rclpy.subscription import Subscription
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.controller_manager import (
     ControllerManager,
     ControllerParameter,
@@ -133,7 +133,10 @@ class ControllerManagerMimic:
         """
         :return: A node offering the parameters and topics of ``controller``.
         """
-        node = Node(controller.name, namespace=ControllerManager(self.name).namespace)
+        node = Node(
+            controller.name,
+            namespace=ControllerManager(self.name).namespace,
+        )
         match controller.controller_type:
             case ControllerType.JOINT_GROUP_VELOCITY:
                 node.declare_parameter(ControllerParameter.JOINTS, controller.joints)
@@ -250,7 +253,8 @@ class ControllerManagerMimics:
         self.thread.start()
         deadline = time() + self.graph_timeout.total_seconds()
         while not all(
-            manager.is_visible_to(rospy.get_node()) for manager in self.managers
+            manager.is_visible_to(background_node.get_node())
+            for manager in self.managers
         ):
             assert time() < deadline, "The mimicked controllers did not appear."
             sleep(0.05)
@@ -275,7 +279,7 @@ class ControllerManagerMimics:
 
 
 @pytest.fixture()
-def serve(init_rospy) -> Iterator[list[ControllerManagerMimics]]:
+def serve(init_background_node) -> Iterator[list[ControllerManagerMimics]]:
     """
     Collects the mimics a test starts and stops them before the ros context goes down.
     """

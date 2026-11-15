@@ -1,19 +1,20 @@
+"""
+The layer of product units of a layered probabilistic circuit.
+"""
+
 from __future__ import annotations
 
-import functools
-from dataclasses import (
-    dataclass,
-)
+from dataclasses import dataclass
 
 import numpy as np
+from array_api_compat import array_namespace
 from random_events.product_algebra import Event, SimpleEvent
-from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Self
+from typing_extensions import Self
 
-from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
@@ -30,6 +31,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base impor
     InnerLayer,
     Layer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    EdgeMatrix,
+    RowReduction,
+    SparseEdgeMatrix,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
     InnerLayerEdges,
 )
@@ -39,9 +45,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     memoized,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
@@ -58,17 +61,7 @@ class ProductLayer(InnerLayer):
 
     Every node multiplies at most one node of each child layer, so the scope of a node
     is the union of the scopes of its child layers and its likelihood is the sum of
-    their log-likelihoods.
-    """
-
-    edges: coo_array
-    """
-    The edges as a sparse integer matrix of shape (#child layers, #nodes).
-
-    The value of the entry ``(l, n)`` is the index of the node in the ``l``-th child
-    layer that the ``n``-th node of this layer multiplies. A node of a child layer may
-    be referenced by several nodes of this layer. A stored ``0`` is an edge to the first
-    node of the child layer, not a missing entry.
+    their log-likelihoods. A node of a child layer may be a factor of several nodes.
     """
 
     @classmethod
@@ -79,12 +72,12 @@ class ProductLayer(InnerLayer):
             every child layer.
         """
         number_of_child_layers = len(child_layers)
-        edges = SparseEntries(
+        edges = InnerLayerEdges(
             np.zeros(number_of_child_layers, dtype=np.int64),
             np.arange(number_of_child_layers),
             np.zeros(number_of_child_layers, dtype=np.int64),
-        ).to_coo_array((number_of_child_layers, 1))
-        return cls(child_layers, edges)
+        )
+        return cls.from_edges(child_layers, edges, 1)
 
     @classmethod
     def node_wise_product_of(cls, child_layers: list[Layer]) -> Self:
@@ -96,35 +89,46 @@ class ProductLayer(InnerLayer):
         number_of_nodes = child_layers[0].number_of_nodes
         number_of_child_layers = len(child_layers)
         nodes = np.tile(np.arange(number_of_nodes), number_of_child_layers)
-        edges = SparseEntries(
-            nodes,
-            np.repeat(np.arange(number_of_child_layers), number_of_nodes),
-            nodes,
-        ).to_coo_array((number_of_child_layers, number_of_nodes))
-        return cls(child_layers, edges)
+        edges = InnerLayerEdges(
+            nodes, np.repeat(np.arange(number_of_child_layers), number_of_nodes), nodes
+        )
+        return cls.from_edges(child_layers, edges, number_of_nodes)
 
     @classmethod
     def from_edges(
-        cls, child_layers: list[Layer], edges: InnerLayerEdges, number_of_nodes: int
+        cls,
+        child_layers: list[Layer],
+        edges: InnerLayerEdges,
+        number_of_nodes: int,
+        edge_matrix_type: type[EdgeMatrix] = SparseEdgeMatrix,
     ) -> Self:
         """
         :param child_layers: The child layers.
         :param edges: The edges from the nodes of the new layer into the child layers,
             at most one per node and child layer.
         :param number_of_nodes: The number of nodes of the new layer.
+        :param edge_matrix_type: The type of matrix to store the edges in.
         :return: The product layer with these edges.
         """
+        offsets = np.cumsum(
+            [0] + [child_layer.number_of_nodes for child_layer in child_layers]
+        ).astype(np.int64)
         return cls(
             child_layers,
-            SparseEntries(
-                edges.child_nodes, edges.child_layer_indices, edges.nodes
-            ).to_coo_array((len(child_layers), number_of_nodes)),
+            edge_matrix_type.from_edge_positions(
+                np.asarray(edges.nodes, dtype=np.int64),
+                offsets[np.asarray(edges.child_layer_indices, dtype=np.int64)]
+                + np.asarray(edges.child_nodes, dtype=np.int64),
+                (number_of_nodes, int(offsets[-1])),
+            ),
         )
 
     def with_edges(
         self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
     ) -> Self:
-        return self.from_edges(child_layers, edges, len(copies) * self.number_of_nodes)
+        return self.from_edges(
+            child_layers, edges, len(copies) * self.number_of_nodes, type(self.edges)
+        )
 
     def attach_child_layer(
         self, child_layer: Layer, nodes: NodeIndices, child_nodes: NodeIndices
@@ -138,30 +142,28 @@ class ProductLayer(InnerLayer):
         :param child_nodes: The node of ``child_layer`` every one of ``nodes``
             multiplies.
         """
-        self.child_layers = self.child_layers + [child_layer]
-        entries = SparseEntries.concatenate(
-            [
-                SparseEntries(self.edges.data, self.edges.row, self.edges.col),
-                SparseEntries(
-                    np.asarray(child_nodes, dtype=np.int64),
-                    np.full(len(nodes), len(self.child_layers) - 1, dtype=np.int64),
-                    np.asarray(nodes, dtype=np.int64),
+        edges = self.inner_layer_edges
+        attached = self.from_edges(
+            self.child_layers + [child_layer],
+            InnerLayerEdges(
+                np.concatenate([edges.nodes, np.asarray(nodes, dtype=np.int64)]),
+                np.concatenate(
+                    [
+                        edges.child_layer_indices,
+                        np.full(len(nodes), len(self.child_layers), dtype=np.int64),
+                    ]
                 ),
-            ]
+                np.concatenate(
+                    [edges.child_nodes, np.asarray(child_nodes, dtype=np.int64)]
+                ),
+            ),
+            self.number_of_nodes,
+            type(self.edges),
         )
-        self.edges = entries.to_coo_array(
-            (len(self.child_layers), self.number_of_nodes)
-        )
+        self.child_layers = attached.child_layers
+        self.edges = attached.edges
         self.reset_variables()
-        for cached in (
-            ProductLayer.inner_layer_edges,
-            ProductLayer.edges_per_child_layer,
-        ):
-            self.__dict__.pop(cached.attrname, None)
-
-    @property
-    def number_of_nodes(self) -> int:
-        return self.edges.shape[1]
+        self.__dict__.pop(InnerLayer.inner_layer_edges.attrname, None)
 
     @property
     def variables(self) -> VariableIndices:
@@ -178,21 +180,16 @@ class ProductLayer(InnerLayer):
         # the edges of a product layer are structure, not parameters
         return 0
 
-    def validate_own(self):
-        if self.edges.shape != (len(self.child_layers), self.number_of_nodes):
-            raise ShapeMismatchError(
-                (len(self.child_layers), self.number_of_nodes), self.edges.shape
-            )
-
     def is_decomposable_of_nodes(self) -> NodeMask:
         """
         A product node is decomposable if no variable is in the scope of more than one
         of its factors.
         """
+        edges = self.inner_layer_edges
         factors_of_node = np.zeros(
             (len(self.child_layers), self.number_of_nodes), dtype=np.int64
         )
-        np.add.at(factors_of_node, (self.edges.row, self.edges.col), 1)
+        np.add.at(factors_of_node, (edges.child_layer_indices, edges.nodes), 1)
         scope_of_child_layer = np.array(
             [
                 np.isin(self.variables, child_layer.variables)
@@ -224,54 +221,22 @@ class ProductLayer(InnerLayer):
 
     # %% queries
 
-    @functools.cached_property
-    def inner_layer_edges(self) -> InnerLayerEdges:
-        return InnerLayerEdges(
-            self.edges.col.astype(np.int64),
-            self.edges.row.astype(np.int64),
-            self.edges.data.astype(np.int64),
-        )
-
-    @functools.cached_property
-    def edges_per_child_layer(self) -> list[InnerLayerEdges]:
+    def combine_factors(
+        self, child_results: list[BackendArray], reduction: RowReduction
+    ) -> BackendArray:
         """
-        :return: The edges into every child layer. A decomposable product has at most one
-            factor in each child layer, so every node appears at most once in each of
-            them; :attr:`InnerLayerEdges.every_node_at_most_once` keeps the reductions
-            correct for a circuit that is not decomposable.
+        Combine, per node, the results of the child nodes it multiplies.
+
+        :param child_results: The result per child layer with the child nodes last,
+            arrays of one backend.
+        :param reduction: How the results of the factors are combined; a node without
+            factors gets its identity.
+        :return: The combined result with the nodes of this layer last, an array of that
+            backend.
         """
-        return [
-            self.inner_layer_edges.into_child_layer(child_layer_index)
-            for child_layer_index in range(len(self.child_layers))
-        ]
-
-    def _gather_and_add(
-        self, child_results: list[SampleNodeValues], fill: float
-    ) -> SampleNodeValues:
-        """
-        Sum, per node, the results of the child nodes the edges point to.
-
-        :param child_results: The result per child layer with the child nodes last.
-        :param fill: The value of a node without any edge.
-        :return: The summed result with the nodes of this layer last.
-        """
-        leading_shape = child_results[0].shape[:-1]
-        result = np.zeros(leading_shape + (self.number_of_nodes,))
-        touched = np.zeros(self.number_of_nodes, dtype=bool)
-
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            gathered = child_result[..., edges.child_nodes]
-            if edges.every_node_at_most_once:
-                result[..., edges.nodes] += gathered
-            else:
-                np.add.at(result, (Ellipsis, edges.nodes), gathered)
-            touched[edges.nodes] = True
-
-        if not touched.all():
-            result[..., ~touched] = fill
-        return result
+        namespace = array_namespace(*child_results)
+        values = self.edges.values_of_columns(namespace.concat(child_results, axis=-1))
+        return self.edges.reduce_by_row(values, reduction)
 
     @memoized
     def log_likelihood_of_nodes(
@@ -281,7 +246,7 @@ class ProductLayer(InnerLayer):
             child_layer.log_likelihood_of_nodes(events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self._gather_and_add(child_results, fill=0.0)
+        return self.combine_factors(child_results, RowReduction.SUM)
 
     @memoized
     def cumulative_distribution_of_nodes(
@@ -291,22 +256,7 @@ class ProductLayer(InnerLayer):
             child_layer.cumulative_distribution_of_nodes(events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self._gather_and_multiply(child_results)
-
-    def _gather_and_multiply(
-        self, child_results: list[SampleNodeValues]
-    ) -> SampleNodeValues:
-        leading_shape = child_results[0].shape[:-1]
-        result = np.ones(leading_shape + (self.number_of_nodes,))
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            gathered = child_result[..., edges.child_nodes]
-            if edges.every_node_at_most_once:
-                result[..., edges.nodes] *= gathered
-            else:
-                np.multiply.at(result, (Ellipsis, edges.nodes), gathered)
-        return result
+        return self.combine_factors(child_results, RowReduction.PRODUCT)
 
     @memoized
     def probability_of_simple_event_of_nodes(
@@ -318,10 +268,15 @@ class ProductLayer(InnerLayer):
         child_results = [
             child_layer.probability_of_simple_event_of_nodes(
                 event, variables, cache=cache
-            ).reshape(1, -1)
+            )
             for child_layer in self.child_layers
         ]
-        return self._gather_and_multiply(child_results).reshape(-1)
+        namespace = array_namespace(*child_results)
+        combined = self.combine_factors(
+            [namespace.reshape(result, (1, -1)) for result in child_results],
+            RowReduction.PRODUCT,
+        )
+        return namespace.reshape(combined, (-1,))
 
     @memoized
     def support_of_nodes(
@@ -382,15 +337,9 @@ class ProductLayer(InnerLayer):
         ]
         # the moments of a decomposable product are the moments of the factor that owns
         # the variable, so summing the (zero padded) child moments is the right reduction
-        result = np.zeros((self.number_of_nodes, query.number_of_variables))
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            if edges.every_node_at_most_once:
-                result[edges.nodes] += child_result[edges.child_nodes]
-            else:
-                np.add.at(result, edges.nodes, child_result[edges.child_nodes])
-        return result
+        return self.combine_factors(
+            [child_result.T for child_result in child_results], RowReduction.SUM
+        ).T
 
     def sample_forward(
         self,
@@ -425,21 +374,25 @@ class ProductLayer(InnerLayer):
         :return: The new layer and the log-probabilities of its nodes.
         """
         result = self.__class__(
-            [child_result.layer for child_result in child_results], self.edges.copy()
+            [child_result.layer for child_result in child_results], self.edges
         )
 
-        own_log_probabilities = np.zeros(self.number_of_nodes)
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            gathered = child_result.log_probabilities[edges.child_nodes]
-            if edges.every_node_at_most_once:
-                own_log_probabilities[edges.nodes] += gathered
-            else:
-                np.add.at(own_log_probabilities, edges.nodes, gathered)
-
         return query.log_probabilities.record(
-            LayerWithLogProbabilities(result, own_log_probabilities)
+            LayerWithLogProbabilities(
+                result, result.sum_of_factor_log_probabilities(child_results)
+            )
+        )
+
+    def sum_of_factor_log_probabilities(
+        self, child_results: list[LayerWithLogProbabilities]
+    ) -> NodeValues:
+        """
+        :param child_results: The log-probabilities of the nodes of every child layer.
+        :return: The log-probability of every node, the sum over its factors.
+        """
+        return self.combine_factors(
+            [child_result.log_probabilities for child_result in child_results],
+            RowReduction.SUM,
         )
 
     @memoized
@@ -463,9 +416,8 @@ class ProductLayer(InnerLayer):
         cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         number_of_events = len(events)
-        number_of_nodes = self.number_of_nodes
-        number_of_entries = self.edges.nnz
-        blocks = np.arange(number_of_events)
+        edges = self.inner_layer_edges
+        blocks = np.repeat(np.arange(number_of_events), len(edges))
 
         child_results = [
             child_layer.log_truncated_of_simple_events(events, query, cache=cache)
@@ -477,31 +429,23 @@ class ProductLayer(InnerLayer):
         node_counts = np.array(
             [child_layer.number_of_nodes for child_layer in self.child_layers]
         )
-        rows = np.tile(self.edges.row, number_of_events)
-        columns = np.tile(self.edges.col, number_of_events) + np.repeat(
-            blocks * number_of_nodes, number_of_entries
+        repeated_edges = InnerLayerEdges(
+            np.tile(edges.nodes, number_of_events) + blocks * self.number_of_nodes,
+            np.tile(edges.child_layer_indices, number_of_events),
+            np.tile(edges.child_nodes, number_of_events)
+            + blocks * np.tile(node_counts[edges.child_layer_indices], number_of_events),
         )
-        data = np.tile(self.edges.data.astype(np.int64), number_of_events) + np.repeat(
-            blocks, number_of_entries
-        ) * np.tile(node_counts[self.edges.row], number_of_events)
-
-        edges = SparseEntries(data, rows, columns).to_coo_array(
-            (len(self.child_layers), number_of_events * number_of_nodes)
-        )
-        result = self.__class__(
-            [child_result.layer for child_result in child_results], edges
+        result = self.from_edges(
+            [child_result.layer for child_result in child_results],
+            repeated_edges,
+            number_of_events * self.number_of_nodes,
+            type(self.edges),
         )
 
-        own_log_probabilities = np.zeros(number_of_events * number_of_nodes)
-        for child_layer_index, child_result in enumerate(child_results):
-            mask = rows == child_layer_index
-            np.add.at(
-                own_log_probabilities,
-                columns[mask],
-                child_result.log_probabilities[data[mask]],
-            )
         return query.log_probabilities.record(
-            LayerWithLogProbabilities(result, own_log_probabilities)
+            LayerWithLogProbabilities(
+                result, result.sum_of_factor_log_probabilities(child_results)
+            )
         )
 
     @memoized
@@ -520,12 +464,13 @@ class ProductLayer(InnerLayer):
     def required_child_nodes(
         self, alive: NodeMask, log_probabilities: LogProbabilitiesOfLayers
     ) -> list[tuple[Layer, NodeMask]]:
-        kept_edges = alive[self.edges.col]
+        edges = self.inner_layer_edges
+        kept_edges = alive[edges.nodes]
         result = []
         for child_layer_index, child_layer in enumerate(self.child_layers):
-            mask = kept_edges & (self.edges.row == child_layer_index)
+            mask = kept_edges & (edges.child_layer_indices == child_layer_index)
             needed = np.zeros(child_layer.number_of_nodes, dtype=bool)
-            needed[self.edges.data[mask].astype(np.int64)] = True
+            needed[edges.child_nodes[mask]] = True
             result.append((child_layer, needed))
         return result
 
@@ -538,14 +483,15 @@ class ProductLayer(InnerLayer):
         if not alive.any():
             return None
 
+        edges = self.inner_layer_edges
         node_remap, number_of_nodes = remap_indices(alive)
-        kept_edges = alive[self.edges.col]
+        kept_edges = alive[edges.nodes]
 
         new_child_layers = []
         new_edges = []
 
         for child_layer_index, child_layer in enumerate(self.child_layers):
-            mask = kept_edges & (self.edges.row == child_layer_index)
+            mask = kept_edges & (edges.child_layer_indices == child_layer_index)
             if not mask.any():
                 continue
 
@@ -557,10 +503,10 @@ class ProductLayer(InnerLayer):
 
             child_remap, _ = remap_indices(needed[id(child_layer)])
             new_edges.append(
-                SparseEntries(
-                    child_remap[self.edges.data[mask].astype(np.int64)],
+                InnerLayerEdges(
+                    node_remap[edges.nodes[mask]],
                     np.full(mask.sum(), len(new_child_layers), dtype=np.int64),
-                    node_remap[self.edges.col[mask]],
+                    child_remap[edges.child_nodes[mask]],
                 )
             )
             new_child_layers.append(pruned_child)
@@ -568,15 +514,18 @@ class ProductLayer(InnerLayer):
         if not new_child_layers:
             return None
 
-        edges = SparseEntries.concatenate(new_edges).to_coo_array(
-            (len(new_child_layers), number_of_nodes)
+        return self.from_edges(
+            new_child_layers,
+            InnerLayerEdges.concatenate(new_edges),
+            number_of_nodes,
+            type(self.edges),
         )
-        return self.__class__(new_child_layers, edges)
 
     @memoized
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
     ) -> Layer | None:
+        edges = self.inner_layer_edges
         new_child_layers = []
         new_edges = []
 
@@ -584,12 +533,12 @@ class ProductLayer(InnerLayer):
             marginal_child = child_layer.marginal(kept, cache=cache)
             if marginal_child is None:
                 continue
-            mask = self.edges.row == child_layer_index
+            mask = edges.child_layer_indices == child_layer_index
             new_edges.append(
-                SparseEntries(
-                    self.edges.data[mask],
+                InnerLayerEdges(
+                    edges.nodes[mask],
                     np.full(mask.sum(), len(new_child_layers), dtype=np.int64),
-                    self.edges.col[mask],
+                    edges.child_nodes[mask],
                 )
             )
             new_child_layers.append(marginal_child)
@@ -597,17 +546,19 @@ class ProductLayer(InnerLayer):
         if not new_child_layers:
             return None
 
-        edges = SparseEntries.concatenate(new_edges).to_coo_array(
-            (len(new_child_layers), self.number_of_nodes)
+        return self.from_edges(
+            new_child_layers,
+            InnerLayerEdges.concatenate(new_edges),
+            self.number_of_nodes,
+            type(self.edges),
         )
-        return self.__class__(new_child_layers, edges)
 
     @memoized
     def simplify(self, cache: QueryCache | None = None) -> Layer:
         simplified_children = [
             child_layer.simplify(cache=cache) for child_layer in self.child_layers
         ]
-        result = self.__class__(simplified_children, self.edges.copy())
+        result = self.__class__(simplified_children, self.edges)
 
         if result.is_identity():
             return simplified_children[0]
@@ -619,12 +570,13 @@ class ProductLayer(InnerLayer):
         """
         if len(self.child_layers) != 1:
             return False
-        if self.edges.nnz != self.number_of_nodes:
+        if self.edges.number_of_edges != self.number_of_nodes:
             return False
         if self.child_layers[0].number_of_nodes != self.number_of_nodes:
             return False
+        edges = self.inner_layer_edges
         # every node multiplies only the node of the child layer with its own index
         return bool(
-            np.array_equal(self.edges.data.astype(np.int64), self.edges.col)
-            and len(np.unique(self.edges.col)) == self.number_of_nodes
+            np.array_equal(edges.child_nodes, edges.nodes)
+            and len(np.unique(edges.nodes)) == self.number_of_nodes
         )

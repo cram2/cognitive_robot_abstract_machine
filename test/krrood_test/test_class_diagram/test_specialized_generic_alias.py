@@ -9,7 +9,7 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from typing_extensions import Generic
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestHasRootBody:
     name: str
 
@@ -17,7 +17,7 @@ class TestHasRootBody:
 TTestHasRootBody = TypeVar("TTestHasRootBody", bound=TestHasRootBody)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestHasStorageSpace(Generic[TTestHasRootBody], SubClassSafeGeneric):
     objects: List[TTestHasRootBody]
 
@@ -25,17 +25,17 @@ class TestHasStorageSpace(Generic[TTestHasRootBody], SubClassSafeGeneric):
 TTestLiquid = TypeVar("TTestLiquid", bound=TestHasRootBody)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestBottle(TestHasStorageSpace[TTestLiquid]):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestWine(TestHasRootBody):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestWineBottle(Role[TestBottle[TestWine]]):
     bottle: TestBottle[TestWine]
 
@@ -52,7 +52,7 @@ def test_specialized_generic_resolution():
     diagram = ClassDiagram(classes=classes)
 
     # Verify that we can resolve fields of WineBottle
-    wrapped_wine_bottle = diagram.get_wrapped_class(TestWineBottle)
+    wrapped_wine_bottle = diagram.get_wrapped_class(clazz=TestWineBottle)
     bottle_field = next(f for f in wrapped_wine_bottle.fields if f.name == "bottle")
 
     # This should not raise TypeError
@@ -61,7 +61,7 @@ def test_specialized_generic_resolution():
 
     # Now verify that specialized generic node also works
     specialization_type = TestBottle[TestWine]
-    wrapped_specialization = diagram.get_wrapped_class(specialization_type)
+    wrapped_specialization = diagram.get_wrapped_class(clazz=specialization_type)
 
     # Verify its fields
     for field in wrapped_specialization.fields:

@@ -7,6 +7,7 @@ from typing_extensions import TYPE_CHECKING
 
 from cramph.node import StatechartNode
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.called_positionally import called_positionally
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
     GraphVisualizerBackend,
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
 # %% interactive statechart graph
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartGraphVisualizer:
     """
     An interactive drawing of the nodes of a statechart and their children.
@@ -65,7 +66,7 @@ class StatechartGraphVisualizer:
         }
 
     def create_visualizer(
-        self, backend: GraphVisualizerBackend, layout: GraphLayout
+        self, *, backend: GraphVisualizerBackend, layout: GraphLayout
     ) -> GraphVisualizerBase:
         """
         :param backend: The rendering technology to use.
@@ -100,6 +101,7 @@ class StatechartGraphVisualizer:
         )
         return graph
 
+    @called_positionally
     def _node_details(self, node: StatechartNode) -> list[str]:
         """
         :param node: The node to describe.
@@ -109,7 +111,7 @@ class StatechartGraphVisualizer:
             f"life cycle: {node.life_cycle_state.name}",
             f"observation: {self.statechart.observation_state[node].name}",
         ]
-        run = self.statechart.state_history.get_current_run_ticks_of_node(node)
+        run = self.statechart.state_history.get_current_run_ticks_of_node(node=node)
         if run is None:
             return details
         return details + [f"start tick: {run.start_tick}", f"end tick: {run.end_tick}"]

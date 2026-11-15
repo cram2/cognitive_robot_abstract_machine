@@ -187,7 +187,7 @@ def test_a_grasp_and_a_lift_are_a_pick_up_where_grasps_are_watched_for(
 # %% concluding another kind of interaction
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectorOfAPlacingFollowingALossOfSupport(AbstractInteractionDetector):
     """
     Concludes a placing from a loss of support detected close to a support, stating only

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .latebound_annotation_type import LateBoundAnnotationType
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BaseWithLateBoundAnnotation:
     """
     Root of the hierarchy that carries the late-bound annotation.

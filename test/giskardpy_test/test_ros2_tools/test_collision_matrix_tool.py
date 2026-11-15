@@ -98,7 +98,7 @@ tool_path = os.path.abspath(
 with substituted_modules(
     {
         "giskardpy.middleware.ros2": MagicMock(),
-        "semantic_digital_twin.adapters.ros.rospy": MagicMock(),
+        "semantic_digital_twin.adapters.ros.background_node": MagicMock(),
         "PyQt5": MagicMock(),
         "PyQt5.QtCore": MagicMock(),
         "PyQt5.QtGui": MagicMock(),

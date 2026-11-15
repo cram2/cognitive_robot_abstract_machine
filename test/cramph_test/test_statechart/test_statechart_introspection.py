@@ -37,12 +37,12 @@ def two_tree_statechart(statechart_executor: StatechartExecutor) -> Statechart:
         nodes=[ConstTrueNode(name="inner_first"), ConstTrueNode(name="inner_last")],
     )
     statechart.add_node(
-        Parallel(
+        node=Parallel(
             name="root",
             nodes=[ConstTrueNode(name="first"), middle, ConstTrueNode(name="last")],
         )
     )
-    statechart.add_node(ConstTrueNode(name="other"))
+    statechart.add_node(node=ConstTrueNode(name="other"))
     return statechart
 
 
@@ -84,7 +84,9 @@ def test_an_empty_statechart_has_no_layers(
 def test_the_drawing_connects_each_node_to_the_nodes_it_runs(
     two_tree_statechart: Statechart,
 ) -> None:
-    visualizer = StatechartGraphVisualizer(two_tree_statechart).create_visualizer(
+    visualizer = StatechartGraphVisualizer(
+        statechart=two_tree_statechart
+    ).create_visualizer(
         backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
     )
 
@@ -100,11 +102,13 @@ def test_a_node_is_drawn_labelled_by_its_unique_name(
     two_tree_statechart: Statechart,
 ) -> None:
     middle = node_named(two_tree_statechart, "middle")
-    visualizer = StatechartGraphVisualizer(two_tree_statechart).create_visualizer(
+    visualizer = StatechartGraphVisualizer(
+        statechart=two_tree_statechart
+    ).create_visualizer(
         backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
     )
 
-    assert visualizer.node_label(middle.index) == middle.unique_name
+    assert visualizer.node_label(node_index=middle.index) == middle.unique_name
 
 
 def test_a_node_is_drawn_in_the_color_of_its_current_state(
@@ -114,14 +118,17 @@ def test_a_node_is_drawn_in_the_color_of_its_current_state(
     node = NodeSucceedingOnObservingTrue(
         name="node", observation=ObservationStateValues.TRUE
     )
-    statechart.add_node(node)
-    statechart.add_node(EndStatechart.when_true(node))
-    visualizer = StatechartGraphVisualizer(statechart).create_visualizer(
+    statechart.add_node(node=node)
+    statechart.add_node(node=EndStatechart.when_true(node=node))
+    visualizer = StatechartGraphVisualizer(statechart=statechart).create_visualizer(
         backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
     )
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=100)
 
     assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert visualizer.node_color(node.index) == LifeCycleValues.SUCCEEDED.color.to_hex()
+    assert (
+        visualizer.node_color(node_index=node.index)
+        == LifeCycleValues.SUCCEEDED.color.to_hex()
+    )

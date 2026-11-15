@@ -26,7 +26,7 @@ from krrood.entity_query_language.verbalization.relational_attributes import (
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ChainPlan:
     """
     A ``MappedVariable`` chain analysed once into the values its rendering needs: the
@@ -58,7 +58,7 @@ class ChainPlan:
         """:return: ``True`` when the chain is a single attribute on a variable (the bare-plural
         *"attributes of Roots"* form).
 
-        >>> ChainPlanner(variable(Robot, []).battery).plan().is_single_variable_attribute
+        >>> ChainPlanner(node=variable(Robot, []).battery).plan().is_single_variable_attribute
         True
         """
         return (
@@ -67,7 +67,7 @@ class ChainPlan:
             and isinstance(self.chain[0], Attribute)
         )
 
-    def renders_as_plural_attribute(self, number: GrammaticalNumber) -> bool:
+    def renders_as_plural_attribute(self, *, number: GrammaticalNumber) -> bool:
         """
         The chain precedence policy in one place: a single attribute on a variable,
         asked for in the plural, renders as the bare-plural noun phrase *"attributes of
@@ -77,13 +77,13 @@ class ChainPlan:
         :param number: The grammatical number requested for the chain.
         :return: ``True`` when the chain renders as the bare-plural attribute form.
 
-        >>> ChainPlanner(variable(Robot, []).battery).plan().renders_as_plural_attribute(GrammaticalNumber.PLURAL)
+        >>> ChainPlanner(node=variable(Robot, []).battery).plan().renders_as_plural_attribute(number=GrammaticalNumber.PLURAL)
         True
         """
         return number is GrammaticalNumber.PLURAL and self.is_single_variable_attribute
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChainPlanner(Planner[MappedVariable, ChainPlan]):
     """
     Analyse a ``MappedVariable`` chain into a ``ChainPlan``: its root, the display path-
@@ -92,14 +92,14 @@ class ChainPlanner(Planner[MappedVariable, ChainPlan]):
 
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
-    >>> ChainPlanner(variable(Task, []).completed).plan().is_boolean_terminal
+    >>> ChainPlanner(node=variable(Task, []).completed).plan().is_boolean_terminal
     True
     """
 
     def plan(self) -> ChainPlan:
         """:return: The chain plan: the walked chain, its root, display parts, and boolean form.
 
-        >>> ChainPlanner(variable(Task, []).name).plan().is_boolean_terminal
+        >>> ChainPlanner(node=variable(Task, []).name).plan().is_boolean_terminal
         False
         """
         chain, root = walk_chain(self.node)

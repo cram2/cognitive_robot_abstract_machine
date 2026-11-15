@@ -3,7 +3,7 @@ from krrood.exceptions import DataclassException, InputError
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockException(DataclassException):
     def error_message(self) -> str:
         pass

@@ -38,8 +38,8 @@ def _build_motion_statechart(
         goal_point=Point3(x=1, reference_frame=root),
         name="cart_pos",
     )
-    motion_statechart.add_node(goal)
-    motion_statechart.add_node(EndMotion.when_true(goal))
+    motion_statechart.add_node(node=goal)
+    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
     return motion_statechart
 
 
@@ -64,7 +64,7 @@ class TestDebugExpressionRecording:
         executor.tick_until_end()
 
         trajectory = executor.require_extension(
-            DebugExpressionRecording
+            extension_type=DebugExpressionRecording
         ).plotter.debug_expression_trajectory
         assert len(trajectory.recorded_debug_expressions) > 0
         assert len(trajectory.times) > 1
@@ -76,7 +76,7 @@ class TestDebugExpressionRecording:
         executor.tick_until_end()
 
         trajectory = executor.require_extension(
-            DebugExpressionRecording
+            extension_type=DebugExpressionRecording
         ).plotter.debug_expression_trajectory
         current = next(
             recorded
@@ -93,7 +93,9 @@ class TestDebugExpressionRecording:
         executor.tick_until_end()
 
         output = tmp_path / "debug_expressions.pdf"
-        executor.require_extension(DebugExpressionRecording).plotter.plot(str(output))
+        executor.require_extension(
+            extension_type=DebugExpressionRecording
+        ).plotter.plot(str(output))
 
         assert output.exists()
         assert output.stat().st_size > 0
@@ -105,7 +107,9 @@ class TestDebugExpressionRecording:
         executor.tick_until_end()
 
         output = tmp_path / "debug_expressions" / "debug_expressions.pdf"
-        executor.require_extension(DebugExpressionRecording).plotter.plot(str(output))
+        executor.require_extension(
+            extension_type=DebugExpressionRecording
+        ).plotter.plot(str(output))
 
         assert output.exists()
         assert output.stat().st_size > 0
@@ -123,9 +127,9 @@ class TestDebugExpressionRecording:
 
         output = tmp_path / "debug_expressions.pdf"
         with pytest.raises(MissingExecutorExtensionError):
-            executor.require_extension(DebugExpressionRecording).plotter.plot(
-                str(output)
-            )
+            executor.require_extension(
+                extension_type=DebugExpressionRecording
+            ).plotter.plot(str(output))
 
 
 class TestDebugExpressionTrajectory:

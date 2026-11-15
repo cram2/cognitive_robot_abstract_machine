@@ -13,25 +13,33 @@ from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NamedPayload:
-    """A payload whose name is shown as the node label and detail line."""
+    """
+    A payload whose name is shown as the node label and detail line.
+    """
 
     name: str
-    """The identifier rendered for this node."""
+    """
+    The identifier rendered for this node.
+    """
 
 
 def chain_graph(names: list[str]) -> rx.PyDiGraph:
-    """Build a directed chain of :class:`NamedPayload` nodes."""
+    """
+    Build a directed chain of :class:`NamedPayload` nodes.
+    """
     graph = rx.PyDiGraph(multigraph=False)
-    indices = [graph.add_node(NamedPayload(name)) for name in names]
+    indices = [graph.add_node(NamedPayload(name=name)) for name in names]
     for parent, child in zip(indices, indices[1:]):
         graph.add_edge(parent, child, None)
     return graph
 
 
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> ThreeGraphVisualizer:
-    """A visualizer that labels and describes nodes by their payload name."""
+    """
+    A visualizer that labels and describes nodes by their payload name.
+    """
     return ThreeGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
@@ -72,7 +80,7 @@ class TestGraphNodes:
     def test_node_extra_data_defaults_to_empty(self):
         visualizer = named_visualizer(chain_graph(["a"]))
 
-        assert visualizer.node_extra_data(0) == {}
+        assert visualizer.node_extra_data(node_index=0) == {}
 
     def test_node_extra_data_is_merged_into_the_node(self):
         class TaggedVisualizer(ThreeGraphVisualizer):
@@ -227,25 +235,33 @@ class TestLayout:
     def test_layered_layout_uses_the_built_in_dag_mode(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
-        options = ThreeGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = ThreeGraphVisualizer.layout_options.get_options(
+            layout=visualizer.layout
+        )
         assert options["dagMode"] == "td"
 
     def test_physics_layout_keeps_the_simulation_running_forever(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = ThreeGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = ThreeGraphVisualizer.layout_options.get_options(
+            layout=visualizer.layout
+        )
         assert math.isinf(options["cooldownTicks"])
 
     def test_spring_layout_settles_and_stops(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.SPRING)
 
-        options = ThreeGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = ThreeGraphVisualizer.layout_options.get_options(
+            layout=visualizer.layout
+        )
         assert options["cooldownTicks"] < math.inf
 
     def test_fixed_layout_runs_just_enough_ticks_to_apply_pinned_positions(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.FIXED)
 
-        options = ThreeGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = ThreeGraphVisualizer.layout_options.get_options(
+            layout=visualizer.layout
+        )
         assert 0 < options["cooldownTicks"] < math.inf
 
 
@@ -307,7 +323,7 @@ class TestExtensionHooks:
 
 
 class TestCheckDependencies:
-    def test_raises_when_flask_is_missing(self, monkeypatch):
+    def test_raises_when_flask_is_missing(self, *, monkeypatch):
         original_find_spec = importlib.util.find_spec
 
         def find_spec_without_flask(name, *args, **kwargs):

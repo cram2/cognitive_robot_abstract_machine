@@ -62,8 +62,8 @@ def _repeat(
         stop_retry_monitor=CountNodeResets(name="counter", node=task, target=target),
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(loop)
-    statechart.add_node(EndStatechart.when_true(loop))
+    statechart.add_node(node=loop)
+    statechart.add_node(node=EndStatechart.when_true(node=loop))
     executor.compile(statechart=statechart)
     return loop, statechart, executor
 
@@ -100,7 +100,7 @@ def test_repeat_until_succeeds_without_retrying(
     )
     loop, statechart, executor = _repeat(statechart_executor, task, target=3)
 
-    executor.tick_until_end(SETTLE_TICKS)
+    executor.tick_until_end(timeout=SETTLE_TICKS)
 
     assert loop.stop_retry_monitor.resets == 0
     assert loop.last_observation_state == ObservationStateValues.TRUE
@@ -123,7 +123,7 @@ def test_repeat_until_puts_the_task_back_to_not_started(
     for _ in range(SETTLE_TICKS):
         executor.tick()
 
-    life_cycles = statechart.state_history.get_life_cycle_history_of_node(task)
+    life_cycles = statechart.state_history.get_life_cycle_history_of_node(node=task)
     restarts = [
         index
         for index in range(1, len(life_cycles) - 1)
@@ -170,9 +170,9 @@ def test_repeat_until_starts_its_task_while_the_stop_monitor_has_not_decided() -
         ),
         stop_retry_monitor=NodeObservingNothingYet(name="undecided"),
     )
-    executor = StatechartExecutor(StatechartContext(world=World()))
+    executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
-    statechart.add_node(loop)
+    statechart.add_node(node=loop)
     executor.compile(statechart=statechart)
 
     executor.tick()
@@ -190,9 +190,9 @@ def test_repeat_until_rejects_a_task_that_cannot_fail() -> None:
         task=task,
         stop_retry_monitor=CountNodeResets(name="counter", node=task, target=1),
     )
-    executor = StatechartExecutor(StatechartContext(world=World()))
+    executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
-    statechart.add_node(loop)
+    statechart.add_node(node=loop)
 
     with pytest.raises(ChildCannotFailError) as error:
         executor.compile(statechart=statechart)
@@ -218,6 +218,6 @@ def test_repeat_until_ends_the_statechart_with_its_exception_once_retrying_stops
     )
 
     with pytest.raises(type(exception)) as error:
-        executor.tick_until_end(SETTLE_TICKS)
+        executor.tick_until_end(timeout=SETTLE_TICKS)
 
     assert error.value is exception

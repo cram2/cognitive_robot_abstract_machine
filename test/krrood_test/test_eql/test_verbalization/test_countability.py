@@ -12,24 +12,24 @@ from krrood.entity_query_language.verbalization.vocabulary.countability import (
 
 
 def test_known_mass_noun_is_uncountable():
-    assert NounCountability().classify("money") is Countability.UNCOUNTABLE
-    assert NounCountability().is_uncountable("water")
+    assert NounCountability().classify(noun="money") is Countability.UNCOUNTABLE
+    assert NounCountability().is_uncountable(noun="water")
 
 
 def test_ordinary_noun_is_countable():
-    assert NounCountability().classify("battery") is Countability.COUNTABLE
-    assert not NounCountability().is_uncountable("department")
+    assert NounCountability().classify(noun="battery") is Countability.COUNTABLE
+    assert not NounCountability().is_uncountable(noun="department")
 
 
 def test_classification_is_case_insensitive():
-    assert NounCountability().is_uncountable("Money")
+    assert NounCountability().is_uncountable(noun="Money")
 
 
 def test_lexicon_is_overridable_for_a_domain():
     custom = NounCountability(uncountable_nouns=frozenset({"plasma"}))
-    assert custom.is_uncountable("plasma")
+    assert custom.is_uncountable(noun="plasma")
     # the default mass nouns are not implied when a domain supplies its own set
-    assert not custom.is_uncountable("money")
+    assert not custom.is_uncountable(noun="money")
 
 
 def test_expanded_lexicon_covers_common_mass_nouns():
@@ -69,7 +69,7 @@ def test_expanded_lexicon_covers_common_mass_nouns():
         "garbage",
         "jewellery",
     ):
-        assert countability.is_uncountable(mass_noun), mass_noun
+        assert countability.is_uncountable(noun=mass_noun), mass_noun
 
 
 def test_dual_sense_nouns_stay_countable():
@@ -79,4 +79,4 @@ def test_dual_sense_nouns_stay_countable():
     """
     countability = NounCountability()
     for countable_noun in ("battery", "department", "robot", "table", "report"):
-        assert not countability.is_uncountable(countable_noun), countable_noun
+        assert not countability.is_uncountable(noun=countable_noun), countable_noun

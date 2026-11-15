@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodePlotSpec:
     visible: bool = True
     collapse_children: bool = False

@@ -34,7 +34,7 @@ class FailureHandlingStrategy(ABC):
     """
 
     @abstractmethod
-    def handle_failure(self, failed_node: StatechartNode) -> None:
+    def handle_failure(self, *, failed_node: StatechartNode) -> None:
         """
         Changes the plan so that it recovers from the failure of `failed_node`.
 
@@ -84,7 +84,9 @@ class FailureHandlingNode(SucceedsOnObservingTrue, StatechartNode):
 
     def on_start(self) -> None:
         with self.statechart.modify(rewrites_compiled_nodes=True):
-            self.failure_handling_strategy.handle_failure(self.observed_node)
+            self.failure_handling_strategy.handle_failure(
+                failed_node=self.observed_node
+            )
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
@@ -121,21 +123,21 @@ class HandledOnFailure(CompositeNodeEndingItsChildren):
         """
         Add the handled node, ended once it is at its goal, and the node observing it.
         """
-        self._check_can_decide(self.handled_node)
-        self._add_child_to_statechart(self.handled_node)
-        self._succeed_at_its_goal(self.handled_node)
+        self._check_can_decide(node=self.handled_node)
+        self._add_child_to_statechart(node=self.handled_node)
+        self._succeed_at_its_goal(child=self.handled_node)
         self.failure_handler = FailureHandlingNode(
             name=f"{self.name}/failure handler",
             observed_node=self.handled_node,
             failure_handling_strategy=self.failure_handling_strategy,
         )
-        self._add_child_to_statechart(self.failure_handler)
+        self._add_child_to_statechart(node=self.failure_handler)
 
     def check_children(self) -> None:
         """
         Rejects a node that cannot fail, since it would never be handled.
         """
-        self._check_child_can_fail(self.handled_node)
+        self._check_child_can_fail(child=self.handled_node)
 
     def build_artifacts(self) -> NodeArtifacts:
         """
@@ -183,14 +185,14 @@ class LimitedRecovery(FailureHandlingStrategy, ABC):
     How often this strategy tried to recover so far.
     """
 
-    def handle_failure(self, failed_node: StatechartNode) -> None:
+    def handle_failure(self, *, failed_node: StatechartNode) -> None:
         if self._attempts_made >= self.maximum_attempts:
             return
         self._attempts_made += 1
-        self.recover(failed_node)
+        self.recover(failed_node=failed_node)
 
     @abstractmethod
-    def recover(self, failed_node: StatechartNode) -> None:
+    def recover(self, *, failed_node: StatechartNode) -> None:
         """
         Changes the plan so that it recovers from the failure of `failed_node`.
 
@@ -204,5 +206,5 @@ class RetryFailedNode(LimitedRecovery):
     Recovers by running the failed node again.
     """
 
-    def recover(self, failed_node: StatechartNode) -> None:
+    def recover(self, *, failed_node: StatechartNode) -> None:
         failed_node.statechart.request_reset(node=failed_node)

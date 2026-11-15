@@ -52,7 +52,9 @@ def _scope(child: VerbalizationFragment, focus_id):
     model keys on).
     """
     node = MinimalSymbolicExpression()
-    return replace(child, source=node), DiscourseModel({node._id_: focus_id})
+    return replace(child, source=node), DiscourseModel(
+        _focus_by_scope={node._id_: focus_id}
+    )
 
 
 def _noun(text: str) -> RoleFragment:
@@ -60,7 +62,9 @@ def _noun(text: str) -> RoleFragment:
 
 
 def _text(fragment) -> str:
-    return flatten_fragment_to_plain_text(CoreferenceProcessor().process(fragment))
+    return flatten_fragment_to_plain_text(
+        CoreferenceProcessor().process(fragment=fragment)
+    )
 
 
 def test_noop_on_plain_tree():
@@ -70,7 +74,7 @@ def test_noop_on_plain_tree():
 
 def test_non_referring_noun_phrase_is_preserved():
     np = NounPhrase(head=_noun("Robot"))
-    out = CoreferenceProcessor().process(np)
+    out = CoreferenceProcessor().process(fragment=np)
     assert isinstance(out, NounPhrase)
     assert out.referent_id is None
     assert flatten_fragment_to_plain_text(out.head) == "Robot"
@@ -79,7 +83,7 @@ def test_non_referring_noun_phrase_is_preserved():
 def test_query_sourced_fragment_is_processed_transparently():
     child = PhraseFragment(parts=[WordFragment(text="its"), _noun("parent")])
     scoped, discourse = _scope(child, focus_id=uuid.uuid4())
-    out = CoreferenceProcessor(discourse=discourse).process(scoped)
+    out = CoreferenceProcessor(discourse=discourse).process(fragment=scoped)
     assert flatten_fragment_to_plain_text(out) == "its parent"
 
 
@@ -88,7 +92,7 @@ def test_recurses_into_noun_phrase_modifiers():
         head=_noun("sum"),
         modifiers=[WordFragment(text="of"), NounPhrase(head=_noun("amounts"))],
     )
-    out = CoreferenceProcessor().process(np)
+    out = CoreferenceProcessor().process(fragment=np)
     assert isinstance(out, NounPhrase)
     assert isinstance(out.modifiers[1], NounPhrase)  # nested NP preserved, recursed
 
@@ -100,8 +104,10 @@ def _realise(fragment, discourse=EMPTY_DISCOURSE) -> str:
     """
     Coreference then determiner phase → plain text (the pipeline's first two stages).
     """
-    resolved = CoreferenceProcessor(discourse=discourse).process(fragment)
-    return flatten_fragment_to_plain_text(DeterminerProcessor().process(resolved))
+    resolved = CoreferenceProcessor(discourse=discourse).process(fragment=fragment)
+    return flatten_fragment_to_plain_text(
+        DeterminerProcessor().process(fragment=resolved)
+    )
 
 
 def test_repeat_mention_is_downgraded_to_definite():
@@ -206,7 +212,7 @@ def test_entity_repeat_drops_restriction_modifiers():
 
 
 def _attr_part(name):
-    return PathStep(name, None)
+    return PathStep(name=name, source_reference=None)
 
 
 def test_chain_rooted_at_subject_pronominalises():
@@ -265,7 +271,7 @@ def _scalar_part(name):
     A scalar-valued hop — a leaf that distributes over a plural subject (*"their
     batteries"*).
     """
-    return PathStep(name, None, is_scalar_value=True)
+    return PathStep(name=name, source_reference=None, is_scalar_value=True)
 
 
 def _operator_numbers(fragment: VerbalizationFragment) -> list:
@@ -313,7 +319,7 @@ def test_copula_agrees_plural_when_a_scalar_leaf_distributes():
     scoped, discourse = _quantified_clause(
         [_scalar_part("battery")], subject_number=GrammaticalNumber.PLURAL
     )
-    resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
+    resolved = CoreferenceProcessor(discourse=discourse).process(fragment=scoped)
     assert _operator_numbers(resolved) == [GrammaticalNumber.PLURAL]
 
 
@@ -327,7 +333,7 @@ def test_copula_stays_singular_for_a_deeper_head_chain():
         [_attr_part("amount_details"), _scalar_part("amount")],
         subject_number=GrammaticalNumber.PLURAL,
     )
-    resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
+    resolved = CoreferenceProcessor(discourse=discourse).process(fragment=scoped)
     assert _operator_numbers(resolved) == [GrammaticalNumber.SINGULAR]
 
 
@@ -339,5 +345,5 @@ def test_copula_untouched_for_a_singular_subject():
     scoped, discourse = _quantified_clause(
         [_scalar_part("battery")], subject_number=GrammaticalNumber.SINGULAR
     )
-    resolved = CoreferenceProcessor(discourse=discourse).process(scoped)
+    resolved = CoreferenceProcessor(discourse=discourse).process(fragment=scoped)
     assert _operator_numbers(resolved) == [GrammaticalNumber.SINGULAR]

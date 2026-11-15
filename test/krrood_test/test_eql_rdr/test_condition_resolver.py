@@ -28,9 +28,11 @@ from krrood.entity_query_language.rdr.condition_resolver import (
 )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Animal:
-    """Minimal RDR classification target used only by this test module."""
+    """
+    Minimal RDR classification target used only by this test module.
+    """
 
     name: str
     has_fur: bool = False
@@ -45,7 +47,9 @@ class Species(Enum):
 
 
 def _empty_knowledge(value):
-    return ConclusionSufficientConditionSets(conclusion_value=value, sufficient_condition_sets=())
+    return ConclusionSufficientConditionSets(
+        conclusion_value=value, sufficient_condition_sets=()
+    )
 
 
 # %% ResolutionMode / ResolvedCondition
@@ -58,7 +62,9 @@ def test_resolution_mode_has_automatic_and_hint_members():
 
 def test_resolved_condition_carries_expression_and_resolver_type():
     animal = variable(Animal, domain=[])
-    resolved = ResolvedCondition(animal.has_fur, TargetSufficientConditionsBasedResolver)
+    resolved = ResolvedCondition(
+        expression=animal.has_fur, resolver_type=TargetSufficientConditionsBasedResolver
+    )
 
     assert resolved.expression is animal.has_fur
     assert resolved.resolver_type is TargetSufficientConditionsBasedResolver
@@ -69,14 +75,14 @@ def test_resolved_condition_carries_expression_and_resolver_type():
 
 def test_guard_expression_returns_the_bare_expression_when_not_negated():
     animal = variable(Animal, domain=[])
-    guard = GuardCondition(animal.has_fur, negated=False)
+    guard = GuardCondition(original_expression=animal.has_fur, negated=False)
 
     assert guard.as_expression is animal.has_fur
 
 
 def test_guard_expression_wraps_a_negated_guard_in_not():
     animal = variable(Animal, domain=[])
-    guard = GuardCondition(animal.has_fur, negated=True)
+    guard = GuardCondition(original_expression=animal.has_fur, negated=True)
 
     guard_expression = guard.as_expression
 
@@ -85,11 +91,11 @@ def test_guard_expression_wraps_a_negated_guard_in_not():
 
     # The wrapped expression itself (not_(has_fur)) must be True exactly when has_fur
     # is False, and False when has_fur is True -- the inverse of the bare condition.
-    negated_guard = GuardCondition(guard_expression, negated=False)
-    cat = Animal("cat", has_fur=True)
-    snake = Animal("snake", has_fur=False)
-    assert negated_guard.holds_for(animal, cat) is False
-    assert negated_guard.holds_for(animal, snake) is True
+    negated_guard = GuardCondition(original_expression=guard_expression, negated=False)
+    cat = Animal(name="cat", has_fur=True)
+    snake = Animal(name="snake", has_fur=False)
+    assert negated_guard.holds_for(shared_variable=animal, case=cat) is False
+    assert negated_guard.holds_for(shared_variable=animal, case=snake) is True
 
 
 # %% TargetSufficientConditionsBasedResolver
@@ -101,13 +107,15 @@ def test_target_sufficient_conditions_resolver_finds_a_discriminating_guard():
         conclusion_value=Species.BIRD,
         sufficient_condition_sets=(
             SufficientConditionSet(
-                conditions=(GuardCondition(animal.can_fly, negated=False),)
+                conditions=(
+                    GuardCondition(original_expression=animal.can_fly, negated=False),
+                )
             ),
         ),
     )
 
-    case = Animal("bat", can_fly=True)
-    corner_case = Animal("cat", can_fly=False)
+    case = Animal(name="bat", can_fly=True)
+    corner_case = Animal(name="cat", can_fly=False)
 
     resolved = TargetSufficientConditionsBasedResolver().resolve(
         case=case,
@@ -130,14 +138,16 @@ def test_target_sufficient_conditions_resolver_returns_none_when_no_guard_discri
         conclusion_value=Species.BIRD,
         sufficient_condition_sets=(
             SufficientConditionSet(
-                conditions=(GuardCondition(animal.can_fly, negated=False),)
+                conditions=(
+                    GuardCondition(original_expression=animal.can_fly, negated=False),
+                )
             ),
         ),
     )
 
     # Both case and corner_case agree on can_fly -- no guard tells them apart.
-    case = Animal("bat", can_fly=True)
-    corner_case = Animal("eagle", can_fly=True)
+    case = Animal(name="bat", can_fly=True)
+    corner_case = Animal(name="eagle", can_fly=True)
 
     resolved = TargetSufficientConditionsBasedResolver().resolve(
         case=case,
@@ -156,11 +166,11 @@ def test_target_sufficient_conditions_resolver_returns_none_with_no_known_paths(
     animal = variable(Animal, domain=[])
 
     resolved = TargetSufficientConditionsBasedResolver().resolve(
-        case=Animal("bat"),
+        case=Animal(name="bat"),
         case_variable=animal,
         target_conclusion=Species.BIRD,
         current_conclusion=Species.MAMMAL,
-        corner_case=Animal("cat"),
+        corner_case=Animal(name="cat"),
         target_knowledge=_empty_knowledge(Species.BIRD),
         current_knowledge=_empty_knowledge(Species.MAMMAL),
     )
@@ -172,19 +182,22 @@ def test_target_sufficient_conditions_resolver_returns_none_with_no_known_paths(
 
 
 def _two_path_current_knowledge(animal):
-    """Two independent sufficient condition sets both concluding the wrong value.
+    """
+    Two independent sufficient condition sets both concluding the wrong value.
 
     ``active_guard`` (can_fly) models the path that actually fired and caused the
-    misclassification; ``non_active_guard`` (lays_eggs) models an unrelated,
-    already-known path to the same wrong conclusion.
+    misclassification; ``non_active_guard`` (lays_eggs) models an unrelated, already-
+    known path to the same wrong conclusion.
     """
     active_guard = animal.can_fly == True  # noqa: E712
     non_active_guard = animal.lays_eggs == True  # noqa: E712
     active_path = SufficientConditionSet(
-        conditions=(GuardCondition(active_guard, negated=False),)
+        conditions=(GuardCondition(original_expression=active_guard, negated=False),)
     )
     non_active_path = SufficientConditionSet(
-        conditions=(GuardCondition(non_active_guard, negated=False),)
+        conditions=(
+            GuardCondition(original_expression=non_active_guard, negated=False),
+        )
     )
     knowledge = ConclusionSufficientConditionSets(
         conclusion_value=Species.MAMMAL,
@@ -195,12 +208,14 @@ def _two_path_current_knowledge(animal):
 
 def test_corner_case_resolver_skips_the_active_path_via_firing_anchor():
     animal = variable(Animal, domain=[])
-    active_guard, non_active_guard, current_knowledge = _two_path_current_knowledge(animal)
+    active_guard, non_active_guard, current_knowledge = _two_path_current_knowledge(
+        animal
+    )
 
     # Discriminates on the active guard only -- must NOT be returned, since that
     # path is excluded via firing_anchor.
-    case = Animal("weird", can_fly=True, lays_eggs=False)
-    corner_case = Animal("plain", can_fly=False, lays_eggs=False)
+    case = Animal(name="weird", can_fly=True, lays_eggs=False)
+    corner_case = Animal(name="plain", can_fly=False, lays_eggs=False)
 
     resolved = CornerCaseKnowledgeResolver().resolve(
         case=case,
@@ -218,10 +233,12 @@ def test_corner_case_resolver_skips_the_active_path_via_firing_anchor():
 
 def test_corner_case_resolver_finds_a_discriminating_guard_on_a_non_active_path():
     animal = variable(Animal, domain=[])
-    active_guard, non_active_guard, current_knowledge = _two_path_current_knowledge(animal)
+    active_guard, non_active_guard, current_knowledge = _two_path_current_knowledge(
+        animal
+    )
 
-    case = Animal("weird", can_fly=False, lays_eggs=True)
-    corner_case = Animal("plain", can_fly=False, lays_eggs=False)
+    case = Animal(name="weird", can_fly=False, lays_eggs=True)
+    corner_case = Animal(name="plain", can_fly=False, lays_eggs=False)
 
     resolved = CornerCaseKnowledgeResolver().resolve(
         case=case,
@@ -241,12 +258,14 @@ def test_corner_case_resolver_finds_a_discriminating_guard_on_a_non_active_path(
 
 def test_corner_case_resolver_searches_every_path_when_firing_anchor_is_none():
     animal = variable(Animal, domain=[])
-    active_guard, non_active_guard, current_knowledge = _two_path_current_knowledge(animal)
+    active_guard, non_active_guard, current_knowledge = _two_path_current_knowledge(
+        animal
+    )
 
     # Discriminates on the guard that would otherwise be excluded as "active" --
     # with no firing_anchor, nothing is excluded, so it must be found.
-    case = Animal("weird", can_fly=True, lays_eggs=False)
-    corner_case = Animal("plain", can_fly=False, lays_eggs=False)
+    case = Animal(name="weird", can_fly=True, lays_eggs=False)
+    corner_case = Animal(name="plain", can_fly=False, lays_eggs=False)
 
     resolved = CornerCaseKnowledgeResolver().resolve(
         case=case,
@@ -265,10 +284,12 @@ def test_corner_case_resolver_searches_every_path_when_firing_anchor_is_none():
 
 def test_corner_case_resolver_returns_none_when_no_path_discriminates():
     animal = variable(Animal, domain=[])
-    _active_guard, _non_active_guard, current_knowledge = _two_path_current_knowledge(animal)
+    _active_guard, _non_active_guard, current_knowledge = _two_path_current_knowledge(
+        animal
+    )
 
-    case = Animal("weird", can_fly=False, lays_eggs=False)
-    corner_case = Animal("plain", can_fly=False, lays_eggs=False)
+    case = Animal(name="weird", can_fly=False, lays_eggs=False)
+    corner_case = Animal(name="plain", can_fly=False, lays_eggs=False)
 
     resolved = CornerCaseKnowledgeResolver().resolve(
         case=case,
@@ -297,7 +318,7 @@ class _AlwaysResolvesResolver(ConditionResolver):
         self.expression = expression
 
     def resolve(self, *args, **kwargs):
-        return ResolvedCondition(self.expression, type(self))
+        return ResolvedCondition(expression=self.expression, resolver_type=type(self))
 
 
 def test_chain_resolver_returns_the_first_non_none_result():
@@ -311,11 +332,11 @@ def test_chain_resolver_returns_the_first_non_none_result():
     )
 
     resolved = chain.resolve(
-        case=Animal("cat"),
+        case=Animal(name="cat"),
         case_variable=animal,
         target_conclusion=Species.MAMMAL,
         current_conclusion=Species.REPTILE,
-        corner_case=Animal("snake"),
+        corner_case=Animal(name="snake"),
         target_knowledge=_empty_knowledge(Species.MAMMAL),
         current_knowledge=_empty_knowledge(Species.REPTILE),
     )
@@ -327,14 +348,16 @@ def test_chain_resolver_returns_the_first_non_none_result():
 
 def test_chain_resolver_returns_none_when_every_resolver_fails():
     animal = variable(Animal, domain=[])
-    chain = ChainConditionResolver(resolvers=[_AlwaysFailsResolver(), _AlwaysFailsResolver()])
+    chain = ChainConditionResolver(
+        resolvers=[_AlwaysFailsResolver(), _AlwaysFailsResolver()]
+    )
 
     resolved = chain.resolve(
-        case=Animal("cat"),
+        case=Animal(name="cat"),
         case_variable=animal,
         target_conclusion=Species.MAMMAL,
         current_conclusion=Species.REPTILE,
-        corner_case=Animal("snake"),
+        corner_case=Animal(name="snake"),
         target_knowledge=_empty_knowledge(Species.MAMMAL),
         current_knowledge=_empty_knowledge(Species.REPTILE),
     )
@@ -357,14 +380,18 @@ def test_chain_resolver_default_prefers_target_knowledge_over_corner_case():
         conclusion_value=Species.BIRD,
         sufficient_condition_sets=(
             SufficientConditionSet(
-                conditions=(GuardCondition(animal.can_fly, negated=False),)
+                conditions=(
+                    GuardCondition(original_expression=animal.can_fly, negated=False),
+                )
             ),
         ),
     )
-    active_guard, _non_active_guard, current_knowledge = _two_path_current_knowledge(animal)
+    active_guard, _non_active_guard, current_knowledge = _two_path_current_knowledge(
+        animal
+    )
 
-    case = Animal("bat", can_fly=True, lays_eggs=True)
-    corner_case = Animal("cat", can_fly=False, lays_eggs=False)
+    case = Animal(name="bat", can_fly=True, lays_eggs=True)
+    corner_case = Animal(name="cat", can_fly=False, lays_eggs=False)
 
     resolved = ChainConditionResolver.backward_inference_default().resolve(
         case=case,

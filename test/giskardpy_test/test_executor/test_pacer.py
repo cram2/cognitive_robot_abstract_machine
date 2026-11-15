@@ -20,10 +20,10 @@ def test_with_executor():
         ],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(counter := CountSeconds(seconds=1.0))
-    statechart.add_node(EndMotion.when_true(counter))
+    statechart.add_node(node=(counter := CountSeconds(seconds=1.0)))
+    statechart.add_node(node=EndMotion.when_true(node=counter))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=1000)
     # we tick 20 (hz) * 2 (real_time_factor) per second and sleep for 1s.
     # +2 because the endmotion needs to extra ticks

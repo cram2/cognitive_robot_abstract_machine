@@ -12,7 +12,7 @@ from krrood.patterns.dataclass_field_descriptor import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CanBehaveLikeDataclassException(Protocol):
     """
     A structural template that indicates the matching class is an exception or can be treated as one.
@@ -34,7 +34,7 @@ class CanBehaveLikeDataclassException(Protocol):
 # %% exception chaining
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CauseLink(DataclassFieldDescriptor):
     """
     The link to the exception that an exception was raised from with ``raise ... from``.
@@ -43,33 +43,33 @@ class CauseLink(DataclassFieldDescriptor):
         cause the exception already has does nothing.
     """
 
-    def read(self, instance: BaseException) -> BaseException | None:
+    def read(self, *, instance: BaseException) -> BaseException | None:
         return instance.__cause__
 
-    def write(self, instance: BaseException, value: BaseException | None) -> None:
+    def write(self, *, instance: BaseException, value: BaseException | None) -> None:
         if value is instance.__cause__:
             return
         instance.__cause__ = value
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ContextLink(DataclassFieldDescriptor):
     """
     The link to the exception that was being handled when an exception was raised,
     recorded whether or not ``raise ... from`` was used.
     """
 
-    def read(self, instance: BaseException) -> BaseException | None:
+    def read(self, *, instance: BaseException) -> BaseException | None:
         return instance.__context__
 
-    def write(self, instance: BaseException, value: BaseException | None) -> None:
+    def write(self, *, instance: BaseException, value: BaseException | None) -> None:
         instance.__context__ = value
 
 
 # %% dataclass exceptions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataclassException(
     Exception, CanBehaveLikeDataclassException, DataclassFieldDescriptorOwner, ABC
 ):
@@ -119,14 +119,14 @@ DataclassException.raised_from = CauseLink()
 DataclassException.raised_while_handling = ContextLink()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputError(DataclassException, ABC):
     """
     Raised when there is an error with user input.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
     """
     Raised when the number of generic parameters does not match the number of resolved types.
@@ -159,7 +159,7 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundGenericParameter(DataclassException):
     """
     Raised when a generic type parameter is read back from a class that binds it to no
@@ -186,7 +186,7 @@ class UnboundGenericParameter(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
     """
     Raised when the current module is not given and/or not found for relative import conversion.
@@ -211,7 +211,7 @@ class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSourceDataToParseImportsFrom(InputError):
     """
     Raised when there is no source data given to parse imports from.
@@ -241,7 +241,7 @@ class NoSourceDataToParseImportsFrom(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoModuleSourceProvided(InputError):
     """
     Raised when there is no source module data given to parse imports from.
@@ -266,7 +266,7 @@ class NoModuleSourceProvided(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDefaultValueFound(DataclassException):
     """
     Raised when no default value for a given field in a dataclass is found.
@@ -288,7 +288,7 @@ class NoDefaultValueFound(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PackageNameNotFoundError(DataclassException):
     """
     Raised when a package name is not found in a given path.
@@ -310,7 +310,7 @@ class PackageNameNotFoundError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PathMissingRequiredPartsError(DataclassException):
     """
     Raised when a path does not contain all required parts.
@@ -333,7 +333,7 @@ class PathMissingRequiredPartsError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubprocessExecutionError(DataclassException):
     """
     Raised when a subprocess execution fails.
@@ -366,7 +366,7 @@ class SubprocessExecutionError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SourceDataNotProvided(InputError):
     """
     Raised when no source data is provided.

@@ -58,7 +58,7 @@ class WorldWithMinimalRobot(WorldSource):
 
 
 def test_an_interrupt_while_waiting_for_goals_shuts_ros_down(
-    init_rospy, mini_world: World
+    init_background_node, mini_world: World
 ) -> None:
     giskard = Giskard(
         world_source=WorldWithMinimalRobot(world=mini_world),
@@ -122,7 +122,7 @@ class UnbuildableWorld(WorldSource):
 
 
 def test_an_interface_that_fails_to_connect_makes_giskard_fail(
-    init_rospy, mini_world: World
+    init_background_node, mini_world: World
 ) -> None:
     giskard = Giskard(
         world_source=WorldWithMinimalRobot(world=mini_world),
@@ -138,7 +138,7 @@ def test_an_interface_that_fails_to_connect_makes_giskard_fail(
 
 
 def test_a_world_that_fails_to_build_makes_giskard_fail_with_that_error(
-    init_rospy,
+    init_background_node,
 ) -> None:
     giskard = Giskard(
         world_source=UnbuildableWorld(),

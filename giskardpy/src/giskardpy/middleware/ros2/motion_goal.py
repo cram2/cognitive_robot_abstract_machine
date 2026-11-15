@@ -76,7 +76,7 @@ class MotionGoal(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         """
         Rebuild a goal from what a client sent.
         """
@@ -93,4 +93,4 @@ class MotionGoal(SubclassJSONSerializer):
         """
         Resolve the motion statechart against the world described by the given kwargs.
         """
-        return Statechart.from_json(self.motion_statechart_json_data, **kwargs)
+        return Statechart.from_json(data=self.motion_statechart_json_data, **kwargs)

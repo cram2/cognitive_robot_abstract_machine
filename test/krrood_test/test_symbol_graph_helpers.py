@@ -5,7 +5,7 @@ from typing_extensions import TypeVar
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Tool:
     name: str
 

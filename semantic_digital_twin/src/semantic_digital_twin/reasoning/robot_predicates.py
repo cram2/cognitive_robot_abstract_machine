@@ -236,10 +236,10 @@ def is_gripper_holding_something(gripper: EndEffector) -> bool:
 @symbolic_function
 def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
     return not PlaceIsOccupied(
-        robot.mobile_base.bounding_box,
-        pose,
-        robot._world,
-        robot.bodies_with_collision
+        box=robot.mobile_base.bounding_box,
+        pose=pose,
+        world=robot._world,
+        allowed_bodies=robot.bodies_with_collision
         + [
             kse
             for annotation in robot._world.get_semantic_annotations_by_type(Floor)
@@ -298,18 +298,20 @@ class VisibleTo(Triple[TKinematicStructureEntity, TCamera]):
         return self.camera
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the entity is visible to the camera"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["entity"]),
+            Noun(content=fields["entity"]),
             Copula(),
-            Adjective("visible"),
+            Adjective(word="visible"),
             Prepositions.TO,
-            Noun(fields["camera"]),
+            Noun(content=fields["camera"]),
         )
 
     def __call__(self) -> bool:
@@ -334,7 +336,7 @@ def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
     # create a world only containing the target body
     world_without_occlusion = deepcopy(body._world)
     root = Body(name=PrefixedName("root"))
-    copied_body = Body.from_json(body.to_json())
+    copied_body = Body.from_json(data=body.to_json())
     root_T_body = body.global_transform
     root_T_body.reference_frame = root
     root_to_copied_body = FixedConnection(

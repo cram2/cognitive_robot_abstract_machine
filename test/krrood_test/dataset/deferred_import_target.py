@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from .deferred_import_owner import Reading, SensorBindingItsReading
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadingOfBoundSensor(Reading):
     """
     A reading that remembers the sensor it was taken by.

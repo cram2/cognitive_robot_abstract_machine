@@ -1,3 +1,7 @@
+"""
+Tests of the check finding code without a docstring.
+"""
+
 from __future__ import annotations
 
 from krrood.development_tools.agents.docstring_presence import (
@@ -21,7 +25,7 @@ def undocumented_first_lines(snippet: DocstringSnippet) -> list[int]:
     """
     return sorted(
         violation.first_line
-        for violation in MissingDocstringChecker().violations(snippet)
+        for violation in MissingDocstringChecker().violations(path=snippet)
     )
 
 

@@ -38,7 +38,7 @@ from .test_demonstrations import RecordingDemonstration
 
 
 # %% a visualization recording its runs
-@dataclass
+@dataclass(kw_only=True)
 class VisualizationRecordingItsRuns(WorldVisualization):
     """
     A visualization recording which worlds it was started on and how often it stopped.
@@ -63,7 +63,7 @@ class VisualizationRecordingItsRuns(WorldVisualization):
     def is_rendering(self) -> bool:
         return self.running
 
-    def _start(self, world: World, cleanup: ExitStack) -> None:
+    def _start(self, *, world: World, cleanup: ExitStack) -> None:
         self.started_worlds.append(world)
         self.running = True
         cleanup.callback(self._record_stop)
@@ -83,8 +83,8 @@ def an_ending_statechart(context: StatechartContext) -> Statechart:
     """
     statechart = Statechart(context=context)
     step = ConstTrueNode(name="step")
-    statechart.add_node(step)
-    statechart.add_node(EndStatechart.when_true(step))
+    statechart.add_node(node=step)
+    statechart.add_node(node=EndStatechart.when_true(node=step))
     return statechart
 
 
@@ -108,7 +108,7 @@ def test_a_visualization_shows_the_world_of_its_executor_while_it_runs() -> None
     world = World()
     executor = an_executor(visualization, world)
 
-    executor.compile(an_ending_statechart(executor.context))
+    executor.compile(statechart=an_ending_statechart(executor.context))
     assert visualization.started_worlds == [world]
     assert visualization.is_rendering
 
@@ -129,7 +129,7 @@ def test_a_recompile_does_not_restart_the_visualization() -> None:
     visualization = VisualizationRecordingItsRuns()
     executor = an_executor(visualization)
     statechart = an_ending_statechart(executor.context)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     executor.after_recompile()
 
@@ -143,7 +143,7 @@ def test_one_visualization_shows_each_run_of_sequential_executors() -> None:
 
     for world in worlds:
         executor = an_executor(visualization, world)
-        executor.compile(an_ending_statechart(executor.context))
+        executor.compile(statechart=an_ending_statechart(executor.context))
         executor.execute()
 
     assert visualization.started_worlds == worlds
@@ -154,12 +154,12 @@ def test_a_plan_run_on_the_real_robot_is_shown_once_compiled() -> None:
     visualization = VisualizationRecordingItsRuns()
     world = World()
     executor = RealRobotPlanExecutor(
-        StatechartContext(world=world), extensions=[visualization]
+        context=StatechartContext(world=world), extensions=[visualization]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(ConstTrueNode(name="step"))
+    statechart.add_node(node=ConstTrueNode(name="step"))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     assert visualization.started_worlds == [world]
     visualization.stop()
@@ -169,8 +169,8 @@ def test_starting_twice_keeps_the_running_visualization() -> None:
     visualization = VisualizationRecordingItsRuns()
     world = World()
 
-    visualization.start(world)
-    visualization.start(World())
+    visualization.start(world=world)
+    visualization.start(world=World())
 
     assert visualization.started_worlds == [world]
     visualization.stop()
@@ -203,7 +203,7 @@ def test_rviz_publishes_through_its_node_while_its_executor_runs(
     visualization = RvizVisualization(ros_node=rclpy_node, collision_visualization=True)
     executor = an_executor(visualization, cylinder_bot_world)
 
-    executor.compile(an_ending_statechart(executor.context))
+    executor.compile(statechart=an_ending_statechart(executor.context))
     publisher = visualization.publisher
     assert publisher.node is rclpy_node
     assert publisher._collision_publisher is not None
@@ -220,7 +220,7 @@ def test_rviz_publishes_through_its_node_while_its_executor_runs(
 def test_rviz_shows_a_world_without_an_executor(cylinder_bot_world, rclpy_node) -> None:
     visualization = RvizVisualization(ros_node=rclpy_node)
 
-    visualization.start(cylinder_bot_world)
+    visualization.start(world=cylinder_bot_world)
     publisher = visualization.publisher
     assert publisher.node is rclpy_node
 
@@ -235,7 +235,7 @@ def test_unavailable_ros_is_reported_without_starting(monkeypatch, rclpy_node) -
     monkeypatch.setattr(visualization_module, "VizMarkerPublisher", None)
     executor = an_executor(RvizVisualization(ros_node=rclpy_node))
     with pytest.raises(RvizUnavailableError):
-        executor.compile(an_ending_statechart(executor.context))
+        executor.compile(statechart=an_ending_statechart(executor.context))
 
 
 def test_rerun_save_uses_existing_native_recording(
@@ -246,7 +246,7 @@ def test_rerun_save_uses_existing_native_recording(
     """
     recording = tmp_path / "world.rrd"
     selected = RerunVisualization(mode=RerunMode.SAVE, target=str(recording))
-    selected.start(cylinder_bot_world)
+    selected.start(world=cylinder_bot_world)
     selected.stop()
     assert recording.stat().st_size > 0
     assert not selected.is_rendering
@@ -295,7 +295,9 @@ def test_a_debugging_action_trial_is_shown_apart_from_the_world_it_copies(
 ) -> None:
     robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(cylinder_bot_world, robot_extensions(robot)),
+        context=StatechartContext.with_extensions(
+            world=cylinder_bot_world, extensions=robot_extensions(robot)
+        ),
         ros_node=rclpy_node,
         debug=True,
     )

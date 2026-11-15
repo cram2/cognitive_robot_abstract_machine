@@ -20,7 +20,7 @@ def reported_first_lines(snippet: MethodNameSnippet) -> list[int]:
     """
     return sorted(
         violation.first_line
-        for violation in LeadingPrepositionChecker().violations(snippet)
+        for violation in LeadingPrepositionChecker().violations(path=snippet)
     )
 
 

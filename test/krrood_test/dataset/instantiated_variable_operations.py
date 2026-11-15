@@ -19,7 +19,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 # %% built types
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Interval:
     """
     A closed range of integers that a query builds from its bounds.
@@ -36,21 +36,21 @@ class Interval:
     """
 
     @classmethod
-    def around(cls, center: int, radius: int) -> Interval:
+    def around(cls, *, center: int, radius: int) -> Interval:
         """
         :param center: The integer in the middle of the range.
         :param radius: How far the range reaches on each side of *center*.
         :return: The range from ``center - radius`` to ``center + radius``.
         """
-        return cls(center - radius, center + radius)
+        return cls(lower=center - radius, upper=center + radius)
 
     @classmethod
-    def point(cls, value: int) -> Self:
+    def point(cls, *, value: int) -> Self:
         """
         :param value: The only integer in the range.
         :return: The range that holds only *value*.
         """
-        return cls(value, value)
+        return cls(lower=value, upper=value)
 
 
 # %% symbolic functions
@@ -95,7 +95,7 @@ def unconstrained_doubled(number: int) -> Any:
 # %% symbolic callable classes
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsEven(Predicate):
     """
     Whether an integer is even.
@@ -110,11 +110,13 @@ class IsEven(Predicate):
         return self.number % 2 == 0
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["number"]), Verb("be"), Noun("even"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(
+            Noun(content=fields["number"]), Verb(lemma="be"), Noun(content="even")
+        )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Halved(SymbolicFunction):
     """
     An integer divided by two, rounded down.
@@ -129,11 +131,11 @@ class Halved(SymbolicFunction):
         return self.number // 2
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return Noun(fields["number"])
+    def _verbalization_fragment_(cls, *, fields):
+        return Noun(content=fields["number"])
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class UnannotatedHalved(SymbolicFunction):
     """
     An integer divided by two, rounded down, whose :meth:`__call__` has no return
@@ -149,5 +151,5 @@ class UnannotatedHalved(SymbolicFunction):
         return self.number // 2
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return Noun(fields["number"])
+    def _verbalization_fragment_(cls, *, fields):
+        return Noun(content=fields["number"])

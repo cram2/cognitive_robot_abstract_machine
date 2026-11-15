@@ -26,7 +26,7 @@ def test_a_hand_written_data_descriptor_and_a_dataclass_property_setter_are_repo
     A computed dataclass property and a plain class property may have a setter.
     """
     violations = HandWrittenFieldAccessorChecker().violations(
-        FieldAccessorSnippet.HAND_WRITTEN_ACCESSORS
+        path=FieldAccessorSnippet.HAND_WRITTEN_ACCESSORS
     )
 
     assert [
@@ -49,4 +49,4 @@ def test_the_field_descriptor_base_may_define_its_own_setter() -> None:
     """
     base_module = Path(inspect.getsourcefile(dataclass_field_descriptor))
 
-    assert list(HandWrittenFieldAccessorChecker().violations(base_module)) == []
+    assert list(HandWrittenFieldAccessorChecker().violations(path=base_module)) == []

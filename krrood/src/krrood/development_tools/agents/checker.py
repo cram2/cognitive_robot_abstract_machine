@@ -18,7 +18,7 @@ from krrood.development_tools.exceptions import GitCommandFailed
 # %% violations
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CodeRuleViolation:
     """
     One place in a source file that breaks a rule.
@@ -44,7 +44,7 @@ class CodeRuleViolation:
     What is wrong and how to fix it, as one sentence fragment.
     """
 
-    def touches(self, lines: set[int]) -> bool:
+    def touches(self, *, lines: set[int]) -> bool:
         """
         :param lines: Line numbers in the file.
         :return: Whether any of them falls within the offending code.
@@ -61,7 +61,7 @@ class CodeRuleViolation:
 # %% checkers
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CodeRuleChecker(ABC):
     """
     Finds the code that breaks one agent rule, the rule that names this checker.
@@ -70,7 +70,7 @@ class CodeRuleChecker(ABC):
     """
 
     @abstractmethod
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+    def violations(self, *, path: Path) -> Iterator[CodeRuleViolation]:
         """
         :param path: A Python source file.
         :return: Every place in it that breaks the rule.
@@ -105,7 +105,7 @@ class DifferencePattern(StrEnum):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class StagedLines:
     """
     The lines a commit being prepared adds or changes.
@@ -116,7 +116,7 @@ class StagedLines:
     The directory of the git repository the commit is prepared in.
     """
 
-    def find_changed_lines(self, path: Path) -> set[int]:
+    def find_changed_lines(self, *, path: Path) -> set[int]:
         """
         :param path: A file in the repository.
         :return: The line numbers, in the staged file, that the staged change adds or
@@ -138,7 +138,7 @@ class StagedLines:
             text=True,
         )
         if result.returncode != 0:
-            raise GitCommandFailed(arguments, result.stderr)
+            raise GitCommandFailed(arguments=arguments, standard_error=result.stderr)
         lines: set[int] = set()
         for hunk in re.finditer(
             DifferencePattern.HUNK_HEADER, result.stdout, re.MULTILINE
@@ -152,7 +152,7 @@ class StagedLines:
 # %% checking files
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CodeRulesCheck:
     """
     Runs a set of checkers over a set of files.
@@ -168,7 +168,7 @@ class CodeRulesCheck:
     The staged change whose code alone is checked; none to check all of it.
     """
 
-    def violations(self, paths: Sequence[Path]) -> list[CodeRuleViolation]:
+    def violations(self, *, paths: Sequence[Path]) -> list[CodeRuleViolation]:
         """
         :param paths: The Python files to check.
         :return: Their violations, file by file, top to bottom.
@@ -176,13 +176,15 @@ class CodeRulesCheck:
         violations: list[CodeRuleViolation] = []
         for path in paths:
             changed = (
-                None if self.staged is None else self.staged.find_changed_lines(path)
+                None
+                if self.staged is None
+                else self.staged.find_changed_lines(path=path)
             )
             found = [
                 violation
                 for checker in self.checkers
-                for violation in checker.violations(path)
-                if changed is None or violation.touches(changed)
+                for violation in checker.violations(path=path)
+                if changed is None or violation.touches(lines=changed)
             ]
             violations.extend(sorted(found, key=lambda violation: violation.first_line))
         return violations

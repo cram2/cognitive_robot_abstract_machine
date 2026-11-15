@@ -16,7 +16,7 @@ from cramph.executor import ExecutorExtension
 from giskardpy.motion_statechart.exceptions import ActionClientTypeMismatchError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RosContextExtension(ContextExtension):
     ros_node: Node
 
@@ -30,7 +30,7 @@ class RosContextExtension(ContextExtension):
 
     Safe to share between multiple tasks that are active at the same time: each
     ``send_goal_async``/``get_result_async`` call returns its own future tracking that
-    specific goal, and callers (:class:`~giskardpy.motion_statechart.ros2_nodes.ros_tasks.ActionServerTask`)
+    specific goal, and callers (:class:`~giskardpy.motion_statechart.ros2_nodes.action_servers.ActionServerTask`)
     keep their own goal message and result on the task instance, not on the client. No
     state on the client itself is mutated per-goal.
     """
@@ -61,7 +61,7 @@ class RosContextExtension(ContextExtension):
         return action_client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RosNodeAccess(ExecutorExtension):
     """
     Gives the nodes of the executed statecharts access to a ROS2 node through a
@@ -73,5 +73,5 @@ class RosNodeAccess(ExecutorExtension):
     The ROS2 node the statechart nodes communicate through.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
-        context.ensure_extension(RosContextExtension(self.ros_node))
+    def extend_context(self, *, context: StatechartContext) -> None:
+        context.ensure_extension(extension=RosContextExtension(ros_node=self.ros_node))

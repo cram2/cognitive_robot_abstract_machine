@@ -85,8 +85,8 @@ class LocalMinimumReached(EndedByOwner, MotionStatechartNode):
     def on_start(self) -> None:
         if self.measure_from_own_start:
             self.context.float_variable_data.set_value(
-                self._start_cycle_variable,
-                self.context.tick_variable.evaluate()[0],
+                expression=self._start_cycle_variable,
+                value=self.context.tick_variable.evaluate()[0],
             )
 
     def set_up(self) -> None:
@@ -98,7 +98,7 @@ class LocalMinimumReached(EndedByOwner, MotionStatechartNode):
         if self.measure_from_own_start:
             self._start_cycle_variable = FloatVariable(f"{self.name}_start_cycle")
             self.context.float_variable_data.register_expression(
-                self._start_cycle_variable
+                expression=self._start_cycle_variable
             )
 
     def build_artifacts(self) -> NodeArtifacts:

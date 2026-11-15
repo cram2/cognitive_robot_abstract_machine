@@ -51,5 +51,8 @@ def test_placeholder_example_value_names_itself_instead_of_a_placeholder():
     """
     snapshot = VerbalizationResultsOfPackage(package=krrood, results=())
 
-    assert snapshot.rendered_result(HasType) == "a variable is of type Integer"
-    assert snapshot.rendered_result(HasTypes) == "a variable is of type Integer or Text"
+    assert snapshot.rendered_result(cls=HasType) == "a variable is of type Integer"
+    assert (
+        snapshot.rendered_result(cls=HasTypes)
+        == "a variable is of type Integer or Text"
+    )

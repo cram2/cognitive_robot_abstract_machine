@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from ..rules import Rule
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseQuery:
     """
     This is a dataclass that represents an attribute of an object and its target value. If attribute name is
@@ -104,7 +104,7 @@ class CaseQuery:
     The Ripple Down Rules that was used to answer the case query.
     """
 
-    def render_rule_tree(self, filepath: str | None = None, view: bool = False):
+    def render_rule_tree(self, *, filepath: str | None = None, view: bool = False):
         if self.rdr is None:
             return
         render_tree(
@@ -328,10 +328,10 @@ class CaseQuery:
 
     def __copy__(self):
         return CaseQuery(
-            self.original_case,
-            self.attribute_name,
-            self.attribute_type,
-            self.mutually_exclusive,
+            original_case=self.original_case,
+            attribute_name=self.attribute_name,
+            _attribute_types=self.attribute_type,
+            mutually_exclusive=self.mutually_exclusive,
             _target=self.target,
             default_value=self.default_value,
             scope=self.scope,
@@ -344,7 +344,7 @@ class CaseQuery:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseConf:
     factory_method: Callable[[Any], Any] = MISSING
 
@@ -352,7 +352,7 @@ class CaseConf:
         return self.factory_method()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RDRConclusion:
     """
     This dataclass represents a conclusion of a Ripple Down Rule.
@@ -388,7 +388,7 @@ class RDRConclusion:
 
             value = getattr(conclusion, name)
 
-            self._record_dependency(name)
+            self._record_dependency(attr_name=name)
 
             return value
 
@@ -398,7 +398,7 @@ class RDRConclusion:
         else:
             setattr(self._wrapped, name, value)
 
-    def _record_dependency(self, attr_name):
+    def _record_dependency(self, *, attr_name):
         # Inspect stack to find instance of CallableExpression
         for frame_info in inspect.stack():
             func_name = frame_info.function

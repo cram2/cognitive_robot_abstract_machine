@@ -115,12 +115,12 @@ def _supporters_detected_for(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [SupportDetector(tracked_object=box, exclude_robot=exclude_robot)]
         ).build(executor.context)
     )
     executor.tick()
-    segmind_context = executor.context.require_extension(SegmindContext)
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
     return [
         event.with_object
         for event in segmind_context.logger.get_events()
@@ -144,7 +144,7 @@ def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
     """
     palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
     box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
-    assert InContactWith(box, palm)()
+    assert InContactWith(body1=box, body2=palm)()
     gripper_bodies = {
         body
         for end_effector in pr2_world_copy.get_semantic_annotations_by_type(EndEffector)
@@ -166,12 +166,12 @@ def _contacts_detected_for(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [ContactDetector(tracked_object=box, exclude_robot=exclude_robot)]
         ).build(executor.context)
     )
     executor.tick()
-    segmind_context = executor.context.require_extension(SegmindContext)
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
     return [
         event.with_object
         for event in segmind_context.logger.get_events()
@@ -251,7 +251,7 @@ def _containers_detected_for(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [
                 SupportDetector(tracked_object=box, exclude_robot=exclude_robot),
                 ContainmentDetector(tracked_object=box, exclude_robot=exclude_robot),
@@ -259,7 +259,7 @@ def _containers_detected_for(
         ).build(executor.context)
     )
     executor.tick()
-    segmind_context = executor.context.require_extension(SegmindContext)
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
     return [
         event.with_object
         for event in segmind_context.logger.get_events()

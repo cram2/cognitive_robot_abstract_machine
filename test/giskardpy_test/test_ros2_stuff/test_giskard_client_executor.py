@@ -7,7 +7,7 @@ import pytest
 from cramph.executor import Executor, ExecutorExtension
 from cramph.monitors import CountTicks
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOutcome
 from giskardpy.middleware.ros2.exceptions import ExecutionAbortedException
 from giskardpy.middleware.ros2.giskard_client_executor import (
@@ -22,7 +22,7 @@ from .test_action_client import ServerAnsweringOneGoal, giskard_command_server
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionCountingCompilesAndRuns(ExecutorExtension):
     """
     An executor extension that counts how often it was told that a statechart compiled
@@ -39,10 +39,10 @@ class ExtensionCountingCompilesAndRuns(ExecutorExtension):
     How often the extension was told that a run stopped.
     """
 
-    def after_compile(self, executor: Executor) -> None:
+    def after_compile(self, *, executor: Executor) -> None:
         self.compile_count += 1
 
-    def after_run(self, executor: Executor) -> None:
+    def after_run(self, *, executor: Executor) -> None:
         self.run_count += 1
 
 
@@ -66,13 +66,13 @@ def executor_with_a_statechart(
     :return: A client with `extension` that compiled a statechart of one node.
     """
     world = World()
-    WorldSynchronizer(node=rospy.get_node(), _world=world)
+    WorldSynchronizer(node=background_node.get_node(), _world=world)
     executor = GiskardClientExecutor(
-        node_handle=rospy.get_node(), world=world, extensions=[extension]
+        node_handle=background_node.get_node(), world=world, extensions=[extension]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(CountTicks(ticks=1))
-    executor.compile(statechart)
+    statechart.add_node(node=CountTicks(ticks=1))
+    executor.compile(statechart=statechart)
     yield executor
     executor.close()
 
@@ -114,10 +114,10 @@ class TestGiskardClientExecutorClose:
 
     def test_close_stops_the_heartbeat(self, giskard_command_server):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
 
         executor = GiskardClientExecutor(
-            node_handle=rospy.get_node(), world=world, announces_presence=True
+            node_handle=background_node.get_node(), world=world, announces_presence=True
         )
 
         executor.close()
@@ -136,9 +136,11 @@ class TestAnnouncingPresence:
         self, giskard_command_server
     ):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
 
-        executor = GiskardClientExecutor(node_handle=rospy.get_node(), world=world)
+        executor = GiskardClientExecutor(
+            node_handle=background_node.get_node(), world=world
+        )
 
         assert executor.heartbeat_publisher is None
 
@@ -146,8 +148,10 @@ class TestAnnouncingPresence:
         self, giskard_command_server
     ):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
-        executor = GiskardClientExecutor(node_handle=rospy.get_node(), world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
+        executor = GiskardClientExecutor(
+            node_handle=background_node.get_node(), world=world
+        )
 
         executor.close()
 
@@ -157,10 +161,10 @@ class TestAnnouncingPresence:
         self, giskard_command_server
     ):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
 
         executor = GiskardClientExecutor(
-            node_handle=rospy.get_node(), world=world, announces_presence=True
+            node_handle=background_node.get_node(), world=world, announces_presence=True
         )
 
         assert not executor.heartbeat_publisher.timer.is_canceled()
@@ -168,8 +172,10 @@ class TestAnnouncingPresence:
 
     def test_a_client_can_start_announcing_itself_later(self, giskard_command_server):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
-        executor = GiskardClientExecutor(node_handle=rospy.get_node(), world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
+        executor = GiskardClientExecutor(
+            node_handle=background_node.get_node(), world=world
+        )
 
         executor.announce_presence()
 
@@ -178,9 +184,9 @@ class TestAnnouncingPresence:
 
     def test_announcing_twice_keeps_the_first_heartbeat(self, giskard_command_server):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
         executor = GiskardClientExecutor(
-            node_handle=rospy.get_node(), world=world, announces_presence=True
+            node_handle=background_node.get_node(), world=world, announces_presence=True
         )
         first_publisher = executor.heartbeat_publisher
 
@@ -201,11 +207,11 @@ class TestGiskardClientExecutorNodeClose:
         self, giskard_command_server
     ):
         world = World()
-        WorldSynchronizer(node=rospy.get_node(), _world=world)
+        WorldSynchronizer(node=background_node.get_node(), _world=world)
 
         client = GiskardClientExecutorNode(node_name="test_client", world=world)
-        assert client.node_handle in rospy.executor.get_nodes()
+        assert client.node_handle in background_node.executor.get_nodes()
 
         client.close()
 
-        assert client.node_handle not in rospy.executor.get_nodes()
+        assert client.node_handle not in background_node.executor.get_nodes()

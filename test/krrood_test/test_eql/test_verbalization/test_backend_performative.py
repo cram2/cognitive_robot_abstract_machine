@@ -23,7 +23,7 @@ from krrood.entity_query_language.verbalization.pipeline import (
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Position:
     """
     A minimal structural type to build a match over.
