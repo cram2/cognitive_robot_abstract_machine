@@ -323,7 +323,9 @@ def test_learned_circuit_has_normalized_parameters(target):
     region_graph = RegionGraph(
         variables=variables, partitions=2, depth=2, repetitions=2
     ).create_random_region_graph()
-    model = region_graph.to_probabilistic_circuit(input_units=5, sum_units=5)
+    model = region_graph.to_probabilistic_circuit(
+        input_units=5, sum_units=5
+    ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     data = np.random.uniform(0, 1, (100, len(variables)))
     # the symbolic column holds the hashes of domain elements, which the circuit encodes
     target_column = model.variables.index(target)
@@ -355,7 +357,7 @@ def test_classification_circuit_predicts_a_distribution_over_the_target(target):
     ).create_random_region_graph()
     model = region_graph.to_probabilistic_circuit(
         input_units=5, sum_units=5, predicted_variable=target
-    )
+    ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     assert isinstance(model, LayeredProbabilisticCircuit)
     assert model.variables == features | SortedSet([target])
 

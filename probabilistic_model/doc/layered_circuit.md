@@ -168,8 +168,8 @@ A circuit with JAX parameters is trained by gradient descent with `fit`, or with
 `GradientDescent` and a `Loss` from `probabilistic_model.learning.gradient_descent`; a
 circuit with PyTorch parameters with `TorchGradientDescent` from
 `probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
-builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with JAX
-parameters: fully factorized input distributions in every leaf region, the cross products
+builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with NumPy
+parameters, which `to_namespace` moves to JAX or PyTorch for training: fully factorized input distributions in every leaf region, the cross products
 of the regions of every partition and fully connected sum layers in every other region. A
 RAT-SPN that predicts a symbolic variable, built with
 `to_probabilistic_circuit(predicted_variable=...)`, is trained generatively on the joint

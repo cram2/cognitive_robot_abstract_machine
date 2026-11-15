@@ -8,10 +8,9 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass, field
 
-import jax.numpy as jnp
-import jax.random
 import numpy as np
 import rustworkx as rx
+from random_events.interval import SimpleInterval
 from random_events.variable import Continuous, Symbolic, Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Iterable, Self
@@ -151,12 +150,46 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
 
     seed: int = 69
     """
-    The seed of :attr:`random_number_generator`, which fixes the graph.
+    The seed of :attr:`random_number_generator`, which fixes the graph and the initial
+    parameters of its circuits.
+    """
+
+    initial_weight_range: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(lower=0.1, upper=1.0)
+    )
+    """
+    The interval the initial weights of the sum units of a circuit are drawn uniformly
+    from.
+    """
+
+    initial_location_range: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(lower=-1.0, upper=1.0)
+    )
+    """
+    The interval the initial means of the Gaussian input distributions of a circuit are
+    drawn uniformly from.
+    """
+
+    initial_scale_range: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(lower=0.5, upper=3.0)
+    )
+    """
+    The interval the initial standard deviations of the Gaussian input distributions of
+    a circuit are drawn uniformly from.
+    """
+
+    initial_probability_range: SimpleInterval = field(
+        default_factory=lambda: SimpleInterval.from_data(lower=0.1, upper=1.0)
+    )
+    """
+    The interval the initial probabilities of the categorical input distributions of a
+    circuit are drawn uniformly from, before they are normalized.
     """
 
     random_number_generator: np.random.Generator = field(init=False, repr=False)
     """
-    The generator that draws the random partitions.
+    The generator that draws the random partitions and the initial parameters of the
+    circuits.
     """
 
     def __post_init__(self) -> None:
@@ -174,7 +207,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         root = Region(variables=self.variables)
         self.add_node(root)
         for repetition in range(self.repetitions):
-            self.split(region=root, depth=self.depth)
+            self.random_split(region=root, depth=self.depth)
         return self
 
     def regions(self) -> Iterable[Region]:
@@ -193,7 +226,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             if isinstance(node, Partition):
                 yield node
 
-    def split(self, *, region: Region, depth: int) -> None:
+    def random_split(self, *, region: Region, depth: int) -> None:
         """
         Add a random partition of a region and split its regions again, until
         ``depth`` splits are made or a region holds a single variable, which stays a
@@ -211,7 +244,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             number_of_parts=self.partitions,
         ):
             self.add_edge(partition, part)
-            self.split(region=part, depth=depth - 1)
+            self.random_split(region=part, depth=depth - 1)
 
     @property
     def root(self) -> Region:
@@ -230,18 +263,16 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         *,
         input_units: int = 5,
         sum_units: int = 5,
-        key: jax.Array = jax.random.PRNGKey(69),
         predicted_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a randomly initialized RAT-SPN with jax parameters.
+        Convert the region graph to a randomly initialized RAT-SPN with numpy parameters.
         With a predicted variable, the root region has one sum unit per category of it
         and the root mixes them, each multiplied by the indicator of its category, so
         that the circuit classifies; without one, the root region has a single sum unit.
 
         :param input_units: The number of input distributions of each leaf region.
         :param sum_units: The number of sum units of each inner region.
-        :param key: The random key of every initial parameter.
         :param predicted_variable: The symbolic variable the circuit classifies into
             its categories, if any.
         :return: The layered circuit.
@@ -257,7 +288,6 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         if predicted_variable is not None:
             variables = variables | SortedSet([predicted_variable])
             number_of_root_units = len(predicted_variable.domain.simple_sets)
-        keys = iter(jax.random.split(key, len(self.nodes()) + 1))
 
         for layer in reversed(rx.bfs_layers(self.graph, [self.index_of(self.root)])):
             for node in map(self.graph.__getitem__, layer):
@@ -274,14 +304,12 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                             if self.in_degree(node) == 0
                             else sum_units
                         ),
-                        key=next(keys),
                     )
                 else:
                     node.layer = self.fully_factorized_input_layer(
                         region=node,
                         variables=variables,
                         input_units=input_units,
-                        key=next(keys),
                     )
 
         root = self.root.layer
@@ -289,7 +317,6 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             root = self.fully_connected_sum_layer(
                 children=[self.root],
                 number_of_nodes=number_of_root_units,
-                key=next(keys),
             )
         if predicted_variable is not None:
             root = self.mixture_of_categories(
@@ -297,29 +324,28 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                 predicted_variable=predicted_variable,
                 variables=variables,
             )
-        circuit = LayeredProbabilisticCircuit(variables, root)
-        return circuit.to_namespace(jnp, floating_point_type=jnp.result_type(float))
+        return LayeredProbabilisticCircuit(variables, root)
 
-    @staticmethod
     def fully_connected_sum_layer(
-        *, children: list[RegionGraphNode], number_of_nodes: int, key: jax.Array
+        self, *, children: list[RegionGraphNode], number_of_nodes: int
     ) -> SumLayer:
         """
         :param children: The nodes whose layers the sum units mix.
         :param number_of_nodes: The number of sum units.
-        :param key: The random key of the initial weights.
         :return: The sum layer that connects every unit to every unit of every child,
-            with dense edges and weights drawn uniformly from [0.1, 1].
+            with dense edges and weights drawn from :attr:`initial_weight_range`.
         """
         child_layers = [child.layer for child in children]
         number_of_columns = sum(layer.number_of_nodes for layer in child_layers)
         rows, columns = np.nonzero(np.ones((number_of_nodes, number_of_columns)))
-        weights = np.asarray(
-            jax.random.uniform(key, shape=(len(rows),), minval=0.1, maxval=1.0)
+        weights = self.random_number_generator.uniform(
+            self.initial_weight_range.lower,
+            self.initial_weight_range.upper,
+            len(rows),
         )
         return SumLayer.from_entries(
             child_layers,
-            SparseEntries(np.log(weights.astype(float)), rows, columns),
+            SparseEntries(np.log(weights), rows, columns),
             number_of_nodes,
             DenseEdgeMatrix,
         )
@@ -330,75 +356,59 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         region: Region,
         variables: SortedSet,
         input_units: int,
-        key: jax.Array,
     ) -> Layer:
         """
         :param region: A leaf region.
         :param variables: The variables of the circuit.
         :param input_units: The number of input distributions.
-        :param key: The random key of the initial parameters.
         :return: The layer whose unit ``i`` is the product of the ``i``-th univariate
             input distribution of every variable of the region.
         """
         univariate_layers = [
             self.input_layer(
-                variable=variable,
-                variables=variables,
-                input_units=input_units,
-                key=variable_key,
+                variable=variable, variables=variables, input_units=input_units
             )
-            for variable, variable_key in zip(
-                region.variables, jax.random.split(key, len(region.variables))
-            )
+            for variable in region.variables
         ]
         if len(univariate_layers) == 1:
             return univariate_layers[0]
         return ProductLayer.node_wise_product_of(univariate_layers)
 
-    @staticmethod
     def input_layer(
-        *,
-        variable: Variable,
-        variables: SortedSet,
-        input_units: int,
-        key: jax.Array,
+        self, *, variable: Variable, variables: SortedSet, input_units: int
     ) -> GaussianLayer | SymbolicLayer:
         """
         :param variable: The variable of a leaf region.
         :param variables: The variables of the circuit.
         :param input_units: The number of input units.
-        :param key: The random key of the initial parameters.
-        :return: Gaussians with locations in [-1, 1] and scales in [0.5, 3] for a
-            continuous variable, categorical distributions with probabilities drawn
-            from [0.1, 1] and normalized for a symbolic one.
+        :return: Gaussians with means drawn from :attr:`initial_location_range` and
+            standard deviations from :attr:`initial_scale_range` for a continuous
+            variable, categorical distributions with probabilities drawn from
+            :attr:`initial_probability_range` and normalized for a symbolic one.
         :raises UnsupportedRegionVariableError: If the variable is of another type.
         """
         variable_index = variables.index(variable)
-        location_key, scale_key = jax.random.split(key)
         if isinstance(variable, Continuous):
             return GaussianLayer(
                 variable_index,
-                np.asarray(
-                    jax.random.uniform(
-                        location_key, (input_units,), minval=-1.0, maxval=1.0
-                    )
-                ).astype(float),
-                np.asarray(
-                    jax.random.uniform(
-                        scale_key, (input_units,), minval=0.5, maxval=3.0
-                    )
-                ).astype(float),
+                self.random_number_generator.uniform(
+                    self.initial_location_range.lower,
+                    self.initial_location_range.upper,
+                    input_units,
+                ),
+                self.random_number_generator.uniform(
+                    self.initial_scale_range.lower,
+                    self.initial_scale_range.upper,
+                    input_units,
+                ),
             )
         if isinstance(variable, Symbolic):
             number_of_states = len(variable.domain.simple_sets)
-            probabilities = np.asarray(
-                jax.random.uniform(
-                    location_key,
-                    (input_units, number_of_states),
-                    minval=0.1,
-                    maxval=1.0,
-                )
-            ).astype(float)
+            probabilities = self.random_number_generator.uniform(
+                self.initial_probability_range.lower,
+                self.initial_probability_range.upper,
+                (input_units, number_of_states),
+            )
             probabilities /= probabilities.sum(axis=1, keepdims=True)
             return SymbolicLayer(
                 variable_index,

@@ -177,17 +177,21 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
     The parameter arrays of the circuit before training.
     """
 
-    impossible: list[jax.Array] = field(init=False)
+    zero_probability_entries: list[jax.Array] = field(init=False)
     """
     Where every parameter array is ``-inf`` before training, a log-probability or log-
     weight of zero probability, which training keeps.
     """
 
     def __post_init__(self) -> None:
+        """
+        Default the optimizer and record the parameters before training and their
+        :attr:`zero_probability_entries`.
+        """
         if self.optimizer is None:
             self.optimizer = optax.adam(1e-3)
         self.initial_parameters = list(self.layer.circuit_parameters)
-        self.impossible = [
+        self.zero_probability_entries = [
             jnp.isneginf(parameter) for parameter in self.initial_parameters
         ]
 
@@ -216,9 +220,10 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
             gradients, state.optimizer_state, state.parameters
         )
         updated = [
-            jnp.where(impossible, -jnp.inf, parameter)
-            for impossible, parameter in zip(
-                self.impossible, optax.apply_updates(state.parameters, updates)
+            jnp.where(zero_probability, -jnp.inf, parameter)
+            for zero_probability, parameter in zip(
+                self.zero_probability_entries,
+                optax.apply_updates(state.parameters, updates),
             )
         ]
         parameters = self.layer.projected_circuit_parameters(updated)

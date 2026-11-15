@@ -1,3 +1,8 @@
+"""
+Probabilistic circuits whose nodes are grouped into layers that store their parameters
+as arrays of any Array API backend, and the queries they answer.
+"""
+
 from __future__ import annotations
 
 from types import ModuleType

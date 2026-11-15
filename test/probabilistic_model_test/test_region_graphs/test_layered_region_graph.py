@@ -1,6 +1,6 @@
 """
-Tests for the layered circuits that region graphs build: their structure, their jax
-parameters, training them and classifying with them.
+Tests for the layered circuits that region graphs build: their structure, their
+parameters, training them with jax and classifying with them.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import pytest
 import scipy.special
 from array_api_compat import array_namespace
 from random_events.variable import Symbolic
+from random_events.interval import SimpleInterval
 from sortedcontainers import SortedSet
 
 from probabilistic_model.learning.gradient_descent import CrossEntropy
@@ -27,6 +28,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matri
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
+    GaussianLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -50,15 +54,72 @@ def region_graph() -> RegionGraph:
     ).create_random_region_graph()
 
 
-def test_a_region_graph_builds_a_layered_circuit_with_jax_parameters(region_graph):
+def test_a_region_graph_builds_a_layered_circuit_with_numpy_parameters(region_graph):
     """
-    The layered circuit of a region graph has jax parameters and gives every row a
+    The layered circuit of a region graph has numpy parameters and gives every row a
     finite log-likelihood.
     """
     circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
-    assert all(isinstance(parameter, jax.Array) for parameter in circuit.parameters)
-    data = jnp.asarray(np.random.default_rng(0).normal(size=(50, 6)))
-    assert bool(jnp.all(jnp.isfinite(circuit.log_likelihood(data))))
+    assert all(isinstance(parameter, np.ndarray) for parameter in circuit.parameters)
+    data = np.random.default_rng(0).normal(size=(50, 6))
+    assert np.all(np.isfinite(circuit.log_likelihood(data)))
+
+
+def test_the_circuit_of_a_region_graph_moves_to_jax_with_the_same_likelihoods(
+    region_graph,
+):
+    """
+    Moving the circuit of a region graph to jax keeps its log-likelihoods.
+    """
+    circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
+    jax_circuit = circuit.to_namespace(jnp, floating_point_type=jnp.result_type(float))
+    assert all(isinstance(parameter, jax.Array) for parameter in jax_circuit.parameters)
+    data = np.random.default_rng(0).normal(size=(50, 6))
+    np.testing.assert_allclose(
+        np.asarray(jax_circuit.log_likelihood(jnp.asarray(data))),
+        circuit.log_likelihood(data),
+        rtol=1e-4,
+    )
+
+
+def test_region_graphs_with_the_same_seed_build_circuits_with_the_same_parameters():
+    """
+    The seed of a region graph fixes the initial parameters of its circuit.
+    """
+    circuits = [
+        RegionGraph(variables=continuous_variables(6), depth=2, repetitions=3, seed=3)
+        .create_random_region_graph()
+        .to_probabilistic_circuit(input_units=4, sum_units=3)
+        for _ in range(2)
+    ]
+    for first, second in zip(circuits[0].parameters, circuits[1].parameters):
+        np.testing.assert_array_equal(first, second)
+
+
+def test_the_initial_parameters_of_a_region_graph_circuit_lie_in_its_ranges():
+    """
+    The initial weights, means and standard deviations of a region graph circuit are
+    drawn from the ranges of the region graph.
+    """
+    region_graph = RegionGraph(
+        variables=continuous_variables(6),
+        depth=2,
+        repetitions=3,
+        initial_weight_range=SimpleInterval.from_data(lower=2.0, upper=3.0),
+        initial_location_range=SimpleInterval.from_data(lower=5.0, upper=6.0),
+        initial_scale_range=SimpleInterval.from_data(lower=0.2, upper=0.4),
+    ).create_random_region_graph()
+    circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
+    gaussians = [layer for layer in circuit.layers if isinstance(layer, GaussianLayer)]
+    sum_layers = [layer for layer in circuit.layers if isinstance(layer, SumLayer)]
+    locations = np.concatenate([layer.location for layer in gaussians])
+    scales = np.concatenate([layer.scale for layer in gaussians])
+    weights = np.exp(
+        np.concatenate([layer.log_weights.ravel() for layer in sum_layers])
+    )
+    assert np.all((locations >= 5.0) & (locations < 6.0))
+    assert np.all((scales >= 0.2) & (scales < 0.4))
+    assert np.all((weights >= 2.0) & (weights < 3.0))
 
 
 def test_the_sum_layers_of_a_region_graph_are_fully_connected_and_dense(region_graph):
@@ -82,7 +143,9 @@ def test_fitting_a_layered_circuit_raises_the_log_likelihood_of_its_data(region_
     Fitting the layered circuit of a region graph raises the average log-likelihood of
     the data.
     """
-    circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
+    circuit = region_graph.to_probabilistic_circuit(
+        input_units=4, sum_units=3
+    ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     data = jnp.asarray(np.random.default_rng(0).normal(size=(500, 6)) * 0.5 + 1.0)
     before = float(jnp.mean(circuit.log_likelihood(data)))
     circuit.fit(data=data, epochs=100, optimizer=optax.adam(0.05))
@@ -170,6 +233,7 @@ def separated_categories(target) -> SeparatedCategories:
         RegionGraph(variables=features, partitions=2, depth=1, repetitions=4)
         .create_random_region_graph()
         .to_probabilistic_circuit(input_units=3, sum_units=3, predicted_variable=target)
+        .to_namespace(jnp, floating_point_type=jnp.result_type(float))
     )
     generator = np.random.default_rng(0)
     labels = generator.integers(0, 2, 400)
