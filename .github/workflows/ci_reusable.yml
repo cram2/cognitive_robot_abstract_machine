@@ -77,6 +77,16 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           uv pip install drake
 
+      - name: Install usd-core
+        if: ${{ inputs.lib == 'semantic_digital_twin' }}
+        env:
+          UV_CACHE_DIR: /opt/ros/.uv_cache
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          # Optional for semantic_digital_twin, so its USD tests only run where it is installed
+          uv pip install usd-core
+
       - name: Install robokudo optional requirements
         if: ${{ contains(fromJSON(inputs.libs), 'robokudo') }}
         env:

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
+import numpy as np
+from krrood.ormatic.utils import classproperty
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from visualization_msgs.msg import MarkerArray
@@ -17,7 +20,7 @@ from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker impor
 )
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.exceptions import WorldHasMultipleTfPublishersError
-from semantic_digital_twin.world_description.geometry import Shape
+from semantic_digital_twin.world_description.geometry import Mesh, Shape
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,73 @@ class ShapeSource(Enum):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True)
+class RvizLoadableMeshes:
+    """
+    Replaces each mesh RViz cannot load with parts it can.
+
+    RViz counts the faces of a mesh with fewer than 65536 vertices with a 16 bit counter
+    (ros2/rviz#1913), so it crashes on such a mesh with more faces.
+    """
+
+    part_filenames: dict[str, list[str]] = field(default_factory=dict)
+    """
+    The files of the parts of every mesh file looked at so far, by the mesh's file name,
+    empty for a mesh RViz loads as it is.
+    """
+
+    @classproperty
+    def largest_16_bit_count(cls) -> int:
+        """
+        :return: The most vertices a mesh RViz gives 16 bit indices can have, and the most
+            faces RViz counts in such a mesh.
+        """
+        return 2**16 - 1
+
+    def loadable_shapes(self, *, shapes: list[Shape]) -> list[Shape]:
+        """
+        :param shapes: The shapes to show.
+        :return: ``shapes``, with every mesh RViz cannot load replaced by its parts, each
+            keeping the mesh's origin, scale, color and texture.
+        """
+        loadable = []
+        for shape in shapes:
+            parts = self._part_filenames(mesh=shape) if isinstance(shape, Mesh) else []
+            if not parts:
+                loadable.append(shape)
+                continue
+            loadable.extend(replace(shape, filename=part) for part in parts)
+        return loadable
+
+    def _part_filenames(self, *, mesh: Mesh) -> list[str]:
+        """
+        :param mesh: The mesh to split.
+        :return: The files of the parts of ``mesh``, each with at most
+            :attr:`largest_16_bit_count` faces, or none if RViz loads it as it is.
+        """
+        if mesh.filename in self.part_filenames:
+            return self.part_filenames[mesh.filename]
+        # RViz reads the file itself, so the vertices are counted as the file stores
+        # them rather than welded.
+        stored_mesh = mesh.stored_mesh
+        face_count = len(stored_mesh.faces)
+        part_filenames = []
+        if (
+            face_count > self.largest_16_bit_count
+            and len(stored_mesh.vertices) <= self.largest_16_bit_count
+        ):
+            part_count = math.ceil(face_count / self.largest_16_bit_count)
+            part_filenames = [
+                Mesh.from_trimesh(
+                    mesh=stored_mesh.submesh([part_faces], append=True)
+                ).filename
+                for part_faces in np.array_split(np.arange(face_count), part_count)
+            ]
+        self.part_filenames[mesh.filename] = part_filenames
+        return part_filenames
+
+
+@dataclass(eq=False, kw_only=True)
 class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
     """
     Publishes the world model as a visualization marker.
@@ -118,6 +187,13 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
     The ROS publisher for the marker.
     """
 
+    _rviz_loadable_meshes: RvizLoadableMeshes = field(
+        init=False, default_factory=RvizLoadableMeshes
+    )
+    """
+    The parts RViz can load of the meshes published so far.
+    """
+
     def __post_init__(self):
         super().__post_init__()
 
@@ -186,14 +262,17 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
         self.markers = MarkerArray()
         frame_names = self.tf_publisher.tf_model_callback.frame_names
         for body in self._world.bodies:
-            shapes = self._select_shapes(body)
-            self._add_markers_for_shapes(shapes, frame_names.assign(body), frame_names)
+            self._add_markers_for_shapes(
+                shapes=self._select_shapes(body),
+                marker_ns=frame_names.assign(body),
+                frame_names=frame_names,
+            )
 
         for region in self._world.regions:
             self._add_markers_for_shapes(
-                region.area.shapes,
-                frame_names.assign(region),
-                frame_names,
+                shapes=region.area.shapes,
+                marker_ns=frame_names.assign(region),
+                frame_names=frame_names,
                 force_alpha=self.region_alpha,
             )
 
@@ -201,14 +280,23 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
 
     def _add_markers_for_shapes(
         self,
+        *,
         shapes: list[Shape],
         marker_ns: str,
         frame_names: TfFrameNames,
         force_alpha: float | None = None,
-    ):
-        if not shapes:
-            return
-        for i, shape in enumerate(shapes):
+    ) -> None:
+        """
+        Adds a marker for every shape to :attr:`markers`, a mesh RViz cannot load as one
+        marker per part it can.
+
+        :param shapes: The shapes to add markers for.
+        :param marker_ns: The namespace of the markers.
+        :param frame_names: The tf frame names the markers are positioned in.
+        :param force_alpha: The transparency of every marker, instead of the shapes' own.
+        """
+        loadable_shapes = self._rviz_loadable_meshes.loadable_shapes(shapes=shapes)
+        for i, shape in enumerate(loadable_shapes):
             marker = SemDTToRos2Converter.convert(shape)
             marker.header.frame_id = frame_names.assign(shape.origin.reference_frame)
             if force_alpha is not None:

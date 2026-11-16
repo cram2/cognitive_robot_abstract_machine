@@ -611,3 +611,29 @@ def test_two_equally_named_bodies_reach_the_tree_as_two_frames(rclpy_node):
     }
 
     assert len(published_frames & told_apart_by_identifier) == 1
+
+
+def test_a_body_named_after_a_path_keeps_its_slashes_in_its_frame(
+    rclpy_node, ros_publishers
+) -> None:
+    """
+    A body named after its prim's path below a scene's root, as
+    :class:`~semantic_digital_twin.adapters.usd.parser.USDComponentParser` names them,
+    is published and looked up under its prefixed name, slashes and all.
+    """
+    world = World()
+    with world.modify_world():
+        scene = Body(name=PrefixedName("scene", "clinic"))
+        chair = Body(name=PrefixedName("Meshes/Assets/Chair/Actor_0003", "clinic"))
+        world.add_connection(FixedConnection(parent=scene, child=chair))
+    ros_publishers.adopt(TFPublisher(node=rclpy_node, _world=world))
+
+    tf_wrapper = TFWrapper(node=rclpy_node)
+
+    assert tf_wrapper.wait_for_transform(
+        "clinic/scene",
+        "clinic/Meshes/Assets/Chair/Actor_0003",
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+    tf_wrapper.stop()
