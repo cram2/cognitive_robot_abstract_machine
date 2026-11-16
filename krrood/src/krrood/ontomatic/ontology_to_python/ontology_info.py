@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import cached_property, lru_cache
+from functools import cached_property
 
 import rdflib
 from typing_extensions import Any, Dict, List, Optional, Set
@@ -465,108 +465,6 @@ class OntologyInfo:
             name: set(class_information.all_base_classes)
             for name, class_information in self.classes.items()
         }
-
-    @lru_cache
-    def properties_inheritance_path_length(
-        self,
-        *,
-        child_class: str,
-        parent_class: str,
-    ) -> Optional[int]:
-        """
-        Calculate the inheritance path length between two classes.
-        Every inheritance level that lies between `child_class` and `parent_class` increases the length by one.
-        In case of multiple inheritance, the path length is calculated for each branch and the minimum is returned.
-
-        :param child_class: The child class.
-        :param parent_class: The parent class.
-        :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
-        """
-        if parent_class not in self.properties[child_class].all_superproperties + [
-            child_class
-        ]:
-            return None
-
-        return self._properties_inheritance_path_length(
-            child_class=child_class, parent_class=parent_class, current_length=0
-        )
-
-    def _properties_inheritance_path_length(
-        self, *, child_class: str, parent_class: str, current_length: int = 0
-    ) -> int:
-        """
-        Helper function for :func:`inheritance_path_length`.
-
-        :param child_class: The child class.
-        :param parent_class: The parent class.
-        :param current_length: The current length of the inheritance path.
-        :return: The minimum path length between `child_class` and `parent_class`.
-        """
-
-        if child_class == parent_class:
-            return current_length
-        else:
-            return min(
-                self._properties_inheritance_path_length(
-                    child_class=base,
-                    parent_class=parent_class,
-                    current_length=current_length + 1,
-                )
-                for base in self.properties[child_class].superproperties
-                if parent_class in self.properties[base].all_superproperties + [base]
-            )
-
-    @lru_cache
-    def classes_inheritance_path_length(
-        self,
-        *,
-        child_class: str,
-        parent_class: str,
-    ) -> Optional[int]:
-        """
-        Calculate the inheritance path length between two classes.
-        Every inheritance level that lies between `child_class` and `parent_class` increases the length by one.
-        In case of multiple inheritance, the path length is calculated for each branch and the minimum is returned.
-
-        :param child_class: The child class.
-        :param parent_class: The parent class.
-        :return: The minimum path length between `child_class` and `parent_class` or None if no path exists.
-        """
-        if (
-            parent_class
-            not in self.classes[child_class].all_base_classes_including_role_takers
-        ):
-            return None
-
-        return self._classes_inheritance_path_length(
-            child_class=child_class, parent_class=parent_class, current_length=0
-        )
-
-    def _classes_inheritance_path_length(
-        self, *, child_class: str, parent_class: str, current_length: int = 0
-    ) -> int:
-        """
-        Helper function for :func:`inheritance_path_length`.
-
-        :param child_class: The child class.
-        :param parent_class: The parent class.
-        :param current_length: The current length of the inheritance path.
-        :return: The minimum path length between `child_class` and `parent_class`.
-        """
-
-        if child_class == parent_class:
-            return current_length
-        else:
-            return min(
-                self._classes_inheritance_path_length(
-                    child_class=base,
-                    parent_class=parent_class,
-                    current_length=current_length + 1,
-                )
-                for base in self.classes[child_class].base_classes
-                if parent_class
-                in self.classes[base].all_base_classes_including_role_takers
-            )
 
     def __hash__(self):
         """
