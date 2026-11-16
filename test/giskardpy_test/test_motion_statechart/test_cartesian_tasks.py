@@ -1,3 +1,7 @@
+"""
+Tests of the Cartesian tasks of motion statecharts.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -394,6 +398,10 @@ def record_tip_path(
 
 
 class TestCartesianPositionTrajectory:
+    """
+    Following a trajectory of Cartesian positions.
+    """
+
     def _points_to_np(self, *, positions: list[Point3] | np.ndarray) -> np.ndarray:
         """
         Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray`
@@ -2046,6 +2054,10 @@ class PositionWhileRunning(TickingExecutorExtension):
 
 
 class TestDiffDriveBaseGoal:
+    """
+    Driving a differential drive base to a goal pose.
+    """
+
     @pytest.mark.parametrize(
         "goal_pose",
         [
@@ -2407,6 +2419,10 @@ class TestDiffDriveBaseGoal:
 
 
 class TestVelocityTasks:
+    """
+    Limiting the Cartesian velocities of a link.
+    """
+
     def _build_statechart(
         self, *, executor: StatechartExecutor, goal_node, limit_node
     ) -> Statechart:
@@ -2686,8 +2702,8 @@ class TestDebugExpressions:
         current = debug_expression_by_name(
             artifacts.debug_expressions, "orient/current"
         )
-        assert isinstance(goal.expression, RotationMatrix)
-        assert isinstance(current.expression, RotationMatrix)
+        assert isinstance(goal.expression, HomogeneousTransformationMatrix)
+        assert isinstance(current.expression, HomogeneousTransformationMatrix)
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 
@@ -2755,6 +2771,10 @@ class TestDebugExpressions:
 
 
 class TestDistanceAlongAxis:
+    """
+    Reaching a distance between two points measured along an axis.
+    """
+
     def test_points_on_two_links_end_the_distance_apart_along_the_axis(
         self, *, prismatic_bot2: World
     ) -> None:
