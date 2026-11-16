@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import rdflib
 from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
@@ -96,4 +97,34 @@ class AmbiguousDescribedClass(DataclassException):
         return (
             "Declare the class expression under, or over, a single named class, or "
             "state it once for each class it describes."
+        )
+
+
+@dataclass(kw_only=True)
+class UnsupportedClassExpression(DataclassException):
+    """
+    Raised when a blank node is named as an anonymous class expression but is none of
+    the kinds of class expression known to the converter.
+    """
+
+    node: rdflib.BNode
+    """
+    The blank node.
+    """
+
+    predicates: list[rdflib.URIRef]
+    """
+    The predicates stated on the blank node.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The blank node {self.node} is no known kind of anonymous class "
+            f"expression; it states {', '.join(map(str, self.predicates))}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name only blank nodes that are anonymous class expressions, or add a "
+            "subclass of ClassExpression for this kind."
         )
