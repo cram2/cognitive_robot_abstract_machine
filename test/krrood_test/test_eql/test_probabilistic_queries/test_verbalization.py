@@ -5,11 +5,9 @@ Verbalizing distributions and probabilities.
 from krrood.entity_query_language.factories import (
     a,
     and_,
-    variable,
-)
-from krrood.parametrization.probabilistic_queries import (
     distribution_of,
     probability_of,
+    variable,
 )
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 

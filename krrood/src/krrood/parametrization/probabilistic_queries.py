@@ -1,6 +1,7 @@
 """
-Entity queries that ask a probabilistic model directly: ``distribution_of`` and
-``probability_of``.
+Entity queries that ask a probabilistic model directly, built by
+:func:`~krrood.entity_query_language.factories.distribution_of` and
+:func:`~krrood.entity_query_language.factories.probability_of`.
 """
 
 from __future__ import annotations
@@ -161,7 +162,7 @@ class Probability(ProbabilisticQuery):
 
     def __repr__(self) -> str:
         """
-        :return: The :func:`probability_of` call that builds this query.
+        :return: The :func:`~krrood.entity_query_language.factories.probability_of` call that builds this query.
         """
         evidence = "" if self.evidence is None else f", evidence={self.evidence!r}"
         return f"probability_of({self.condition!r}{evidence})"
@@ -221,7 +222,7 @@ class Distribution(ProbabilisticQuery):
 
     def __repr__(self) -> str:
         """
-        :return: The :func:`distribution_of` call that builds this query.
+        :return: The :func:`~krrood.entity_query_language.factories.distribution_of` call that builds this query.
         """
         args = (
             f", marginalize_for={self.marginalize_for!r}"
@@ -229,42 +230,3 @@ class Distribution(ProbabilisticQuery):
             else ""
         )
         return f"distribution_of({self.match!r}{args})"
-
-
-# %% factories
-
-
-def distribution_of(
-    match: Match, *, marginalize_for: tuple[Attribute, ...] = ()
-) -> Distribution:
-    """
-    Request the distribution a match's conditions describe (see :class:`Distribution`),
-    e.g. ``distribution_of(a(Pick)(arm=0.3, outcome=...))``. It never resolves to rows:
-    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` answers
-    it with the resolved probabilistic model.
-
-    :param match: The match whose conditions describe the distribution.
-    :param marginalize_for: Optionally, a subset of the match's free variables to narrow
-        the result to (further marginalization), e.g. ``distribution_of(match,
-        marginalize_for=(match.outcome,))``. Without it, every one of the match's free
-        variables is kept.
-    :return: Distribution descriptor.
-    """
-    return Distribution(match=match, marginalize_for=marginalize_for)
-
-
-def probability_of(
-    condition: ConditionType, evidence: ConditionType | None = None
-) -> Probability:
-    """
-    Request the probability of a condition, optionally given evidence (see
-    :class:`Probability`), e.g. ``probability_of(x.A > 5, x.B < 2)``. For the
-    expectation of an attribute, use
-    :func:`~krrood.entity_query_language.factories.average` instead.
-
-    :param condition: The condition to compute the probability of.
-    :param evidence: The condition to condition the probability on, or ``None`` for the
-        unconditional probability.
-    :return: Probability descriptor.
-    """
-    return Probability(condition=condition, evidence=evidence)

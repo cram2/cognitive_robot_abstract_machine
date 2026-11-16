@@ -9,7 +9,7 @@ from krrood.entity_query_language.exceptions import (
     BackendCannotEvaluateProbabilisticQuery,
 )
 from krrood.entity_query_language.factories import a
-from krrood.parametrization.probabilistic_queries import distribution_of
+from krrood.entity_query_language.factories import distribution_of
 
 from ._fixtures import Coin
 

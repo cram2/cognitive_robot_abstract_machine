@@ -22,7 +22,7 @@ from krrood.entity_query_language.factories import (
     entity,
     variable,
 )
-from krrood.parametrization.probabilistic_queries import probability_of
+from krrood.entity_query_language.factories import probability_of
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor

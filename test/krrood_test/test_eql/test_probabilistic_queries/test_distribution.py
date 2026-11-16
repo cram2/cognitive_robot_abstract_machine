@@ -11,7 +11,7 @@ from krrood.entity_query_language.factories import (
     a,
     variable,
 )
-from krrood.parametrization.probabilistic_queries import distribution_of
+from krrood.entity_query_language.factories import distribution_of
 from krrood.parametrization.model_registries import DictRegistry
 
 from ._fixtures import Coin, build_three_independent_variables_circuit

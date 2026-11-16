@@ -13,7 +13,7 @@ from krrood.entity_query_language.factories import (
     and_,
     variable,
 )
-from krrood.parametrization.probabilistic_queries import probability_of
+from krrood.entity_query_language.factories import probability_of
 from krrood.parametrization.exceptions import JointQueryAcrossClassesNotSupported
 from krrood.parametrization.model_registries import DictRegistry
 

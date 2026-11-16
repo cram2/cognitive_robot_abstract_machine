@@ -19,7 +19,7 @@ from krrood.entity_query_language.factories import (
     average,
     variable,
 )
-from krrood.parametrization.probabilistic_queries import probability_of
+from krrood.entity_query_language.factories import probability_of
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.parametrization.exceptions import (
     JointQueryAcrossClassesNotSupported,

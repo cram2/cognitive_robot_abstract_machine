@@ -12,7 +12,7 @@ from krrood.entity_query_language.factories import (
     and_,
     or_,
 )
-from krrood.parametrization.probabilistic_queries import distribution_of
+from krrood.entity_query_language.factories import distribution_of
 from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (

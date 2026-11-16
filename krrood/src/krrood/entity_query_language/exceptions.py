@@ -14,6 +14,7 @@ from typing_extensions import TYPE_CHECKING, Any, Callable
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
+    from krrood.entity_query_language.enums import ProbabilisticLibrary
     import random_events.variable
     from probabilistic_model.causal_structure.identification import Identification
 
@@ -1567,3 +1568,25 @@ class NoLearnedCausalStructure(DataclassException):
             "Learn the structure of the class and give it to the ProbabilisticBackend "
             "in causal_structures."
         )
+
+
+@dataclass(kw_only=True)
+class ProbabilisticLibrariesNotInstalled(DataclassException):
+    """
+    Raised when a probabilistic query is built while a library it needs is not
+    installed.
+    """
+
+    missing_libraries: tuple[ProbabilisticLibrary, ...]
+    """
+    The libraries that are not installed.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Probabilistic queries need the libraries "
+            f"{', '.join(self.missing_libraries)}, which are not installed."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Install {' and '.join(self.missing_libraries)} to build probabilistic queries."

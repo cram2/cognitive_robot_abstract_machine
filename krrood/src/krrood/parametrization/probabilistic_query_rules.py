@@ -48,7 +48,7 @@ class DistributionRule(PhraseRule):
     Example::
 
         >>> from krrood.entity_query_language.factories import a
-        >>> from krrood.parametrization.probabilistic_queries import distribution_of
+        >>> from krrood.entity_query_language.factories import distribution_of
         >>> match = a(Robot)(name="R2", battery=...)
         >>> verbalize_expression(distribution_of(match))
         "The distribution over a Robot given that its name is 'R2'"
@@ -112,7 +112,7 @@ class ProbabilityRule(PhraseRule):
     Example::
 
         >>> from krrood.entity_query_language.factories import variable
-        >>> from krrood.parametrization.probabilistic_queries import probability_of
+        >>> from krrood.entity_query_language.factories import probability_of
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(probability_of(robot.battery > 50))
         'the probability that the battery of a Robot is greater than 50'

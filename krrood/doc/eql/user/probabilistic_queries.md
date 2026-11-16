@@ -36,9 +36,9 @@ exist, but about the *model itself*. Three constructs answer that kind of questi
 | Question | Construct | Answer |
 |---|---|---|
 | "On average, how fast do robots move?" | {py:func}`~krrood.entity_query_language.factories.average` | a number |
-| "What fraction of robots run dangerously hot?" | {py:func}`~krrood.parametrization.probabilistic_queries.probability_of` | a number |
-| "Of the robots running hot, how many are critically hot?" | {py:func}`~krrood.parametrization.probabilistic_queries.probability_of` with `evidence` | a number |
-| "Given today's charge level, what does the rest look like?" | {py:func}`~krrood.parametrization.probabilistic_queries.distribution_of` | a distribution |
+| "What fraction of robots run dangerously hot?" | {py:func}`~krrood.entity_query_language.factories.probability_of` | a number |
+| "Of the robots running hot, how many are critically hot?" | {py:func}`~krrood.entity_query_language.factories.probability_of` with `evidence` | a number |
+| "Given today's charge level, what does the rest look like?" | {py:func}`~krrood.entity_query_language.factories.distribution_of` | a distribution |
 
 Without live telemetry on hand -- only the fitted model -- all three questions below
 get answered from it, via
@@ -70,11 +70,9 @@ from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     a,
     average,
-    variable,
-)
-from krrood.parametrization.probabilistic_queries import (
     distribution_of,
     probability_of,
+    variable,
 )
 from krrood.parametrization.model_registries import DictRegistry
 
@@ -226,8 +224,8 @@ answered from a model instead of only ever a table.
 
 ## API Reference
 
-- {py:func}`~krrood.parametrization.probabilistic_queries.distribution_of`
-- {py:func}`~krrood.parametrization.probabilistic_queries.probability_of`
+- {py:func}`~krrood.entity_query_language.factories.distribution_of`
+- {py:func}`~krrood.entity_query_language.factories.probability_of`
 - {py:func}`~krrood.entity_query_language.factories.average`
 - {py:class}`~krrood.parametrization.probabilistic_queries.ProbabilisticQuery`
 - {py:class}`~krrood.parametrization.probabilistic_queries.Distribution`
