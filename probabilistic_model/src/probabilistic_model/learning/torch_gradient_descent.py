@@ -6,6 +6,7 @@ leaf tensors of a torch optimizer and the loss is differentiated by autograd.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 import torch
 import tqdm
@@ -16,6 +17,13 @@ from probabilistic_model.learning.gradient_descent import (
     LayerType,
     Loss,
     TrainingRun,
+)
+from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
+from probabilistic_model.learning.device_memory import (
+    HostMemory,
+    PeakTrackingMemory,
+    ProbeMeasurement,
+    StepMemory,
 )
 from probabilistic_model.learning.training_schedule import (
     Convergence,
@@ -123,6 +131,68 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
         ).history_until_converged(training=training)
         return TrainingRun(trained_root=self.trained_root(), history=history)
 
+    def device_memory(self) -> PeakTrackingMemory:
+        """
+        :return: The memory of the device the parameters of the circuit are stored on.
+        """
+        device = self.parameters[0].device
+        if device.type == TorchDeviceType.CUDA:
+            return TorchDeviceMemory(device=device)
+        return HostMemory()
+
+    def step_memory(self, *arguments: torch.Tensor, probe_rows: int = 64) -> StepMemory:
+        """
+        Measure the memory of the loss and its gradient on two small batches, leaving
+        the parameters unchanged.
+
+        :param arguments: The tensors the :attr:`loss` takes after the circuit, one row
+            per training example each.
+        :param probe_rows: The rows of the smaller of the two batches; the larger has
+            twice as many.
+        :return: The memory one step allocates.
+        :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
+        """
+        device = self.parameters[0].device
+        if device.type != TorchDeviceType.CUDA:
+            raise UnmeasurableHostStepMemoryError()
+        memory = TorchDeviceMemory(device=device)
+        smaller_rows = max(1, min(probe_rows, arguments[0].shape[0] // 2))
+        return StepMemory.from_two_probes(
+            smaller=ProbeMeasurement(
+                rows=smaller_rows,
+                step_bytes=self.probe_step_bytes(
+                    batch=tuple(argument[:smaller_rows] for argument in arguments),
+                    memory=memory,
+                ),
+            ),
+            larger=ProbeMeasurement(
+                rows=2 * smaller_rows,
+                step_bytes=self.probe_step_bytes(
+                    batch=tuple(argument[: 2 * smaller_rows] for argument in arguments),
+                    memory=memory,
+                ),
+            ),
+        )
+
+    def probe_step_bytes(
+        self, *, batch: tuple[torch.Tensor, ...], memory: TorchDeviceMemory
+    ) -> int:
+        """
+        :param batch: The same rows of every training array.
+        :param memory: The memory of the CUDA device the parameters are stored on.
+        :return: The most bytes the loss and its gradient on the batch had in use beyond
+            what was in use before; the gradient is discarded afterwards.
+        """
+        memory.reset_peak()
+        before = memory.in_use_bytes()
+        self.loss.evaluate(
+            self.layer.copy_with_circuit_parameters(self.parameters), *batch
+        ).backward()
+        peak = memory.peak_bytes()
+        for parameter in self.parameters:
+            parameter.grad = None
+        return peak - before
+
     def step(
         self, *, optimizer: torch.optim.Optimizer, arguments: tuple[torch.Tensor, ...]
     ) -> float:
@@ -180,3 +250,39 @@ class TorchGradientDescentTraining(MiniBatchTraining):
 
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> float:
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
+
+
+# %% device memory
+
+
+class TorchDeviceType(StrEnum):
+    """
+    The types of torch devices that are told apart.
+    """
+
+    CUDA = "cuda"
+
+
+@dataclass(kw_only=True)
+class TorchDeviceMemory(PeakTrackingMemory):
+    """
+    The memory of a CUDA device torch stores tensors on.
+    """
+
+    device: torch.device
+    """
+    The CUDA device.
+    """
+
+    def free_bytes(self) -> int:
+        free, _ = torch.cuda.mem_get_info(self.device)
+        return free
+
+    def in_use_bytes(self) -> int:
+        return torch.cuda.memory_allocated(self.device)
+
+    def peak_bytes(self) -> int:
+        return torch.cuda.max_memory_allocated(self.device)
+
+    def reset_peak(self) -> None:
+        torch.cuda.reset_peak_memory_stats(self.device)

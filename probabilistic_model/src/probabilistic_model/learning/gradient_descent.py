@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import functools
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 import jax
 import jax.numpy as jnp
@@ -21,6 +22,12 @@ from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import Callable, Generic, Self, TypeVar
 
+from probabilistic_model.learning.device_memory import (
+    DeviceMemory,
+    HostMemory,
+    ProbeMeasurement,
+    StepMemory,
+)
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
@@ -299,6 +306,55 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
             history=history,
         )
 
+    def device_memory(self) -> DeviceMemory:
+        """
+        :return: The memory of the device the parameters of the circuit are stored on.
+        """
+        [device] = self.initial_parameters[0].devices()
+        if device.platform == JaxPlatform.CPU:
+            return HostMemory()
+        return JaxDeviceMemory(device=device)
+
+    def step_memory(self, *arguments: jax.Array, probe_rows: int = 64) -> StepMemory:
+        """
+        :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
+            per training example each.
+        :param probe_rows: The rows of the smaller of the two batches the compiled step
+            is measured on; the larger has twice as many.
+        :return: The memory one compiled step allocates, as XLA reports it.
+        """
+        smaller_rows = max(1, min(probe_rows, arguments[0].shape[0] // 2))
+        return StepMemory.from_two_probes(
+            smaller=ProbeMeasurement(
+                rows=smaller_rows,
+                step_bytes=self.compiled_step_bytes(
+                    batch=tuple(argument[:smaller_rows] for argument in arguments)
+                ),
+            ),
+            larger=ProbeMeasurement(
+                rows=2 * smaller_rows,
+                step_bytes=self.compiled_step_bytes(
+                    batch=tuple(argument[: 2 * smaller_rows] for argument in arguments)
+                ),
+            ),
+        )
+
+    def compiled_step_bytes(self, *, batch: tuple[jax.Array, ...]) -> int:
+        """
+        :param batch: The same rows of every training array.
+        :return: The bytes the step compiled for this batch allocates: its batch, its
+            temporaries and its new state.
+        """
+        analysis = (
+            jax.jit(self.step).lower(self.initial_state(), *batch).compile()
+        ).memory_analysis()
+        return (
+            sum(argument.nbytes for argument in batch)
+            + analysis.temp_size_in_bytes
+            + analysis.output_size_in_bytes
+            - analysis.alias_size_in_bytes
+        )
+
     def initial_state(self) -> TrainingState:
         """
         :return: The state before the first step: the parameters before training and a
@@ -345,3 +401,41 @@ class GradientDescentTraining(MiniBatchTraining):
     def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> float:
         self.state = self.compiled_step(self.state, *batch)
         return float(self.state.loss)
+
+
+# %% device memory
+
+
+class JaxPlatform(StrEnum):
+    """
+    The platforms of jax devices that are told apart.
+    """
+
+    CPU = "cpu"
+
+
+class JaxMemoryStatistic(StrEnum):
+    """
+    The entries of :meth:`jax.Device.memory_stats` that are read, each in bytes.
+    """
+
+    LIMIT = "bytes_limit"
+    IN_USE = "bytes_in_use"
+
+
+@dataclass(kw_only=True)
+class JaxDeviceMemory(DeviceMemory):
+    """
+    The memory of an accelerator jax stores arrays on.
+    """
+
+    device: jax.Device
+    """
+    The accelerator.
+    """
+
+    def free_bytes(self) -> int:
+        statistics = self.device.memory_stats()
+        return (
+            statistics[JaxMemoryStatistic.LIMIT] - statistics[JaxMemoryStatistic.IN_USE]
+        )

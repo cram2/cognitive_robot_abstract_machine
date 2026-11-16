@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from array_api_compat import array_namespace, device
-from typing_extensions import Iterator
+from typing_extensions import Iterator, Self
+
+from probabilistic_model.learning.device_memory import DeviceMemory, StepMemory
+from probabilistic_model.learning.exceptions import NotEnoughMemoryError
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -124,6 +127,27 @@ class MiniBatches:
         Seed :attr:`random_number_generator` with :attr:`seed`.
         """
         self.random_number_generator = np.random.default_rng(self.seed)
+
+    @classmethod
+    def fitting_in_memory(
+        cls, *, memory: DeviceMemory, step_memory: StepMemory, seed: int = 69
+    ) -> Self:
+        """
+        :param memory: The memory of the device that trains.
+        :param step_memory: The memory one training step allocates.
+        :param seed: The seed of the shuffling.
+        :return: Mini-batches of the most rows whose steps fit in the free memory.
+        :raises NotEnoughMemoryError: If not even a step on one row fits.
+        """
+        free_bytes = memory.free_bytes()
+        batch_size = step_memory.rows_fitting_in(free_bytes=free_bytes)
+        if batch_size < 1:
+            raise NotEnoughMemoryError(
+                free_bytes=free_bytes,
+                fixed_bytes=step_memory.fixed_bytes,
+                bytes_per_row=step_memory.bytes_per_row,
+            )
+        return cls(batch_size=batch_size, seed=seed)
 
     def batches_of_epoch(
         self, *, arguments: tuple[BackendArray, ...]
