@@ -14,6 +14,7 @@ import numpy as np
 
 from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
+from krrood.patterns.called_positionally import called_positionally
 
 
 class JoystickEStop:
@@ -40,6 +41,7 @@ class JoystickEStop:
             Joy, "/joy", self.joy_cb, 10
         )
 
+    @called_positionally
     def joy_cb(self, joy_msg: Joy):
         """
         Cancels all Giskard goals.

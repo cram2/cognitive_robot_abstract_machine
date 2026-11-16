@@ -35,6 +35,7 @@ class MovesGripperToConfiguration(ABC):
     @abstractmethod
     def moving_gripper_to(
         cls,
+        *,
         configuration: GripperConfiguration,
         stall_minimum_time: float | None = None,
         tolerate_stall: bool = False,
@@ -89,6 +90,7 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
     @classmethod
     def moving_gripper_to(
         cls,
+        *,
         configuration: GripperConfiguration,
         stall_minimum_time: float | None = None,
         tolerate_stall: bool = False,
@@ -152,10 +154,11 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
         if not self.tolerate_stall:
             return finger_task
         return Parallel(
-            nodes=[finger_task, self._stall_monitor(finger_task)], minimum_success=1
+            nodes=[finger_task, self._stall_monitor(finger_task=finger_task)],
+            minimum_success=1,
         )
 
-    def _stall_monitor(self, finger_task: MotionStatechartNode) -> Stalled:
+    def _stall_monitor(self, *, finger_task: MotionStatechartNode) -> Stalled:
         """
         :param finger_task: The task driving the fingers to the goal.
         :return: A monitor that observes `finger_task` no longer approaching its goal for

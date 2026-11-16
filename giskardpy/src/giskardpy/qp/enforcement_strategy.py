@@ -43,7 +43,7 @@ def normalize_slack_weight(
     return weight * (1 / (sm.Scalar(velocity_scale) ** 2 * control_horizon))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EnforcementStrategy(ABC):
     """
     Turns a block of constraints into the QP building blocks that enforce them: the
@@ -141,7 +141,7 @@ class EnforcementStrategy(ABC):
         return Vector([dof.variables.acceleration for dof in self.degrees_of_freedom])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
     """
     Base for strategies that map per-constraint expressions onto QP rows and read their
@@ -152,16 +152,14 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
     """
 
     @abstractmethod
-    def create_bounds(
-        self, bounds_getter: Callable[[GiskardConstraint], Scalar]
-    ) -> Vector:
+    def create_bounds(self, *, bounds_getter: Callable[..., Scalar]) -> Vector:
         """
         Builds the constraint bounds, reading the relevant bound of each constraint via
         the getter.
         """
 
     def lower_bound_of_constraint(
-        self, constraint: GiskardInequalityConstraint
+        self, *, constraint: GiskardInequalityConstraint
     ) -> Scalar:
         """
         The lower bound this strategy enforces for an inequality constraint.
@@ -169,7 +167,7 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         return constraint.lower_bound
 
     def upper_bound_of_constraint(
-        self, constraint: GiskardInequalityConstraint
+        self, *, constraint: GiskardInequalityConstraint
     ) -> Scalar:
         """
         The upper bound this strategy enforces for an inequality constraint.
@@ -177,7 +175,7 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         return constraint.upper_bound
 
     def equality_bound_of_constraint(
-        self, constraint: GiskardEqualityConstraint
+        self, *, constraint: GiskardEqualityConstraint
     ) -> Scalar:
         """
         The bound this strategy enforces for an equality constraint.
@@ -188,24 +186,24 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         """
         Builds the lower bounds of the inequality constraints.
         """
-        self._require_constraint_type(GiskardInequalityConstraint)
-        return self.create_bounds(self.lower_bound_of_constraint)
+        self._require_constraint_type(expected=GiskardInequalityConstraint)
+        return self.create_bounds(bounds_getter=self.lower_bound_of_constraint)
 
     def create_upper_bounds(self) -> Vector:
         """
         Builds the upper bounds of the inequality constraints.
         """
-        self._require_constraint_type(GiskardInequalityConstraint)
-        return self.create_bounds(self.upper_bound_of_constraint)
+        self._require_constraint_type(expected=GiskardInequalityConstraint)
+        return self.create_bounds(bounds_getter=self.upper_bound_of_constraint)
 
     def create_equality_bounds(self) -> Vector:
         """
         Builds the bounds of the equality constraints.
         """
-        self._require_constraint_type(GiskardEqualityConstraint)
-        return self.create_bounds(self.equality_bound_of_constraint)
+        self._require_constraint_type(expected=GiskardEqualityConstraint)
+        return self.create_bounds(bounds_getter=self.equality_bound_of_constraint)
 
-    def _require_constraint_type(self, expected: type[GiskardConstraint]) -> None:
+    def _require_constraint_type(self, *, expected: type[GiskardConstraint]) -> None:
         """
         Ensures every constraint handled by this strategy is of the expected type.
         """
@@ -219,7 +217,7 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
                 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IntegralStrategy(ExpressionEnforcementStrategy):
     """
     Enforces a constraint on the integral of an expression's derivative over the prediction
@@ -302,7 +300,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
                         constraint.velocity_scale,
                         self.qp_controller_config.control_horizon,
                     )
-                    * self.demand_compensation_of_constraint(constraint)
+                    * self.demand_compensation_of_constraint(constraint=constraint)
                     for constraint in self.constraints
                 ]
             ),
@@ -320,7 +318,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         )
 
     def demand_compensation_of_constraint(
-        self, constraint: GiskardConstraint
+        self, *, constraint: GiskardConstraint
     ) -> Scalar:
         """
         The factor that makes a demand capped by the constraint's cruise velocity pull
@@ -332,18 +330,22 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         one's lowered.
         """
         change_at_velocity_scale = self.change_within_control_horizon(
-            constraint.velocity_scale
+            velocity=constraint.velocity_scale
         )
         return constraint.kept_fraction_of_demand(
-            change_at_velocity_scale
+            reachable_change=change_at_velocity_scale
         ).safe_division(
             other=constraint.kept_fraction_of_demand(
-                self.reachable_change_of_constraint(constraint)
+                reachable_change=self.reachable_change_of_constraint(
+                    constraint=constraint
+                )
             ),
             if_nan=1,
         )
 
-    def reachable_change_of_constraint(self, constraint: GiskardConstraint) -> Scalar:
+    def reachable_change_of_constraint(
+        self, *, constraint: GiskardConstraint
+    ) -> Scalar:
         """
         The largest change of a constraint's expression that may be demanded within the
         control horizon: the change the robot executes at the constraint's cruise
@@ -352,11 +354,11 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         if constraint.cruise_velocity is None:
             raise MissingCruiseVelocityError(constraint_name=constraint.name)
         return (
-            self.change_within_control_horizon(constraint.cruise_velocity)
+            self.change_within_control_horizon(velocity=constraint.cruise_velocity)
             / self.qp_controller_config.executed_to_mean_velocity_ratio
         )
 
-    def change_within_control_horizon(self, velocity: sm.ScalarData) -> Scalar:
+    def change_within_control_horizon(self, *, velocity: sm.ScalarData) -> Scalar:
         """
         :return: How far an expression changes within the control horizon at the given
             velocity.
@@ -368,7 +370,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         )
 
     def lower_bound_of_constraint(
-        self, constraint: GiskardInequalityConstraint
+        self, *, constraint: GiskardInequalityConstraint
     ) -> Scalar:
         """
         A positive lower bound demands motion, so it is capped to the reachable change.
@@ -376,11 +378,12 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         A negative one only permits motion and is kept, however far away it is.
         """
         return sm.min(
-            constraint.lower_bound, self.reachable_change_of_constraint(constraint)
+            constraint.lower_bound,
+            self.reachable_change_of_constraint(constraint=constraint),
         )
 
     def upper_bound_of_constraint(
-        self, constraint: GiskardInequalityConstraint
+        self, *, constraint: GiskardInequalityConstraint
     ) -> Scalar:
         """
         A negative upper bound demands motion, so it is capped to the reachable change.
@@ -388,27 +391,27 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         A positive one only permits motion and is kept, however far away it is.
         """
         return sm.max(
-            constraint.upper_bound, -self.reachable_change_of_constraint(constraint)
+            constraint.upper_bound,
+            -self.reachable_change_of_constraint(constraint=constraint),
         )
 
     def equality_bound_of_constraint(
-        self, constraint: GiskardEqualityConstraint
+        self, *, constraint: GiskardEqualityConstraint
     ) -> Scalar:
         """
         An equality bound always demands motion, so it is capped to the reachable change
         by the constraint's own bound cap.
         """
         return constraint.bound_cap.cap_bound(
-            constraint.bound, self.reachable_change_of_constraint(constraint)
+            bound=constraint.bound,
+            reachable_change=self.reachable_change_of_constraint(constraint=constraint),
         )
 
-    def create_bounds(
-        self, bounds_getter: Callable[[GiskardConstraint], Scalar]
-    ) -> Vector:
+    def create_bounds(self, *, bounds_getter: Callable[..., Scalar]) -> Vector:
         """
         Builds the bounds, one per constraint.
         """
-        return Vector([bounds_getter(c) for c in self.constraints])
+        return Vector([bounds_getter(constraint=c) for c in self.constraints])
 
     def create_names(self) -> list[str]:
         """
@@ -417,7 +420,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         return [c.name for c in self.constraints]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VelocityStrategy(ExpressionEnforcementStrategy):
     """
     The constraint will be applied to the derivative of the expression.
@@ -523,9 +526,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             names=names,
         )
 
-    def create_bounds(
-        self, bounds_getter: Callable[[GiskardConstraint], Scalar]
-    ) -> Vector:
+    def create_bounds(self, *, bounds_getter: Callable[..., Scalar]) -> Vector:
         """
         Builds the bounds, one per constraint and control step.
         """
@@ -533,7 +534,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         for _ in range(self.qp_controller_config.control_horizon):
             for c in self.constraints:
                 bounds.append(
-                    bounds_getter(c)
+                    bounds_getter(constraint=c)
                     * self.qp_controller_config.control_time_step.total_seconds()
                 )
         return Vector(bounds)
@@ -549,7 +550,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         return names
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SystemDynamicsStrategy(EnforcementStrategy):
     """
     The constraints produced by this class describe the discrete-time relationships between variables

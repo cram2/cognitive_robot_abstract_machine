@@ -19,7 +19,7 @@ from krrood_spatial_math.spatial_types import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GeometricConstraintBuilder:
     """
     Builds high-level geometric constraints (point, vector, and rotation goals, and
@@ -41,7 +41,7 @@ class GeometricConstraintBuilder:
         return 0.5
 
     @staticmethod
-    def _indexed_constraint_name(name: str | None, index: int) -> str | None:
+    def _indexed_constraint_name(*, name: str | None, index: int) -> str | None:
         """
         Builds a per-axis constraint name, or None so the collection assigns an index-
         based name.
@@ -52,6 +52,7 @@ class GeometricConstraintBuilder:
 
     def add_point_goal_constraints(
         self,
+        *,
         frame_P_current: Point3,
         frame_P_goal: Point3,
         cruise_velocity: sm.ScalarData,
@@ -81,12 +82,13 @@ class GeometricConstraintBuilder:
                 quadratic_weight=quadratic_weight,
                 cruise_velocity=cruise_velocity,
                 velocity_scale=VelocityScale.TRANSLATION,
-                name=self._indexed_constraint_name(name, i),
+                name=self._indexed_constraint_name(name=name, index=i),
                 bound_cap=error_cap,
             )
 
     def add_position_constraint(
         self,
+        *,
         expression_current: sm.SymbolicScalar,
         expression_goal: sm.ScalarData,
         cruise_velocity: sm.ScalarData,
@@ -118,6 +120,7 @@ class GeometricConstraintBuilder:
 
     def add_vector_goal_constraints(
         self,
+        *,
         frame_V_current: Vector3,
         frame_V_goal: Vector3,
         cruise_velocity: sm.ScalarData,
@@ -151,11 +154,12 @@ class GeometricConstraintBuilder:
                 cruise_velocity=cruise_velocity,
                 velocity_scale=VelocityScale.ROTATION,
                 quadratic_weight=quadratic_weight,
-                name=self._indexed_constraint_name(name, i),
+                name=self._indexed_constraint_name(name=name, index=i),
             )
 
     def add_rotation_goal_constraints(
         self,
+        *,
         frame_R_current: RotationMatrix,
         frame_R_goal: RotationMatrix,
         cruise_velocity: sm.ScalarData,
@@ -171,7 +175,9 @@ class GeometricConstraintBuilder:
         :param frame_R_goal: goal rotation as rotation matrix
         :param cruise_velocity: rad/s
         """
-        quaternion_error = self._quaternion_error(frame_R_current, frame_R_goal)
+        quaternion_error = self._quaternion_error(
+            frame_R_current=frame_R_current, frame_R_goal=frame_R_goal
+        )
 
         # w is redundant
         error_cap = RotationBoundCap(
@@ -184,7 +190,7 @@ class GeometricConstraintBuilder:
                 quadratic_weight=quadratic_weight,
                 cruise_velocity=sm.Scalar(cruise_velocity)
                 * self.quaternion_error_per_radian,
-                name=self._indexed_constraint_name(name, i),
+                name=self._indexed_constraint_name(name=name, index=i),
                 bound_cap=error_cap,
                 velocity_scale=VelocityScale.ROTATION
                 * self.quaternion_error_per_radian,
@@ -192,6 +198,7 @@ class GeometricConstraintBuilder:
 
     def add_yaw_goal_constraint(
         self,
+        *,
         frame_R_current: RotationMatrix,
         frame_R_goal: RotationMatrix,
         cruise_velocity: sm.ScalarData,
@@ -212,7 +219,9 @@ class GeometricConstraintBuilder:
         frame_R_goal_yaw = RotationMatrix.from_rpy(
             yaw=frame_R_goal.rpy[2], reference_frame=frame_R_goal.reference_frame
         )
-        quaternion_error = self._quaternion_error(frame_R_current, frame_R_goal_yaw)
+        quaternion_error = self._quaternion_error(
+            frame_R_current=frame_R_current, frame_R_goal=frame_R_goal_yaw
+        )
         self.collection.add_equality_constraint(
             task_expression=quaternion_error.z,
             equality_bound=-quaternion_error.z,
@@ -228,7 +237,7 @@ class GeometricConstraintBuilder:
 
     @staticmethod
     def _quaternion_error(
-        frame_R_current: RotationMatrix, frame_R_goal: RotationMatrix
+        *, frame_R_current: RotationMatrix, frame_R_goal: RotationMatrix
     ) -> Quaternion:
         """
         :return: The rotation from frame_R_current to frame_R_goal, the shorter way
@@ -251,6 +260,7 @@ class GeometricConstraintBuilder:
 
     def add_translational_velocity_limit(
         self,
+        *,
         frame_P_current: Point3,
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
@@ -282,6 +292,7 @@ class GeometricConstraintBuilder:
 
     def add_rotational_velocity_limit(
         self,
+        *,
         frame_R_current: RotationMatrix,
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,

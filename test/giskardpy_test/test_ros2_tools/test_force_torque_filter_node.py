@@ -23,16 +23,16 @@ def test_offset_estimator_tracks_constant_offset():
     xs = offset + noise
     last = None
     for x in xs:
-        last = est.update(float(x))
+        last = est.update(x=float(x))
     assert abs(last - offset) < 0.15
 
 
 def test_offset_estimator_initializes_to_first_sample():
     est = OffsetEstimator(alpha=0.5)
     first = 42.0
-    assert est.update(first) == pytest.approx(first)
+    assert est.update(x=first) == pytest.approx(first)
     # Next update should move toward the new value
-    y = est.update(50.0)
+    y = est.update(x=50.0)
     assert first < y < 50.0
 
 
@@ -43,7 +43,7 @@ def test_lowpass_butter_reduces_high_freq():
     low = np.sin(2 * np.pi * 1 * t)
     high = 0.5 * np.sin(2 * np.pi * 30 * t)
     x = low + high
-    y = np.array([filt.step(float(xi)) for xi in x])
+    y = np.array([filt.step(x=float(xi)) for xi in x])
     # Basic check: overall std should be reduced
     assert y.std() < x.std()
 
@@ -53,7 +53,7 @@ def test_derivative_of_linear_ramp_is_constant():
     dt = 0.01
     slope = 3.0
     xs = [slope * i * dt for i in range(200)]
-    ys = [der.step(x, dt) for x in xs]
+    ys = [der.step(x=x, dt=dt) for x in xs]
     ys = ys[1:]
     assert np.mean(ys) == pytest.approx(slope, abs=1e-2)
 
@@ -74,7 +74,7 @@ def test_wrench_processor_filters_and_derives():
         offset_alpha=0.01,
         warmup_samples=0,
     )
-    proc = WrenchProcessor(cfg)
+    proc = WrenchProcessor(config=cfg)
 
     from geometry_msgs.msg import Vector3, Wrench
 
@@ -92,7 +92,7 @@ def test_wrench_processor_filters_and_derives():
             force=Vector3(x=float(xi), y=0.0, z=0.0),
             torque=Vector3(x=0.0, y=0.0, z=0.0),
         )
-        wf, wd = proc.process(w, dt)
+        wf, wd = proc.process(w=w, dt=dt)
         filt_vals.append(wf.force.x)
         diff_vals.append(wd.force.x)
 
