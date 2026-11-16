@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
-from threading import Thread, Timer
+import threading
+import time
+from threading import RLock, Thread, Timer
 from uuid import UUID
 
 import numpy as np
@@ -15,6 +17,7 @@ from py_trees.behaviours import Failure, Running, Success
 from py_trees.common import Status
 from rclpy.context import Context
 from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.messages import WorldUpdate
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -163,6 +166,65 @@ def answer_trigger(
     return response
 
 
+def lock_is_free_for_another_thread(
+    lock: RLock, timeout: timedelta = timedelta(milliseconds=300)
+) -> bool:
+    """
+    :param lock: A reentrant lock, which the thread holding it would always acquire
+        again.
+    :param timeout: How long the other thread waits for ``lock``.
+    :return: Whether a thread other than the caller acquires ``lock`` within
+        ``timeout``.
+    """
+    acquired = []
+
+    def acquire_and_release() -> None:
+        if lock.acquire(timeout=timeout.total_seconds()):
+            acquired.append(True)
+            lock.release()
+
+    probe = Thread(target=acquire_and_release)
+    probe.start()
+    probe.join()
+    return acquired == [True]
+
+
+@dataclass(kw_only=True)
+class WorldFetchAnsweredTooLate:
+    """
+    A world fetcher service that answers only after a delay, with no world.
+    """
+
+    answer_delay: timedelta
+    """
+    How long the service takes to answer a request.
+    """
+
+    def answer(
+        self, request: Trigger.Request, response: Trigger.Response
+    ) -> Trigger.Response:
+        """
+        :return: ``response``, holding no world, after :attr:`answer_delay`.
+        """
+        time.sleep(self.answer_delay.total_seconds())
+        return response
+
+
+@pytest.fixture
+def world_fetch_answered_too_late(
+    other_process_node: Node,
+) -> Iterator[WorldFetchAnsweredTooLate]:
+    """
+    A process that offers a world fetcher service, which answers only after two seconds.
+    """
+    late_service = WorldFetchAnsweredTooLate(answer_delay=timedelta(seconds=2))
+    service = other_process_node.create_service(
+        Trigger, "/answering_too_late/fetch_world", late_service.answer
+    )
+    yield late_service
+    other_process_node.destroy_service(service)
+
+
 @pytest.fixture
 def joined_robokudo(
     node: Node, shared_world: SharedWorld, engine: EngineRunningABehaviour
@@ -256,6 +318,37 @@ class TestJoiningSharedWorld:
 
         assert wait_until(
             lambda: table.id in [body.id for body in joined_robokudo.world.bodies]
+        )
+
+    def test_objects_of_a_pass_are_published_once_the_world_is_released(
+        self, joined_robokudo: RoboKudo, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """
+        Every update about the objects of a pass leaves RoboKudo only while no thread
+        holds its world, as semDT requires of a modification.
+        """
+        synchronizer = joined_robokudo.synchronizer
+        world_lock = joined_robokudo.world.state.world_lock
+        world_released_during_publish = []
+        publish = synchronizer.publish
+
+        def publish_noting_the_world_lock(update: WorldUpdate) -> None:
+            world_released_during_publish.append(
+                lock_is_free_for_another_thread(world_lock)
+            )
+            publish(update)
+
+        monkeypatch.setattr(synchronizer, "publish", publish_noting_the_world_lock)
+
+        put_pass_into_world(
+            joined_robokudo,
+            cas_seen_from(joined_robokudo.world, camera_pose(x=1.0)),
+            make_object_hypothesis(translation=(0.0, 0.5, 2.0)),
+        )
+
+        assert world_released_during_publish
+        assert world_released_during_publish == [True] * len(
+            world_released_during_publish
         )
 
     def test_perceived_object_reaches_the_shared_world_at_its_pose(
@@ -474,6 +567,28 @@ class TestDiscoveringASharedWorld:
         ]
         robokudo.close()
         served_worlds[0].close()
+
+    def test_stops_serving_its_node_when_the_shared_world_arrives_too_late(
+        self,
+        node: Node,
+        engine: EngineRunningABehaviour,
+        world_fetch_answered_too_late: WorldFetchAnsweredTooLate,
+    ) -> None:
+        """
+        A world fetch that takes longer than the configured fetch timeout fails
+        RoboKudo's start, and leaves no thread serving its node.
+        """
+        threads_before = set(threading.enumerate())
+
+        with pytest.raises(TimeoutError):
+            RoboKudo(
+                node=node,
+                analysis_engine=engine,
+                world_discovery_timeout=timedelta(seconds=10),
+                world_fetch_timeout=world_fetch_answered_too_late.answer_delay / 4,
+            )
+
+        assert wait_until(lambda: set(threading.enumerate()) <= threads_before)
 
 
 # %% one RoboKudo per process

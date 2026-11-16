@@ -85,6 +85,11 @@ class RoboKudo:
     of its own.
     """
 
+    world_fetch_timeout: timedelta = timedelta(seconds=300)
+    """
+    How long the process serving a shared world may take to send it.
+    """
+
     publishes_own_world: bool = False
     """
     Whether to publish a world of its own to RViz, as markers and as the tf frames of
@@ -134,6 +139,9 @@ class RoboKudo:
         perceive into an empty world of its own.
 
         .. note:: No other executor may serve :attr:`node`.
+
+        :raises TimeoutError: If the process serving a shared world does not send it
+            within :attr:`world_fetch_timeout`; :attr:`node` is no longer served then.
         """
         self.executor = SingleThreadedExecutor(context=self.node.context)
         self.executor.add_node(self.node)
@@ -149,7 +157,15 @@ class RoboKudo:
             )
             self.world = World()
         else:
-            self.world = fetch_world_from_service(self.node)
+            try:
+                self.world = fetch_world_from_service(
+                    self.node,
+                    timeout_seconds=self.world_fetch_timeout.total_seconds(),
+                )
+            except BaseException:
+                # Nothing could close the executor started above once this start fails.
+                self.close()
+                raise
             self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
 
     @classmethod
@@ -294,8 +310,8 @@ class RoboKudo:
         Form a belief about each object the last pass of ``pipeline`` found and match
         the beliefs to the perceivable objects of :attr:`world`. A matched object is
         updated as :meth:`PerceptionBelief.update_known_object` describes; any other
-        belief is added to :attr:`world`. No other thread changes :attr:`world`
-        meanwhile.
+        belief is added to :attr:`world`. No other thread changes :attr:`world` while the
+        beliefs are matched; each change is published once its modification has ended.
 
         A pass without a camera pose in the world is left out, with a warning logged.
 
@@ -317,7 +333,7 @@ class RoboKudo:
             )
             return
         world_T_camera = observation.world_T_camera
-        with self.world._world_lock:
+        with self.world.state.world_lock:
             if (
                 world_T_camera.reference_frame
                 not in self.world.kinematic_structure_entities
@@ -338,12 +354,14 @@ class RoboKudo:
                 is not None
             ]
             matches = matcher.match(beliefs=beliefs, world=self.world)
-            for belief in beliefs:
-                known_object = matches.get(belief)
-                if known_object is None:
-                    belief.add_to_world(world=self.world)
-                    continue
-                belief.update_known_object(known_object=known_object, world=self.world)
+        # Released first: a modification publishes only once no outer hold of the
+        # world lock remains, as semDT's modify_world requires.
+        for belief in beliefs:
+            known_object = matches.get(belief)
+            if known_object is None:
+                belief.add_to_world(world=self.world)
+                continue
+            belief.update_known_object(known_object=known_object, world=self.world)
 
     def close(self) -> None:
         """

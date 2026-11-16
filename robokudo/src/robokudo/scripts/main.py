@@ -101,6 +101,13 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "_world_fetch_timeout",
+        dest="world_fetch_timeout",
+        type=float,
+        default=RoboKudo.world_fetch_timeout.total_seconds(),
+        help="Seconds the process serving a shared world may take to send it.",
+    )
+    parser.add_argument(
         "_debugmode",
         action="store_true",
         help="If set, the rcply root logger will be set to DEBUG log level which will yield many ROS-related debug messages.",
@@ -174,6 +181,7 @@ def main() -> None:
         node=node1,
         analysis_engine=loaded_ae,
         world_discovery_timeout=timedelta(seconds=args.world_discovery_timeout),
+        world_fetch_timeout=timedelta(seconds=args.world_fetch_timeout),
         publishes_own_world=True,
     )
 
