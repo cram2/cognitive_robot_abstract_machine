@@ -33,7 +33,7 @@ from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Query
 from krrood.ormatic.eql_interface import eql_to_sql
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 
 T = TypeVar("T")

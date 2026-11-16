@@ -166,6 +166,9 @@ class CausalRelation(ClassRelation):
         )
 
     def __str__(self):
+        """
+        :return: The relation as ``causal(first, second)``, by its variables' names.
+        """
         return f"causal({self.first.name}, {self.second.name})"
 
 

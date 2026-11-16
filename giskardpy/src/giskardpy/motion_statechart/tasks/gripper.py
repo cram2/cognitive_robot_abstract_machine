@@ -33,7 +33,7 @@ class MovesGripperToConfiguration(ABC):
 
     @classmethod
     @abstractmethod
-    def moving_gripper_to(
+    def create_gripper_goal(
         cls,
         *,
         configuration: GripperConfiguration,
@@ -88,7 +88,7 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
     """
 
     @classmethod
-    def moving_gripper_to(
+    def create_gripper_goal(
         cls,
         *,
         configuration: GripperConfiguration,

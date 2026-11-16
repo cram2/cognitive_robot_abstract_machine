@@ -487,8 +487,10 @@ def test_supporting(two_block_world) -> None:
     center, top = two_block_world
 
     with center._world.modify_world():
-        top.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=center, z=1.0)
+        top.parent_connection.update_parent_T_connection(
+            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+                reference_frame=center, z=1.0
+            )
         )
     assert SupportedBy(supported=top, supporting=center)()
     assert not SupportedBy(supported=center, supporting=top)()
@@ -858,8 +860,8 @@ def _stand_on(center: Body, top: Body, gap: float = 0.0) -> None:
     Stand ``top`` on ``center``, leaving ``gap`` between the faces that meet.
     """
     with center._world.modify_world():
-        top.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+        top.parent_connection.update_parent_T_connection(
+            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
                 reference_frame=center, z=1.0 + gap
             )
         )

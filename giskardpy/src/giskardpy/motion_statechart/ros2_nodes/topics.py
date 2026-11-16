@@ -1,3 +1,7 @@
+"""
+Motion statechart nodes that subscribe or publish to ROS 2 topics.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,7 +13,7 @@ from rclpy.subscription import Subscription
 from typing_extensions import Generic
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues

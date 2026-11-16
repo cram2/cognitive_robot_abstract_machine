@@ -152,7 +152,7 @@ def test_a_preset_configuration_is_reached_through_the_endpoint_of_its_state(
     )
     endpoint = gripper.griplink_endpoint(GripperState.CLOSE)
 
-    task = GriplinkActionServerTask.moving_gripper_to(configuration=configuration)
+    task = GriplinkActionServerTask.create_gripper_goal(configuration=configuration)
 
     assert type(task) is GriplinkPresetActionServerTask
     assert (task.action_topic, task.message_type, task.grip_preset) == (
@@ -176,7 +176,7 @@ def test_a_flex_configuration_is_reached_with_its_hardware_parameters(
     )
     endpoint = gripper.griplink_endpoint(GripperState.FLEXCLOSE)
 
-    task = GriplinkActionServerTask.moving_gripper_to(configuration=configuration)
+    task = GriplinkActionServerTask.create_gripper_goal(configuration=configuration)
 
     assert type(task) is GriplinkFlexActionServerTask
     assert (
@@ -203,10 +203,10 @@ def test_a_configuration_of_no_griplink_kind_is_reached_with_a_finger_goal(
         left_gripper_of(daisy_world), GripperState.CLOSE
     )
 
-    goal = GriplinkActionServerTask.moving_gripper_to(configuration=configuration)
+    goal = GriplinkActionServerTask.create_gripper_goal(configuration=configuration)
 
     assert type(goal) is type(
-        MoveFingers.moving_gripper_to(configuration=configuration)
+        MoveFingers.create_gripper_goal(configuration=configuration)
     )
 
 
@@ -219,7 +219,7 @@ def test_a_state_served_by_an_action_of_the_other_kind_has_no_endpoint(
     ).joint_state
 
     with pytest.raises(NoGriplinkEndpoint):
-        GriplinkActionServerTask.moving_gripper_to(
+        GriplinkActionServerTask.create_gripper_goal(
             configuration=GriplinkPresetConfiguration(
                 end_effector=gripper, joint_state=flex_close_state
             )

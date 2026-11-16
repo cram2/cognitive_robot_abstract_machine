@@ -1,3 +1,8 @@
+"""
+Semantic annotations of the furniture, appliances, doors, handles and other things a
+world contains.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -7,7 +12,7 @@ from typing_extensions import Iterable, Iterator, Self, TYPE_CHECKING
 
 import numpy as np
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent

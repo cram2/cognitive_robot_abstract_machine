@@ -1,3 +1,7 @@
+"""
+Tests of the context extensions statechart nodes declare they require.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,7 +16,7 @@ from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% mimics
 

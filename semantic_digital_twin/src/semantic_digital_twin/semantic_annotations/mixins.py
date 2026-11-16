@@ -15,7 +15,7 @@ import trimesh
 from trimesh.util import concatenate
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.model_registries import ModelRegistry
 from krrood.patterns.mixin import Mixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric

@@ -1,3 +1,8 @@
+"""
+Conversion of worlds into MultiSim simulations, with their cameras, lights and MuJoCo
+properties.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -30,7 +35,7 @@ from physics_simulators.base_simulator import (
     SimulatorConstraints,
 )
 from krrood.exceptions import UnboundGenericParameter
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import recursive_subclasses
 from scipy.spatial.transform import Rotation

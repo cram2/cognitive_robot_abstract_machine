@@ -27,10 +27,14 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from semantic_digital_twin.world import World
 
-from giskardpy.motion_statechart.ros2_nodes.action_servers import (
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
+from giskardpy.motion_statechart.ros2_nodes.robotiq import (
     RobotiqGripperActionServerTask,
 )
 from krrood.patterns.called_positionally import called_positionally
+from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.tracy import Tracy
 
 
 def unique_topic(prefix: str = "robotiq/gripper_cmd") -> str:
@@ -107,6 +111,45 @@ def run_statechart_until_observed(
     )
     executor.compile(statechart=statechart)
     executor.tick_until_end()
+
+
+# %% reaching a gripper configuration
+
+
+@pytest.mark.parametrize("state", [GripperState.OPEN, GripperState.CLOSE])
+def test_a_configuration_is_reached_through_the_parallel_gripper_command_server_of_its_gripper(
+    tracy_world: World, state: GripperState
+) -> None:
+    gripper = tracy_world.get_semantic_annotations_by_type(Tracy)[
+        0
+    ].left_arm.end_effector
+    configuration = gripper.default_configuration(state)
+
+    task = RobotiqGripperActionServerTask.create_gripper_goal(
+        configuration=configuration
+    )
+
+    assert type(task) is RobotiqGripperActionServerTask
+    assert (task.action_topic, task.target_position) == (
+        gripper.parallel_gripper_command_topic,
+        configuration.joint_state.target_value(gripper.knuckle_joint),
+    )
+
+
+def test_a_gripper_without_a_parallel_gripper_command_server_is_reached_with_a_finger_goal(
+    pr2_world_state_reset: World,
+) -> None:
+    configuration = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[
+        0
+    ].left_arm.end_effector.default_configuration(GripperState.CLOSE)
+
+    goal = RobotiqGripperActionServerTask.create_gripper_goal(
+        configuration=configuration
+    )
+
+    assert type(goal) is type(
+        MoveFingers.create_gripper_goal(configuration=configuration)
+    )
 
 
 # %% Tests

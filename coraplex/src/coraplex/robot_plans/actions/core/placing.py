@@ -98,7 +98,7 @@ class PlaceAction(
             ),
             Parallel(
                 nodes=[
-                    self.gripper_goal_type.moving_gripper_to(
+                    self.gripper_goal_type.create_gripper_goal(
                         configuration=arm.end_effector.default_configuration(
                             GripperState.OPEN,
                             finger_velocity=self.release_opening_velocity,

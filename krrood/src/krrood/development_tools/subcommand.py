@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 
 class Subcommand(StrEnum):
