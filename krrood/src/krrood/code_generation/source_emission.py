@@ -21,7 +21,7 @@ from krrood.code_generation.exceptions import (
     NoApplicableSourceEmitterError,
     ObjectNotSerializableError,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.specificity_ranking import (
     SpecificityRankedAlternative,
     concrete_subclasses,

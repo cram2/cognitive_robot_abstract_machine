@@ -45,7 +45,7 @@ from krrood.entity_query_language.source_emission import (
     ConditionEmissionContext,
     ConditionSourceEmitter,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.rdr.single_class import EQLSingleClassRDR

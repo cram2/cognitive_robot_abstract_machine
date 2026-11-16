@@ -64,7 +64,7 @@ from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.math_operations import MathOperator
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
-from krrood.symbol_graph.helpers import (
+from krrood.entity_query_language.class_diagram_lookup import (
     get_field_type_endpoint,
     get_method_return_type,
     get_wrapped_field,

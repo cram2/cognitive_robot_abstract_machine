@@ -14,7 +14,7 @@ from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.qp_solver import QPSolver
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPSolverPIQP(QPSolver[QPDataExplicit]):
     """
     Solves explicit QPs with piqp's sparse proximal interior point solver.
@@ -79,7 +79,7 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
         self.solver.settings.infeasibility_threshold = self.infeasibility_threshold
         self.solver.settings.eps_primal_inf = self.primal_infeasibility_tolerance
 
-    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
+    def solver_call_explicit_interface(self, *, qp_data: QPDataExplicit) -> np.ndarray:
         weight_matrix = qp_data.hessian
         if len(qp_data.inequality_upper_bounds) == 0:
             self.solver.setup(

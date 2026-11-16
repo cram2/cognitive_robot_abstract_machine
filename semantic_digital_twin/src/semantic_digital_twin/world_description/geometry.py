@@ -1,3 +1,7 @@
+"""
+The shapes of bodies, with their colors, textures, meshes and scales.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -25,7 +29,7 @@ from typing_extensions import Any, Self, TYPE_CHECKING, TypeVar, Sequence
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from krrood.bounds import Bounds, BoundsInterface
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from random_events.interval import SimpleInterval, Bound, closed
 from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables

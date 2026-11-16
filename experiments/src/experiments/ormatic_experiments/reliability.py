@@ -66,7 +66,7 @@ def _build_hsrb_world() -> World:
         world.add_connection(map_C_odom)
         drive = OmniDrive.create_with_dofs(parent=odom, child=old_root, world=world)
         world.add_connection(drive)
-        drive.has_hardware_interface = True
+        world.set_dofs_has_hardware_interface(drive.active_dofs, True)
 
     return world
 

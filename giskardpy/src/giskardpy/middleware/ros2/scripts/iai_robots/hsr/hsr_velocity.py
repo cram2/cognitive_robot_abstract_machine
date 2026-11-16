@@ -29,7 +29,7 @@ def create_giskard(node: Node) -> Giskard:
             ]
         ),
         robot_interface_config=HSRVelocityInterface(),
-        server_config=GiskardServerConfig(debug_mode=False),
+        server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(
             # reproduces the braking of the former prediction_horizon=15
             target_frequency=40,
@@ -42,7 +42,7 @@ def main() -> None:
     """
     Run the Giskard :func:`create_giskard` builds as a ros node until ROS shuts down.
     """
-    Giskard.launch(create_giskard)
+    Giskard.launch(create_giskard=create_giskard)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,7 @@
+"""
+Helpers shared by the ripple down rules classifiers.
+"""
+
 from __future__ import annotations
 
 import builtins
@@ -38,17 +42,6 @@ from krrood.utils import (
 )
 
 try:
-    import matplotlib
-    from matplotlib import pyplot as plt
-
-    Figure = plt.Figure
-except ImportError as e:
-    matplotlib = None
-    plt = None
-    Figure = None
-    logger.debug(f"{e}: matplotlib is not installed")
-
-try:
     import networkx as nx
 except ImportError as e:
     nx = None
@@ -85,6 +78,7 @@ from typing_extensions import (
 if TYPE_CHECKING:
     from .datastructures.case import Case
     from .datastructures.dataclasses import CaseQuery
+    from matplotlib.figure import Figure
 
 import ast
 from krrood.patterns.called_positionally import called_positionally
@@ -1730,12 +1724,15 @@ def render_tree(
                 logger.warning(f"{e}")
 
 
-def draw_tree(root: Node, fig: Figure):
+def draw_tree(root: Node | None, fig: Figure) -> None:
     """
-    Draw the tree using matplotlib and networkx.
+    Draw the rule tree on the figure, replacing what the figure showed before.
+
+    :param root: The root rule of the tree; nothing is drawn if it is ``None``.
+    :param fig: The figure to draw on.
+    :raises ModuleNotFoundError: If matplotlib is not installed.
     """
-    # if matplotlib.get_backend().lower() not in ['qt5agg', 'qt4agg', 'qt6agg']:
-    #     matplotlib.use("Qt6Agg")  # or "Qt6Agg", depending on availability
+    from matplotlib import pyplot as plt
 
     if root is None:
         return

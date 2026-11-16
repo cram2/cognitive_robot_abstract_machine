@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from giskardpy.middleware.ros2.giskard import Giskard
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotInterfaceConfig(ABC):
     """
     Describes how Giskard reads the state of a robot and how it commands it.
@@ -65,7 +65,7 @@ class RobotInterfaceConfig(ABC):
         interface.
     """
 
-    def attach(self, giskard: Giskard) -> None:
+    def attach(self, *, giskard: Giskard) -> None:
         """
         Bind this interface to the Giskard instance it configures.
         """
@@ -104,7 +104,7 @@ class RobotInterfaceConfig(ABC):
         return self.giskard.motion_server.control_loop
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StandAloneRobotInterfaceConfig(RobotInterfaceConfig):
     """
     Simulates the motion in place, without talking to any hardware.
@@ -123,7 +123,7 @@ class StandAloneRobotInterfaceConfig(RobotInterfaceConfig):
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
     """
     Reads the state of a real robot and sends it the commands of the controller.
@@ -166,6 +166,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     def sync_odometry_topic(
         self,
+        *,
         odometry_topic: str | None = None,
         joint: OmniDrive | DifferentialDrive = None,
         sync_in_control_loop: bool = True,
@@ -189,7 +190,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             self.control_loop.inputs.synchronizers.append(synchronizer)
 
     def sync_6dof_joint_with_tf_frame(
-        self, joint: Connection6DoF, tf_parent_frame: str, tf_child_frame: str
+        self, *, joint: Connection6DoF, tf_parent_frame: str, tf_child_frame: str
     ):
         """
         Tell Giskard to sync a 6dof joint with a tf frame.
@@ -216,7 +217,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         self.motion_server.inputs.add_robot_inputs(self.robot)
         self.control_loop.inputs.add_robot_inputs(self.robot)
 
-    def sync_robot_part(self, robot_part: HasInputSource):
+    def sync_robot_part(self, *, robot_part: HasInputSource):
         """
         Tell Giskard to read one part of the robot from the robot itself, on the topic
         that part declares.
@@ -225,7 +226,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         self.motion_server.inputs.add_robot_part_input(robot_part)
         self.control_loop.inputs.add_robot_part_input(robot_part)
 
-    def sync_joint_state_topic(self, topic_name: str, group_name: str | None = None):
+    def sync_joint_state_topic(self, *, topic_name: str, group_name: str | None = None):
         """
         Tell Giskard to sync the world state with a joint state topic.
         """
@@ -248,6 +249,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     def add_drive_velocity_command_topic(
         self,
+        *,
         command_topic: str | None = None,
         drive: WheeledDrive | None = None,
         minimum_linear_velocity: float = 0.0,
@@ -285,14 +287,19 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                 world=self.world,
                 command_topic=command_topic,
                 connection=drive,
-                minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
-                minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
+                minimum_linear_velocity=MinimumVelocity(
+                    magnitude=minimum_linear_velocity
+                ),
+                minimum_angular_velocity=MinimumVelocity(
+                    magnitude=minimum_angular_velocity
+                ),
                 command_format=command_format,
             )
         )
 
     def add_joint_group_velocity_command_topic(
         self,
+        *,
         command_topic: str,
         connections: list[str],
         minimum_valid_velocity: float = 0.0,
@@ -323,7 +330,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                 command_topic=command_topic,
                 connections=controlled_connections,
                 minimum_velocities=JointMinimumVelocities.from_magnitudes(
-                    minimum_valid_velocity, minimum_velocity_overrides
+                    default=minimum_valid_velocity, overrides=minimum_velocity_overrides
                 ),
                 command_format=command_format or Float64MultiArrayFormat(),
             )
@@ -333,6 +340,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     def discover_interfaces_from_controller_manager(
         self,
+        *,
         controller_manager_name: str = "controller_manager",
         whitelist: list[str] | None = None,
     ) -> None:
@@ -345,28 +353,34 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param whitelist: The names of the controllers to consider, all if ``None``.
         """
         controller_manager = ControllerManager(
-            controller_manager_name, ros_graph=RosGraph(background_node.get_node())
+            name=controller_manager_name, ros_graph=RosGraph(background_node.get_node())
         )
-        for controller in controller_manager.active_controllers(whitelist):
+        for controller in controller_manager.active_controllers(whitelist=whitelist):
             match controller.type:
                 case ControllerType.JOINT_STATE_BROADCASTER:
                     self.sync_joint_state_topic(
-                        controller_manager.joint_state_topic_of(controller.name)
+                        topic_name=controller_manager.joint_state_topic_of(
+                            controller_name=controller.name
+                        )
                     )
                 case ControllerType.JOINT_GROUP_VELOCITY:
                     command_format = Float64MultiArrayFormat()
                     self.add_joint_group_velocity_command_topic(
                         command_topic=controller_manager.command_topic_of(
-                            controller.name, command_format.message_type()
+                            controller_name=controller.name,
+                            message_type=command_format.message_type(),
                         ),
-                        connections=controller_manager.joints_of(controller.name),
+                        connections=controller_manager.joints_of(
+                            controller_name=controller.name
+                        ),
                         command_format=command_format,
                     )
                 case ControllerType.DIFF_DRIVE:
                     command_format = TwistStampedFormat()
                     self.add_drive_velocity_command_topic(
                         command_topic=controller_manager.command_topic_of(
-                            controller.name, command_format.message_type()
+                            controller_name=controller.name,
+                            message_type=command_format.message_type(),
                         ),
                         command_format=command_format,
                     )

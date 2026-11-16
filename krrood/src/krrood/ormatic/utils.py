@@ -1,5 +1,6 @@
 """
-Helpers for ORMatic: class discovery, database engines and column types.
+Helpers for the object-relational mapping: finding the classes of modules and packages,
+creating and dropping databases, and reading column types.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import pkgutil
 import types
 from contextlib import suppress
 from functools import lru_cache
-from typing_extensions import TypeVar, Iterable, Any, Callable, get_type_hints
+from typing_extensions import TypeVar, Iterable, Any, get_type_hints
 
 import sqlalchemy
 from sqlalchemy import (
@@ -26,8 +27,6 @@ from sqlalchemy import (
 
 from krrood.adapters.json_serializer import to_json, from_json
 from krrood.ormatic.exceptions import UnsupportedColumnType
-from krrood.patterns.classproperty import classproperty as classproperty
-from krrood.utils import T
 
 
 def classes_of_module(module: types.ModuleType) -> list[type]:

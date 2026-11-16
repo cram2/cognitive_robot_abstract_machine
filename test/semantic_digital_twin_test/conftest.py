@@ -12,8 +12,10 @@ regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
 import os
 
+import numpy as np
 import pytest
 import sqlalchemy
+import trimesh
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
@@ -71,3 +73,26 @@ def table_world():
     table_path = os.path.join(urdf_dir, "table.urdf")
 
     return URDFParser.from_file(file_path=table_path).create_world()
+
+
+# %% flat meshes
+
+
+@pytest.fixture
+def millimetre_wall_strip() -> trimesh.Trimesh:
+    """
+    A flat, zero-volume quad one millimetre wide and 2.8 metres tall, as architectural
+    USD scenes contain, in which V-HACD finds no convex parts.
+    """
+    return trimesh.Trimesh(
+        vertices=np.array(
+            [
+                [0.001, 0.0, 2.8],
+                [0.0, 0.0, 2.8],
+                [0.001, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+        ),
+        faces=np.array([[2, 1, 0], [1, 2, 3]]),
+        process=False,
+    )

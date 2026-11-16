@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound=QPData)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPDataFactory(Generic[T], ABC):
     """
     A factory that creates a specific QPData format objects from QPDataSymbolic objects.
@@ -50,7 +50,7 @@ class QPDataFactory(Generic[T], ABC):
 
     @classmethod
     def get_factory_from_qp_data_type(
-        cls, qp_data_type: type[QPData]
+        cls, *, qp_data_type: type[QPData]
     ) -> type[QPDataFactory]:
         """
         Returns the factory that handles conversion for the given QPData type.
@@ -63,6 +63,7 @@ class QPDataFactory(Generic[T], ABC):
     @abstractmethod
     def compile(
         self,
+        *,
         world_state_symbols: list[FloatVariable],
         life_cycle_symbols: list[FloatVariable],
         float_variables: list[FloatVariable],
@@ -81,6 +82,7 @@ class QPDataFactory(Generic[T], ABC):
     @abstractmethod
     def evaluate(
         self,
+        *,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
         float_variables: np.ndarray,
@@ -100,7 +102,7 @@ class QPDataFactory(Generic[T], ABC):
         return hash(id(self))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
     """
     A factory that creates QPDataExplicit objects from QPDataSymbolic objects.
@@ -123,6 +125,7 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
 
     def compile(
         self,
+        *,
         world_state_symbols: list[FloatVariable],
         life_cycle_symbols: list[FloatVariable],
         float_variables: list[FloatVariable],
@@ -177,6 +180,7 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
 
     def evaluate(
         self,
+        *,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
         float_variables: np.ndarray,
@@ -213,7 +217,7 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
     """
     Builds a :class:`QPDataTwoSidedInequality` by combining the equality and inequality
@@ -232,6 +236,7 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
 
     def compile(
         self,
+        *,
         world_state_symbols: list[FloatVariable],
         life_cycle_symbols: list[FloatVariable],
         float_variables: list[FloatVariable],
@@ -310,6 +315,7 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
 
     def evaluate(
         self,
+        *,
         world_state: np.ndarray,
         life_cycle_state: np.ndarray,
         float_variables: np.ndarray,

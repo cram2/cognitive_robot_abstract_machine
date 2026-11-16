@@ -20,7 +20,7 @@ from krrood.code_generation.source_emission import (
     SourceEmissionContext,
     ValueSourceEmitter,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% ObjectSource
 

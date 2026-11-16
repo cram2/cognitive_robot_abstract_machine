@@ -58,7 +58,7 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
 )
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
@@ -2451,10 +2451,14 @@ class CompositeNode(StatechartNode):
     def _check_accepts_children(self) -> None:
         """
         :raises StatechartAlreadyCompiledError: If the latest compile covered this
-            node, which fixed its wiring over its children, and it accepts no children
-            after that.
+            node, which fixed its wiring over its children, it accepts no children
+            after that, and no block of :meth:`~cramph.statechart.Statechart.modify`
+            rewriting compiled nodes is open.
         """
-        if self.accepts_children_after_compile:
+        if (
+            self.accepts_children_after_compile
+            or self.statechart.may_rewrite_compiled_nodes
+        ):
             return
         if self.statechart.compiler.latest_compile_covers(node=self):
             raise StatechartAlreadyCompiledError()

@@ -49,7 +49,7 @@ from krrood.entity_query_language.rules.conclusion_selector import (
     Refinement,
 )
 from krrood.entity_query_language.rules.decomposition import ConclusionSelectorBranch
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 NodeType = TypeVar("NodeType", bound=SymbolicExpression)
 

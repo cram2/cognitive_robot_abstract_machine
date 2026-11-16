@@ -21,7 +21,7 @@ from krrood.development_tools.agents.leading_preposition import (
     LeadingPrepositionChecker,
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.dataclass_field_descriptor import (
     DataclassFieldDescriptor,
     DataclassFieldDescriptorOwner,

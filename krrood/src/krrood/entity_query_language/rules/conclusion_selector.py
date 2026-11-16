@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing_extensions import Iterable, TYPE_CHECKING, Self
 
 from krrood.entity_query_language.exceptions import SelfReferentialInsertionError
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.operators.set_operations import Union as EQLUnion
 from krrood.entity_query_language.operators.core_logical_operators import (
