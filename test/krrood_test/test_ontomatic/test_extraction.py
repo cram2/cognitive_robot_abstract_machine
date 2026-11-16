@@ -9,7 +9,10 @@ from pathlib import Path
 import pytest
 import rdflib
 from rdflib import Namespace
+from rdflib.namespace import OWL, RDFS
 
+from krrood.ontomatic.failures import AmbiguousDescribedClass
+from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.extraction import (
     ClassExtractor,
     MetadataExtractor,
@@ -89,6 +92,204 @@ def test_a_class_keeps_its_label_and_comment(class_extractor, extraction):
     assert (person.label, person.comment) == ("person", "A human being.")
 
 
+# %% class expressions
+
+
+@pytest.fixture(scope="module")
+def class_expressions() -> Namespace:
+    """
+    The namespace of the ontology of class expressions the tests read.
+    """
+    return Namespace("http://example.org/class_expressions_extraction#")
+
+
+@pytest.fixture(scope="module")
+def class_expressions_graph() -> rdflib.Graph:
+    """
+    The graph of the ontology of class expressions.
+    """
+    graph = rdflib.Graph()
+    graph.parse(
+        Path(__file__).parent.parent
+        / "dataset"
+        / "ontologies"
+        / "class_expressions_extraction.ttl"
+    )
+    return graph
+
+
+@pytest.fixture(scope="module")
+def class_expressions_extractor(
+    class_expressions_graph: rdflib.Graph,
+) -> ClassExtractor:
+    """
+    Reads the classes of the ontology of class expressions.
+    """
+    return ClassExtractor(
+        graph=class_expressions_graph,
+        metadata_extractor=MetadataExtractor(graph=class_expressions_graph),
+    )
+
+
+def test_a_class_records_the_named_classes_it_is_disjoint_with(
+    class_expressions_extractor, class_expressions
+):
+    """
+    A class records the named classes it is declared disjoint with.
+    """
+    assert class_expressions_extractor.extract(
+        class_uri=class_expressions.Plant
+    ).disjoint_with == ["Animal"]
+
+
+def test_a_class_records_the_named_classes_it_is_equivalent_to(
+    class_expressions_extractor, class_expressions
+):
+    """
+    A class records the named classes it is declared equivalent to.
+    """
+    assert class_expressions_extractor.extract(
+        class_uri=class_expressions.Creature
+    ).equivalent_classes == ["Animal"]
+
+
+def test_the_named_classes_a_definition_intersects_are_superclasses(
+    class_expressions_extractor, class_expressions
+):
+    """
+    A class defined by an intersection is a subclass of the named classes in it.
+    """
+    assert class_expressions_extractor.extract(
+        class_uri=class_expressions.Cat
+    ).superclasses == ["Animal", "Pet"]
+
+
+def test_a_superclass_both_declared_and_intersected_is_recorded_once(
+    class_expressions_extractor, class_expressions
+):
+    """
+    A class declared under a class its definition also intersects records that
+    superclass once.
+    """
+    assert class_expressions_extractor.extract(
+        class_uri=class_expressions.Kitten
+    ).superclasses == ["Animal", "Pet"]
+
+
+def test_an_anonymous_union_superclass_is_a_description_of_the_class(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    A class declared under an anonymous union records the union as a description.
+    """
+    union = class_expressions_graph.value(class_expressions.Tiger, RDFS.subClassOf)
+    assert class_expressions_extractor.extract(
+        class_uri=class_expressions.Tiger
+    ).has_descriptions == [
+        NamingRegistry.uri_to_python_name(uri=union, graph=class_expressions_graph)
+    ]
+
+
+def test_an_expression_under_a_named_class_describes_it(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    An anonymous expression declared under one named class describes that class and
+    keeps it as its superclass.
+    """
+    expression = class_expressions_extractor.extract(
+        class_uri=class_expressions_graph.value(
+            predicate=RDFS.subClassOf, object=class_expressions.Hunter
+        )
+    )
+    assert (expression.is_description_for, expression.superclasses) == (
+        "Hunter",
+        ["Hunter"],
+    )
+
+
+def test_an_expression_over_a_named_class_describes_it(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    An anonymous expression one named class is declared under describes that class.
+    """
+    expression = class_expressions_extractor.extract(
+        class_uri=class_expressions_graph.value(
+            class_expressions.Tiger, RDFS.subClassOf
+        )
+    )
+    assert (expression.is_description_for, expression.superclasses) == (
+        "Tiger",
+        [Symbol.__name__],
+    )
+
+
+def test_a_definition_describes_the_class_it_defines(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    An anonymous expression a named class is equivalent to describes that class.
+    """
+    expression = class_expressions_extractor.extract(
+        class_uri=class_expressions_graph.value(
+            class_expressions.Cat, OWL.equivalentClass
+        )
+    )
+    assert (expression.is_description_for, expression.superclasses) == (
+        "Cat",
+        [Symbol.__name__],
+    )
+
+
+def test_an_intersection_describing_no_class_is_under_its_named_members(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    An anonymous intersection that describes no named class is a subclass of the named
+    classes it intersects.
+    """
+    restriction = class_expressions_graph.value(
+        class_expressions.Owner, RDFS.subClassOf
+    )
+    expression = class_expressions_extractor.extract(
+        class_uri=class_expressions_graph.value(restriction, OWL.someValuesFrom)
+    )
+    assert (expression.is_description_for, expression.superclasses) == (
+        None,
+        ["Animal", "Pet"],
+    )
+
+
+def test_an_expression_under_two_named_classes_is_refused(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    An anonymous expression declared under two named classes describes no single class.
+    """
+    with pytest.raises(AmbiguousDescribedClass):
+        class_expressions_extractor.extract(
+            class_uri=class_expressions_graph.value(
+                predicate=RDFS.subClassOf, object=class_expressions.Mammal
+            )
+        )
+
+
+def test_an_expression_over_two_named_classes_is_refused(
+    class_expressions_extractor, class_expressions, class_expressions_graph
+):
+    """
+    An anonymous expression two named classes are declared under describes no single
+    class.
+    """
+    with pytest.raises(AmbiguousDescribedClass):
+        class_expressions_extractor.extract(
+            class_uri=class_expressions_graph.value(
+                class_expressions.Lion, RDFS.subClassOf
+            )
+        )
+
+
 # %% properties
 
 
@@ -166,6 +367,126 @@ def test_a_property_is_named_for_its_field_and_its_descriptor(
         "has_advisor",
         "HasAdvisor",
     )
+
+
+# %% relations between properties
+
+
+@pytest.fixture(scope="module")
+def property_relations() -> Namespace:
+    """
+    The namespace of the ontology of related properties the tests read.
+    """
+    return Namespace("http://example.org/property_relations_extraction#")
+
+
+@pytest.fixture(scope="module")
+def property_relations_extractor() -> PropertyExtractor:
+    """
+    Reads the properties of the ontology of related properties.
+    """
+    graph = rdflib.Graph()
+    graph.parse(
+        Path(__file__).parent.parent
+        / "dataset"
+        / "ontologies"
+        / "property_relations_extraction.ttl"
+    )
+    return PropertyExtractor(
+        graph=graph, metadata_extractor=MetadataExtractor(graph=graph)
+    )
+
+
+def test_an_equivalence_is_recorded_on_both_properties(
+    property_relations_extractor, property_relations
+):
+    """
+    ``owl:equivalentProperty`` stated on one property makes each property equivalent to
+    the other.
+    """
+    assert (
+        property_relations_extractor.extract(
+            property_uri=property_relations.livesIn
+        ).equivalent_properties,
+        property_relations_extractor.extract(
+            property_uri=property_relations.resides
+        ).equivalent_properties,
+    ) == (["resides"], ["livesIn"])
+
+
+def test_a_disjointness_is_recorded_on_both_properties(
+    property_relations_extractor, property_relations
+):
+    """
+    ``owl:propertyDisjointWith`` stated on one property makes each property disjoint
+    with the other.
+    """
+    assert (
+        property_relations_extractor.extract(
+            property_uri=property_relations.livesIn
+        ).disjoint_properties,
+        property_relations_extractor.extract(
+            property_uri=property_relations.visits
+        ).disjoint_properties,
+    ) == (["visits"], ["livesIn"])
+
+
+def test_a_property_with_several_inverses_records_them_all_and_the_first_by_name(
+    property_relations_extractor, property_relations
+):
+    """
+    A property stated as the inverse of several records all of them, in order of name,
+    and takes the first as its inverse.
+    """
+    parent_of = property_relations_extractor.extract(
+        property_uri=property_relations.parentOf
+    )
+    assert (parent_of.inverses, parent_of.inverse_of) == (
+        ["childOf", "hasParent"],
+        "childOf",
+    )
+
+
+def test_a_property_records_asymmetry_and_irreflexivity(
+    property_relations_extractor, property_relations
+):
+    """
+    A property declared asymmetric and irreflexive is recorded as both, and as neither
+    symmetric nor reflexive.
+    """
+    dominates = property_relations_extractor.extract(
+        property_uri=property_relations.dominates
+    )
+    assert (
+        dominates.is_asymmetric,
+        dominates.is_irreflexive,
+        dominates.is_symmetric,
+        dominates.is_reflexive,
+    ) == (True, True, False, False)
+
+
+def test_a_property_records_reflexivity(
+    property_relations_extractor, property_relations
+):
+    """
+    A property declared reflexive is recorded as reflexive.
+    """
+    assert property_relations_extractor.extract(
+        property_uri=property_relations.sameAgeAs
+    ).is_reflexive
+
+
+def test_a_property_keeps_the_nodes_of_its_ranges(
+    property_relations_extractor, property_relations
+):
+    """
+    A property keeps the nodes of its ranges beside their names.
+    """
+    assert sorted(
+        property_relations_extractor.extract(
+            property_uri=property_relations.livesIn
+        ).range_uris
+    ) == sorted([property_relations.Place, property_relations.Person])
 
 
 # %% the whole ontology

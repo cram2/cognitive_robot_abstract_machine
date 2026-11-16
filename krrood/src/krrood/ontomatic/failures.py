@@ -1,3 +1,8 @@
+"""
+The errors raised while reading an ontology and while keeping its facts on Python
+objects.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -61,4 +66,34 @@ class NoObjectOfIndividualDeclaresProperty(DataclassException):
         return (
             f"Give the individual a role, or a class, that declares a field managed by "
             f"{self.property_descriptor_class.__name__}."
+        )
+
+
+@dataclass(kw_only=True)
+class AmbiguousDescribedClass(DataclassException):
+    """
+    Raised when an anonymous class expression is declared under, or over, more than one
+    named class, so it describes no single class.
+    """
+
+    class_expression_name: str
+    """
+    The name given to the anonymous class expression.
+    """
+
+    candidates: list[str]
+    """
+    The names of the named classes the expression could describe.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The class expression {self.class_expression_name} describes more than "
+            f"one named class: {', '.join(self.candidates)}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Declare the class expression under, or over, a single named class, or "
+            "state it once for each class it describes."
         )
