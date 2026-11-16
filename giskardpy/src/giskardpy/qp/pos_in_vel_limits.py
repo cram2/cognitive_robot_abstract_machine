@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.derivatives import Derivatives
 # %% braking to rest
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BrakingProfile:
     """
     Velocity of a degree of freedom at each step of the prediction horizon while it
@@ -47,7 +47,7 @@ class BrakingProfile:
 
     @classmethod
     def fastest(
-        cls, braking: JerkLimitedBraking, prediction_horizon: int
+        cls, *, braking: JerkLimitedBraking, prediction_horizon: int
     ) -> BrakingProfile:
         """
         Creates the profile that brakes from the velocity limit of ``braking`` to rest
@@ -65,16 +65,16 @@ class BrakingProfile:
         :return: Fastest braking profile from the velocity limit of ``braking`` to rest.
         """
         return cls(
-            velocity=cls._solve_fastest_braking(braking, prediction_horizon)[
-                :prediction_horizon
-            ],
+            velocity=cls._solve_fastest_braking(
+                braking=braking, prediction_horizon=prediction_horizon
+            )[:prediction_horizon],
             time_step=braking.time_step,
         )
 
     @staticmethod
     @memoize
     def _solve_fastest_braking(
-        braking: JerkLimitedBraking, prediction_horizon: int
+        *, braking: JerkLimitedBraking, prediction_horizon: int
     ) -> npt.NDArray:
         """
         Solves the linear program behind :meth:`fastest` and returns its solution: the
@@ -94,7 +94,9 @@ class BrakingProfile:
             last_step = (derivative + 1) * prediction_horizon - 1
             lower_bounds[last_step] = upper_bounds[last_step] = 0
         link_model = BrakingProfile._derivative_link_model(
-            braking.time_step, prediction_horizon, number_of_derivatives
+            time_step=braking.time_step,
+            prediction_horizon=prediction_horizon,
+            number_of_derivatives=number_of_derivatives,
         )
         link_bounds = np.zeros(link_model.shape[0])
         link_bounds[0] = braking.velocity_limit
@@ -113,11 +115,13 @@ class BrakingProfile:
             num_equality_slack_variables=0,
             num_inequality_slack_variables=0,
         )
-        return LinearProgramSolverHighs().solver_call_explicit_interface(qp_data)
+        return LinearProgramSolverHighs().solver_call_explicit_interface(
+            qp_data=qp_data
+        )
 
     @staticmethod
     def _derivative_link_model(
-        time_step: timedelta, prediction_horizon: int, number_of_derivatives: int
+        *, time_step: timedelta, prediction_horizon: int, number_of_derivatives: int
     ) -> npt.NDArray:
         """
         Returns the equality matrix that integrates each derivative into the one below
@@ -160,7 +164,9 @@ class BrakingProfile:
         :return: Velocity at each step of the prediction horizon.
         """
         time_step = self.time_step.total_seconds()
-        velocity_profile = self.zero_negligible_velocities(self.velocity)
+        velocity_profile = self.zero_negligible_velocities(
+            velocity_profile=self.velocity
+        )
         number_of_steps = velocity_profile.shape[0]
         tails = [np.zeros(number_of_steps)]
         tail_distances = [0.0]
@@ -192,7 +198,7 @@ class BrakingProfile:
 
     @staticmethod
     def zero_negligible_velocities(
-        velocity_profile: npt.NDArray, negligible_velocity=1e-4
+        *, velocity_profile: npt.NDArray, negligible_velocity=1e-4
     ) -> npt.NDArray:
         """
         Returns a copy of a braking profile in which every velocity below
@@ -218,7 +224,7 @@ class BrakingProfile:
 # %% slowing down as soon as possible
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SlowdownProfile:
     """
     Velocity and jerk of a degree of freedom at each step of the prediction horizon
@@ -238,6 +244,7 @@ class SlowdownProfile:
     @classmethod
     def immediate(
         cls,
+        *,
         current_velocity: Scalar,
         current_acceleration: Scalar,
         target_velocity_profile: Vector,
@@ -274,6 +281,7 @@ class SlowdownProfile:
     @staticmethod
     @substitution_cache
     def _profiles(
+        *,
         current_velocity: Scalar,
         current_acceleration: Scalar,
         target_velocity_profile: Vector,
@@ -323,6 +331,7 @@ class SlowdownProfile:
     @staticmethod
     @substitution_cache
     def _next_velocity_and_acceleration(
+        *,
         current_velocity: Scalar,
         current_acceleration: Scalar,
         velocity_limit: Scalar,
@@ -349,7 +358,9 @@ class SlowdownProfile:
         :return: The velocity and acceleration of the next time step.
         """
         acceleration_limit_from_velocity = SlowdownProfile._acceleration_cap(
-            current_velocity, jerk_limit, delta_time
+            current_velocity=current_velocity,
+            jerk_limit=jerk_limit,
+            delta_time=delta_time,
         )
         acceleration_limit_from_horizon = (
             remaining_prediction_horizon * jerk_limit * delta_time
@@ -388,7 +399,7 @@ class SlowdownProfile:
     @staticmethod
     @substitution_cache
     def _acceleration_cap(
-        current_velocity: Scalar, jerk_limit: Scalar, delta_time: Scalar
+        *, current_velocity: Scalar, jerk_limit: Scalar, delta_time: Scalar
     ) -> Scalar:
         """
         Compute the largest acceleration that can be reached when braking to a stop
@@ -405,7 +416,9 @@ class SlowdownProfile:
         acceleration_integral = sm.abs(current_velocity) / delta_time
         jerk_step = jerk_limit * delta_time
         number_of_ramp_steps = sm.floor(
-            SlowdownProfile._reverse_gauss(sm.abs(acceleration_integral / jerk_step))
+            SlowdownProfile._reverse_gauss(
+                integral=sm.abs(acceleration_integral / jerk_step)
+            )
         )
         leftover_acceleration_per_step = (
             -sm.gauss(number_of_ramp_steps) * jerk_step + acceleration_integral
@@ -413,7 +426,7 @@ class SlowdownProfile:
         return sm.abs(number_of_ramp_steps * jerk_step + leftover_acceleration_per_step)
 
     @staticmethod
-    def _reverse_gauss(integral: Scalar) -> Scalar:
+    def _reverse_gauss(*, integral: Scalar) -> Scalar:
         """
         Invert the Gauss summation formula to recover the term count from a triangular
         sum.

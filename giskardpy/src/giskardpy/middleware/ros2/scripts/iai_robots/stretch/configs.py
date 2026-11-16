@@ -11,7 +11,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StretchVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Commands the arm, head and drive of Stretch through their velocity controllers.

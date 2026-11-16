@@ -69,7 +69,7 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
     }
     _times: dict[tuple[int, int, int], list] = defaultdict(list)
 
-    def init(self, qp_data: QPDataExplicit):
+    def init(self, *, qp_data: QPDataExplicit):
         self.qpProblem = gurobipy.Model("qp")
         self.x = self.qpProblem.addMVar(
             qp_data.quadratic_weights.shape[0],
@@ -133,8 +133,8 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
             ubA_constraint_ids,
         )
 
-    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
-        self.init(qp_data)
+    def solver_call_explicit_interface(self, *, qp_data: QPDataExplicit) -> np.ndarray:
+        self.init(qp_data=qp_data)
         self.qpProblem.optimize()
         success = self.qpProblem.status
         if success in {gurobipy.GRB.OPTIMAL, gurobipy.GRB.SUBOPTIMAL}:

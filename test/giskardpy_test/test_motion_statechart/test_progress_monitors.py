@@ -141,7 +141,7 @@ class TestStallDetection:
     tasks.
     """
 
-    def test_stall_cancels_the_motion(self, pr2_world_state_reset: World):
+    def test_stall_cancels_the_motion(self, *, pr2_world_state_reset: World):
         """
         An arm that has extended as far as it can stops closing on its goal, so the
         motion is cancelled instead of running forever.
@@ -167,7 +167,7 @@ class TestStallDetection:
 
         assert goal.unique_name in str(exception_info.value)
 
-    def test_a_task_jittering_in_place_stalls(self, cylinder_bot_world: World):
+    def test_a_task_jittering_in_place_stalls(self, *, cylinder_bot_world: World):
         """
         A task pushed back every cycle, as an arm held off by a collision is, keeps
         moving without getting any closer to its goal, so the motion is cancelled.
@@ -204,7 +204,7 @@ class TestStallDetection:
                 cylinder_bot_world.notify_state_change()
 
     def test_reachable_goal_is_never_reported_as_stalled(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         A goal the robot converges on reads as progressing for the whole motion.
@@ -236,7 +236,7 @@ class TestStallDetection:
         assert set(recorded[progressing]) == {ObservationStateValues.TRUE}
 
     def test_momentary_stall_shorter_than_the_timeout_is_tolerated(
-        self, cylinder_bot_diff_world: World
+        self, *, cylinder_bot_diff_world: World
     ):
         """
         A differential drive turns in place before it translates, so its position error
@@ -283,7 +283,7 @@ class TestStallDetection:
         ), "no task ever paused, so the timeout was never what prevented the cancel"
 
     def test_stall_inside_a_sequence_names_the_stuck_step(
-        self, pr2_world_state_reset: World
+        self, *, pr2_world_state_reset: World
     ):
         """
         Watching each converging task separately means the stuck step of a sequence is
@@ -333,7 +333,7 @@ class TestStallDetection:
         assert reachable.unique_name not in str(exception_info.value)
 
     def test_a_stall_names_only_the_stuck_task_not_one_holding_its_goal(
-        self, pr2_world_state_reset: World
+        self, *, pr2_world_state_reset: World
     ):
         """
         A task that holds its goal while another one is stuck has not stopped
@@ -383,7 +383,7 @@ class TestStallDetection:
         assert holding.unique_name not in str(exception_info.value)
 
     def test_a_motion_whose_running_tasks_all_reached_their_goals_is_not_stalled(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         A task at its goal has nothing left to approach, so it must not keep alive the
@@ -424,7 +424,7 @@ class TestStallDetection:
         assert progressing.observation_state == ObservationStateValues.TRUE
 
     def test_stall_time_does_not_accumulate_before_the_goal_starts(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         Nothing is converging before the watched task starts, which must not be mistaken
@@ -458,7 +458,9 @@ class TestStallDetection:
             == ObservationStateValues.TRUE
         )
 
-    def test_the_stall_timer_counts_the_whole_timeout(self, cylinder_bot_world: World):
+    def test_the_stall_timer_counts_the_whole_timeout(
+        self, *, cylinder_bot_world: World
+    ):
         """
         The timeout reaches the timer as simulated seconds, so neither the days of a
         long window nor the fraction of a sub-second one is lost on the way.
@@ -487,7 +489,7 @@ class TestStallDetection:
         assert [node.seconds for node in timer] == [timeout.total_seconds()]
 
     def test_one_monitor_watches_every_task_beneath_the_watched_node(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ) -> None:
         """
         A plan holds dozens of converging tasks, and a monitor per task made the
@@ -522,7 +524,9 @@ class TestStallDetection:
         assert progressing.nodes[1].monitored_tasks == tasks
         assert progressing.monitored_tasks == tasks
 
-    def test_a_task_at_its_goal_is_not_approaching_one(self, cylinder_bot_world: World):
+    def test_a_task_at_its_goal_is_not_approaching_one(
+        self, *, cylinder_bot_world: World
+    ):
         """
         A task that is exactly at its goal has nothing left to approach, so it must not
         read as the progress that keeps a stalled motion from being given up on.
@@ -573,7 +577,7 @@ it.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScriptedErrorRun:
     """
     A :class:`NoMonitoredTaskApproachingItsGoal` watching tasks whose errors a test sets
@@ -648,7 +652,7 @@ class ScriptedErrorRun:
         )
 
     def observations_while_the_error_is(
-        self, errors: list[float]
+        self, *, errors: list[float]
     ) -> list[ObservationStateValues]:
         """
         :param errors: The first task's error on each control cycle, the bot being
@@ -656,11 +660,11 @@ class ScriptedErrorRun:
         :return: What the monitor observes on each of those control cycles.
         """
         return self.observations_while_the_bot_is_at(
-            [self.goal_xs[0] - error for error in errors]
+            positions=[self.goal_xs[0] - error for error in errors]
         )
 
     def observations_while_the_bot_is_at(
-        self, positions: list[float]
+        self, *, positions: list[float]
     ) -> list[ObservationStateValues]:
         """
         :param positions: The bot's x position on each control cycle.
@@ -683,30 +687,30 @@ class TestConvergenceRule:
         ids=["too-slow", "fast-enough"],
     )
     def test_an_error_has_to_fall_by_the_minimum_rate(
-        self, cylinder_bot_world: World, fall_factor, observed
+        self, *, cylinder_bot_world: World, fall_factor, observed
     ):
-        run = ScriptedErrorRun(cylinder_bot_world)
+        run = ScriptedErrorRun(world=cylinder_bot_world)
         start = 1.0
 
         observations = run.observations_while_the_error_is(
-            [start, start - fall_factor * run.required_fall_per_cycle]
+            errors=[start, start - fall_factor * run.required_fall_per_cycle]
         )
 
         assert observations == [ObservationStateValues.FALSE, observed]
 
     def test_falling_back_after_a_detour_is_not_progress_until_it_beats_the_start(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         An error that rises and then falls back to where it was has made no progress,
         and only falling below that by the rate for all the time since counts.
         """
-        run = ScriptedErrorRun(cylinder_bot_world)
+        run = ScriptedErrorRun(world=cylinder_bot_world)
         start = 1.0
         beyond = start - 4 * run.required_fall_per_cycle
 
         observations = run.observations_while_the_error_is(
-            [start, start + 0.5, start, beyond]
+            errors=[start, start + 0.5, start, beyond]
         )
 
         assert observations == [
@@ -716,31 +720,31 @@ class TestConvergenceRule:
             ObservationStateValues.FALSE,
         ]
 
-    def test_a_restarted_task_is_judged_afresh(self, cylinder_bot_world: World):
+    def test_a_restarted_task_is_judged_afresh(self, *, cylinder_bot_world: World):
         """
         A task that starts again has nothing to be compared with from its last run.
         """
-        run = ScriptedErrorRun(cylinder_bot_world)
-        assert run.observations_while_the_error_is([1.0, 1.0]) == [
+        run = ScriptedErrorRun(world=cylinder_bot_world)
+        assert run.observations_while_the_error_is(errors=[1.0, 1.0]) == [
             ObservationStateValues.FALSE,
             ObservationStateValues.TRUE,
         ]
 
         run.monitor.on_start()
 
-        assert run.observations_while_the_error_is([5.0]) == [
+        assert run.observations_while_the_error_is(errors=[5.0]) == [
             ObservationStateValues.FALSE
         ]
 
     def test_a_task_cycling_through_its_goal_makes_no_progress(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ) -> None:
         """
         A task that falls into its goal, is pushed back out and falls in again, over and
         over, gets no closer than it already was, so it cannot hide that another task is
         stuck.
         """
-        run = ScriptedErrorRun(cylinder_bot_world, goal_xs=[GOAL_X, 0.0])
+        run = ScriptedErrorRun(world=cylinder_bot_world, goal_xs=[GOAL_X, 0.0])
         threshold_of_the_cycling_task = run.tasks[1].threshold
         cycle = [
             3 * threshold_of_the_cycling_task,
@@ -748,23 +752,23 @@ class TestConvergenceRule:
             threshold_of_the_cycling_task / 2,
         ]
 
-        run.observations_while_the_bot_is_at(cycle)
-        later_cycles = run.observations_while_the_bot_is_at(cycle + cycle)
+        run.observations_while_the_bot_is_at(positions=cycle)
+        later_cycles = run.observations_while_the_bot_is_at(positions=cycle + cycle)
 
         assert later_cycles == [ObservationStateValues.TRUE] * len(later_cycles)
 
     def test_several_tasks_are_stalled_only_while_none_of_them_approaches(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ) -> None:
         """
         Driving towards one goal and away from another is progress, and standing still
         is progress for neither, which the one monitor watching both has to tell apart.
         """
-        run = ScriptedErrorRun(cylinder_bot_world, goal_xs=[GOAL_X, -GOAL_X])
+        run = ScriptedErrorRun(world=cylinder_bot_world, goal_xs=[GOAL_X, -GOAL_X])
         step = 4 * run.required_fall_per_cycle
 
-        moving = run.observations_while_the_bot_is_at([0.0, step, 2 * step])
-        standing = run.observations_while_the_bot_is_at([2 * step])
+        moving = run.observations_while_the_bot_is_at(positions=[0.0, step, 2 * step])
+        standing = run.observations_while_the_bot_is_at(positions=[2 * step])
 
         assert moving == [
             ObservationStateValues.FALSE,
@@ -774,17 +778,17 @@ class TestConvergenceRule:
         assert standing == [ObservationStateValues.TRUE]
 
     def test_the_stalled_tasks_are_those_not_approaching_their_goal(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ) -> None:
         """
         The monitor names the tasks it judges stuck, so a stall can blame them and not
         the tasks that still get closer.
         """
-        run = ScriptedErrorRun(cylinder_bot_world, goal_xs=[GOAL_X, -GOAL_X])
+        run = ScriptedErrorRun(world=cylinder_bot_world, goal_xs=[GOAL_X, -GOAL_X])
         approached, receding = run.tasks
         step = 4 * run.required_fall_per_cycle
 
-        run.observations_while_the_bot_is_at([0.0, step, 2 * step])
+        run.observations_while_the_bot_is_at(positions=[0.0, step, 2 * step])
 
         assert run.monitor.stalled_tasks == [receding]
 
@@ -800,7 +804,7 @@ class TestTimeDerivative:
         assert time_derivative_from_joint_motion(Scalar(3.0)).evaluate()[0] == 0.0
 
     def test_an_expression_of_a_joint_changes_with_its_velocity(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         An error that depends on a joint changes as fast as the joint moves, scaled by
@@ -821,7 +825,7 @@ class TestTimeDerivative:
 
 
 class TestErrorDrivesObservation:
-    def test_error_is_the_distance_to_the_goal(self, cylinder_bot_world: World):
+    def test_error_is_the_distance_to_the_goal(self, *, cylinder_bot_world: World):
         """
         CartesianPosition reports the distance between tip and goal as its error.
         """
@@ -840,7 +844,7 @@ class TestErrorDrivesObservation:
         expected = np.linalg.norm(goal_point.to_np()[:3] - tip_position)
         assert artifacts.error.evaluate()[0] == pytest.approx(expected)
 
-    def test_observation_follows_from_the_error(self, cylinder_bot_world: World):
+    def test_observation_follows_from_the_error(self, *, cylinder_bot_world: World):
         """
         The success condition is derived from the error and the threshold rather than
         written out a second time.
@@ -858,7 +862,9 @@ class TestErrorDrivesObservation:
         expected = (artifacts.error <= goal.threshold).evaluate()[0]
         assert artifacts.observation.evaluate()[0] == expected
 
-    def test_normalized_error_is_one_at_the_threshold(self, cylinder_bot_world: World):
+    def test_normalized_error_is_one_at_the_threshold(
+        self, *, cylinder_bot_world: World
+    ):
         """
         Dividing by the threshold makes errors of different tasks comparable, with 1
         meaning "exactly at the threshold".
@@ -938,7 +944,7 @@ class TestTaskAtItsGoal:
         "task_at_its_goal", [position_task_at_its_goal, trajectory_task_at_its_goal]
     )
     def test_a_task_at_its_goal_is_not_approaching_it(
-        self, cylinder_bot_world: World, task_at_its_goal
+        self, *, cylinder_bot_world: World, task_at_its_goal
     ):
         """
         A task holding its goal, like a grip held while something else moves, can see
@@ -973,7 +979,7 @@ class TestTaskAtItsGoal:
 
 class TestNothingToConverge:
     def test_a_node_that_never_converges_stalls_after_the_timeout(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         A velocity limit enforces an invariant rather than closing on a goal, so nothing
@@ -1017,7 +1023,7 @@ class TestNothingToConverge:
 
 class TestNodeDependencies:
     def test_a_dependency_is_built_first_even_when_added_later(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         Build order follows declared dependencies, not the order nodes were added.
@@ -1043,7 +1049,7 @@ class TestNodeDependencies:
         assert built_after == ["dependency", "dependent"]
 
     def test_watching_a_goal_that_did_not_join_yet_is_rejected(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ) -> None:
         """
         The monitor finds the tasks of the goal it watches when it expands, which is
@@ -1069,7 +1075,7 @@ class TestNodeDependencies:
         with pytest.raises(PrerequisiteNotExpandedError):
             motion_statechart.add_node(node=progressing)
 
-    def test_a_dependency_cycle_is_reported(self, cylinder_bot_world: World):
+    def test_a_dependency_cycle_is_reported(self, *, cylinder_bot_world: World):
         """
         Nodes that depend on each other cannot be ordered, which must be said plainly
         instead of recursing forever.
@@ -1094,7 +1100,7 @@ class TestNodeDependencies:
 
 class TestTrajectoryProgress:
     def test_a_trajectory_being_followed_is_progressing(
-        self, cylinder_bot_world: World
+        self, *, cylinder_bot_world: World
     ):
         """
         A trajectory task knows how far it has come only from its own bookkeeping, and
