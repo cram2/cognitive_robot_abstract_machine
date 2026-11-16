@@ -33,13 +33,3 @@ For rustworkx based probabilistic circuits the next class diagram is relevant.
         :strict:
         :caption: Inheritance Diagram for probabilistic circuits implemented with rustworkx.
 ```
-
-Finally, for jax based circuits, which are learned by gradient descent and converted into
-layered numpy circuits for inference, this class diagram is relevant.
-
-```{eval-rst}
-    .. autoclasstree:: probabilistic_model.probabilistic_circuit.jax probabilistic_model.probabilistic_circuit.jax.coupling_circuit probabilistic_model.probabilistic_circuit.jax.gaussian_layer probabilistic_model.probabilistic_circuit.jax.discrete_layer probabilistic_model.probabilistic_circuit.jax.uniform_layer
-        :zoom:
-        :namespace: probabilistic_model.probabilistic_circuit.jax
-        :caption: Inheritance Diagram for probabilistic circuits implemented with jax.
-```

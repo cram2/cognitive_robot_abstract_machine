@@ -15,6 +15,7 @@ from rclpy.task import Future
 
 from cramph.data_types import ObservationStateValues
 from cramph.node import StatechartNode
+from krrood.patterns.called_positionally import called_positionally
 from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
@@ -84,6 +85,7 @@ class RobotiqGripperActionServerTask(
     @classmethod
     def moving_gripper_to(
         cls,
+        *,
         configuration: GripperConfiguration,
         stall_minimum_time: float | None = None,
         tolerate_stall: bool = False,
@@ -104,7 +106,9 @@ class RobotiqGripperActionServerTask(
         end_effector = configuration.end_effector
         if not isinstance(end_effector, HasParallelGripperCommandServer):
             return MoveFingers.moving_gripper_to(
-                configuration, stall_minimum_time, tolerate_stall
+                configuration=configuration,
+                stall_minimum_time=stall_minimum_time,
+                tolerate_stall=tolerate_stall,
             )
         return cls(
             action_topic=end_effector.action_topic_serving(
@@ -123,6 +127,7 @@ class RobotiqGripperActionServerTask(
         self._goal_accepted = False
         self._done = False
 
+    @called_positionally
     def goal_response_callback(self, future: Future) -> None:
         """
         Differs from :meth:`ActionServerTask.goal_response_callback` in recording
@@ -141,12 +146,13 @@ class RobotiqGripperActionServerTask(
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self.result_callback)
 
+    @called_positionally
     def result_callback(self, future: Future) -> None:
         """
         Differs from :meth:`ActionServerTask.result_callback` in marking the goal as
         answered.
         """
-        super().result_callback(future)
+        super().result_callback(future=future)
         self._done = True
         logger.info(
             f"Gripper action finished. "

@@ -53,10 +53,23 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
     The leaf tensors the optimizer updates, copies of the parameters of the circuit.
     """
 
+    zero_probability_entries: list[torch.Tensor] = field(init=False)
+    """
+    Where every parameter is ``-inf`` before training, a log-probability or log-weight
+    of zero probability, which training keeps.
+    """
+
     def __post_init__(self) -> None:
+        """
+        Copy the parameters of the circuit into the trained leaf tensors and record
+        their :attr:`zero_probability_entries`.
+        """
         self.parameters = [
             parameter.detach().clone().requires_grad_(True)
             for parameter in self.layer.circuit_parameters
+        ]
+        self.zero_probability_entries = [
+            torch.isneginf(parameter) for parameter in self.parameters
         ]
 
     def minimize(self, epochs: int, *arguments: torch.Tensor) -> LayerType:
@@ -75,6 +88,10 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
             loss.backward()
             optimizer.step()
             with torch.no_grad():
+                for parameter, zero_probability in zip(
+                    self.parameters, self.zero_probability_entries
+                ):
+                    parameter.masked_fill_(zero_probability, -torch.inf)
                 projected = self.layer.projected_circuit_parameters(self.parameters)
                 for parameter, valid in zip(self.parameters, projected):
                     parameter.copy_(valid)

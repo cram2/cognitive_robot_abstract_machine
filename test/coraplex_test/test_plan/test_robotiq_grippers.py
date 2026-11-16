@@ -85,7 +85,9 @@ def test_a_simulated_robot_moves_its_fingers_with_a_giskard_goal(extensions) -> 
         SetGripperAction(configuration=configuration), simulated_executor(extensions)
     )
 
-    assert type(action.goal) is type(MoveFingers.moving_gripper_to(configuration))
+    assert type(action.goal) is type(
+        MoveFingers.moving_gripper_to(configuration=configuration)
+    )
 
 
 def test_a_real_robot_whose_grippers_take_other_action_messages_keeps_its_finger_goals(
@@ -105,7 +107,9 @@ def test_a_real_robot_whose_grippers_take_other_action_messages_keeps_its_finger
     )
 
     assert action.gripper_goal_type is MoveFingers
-    assert type(action.goal) is type(MoveFingers.moving_gripper_to(configuration))
+    assert type(action.goal) is type(
+        MoveFingers.moving_gripper_to(configuration=configuration)
+    )
 
 
 # %% grasping

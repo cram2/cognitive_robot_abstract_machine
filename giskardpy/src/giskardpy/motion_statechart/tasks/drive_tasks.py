@@ -149,7 +149,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
 
     @abstractmethod
     def parent_R_goal(
-        self, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix
     ) -> RotationMatrix:
         """
         :param parent_T_base: The pose of the base relative to the drive's parent.
@@ -164,7 +164,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
         artifacts = MotionNodeArtifacts()
         parent_T_base = self.parent_T_base()
         parent_R_base = parent_T_base.rotation_matrix
-        parent_R_goal = self.parent_R_goal(parent_T_base)
+        parent_R_goal = self.parent_R_goal(parent_T_base=parent_T_base)
         artifacts.geometry.add_yaw_goal_constraint(
             frame_R_current=parent_R_base,
             frame_R_goal=parent_R_goal,
@@ -185,7 +185,7 @@ class BaseOrientation(DrivenBaseRotation):
     """
 
     def parent_R_goal(
-        self, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix
     ) -> RotationMatrix:
         return self.parent_T_goal.rotation_matrix
 
@@ -198,10 +198,10 @@ class BaseHeading(DrivenBaseRotation):
     """
 
     def parent_R_goal(
-        self, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix
     ) -> RotationMatrix:
         parent_V_base_to_goal = self.parent_T_goal.position - self.parent_P_viewpoint(
-            parent_T_base
+            parent_T_base=parent_T_base
         )
         parent_V_base_to_goal.scale(1)
         return RotationMatrix.from_vectors(
@@ -211,7 +211,7 @@ class BaseHeading(DrivenBaseRotation):
         )
 
     def parent_P_viewpoint(
-        self, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix
     ) -> Point3:
         """
         :param parent_T_base: The pose of the base relative to the drive's parent.
@@ -245,10 +245,10 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
             tip=self.base,
             float_variable_data=self.context.float_variable_data,
         )
-        self._parent_T_start_binding.bind(self.context.world)
+        self._parent_T_start_binding.bind(world=self.context.world)
 
     def on_start(self) -> None:
-        self._parent_T_start_binding.bind(self.context.world)
+        self._parent_T_start_binding.bind(world=self.context.world)
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -258,12 +258,12 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         """
         if self._parent_T_start_binding.root is not self.drive_parent:
             self._parent_T_start_binding.change_root(
-                self.drive_parent, self.context.world
+                root=self.drive_parent, world=self.context.world
             )
         return super().build_artifacts()
 
     def parent_P_viewpoint(
-        self, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix
     ) -> Point3:
         return self._parent_T_start_binding.root_T_tip.position
 
@@ -280,7 +280,7 @@ class MobileBasePoseGoal(ABC):
     @classmethod
     @abstractmethod
     def moving_base_of(
-        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
+        cls, *, robot: AbstractRobot, goal_pose: Pose, threshold: float
     ) -> Self:
         """
         :param robot: The robot whose base is put at `goal_pose`.
@@ -368,7 +368,7 @@ class DrivenBaseGoal(
         """
 
     @abstractmethod
-    def _create_motion(self, task_parameters: dict[str, Any]) -> None:
+    def _create_motion(self, *, task_parameters: dict[str, Any]) -> None:
         """
         Creates the node running the tasks that move :attr:`driven_body`.
 
@@ -377,7 +377,7 @@ class DrivenBaseGoal(
 
     @classmethod
     def moving_base_of(
-        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
+        cls, *, robot: AbstractRobot, goal_pose: Pose, threshold: float
     ) -> Self:
         """
         Differs from :meth:`MobileBasePoseGoal.moving_base_of` in requiring `robot` to
@@ -416,7 +416,7 @@ class DrivenBaseGoal(
             )
         )
         self._create_motion(
-            dict(
+            task_parameters=dict(
                 base=self.driven_body,
                 goal_pose=self.goal_pose,
                 parent_T_goal_reference_frame=self.parent_T_goal_reference_frame,
@@ -439,11 +439,11 @@ class DrivenBaseGoal(
             float_variable_data=self.context.float_variable_data,
             root_T_tip=self.parent_T_goal_reference_frame,
         )
-        self._forward_kinematics_binding.bind(self.context.world)
+        self._forward_kinematics_binding.bind(world=self.context.world)
 
     def on_start(self) -> None:
         if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._forward_kinematics_binding.bind(self.context.world)
+            self._forward_kinematics_binding.bind(world=self.context.world)
 
     def build_artifacts(self) -> NodeArtifacts:
         """
@@ -455,7 +455,7 @@ class DrivenBaseGoal(
         """
         if self._forward_kinematics_binding.root is not self._drive_parent:
             self._forward_kinematics_binding.change_root(
-                self._drive_parent, self.context.world
+                root=self._drive_parent, world=self.context.world
             )
         return NodeArtifacts(
             observation=trinary_if_cases(
@@ -484,7 +484,7 @@ class HolonomicBaseGoal(DrivenBaseGoal):
     def motion(self) -> StatechartNode:
         return self.parallel
 
-    def _create_motion(self, task_parameters: dict[str, Any]) -> None:
+    def _create_motion(self, *, task_parameters: dict[str, Any]) -> None:
         self.parallel = Parallel(
             name=f"{self.name}/parallel",
             nodes=[
@@ -519,7 +519,7 @@ class DifferentialDriveBaseGoal(DrivenBaseGoal):
     def motion(self) -> StatechartNode:
         return self.sequence
 
-    def _create_motion(self, task_parameters: dict[str, Any]) -> None:
+    def _create_motion(self, *, task_parameters: dict[str, Any]) -> None:
         steps = [
             BaseTurnTowardsGoalPosition(name=f"{self.name}/step1", **task_parameters),
             Parallel(
