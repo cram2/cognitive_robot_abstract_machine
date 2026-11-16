@@ -128,7 +128,9 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
                 width=plan_node.width,
                 speed=self.finger_speed,
             )
-        plan_node.statechart.replace(ControlStructureNode.step_holding(plan_node), task)
+        plan_node.statechart.replace(
+            node=ControlStructureNode.step_holding(node=plan_node), replacement=task
+        )
 
 
 @dataclass
@@ -147,14 +149,14 @@ class CloseGarmiFingersToWidthWithTheirFrankaDriver(
 
     def apply(self, plan_node: MoveFingersToWidthAction) -> None:
         plan_node.statechart.replace(
-            plan_node, self.grasp(plan_node.two_finger_gripper)
+            node=plan_node, replacement=self.grasp(plan_node.two_finger_gripper)
         )
 
 
 # %% running plans on the real GARMI
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealGarmiPlanExecutor(RealRobotPlanExecutor):
     """
     Runs plans on the real GARMI, whose grippers move through their Franka gripper

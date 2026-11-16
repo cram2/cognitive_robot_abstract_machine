@@ -581,7 +581,7 @@ class MovesToolCenterPoint(
             return goal
         if isinstance(goal, Parallel):
             for node in accompanying:
-                goal.add_node(node)
+                goal.add_node(node=node)
             return goal
         return Parallel(nodes=[goal, *accompanying], name=type(goal).__name__)
 

@@ -18,7 +18,7 @@ def test_creating_a_trajectory_plotter_does_not_record_yet():
     GoalTrajectoryPlotter(executor=executor)
 
     with pytest.raises(MissingExecutorExtensionError):
-        executor.require_extension(WorldStateTrajectoryRecording)
+        executor.require_extension(extension_type=WorldStateTrajectoryRecording)
 
 
 def test_start_recording_hands_the_trajectory_plotter_to_the_executor():
@@ -28,7 +28,7 @@ def test_start_recording_hands_the_trajectory_plotter_to_the_executor():
     plotter.start_recording()
 
     assert (
-        executor.require_extension(WorldStateTrajectoryRecording).plotter
+        executor.require_extension(extension_type=WorldStateTrajectoryRecording).plotter
         is plotter.trajectory_plotter
     )
 
@@ -39,4 +39,4 @@ def test_a_plotter_without_own_recording_leaves_the_executor_alone():
     GoalGanttChartPlotter(executor=executor).start_recording()
 
     with pytest.raises(MissingExecutorExtensionError):
-        executor.require_extension(WorldStateTrajectoryRecording)
+        executor.require_extension(extension_type=WorldStateTrajectoryRecording)

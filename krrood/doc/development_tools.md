@@ -12,13 +12,15 @@ can use the same conventions:
   krrood ships and the repository's own, replacing whatever the file held.
   With `--check` it writes nothing and exits non-zero when the file differs; run that in
   CI.
-
+- `krrood skills [--check]` generates the `.claude/skills/<name>/SKILL.md` of every
+  skill the repository declares, replacing whatever those files held. `--check` works
+  as for `agents-md`.
 - `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
   enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
   the staged change (`git diff --cached`) adds or changes are checked, because existing
   code has many violations; `--all-lines` checks every line.
 
-`format` and `agents-md` exit with 1 when they modified a file, and `check` when it
+`format`, `agents-md` and `skills` exit with 1 when they modified a file, and `check` when it
 found a violation, following pre-commit's convention for hooks.
 
 ## Rules
@@ -57,10 +59,36 @@ a module only imports, or one defined anywhere else, is never listed. Top-level
 sections appear in alphabetical order of their headings, and nested sections in the
 order they are written.
 
+## Core boundary
+
+A distribution can declare a light core that a plain `pip install` must be able to load,
+in its `pyproject.toml`:
+
+```toml
+[tool.krrood.core-boundary]
+# The packages and modules of core; every other module of the distribution is not core.
+core = ["my_package.core"]
+# The distributions core may load, with everything they require; without it, core may
+# load only the standard library.
+dependencies = ["typing-extensions"]
+```
+
+`krrood check` then reports every import that a core module runs when it is loaded
+(outside functions and `if TYPE_CHECKING:`) and that loads a module outside core, or a
+distribution outside `dependencies` and what they require. It reads the whole
+distribution's import graph, so for a module outside core it also names the
+distributions that module loads in turn, however long the chain. It maps an imported
+package to its distribution through the installed packages, so it runs in the
+distribution's development environment. Core may import anything inside a function.
+
+Like every checker, it checks only the lines a commit changes, so existing crossings do
+not block a commit and a new one cannot slip in; `krrood check --all-lines` lists all of
+them.
+
 ## Installation
 
 The formatting tools are an optional dependency, pinned so every repository formats
-alike:
+alike. The development tools need Python 3.11 or later:
 
 ```bash
 pip install "krrood[development-tools]"
@@ -68,36 +96,20 @@ pip install "krrood[development-tools]"
 
 ## Use with pre-commit
 
-pre-commit installs krrood into the hook's own environment:
+The hooks are published in
+[`.pre-commit-hooks.yaml`](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/.pre-commit-hooks.yaml)
+at the root of cognitive_robot_abstract_machine: `krrood-format`, `krrood-agents-md`,
+`krrood-skills` and `krrood-check`. Add that repository to your
+`.pre-commit-config.yaml` and list the hook ids you want.
 
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: krrood-format
-        name: Format Python (ruff, then docformatter)
-        entry: krrood format
-        language: python
-        additional_dependencies: ["krrood[development-tools]==<version>"]
-        types: [python]
-      - id: krrood-agents-md
-        name: Update the rules in AGENTS.md
-        entry: krrood agents-md
-        language: python
-        additional_dependencies: ["krrood[development-tools]==<version>"]
-        pass_filenames: false
-        always_run: true
-```
-
-To use rules that are not released yet, replace the requirement with a commit of
-cognitive_robot_abstract_machine:
-`krrood[development-tools] @ git+https://github.com/cram2/cognitive_robot_abstract_machine@<commit>#subdirectory=krrood`.
-
-The same hooks are published in the `.pre-commit-hooks.yaml` at the root of
-[cognitive_robot_abstract_machine](https://github.com/cram2/cognitive_robot_abstract_machine).
-They run the `krrood` command already installed in your development environment
+The hooks run the `krrood` command already installed in your development environment
 (`language: system`), because pre-commit would otherwise install that whole repository
-rather than krrood.
+rather than krrood. `krrood-check` needs that environment anyway: the core boundary check
+reads the installed packages.
+
+To use rules that are not released yet, install krrood from a commit of
+cognitive_robot_abstract_machine:
+`pip install "krrood[development-tools] @ git+https://github.com/cram2/cognitive_robot_abstract_machine@<commit>#subdirectory=krrood"`.
 
 ## Project rules
 
@@ -114,6 +126,54 @@ class DeploymentRules(Section):
     DEPLOY_FROM_TAGS = "Deploy only tagged commits"
     TAG_RELEASES = "Tag every release", ("Use semantic versions", "Sign the tag")
 ```
+
+## Skills
+
+A skill is code as well: a class subclassing `Skill`, named for the skill followed by
+`Skill`, in an `agent_skills.py` module at the repository root or in the modules of an
+`agent_skills` package there. `krrood skills` writes each skill defined in it to the
+path its `path` classproperty gives, relative to the repository root, usually
+`.claude/skills/<name>/SKILL.md`. The name is the class name's words in kebab case
+(`CRAMLiveSessionSkill` becomes `cram-live-session`). The skill's other classproperties
+give the front matter (`description`, `allowed_tools`), the paragraphs below its title
+(`introduction`) and its sections, which are `Section`s like the rules and are written
+in the order `sections` lists them, one heading level below the title:
+
+```python
+from pathlib import Path
+
+from krrood.development_tools.agents.rule import Section
+from krrood.development_tools.agents.skill import AgentTool, Skill
+
+
+class LoopRules(Section):
+    ONE_STEP_PER_INSTRUCTION = "Do what the developer asked, then stop and wait"
+
+
+class LiveSessionSkill(Skill):
+    @classproperty
+    def path(cls) -> Path:
+        return Path(".claude/skills/live-session/SKILL.md")
+
+    @classproperty
+    def description(cls) -> str:
+        return "Drive a simulated robot step by step. Use when ..."
+
+    @classproperty
+    def allowed_tools(cls) -> list[AgentTool]:
+        return [AgentTool.BASH, AgentTool.READ]
+
+    @classproperty
+    def introduction(cls) -> str:
+        return "The developer says what the robot does next. ..."
+
+    @classproperty
+    def sections(cls) -> list[type[Section]]:
+        return [LoopRules]
+```
+
+Never edit a generated `SKILL.md`; the comment below its front matter names the class
+and module it comes from. Skills written by hand in `.claude/skills` are left alone.
 
 ## Changing a rule
 

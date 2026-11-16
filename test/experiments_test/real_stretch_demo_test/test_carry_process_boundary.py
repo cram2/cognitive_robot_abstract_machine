@@ -48,7 +48,9 @@ def test_a_carry_runs_against_a_controller_in_another_process(
             )
         )
     executor = RealRobotPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(stretch)]),
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=stretch)]
+        ),
         ros_node=session.node,
     )
     carry = CarryAction(
@@ -58,9 +60,9 @@ def test_a_carry_runs_against_a_controller_in_another_process(
         holding_arms=[arm],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(carry)
+    statechart.add_node(node=carry)
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.execute()
     executor.close()
 

@@ -84,18 +84,21 @@ class AlignPlanes(
         root_V_tip_normal.scale(1)
 
         root_V_tip_normal.visualisation_frame = self.tip_link
-        current_dbg = DebugExpression(
+        current_normal_debug_expression = DebugExpression(
             name=f"{self.name}/current_normal",
             expression=root_V_tip_normal,
             color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
-        goal_dbg = DebugExpression(
+        # a copy, as transforming returns the reference normal itself when it is in the root
+        root_V_reference_normal_at_tip = Vector3.from_iterable(root_V_root_normal)
+        root_V_reference_normal_at_tip.visualisation_frame = self.tip_link
+        reference_normal_debug_expression = DebugExpression(
             name=f"{self.name}/reference_normal",
-            expression=root_V_root_normal,
+            expression=root_V_reference_normal_at_tip,
             color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
         )
-        artifacts.debug_expressions.append(current_dbg)
-        artifacts.debug_expressions.append(goal_dbg)
+        artifacts.debug_expressions.append(current_normal_debug_expression)
+        artifacts.debug_expressions.append(reference_normal_debug_expression)
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
@@ -158,7 +161,7 @@ class KeepHeldBodyUpright(AlignPlanes):
             tip=self.tip_link,
             float_variable_data=self.context.float_variable_data,
         )
-        self._tool_T_held_body.bind(self.context.world)
+        self._tool_T_held_body.bind(world=self.context.world)
         self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3.Z(
             reference_frame=self.tip_link
         )
@@ -170,5 +173,6 @@ class KeepHeldBodyUpright(AlignPlanes):
         super().on_start()
         held_body = self.end_effector.held_body
         self._tool_T_held_body.change_tip(
-            self.root_link if held_body is None else held_body, self.context.world
+            tip=self.root_link if held_body is None else held_body,
+            world=self.context.world,
         )

@@ -18,6 +18,8 @@ from typing_extensions import (
     Callable,
     Generic,
     Hashable,
+    Iterable,
+    Iterator,
     Mapping,
     Sequence,
     TypeVar,
@@ -26,6 +28,7 @@ from typing_extensions import (
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.entity_query_language.core.bound_value import HasBoundValue
+from krrood.entity_query_language.utils import T
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import ensure_hashable
@@ -408,7 +411,7 @@ class GroundTermExpression(Generic[GroundTermType], SubClassSafeGeneric):
 
 class TermReader(Interface):
     """
-    Reads the value of a ground term during an evaluation.
+    Reads the value of a ground term, and the instances of a type, during an evaluation.
     """
 
     @abstractmethod
@@ -416,6 +419,21 @@ class TermReader(Interface):
         """
         :param term: The ground term to read.
         :return: The value of *term*, or ``None`` when it has none.
+        """
+
+    @abstractmethod
+    def existing_values(self, *, values: Iterable[T]) -> Iterator[T]:
+        """
+        :param values: Values of a domain, as the live objects hold them.
+        :return: The values of *values* that exist in the evaluation, in their order.
+        """
+
+    @abstractmethod
+    def added_instances_of(self, *, type_: type[T]) -> Iterator[T]:
+        """
+        :param type_: The type whose instances to read.
+        :return: The instances of *type_* that exist in the evaluation in addition to
+            the live ones.
         """
 
 
@@ -427,3 +445,9 @@ class LiveTermReader(TermReader):
 
     def value_of_term(self, *, term: GroundTerm) -> TermValue | None:
         return term.live_term_value()
+
+    def existing_values(self, *, values: Iterable[T]) -> Iterator[T]:
+        return iter(values)
+
+    def added_instances_of(self, *, type_: type[T]) -> Iterator[T]:
+        return iter(())

@@ -4,7 +4,7 @@ Reading what a ros2_control controller manager knows about the robot it drives.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from controller_manager_msgs.srv import ListControllers
@@ -15,12 +15,7 @@ from giskardpy.middleware.ros2.exceptions import (
     ControllersNotActiveError,
     ControllersNotLoadedError,
 )
-from giskardpy.middleware.ros2.ros2_interface import (
-    call_service,
-    get_parameters,
-    search_for_publisher_of_node_with_type,
-    search_for_subscriber_of_node_with_type,
-)
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 
 if TYPE_CHECKING:
     from controller_manager_msgs.msg import ControllerState as ControllerStateMessage
@@ -63,7 +58,7 @@ class ControllerParameter(StrEnum):
 # %% controller manager
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControllerManager:
     """
     A ros2_control controller manager and the controllers it loaded.
@@ -72,6 +67,11 @@ class ControllerManager:
     name: str = "controller_manager"
     """
     The name of the controller manager node, including the namespace it runs in.
+    """
+
+    ros_graph: RosGraph = field(default_factory=RosGraph, kw_only=True)
+    """
+    The graph the controller manager and its controllers are looked up in.
     """
 
     @property
@@ -89,7 +89,7 @@ class ControllerManager:
         return "/" + self.name.strip("/").rpartition("/")[0]
 
     def active_controllers(
-        self, whitelist: list[str] | None = None
+        self, *, whitelist: list[str] | None = None
     ) -> list[ControllerStateMessage]:
         """
         :param whitelist: The names of the controllers to consider, all if ``None``.
@@ -99,8 +99,10 @@ class ControllerManager:
         :raises ControllersNotActiveError: If the whitelist names a controller that is
             loaded but does not run.
         """
-        controllers = call_service(
-            ListControllers, f"{self.name}/list_controllers", ListControllers.Request()
+        controllers = self.ros_graph.call_service(
+            ListControllers,
+            f"{self.name}/list_controllers",
+            ListControllers.Request(),
         ).controller
         if whitelist is not None:
             loaded_controllers = {controller.name for controller in controllers}
@@ -131,34 +133,36 @@ class ControllerManager:
             if controller.state == ControllerState.ACTIVE
         ]
 
-    def joints_of(self, controller_name: str) -> list[str]:
+    def joints_of(self, *, controller_name: str) -> list[str]:
         """
         :return: The joints the controller commands, in the order of its command layout.
         """
         return (
-            get_parameters(
-                parameters=[ControllerParameter.JOINTS],
+            self.ros_graph.get_parameters(
                 node_name=f"{self.namespace.rstrip('/')}/{controller_name}",
+                parameter_names=[ControllerParameter.JOINTS],
             )
             .values[0]
             .string_array_value
         )
 
-    def command_topic_of(self, controller_name: str, message_type: type) -> str:
+    def command_topic_of(self, *, controller_name: str, message_type: type) -> str:
         """
         :param message_type: The message type the controller receives its commands in.
         :return: The topic the controller receives its commands on.
         """
-        return search_for_subscriber_of_node_with_type(
+        return self.ros_graph.subscriber_of_node_with_type(
             node_name=controller_name,
             topic_type=message_type,
             namespace=self.namespace,
         )
 
-    def joint_state_topic_of(self, controller_name: str) -> str:
+    def joint_state_topic_of(self, *, controller_name: str) -> str:
         """
         :return: The topic a joint state broadcaster publishes on.
         """
-        return search_for_publisher_of_node_with_type(
-            node_name=controller_name, topic_type=JointState, namespace=self.namespace
+        return self.ros_graph.publisher_of_node_with_type(
+            node_name=controller_name,
+            topic_type=JointState,
+            namespace=self.namespace,
         )

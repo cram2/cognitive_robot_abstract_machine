@@ -758,10 +758,10 @@ def build_perception_task(
     :return: The statechart holding the task, in the context it was built with.
     """
     context = StatechartContext(world=world)
-    MotionControl().extend_context(context)
-    context.add_extension(RosContextExtension(ros_node))
+    MotionControl().extend_context(context=context)
+    context.add_extension(extension=RosContextExtension(ros_node=ros_node))
     statechart = Statechart(context=context)
-    statechart.add_node(task)
+    statechart.add_node(node=task)
     task.build()
     return statechart
 
@@ -798,7 +798,11 @@ def test_perception_task_needs_ros_access(
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     statechart = Statechart(context=StatechartContext(world=world))
     statechart.add_node(
-        task := PerceptionTask(query=query, answered_by=PerceptionSource.WORLD_MODEL)
+        node=(
+            task := PerceptionTask(
+                query=query, answered_by=PerceptionSource.WORLD_MODEL
+            )
+        )
     )
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
@@ -1012,9 +1016,11 @@ def test_perception_task_survives_a_chart_round_trip(
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     chart = Statechart(context=StatechartContext(world=world))
     chart.add_node(
-        task := PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
+        node=(
+            task := PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
+        )
     )
-    chart.add_node(EndMotion.when_true(task))
+    chart.add_node(node=EndMotion.when_true(node=task))
 
     restored_chart = Statechart.from_json(
         data=json.loads(json.dumps(chart.to_json())),
@@ -1052,7 +1058,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
         name="MoveTCP",
     )
     statechart = build_perception_task(detection, world, rclpy_node)
-    statechart.add_node(reach)
+    statechart.add_node(node=reach)
     reach.build()
 
     run_perception_task(detection)

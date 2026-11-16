@@ -241,7 +241,7 @@ class InsertCylinder(
             weight=self.weight,
         )
         self._add_children_to_statechart(
-            [
+            nodes=[
                 self.reach_top,
                 self.tilt_task,
                 self.stay_on_line,

@@ -39,8 +39,6 @@ dependencies = [
     "scikit-learn>=1.7",
     "stepmix>=3.0.0",
     "jax>=0.6.0",
-    "jaxtyping>=0.3.2",
-    "equinox>=0.12.1",
     "mlflow>=2.22.0",
     "optax>=0.2.4",
     "pyjpt; sys_platform == 'linux'",
@@ -53,6 +51,8 @@ dependencies = [
     "superqt",
     "krrood>=26.10.0",
     "causal-learn",
+    "array-api-compat>=1.15",
+    "array-api-extra>=0.11",
 ]
 
 [project.urls]
@@ -68,6 +68,9 @@ include = ["probabilistic_model*"]
 version = {attr = "probabilistic_model._version.__version__"}
 
 [project.optional-dependencies]
+torch = [
+    "torch>=2.4",
+]
 dev = [
     "pytest",
     "pandas>=2.2.3",

@@ -15,7 +15,7 @@ from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.world_description.connections import WheeledDrive
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownMinimumVelocityJointError(SetupException):
     """
     Raised when a minimum velocity override names a joint that is not commanded.
@@ -41,25 +41,7 @@ class UnknownMinimumVelocityJointError(SetupException):
         return f"Use one of {sorted(self.commanded_joint_names)}."
 
 
-@dataclass
-class ServiceUnavailableError(SetupException):
-    """
-    Raised when a service Giskard needs for its setup does not become available.
-    """
-
-    service_name: str
-    """
-    The service that was waited for.
-    """
-
-    def error_message(self) -> str:
-        return f'The service "{self.service_name}" is not available.'
-
-    def suggest_correction(self) -> str:
-        return "Make sure the node offering the service is running."
-
-
-@dataclass
+@dataclass(kw_only=True)
 class ControllersNotLoadedError(SetupException):
     """
     Raised when controllers Giskard was told to use are not loaded by their controller
@@ -86,7 +68,7 @@ class ControllersNotLoadedError(SetupException):
         return "Load the controllers or remove them from the whitelist."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControllersNotActiveError(SetupException):
     """
     Raised when controllers Giskard was told to use are loaded by their controller
@@ -113,7 +95,7 @@ class ControllersNotActiveError(SetupException):
         return "Activate the controllers or remove them from the whitelist."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoUniqueDriveError(SetupException):
     """
     Raised when Giskard is told to command the drive of a world without being told which
@@ -135,14 +117,14 @@ class NoUniqueDriveError(SetupException):
         return "Name the drive to command."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutionException(GiskardException):
     """
     Base class for errors that occur while executing a trajectory.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoActiveGoalToCancelError(ExecutionException):
     """
     Raised when a goal cancellation is requested but no goal is active.
@@ -155,7 +137,7 @@ class NoActiveGoalToCancelError(ExecutionException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutionCanceledException(ExecutionException):
     """
     Raised when the execution of a goal is canceled.
@@ -180,7 +162,7 @@ class ExecutionCanceledException(ExecutionException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientDisconnectedError(ExecutionException):
     """
     Raised when the client that sent the running goal disconnected.
@@ -206,7 +188,7 @@ class ClientDisconnectedError(ExecutionException):
         return "Restart the client and send the goal again."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoWatchedClientError(GiskardException):
     """
     Raised when a presence check is asked about a client while it watches none.
@@ -224,7 +206,7 @@ class NoWatchedClientError(GiskardException):
         return "Only ask a check about a client that it started watching."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelModifiedDuringMotionError(ExecutionException):
     """
     Raised when another process modified the world model while a motion was running.
@@ -244,7 +226,7 @@ class WorldModelModifiedDuringMotionError(ExecutionException):
         return "Send the goal again; the modification is applied by then."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RequiredWorldUpdateNotReceivedError(ExecutionException):
     """
     Raised when a goal names a change of the client's world that never arrived.
@@ -288,7 +270,7 @@ class RequiredWorldUpdateNotReceivedError(ExecutionException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardWorldUpdateNotReceivedError(ExecutionException):
     """
     Raised when the changes Giskard made during a goal never reached the client.
@@ -319,7 +301,7 @@ class GiskardWorldUpdateNotReceivedError(ExecutionException):
         return "Check that this world is still connected to the world sync topic."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutionAbortedException(ExecutionException):
     """
     Raised when the execution is aborted by Giskard.
@@ -332,7 +314,7 @@ class ExecutionAbortedException(ExecutionException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GoalRequestNotAnsweredError(ExecutionException):
     """
     Raised when no action server answered a goal request in time.
@@ -364,7 +346,7 @@ class GoalRequestNotAnsweredError(ExecutionException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionClientClosedError(ExecutionException):
     """
     Raised when a goal is sent through an action client that was closed.
@@ -382,7 +364,7 @@ class ActionClientClosedError(ExecutionException):
         return "Build a new client for the action and send the goal through it."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnexpectedGoalStatusError(ExecutionException):
     """
     Raised when a goal ends in a status that a finished goal cannot have.
@@ -405,7 +387,7 @@ class UnexpectedGoalStatusError(ExecutionException):
         return "Report this to the maintainers of the action server."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnserializableGoalError(ExecutionException):
     """
     Stands in for the error a goal failed with when that error could not be serialized,
@@ -429,7 +411,7 @@ class UnserializableGoalError(ExecutionException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartOutOfStepError(ExecutionException):
     """
     Raised when a client sends a child for a statechart that holds other nodes than the
@@ -456,7 +438,7 @@ class StatechartOutOfStepError(ExecutionException):
         return "Send children only for the goal the client's statechart was sent as."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartNotEndedByResultError(ExecutionException):
     """
     Raised when the result of a goal that succeeded leaves the client's statechart in a
@@ -473,7 +455,7 @@ class StatechartNotEndedByResultError(ExecutionException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateUpdateAheadOfStatechartError(ExecutionException):
     """
     Raised when Giskard reports the states of more nodes than the client's copy of the
@@ -502,7 +484,7 @@ class StateUpdateAheadOfStatechartError(ExecutionException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionServerThreadStillRunningError(GiskardException):
     """
     Raised when a motion server's background thread does not stop in time.

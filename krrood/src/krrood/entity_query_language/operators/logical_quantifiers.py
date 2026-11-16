@@ -16,6 +16,7 @@ from functools import cached_property
 from typing_extensions import Iterable
 
 from krrood.entity_query_language.core.base_expressions import (
+    Operand,
     OperationResult,
     Selectable,
     SymbolicExpression,
@@ -44,6 +45,18 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
     only inside the quantifier, including inside the quantified variable's own domain
     expression, is local to it and is quantified together with the quantified variable.
     """
+
+    def __post_init__(self):
+        """
+        Read the quantified operand as the variable and condition it quantifies with
+        (see :meth:`~krrood.entity_query_language.core.base_expressions.Operand._quantif
+        ier_operands_`).
+        """
+        if isinstance(self.left, Operand):
+            self.left, self.right = self.left._quantifier_operands_(
+                condition=self.right
+            )
+        super().__post_init__()
 
     @property
     def variable(self):

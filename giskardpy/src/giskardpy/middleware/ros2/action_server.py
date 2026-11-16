@@ -13,7 +13,8 @@ from giskardpy.data_types.exceptions import (
     MissingActionResultError,
     MissingGoalOutcomeError,
 )
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
+from krrood.patterns.called_positionally import called_positionally
 
 
 class GoalOutcome(Enum):
@@ -36,7 +37,7 @@ class GoalOutcome(Enum):
     The motion was stopped by the client or superseded by a new goal.
     """
 
-    def report_to(self, goal_handle: ServerGoalHandle) -> None:
+    def report_to(self, *, goal_handle: ServerGoalHandle) -> None:
         """
         Transition the goal handle into the state matching this outcome.
 
@@ -55,7 +56,7 @@ class GoalOutcome(Enum):
                 goal_handle.abort()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GoalAnswer:
     """
     The motion server's answer to one goal, handed back to the rclpy thread that waits
@@ -78,7 +79,7 @@ class GoalAnswer:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionServerHandler:
     """
     Hands goals from rclpy's executor threads over to the thread that runs the motion
@@ -149,7 +150,7 @@ class ActionServerHandler:
 
     def __post_init__(self):
         self._action_server = ActionServer(
-            node=rospy.get_node(),
+            node=background_node.get_node(),
             action_type=self.action_type,
             action_name=self.action_name,
             execute_callback=self.execute_callback,
@@ -169,36 +170,39 @@ class ActionServerHandler:
         self._action_server.destroy()
         self._action_server = None
 
-    def loginfo(self, message: str, goal_id: int | None = None) -> None:
+    def loginfo(self, *, message: str, goal_id: int | None = None) -> None:
         """
         Log a message tagged with the action name and a goal id, the current goal's
         unless another is given.
         """
         if goal_id is None:
             goal_id = self.goal_id
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"{self.action_name}(Goal #{goal_id}): {message}"
         )
 
+    @called_positionally
     def default_goal_callback(self, goal_request: Any) -> GoalResponse:
         """
         Accept every goal and cancel a running one to make room for the new goal.
         """
         if self.goal_handle is not None:
             self.loginfo(
-                f"New Goal requested while Goal #{self.goal_id} is being processed. "
+                message=f"New Goal requested while Goal #{self.goal_id} is being processed. "
                 f"Cancelling old Goal."
             )
             self.cancel_requested = True
         return GoalResponse.ACCEPT
 
+    @called_positionally
     def cancel_callback(self, goal_handle: ServerGoalHandle) -> CancelResponse:
         """
         Accept every cancel request.
         """
-        self.loginfo("Cancel request received.")
+        self.loginfo(message="Cancel request received.")
         return CancelResponse.ACCEPT
 
+    @called_positionally
     async def execute_callback(self, goal_handle: ServerGoalHandle) -> Any:
         """
         Queue the goal for the motion server thread, wait for its answer and tell rclpy
@@ -208,8 +212,8 @@ class ActionServerHandler:
             sleep(0.1)
         self.goal_queue.put(goal_handle)
         answer: GoalAnswer = self.result_queue.get()
-        self.loginfo("Sending response.", goal_id=answer.goal_id)
-        answer.outcome.report_to(goal_handle)
+        self.loginfo(message="Sending response.", goal_id=answer.goal_id)
+        answer.outcome.report_to(goal_handle=goal_handle)
         return answer.result_message
 
     def accept_goal(self) -> None:
@@ -222,7 +226,7 @@ class ActionServerHandler:
             return
         self.goal_msg = self.goal_handle.request
         self.goal_id += 1
-        self.loginfo("Accepted")
+        self.loginfo(message="Accepted")
 
     @property
     def result_message(self) -> Any:
@@ -247,7 +251,7 @@ class ActionServerHandler:
         """
         return not self.goal_queue.empty()
 
-    def send_feedback(self, message: Any) -> None:
+    def send_feedback(self, *, message: Any) -> None:
         """
         Publish feedback for the current goal.
         """

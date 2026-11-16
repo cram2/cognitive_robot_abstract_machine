@@ -82,8 +82,8 @@ class PlaceAction(
             ),
             Parallel(
                 nodes=[
-                    self.gripper_goal_type.moving_gripper_to(
-                        self.arm.end_effector.default_configuration(
+                    self.gripper_goal_type.create_gripper_goal(
+                        configuration=self.arm.end_effector.default_configuration(
                             GripperState.OPEN,
                             finger_velocity=self.max_release_opening_velocity,
                         )
@@ -118,7 +118,7 @@ class PlaceAction(
             annotation that can be grasped.
         """
         for previous in self.statechart.get_preceding_nodes_by_type(
-            self, PickUpAction | PlaceAction
+            node=self, node_type=PickUpAction | PlaceAction
         ):
             if previous.arm is not self.arm:
                 continue

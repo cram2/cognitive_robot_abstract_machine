@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 
 class Subcommand(StrEnum):
@@ -22,6 +22,11 @@ class Subcommand(StrEnum):
     AGENTS_MD = "agents-md"
     """
     Generate the repository's ``AGENTS.md``.
+    """
+
+    SKILLS = "skills"
+    """
+    Generate the ``SKILL.md`` of every skill the repository declares.
     """
 
     CHECK = "check"

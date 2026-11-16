@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
@@ -25,8 +25,8 @@ def main() -> None:
     """
     Move two joints of the arm to a goal and wait until the motion ends.
     """
-    rospy.init_node("giskard_client")
-    giskard = GiskardClientExecutor(node_handle=rospy.get_node())
+    background_node.init_node("giskard_client")
+    giskard = GiskardClientExecutor(node_handle=background_node.get_node())
     goal_positions_in_radians = {
         UniversalRobotJoint.SHOULDER_PAN: 0.5,
         UniversalRobotJoint.ELBOW: 1.0,
@@ -34,17 +34,19 @@ def main() -> None:
 
     motion_statechart = Statechart(context=giskard.context)
     motion_statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                goal_positions_in_radians, giskard.world
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    goal_positions_in_radians, giskard.world
+                )
             )
         )
     )
-    motion_statechart.add_node(EndMotion.when_true(joint_goal))
-    giskard.compile(motion_statechart)
+    motion_statechart.add_node(node=EndMotion.when_true(node=joint_goal))
+    giskard.compile(statechart=motion_statechart)
     giskard.execute()
 
-    rospy.shutdown()
+    background_node.shutdown()
 
 
 if __name__ == "__main__":

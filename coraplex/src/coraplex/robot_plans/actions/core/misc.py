@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from coraplex.datastructures.enums import (
     DetectionState,
     DetectionTechnique,

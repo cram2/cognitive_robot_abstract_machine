@@ -33,7 +33,7 @@ def create_context_with_motion_control(
         if qp_controller_config is None
         else MotionControl(qp_controller_config=qp_controller_config)
     )
-    motion_control.extend_context(context)
+    motion_control.extend_context(context=context)
     return context
 
 
@@ -55,7 +55,7 @@ def add_to_statechart_with_motion_control(
     statechart = Statechart(
         context=create_context_with_motion_control(world, qp_controller_config)
     )
-    statechart.add_node(node)
+    statechart.add_node(node=node)
     return statechart
 
 
@@ -69,7 +69,7 @@ class StatechartOrigin(ABC):
 
     @abstractmethod
     def create_building_context(
-        self, executor: StatechartExecutor
+        self, *, executor: StatechartExecutor
     ) -> StatechartContext:
         """
         :param executor: The executor that will run the statechart.
@@ -78,7 +78,7 @@ class StatechartOrigin(ABC):
 
     @abstractmethod
     def hand_over(
-        self, statechart: Statechart, executor: StatechartExecutor
+        self, *, statechart: Statechart, executor: StatechartExecutor
     ) -> Statechart:
         """
         :param statechart: The statechart built in the context of
@@ -88,36 +88,36 @@ class StatechartOrigin(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BuiltForTheExecutor(StatechartOrigin):
     """
     The statechart is built in the context of the executor running it.
     """
 
     def create_building_context(
-        self, executor: StatechartExecutor
+        self, *, executor: StatechartExecutor
     ) -> StatechartContext:
         return executor.context
 
     def hand_over(
-        self, statechart: Statechart, executor: StatechartExecutor
+        self, *, statechart: Statechart, executor: StatechartExecutor
     ) -> Statechart:
         return statechart
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SentThroughJSON(StatechartOrigin):
     """
     The statechart is built in a context of its own and reaches the executor as JSON.
     """
 
     def create_building_context(
-        self, executor: StatechartExecutor
+        self, *, executor: StatechartExecutor
     ) -> StatechartContext:
         return create_context_with_motion_control(executor.context.world)
 
     def hand_over(
-        self, statechart: Statechart, executor: StatechartExecutor
+        self, *, statechart: Statechart, executor: StatechartExecutor
     ) -> Statechart:
         """
         .. note:: The sender releases what it registered in the world it shares with

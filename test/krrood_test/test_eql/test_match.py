@@ -226,6 +226,24 @@ def test_underscore_attribute_access_is_not_symbolic():
         _ = match._missing_internal_
 
 
+def test_a_pattern_evaluated_before_it_is_nested_still_restricts_the_parent(
+    handles_and_containers_world,
+):
+    world = handles_and_containers_world
+    handle = a(Handle)(name="Handle1").from_(domain=world.bodies)
+    handle.tolist()
+
+    connections = a(FixedConnection)(child=handle).from_(domain=world.connections)
+
+    assert connections.tolist() == [
+        connection
+        for connection in world.connections
+        if isinstance(connection, FixedConnection)
+        and isinstance(connection.child, Handle)
+        and connection.child.name == "Handle1"
+    ]
+
+
 def test_from_restricts_the_search():
     @dataclass(kw_only=True, unsafe_hash=True)
     class Robot:

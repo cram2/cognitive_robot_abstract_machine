@@ -1,3 +1,5 @@
+from rclpy.node import Node
+
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.tracy import Tracy
@@ -5,10 +7,13 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
-def create_giskard() -> Giskard:
+def create_giskard(node: Node) -> Giskard:
     """
     Build a Giskard that simulates Tracy, described by the file its robot class
     declares.
+
+    :param node: The node Giskard runs on, unused because the robot is described by a
+        file.
     """
     return Giskard.standalone(
         world_source=WorldSpecification(
@@ -22,7 +27,7 @@ def main() -> None:
     """
     Run the Giskard :func:`create_giskard` builds as a ros node until ROS shuts down.
     """
-    Giskard.launch(create_giskard)
+    Giskard.launch(create_giskard=create_giskard)
 
 
 if __name__ == "__main__":

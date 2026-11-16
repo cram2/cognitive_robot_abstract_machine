@@ -79,9 +79,9 @@ class NavigateAction(DrivesBase, GoalAction, HasPlanarGoalPoseParameter):
 
     def create_goal(self) -> StatechartNode:
         return self.base_goal_type.moving_base_of(
-            self.robot,
-            self.robot.mobile_base.pose_facing(self.planar_goal_pose),
-            self.threshold,
+            robot=self.robot,
+            goal_pose=self.robot.mobile_base.pose_facing(self.planar_goal_pose),
+            threshold=self.threshold,
         )
 
 
@@ -171,7 +171,7 @@ class PathPlanningNavigateAction(
     def create_steps(self) -> list[StatechartNode]:
         return [
             self.base_goal_type.moving_base_of(
-                self.robot, waypoint.pose, self.threshold
+                robot=self.robot, goal_pose=waypoint.pose, threshold=self.threshold
             )
             for waypoint in self._path()
         ]

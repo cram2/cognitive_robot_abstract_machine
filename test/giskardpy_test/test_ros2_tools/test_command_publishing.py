@@ -2,6 +2,8 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing_extensions import Any
 
+from krrood.patterns.called_positionally import called_positionally
+
 import numpy as np
 import pytest
 from control_msgs.msg import MultiDOFCommand
@@ -35,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% test doubles
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingPublisher:
     """
     Stand-in for a ROS publisher that stores every published message.
@@ -58,11 +60,12 @@ class RecordingPublisher:
             return None
         return self.published_messages[-1]
 
+    @called_positionally
     def publish(self, message: Any) -> None:
         self.published_messages.append(deepcopy(message))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpec:
     """
     Describes a connection to be built for a publisher test.
@@ -183,7 +186,7 @@ def group_publisher_for(
         command_topic="test_cmd",
         connections=[world.get_connection_by_name(spec.name) for spec in specs],
         minimum_velocities=JointMinimumVelocities.from_magnitudes(
-            minimum_valid_velocity, minimum_velocity_overrides
+            default=minimum_valid_velocity, overrides=minimum_velocity_overrides
         ),
         command_format=command_format or Float64MultiArrayFormat(),
     )
@@ -259,64 +262,68 @@ def build_drive_world(
 
 
 def test_scalar_below_minimum_keeps_its_sign():
-    minimum_velocity = MinimumVelocity(0.03)
+    minimum_velocity = MinimumVelocity(magnitude=0.03)
 
-    assert minimum_velocity.enforce_on_scalar(0.01) == pytest.approx(0.03)
-    assert minimum_velocity.enforce_on_scalar(-0.01) == pytest.approx(-0.03)
+    assert minimum_velocity.enforce_on_scalar(velocity=0.01) == pytest.approx(0.03)
+    assert minimum_velocity.enforce_on_scalar(velocity=-0.01) == pytest.approx(-0.03)
 
 
 def test_scalar_at_zero_stays_zero():
-    assert MinimumVelocity(0.03).enforce_on_scalar(0.0) == pytest.approx(0.0)
+    assert MinimumVelocity(magnitude=0.03).enforce_on_scalar(
+        velocity=0.0
+    ) == pytest.approx(0.0)
 
 
 def test_scalar_above_minimum_is_unchanged():
-    assert MinimumVelocity(0.03).enforce_on_scalar(0.1) == pytest.approx(0.1)
+    assert MinimumVelocity(magnitude=0.03).enforce_on_scalar(
+        velocity=0.1
+    ) == pytest.approx(0.1)
 
 
 def test_zero_magnitude_disables_raising():
-    assert MinimumVelocity().enforce_on_scalar(0.001) == pytest.approx(0.001)
-    assert MinimumVelocity().enforce_on_vector([0.001, 0.001]) == pytest.approx(
-        [0.001, 0.001]
-    )
+    assert MinimumVelocity().enforce_on_scalar(velocity=0.001) == pytest.approx(0.001)
+    assert MinimumVelocity().enforce_on_vector(
+        velocities=[0.001, 0.001]
+    ) == pytest.approx([0.001, 0.001])
 
 
 def test_vector_below_minimum_is_scaled_to_the_minimum_norm():
-    raised = MinimumVelocity(0.05).enforce_on_vector([0.02, 0.02])
+    raised = MinimumVelocity(magnitude=0.05).enforce_on_vector(velocities=[0.02, 0.02])
 
     assert raised[0] == pytest.approx(raised[1])
     assert np.linalg.norm(raised) == pytest.approx(0.05)
 
 
 def test_vector_below_minimum_keeps_its_direction():
-    raised = MinimumVelocity(0.05).enforce_on_vector([0.03, -0.01])
+    raised = MinimumVelocity(magnitude=0.05).enforce_on_vector(velocities=[0.03, -0.01])
 
     assert raised[0] / raised[1] == pytest.approx(0.03 / -0.01)
 
 
 def test_single_element_vector_matches_the_scalar_case():
-    minimum_velocity = MinimumVelocity(0.05)
+    minimum_velocity = MinimumVelocity(magnitude=0.05)
 
-    assert minimum_velocity.enforce_on_vector([-0.01]) == pytest.approx(
-        [minimum_velocity.enforce_on_scalar(-0.01)]
+    assert minimum_velocity.enforce_on_vector(velocities=[-0.01]) == pytest.approx(
+        [minimum_velocity.enforce_on_scalar(velocity=-0.01)]
     )
 
 
 def test_vector_above_minimum_is_unchanged():
-    assert MinimumVelocity(0.05).enforce_on_vector([0.3, 0.4]) == pytest.approx(
-        [0.3, 0.4]
-    )
+    assert MinimumVelocity(magnitude=0.05).enforce_on_vector(
+        velocities=[0.3, 0.4]
+    ) == pytest.approx([0.3, 0.4])
 
 
 def test_zero_vector_stays_zero():
-    assert MinimumVelocity(0.05).enforce_on_vector([0.0, 0.0]) == pytest.approx(
-        [0.0, 0.0]
-    )
+    assert MinimumVelocity(magnitude=0.05).enforce_on_vector(
+        velocities=[0.0, 0.0]
+    ) == pytest.approx([0.0, 0.0])
 
 
 # %% joint group publisher
 
 
-def test_publishes_one_value_per_connection(init_rospy):
+def test_publishes_one_value_per_connection(init_background_node):
     specs = [
         ConnectionSpec(name="joint_a", velocity=0.1),
         ConnectionSpec(name="joint_b", velocity=0.2),
@@ -329,7 +336,7 @@ def test_publishes_one_value_per_connection(init_rospy):
     assert len(data) == len(specs)
 
 
-def test_below_threshold_velocity_is_raised_to_minimum(init_rospy):
+def test_below_threshold_velocity_is_raised_to_minimum(init_background_node):
     specs = [
         ConnectionSpec(name="slow_positive", velocity=0.01),
         ConnectionSpec(name="slow_negative", velocity=-0.01),
@@ -342,7 +349,7 @@ def test_below_threshold_velocity_is_raised_to_minimum(init_rospy):
     assert data[1] == pytest.approx(-0.03)
 
 
-def test_default_minimum_valid_velocity_does_not_clamp(init_rospy):
+def test_default_minimum_valid_velocity_does_not_clamp(init_background_node):
     specs = [
         ConnectionSpec(name="slow_positive", velocity=0.01),
         ConnectionSpec(name="slow_negative", velocity=-0.01),
@@ -355,7 +362,7 @@ def test_default_minimum_valid_velocity_does_not_clamp(init_rospy):
     assert data[1] == pytest.approx(-0.01)
 
 
-def test_velocities_outside_threshold_are_unchanged(init_rospy):
+def test_velocities_outside_threshold_are_unchanged(init_background_node):
     specs = [
         ConnectionSpec(name="fast", velocity=0.1),
         ConnectionSpec(name="stopped", velocity=0.0),
@@ -368,7 +375,7 @@ def test_velocities_outside_threshold_are_unchanged(init_rospy):
     assert data[1] == pytest.approx(0.0)
 
 
-def test_joint_with_zero_override_is_not_raised(init_rospy):
+def test_joint_with_zero_override_is_not_raised(init_background_node):
     specs = [
         ConnectionSpec(name="exempt_joint", velocity=0.01),
         ConnectionSpec(name="clamped_joint", velocity=0.01),
@@ -385,7 +392,7 @@ def test_joint_with_zero_override_is_not_raised(init_rospy):
     assert data[1] == pytest.approx(0.03)
 
 
-def test_joint_override_replaces_the_default_minimum(init_rospy):
+def test_joint_override_replaces_the_default_minimum(init_background_node):
     specs = [
         ConnectionSpec(name="stiff_joint", velocity=0.01),
         ConnectionSpec(name="clamped_joint", velocity=0.01),
@@ -402,7 +409,9 @@ def test_joint_override_replaces_the_default_minimum(init_rospy):
     assert data[1] == pytest.approx(0.03)
 
 
-def test_group_publisher_follows_its_joints_through_a_model_change(init_rospy):
+def test_group_publisher_follows_its_joints_through_a_model_change(
+    init_background_node,
+):
     specs = [
         ConnectionSpec(name="joint_a", velocity=0.1),
         ConnectionSpec(name="joint_b", velocity=0.2),
@@ -422,7 +431,9 @@ def test_group_publisher_follows_its_joints_through_a_model_change(init_rospy):
     assert publish_group(controller) == pytest.approx([0.1, 0.2])
 
 
-def test_group_publisher_publishes_the_velocities_of_the_current_cycle(init_rospy):
+def test_group_publisher_publishes_the_velocities_of_the_current_cycle(
+    init_background_node,
+):
     specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
     world = build_world_with_joints(specs)
     controller = group_publisher_for(world, specs)
@@ -441,7 +452,7 @@ def test_group_publisher_publishes_the_velocities_of_the_current_cycle(init_rosp
 # %% group command message formats
 
 
-def test_default_format_publishes_a_float64_multi_array(init_rospy):
+def test_default_format_publishes_a_float64_multi_array(init_background_node):
     controller = build_group_publisher([ConnectionSpec(name="joint_a", velocity=0.1)])
 
     message = publish_group_message(controller)
@@ -450,7 +461,7 @@ def test_default_format_publishes_a_float64_multi_array(init_rospy):
     assert list(message.data) == pytest.approx([0.1])
 
 
-def test_multi_dof_format_publishes_the_velocities_as_values(init_rospy):
+def test_multi_dof_format_publishes_the_velocities_as_values(init_background_node):
     specs = [
         ConnectionSpec(name="joint_a", velocity=0.1),
         ConnectionSpec(name="joint_b", velocity=0.2),
@@ -463,14 +474,16 @@ def test_multi_dof_format_publishes_the_velocities_as_values(init_rospy):
     assert list(message.values) == pytest.approx([0.1, 0.2])
 
 
-def test_multi_dof_format_leaves_the_degree_of_freedom_names_empty(init_rospy):
+def test_multi_dof_format_leaves_the_degree_of_freedom_names_empty(
+    init_background_node,
+):
     specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
     controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
 
     assert list(publish_group_message(controller).dof_names) == []
 
 
-def test_minimum_velocity_is_raised_in_every_message_format(init_rospy):
+def test_minimum_velocity_is_raised_in_every_message_format(init_background_node):
     specs = [ConnectionSpec(name="slow_positive", velocity=0.01)]
     controller = build_group_publisher(
         specs, minimum_valid_velocity=0.03, command_format=MultiDOFCommandFormat()
@@ -479,7 +492,7 @@ def test_minimum_velocity_is_raised_in_every_message_format(init_rospy):
     assert list(publish_group_message(controller).values) == pytest.approx([0.03])
 
 
-def test_stopping_publishes_zero_velocities_in_the_default_format(init_rospy):
+def test_stopping_publishes_zero_velocities_in_the_default_format(init_background_node):
     specs = [
         ConnectionSpec(name="joint_a", velocity=0.1),
         ConnectionSpec(name="joint_b", velocity=0.2),
@@ -492,7 +505,9 @@ def test_stopping_publishes_zero_velocities_in_the_default_format(init_rospy):
     assert list(message.data) == pytest.approx([0.0, 0.0])
 
 
-def test_stopping_publishes_zero_velocities_in_the_configured_format(init_rospy):
+def test_stopping_publishes_zero_velocities_in_the_configured_format(
+    init_background_node,
+):
     specs = [
         ConnectionSpec(name="joint_a", velocity=0.1),
         ConnectionSpec(name="joint_b", velocity=0.2),
@@ -508,7 +523,7 @@ def test_stopping_publishes_zero_velocities_in_the_configured_format(init_rospy)
 # %% minimum velocity overrides that apply to nothing
 
 
-def test_an_override_of_an_uncommanded_joint_is_rejected(init_rospy):
+def test_an_override_of_an_uncommanded_joint_is_rejected(init_background_node):
     """
     An override that matches no commanded joint would silently do nothing, which reads
     like the joint is exempt while the hardware still receives the default minimum.
@@ -523,7 +538,7 @@ def test_an_override_of_an_uncommanded_joint_is_rejected(init_rospy):
         )
 
 
-def test_the_rejected_override_names_the_joint_it_could_not_find(init_rospy):
+def test_the_rejected_override_names_the_joint_it_could_not_find(init_background_node):
     specs = [ConnectionSpec(name="joint_a", velocity=0.01)]
 
     with pytest.raises(UnknownMinimumVelocityJointError) as rejection:
@@ -532,7 +547,7 @@ def test_the_rejected_override_names_the_joint_it_could_not_find(init_rospy):
     assert rejection.value.joint_name == "typo_joint"
 
 
-def test_overrides_of_commanded_joints_are_accepted(init_rospy):
+def test_overrides_of_commanded_joints_are_accepted(init_background_node):
     specs = [
         ConnectionSpec(name="joint_a", velocity=0.01),
         ConnectionSpec(name="joint_b", velocity=0.01),
@@ -563,13 +578,13 @@ def build_drive_publisher(
         world=world,
         command_topic="/cmd_vel",
         connection=world.get_connection_by_name("brumbrum"),
-        minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
-        minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
+        minimum_linear_velocity=MinimumVelocity(magnitude=minimum_linear_velocity),
+        minimum_angular_velocity=MinimumVelocity(magnitude=minimum_angular_velocity),
         command_format=command_format or TwistFormat(),
     )
 
 
-def test_slow_drive_command_is_raised_without_turning(init_rospy):
+def test_slow_drive_command_is_raised_without_turning(init_background_node):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.02
@@ -582,7 +597,7 @@ def test_slow_drive_command_is_raised_without_turning(init_rospy):
     assert np.linalg.norm([command.linear.x, command.linear.y]) == pytest.approx(0.05)
 
 
-def test_linear_and_angular_minimums_are_independent(init_rospy):
+def test_linear_and_angular_minimums_are_independent(init_background_node):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.5
@@ -597,7 +612,7 @@ def test_linear_and_angular_minimums_are_independent(init_rospy):
     assert command.angular.z == pytest.approx(0.03)
 
 
-def test_drive_at_rest_stays_at_rest(init_rospy):
+def test_drive_at_rest_stays_at_rest(init_background_node):
     world = build_drive_world(OmniDrive)
     publisher = build_drive_publisher(
         world, minimum_linear_velocity=0.05, minimum_angular_velocity=0.03
@@ -610,7 +625,7 @@ def test_drive_at_rest_stays_at_rest(init_rospy):
     assert command.angular.z == pytest.approx(0.0)
 
 
-def test_drive_without_minimums_publishes_unchanged_velocities(init_rospy):
+def test_drive_without_minimums_publishes_unchanged_velocities(init_background_node):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.001
@@ -626,7 +641,7 @@ def test_drive_without_minimums_publishes_unchanged_velocities(init_rospy):
 # %% drive command message formats
 
 
-def test_default_drive_format_publishes_a_twist(init_rospy):
+def test_default_drive_format_publishes_a_twist(init_background_node):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -638,7 +653,7 @@ def test_default_drive_format_publishes_a_twist(init_rospy):
 
 
 def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
-    init_rospy,
+    init_background_node,
 ):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
@@ -654,7 +669,9 @@ def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
     assert command.twist.angular.z == pytest.approx(0.4)
 
 
-def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(init_rospy):
+def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
+    init_background_node,
+):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -671,7 +688,7 @@ def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(init_ros
 # %% drive publisher and model changes
 
 
-def test_drive_publisher_follows_its_dofs_through_a_model_change(init_rospy):
+def test_drive_publisher_follows_its_dofs_through_a_model_change(init_background_node):
     world = World()
     odom = Body(name=PrefixedName("odom"))
     removable = add_removable_joint(world, odom)
@@ -691,7 +708,9 @@ def test_drive_publisher_follows_its_dofs_through_a_model_change(init_rospy):
     assert command.angular.z == pytest.approx(0.4)
 
 
-def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(init_rospy):
+def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
+    init_background_node,
+):
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -708,7 +727,7 @@ def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(init_rosp
     ] == pytest.approx([0.3, 0.6])
 
 
-def test_differential_drive_is_raised_along_x_only(init_rospy):
+def test_differential_drive_is_raised_along_x_only(init_background_node):
     world = build_drive_world(DifferentialDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = -0.01

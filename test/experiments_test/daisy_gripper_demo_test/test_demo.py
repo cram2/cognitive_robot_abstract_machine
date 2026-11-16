@@ -63,8 +63,8 @@ def plan(
     The top-level node of the plan the demonstration performs.
     """
     context = StatechartContext.with_extensions(
-        demonstration_world,
-        demonstration.build_context_extensions(demonstration_world),
+        world=demonstration_world,
+        extensions=demonstration.build_context_extensions(demonstration_world),
     )
     [plan] = demonstration.build_statechart(context).top_level_nodes
     return plan

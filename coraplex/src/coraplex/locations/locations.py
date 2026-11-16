@@ -48,7 +48,7 @@ class CostmapLocation(Location, ABC):
         """
         :return: The robot to stand.
         """
-        return self.context.require_extension(RobotAccess).robot
+        return self.context.require_extension(extension_type=RobotAccess).robot
 
     @property
     def sampling_seed(self) -> int | None:
@@ -56,7 +56,9 @@ class CostmapLocation(Location, ABC):
         :return: The seed of the plan the location is sampled for, so a run can be
             repeated; ``None`` samples afresh each time.
         """
-        return self.context.require_extension(StatementGrounding).sampling_seed
+        return self.context.require_extension(
+            extension_type=StatementGrounding
+        ).sampling_seed
 
     @abstractmethod
     def costmap(self) -> Costmap:

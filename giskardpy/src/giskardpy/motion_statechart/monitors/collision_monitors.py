@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
     MotionStatechartNode,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
     AvoidedExternalContact,
 )
@@ -62,8 +62,8 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             :attr:`distance_threshold`.
         """
         manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_external_collision_manager(self.context)
+            extension_type=MotionControlContext
+        ).get_or_create_external_collision_manager(context=self.context)
 
         manager.register_group_of_body(self.body)
         group = manager.get_collision_group(self.body)
@@ -122,8 +122,8 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             :attr:`distance_threshold`.
         """
         manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_self_collision_manager(self.context)
+            extension_type=MotionControlContext
+        ).get_or_create_self_collision_manager(context=self.context)
 
         manager.register_groups_of_body_combination(self.body_a, self.body_b)
         combination = manager.body_pair_to_group_pair(self.body_a, self.body_b)

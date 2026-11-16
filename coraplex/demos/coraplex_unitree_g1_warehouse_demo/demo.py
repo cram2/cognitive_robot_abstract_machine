@@ -160,11 +160,11 @@ def build_statechart(
     :return: The statechart carrying the parcel from one pallet stack to the other.
     """
     world = context.world
-    robot = context.require_extension(RobotAccess).robot
+    robot = context.require_extension(extension_type=RobotAccess).robot
     parcel = world.get_semantic_annotations_by_type(Parcel)[0]
     statechart = Statechart(context=context)
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
@@ -232,11 +232,15 @@ def run(
     see :func:`build_statechart`, showing it with `visualizations`.
     """
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(robot)]),
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=robot)]
+        ),
         ros_node=ros_node,
         extensions=visualizations,
     )
-    executor.compile(build_statechart(executor.context, source, destination, turn))
+    executor.compile(
+        statechart=build_statechart(executor.context, source, destination, turn)
+    )
     executor.execute()
 
 

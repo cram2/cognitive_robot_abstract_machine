@@ -95,7 +95,7 @@ from HasCaseA   sRootBody, has a list of Produces, for example our Apples, and d
 ```{code-cell} ipython3
 from semantic_digital_twin.semantic_annotations.mixins import HasCaseAsRootBody
 from krrood_spatial_math.spatial_types import Vector3
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from dataclasses import dataclass, field
 
 @dataclass(eq=False)

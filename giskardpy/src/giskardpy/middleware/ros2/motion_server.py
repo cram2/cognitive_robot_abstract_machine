@@ -1,3 +1,8 @@
+"""
+The server that accepts motion goals over ROS, runs them in the control loop of Giskard
+and answers each of them.
+"""
+
 from __future__ import annotations
 
 import json
@@ -12,7 +17,7 @@ from json_msgs.action import JsonAction
 
 from cramph.executor import StatechartExecutor
 from cramph.executor import RealTimePacer
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.control_loop import ControlLoop
@@ -27,7 +32,9 @@ from giskardpy.middleware.ros2.exceptions import (
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
-from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
+from giskardpy.motion_statechart.debug_expression_publisher import (
+    DebugExpressionPublishing,
+)
 from giskardpy.middleware.ros2.world_updates import (
     IncomingWorldUpdates,
     OutgoingWorldUpdates,
@@ -43,7 +50,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionServer:
     """
     The goal lifecycle of Giskard.
@@ -99,6 +106,12 @@ class MotionServer:
     Ticked once per idle cycle and, through the control loop, once per control cycle.
     """
 
+    debug_expression_publishing: DebugExpressionPublishing
+    """
+    The extension of :attr:`executor` that publishes the debug expressions of a goal
+    that asks for them.
+    """
+
     idle_frequency: float = 20.0
     """
     Frequency in hertz at which the idle loop runs.
@@ -107,11 +120,6 @@ class MotionServer:
     world_update_timeout: float = 30.0
     """
     Seconds a goal waits for the change of the world it was built on.
-    """
-
-    post_goal_plotters: list[PostGoalPlotter] = field(default_factory=list)
-    """
-    Debug plots that are written once a goal is finished.
     """
 
     idle_pacer: RealTimePacer = field(init=False)
@@ -148,13 +156,15 @@ class MotionServer:
         whether that happens while idle or while a goal is running. Either way the robot
         is stopped before the interrupt is allowed to propagate further.
         """
-        rospy.get_node().get_logger().info("giskard is ready")
+        background_node.get_node().get_logger().info("giskard is ready")
         try:
             while rclpy.ok() and not self._stop_requested.is_set():
                 self.run_idle_cycle()
                 self.idle_pacer.sleep()
         except KeyboardInterrupt:
-            rospy.get_node().get_logger().info("Interrupted, stopping the robot.")
+            background_node.get_node().get_logger().info(
+                "Interrupted, stopping the robot."
+            )
             self.control_loop.stop()
             raise
 
@@ -166,7 +176,7 @@ class MotionServer:
         self._background_thread = Thread(target=self.live, name="motion server")
         self._background_thread.start()
 
-    def stop(self, timeout: float = 2.0) -> None:
+    def stop(self, *, timeout: float = 2.0) -> None:
         """
         Make a background :meth:`live` loop return and wait for it to finish.
 
@@ -214,9 +224,11 @@ class MotionServer:
             goal = MotionGoal.from_json(
                 data=json.loads(self.action_server.goal_msg.goal)
             )
-            self.client_watchdog.watch(goal.client)
-            self.wait_for_required_world_updates(goal.required_position)
-            self.compile_goal(goal)
+            self.client_watchdog.watch(client=goal.client)
+            self.wait_for_required_world_updates(
+                required_position=goal.required_position
+            )
+            self.compile_goal(goal=goal)
             self.control_loop.run()
         except Exception as exception:
             if not (
@@ -226,10 +238,10 @@ class MotionServer:
                 traceback.print_exc()
             error = exception
         finally:
-            self.finish_goal(error)
+            self.finish_goal(error=error)
 
     def wait_for_required_world_updates(
-        self, required_position: StreamPosition | None
+        self, *, required_position: StreamPosition | None
     ) -> None:
         """
         Wait until the world contains the change the goal was built on.
@@ -247,7 +259,7 @@ class MotionServer:
         deadline = time.monotonic() + self.world_update_timeout
         while True:
             self.world_updates.apply_all()
-            if self.world_updates.has_applied(required_position):
+            if self.world_updates.has_applied(position=required_position):
                 return
             if self.client_watchdog.is_client_gone():
                 raise ClientDisconnectedError(client=self.client_watchdog.client)
@@ -260,11 +272,11 @@ class MotionServer:
                 )
             self.idle_pacer.sleep()
 
-    def compile_goal(self, goal: MotionGoal) -> None:
+    def compile_goal(self, *, goal: MotionGoal) -> None:
         """
         Turn the goal message into a compiled motion statechart.
         """
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"Parsing goal #{self.action_server.goal_id} message."
         )
         tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
@@ -273,16 +285,19 @@ class MotionServer:
         motion_statechart = goal.parse_motion_statechart(
             context=self.executor.context, **kwargs
         )
-        self.executor.compile(motion_statechart)
+        self.debug_expression_publishing.publishes_markers = (
+            goal.publishes_debug_expressions
+        )
+        self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
-        rospy.get_node().get_logger().info("Done parsing goal message.")
+        background_node.get_node().get_logger().info("Done parsing goal message.")
 
-    def finish_goal(self, error: Exception | None) -> None:
+    def finish_goal(self, *, error: Exception | None) -> None:
         """
         Stop the robot, clean up the motion statechart and answer the client.
 
-        The client is answered even if cleaning up or plotting fails, so that a failure
-        here cannot make it wait forever.
+        The client is answered even if cleaning up fails, so that a failure here cannot
+        make it wait forever.
         """
         try:
             self.client_watchdog.stop_watching()
@@ -290,12 +305,11 @@ class MotionServer:
             if self.executor.statechart is not None:
                 self.executor.statechart.cleanup_nodes()
             self.feedback_publisher.publish()
-            self.write_debug_plots()
         finally:
-            self.action_server.result_message = self.create_result(error)
+            self.action_server.result_message = self.create_result(error=error)
             self.action_server.send_result()
 
-    def create_result(self, error: Exception | None) -> JsonAction.Result:
+    def create_result(self, *, error: Exception | None) -> JsonAction.Result:
         """
         Mark the goal as canceled, aborted or succeeded and describe its final state.
 
@@ -307,21 +321,23 @@ class MotionServer:
         match error:
             case ExecutionCanceledException():
                 self.action_server.set_canceled()
-                rospy.get_node().get_logger().warning("Goal canceled by user.")
+                background_node.get_node().get_logger().warning(
+                    "Goal canceled by user."
+                )
             case None:
                 self.action_server.set_succeeded()
-                rospy.get_node().get_logger().info("Goal succeeded.")
+                background_node.get_node().get_logger().info("Goal succeeded.")
             case _:
                 self.action_server.set_aborted()
-                rospy.get_node().get_logger().error(f"Goal aborted: {error}")
+                background_node.get_node().get_logger().error(f"Goal aborted: {error}")
         states = self.create_states()
         if error is not None:
-            states["error"] = self.serialize_error(error)
+            states["error"] = self.serialize_error(error=error)
         result = JsonAction.Result()
         result.result = json.dumps(states)
         return result
 
-    def serialize_error(self, error: Exception) -> dict[str, Any]:
+    def serialize_error(self, *, error: Exception) -> dict[str, Any]:
         """
         Serialize the error a goal failed with, so that the client can rebuild it.
 
@@ -332,7 +348,7 @@ class MotionServer:
         try:
             return to_json(error)
         except JSONSerializationError as serialization_error:
-            rospy.get_node().get_logger().error(
+            background_node.get_node().get_logger().error(
                 f"Cannot send {type(error).__name__} to the client: "
                 f"{serialization_error}"
             )
@@ -352,22 +368,3 @@ class MotionServer:
         if self.executor.statechart is None:
             return {}
         return self.feedback_publisher.create_states()
-
-    def write_debug_plots(self) -> None:
-        """
-        Write the configured debug plots of the finished goal.
-
-        A plot is a diagnostic, so a plotter that fails is reported and skipped. Letting
-        it raise would end the loop that serves goals, leaving every later client
-        waiting for a result that no one is going to produce.
-        """
-        if self.executor.statechart is None:
-            return
-        for plotter in self.post_goal_plotters:
-            try:
-                plotter.plot(self.action_server.goal_id)
-            except Exception:
-                rospy.get_node().get_logger().error(
-                    f"{type(plotter).__name__} failed to plot goal "
-                    f"#{self.action_server.goal_id}:\n{traceback.format_exc()}"
-                )

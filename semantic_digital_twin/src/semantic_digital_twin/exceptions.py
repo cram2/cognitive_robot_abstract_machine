@@ -1,3 +1,7 @@
+"""
+The exceptions raised across the semantic digital twin.
+"""
+
 from __future__ import annotations, absolute_import
 
 # %% Imports
@@ -12,7 +16,7 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -542,6 +546,52 @@ class InvalidRollbackVersionError(WorldValidationError):
 
     def suggest_correction(self) -> str:
         return "pass a version between 0 and the world's current version."
+
+
+@dataclass(kw_only=True)
+class RollbackBeforeClearError(WorldValidationError):
+    """
+    Raised when attempting to roll back to a version from before the world's history was
+    last cleared, which the history no longer holds the modifications to restore.
+    """
+
+    target_version: int
+    """
+    The version that was requested.
+    """
+
+    version_at_last_clear: int
+    """
+    The version the world was at when its history was last cleared.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot roll back to version {self.target_version}: the world's history "
+            f"was cleared at version {self.version_at_last_clear}, so no version up to "
+            f"it can be restored."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"pass a version after {self.version_at_last_clear}."
+
+
+@dataclass(kw_only=True)
+class WorldMergedWithItselfError(UsageError):
+    """
+    Raised when a world is asked to merge itself into itself.
+    """
+
+    world: World
+    """
+    The world that was to be merged with itself.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot merge the world {self.world} with itself."
+
+    def suggest_correction(self) -> str:
+        return "merge another world, or a copy of this one."
 
 
 @dataclass
@@ -2568,6 +2618,31 @@ class SimulationAlreadyRunningError(UsageError):
 
     def suggest_correction(self) -> str:
         return "Stop the simulation before starting it again."
+
+
+@dataclass(kw_only=True)
+class SnapshotDoesNotFitSimulationError(UsageError):
+    """
+    Raised when a simulation is restored from a snapshot of a simulation that was built
+    from a different world.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation the snapshot was restored into.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The snapshot was not taken of the simulation of the world rooted at "
+            f"{self.world_name}: its physics or world state has a different size."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Restore only snapshots taken of this simulation, after the last change to "
+            "its world's model."
+        )
 
 
 @dataclass

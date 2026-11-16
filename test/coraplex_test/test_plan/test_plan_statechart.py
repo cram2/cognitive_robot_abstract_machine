@@ -129,7 +129,7 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
     assert isinstance(navigate, NavigateAction)
     assert navigate.statechart is statechart
     assert torso.statechart is statechart
-    assert len(statechart.get_nodes_by_type(EndMotion)) == 1
+    assert len(statechart.get_nodes_by_type(node_type=EndMotion)) == 1
     assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
 
 
@@ -203,9 +203,12 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     )
     statechart = Statechart(context=simulated_executor(extensions).context)
 
-    statechart.add_node(Sequence(nodes=[pick_up, place]))
+    statechart.add_node(node=Sequence(nodes=[pick_up, place]))
 
-    assert statechart.get_preceding_node_by_type(place, PickUpAction) is pick_up
+    assert (
+        statechart.get_preceding_node_by_type(node=place, node_type=PickUpAction)
+        is pick_up
+    )
 
 
 def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
@@ -227,9 +230,12 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     paused_place = PausedUntilTrue(monitor=ConstTrueNode(), monitored_node=place)
     statechart = Statechart(context=simulated_executor(extensions).context)
 
-    statechart.add_node(Sequence(nodes=[pick_up, paused_place]))
+    statechart.add_node(node=Sequence(nodes=[pick_up, paused_place]))
 
-    assert statechart.get_preceding_node_by_type(place, PickUpAction) is pick_up
+    assert (
+        statechart.get_preceding_node_by_type(node=place, node_type=PickUpAction)
+        is pick_up
+    )
 
 
 def test_a_place_after_several_pick_ups_moves_only_the_arm_it_is_given(
@@ -248,7 +254,7 @@ def test_a_place_after_several_pick_ups_moves_only_the_arm_it_is_given(
     statechart = Statechart(context=simulated_executor(extensions).context)
 
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             nodes=[
                 PickUpAction(
                     grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
@@ -286,7 +292,7 @@ def test_a_place_after_an_earlier_place_moves_only_the_arm_it_is_given(
     statechart = Statechart(context=simulated_executor(extensions).context)
 
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             nodes=[
                 PickUpAction(
                     grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
@@ -348,7 +354,9 @@ class GiskardRecordingTheGoal:
     def execute(self) -> None:
         self.executed.append(self.compiled)
         self.child_choosers.extend(
-            self.compiled.context.require_extension(ChildChooserAccess).choosers
+            self.compiled.context.require_extension(
+                extension_type=ChildChooserAccess
+            ).choosers
         )
 
     def close(self) -> None:
@@ -385,7 +393,7 @@ def test_a_sent_plan_compiles_without_what_its_actions_read_to_expand(
     )
     received = StatechartSentThroughJSON.received_in(sent, receiver.context).received
 
-    receiver.compile(received)
+    receiver.compile(statechart=received)
 
     assert received.compiler.is_compiled
 
@@ -412,7 +420,7 @@ def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions
     world, robot, extensions = pr2_apartment_context
     giskard = GiskardRecordingTheGoal()
     monkeypatch.setattr(
-        executors, "GiskardClientExecutor", lambda ros_node, context: giskard
+        executors, "GiskardClientExecutor", lambda node_handle, context: giskard
     )
     plan = Sequence(
         nodes=[
@@ -428,7 +436,7 @@ def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions
     )
     executor = robot_executor(extensions)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     [statechart] = giskard.executed
@@ -443,7 +451,7 @@ def test_plans_run_one_after_another_share_one_connection_to_giskard(
     world, robot, extensions = pr2_apartment_context
     connections = []
 
-    def connect(ros_node, context) -> GiskardRecordingTheGoal:
+    def connect(node_handle, context) -> GiskardRecordingTheGoal:
         connections.append(GiskardRecordingTheGoal())
         return connections[-1]
 
@@ -455,7 +463,7 @@ def test_plans_run_one_after_another_share_one_connection_to_giskard(
     ]
 
     for plan in plans:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     [connection] = connections
@@ -470,11 +478,11 @@ def test_closing_the_executor_closes_its_connection_to_giskard(
     world, robot, extensions = pr2_apartment_context
     giskard = GiskardRecordingTheGoal()
     monkeypatch.setattr(
-        executors, "GiskardClientExecutor", lambda ros_node, context: giskard
+        executors, "GiskardClientExecutor", lambda node_handle, context: giskard
     )
     executor = robot_executor(extensions)
     executor.compile(
-        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
     )
     executor.execute()
 
@@ -491,7 +499,7 @@ def test_an_executor_that_never_ran_a_plan_connects_to_nothing(
     monkeypatch.setattr(
         executors,
         "GiskardClientExecutor",
-        lambda ros_node, context: connections.append(GiskardRecordingTheGoal()),
+        lambda node_handle, context: connections.append(GiskardRecordingTheGoal()),
     )
     executor = robot_executor(extensions)
 
@@ -524,7 +532,7 @@ class GiskardTickingTheGoalUntilItEnded:
         giskard = StatechartExecutor(
             context=self.compiled.context, extensions=[MotionControl()]
         )
-        giskard.compile(self.compiled)
+        giskard.compile(statechart=self.compiled)
         giskard.tick_until_end(timeout=self.tick_limit)
 
 
@@ -535,11 +543,11 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
     monkeypatch.setattr(
         executors,
         "GiskardClientExecutor",
-        lambda ros_node, context: GiskardTickingTheGoalUntilItEnded(),
+        lambda node_handle, context: GiskardTickingTheGoalUntilItEnded(),
     )
     plan = NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE)
     executor = robot_executor(extensions)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
 
     with pytest.raises(MotionDidNotFinish) as failure:
         executor.execute()
@@ -555,13 +563,13 @@ def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empt
     monkeypatch.setattr(
         executors,
         "GiskardClientExecutor",
-        lambda ros_node, context: GiskardTickingTheGoalUntilItEnded(),
+        lambda node_handle, context: GiskardTickingTheGoalUntilItEnded(),
     )
     plan = StatementNode(
         statement=a(NavigateAction)(planar_goal_pose=variable(Pose2D, domain=[]))
     )
     executor = robot_executor(extensions)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
 
     with pytest.raises(EmptyUnderspecified) as failure:
         executor.execute()
@@ -579,9 +587,11 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     world, robot, extensions = pr2_apartment_context
     sent = Statechart(context=simulated_executor(extensions).context)
     sent.add_node(
-        action := SetGripperAction(
-            gripper_configuration=robot.left_arm.end_effector.default_configuration(
-                GripperState.OPEN
+        node=(
+            action := SetGripperAction(
+                gripper_configuration=robot.left_arm.end_effector.default_configuration(
+                    GripperState.OPEN
+                )
             )
         )
     )
@@ -592,8 +602,8 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
 
-    received_action = received.get_node_by_index(action.index)
-    assert received_action.goal is received.get_node_by_index(action.goal.index)
+    received_action = received.get_node_by_index(index=action.index)
+    assert received_action.goal is received.get_node_by_index(index=action.goal.index)
 
 
 def test_an_expanded_action_is_received_with_the_steps_it_runs(
@@ -607,9 +617,11 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     target = Pose.from_xyz_rpy(1.0, 0.0, 1.0, reference_frame=world.root)
     sent = Statechart(context=simulated_executor(extensions).context)
     sent.add_node(
-        action := FaceAndLookAtAction(
-            face_at=FaceAtAction(look_target=target),
-            look_at=LookAtAction(look_target=target),
+        node=(
+            action := FaceAndLookAtAction(
+                face_at=FaceAtAction(look_target=target),
+                look_at=LookAtAction(look_target=target),
+            )
         )
     )
 
@@ -619,10 +631,10 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
 
-    received_action = received.get_node_by_index(action.index)
+    received_action = received.get_node_by_index(index=action.index)
     assert type(received_action) is FaceAndLookAtAction
     assert received_action.nodes == [
-        received.get_node_by_index(step.index) for step in action.nodes
+        received.get_node_by_index(index=step.index) for step in action.nodes
     ]
     assert [type(step) for step in received_action.nodes] == [
         FaceAtAction,

@@ -1,3 +1,8 @@
+"""
+The states a statechart keeps for each of its nodes: their life cycle and their
+observations.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -14,7 +19,7 @@ from typing_extensions import (
 )
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.data_types import (
     LifeCycleValues,
     ObservationStateValues,
@@ -32,7 +37,7 @@ if TYPE_CHECKING:
 # %% the state of every node of a statechart
 
 
-@dataclass(repr=False, eq=False)
+@dataclass(kw_only=True, repr=False, eq=False)
 class State(MutableMapping[StatechartNode, float], SubclassJSONSerializer, ABC):
     """
     Maps every node of a statechart to a scalar value, backed by a single contiguous
@@ -196,7 +201,7 @@ class State(MutableMapping[StatechartNode, float], SubclassJSONSerializer, ABC):
         return np.array_equal(self.data, other.data)
 
 
-@dataclass(repr=False, eq=False)
+@dataclass(kw_only=True, repr=False, eq=False)
 class LifeCycleState(State):
     """
     The life cycle state of every node in a statechart, see
@@ -226,7 +231,7 @@ class LifeCycleState(State):
         )
 
 
-@dataclass(repr=False, eq=False)
+@dataclass(kw_only=True, repr=False, eq=False)
 class ObservationState(State):
     """
     The observation state of every node in a statechart, see
@@ -248,7 +253,7 @@ class ObservationState(State):
         return ObservationStateValues(super().__getitem__(node))
 
 
-@dataclass(repr=False, eq=False)
+@dataclass(kw_only=True, repr=False, eq=False)
 class LastObservationState(State):
     """
     The observation every node of a statechart took most recently.

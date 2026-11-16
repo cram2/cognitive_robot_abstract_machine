@@ -23,7 +23,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% the world whose structure changes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SlidingWorld:
     """
     A world with a box resting at the origin and a slider that moves along x, so that
@@ -145,7 +145,7 @@ class NodeObservingABodyPastAPosition(EndedByOwner, StatechartNode):
         return NodeArtifacts(observation=root_T_body.position.x >= self.position)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionRecordingCompiles(TickingExecutorExtension):
     """
     An executor extension that records in which order it was told about compiling.
@@ -156,11 +156,11 @@ class ExtensionRecordingCompiles(TickingExecutorExtension):
     The hooks that ran, in order, each by its method name.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         self.events.append(self.before_recompile.__name__)
         return True
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.events.append(self.after_compile.__name__)
 
 
@@ -170,8 +170,8 @@ def _compile(executor: StatechartExecutor, *nodes: StatechartNode) -> Statechart
     """
     statechart = Statechart(context=executor.context)
     for node in nodes:
-        statechart.add_node(node)
-    executor.compile(statechart)
+        statechart.add_node(node=node)
+    executor.compile(statechart=statechart)
     return statechart
 
 
@@ -182,7 +182,7 @@ def test_moving_a_branch_puts_the_body_below_its_new_parent(
     sliding_world: SlidingWorld, sliding_executor: StatechartExecutor
 ) -> None:
     move = MoveBranch(branch_root=sliding_world.box, new_parent=sliding_world.slider)
-    _compile(sliding_executor, move, EndStatechart.when_true(move))
+    _compile(sliding_executor, move, EndStatechart.when_true(node=move))
 
     sliding_executor.tick_until_end(timeout=10)
 
@@ -298,6 +298,6 @@ def test_nodes_joining_after_the_world_structure_changed_have_every_node_built_a
 
     sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
     with statechart.modify():
-        statechart.add_node(NodeCountingItsBuilds(name="joining"))
+        statechart.add_node(node=NodeCountingItsBuilds(name="joining"))
 
     assert counting.build_count == 2

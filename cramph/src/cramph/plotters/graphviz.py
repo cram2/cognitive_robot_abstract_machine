@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from cramph.statechart import Statechart
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class ConditionDependency:
     """
     One node reading another in its transition conditions.
@@ -47,7 +47,7 @@ class ConditionDependency:
     The conditions of :attr:`condition_owner` that read :attr:`observed_node`.
     """
 
-    def minimum_rank_distance(self, metrics: DrawingMetrics) -> int:
+    def minimum_rank_distance(self, *, metrics: DrawingMetrics) -> int:
         """
         A rank distance is a lower bound, so the separate arrows this one replaces
         already left graphviz solving for the largest of them.
@@ -56,7 +56,7 @@ class ConditionDependency:
         :return: How many rows below the observed node its owner is drawn at least.
         """
         return max(
-            metrics.minimum_rank_distance(condition.kind)
+            metrics.minimum_rank_distance(transition_kind=condition.kind)
             for condition in self.conditions
         )
 
@@ -84,7 +84,7 @@ def format_condition_text(text: str, color_constants: bool = False) -> str:
     return text
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartGraphviz:
     """
     Draws a statechart as a graphviz graph.
@@ -157,6 +157,7 @@ class StatechartGraphviz:
 
     def _format_graph_node(
         self,
+        *,
         node: StatechartNode,
     ) -> str:
         """
@@ -191,7 +192,7 @@ class StatechartGraphviz:
             f"</TR>"
         )
         if node.plot_specifications.collapse_children:
-            label += self._build_hidden_node_count_block(node)
+            label += self._build_hidden_node_count_block(node=node)
         if self.compact:
             label += (
                 f"<TR>"
@@ -199,11 +200,11 @@ class StatechartGraphviz:
                 f"</TR>"
             )
         else:
-            label += self._build_condition_block(node)
+            label += self._build_condition_block(node=node)
         label += f"</TABLE>>"
         return label
 
-    def _build_hidden_node_count_block(self, node: StatechartNode) -> str:
+    def _build_hidden_node_count_block(self, *, node: StatechartNode) -> str:
         """
         :param node: The node whose descendants are left out of the drawing.
         :return: The label row stating how many of them are hidden.
@@ -219,7 +220,7 @@ class StatechartGraphviz:
         )
 
     def _build_condition_block(
-        self, node: StatechartNode, line_color: str = "black"
+        self, *, node: StatechartNode, line_color: str = "black"
     ) -> str:
         """
         Builds the label rows listing the transition conditions of a node.
@@ -234,9 +235,9 @@ class StatechartGraphviz:
         life_cycle_state = self.statechart.life_cycle_state[node]
         return "".join(
             self._build_condition_row(
-                prefix=self.condition_prefix(condition.kind),
+                prefix=self.condition_prefix(transition_kind=condition.kind),
                 condition=condition,
-                is_active=condition.kind.can_trigger_from(life_cycle_state),
+                is_active=condition.kind.can_trigger_from(life_cycle=life_cycle_state),
                 line_color=line_color,
             )
             for condition in node.effective_conditions
@@ -245,7 +246,7 @@ class StatechartGraphviz:
         )
 
     @staticmethod
-    def condition_prefix(transition_kind: TransitionKind) -> str:
+    def condition_prefix(*, transition_kind: TransitionKind) -> str:
         """
         :param transition_kind: The transition whose condition a row lists.
         :return: The text a condition row starts with.
@@ -254,6 +255,7 @@ class StatechartGraphviz:
 
     def _build_condition_row(
         self,
+        *,
         prefix: str,
         condition: TransitionCondition,
         is_active: bool,
@@ -266,7 +268,7 @@ class StatechartGraphviz:
         :param line_color: The color of the line separating rows.
         :return: The HTML table rows for this condition.
         """
-        rendered = self._render_condition(condition, grayed_out=not is_active)
+        rendered = self._render_condition(condition=condition, grayed_out=not is_active)
         if is_active:
             font_tag = f'<FONT FACE="{Font.MONOSPACE}">{prefix}:{rendered}</FONT>'
         else:
@@ -277,7 +279,7 @@ class StatechartGraphviz:
         )
 
     def _render_condition(
-        self, condition: TransitionCondition, grayed_out: bool = False
+        self, *, condition: TransitionCondition, grayed_out: bool = False
     ) -> str:
         """
         Writes a condition for display, coloring every term in the value that term
@@ -309,23 +311,23 @@ class StatechartGraphviz:
         terms = re.compile(f"({'|'.join(re.escape(term) for term in values_by_term)})")
         return "".join(
             (
-                self._color_term(part, values_by_term[part])
+                self._color_term(term=part, value=values_by_term[part])
                 if part in values_by_term
                 else format_condition_text(part, color_constants=True)
             )
             for part in terms.split(text)
         )
 
-    def _color_term(self, term: str, value: ObservationStateValues) -> str:
+    def _color_term(self, *, term: str, value: ObservationStateValues) -> str:
         """
         :param term: The term as it is written in the condition, quotes included.
         :param value: The value that term takes.
         :return: The term in the color of that value.
         """
-        style = ObservationDrawingStyle.of_observation(value)
+        style = ObservationDrawingStyle.of_observation(observation=value)
         return f'<FONT COLOR="{style.color.to_hex()}">{term}</FONT>'
 
-    def _escape_name(self, name: str) -> str:
+    def _escape_name(self, *, name: str) -> str:
         """
         :param name: The node name to escape.
         :return: The name in the quoted form pydot stores it under.
@@ -333,7 +335,7 @@ class StatechartGraphviz:
         return f'"{name}"'
 
     def _get_cluster_of_node(
-        self, node_name: str, graph: pydot.Graph | pydot.Cluster
+        self, *, node_name: str, graph: pydot.Graph | pydot.Cluster
     ) -> pydot.Cluster | None:
         """
         :param node_name: The name of the node to look for.
@@ -343,7 +345,7 @@ class StatechartGraphviz:
         node_cluster = None
         for cluster in graph.get_subgraphs():
             if (
-                len(cluster.get_node(self._escape_name(node_name))) == 1
+                len(cluster.get_node(self._escape_name(name=node_name))) == 1
                 or len(cluster.get_node(node_name)) == 1
             ):
                 node_cluster = cluster
@@ -352,6 +354,7 @@ class StatechartGraphviz:
 
     def _add_node(
         self,
+        *,
         graph: pydot.Graph,
         node: StatechartNode,
     ) -> pydot.Node:
@@ -363,7 +366,7 @@ class StatechartGraphviz:
         :param node: The node to draw.
         :return: The added node.
         """
-        pydot_node = self._create_pydot_node(node)
+        pydot_node = self._create_pydot_node(node=node)
         if len(node.plot_specifications.extra_border_styles) == 0:
             graph.add_node(pydot_node)
             return pydot_node
@@ -384,7 +387,7 @@ class StatechartGraphviz:
             graph.add_subgraph(c)
         return pydot_node
 
-    def _create_pydot_node(self, node: StatechartNode) -> pydot.Node:
+    def _create_pydot_node(self, *, node: StatechartNode) -> pydot.Node:
         """
         :param node: The node to draw.
         :return: A labelled pydot node shaped and styled by the node's plot
@@ -412,11 +415,13 @@ class StatechartGraphviz:
         :return: The drawn graph.
         """
         self._cluster_map[None] = self.graph
-        self._add_nodes(self.graph, self.statechart.top_level_nodes)
+        self._add_nodes(
+            parent_cluster=self.graph, nodes=self.statechart.top_level_nodes
+        )
         self._add_edges()
         return self.graph
 
-    def to_dot_graph_pdf(self, file_name: str):
+    def to_dot_graph_pdf(self, *, file_name: str):
         """
         Draws the statechart and writes it to a pdf.
 
@@ -428,7 +433,7 @@ class StatechartGraphviz:
         self.graph.write_pdf(file_name)
         print(f"Saved task graph at {file_name}.")
 
-    def _is_drawn(self, node: StatechartNode) -> bool:
+    def _is_drawn(self, *, node: StatechartNode) -> bool:
         """
         :param node: The node to check.
         :return: Whether the node appears in the drawing, which it does not if it or one
@@ -445,6 +450,7 @@ class StatechartGraphviz:
 
     def _add_nodes(
         self,
+        *,
         parent_cluster: pydot.Graph | pydot.Cluster,
         nodes: list[StatechartNode],
     ):
@@ -458,28 +464,31 @@ class StatechartGraphviz:
         for i, node in enumerate(nodes):
             # Skip invisible nodes entirely, as well as the children of a
             # CompositeNode that is invisible or collapses them.
-            if not self._is_drawn(node):
+            if not self._is_drawn(node=node):
                 continue
 
             if (
                 isinstance(node, CompositeNode)
                 and not node.plot_specifications.collapse_children
             ):
-                goal_cluster = self._add_cluster(node, parent_cluster)
+                goal_cluster = self._add_cluster(
+                    node=node, parent_cluster=parent_cluster
+                )
                 self._add_node(
                     graph=goal_cluster,
                     node=node,
                 )
-                self._add_nodes(goal_cluster, node.children)
+                self._add_nodes(parent_cluster=goal_cluster, nodes=node.children)
                 continue
 
             self._add_node(
-                parent_cluster,
+                graph=parent_cluster,
                 node=node,
             )
 
     def _add_cluster(
         self,
+        *,
         node: StatechartNode,
         parent_cluster: pydot.Graph | pydot.Cluster,
     ):
@@ -509,7 +518,7 @@ class StatechartGraphviz:
         reads it.
         """
         for dependency in self._dependencies_to_draw():
-            self._add_dependency_edge(dependency)
+            self._add_dependency_edge(dependency=dependency)
 
     def _dependencies_to_draw(self) -> list[ConditionDependency]:
         """
@@ -526,17 +535,23 @@ class StatechartGraphviz:
         ) in self.statechart.rx_graph.edge_index_map().values():
             condition_owner = self.statechart.rx_graph.get_node_data(owner_index)
             observed_node = self.statechart.rx_graph.get_node_data(observed_index)
-            if not self._is_drawn(condition_owner) or not self._is_drawn(observed_node):
+            if not self._is_drawn(node=condition_owner) or not self._is_drawn(
+                node=observed_node
+            ):
                 continue
-            if not self._are_nodes_in_same_cluster(condition_owner, observed_node):
+            if not self._are_nodes_in_same_cluster(
+                condition_owner=condition_owner, observed_node=observed_node
+            ):
                 continue
-            new_dependency = ConditionDependency(condition_owner, observed_node)
+            new_dependency = ConditionDependency(
+                condition_owner=condition_owner, observed_node=observed_node
+            )
             dependency = dependencies.setdefault(new_dependency, new_dependency)
             dependency.conditions.append(condition)
         return list(dependencies.values())
 
     def _are_nodes_in_same_cluster(
-        self, condition_owner: StatechartNode, observed_node: StatechartNode
+        self, *, condition_owner: StatechartNode, observed_node: StatechartNode
     ) -> bool:
         """
         :param condition_owner: The node whose condition reads the other.
@@ -553,6 +568,7 @@ class StatechartGraphviz:
 
     def _edge_clusters_kwargs(
         self,
+        *,
         graph: pydot.Graph | pydot.Cluster,
         src_name: str,
         dst_name: str,
@@ -568,15 +584,15 @@ class StatechartGraphviz:
             cluster.
         """
         kwargs: dict[str, object] = {}
-        dst_cluster = self._get_cluster_of_node(dst_name, graph)
-        src_cluster = self._get_cluster_of_node(src_name, graph)
+        dst_cluster = self._get_cluster_of_node(node_name=dst_name, graph=graph)
+        src_cluster = self._get_cluster_of_node(node_name=src_name, graph=graph)
         if dst_cluster is not None:
             kwargs["lhead"] = dst_cluster.get_name()
         if src_cluster is not None:
             kwargs["ltail"] = src_cluster.get_name()
         return kwargs
 
-    def _add_dependency_edge(self, dependency: ConditionDependency) -> None:
+    def _add_dependency_edge(self, *, dependency: ConditionDependency) -> None:
         """
         Draws the arrow of a single dependency.
 
@@ -589,11 +605,13 @@ class StatechartGraphviz:
         source_name = str(dependency.observed_node.unique_name)
         destination_name = str(dependency.condition_owner.unique_name)
 
-        kwargs = self._edge_clusters_kwargs(graph, source_name, destination_name)
+        kwargs = self._edge_clusters_kwargs(
+            graph=graph, src_name=source_name, dst_name=destination_name
+        )
         style = ObservationDrawingStyle.UNKNOWN
         color = (
             style.color.to_hex()
-            if self._is_dependency_active(dependency)
+            if self._is_dependency_active(dependency=dependency)
             else self.disabled_condition_color.to_hex()
         )
 
@@ -602,14 +620,14 @@ class StatechartGraphviz:
                 src=source_name,
                 dst=destination_name,
                 color=color,
-                penwidth=style.line_width(self.metrics),
-                minlen=dependency.minimum_rank_distance(self.metrics),
+                penwidth=style.line_width(metrics=self.metrics),
+                minlen=dependency.minimum_rank_distance(metrics=self.metrics),
                 arrowsize=self.metrics.arrow_size,
                 **kwargs,
             )
         )
 
-    def _is_dependency_active(self, dependency: ConditionDependency) -> bool:
+    def _is_dependency_active(self, *, dependency: ConditionDependency) -> bool:
         """
         :param dependency: The dependency to check.
         :return: Whether at least one of the conditions this dependency bundles can
@@ -617,6 +635,6 @@ class StatechartGraphviz:
         """
         life_cycle_state = self.statechart.life_cycle_state[dependency.condition_owner]
         return any(
-            condition.kind.can_trigger_from(life_cycle_state)
+            condition.kind.can_trigger_from(life_cycle=life_cycle_state)
             for condition in dependency.conditions
         )

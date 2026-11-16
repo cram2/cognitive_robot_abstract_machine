@@ -29,7 +29,7 @@ class GarmiInteractiveMarkerChain(Enum):
     RIGHT_ARM = RootTipPair(root_link="map", tip_link="right_fr3_hand_tcp")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Closed-loop velocity interface for the real GARMI robot.
@@ -46,7 +46,9 @@ class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
             tf_child_frame=self.robot.mobile_base.odometry_body_name,
         )
         omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
-        self.sync_odometry_topic("/r100_0603/platform/odom/filtered", omni_drive)
+        self.sync_odometry_topic(
+            odometry_topic="/r100_0603/platform/odom/filtered", joint=omni_drive
+        )
         self.add_drive_velocity_command_topic(
             command_topic="/r100_0603/joy_teleop/cmd_vel",
             drive=omni_drive,
@@ -56,7 +58,7 @@ class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
         # The merged whole-robot joint state (~50 Hz): arms + lift, the platform's
         # wheels, and the head. The per-subsystem topics
         # stay available if a joint group needs faster sync.
-        self.sync_joint_state_topic("/garmi/joint_states")
+        self.sync_joint_state_topic(topic_name="/garmi/joint_states")
 
         self.add_joint_group_velocity_command_topic(
             command_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",

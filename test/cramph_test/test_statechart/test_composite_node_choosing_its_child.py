@@ -35,7 +35,7 @@ from semantic_digital_twin.world import World
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserAnsweringInTurn(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Has no choice for the first few questions, then gives the prepared children one
@@ -57,7 +57,7 @@ class ChooserAnsweringInTurn(ChildChooser[CompositeNodeChoosingItsChild]):
     Every node that asked, once per question.
     """
 
-    def has_choice_for(self, node: CompositeNodeChoosingItsChild) -> bool:
+    def has_choice_for(self, *, node: CompositeNodeChoosingItsChild) -> bool:
         self.asked_nodes.append(node)
         if self.unanswered_questions == 0:
             return True
@@ -65,14 +65,14 @@ class ChooserAnsweringInTurn(ChildChooser[CompositeNodeChoosingItsChild]):
         return False
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         if not self.children:
             return None
         return self.children.pop(0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserGivingUpOnItsChildren(ChooserAnsweringInTurn):
     """
     Gives the prepared children in turn, each with the failure monitors prepared for it,
@@ -93,6 +93,7 @@ class ChooserGivingUpOnItsChildren(ChooserAnsweringInTurn):
 
     def prepare_chosen_child(
         self,
+        *,
         node: CompositeNodeChoosingItsChild,
         child: StatechartNode,
     ) -> None:
@@ -100,6 +101,7 @@ class ChooserGivingUpOnItsChildren(ChooserAnsweringInTurn):
 
     def failure_monitors_for(
         self,
+        *,
         node: CompositeNodeChoosingItsChild,
         child: StatechartNode,
     ) -> list[StatechartNode]:
@@ -107,7 +109,7 @@ class ChooserGivingUpOnItsChildren(ChooserAnsweringInTurn):
         return self.failure_monitors.pop(0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionCountingCompiles(TickingExecutorExtension):
     """
     An executor extension that counts how often it was told the statechart compiled.
@@ -118,7 +120,7 @@ class ExtensionCountingCompiles(TickingExecutorExtension):
     How often :meth:`after_compile` ran.
     """
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.compile_count += 1
 
 
@@ -156,7 +158,7 @@ def _run_count(statechart: Statechart, node: StatechartNode) -> int:
     """
     :return: How often `node` went from not started to running.
     """
-    life_cycles = statechart.state_history.get_life_cycle_history_of_node(node)
+    life_cycles = statechart.state_history.get_life_cycle_history_of_node(node=node)
     return sum(
         previous == LifeCycleValues.NOT_STARTED and current == LifeCycleValues.RUNNING
         for previous, current in zip(life_cycles, life_cycles[1:])
@@ -175,7 +177,7 @@ def _run_repeated_until_decided(
 
     :return: The statechart that ran.
     """
-    executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
     statechart = Statechart(context=executor.context)
     loop = RepeatUntil(
         name="loop",
@@ -184,10 +186,10 @@ def _run_repeated_until_decided(
             name="counter", node=task, target=resets_until_stopped
         ),
     )
-    statechart.add_node(loop)
-    statechart.add_node(EndStatechart.when_true(loop))
-    statechart.add_node(EndStatechart.when_failed(loop))
-    executor.compile(statechart)
+    statechart.add_node(node=loop)
+    statechart.add_node(node=EndStatechart.when_true(node=loop))
+    statechart.add_node(node=EndStatechart.when_failed(node=loop))
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=60)
     return statechart
 
@@ -202,12 +204,12 @@ def _run_choosing_node(
 
     :return: The choosing node.
     """
-    executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
     statechart = Statechart(context=executor.context)
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
-    statechart.add_node(choosing_node)
-    statechart.add_node(end_node_factory(choosing_node))
-    executor.compile(statechart)
+    statechart.add_node(node=choosing_node)
+    statechart.add_node(node=end_node_factory(node=choosing_node))
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=30)
     return choosing_node
 
@@ -221,7 +223,7 @@ def test_the_node_succeeds_with_the_child_it_chose(
     child = _succeeding_child("child")
 
     choosing_node = _run_choosing_node(
-        statechart_executor, ChooserAnsweringInTurn([child])
+        statechart_executor, ChooserAnsweringInTurn(children=[child])
     )
 
     assert choosing_node.children == [child]
@@ -237,7 +239,7 @@ def test_a_failed_child_makes_the_node_choose_again(
 
     choosing_node = _run_choosing_node(
         statechart_executor,
-        ChooserAnsweringInTurn([failing, succeeding]),
+        ChooserAnsweringInTurn(children=[failing, succeeding]),
     )
 
     assert choosing_node.children == [failing, succeeding]
@@ -248,7 +250,7 @@ def test_a_failed_child_makes_the_node_choose_again(
 def test_no_child_left_fails_the_node(statechart_executor: StatechartExecutor) -> None:
     choosing_node = _run_choosing_node(
         statechart_executor,
-        ChooserAnsweringInTurn([]),
+        ChooserAnsweringInTurn(children=[]),
         end_node_factory=EndStatechart.when_failed,
     )
 
@@ -260,7 +262,7 @@ def test_a_pending_choice_is_asked_again_on_the_next_tick(
     statechart_executor: StatechartExecutor,
 ) -> None:
     child = _succeeding_child("child")
-    chooser = ChooserAnsweringInTurn([child], unanswered_questions=2)
+    chooser = ChooserAnsweringInTurn(children=[child], unanswered_questions=2)
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
@@ -271,16 +273,18 @@ def test_a_pending_choice_is_asked_again_on_the_next_tick(
 def test_a_node_that_is_not_running_is_not_asked(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    chooser = ChooserAnsweringInTurn([_succeeding_child("child")])
-    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    chooser = ChooserAnsweringInTurn(children=[_succeeding_child("child")])
+    statechart_executor.context.add_extension(
+        extension=ChildChooserAccess(choosers=[chooser])
+    )
     statechart = Statechart(context=statechart_executor.context)
     never_true = ConstFalseNode(name="never true")
-    statechart.add_node(never_true)
+    statechart.add_node(node=never_true)
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
     choosing_node.start_condition = never_true.observes_true
-    statechart.add_node(choosing_node)
+    statechart.add_node(node=choosing_node)
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
 
     assert chooser.asked_nodes == []
@@ -290,16 +294,18 @@ def test_a_node_that_is_not_running_is_not_asked(
 def test_choosing_keeps_the_state_and_history_of_the_nodes_already_there(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    chooser = ChooserAnsweringInTurn([_succeeding_child("child")])
-    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    chooser = ChooserAnsweringInTurn(children=[_succeeding_child("child")])
+    statechart_executor.context.add_extension(
+        extension=ChildChooserAccess(choosers=[chooser])
+    )
     statechart = Statechart(context=statechart_executor.context)
     earlier = _succeeding_child("earlier")
-    statechart.add_node(earlier)
+    statechart.add_node(node=earlier)
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
     choosing_node.start_condition = earlier.is_succeeded
-    statechart.add_node(choosing_node)
-    statechart.add_node(EndStatechart.when_true(choosing_node))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=choosing_node)
+    statechart.add_node(node=EndStatechart.when_true(node=choosing_node))
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
     assert earlier.life_cycle_state == LifeCycleValues.SUCCEEDED
     recorded_before_choosing = len(statechart.state_history)
@@ -319,13 +325,15 @@ def test_a_choice_compiles_the_statechart_once(
     executor = StatechartExecutor(context=statechart_context, extensions=[counting])
     child = _succeeding_child("child")
     executor.context.add_extension(
-        ChildChooserAccess(choosers=[ChooserAnsweringInTurn([child])])
+        extension=ChildChooserAccess(
+            choosers=[ChooserAnsweringInTurn(children=[child])]
+        )
     )
     statechart = Statechart(context=executor.context)
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
-    statechart.add_node(choosing_node)
+    statechart.add_node(node=choosing_node)
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     assert choosing_node.children == [child]
     assert counting.compile_count == 2
@@ -337,13 +345,13 @@ def test_the_node_observes_what_its_latest_child_observed(
     child: StatechartNode = _succeeding_child("child")
 
     choosing_node = _run_choosing_node(
-        statechart_executor, ChooserAnsweringInTurn([child])
+        statechart_executor, ChooserAnsweringInTurn(children=[child])
     )
 
     assert choosing_node.last_observation_state == ObservationStateValues.TRUE
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionHoldingStill(TickingExecutorExtension):
     """
     An executor extension that notes when it was told to hold still.
@@ -354,12 +362,12 @@ class ExtensionHoldingStill(TickingExecutorExtension):
     Whether :meth:`before_recompile` ran.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         self.is_holding_still = True
         return True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserNotingWhetherTheExtensionHeldStill(
     ChildChooser[CompositeNodeChoosingItsChild]
 ):
@@ -383,7 +391,7 @@ class ChooserNotingWhetherTheExtensionHeldStill(
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.held_still_when_asked.append(self.extension.is_holding_still)
         return self.child
@@ -398,16 +406,16 @@ def test_the_extensions_hold_still_before_a_node_chooses(statechart_context) -> 
     chooser = ChooserNotingWhetherTheExtensionHeldStill(
         extension=extension, child=_succeeding_child("child")
     )
-    executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
     statechart = Statechart(context=executor.context)
-    statechart.add_node(CompositeNodeChoosingItsChild(name="choosing"))
+    statechart.add_node(node=CompositeNodeChoosingItsChild(name="choosing"))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     assert chooser.held_still_when_asked == [True]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EventLog:
     """
     The order in which nodes started and children were chosen.
@@ -434,7 +442,7 @@ class NodeNotingItsStart(NodeObservingAFixedValue):
         self.log.events.append(f"{self.name} started")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserNotingItsChoice(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Gives one child and notes in a log when it chooses it.
@@ -451,7 +459,7 @@ class ChooserNotingItsChoice(ChildChooser[CompositeNodeChoosingItsChild]):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.log.events.append(f"{node.name} chose")
         return self.child
@@ -466,15 +474,17 @@ def test_a_node_chooses_before_the_nodes_starting_beside_it_act(
     """
     log = EventLog()
     chooser = ChooserNotingItsChoice(log=log, child=_succeeding_child("child"))
-    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart_executor.context.add_extension(
+        extension=ChildChooserAccess(choosers=[chooser])
+    )
     statechart = Statechart(context=statechart_executor.context)
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
     sibling = NodeNotingItsStart(
         name="sibling", observation=ObservationStateValues.UNKNOWN, log=log
     )
-    statechart.add_nodes([choosing_node, sibling])
+    statechart.add_nodes(nodes=[choosing_node, sibling])
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
 
     assert log.events == [
@@ -486,7 +496,7 @@ def test_a_node_chooses_before_the_nodes_starting_beside_it_act(
 # %% one choice handing other nodes their children
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserHandingTheOthersTheirChildren(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Gives the first node that asks its child and hands every other node of a group the
@@ -504,16 +514,18 @@ class ChooserHandingTheOthersTheirChildren(ChildChooser[CompositeNodeChoosingIts
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.asked_nodes.append(node)
         for other, child in self.children.items():
             if other is not node:
-                other.choose_child_with(ChooserAnsweringInTurn([child]))
+                other.choose_child_with(
+                    chooser=ChooserAnsweringInTurn(children=[child])
+                )
         return self.children[node]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserAnsweringOnceAnotherNodeChose(ChooserAnsweringInTurn):
     """
     Has no choice for a node until another node has chosen its child, as a choice made
@@ -525,7 +537,7 @@ class ChooserAnsweringOnceAnotherNodeChose(ChooserAnsweringInTurn):
     The node that has to have chosen before any other node gets an answer.
     """
 
-    def has_choice_for(self, node: CompositeNodeChoosingItsChild) -> bool:
+    def has_choice_for(self, *, node: CompositeNodeChoosingItsChild) -> bool:
         self.asked_nodes.append(node)
         return node is self.chosen_first or self.chosen_first.latest_child is not None
 
@@ -534,7 +546,7 @@ def _start_tick(statechart: Statechart, node: StatechartNode) -> int:
     """
     :return: The tick `node` started its current run on.
     """
-    return statechart.state_history.get_current_run_ticks_of_node(node).start_tick
+    return statechart.state_history.get_current_run_ticks_of_node(node=node).start_tick
 
 
 def test_a_node_handed_its_child_by_another_choice_is_not_asked_again(
@@ -548,17 +560,19 @@ def test_a_node_handed_its_child_by_another_choice_is_not_asked_again(
             handed: _succeeding_child("child of handed"),
         }
     )
-    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart_executor.context.add_extension(
+        extension=ChildChooserAccess(choosers=[chooser])
+    )
     statechart = Statechart(context=statechart_executor.context)
     parallel = Parallel(
         name="parallel",
         nodes=[asking, Sequence(name="branch", nodes=[handed])],
     )
     root = Sequence(name="root", nodes=[parallel])
-    statechart.add_node(root)
-    statechart.add_node(EndStatechart.when_true(root))
+    statechart.add_node(node=root)
+    statechart.add_node(node=EndStatechart.when_true(node=root))
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
 
     assert chooser.asked_nodes == [asking]
@@ -575,14 +589,16 @@ def test_a_choice_another_choice_enables_is_taken_on_the_same_tick(
         children=[_succeeding_child("first child"), _succeeding_child("second child")],
         chosen_first=first,
     )
-    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart_executor.context.add_extension(
+        extension=ChildChooserAccess(choosers=[chooser])
+    )
     statechart = Statechart(context=statechart_executor.context)
     parallel = Parallel(name="parallel", nodes=[waiting, first])
     root = Sequence(name="root", nodes=[parallel])
-    statechart.add_node(root)
-    statechart.add_node(EndStatechart.when_true(root))
+    statechart.add_node(node=root)
+    statechart.add_node(node=EndStatechart.when_true(node=root))
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
 
     assert _start_tick(statechart, waiting.latest_child) == _start_tick(
@@ -601,13 +617,15 @@ def test_a_node_handed_its_child_before_it_started_runs_it_once_it_starts(
             later: _succeeding_child("child of later"),
         }
     )
-    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart_executor.context.add_extension(
+        extension=ChildChooserAccess(choosers=[chooser])
+    )
     statechart = Statechart(context=statechart_executor.context)
     sequence = Sequence(name="sequence", nodes=[asking, later])
-    statechart.add_node(sequence)
-    statechart.add_node(EndStatechart.when_true(sequence))
+    statechart.add_node(node=sequence)
+    statechart.add_node(node=EndStatechart.when_true(node=sequence))
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
 
     assert chooser.asked_nodes == [asking]
@@ -625,7 +643,7 @@ class NodeChoosingItsChildByItsOwnRule(CompositeNodeChoosingItsChild):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserOfItsOwnKind(ChildChooser[NodeChoosingItsChildByItsOwnRule]):
     """
     Chooses for nodes of :class:`NodeChoosingItsChildByItsOwnRule` only, and never has a
@@ -638,7 +656,7 @@ class ChooserOfItsOwnKind(ChildChooser[NodeChoosingItsChildByItsOwnRule]):
     """
 
     def choose_child(
-        self, node: NodeChoosingItsChildByItsOwnRule
+        self, *, node: NodeChoosingItsChildByItsOwnRule
     ) -> StatechartNode | None:
         self.asked_nodes.append(node)
         return None
@@ -647,17 +665,17 @@ class ChooserOfItsOwnKind(ChildChooser[NodeChoosingItsChildByItsOwnRule]):
 def test_a_node_asks_the_chooser_of_its_own_kind(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    general_chooser = ChooserAnsweringInTurn([_succeeding_child("general")])
+    general_chooser = ChooserAnsweringInTurn(children=[_succeeding_child("general")])
     own_kind_chooser = ChooserOfItsOwnKind()
     statechart_executor.context.add_extension(
-        ChildChooserAccess(choosers=[general_chooser, own_kind_chooser])
+        extension=ChildChooserAccess(choosers=[general_chooser, own_kind_chooser])
     )
     statechart = Statechart(context=statechart_executor.context)
     choosing_node = NodeChoosingItsChildByItsOwnRule(name="choosing")
-    statechart.add_node(choosing_node)
-    statechart.add_node(EndStatechart.when_failed(choosing_node))
+    statechart.add_node(node=choosing_node)
+    statechart.add_node(node=EndStatechart.when_failed(node=choosing_node))
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
 
     assert own_kind_chooser.asked_nodes == [choosing_node]
@@ -668,26 +686,28 @@ def test_a_node_without_a_chooser_of_its_kind_cannot_choose(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart_executor.context.add_extension(
-        ChildChooserAccess(choosers=[ChooserOfItsOwnKind()])
+        extension=ChildChooserAccess(choosers=[ChooserOfItsOwnKind()])
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(CompositeNodeChoosingItsChild(name="choosing"))
+    statechart.add_node(node=CompositeNodeChoosingItsChild(name="choosing"))
 
     with pytest.raises(NoChildChooserForNodeError):
-        statechart_executor.compile(statechart)
+        statechart_executor.compile(statechart=statechart)
 
 
 def test_a_node_with_two_choosers_of_its_kind_cannot_choose(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart_executor.context.add_extension(
-        ChildChooserAccess(choosers=[ChooserOfItsOwnKind(), ChooserOfItsOwnKind()])
+        extension=ChildChooserAccess(
+            choosers=[ChooserOfItsOwnKind(), ChooserOfItsOwnKind()]
+        )
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(NodeChoosingItsChildByItsOwnRule(name="choosing"))
+    statechart.add_node(node=NodeChoosingItsChildByItsOwnRule(name="choosing"))
 
     with pytest.raises(SeveralChildChoosersForNodeError):
-        statechart_executor.compile(statechart)
+        statechart_executor.compile(statechart=statechart)
 
 
 # %% giving up on a child
@@ -700,7 +720,7 @@ def test_a_child_is_given_up_on_once_one_of_its_failure_monitors_fires(
     timeout = CountTicks(name="timeout", ticks=3)
     succeeding = _succeeding_child("succeeding")
     chooser = ChooserGivingUpOnItsChildren(
-        [undecided, succeeding], failure_monitors=[[timeout], []]
+        children=[undecided, succeeding], failure_monitors=[[timeout], []]
     )
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
@@ -717,7 +737,9 @@ def test_a_child_reaching_its_goal_succeeds_although_a_monitor_fires_on_that_tic
     firing_at_once = NodeObservingAFixedValue(
         name="firing at once", observation=ObservationStateValues.TRUE
     )
-    chooser = ChooserGivingUpOnItsChildren([child], failure_monitors=[[firing_at_once]])
+    chooser = ChooserGivingUpOnItsChildren(
+        children=[child], failure_monitors=[[firing_at_once]]
+    )
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
@@ -733,7 +755,7 @@ def test_the_failure_monitors_of_a_child_stop_once_it_ended(
     undecided = _undecided_child("undecided")
     timeout = CountTicks(name="timeout", ticks=5)
     chooser = ChooserGivingUpOnItsChildren(
-        [failing, undecided], failure_monitors=[[never_firing], [timeout]]
+        children=[failing, undecided], failure_monitors=[[never_firing], [timeout]]
     )
 
     _run_choosing_node(
@@ -749,14 +771,16 @@ def test_the_failure_monitors_of_a_child_are_not_among_the_chosen_children(
 ) -> None:
     undecided = _undecided_child("undecided")
     timeout = CountTicks(name="timeout", ticks=3)
-    chooser = ChooserGivingUpOnItsChildren([undecided], failure_monitors=[[timeout]])
+    chooser = ChooserGivingUpOnItsChildren(
+        children=[undecided], failure_monitors=[[timeout]]
+    )
 
     choosing_node = _run_choosing_node(
         statechart_executor, chooser, end_node_factory=EndStatechart.when_failed
     )
 
     assert choosing_node.chosen_children == [undecided]
-    assert choosing_node.failure_monitors_of(undecided) == [timeout]
+    assert choosing_node.failure_monitors_of(child=undecided) == [timeout]
     assert choosing_node.latest_child is undecided
 
 
@@ -768,13 +792,13 @@ def test_the_failure_reasons_are_the_monitors_that_gave_up_on_a_child(
     never_firing = ConstFalseNode(name="never firing")
     succeeding = _succeeding_child("succeeding")
     chooser = ChooserGivingUpOnItsChildren(
-        [undecided, succeeding], failure_monitors=[[never_firing, timeout], []]
+        children=[undecided, succeeding], failure_monitors=[[never_firing, timeout], []]
     )
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
-    assert choosing_node.failure_reasons_of(undecided) == [timeout]
-    assert choosing_node.failure_reasons_of(succeeding) == []
+    assert choosing_node.failure_reasons_of(child=undecided) == [timeout]
+    assert choosing_node.failure_reasons_of(child=succeeding) == []
     assert choosing_node.failure_reasons == [timeout]
 
 
@@ -785,20 +809,20 @@ def test_a_child_failing_on_its_own_has_no_failure_reasons(
     never_firing = ConstFalseNode(name="never firing")
     succeeding = _succeeding_child("succeeding")
     chooser = ChooserGivingUpOnItsChildren(
-        [failing, succeeding], failure_monitors=[[never_firing], []]
+        children=[failing, succeeding], failure_monitors=[[never_firing], []]
     )
 
     choosing_node = _run_choosing_node(statechart_executor, chooser)
 
     assert failing.life_cycle_state == LifeCycleValues.FAILED
-    assert choosing_node.failure_reasons_of(failing) == []
+    assert choosing_node.failure_reasons_of(child=failing) == []
 
 
 def test_a_chosen_child_is_prepared_once_it_joined_and_before_its_monitors_are_asked_for(
     statechart_executor: StatechartExecutor,
 ) -> None:
     child = _succeeding_child("child")
-    chooser = ChooserGivingUpOnItsChildren([child], failure_monitors=[[]])
+    chooser = ChooserGivingUpOnItsChildren(children=[child], failure_monitors=[[]])
 
     _run_choosing_node(statechart_executor, chooser)
 
@@ -814,7 +838,7 @@ def test_a_reset_node_chooses_again_instead_of_running_its_earlier_children(
     failing = _failing_child("failing")
     undecided = _undecided_child("undecided")
     succeeding = _succeeding_child("succeeding")
-    chooser = ChooserAnsweringInTurn([failing, undecided, succeeding])
+    chooser = ChooserAnsweringInTurn(children=[failing, undecided, succeeding])
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
     stopped = StoppedWhenTrue(
         name="stopped",
@@ -837,7 +861,7 @@ def test_a_node_that_ran_out_of_children_chooses_again_after_a_reset(
     statechart_executor: StatechartExecutor,
 ) -> None:
     succeeding = _succeeding_child("succeeding")
-    chooser = ChooserAnsweringInTurn([None, succeeding])
+    chooser = ChooserAnsweringInTurn(children=[None, succeeding])
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
 
     _run_repeated_until_decided(
@@ -860,14 +884,16 @@ def test_a_chosen_child_is_still_chosen_after_a_json_round_trip() -> None:
     """
     statechart = Statechart(context=StatechartContext(world=World()))
     choosing_node = CompositeNodeChoosingItsChild(name="choosing")
-    statechart.add_node(choosing_node)
+    statechart.add_node(node=choosing_node)
     child = _succeeding_child("child")
-    choosing_node.choose_child_with(ChooserAnsweringInTurn([child]))
+    choosing_node.choose_child_with(chooser=ChooserAnsweringInTurn(children=[child]))
 
     received = Statechart.from_json(
         data=json.loads(json.dumps(statechart.to_json())),
         context=StatechartContext(world=World()),
     )
 
-    received_node = received.get_node_by_index(choosing_node.index)
-    assert received_node.chosen_children == [received.get_node_by_index(child.index)]
+    received_node = received.get_node_by_index(index=choosing_node.index)
+    assert received_node.chosen_children == [
+        received.get_node_by_index(index=child.index)
+    ]

@@ -35,10 +35,10 @@ def test_generic_nodes_tick_until_the_statechart_ends(
     second_step = CountTicks(ticks=3)
     sequence = Sequence(nodes=[first_step, second_step])
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(sequence)
-    statechart.add_node(EndStatechart.when_true(sequence))
+    statechart.add_node(node=sequence)
+    statechart.add_node(node=EndStatechart.when_true(node=sequence))
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end()
 
     assert statechart.is_ended()
@@ -52,9 +52,9 @@ def test_executing_ticks_the_compiled_statechart_until_it_ends(
 ) -> None:
     step = CountTicks(ticks=2)
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(step)
-    statechart.add_node(EndStatechart.when_true(step))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=step)
+    statechart.add_node(node=EndStatechart.when_true(node=step))
+    statechart_executor.compile(statechart=statechart)
 
     statechart_executor.execute()
 
@@ -67,10 +67,10 @@ def test_end_statechart_ends_the_tick_after_it_starts(
     statechart_executor: StatechartExecutor,
 ) -> None:
     node = ConstTrueNode()
-    end = EndStatechart.when_true(node)
+    end = EndStatechart.when_true(node=node)
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_nodes([node, end])
-    statechart_executor.compile(statechart)
+    statechart.add_nodes(nodes=[node, end])
+    statechart_executor.compile(statechart=statechart)
 
     statechart_executor.tick()
     assert end.life_cycle_state == LifeCycleValues.RUNNING
@@ -86,8 +86,10 @@ def test_cancel_statechart_raises_its_exception(
     node = ConstTrueNode()
     exception = NodeAssertionError(reason="cancelled")
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_nodes([node, CancelStatechart.when_true(node, exception)])
-    statechart_executor.compile(statechart)
+    statechart.add_nodes(
+        nodes=[node, CancelStatechart.when_true(node=node, exception=exception)]
+    )
+    statechart_executor.compile(statechart=statechart)
 
     with pytest.raises(NodeAssertionError) as raised:
         statechart_executor.tick()
@@ -100,7 +102,7 @@ def test_generic_nodes_build_plain_node_artifacts(
 ) -> None:
     node = ConstTrueNode()
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_nodes([node, EndStatechart.when_true(node)])
+    statechart.add_nodes(nodes=[node, EndStatechart.when_true(node=node)])
 
     artifacts = node.build()
 
@@ -117,8 +119,8 @@ def test_simulation_time_is_counted_in_tick_durations(
     tick_duration = statechart_executor.context.tick_duration
     counter = CountSimulationTimeSeconds(seconds=ticks * tick_duration)
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_nodes([counter, EndStatechart.when_true(counter)])
-    statechart_executor.compile(statechart)
+    statechart.add_nodes(nodes=[counter, EndStatechart.when_true(node=counter)])
+    statechart_executor.compile(statechart=statechart)
 
     for _ in range(ticks - 1):
         statechart_executor.tick()
@@ -141,8 +143,8 @@ def test_a_statechart_ticks_without_knowing_its_tick_duration(
     executor = StatechartExecutor(context=statechart_context_without_tick_duration)
     counter = CountTicks(ticks=2)
     statechart = Statechart(context=executor.context)
-    statechart.add_nodes([counter, EndStatechart.when_true(counter)])
-    executor.compile(statechart)
+    statechart.add_nodes(nodes=[counter, EndStatechart.when_true(node=counter)])
+    executor.compile(statechart=statechart)
 
     executor.tick_until_end()
 
@@ -164,8 +166,8 @@ def test_simulation_time_cannot_be_counted_without_a_tick_duration(
     executor = StatechartExecutor(context=statechart_context_without_tick_duration)
     counter = CountSimulationTimeSeconds(seconds=1.0)
     statechart = Statechart(context=executor.context)
-    statechart.add_nodes([counter, EndStatechart.when_true(counter)])
-    executor.compile(statechart)
+    statechart.add_nodes(nodes=[counter, EndStatechart.when_true(node=counter)])
+    executor.compile(statechart=statechart)
 
     with pytest.raises(TickDurationUnknownError):
         executor.tick()
@@ -196,7 +198,7 @@ class ExecutorStage(StrEnum):
     AFTER_RUN = auto()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StageRecord:
     """
     One stage an extension was called at.
@@ -213,7 +215,7 @@ class StageRecord:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionRecordingCompileAndRun(ExecutorExtension):
     """
     An executor extension that appends every stage of an :class:`ExecutorExtension` it
@@ -225,23 +227,23 @@ class ExtensionRecordingCompileAndRun(ExecutorExtension):
     The record shared by every extension of one executor.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
-        self._record(ExecutorStage.EXTEND_CONTEXT)
+    def extend_context(self, *, context: StatechartContext) -> None:
+        self._record(stage=ExecutorStage.EXTEND_CONTEXT)
 
-    def after_compile(self, executor: Executor) -> None:
-        self._record(ExecutorStage.AFTER_COMPILE)
+    def after_compile(self, *, executor: Executor) -> None:
+        self._record(stage=ExecutorStage.AFTER_COMPILE)
 
-    def after_run(self, executor: Executor) -> None:
-        self._record(ExecutorStage.AFTER_RUN)
+    def after_run(self, *, executor: Executor) -> None:
+        self._record(stage=ExecutorStage.AFTER_RUN)
 
-    def _record(self, stage: ExecutorStage) -> None:
+    def _record(self, *, stage: ExecutorStage) -> None:
         """
         :param stage: The stage this extension was called at.
         """
         self.records.append(StageRecord(extension=self, stage=stage))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionRecordingItsStages(
     ExtensionRecordingCompileAndRun, TickingExecutorExtension
 ):
@@ -249,14 +251,14 @@ class ExtensionRecordingItsStages(
     An executor extension that also records every tick it is called around.
     """
 
-    def before_tick(self, executor: StatechartExecutor) -> None:
-        self._record(ExecutorStage.BEFORE_TICK)
+    def before_tick(self, *, executor: StatechartExecutor) -> None:
+        self._record(stage=ExecutorStage.BEFORE_TICK)
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
-        self._record(ExecutorStage.AFTER_TICK)
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
+        self._record(stage=ExecutorStage.AFTER_TICK)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutorRunningWithoutTicks(Executor):
     """
     An executor that runs a statechart without ticking it, as one that hands the
@@ -269,15 +271,15 @@ class ExecutorRunningWithoutTicks(Executor):
     def default_executor_extensions(self) -> list[ExecutorExtension]:
         return []
 
-    def compile(self, statechart: Statechart) -> None:
-        super().compile(statechart)
+    def compile(self, *, statechart: Statechart) -> None:
+        super().compile(statechart=statechart)
         self._notify_compiled()
 
     def execute(self) -> None:
         self.finish_run()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CountingContext(ContextExtension):
     """
     A context extension counting how often the nodes that require it were built.
@@ -289,7 +291,7 @@ class CountingContext(ContextExtension):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionInstallingACountingContext(ExecutorExtension):
     """
     An executor extension that makes a :class:`CountingContext` available to the nodes.
@@ -300,8 +302,8 @@ class ExtensionInstallingACountingContext(ExecutorExtension):
     The context extension this extension installs.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
-        context.add_extension(self.counting_context)
+    def extend_context(self, *, context: StatechartContext) -> None:
+        context.add_extension(extension=self.counting_context)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -311,11 +313,11 @@ class NodeRequiringACountingContext(ConstTrueNode):
     """
 
     def build_artifacts(self) -> NodeArtifacts:
-        self.context.require_extension(CountingContext).builds += 1
+        self.context.require_extension(extension_type=CountingContext).builds += 1
         return super().build_artifacts()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionSettingTheTickDuration(ExecutorExtension):
     """
     An executor extension that decides how long a tick lasts.
@@ -326,8 +328,8 @@ class ExtensionSettingTheTickDuration(ExecutorExtension):
     How many seconds one tick lasts.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
-        context.set_tick_duration(self.tick_duration)
+    def extend_context(self, *, context: StatechartContext) -> None:
+        context.set_tick_duration(tick_duration=self.tick_duration)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -355,7 +357,7 @@ def _statechart_ending_after_one_node(executor: StatechartExecutor) -> Statechar
     """
     node = ConstTrueNode()
     statechart = Statechart(context=executor.context)
-    statechart.add_nodes([node, EndStatechart.when_true(node)])
+    statechart.add_nodes(nodes=[node, EndStatechart.when_true(node=node)])
     return statechart
 
 
@@ -365,11 +367,11 @@ def test_an_extension_is_called_at_every_stage_of_a_run(
     records: list[StageRecord] = []
     executor = StatechartExecutor(
         context=statechart_context,
-        extensions=[ExtensionRecordingItsStages(records)],
+        extensions=[ExtensionRecordingItsStages(records=records)],
     )
     assert [record.stage for record in records] == [ExecutorStage.EXTEND_CONTEXT]
 
-    executor.compile(_statechart_ending_after_one_node(executor))
+    executor.compile(statechart=_statechart_ending_after_one_node(executor))
     assert [record.stage for record in records[1:]] == [ExecutorStage.AFTER_COMPILE]
 
     executor.tick_until_end()
@@ -388,10 +390,10 @@ def test_an_executor_that_does_not_tick_calls_the_stages_around_its_run(
     records: list[StageRecord] = []
     executor = ExecutorRunningWithoutTicks(
         context=statechart_context,
-        extensions=[ExtensionRecordingCompileAndRun(records)],
+        extensions=[ExtensionRecordingCompileAndRun(records=records)],
     )
 
-    executor.compile(_statechart_ending_after_one_node(executor))
+    executor.compile(statechart=_statechart_ending_after_one_node(executor))
     executor.execute()
 
     assert [record.stage for record in records] == [
@@ -405,10 +407,10 @@ def test_only_ticking_extensions_are_called_around_a_tick(
     statechart_context: StatechartContext,
 ) -> None:
     records: list[StageRecord] = []
-    not_ticking = ExtensionRecordingCompileAndRun(records)
+    not_ticking = ExtensionRecordingCompileAndRun(records=records)
     executor = StatechartExecutor(context=statechart_context, extensions=[not_ticking])
 
-    executor.compile(_statechart_ending_after_one_node(executor))
+    executor.compile(statechart=_statechart_ending_after_one_node(executor))
     executor.tick_until_end()
 
     assert [record.stage for record in records] == [
@@ -422,13 +424,13 @@ def test_extensions_are_called_in_the_order_they_are_listed(
     statechart_context: StatechartContext,
 ) -> None:
     records: list[StageRecord] = []
-    first = ExtensionRecordingItsStages(records)
-    second = ExtensionRecordingItsStages(records)
+    first = ExtensionRecordingItsStages(records=records)
+    second = ExtensionRecordingItsStages(records=records)
     executor = StatechartExecutor(
         context=statechart_context, extensions=[first, second]
     )
 
-    executor.compile(_statechart_ending_after_one_node(executor))
+    executor.compile(statechart=_statechart_ending_after_one_node(executor))
     executor.tick()
 
     assert [record.extension for record in records] == [first, second] * 4
@@ -439,19 +441,19 @@ def test_nodes_are_built_with_the_context_extensions_of_every_executor_extension
 ) -> None:
     first = ExtensionInstallingACountingContext()
     records: list[StageRecord] = []
-    second = ExtensionRecordingItsStages(records)
+    second = ExtensionRecordingItsStages(records=records)
     executor = StatechartExecutor(
         context=statechart_context, extensions=[first, second]
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             node := NodeRequiringACountingContext(),
-            EndStatechart.when_true(node),
+            EndStatechart.when_true(node=node),
         ]
     )
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.tick_until_end()
 
     assert first.counting_context.builds == 1
@@ -464,13 +466,13 @@ def test_a_compile_whose_first_tick_raises_tells_the_extensions_the_run_stopped(
     records: list[StageRecord] = []
     executor = StatechartExecutor(
         context=statechart_context,
-        extensions=[ExtensionRecordingCompileAndRun(records)],
+        extensions=[ExtensionRecordingCompileAndRun(records=records)],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(NodeFailingToStart())
+    statechart.add_node(node=NodeFailingToStart())
 
     with pytest.raises(NodeAssertionError):
-        executor.compile(statechart)
+        executor.compile(statechart=statechart)
 
     assert [record.stage for record in records] == [
         ExecutorStage.EXTEND_CONTEXT,
@@ -483,10 +485,10 @@ def test_a_compile_whose_first_tick_raises_cleans_up_the_nodes(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(node := NodeFailingToStart())
+    statechart.add_node(node=(node := NodeFailingToStart()))
 
     with pytest.raises(NodeAssertionError):
-        statechart_executor.compile(statechart)
+        statechart_executor.compile(statechart=statechart)
 
     assert node.cleaned_up
 
@@ -512,23 +514,28 @@ def test_an_executor_finds_its_extension_by_type(
     extension = ExtensionInstallingACountingContext()
     executor = StatechartExecutor(
         context=statechart_context,
-        extensions=[ExtensionRecordingItsStages([]), extension],
+        extensions=[ExtensionRecordingItsStages(records=[]), extension],
     )
 
-    assert executor.require_extension(ExtensionInstallingACountingContext) is extension
+    assert (
+        executor.require_extension(extension_type=ExtensionInstallingACountingContext)
+        is extension
+    )
 
 
 def test_requiring_an_extension_the_executor_does_not_have_is_rejected(
     statechart_executor: StatechartExecutor,
 ) -> None:
     with pytest.raises(MissingExecutorExtensionError):
-        statechart_executor.require_extension(ExtensionRecordingItsStages)
+        statechart_executor.require_extension(
+            extension_type=ExtensionRecordingItsStages
+        )
 
 
 # %% default extensions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutorWithDefaults(StatechartExecutor):
     """
     An executor that brings a :class:`CountingContext` and an
@@ -547,18 +554,23 @@ def test_an_executor_adds_its_default_context_extensions(
 ) -> None:
     executor = ExecutorWithDefaults(context=statechart_context)
 
-    assert type(executor.context.require_extension(CountingContext)) is CountingContext
+    assert (
+        type(executor.context.require_extension(extension_type=CountingContext))
+        is CountingContext
+    )
 
 
 def test_a_supplied_context_extension_replaces_the_default_of_its_type(
     statechart_context: StatechartContext,
 ) -> None:
     supplied = CountingContext(builds=3)
-    statechart_context.add_extension(supplied)
+    statechart_context.add_extension(extension=supplied)
 
     executor = ExecutorWithDefaults(context=statechart_context)
 
-    assert executor.context.require_extension(CountingContext) is supplied
+    assert (
+        executor.context.require_extension(extension_type=CountingContext) is supplied
+    )
 
 
 def test_an_executor_adds_its_default_executor_extensions(
@@ -589,19 +601,19 @@ def test_an_executor_rejects_a_statechart_built_in_a_different_context(
     statechart_context_without_tick_duration: StatechartContext,
 ) -> None:
     statechart = Statechart(context=statechart_context_without_tick_duration)
-    statechart.add_node(ConstTrueNode())
+    statechart.add_node(node=ConstTrueNode())
 
     with pytest.raises(StatechartOfDifferentContextError):
-        statechart_executor.compile(statechart)
+        statechart_executor.compile(statechart=statechart)
 
 
 def test_a_statechart_ticks_in_the_context_it_was_built_in(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(counter := CountTicks(ticks=2))
-    statechart.add_node(EndStatechart.when_true(counter))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=(counter := CountTicks(ticks=2)))
+    statechart.add_node(node=EndStatechart.when_true(node=counter))
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end()
 
     assert statechart.is_ended()

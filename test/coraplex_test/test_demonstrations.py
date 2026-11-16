@@ -142,7 +142,9 @@ class RecordingDemonstration(RobotDemonstration):
 
     def build_statechart(self, context: StatechartContext) -> Statechart:
         statechart = Statechart(context=context)
-        statechart.add_node(FunctionCall(function=lambda: self.run_plan_body(context)))
+        statechart.add_node(
+            node=FunctionCall(function=lambda: self.run_plan_body(context))
+        )
         return statechart
 
     @contextmanager

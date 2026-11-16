@@ -1,3 +1,7 @@
+"""
+The actions that open and close a container by moving its handle.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -6,7 +10,7 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import (
     a,
-    flat_variable,
+    variable_from,
     variable,
 )
 from krrood.entity_query_language.query.match import Match
@@ -77,7 +81,7 @@ class MovesContainerByItsHandle(
             Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
         )
         return a(cls)(
-            grasp_candidate=flat_variable(
+            grasp_candidate=variable_from(
                 GraspsByCloseness(
                     graspable=handle,
                     standing_position=where_the_robot_stands,
@@ -138,8 +142,8 @@ class MovesContainerByItsHandle(
                 approach_clearance=self.approach_clearance,
             ),
             self._create_mechanism_goal(),
-            self.gripper_goal_type.moving_gripper_to(
-                end_effector.default_configuration(GripperState.OPEN)
+            self.gripper_goal_type.create_gripper_goal(
+                configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
                 self.back_off_pose(self.grasp_candidate.grasp_pose, end_effector),

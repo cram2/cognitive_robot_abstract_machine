@@ -14,6 +14,7 @@ from itertools import chain
 from uuid import UUID
 
 import numpy as np
+import numpy.typing as npt
 import rustworkx as rx
 import rustworkx.visualization
 from PIL.Image import Image
@@ -57,6 +58,8 @@ from semantic_digital_twin.exceptions import (
     MismatchingWorld,
     InsufficientModificationHistoryError,
     InvalidRollbackVersionError,
+    RollbackBeforeClearError,
+    WorldMergedWithItselfError,
     WorldHasNoUniqueRootError,
     NoControlledConnectionInChainError,
 )
@@ -132,21 +135,38 @@ GenericSemanticAnnotation = TypeVar(
 FunctionStack = List[Tuple[Callable, Dict[str, Any]]]
 
 
+@dataclass(kw_only=True)
 class ResetStateContextManager:
     """
     A context manager for resetting the state of a given `World` instance.
 
-    This class is designed to allow operations to be performed on a `World` object,
-    ensuring that its state can be safely returned to its previous condition upon
-    leaving the context. The original state of the `World` instance is restored even if
-    an exception occurs within the context, and the state change is notified.
+    On leaving the context, even through an exception, every degree of freedom still in
+    the world gets back the state it had on entering, and the state change is notified.
+    A degree of freedom added inside the context keeps its state, having none to go back
+    to.
     """
 
-    def __init__(self, world: World):
-        self.world = world
+    world: World
+    """
+    The world whose state is reset.
+    """
+
+    degree_of_freedom_ids_on_entering: list[UUID] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    The degrees of freedom of the world when the context was entered, in the order of
+    the columns of :attr:`state_on_entering`.
+    """
+
+    state_on_entering: npt.NDArray[np.float64] = field(init=False, repr=False)
+    """
+    The state of every degree of freedom when the context was entered, one column each.
+    """
 
     def __enter__(self) -> None:
-        self.state = self.world.state._data.copy()
+        self.degree_of_freedom_ids_on_entering = self.world.state.keys()
+        self.state_on_entering = self.world.state._data.copy()
 
     def __exit__(
         self,
@@ -154,7 +174,17 @@ class ResetStateContextManager:
         exc_val: Exception | None,
         exc_tb: type | None,
     ) -> None:
-        self.world.state._data[:] = self.state
+        if self.world.state.keys() == self.degree_of_freedom_ids_on_entering:
+            self.world.state._data[:] = self.state_on_entering
+        else:
+            # the model changed inside the context, so the columns no longer line up
+            for column, degree_of_freedom_id in enumerate(
+                self.degree_of_freedom_ids_on_entering
+            ):
+                if degree_of_freedom_id in self.world.state:
+                    self.world.state[degree_of_freedom_id] = self.state_on_entering[
+                        :, column
+                    ]
         self.world.notify_state_change()
 
 
@@ -291,8 +321,13 @@ class WorldModelUpdateContextManager:
                         ) from exc_val
                 raise exc_val
 
-            self.world.delete_orphaned_dofs()
             model_manager = self.world._model_manager
+            # only the outermost block deletes orphans, as an outer block may still
+            # attach the degrees of freedom it added
+            if model_manager._active_world_model_update_context_manager_ids == [
+                self._id
+            ]:
+                self.world.delete_orphaned_dofs()
             model_manager._active_world_model_update_context_manager_ids.remove(
                 self._id
             )
@@ -300,7 +335,17 @@ class WorldModelUpdateContextManager:
             if model_manager._active_world_model_update_context_manager_ids:
                 return
 
-            # only clean up caches in the last modification block
+            # a block that modified nothing leaves the model as it was, but announces
+            # the state written inside it
+            if len(model_manager.current_model_modification_block) == 0:
+                try:
+                    self.world.notify_state_change(publish_changes=self.publish_changes)
+                    run_pending_publications = True
+                finally:
+                    self.world.world_is_being_modified = False
+                    model_manager._current_modifications_will_be_published = None
+                return
+
             clear_memoization_cache(self.world)
 
             model_manager.model_modification_blocks.append(
@@ -435,6 +480,14 @@ class WorldModelManager:
     outer lists indicates when to trigger the model/state change callbacks. The inner
     list is a block of modifications where change callbacks must not be called in
     between.
+    """
+
+    version_at_last_clear: int | None = field(default=None, kw_only=True)
+    """
+    The version the world was at when :meth:`World.clear` last emptied the history, or
+    ``None`` if it never did.
+
+    The history cannot roll back to it or any earlier version.
     """
 
     current_model_modification_block: WorldModelModificationBlock = field(
@@ -1171,7 +1224,8 @@ class World(HasSimulatorProperties):
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> None:
         """
-        Removes a kinematic_structure_entity from the world.
+        Removes a kinematic_structure_entity from the world, together with the
+        connections still attached to it, each recorded as its own removal.
 
         Removing a kinematic_structure_entity this world does not own does nothing and
         is not recorded, so a history can never open with the removal of a
@@ -1181,6 +1235,15 @@ class World(HasSimulatorProperties):
         """
         if kinematic_structure_entity._world is not self:
             return
+        index = kinematic_structure_entity.index
+        attached_edges = list(
+            chain(
+                self.kinematic_structure.in_edges(index),
+                self.kinematic_structure.out_edges(index),
+            )
+        )
+        for _, _, connection in attached_edges:
+            self.remove_connection(connection)
         self._remove_kinematic_structure_entity(kinematic_structure_entity)
 
     @atomic_world_modification(modification=RemoveKinematicStructureEntityModification)
@@ -1193,19 +1256,9 @@ class World(HasSimulatorProperties):
         Do not call this function directly, use `remove_kinematic_structure_entity`
         instead.
 
-        Connections still attached to it leave the world with it, as removing its node
-        removes their edges from the kinematic structure.
-
         :param kinematic_structure_entity: The kinematic_structure_entity to remove.
         """
-        index = kinematic_structure_entity.index
-        attached_edges = chain(
-            self.kinematic_structure.in_edges(index),
-            self.kinematic_structure.out_edges(index),
-        )
-        for _, _, connection in attached_edges:
-            connection.remove_from_world()
-        self.kinematic_structure.remove_node(index)
+        self.kinematic_structure.remove_node(kinematic_structure_entity.index)
         kinematic_structure_entity.remove_from_world()
 
     def remove_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
@@ -1793,7 +1846,9 @@ class World(HasSimulatorProperties):
     def merge_world(
         self,
         other: World,
-        root_connection: Connection = None,
+        root_connection: Connection | None = None,
+        *,
+        publish_changes: bool = True,
     ) -> None:
         """
         Merge a world into the existing one by merging degrees of freedom, states,
@@ -1802,11 +1857,13 @@ class World(HasSimulatorProperties):
         :param other: The world to be added.
         :param root_connection: If provided, this connection will be used to connect the
             two worlds. Otherwise, a new Connection6DoF will be created
-        :return: None
+        :param publish_changes: Whether the merge is published to synchronized worlds.
+        :raises WorldMergedWithItselfError: If ``other`` is this world.
         """
-        assert other is not self, "Cannot merge a world with itself."
+        if other is self:
+            raise WorldMergedWithItselfError(world=self)
 
-        with self.modify_world(), other.modify_world():
+        with self.modify_world(publish_changes=publish_changes), other.modify_world():
             self_root = self.root
             other_state = deepcopy(other.state)
 
@@ -1841,13 +1898,11 @@ class World(HasSimulatorProperties):
         model_change_callbacks = list(self._model_manager.model_change_callbacks)
         state_change_callbacks = list(self.state.state_change_callbacks)
 
-        with self._world_lock:
-            with self.modify_world(publish_changes=False):
-                self.clear()
-            self.merge_world(other)
+        with self.modify_world(publish_changes=False):
+            self.clear()
             self._model_manager.model_change_callbacks.extend(model_change_callbacks)
             self.state.state_change_callbacks.extend(state_change_callbacks)
-            self._notify_model_change(publish_changes=False)
+            self.merge_world(other, publish_changes=False)
 
     def is_kinematic_structure_entity_in_world_by_name(self, name: str) -> bool:
         """
@@ -2034,8 +2089,11 @@ class World(HasSimulatorProperties):
         Copies the subgraph of the kinematic structure from the root body to a new world
         and removes it from the old world.
 
+        The moved degrees of freedom keep their state, so every joint of the branch
+        stays where it was.
+
         :param new_root: The root body of the subgraph to be copied.
-        :return: A new `World` instance containing the copied subgraph.
+        :return: A new :class:`World` instance containing the copied subgraph.
         """
         new_world = World(name=self.name)
         child_bodies = self.compute_descendent_child_kinematic_structure_entities(
@@ -2059,16 +2117,16 @@ class World(HasSimulatorProperties):
             for connection in child_body_parent_connections
             for dof in connection.dofs
         ]
+        branch_state = {
+            dof.id: self.state[dof.id].data.copy() for dof in child_body_dofs
+        }
 
         with self.modify_world(), new_world.modify_world():
             for dof in child_body_dofs:
                 self.remove_degree_of_freedom(dof)
                 new_world.add_degree_of_freedom(dof)
+                new_world.state[dof.id] = branch_state[dof.id]
 
-            # connections must be removed before the kinematic structure entities:
-            # removing a node makes rustworkx silently drop its edges, so a
-            # connection removed afterwards is recorded against entities its own
-            # history has already dropped, and can no longer be replayed
             self.remove_connection(root_connection)
             for connection in child_body_parent_connections:
                 self.remove_connection(connection)
@@ -2570,11 +2628,19 @@ class World(HasSimulatorProperties):
     def clear(self):
         """
         Clears all stored data and resets the state of the instance.
+
+        The modification history restarts empty, without the removals of the
+        modification block this is called in.
         """
         self._clear_world_entities()
         self.state.clear()
         self._world_entity_hash_table.clear()
         self._model_manager.model_modification_blocks.clear()
+        self._model_manager.current_model_modification_block = (
+            WorldModelModificationBlock()
+        )
+        self._model_manager.version_at_last_clear = self._model_manager.version
+        clear_memoization_cache(self)
         self._model_manager.model_change_callbacks.clear()
         self.state.state_change_callbacks.clear()
         self.__post_init__()
@@ -2691,6 +2757,17 @@ class World(HasSimulatorProperties):
     def modify_world(
         self, publish_changes: bool = True
     ) -> WorldModelUpdateContextManager:
+        """
+        Open a block of modifications that the world records, announces and publishes as
+        one when the outermost open block closes.
+
+        .. warning:: Memoized queries, such as :attr:`root` and the lookups by name,
+            keep the answer they first gave inside an open block until the outermost
+            block closes, so they may not reflect modifications made since.
+
+        :param publish_changes: Whether the modifications are published to synchronized
+            worlds.
+        """
         return WorldModelUpdateContextManager(
             world=self, publish_changes=publish_changes
         )
@@ -2712,7 +2789,7 @@ class World(HasSimulatorProperties):
         )
 
     def reset_state_context(self) -> ResetStateContextManager:
-        return ResetStateContextManager(self)
+        return ResetStateContextManager(world=self)
 
     def get_world_model_manager(self) -> WorldModelManager:
         return self._model_manager
@@ -2768,6 +2845,8 @@ class World(HasSimulatorProperties):
         :return: The modification blocks that were rolled back, most recent first.
         :raises InvalidRollbackVersionError: If ``version`` is not a version the world
             has already reached.
+        :raises RollbackBeforeClearError: If ``version`` is from before :meth:`clear`
+            last emptied the history.
         """
         current_version = self._model_manager.version
         if not 0 <= version <= current_version:
@@ -2775,6 +2854,16 @@ class World(HasSimulatorProperties):
                 world=self,
                 target_version=version,
                 current_version=current_version,
+            )
+        version_at_last_clear = self._model_manager.version_at_last_clear
+        if (
+            version_at_last_clear is not None
+            and version <= version_at_last_clear < current_version
+        ):
+            raise RollbackBeforeClearError(
+                world=self,
+                target_version=version,
+                version_at_last_clear=version_at_last_clear,
             )
         return self.rollback_modification_blocks(current_version - version)
 

@@ -1,3 +1,8 @@
+"""
+Translation of EQL queries into SQLAlchemy selections over the ORM's data access
+objects.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -462,7 +467,7 @@ class DomainValueExtractor:
                 literal_node.value if hasattr(literal_node, "value") else literal_node
             )
 
-        values = [value for value in literal_node._re_enterable_domain_generator_]
+        values = [value for value in literal_node._values_domain_.listed_values]
 
         if len(values) > 1:
             return values
@@ -485,7 +490,7 @@ class DomainValueExtractor:
             return variable.value if hasattr(variable, "value") else variable
 
         try:
-            sample = next(iter(variable._re_enterable_domain_generator_)).value
+            sample = next(iter(variable._values_domain_.listed_values)).value
         except (StopIteration, AttributeError):
             return variable.value if hasattr(variable, "value") else variable
 
