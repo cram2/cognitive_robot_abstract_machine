@@ -37,7 +37,6 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import CompressedImage, CameraInfo, Image
-from tf2_ros import Buffer
 from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.patterns.classproperty import classproperty
@@ -50,7 +49,6 @@ from robokudo.exceptions import (
 )
 from robokudo.io.exceptions import CameraAnnotationAmbiguous
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
-from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.camera import CameraObservation
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.utils.ros_frames import find_bodies_for_ros_frame, normalize_ros_frame_id
@@ -59,6 +57,10 @@ from robokudo.world import (
     world_instance,
 )
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from semantic_digital_twin.adapters.ros.ros2_to_semdt_converters import (
+    TransformToSemDTConverter,
+)
+from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
     PinholeCameraModel,
@@ -404,12 +406,12 @@ class ROSCameraInterface(CameraInterface):
         Camera pose from the most recent successful TF lookup.
         """
         if self.lookup_viewpoint:
-            self.tf_buffer: Buffer = TFListenerProxy().buffer_for_node(self.node)
+            self.tf_wrapper: TFWrapper = TFWrapper(node=self.node)
             """
-            TF buffer populated by the per-node transform listener.
+            Looks the camera pose up in TF.
             """
 
-    def lookup_transform(self, timestamp: Time | None = None) -> bool:
+    def lookup_transform(self, *, timestamp: Time | None = None) -> bool:
         """
         Cache a camera pose when the requested TF sample is available.
 
@@ -419,26 +421,18 @@ class ROSCameraInterface(CameraInterface):
         if not self.lookup_viewpoint:
             return True
         timestamp = timestamp if timestamp is not None else Time()
-        if not self.tf_buffer.can_transform(
+        if not self.tf_wrapper.wait_for_transform(
             target_frame=self.tf_to,
             source_frame=self.tf_from,
             time=timestamp,
             timeout=Duration(seconds=1.0 / 30.0),
         ):
             return False
-        world_T_camera = self.tf_buffer.lookup_transform(
+        world_T_camera = self.tf_wrapper.lookup_transform(
             target_frame=self.tf_to, source_frame=self.tf_from, time=timestamp
         )
-        translation = world_T_camera.transform.translation
-        rotation = world_T_camera.transform.rotation
-        self._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=float(translation.x),
-            pos_y=float(translation.y),
-            pos_z=float(translation.z),
-            quat_x=float(rotation.x),
-            quat_y=float(rotation.y),
-            quat_z=float(rotation.z),
-            quat_w=float(rotation.w),
+        self._world_T_camera = TransformToSemDTConverter.convert(
+            data=world_T_camera.transform, world=world_instance()
         )
         return True
 

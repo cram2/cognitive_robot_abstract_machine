@@ -1,3 +1,8 @@
+"""
+The server that accepts motion goals over ROS, runs them in the control loop of Giskard
+and answers each of them.
+"""
+
 from __future__ import annotations
 
 import json
@@ -27,7 +32,9 @@ from giskardpy.middleware.ros2.exceptions import (
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
-from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
+from giskardpy.motion_statechart.debug_expression_publisher import (
+    DebugExpressionPublishing,
+)
 from giskardpy.middleware.ros2.world_updates import (
     IncomingWorldUpdates,
     OutgoingWorldUpdates,
@@ -99,6 +106,12 @@ class MotionServer:
     Ticked once per idle cycle and, through the control loop, once per control cycle.
     """
 
+    debug_expression_publishing: DebugExpressionPublishing
+    """
+    The extension of :attr:`executor` that publishes the debug expressions of a goal
+    that asks for them.
+    """
+
     idle_frequency: float = 20.0
     """
     Frequency in hertz at which the idle loop runs.
@@ -107,11 +120,6 @@ class MotionServer:
     world_update_timeout: float = 30.0
     """
     Seconds a goal waits for the change of the world it was built on.
-    """
-
-    post_goal_plotters: list[PostGoalPlotter] = field(default_factory=list)
-    """
-    Debug plots that are written once a goal is finished.
     """
 
     idle_pacer: RealTimePacer = field(init=False)
@@ -277,6 +285,9 @@ class MotionServer:
         motion_statechart = goal.parse_motion_statechart(
             context=self.executor.context, **kwargs
         )
+        self.debug_expression_publishing.publishes_markers = (
+            goal.publishes_debug_expressions
+        )
         self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
         background_node.get_node().get_logger().info("Done parsing goal message.")
@@ -285,8 +296,8 @@ class MotionServer:
         """
         Stop the robot, clean up the motion statechart and answer the client.
 
-        The client is answered even if cleaning up or plotting fails, so that a failure
-        here cannot make it wait forever.
+        The client is answered even if cleaning up fails, so that a failure here cannot
+        make it wait forever.
         """
         try:
             self.client_watchdog.stop_watching()
@@ -294,7 +305,6 @@ class MotionServer:
             if self.executor.statechart is not None:
                 self.executor.statechart.cleanup_nodes()
             self.feedback_publisher.publish()
-            self.write_debug_plots()
         finally:
             self.action_server.result_message = self.create_result(error=error)
             self.action_server.send_result()
@@ -358,22 +368,3 @@ class MotionServer:
         if self.executor.statechart is None:
             return {}
         return self.feedback_publisher.create_states()
-
-    def write_debug_plots(self) -> None:
-        """
-        Write the configured debug plots of the finished goal.
-
-        A plot is a diagnostic, so a plotter that fails is reported and skipped. Letting
-        it raise would end the loop that serves goals, leaving every later client
-        waiting for a result that no one is going to produce.
-        """
-        if self.executor.statechart is None:
-            return
-        for plotter in self.post_goal_plotters:
-            try:
-                plotter.plot(goal_id=self.action_server.goal_id)
-            except Exception:
-                background_node.get_node().get_logger().error(
-                    f"{type(plotter).__name__} failed to plot goal "
-                    f"#{self.action_server.goal_id}:\n{traceback.format_exc()}"
-                )

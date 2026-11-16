@@ -382,3 +382,24 @@ class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
 
     def suggest_correction(self) -> str:
         return "Call tick() at least once before plotting, or configure debug expressions to record."
+
+
+@dataclass(kw_only=True)
+class MarkerPublishingThreadEndedError(DataclassException):
+    """
+    Raised when markers are submitted for publishing after the thread publishing them
+    ended because publishing raised; the exception it raised is the cause.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "The thread publishing the debug markers ended, so no submitted marker "
+            "would ever be published."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Read the cause of this error, often a ROS node that was destroyed while "
+            "it still published. Publishing starts again with the next compiled "
+            "statechart."
+        )

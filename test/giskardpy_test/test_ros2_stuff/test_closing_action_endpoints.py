@@ -154,6 +154,9 @@ def test_a_closed_action_client_no_longer_uses_its_action(
 def test_a_closed_action_client_refuses_to_send_a_goal(
     closed_client_action_server: ActionServerHandler,
 ) -> None:
+    """
+    Sending a goal through a closed client raises instead of waiting for an answer.
+    """
     action_client = GiskardActionClient(
         node_handle=background_node.get_node(),
         action_type=JsonAction,

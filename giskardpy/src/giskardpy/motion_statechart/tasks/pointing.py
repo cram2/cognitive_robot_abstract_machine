@@ -1,3 +1,7 @@
+"""
+Tasks that point an axis of a link at a goal point.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,6 +1,6 @@
 """
-Mixins that give a semantic annotation what it has: a root body or region, grasp
-candidates, parts and apertures.
+Mixins that give semantic annotations a shared trait, such as having a handle or moving
+on a joint of their own.
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    MissingMovableJointError,
     NoGraspGeometry,
     NoSupportingSurfaceError,
     UnknownPartWholeRelationshipField,
@@ -749,6 +750,19 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
             parent_connection
             if isinstance(parent_connection, ActiveConnection1DOF)
             else None
+        )
+
+    @property
+    def opening_ratio(self) -> float:
+        """
+        How far the root stands along the travel of :attr:`movable_joint`: ``0`` at its
+        lower limit, where a door or drawer stands closed, and ``1`` at its upper limit.
+        """
+        if self.movable_joint is None:
+            raise MissingMovableJointError(self)
+        limits = self.movable_joint.dof.limits
+        return (self.movable_joint.position - limits.lower.position) / (
+            limits.upper.position - limits.lower.position
         )
 
     @abstractmethod
