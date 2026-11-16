@@ -480,6 +480,26 @@ class UsdMeshShapeBuilder(UsdShapeBuilder):
 
 
 @dataclass(kw_only=True)
+class UsdJointedLinks:
+    """
+    The link bodies physics joints connect and the connections the joints describe,
+    built before any world is modified.
+    """
+
+    link_bodies: dict[str, Body] = field(default_factory=dict)
+    """
+    The link bodies, by the stage path of their root prim.
+    """
+
+    connections: list[ConnectionSpecificationWithEndpoints] = field(
+        default_factory=list
+    )
+    """
+    The connections the joints describe.
+    """
+
+
+@dataclass(kw_only=True)
 class USDStageParser(WorldModelParser, ABC):
     """
     Base for the parsers that turn a Universal Scene Description (USD) stage, read with
@@ -560,6 +580,15 @@ class USDStageParser(WorldModelParser, ABC):
         if len(top_level_prims) != 1:
             return None
         return top_level_prims[0]
+
+    def _create_world_with_root_body(self) -> World:
+        """
+        :return: A world whose root body is named after :meth:`_root_prim`, or after
+            :attr:`prefix` if there is none.
+        """
+        root_prim = self._root_prim()
+        root_body_name = root_prim.GetName() if root_prim is not None else self.prefix
+        return World.create_with_root_body(root_body_name, self.prefix)
 
     def _top_level_prims(self) -> list[Usd.Prim]:
         """
@@ -879,6 +908,25 @@ class USDStageParser(WorldModelParser, ABC):
             return prim.GetParent()
         return prim
 
+    def _add_jointed_links(
+        self, *, world: World, jointed_links: UsdJointedLinks
+    ) -> None:
+        """
+        Adds the link bodies of ``jointed_links``, with their semantic labels, and
+        their connections to ``world``. Must be called inside ``world``'s modification
+        context.
+
+        :param world: The world to add to.
+        :param jointed_links: The links and connections to add.
+        """
+        for path_string, link_body in jointed_links.link_bodies.items():
+            world.add_body(link_body)
+            self._attach_semantic_labels(
+                world=world, prim=self.stage.GetPrimAtPath(path_string), body=link_body
+            )
+        for connection in jointed_links.connections:
+            connection.connect(world)
+
     @abstractmethod
     def _create_joint_link_body(self, *, prim: Usd.Prim) -> Body:
         """
@@ -931,6 +979,18 @@ class USDStageParser(WorldModelParser, ABC):
         )
 
     # %% semantics
+
+    def _attach_root_semantic_labels(self, *, world: World) -> None:
+        """
+        Attaches the semantic labels of :meth:`_root_prim`, if there is one, to the root
+        body of ``world``. Must be called inside ``world``'s modification context.
+
+        :param world: The world whose root body was created for :meth:`_root_prim`.
+        """
+        root_prim = self._root_prim()
+        if root_prim is None:
+            return
+        self._attach_semantic_labels(world=world, prim=root_prim, body=world.root)
 
     @staticmethod
     def _attach_semantic_labels(*, world: World, prim: Usd.Prim, body: Body) -> None:
@@ -1014,39 +1074,22 @@ class USDParser(USDStageParser):
         :param joint_prims: Every ``UsdPhysics.Joint`` prim in the stage.
         :return: The parsed world.
         """
-        root_prim = self._root_prim()
-        root_body_name = root_prim.GetName() if root_prim is not None else self.prefix
-        world = World.create_with_root_body(root_body_name, self.prefix)
-        root_body = world.root
-
+        world = self._create_world_with_root_body()
         # Every joint is described (and so validated) before the world is touched
         # further: a World left partway through a failed modification is unusable, so
         # anything that can raise must run before entering another modify_world block.
-        link_bodies: dict[str, Body] = {}
-        connection_specifications_with_endpoints = [
+        jointed_links = UsdJointedLinks()
+        jointed_links.connections = [
             self._describe_joint(
-                joint_prim=joint_prim, root_body=root_body, link_bodies=link_bodies
+                joint_prim=joint_prim,
+                root_body=world.root,
+                link_bodies=jointed_links.link_bodies,
             )
             for joint_prim in joint_prims
         ]
-
         with world.modify_world():
-            if root_prim is not None:
-                self._attach_semantic_labels(
-                    world=world, prim=root_prim, body=root_body
-                )
-            for path_string, link_body_instance in link_bodies.items():
-                world.add_body(link_body_instance)
-                self._attach_semantic_labels(
-                    world=world,
-                    prim=self.stage.GetPrimAtPath(path_string),
-                    body=link_body_instance,
-                )
-            for (
-                connection_specification_with_endpoints
-            ) in connection_specifications_with_endpoints:
-                connection_specification_with_endpoints.connect(world)
-
+            self._attach_root_semantic_labels(world=world)
+            self._add_jointed_links(world=world, jointed_links=jointed_links)
         return world
 
     def _parse_jointless_stage(self) -> World:
@@ -1057,25 +1100,20 @@ class USDParser(USDStageParser):
 
         :return: The parsed world.
         """
+        world = self._create_world_with_root_body()
         root_prim = self._root_prim()
-
         if root_prim is not None:
-            world = World.create_with_root_body(root_prim.GetName(), self.prefix)
-            root_body = world.root
             shapes = self._shapes_in_subtree(
                 link_prim=root_prim, link_to_world=self._local_to_world(prim=root_prim)
             )
-            shape_collection = ShapeCollection(shapes, reference_frame=root_body)
+            shape_collection = ShapeCollection(shapes, reference_frame=world.root)
             shape_collection.transform_all_shapes_to_own_frame()
-            root_body.visual = shape_collection
-            root_body.collision = shape_collection
+            world.root.visual = shape_collection
+            world.root.collision = shape_collection
             with world.modify_world():
-                self._attach_semantic_labels(
-                    world=world, prim=root_prim, body=root_body
-                )
+                self._attach_root_semantic_labels(world=world)
             return world
 
-        world = World.create_with_root_body(self.prefix, self.prefix)
         top_level_prims = self._top_level_prims()
         bodies = [
             self._create_free_body(prim=prim, name=prim.GetName())
@@ -1113,6 +1151,28 @@ class UsdSceneContent:
 
 
 @dataclass(kw_only=True)
+class UsdComponent:
+    """
+    A component of a USD scene, with the physics joints inside it and its body.
+    """
+
+    prim: Usd.Prim
+    """
+    The component's prim.
+    """
+
+    joint_prims: list[Usd.Prim]
+    """
+    The physics joint prims inside the component.
+    """
+
+    body: Body
+    """
+    The component's body, without the geometry of the links its joints connect.
+    """
+
+
+@dataclass(kw_only=True)
 class USDComponentParser(USDStageParser):
     """
     Parses a USD scene into one body per prim of kind ``component`` (a placed asset
@@ -1142,75 +1202,86 @@ class USDComponentParser(USDStageParser):
         :raises UsdPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
             relationship has no target.
         """
-        root_prim = self._root_prim()
-        root_body_name = root_prim.GetName() if root_prim is not None else self.prefix
-        world = World.create_with_root_body(root_body_name, self.prefix)
-        root_body = world.root
-
+        world = self._create_world_with_root_body()
         # Every shape and joint is built before the world is modified: a World left
         # partway through a failed modification is unusable.
         content = self._scene_content(scene_root=self._scene_root())
-        joints_by_component = self._joints_by_component(
-            component_prims=content.component_prims
-        )
-        root_shapes = ShapeCollection(content.root_shapes, reference_frame=root_body)
-        root_body.visual = root_shapes
-        root_body.collision = root_shapes
-        link_bodies: dict[str, Body] = {}
-        component_bodies = []
-        connection_specifications_with_endpoints = []
-        for component_prim in content.component_prims:
-            joint_prims = joints_by_component[component_prim.GetPath()]
-            for joint_prim in joint_prims:
-                self._validate_joint_inside_component(
-                    component_prim=component_prim, joint_prim=joint_prim
+        root_shapes = ShapeCollection(content.root_shapes, reference_frame=world.root)
+        world.root.visual = root_shapes
+        world.root.collision = root_shapes
+        components = self._create_components(component_prims=content.component_prims)
+        jointed_links = self._describe_component_joints(components=components)
+        with world.modify_world():
+            self._attach_root_semantic_labels(world=world)
+            for component in components:
+                self._add_free_body(
+                    world=world, prim=component.prim, body=component.body
                 )
-            component_body = self._create_free_body(
+            self._add_jointed_links(world=world, jointed_links=jointed_links)
+        return world
+
+    def _create_components(
+        self, *, component_prims: list[Usd.Prim]
+    ) -> list[UsdComponent]:
+        """
+        :param component_prims: The components of the scene, none inside another.
+        :return: Each component with its joints and its body.
+        :raises UnreadUsdPhysicsJointsError: If a physics joint is inside no component.
+        """
+        joints_by_component = self._joints_by_component(component_prims=component_prims)
+        components = []
+        for component_prim in component_prims:
+            joint_prims = joints_by_component[component_prim.GetPath()]
+            body = self._create_free_body(
                 prim=component_prim,
                 name=self._name_below_scene_root(prim=component_prim),
                 excluded_prim_paths=self._linked_prim_paths(joint_prims=joint_prims)
                 - {component_prim.GetPath()},
             )
-            component_bodies.append(component_body)
-            # A joint attached to the component itself, or to nothing, attaches its
-            # link to the component's body.
-            link_bodies[str(component_prim.GetPath())] = component_body
-            connection_specifications_with_endpoints.extend(
-                self._describe_joint(
-                    joint_prim=joint_prim,
-                    root_body=component_body,
-                    link_bodies=link_bodies,
-                )
-                for joint_prim in joint_prims
+            components.append(
+                UsdComponent(prim=component_prim, joint_prims=joint_prims, body=body)
             )
-        component_paths = {
-            str(component_prim.GetPath()) for component_prim in content.component_prims
-        }
-        link_bodies_below_components = {
-            path_string: link_body
-            for path_string, link_body in link_bodies.items()
-            if path_string not in component_paths
-        }
+        return components
 
-        with world.modify_world():
-            if root_prim is not None:
-                self._attach_semantic_labels(
-                    world=world, prim=root_prim, body=root_body
+    def _describe_component_joints(
+        self, *, components: list[UsdComponent]
+    ) -> UsdJointedLinks:
+        """
+        :param components: The components of the scene.
+        :return: The links the physics joints inside the components connect and the
+            connections the joints describe. A joint attached to its component, or to
+            nothing, attaches its link to the component's body.
+        :raises UsdJointChildIsComponentError: If a joint's ``body1`` is its component.
+        :raises UsdJointLinkOutsideComponentError: If a joint connects a link outside its
+            component.
+        :raises ScaledArticulatedUsdComponentError: If a link a joint connects is scaled.
+        """
+        component_paths = {str(component.prim.GetPath()) for component in components}
+        # Holds the components too, so a joint's body0 resolves to its component's body.
+        bodies_by_path = {
+            str(component.prim.GetPath()): component.body for component in components
+        }
+        connections = []
+        for component in components:
+            for joint_prim in component.joint_prims:
+                self._validate_joint_inside_component(
+                    component=component, joint_prim=joint_prim
                 )
-            for component_prim, body in zip(content.component_prims, component_bodies):
-                self._add_free_body(world=world, prim=component_prim, body=body)
-            for path_string, link_body in link_bodies_below_components.items():
-                world.add_body(link_body)
-                self._attach_semantic_labels(
-                    world=world,
-                    prim=self.stage.GetPrimAtPath(path_string),
-                    body=link_body,
+                connections.append(
+                    self._describe_joint(
+                        joint_prim=joint_prim,
+                        root_body=component.body,
+                        link_bodies=bodies_by_path,
+                    )
                 )
-            for (
-                connection_specification_with_endpoints
-            ) in connection_specifications_with_endpoints:
-                connection_specification_with_endpoints.connect(world)
-        return world
+        return UsdJointedLinks(
+            link_bodies={
+                path_string: body
+                for path_string, body in bodies_by_path.items()
+                if path_string not in component_paths
+            },
+            connections=connections,
+        )
 
     def _create_joint_link_body(self, *, prim: Usd.Prim) -> Body:
         return self._create_free_body(
@@ -1263,10 +1334,10 @@ class USDComponentParser(USDStageParser):
         return joints_by_component
 
     def _validate_joint_inside_component(
-        self, *, component_prim: Usd.Prim, joint_prim: Usd.Prim
+        self, *, component: UsdComponent, joint_prim: Usd.Prim
     ) -> None:
         """
-        :param component_prim: A component of the scene.
+        :param component: A component of the scene.
         :param joint_prim: A physics joint prim inside the component.
         :raises UsdJointChildIsComponentError: If the joint's ``body1`` is the
             component.
@@ -1276,7 +1347,7 @@ class USDComponentParser(USDStageParser):
             scaled; an unset ``body0`` is the component.
         """
         joint = UsdPhysics.Joint(joint_prim)
-        component_path = component_prim.GetPath()
+        component_path = component.prim.GetPath()
         child_paths = self._link_paths(relationship=joint.GetBody1Rel())
         if component_path in child_paths:
             raise UsdJointChildIsComponentError(

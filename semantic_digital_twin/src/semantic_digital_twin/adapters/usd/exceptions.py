@@ -107,10 +107,19 @@ class UnsupportedUsdGeometryTypeError(ParsingError):
 
 
 @dataclass(kw_only=True)
-class UnreadUsdPhysicsJointsError(ParsingError):
+class UnsupportedUsdComponentSceneError(ParsingError):
     """
-    Raised when a stage has physics joints the parser cannot attach to anything, such as
-    joints outside every component of a scene.
+    Raised when a valid USD scene holds something
+    :class:`~semantic_digital_twin.adapters.usd.parser.USDComponentParser` does not read
+    yet.
+    """
+
+
+@dataclass(kw_only=True)
+class UnreadUsdPhysicsJointsError(UnsupportedUsdComponentSceneError):
+    """
+    Raised when a scene has physics joints outside every component, such as a door
+    hinged to a wall.
     """
 
     joint_paths: list[str]
@@ -121,56 +130,22 @@ class UnreadUsdPhysicsJointsError(ParsingError):
     def error_message(self) -> str:
         return (
             f"Stage '{self.file_path}' has {len(self.joint_paths)} physics joints "
-            f"outside every component, which this parser does not read, the first at "
-            f"'{self.joint_paths[0]}'."
+            f"outside every component, the first at '{self.joint_paths[0]}'. "
+            f"USDComponentParser only reads the joints inside a component so far."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Give the prim holding the joints and the links they connect the kind "
-            "'component', or parse the stage with USDParser."
+            "Extend USDComponentParser to read joints outside components, making each "
+            "link they connect a body of its own."
         )
 
 
 @dataclass(kw_only=True)
-class ScaledArticulatedUsdComponentError(ParsingError):
-    """
-    Raised when a link a physics joint inside a component connects is scaled, by its own
-    transform or an ancestor's.
-
-    The joint's authored offsets are lengths in the link's scaled frame, which the
-    link's body does not have.
-    """
-
-    joint_path: str
-    """
-    The stage path of the physics joint prim.
-    """
-
-    scaled_prim_path: str
-    """
-    The stage path of the root prim of the scaled link.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' that "
-            f"connects '{self.scaled_prim_path}', which is scaled, so the joint's "
-            f"offsets would not be scaled with it."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Author the scale on the geometry below the links instead of on the "
-            "component, its links or their ancestors."
-        )
-
-
-@dataclass(kw_only=True)
-class UsdJointChildIsComponentError(ParsingError):
+class UsdJointChildIsComponentError(UnsupportedUsdComponentSceneError):
     """
     Raised when the ``body1`` of a physics joint inside a component is the component
-    itself, which is already attached to the scene's root.
+    itself, such as a door asset hinged to the world.
     """
 
     joint_path: str
@@ -186,22 +161,23 @@ class UsdJointChildIsComponentError(ParsingError):
     def error_message(self) -> str:
         return (
             f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' "
-            f"whose body1 is its own component '{self.component_path}', which is "
-            f"already attached to the scene's root."
+            f"whose body1 is its own component '{self.component_path}'. "
+            f"USDComponentParser attaches every component to the scene's root so far, "
+            f"never by a joint."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Target a link below the component with the joint's body1, or make the "
-            "part the joint moves a component of its own."
+            "Extend USDComponentParser to attach a component that is a joint's body1 "
+            "by that joint instead of to the scene's root."
         )
 
 
 @dataclass(kw_only=True)
-class UsdJointLinkOutsideComponentError(ParsingError):
+class UsdJointLinkOutsideComponentError(UnsupportedUsdComponentSceneError):
     """
-    Raised when a physics joint inside a component targets a link outside that
-    component, such as a link of another component.
+    Raised when a physics joint inside a component connects a link outside that
+    component, such as a drawer whose slide belongs to another component.
     """
 
     joint_path: str
@@ -223,11 +199,43 @@ class UsdJointLinkOutsideComponentError(ParsingError):
         return (
             f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' "
             f"inside the component '{self.component_path}' that connects "
-            f"'{self.link_path}', which is outside it."
+            f"'{self.link_path}', which is outside it. USDComponentParser only reads "
+            f"joints between the links of one component so far."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Make the joint connect links of its own component only, or make one "
-            "component holding both links."
+            "Extend USDComponentParser to read joints that connect links of different "
+            "components, or links outside every component."
+        )
+
+
+@dataclass(kw_only=True)
+class ScaledArticulatedUsdComponentError(UnsupportedUsdComponentSceneError):
+    """
+    Raised when a link a physics joint inside a component connects is scaled, by its own
+    transform or an ancestor's, such as in a scene exported in centimetres.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    scaled_prim_path: str
+    """
+    The stage path of the root prim of the scaled link.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' that "
+            f"connects '{self.scaled_prim_path}', which is scaled. USDComponentParser "
+            f"does not scale a joint's offsets so far, so the link would be misplaced."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Extend USDComponentParser to scale a joint's offsets by the scale of the "
+            "link each is given in."
         )
