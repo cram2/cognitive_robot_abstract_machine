@@ -37,6 +37,9 @@ from semantic_digital_twin.datastructures.camera_model import (
     PinholeCameraModel,
     RationalPolynomialCameraDistortion,
 )
+from semantic_digital_twin.adapters.ros.ros2_to_semdt_converters import (
+    TransformToSemDTConverter,
+)
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -445,6 +448,19 @@ def test_camera_observation_connects_new_camera_in_rooted_world_without_pose(
 # %% Live reader contracts
 
 
+def tf_sample(*, x: float, y: float, z: float, stamp: Time) -> TransformStamped:
+    """
+    :return: A camera pose as TF provides it for ``stamp``, without rotation.
+    """
+    sample = TransformStamped()
+    sample.header.stamp = stamp
+    sample.transform.translation.x = x
+    sample.transform.translation.y = y
+    sample.transform.translation.z = z
+    sample.transform.rotation.w = 1.0
+    return sample
+
+
 def test_live_reader_rejects_tf_source_for_a_different_optical_frame(
     runtime_world: World,
     camera_info: CameraInfo,
@@ -487,16 +503,15 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.4, pos_y=0.2, pos_z=1.3
-    )
     interface.color = np.zeros(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
     )
     interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
     interface.camera_info = camera_info
     interface.timestamp = Time(sec=10, nanosec=20)
-    interface._world_T_camera_timestamp = interface.timestamp
+    interface._world_T_camera = tf_sample(
+        x=0.4, y=0.2, z=1.3, stamp=interface.timestamp
+    )
     interface.lock = Lock()
     cas = CAS()
 
@@ -523,16 +538,15 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.4, pos_y=0.2, pos_z=1.3
-    )
     interface.color = np.zeros(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
     )
     interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
     interface.camera_info = camera_info
     interface.timestamp = Time(sec=10, nanosec=20)
-    interface._world_T_camera_timestamp = interface.timestamp
+    interface._world_T_camera = tf_sample(
+        x=0.4, y=0.2, z=1.3, stamp=interface.timestamp
+    )
     interface.lock = Lock()
     cas = CAS()
 
@@ -803,10 +817,9 @@ def transform_camera() -> ROSCameraInterface:
     camera.tf_from = "camera_optical_frame"
     camera.tf_to = "map"
     camera.camera_config = TfComponent(tf_from=camera.tf_from, tf_to=camera.tf_to)
-    camera.tf_buffer = Mock()
-    camera.tf_buffer.can_transform.return_value = False
+    camera.tf_wrapper = Mock()
+    camera.tf_wrapper.wait_for_transform.return_value = False
     camera._world_T_camera = None
-    camera._world_T_camera_timestamp = None
     return camera
 
 
@@ -816,40 +829,46 @@ def test_unavailable_transform_returns_false(
     """
     An unavailable sample is reported without attempting its lookup.
     """
-    transform_camera.tf_buffer.can_transform.return_value = False
+    transform_camera.tf_wrapper.wait_for_transform.return_value = False
     assert transform_camera.lookup_transform() is False
-    transform_camera.tf_buffer.lookup_transform.assert_not_called()
+    transform_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 def test_available_transform_updates_pose(transform_camera: ROSCameraInterface) -> None:
     """
-    A sampled pose is cached as a homogeneous transformation matrix.
+    A sampled pose is cached as TF provides it.
     """
-    sample = TransformStamped()
-    sample.transform.translation.x = 1.0
-    sample.transform.translation.y = 2.0
-    sample.transform.translation.z = 3.0
-    sample.transform.rotation.w = 1.0
-    transform_camera.tf_buffer.can_transform.return_value = True
-    transform_camera.tf_buffer.lookup_transform.return_value = sample
+    sample = tf_sample(x=1.0, y=2.0, z=3.0, stamp=Time(nanosec=123))
+    transform_camera.tf_wrapper.wait_for_transform.return_value = True
+    transform_camera.tf_wrapper.lookup_transform.return_value = sample
     timestamp = ROSClockTime(nanoseconds=123)
-    assert transform_camera.lookup_transform(timestamp) is True
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=sample.transform.translation.x,
-        pos_y=sample.transform.translation.y,
-        pos_z=sample.transform.translation.z,
-        quat_x=sample.transform.rotation.x,
-        quat_y=sample.transform.rotation.y,
-        quat_z=sample.transform.rotation.z,
-        quat_w=sample.transform.rotation.w,
-    )
-    np.testing.assert_array_equal(
-        transform_camera._world_T_camera.to_np(), expected_pose.to_np()
-    )
-    transform_camera.tf_buffer.lookup_transform.assert_called_once_with(
+    assert transform_camera.lookup_transform(timestamp=timestamp) is True
+    assert transform_camera._world_T_camera is sample
+    transform_camera.tf_wrapper.lookup_transform.assert_called_once_with(
         target_frame=transform_camera.tf_to,
         source_frame=transform_camera.tf_from,
         time=timestamp,
+    )
+
+
+def test_cached_sample_is_bound_as_the_camera_pose(
+    transform_camera: ROSCameraInterface,
+) -> None:
+    """
+    The camera pose of a frame is the TF sample cached for its acquisition time.
+    """
+    stamp = Time(sec=1)
+    transform_camera._world_T_camera = tf_sample(x=1.0, y=2.0, z=3.0, stamp=stamp)
+    world = World()
+
+    pose = transform_camera.world_T_camera_from_tf(world=world, timestamp=stamp)
+
+    transform_camera.tf_wrapper.wait_for_transform.assert_not_called()
+    np.testing.assert_array_equal(
+        pose.to_np(),
+        TransformToSemDTConverter.convert(
+            data=transform_camera._world_T_camera.transform, world=world
+        ).to_np(),
     )
 
 
@@ -861,8 +880,8 @@ def test_disabled_lookup_does_not_access_buffer(
     """
     transform_camera.lookup_viewpoint = False
     assert transform_camera.lookup_transform() is True
-    transform_camera.tf_buffer.can_transform.assert_not_called()
-    transform_camera.tf_buffer.lookup_transform.assert_not_called()
+    transform_camera.tf_wrapper.wait_for_transform.assert_not_called()
+    transform_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 def test_transform_lookup_errors_propagate(
@@ -871,8 +890,8 @@ def test_transform_lookup_errors_propagate(
     """
     A buffer failure after its availability check reaches the caller.
     """
-    transform_camera.tf_buffer.can_transform.return_value = True
-    transform_camera.tf_buffer.lookup_transform.side_effect = LookupException
+    transform_camera.tf_wrapper.wait_for_transform.return_value = True
+    transform_camera.tf_wrapper.lookup_transform.side_effect = LookupException
     with pytest.raises(LookupException):
         transform_camera.lookup_transform()
 

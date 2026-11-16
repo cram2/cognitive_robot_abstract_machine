@@ -36,8 +36,8 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
+from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, CameraInfo, Image
-from tf2_ros import Buffer
 from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.ormatic.utils import classproperty
@@ -51,11 +51,14 @@ from robokudo.exceptions import (
 )
 from robokudo.io.exceptions import CameraAnnotationAmbiguous
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
-from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.camera import CameraObservation
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.utils.ros_frames import find_bodies_for_ros_frame, normalize_ros_frame_id
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from semantic_digital_twin.adapters.ros.ros2_to_semdt_converters import (
+    TransformToSemDTConverter,
+)
+from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
@@ -435,13 +438,10 @@ class ROSCameraInterface(CameraInterface):
             """
             Transform target frame.
             """
-        self._world_T_camera: HomogeneousTransformationMatrix | None = None
+        self._world_T_camera: TransformStamped | None = None
         """
-        Camera pose from the most recent successful TF lookup.
-        """
-        self._world_T_camera_timestamp: builtin_interfaces.msg.Time | None = None
-        """
-        Time TF provided :attr:`_world_T_camera` for.
+        Camera pose from the most recent successful TF lookup, stamped with the time TF
+        provided it for.
         """
         self.timestamp: builtin_interfaces.msg.Time | None = None
         """
@@ -452,9 +452,9 @@ class ROSCameraInterface(CameraInterface):
         Guards the latest frame against being replaced while it is read.
         """
         if self.lookup_viewpoint:
-            self.tf_buffer: Buffer = TFListenerProxy().buffer_for_node(self.node)
+            self.tf_wrapper: TFWrapper = TFWrapper(node=self.node)
             """
-            TF buffer populated by the per-node transform listener.
+            Looks the camera pose up in TF.
             """
 
     def has_new_data(self) -> bool:
@@ -466,10 +466,12 @@ class ROSCameraInterface(CameraInterface):
         with self.lock:
             if not self._has_new_data:
                 return False
-            self._has_new_data = self.lookup_transform(Time.from_msg(self.timestamp))
+            self._has_new_data = self.lookup_transform(
+                timestamp=Time.from_msg(self.timestamp)
+            )
             return self._has_new_data
 
-    def lookup_transform(self, timestamp: Time | None = None) -> bool:
+    def lookup_transform(self, *, timestamp: Time | None = None) -> bool:
         """
         Cache a camera pose when the requested TF sample is available, waiting for it at
         most the configured camera pose timeout.
@@ -480,7 +482,7 @@ class ROSCameraInterface(CameraInterface):
         if not self.lookup_viewpoint:
             return True
         timestamp = timestamp if timestamp is not None else Time()
-        if not self.tf_buffer.can_transform(
+        if not self.tf_wrapper.wait_for_transform(
             target_frame=self.tf_to,
             source_frame=self.tf_from,
             time=timestamp,
@@ -489,20 +491,8 @@ class ROSCameraInterface(CameraInterface):
             ),
         ):
             return False
-        world_T_camera = self.tf_buffer.lookup_transform(
+        self._world_T_camera = self.tf_wrapper.lookup_transform(
             target_frame=self.tf_to, source_frame=self.tf_from, time=timestamp
-        )
-        self._world_T_camera_timestamp = world_T_camera.header.stamp
-        translation = world_T_camera.transform.translation
-        rotation = world_T_camera.transform.rotation
-        self._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=float(translation.x),
-            pos_y=float(translation.y),
-            pos_z=float(translation.z),
-            quat_x=float(rotation.x),
-            quat_y=float(rotation.y),
-            quat_z=float(rotation.z),
-            quat_w=float(rotation.w),
         )
         return True
 
@@ -519,15 +509,18 @@ class ROSCameraInterface(CameraInterface):
         """
         if not self.lookup_viewpoint:
             return None
-        if self._world_T_camera_timestamp != timestamp and not self.lookup_transform(
-            Time.from_msg(timestamp)
-        ):
+        if (
+            self._world_T_camera is None
+            or self._world_T_camera.header.stamp != timestamp
+        ) and not self.lookup_transform(timestamp=Time.from_msg(timestamp)):
             raise CameraPoseMissing()
         return self.bind_world_T_camera(
             world=world,
             world_frame=self.tf_to,
             camera_frame=self.tf_from,
-            world_T_camera=self._world_T_camera,
+            world_T_camera=TransformToSemDTConverter.convert(
+                data=self._world_T_camera.transform, world=world
+            ),
         )
 
     def validate_camera_frame_for_tf(self, camera_frame: str) -> None:
