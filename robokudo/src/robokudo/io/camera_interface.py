@@ -110,10 +110,6 @@ class CameraInterface(object):
         """
         RoboKudo logger instance.
         """
-        self.lookup_viewpoint: bool = False
-        """
-        Whether the camera pose is looked up through TF.
-        """
 
     def has_new_data(self) -> bool:
         """
@@ -122,6 +118,15 @@ class CameraInterface(object):
         :return: True if new data is available, False otherwise
         """
         return self._has_new_data
+
+    def adds_missing_camera(self, *, world: World) -> bool:
+        """
+        Whether this interface adds its camera to ``world`` when ``world`` lacks it.
+
+        :param world: The world perception perceives into.
+        :return: Whether a missing camera body and :class:`Camera` are added.
+        """
+        return True
 
     def bind_world_T_camera(
         self,
@@ -136,7 +141,7 @@ class CameraInterface(object):
 
         A camera another process attached, such as a robot's camera, is located by
         ``world``. Any other camera is mounted below the world frame and moved to the
-        sampled pose, unless ``world`` is shared and lacks a camera located through TF.
+        sampled pose, unless ``world`` lacks it and :meth:`adds_missing_camera` is false.
 
         :param world: The world perception perceives into.
         :param world_frame: Name of the pose reference frame.
@@ -179,11 +184,7 @@ class CameraInterface(object):
             and world.root is not camera_body
         ):
             raise UnknownWorldFrameError(world_frame=reference_name)
-        if (
-            camera_body is None
-            and self.lookup_viewpoint
-            and WorldSynchronizer.all_callbacks_of_this_type_from_world(world)
-        ):
+        if camera_body is None and not self.adds_missing_camera(world=world):
             return HomogeneousTransformationMatrix(
                 data=world_T_camera, reference_frame=world_body
             )
@@ -349,17 +350,14 @@ class CameraInterface(object):
         """
         Register a validated stream camera and connect a new optical root to ``world``.
 
-        A camera located through TF is not registered in a world other processes share.
+        Nothing is registered when :meth:`adds_missing_camera` is false.
 
         :param world: The world perception perceives into.
         :param camera: Semantic camera whose observation has passed frame validation.
         """
         if world.find_world_entity_with_id(camera.id) is camera:
             return
-        if (
-            self.lookup_viewpoint
-            and WorldSynchronizer.all_callbacks_of_this_type_from_world(world)
-        ):
+        if not self.adds_missing_camera(world=world):
             return
         existing_root = world.root
         camera_body = camera.root
@@ -416,8 +414,12 @@ class ROSCameraInterface(CameraInterface):
         """
         ROS node for communication with ROS.
         """
+        self.lookup_viewpoint: bool = False
+        """
+        Whether the camera pose is looked up through TF.
+        """
         if hasattr(self.camera_config, "lookup_viewpoint"):
-            self.lookup_viewpoint: bool = self.camera_config.lookup_viewpoint
+            self.lookup_viewpoint = self.camera_config.lookup_viewpoint
 
             self.tf_from: str = (
                 normalize_ros_frame_id(camera_config.tf_from)
@@ -468,6 +470,16 @@ class ROSCameraInterface(CameraInterface):
                 return False
             self._has_new_data = self.lookup_transform(Time.from_msg(self.timestamp))
             return self._has_new_data
+
+    def adds_missing_camera(self, *, world: World) -> bool:
+        """
+        Unlike :meth:`CameraInterface.adds_missing_camera`, leave a camera located
+        through TF to the processes ``world`` is synchronized with.
+        """
+        return not (
+            self.lookup_viewpoint
+            and WorldSynchronizer.all_callbacks_of_this_type_from_world(world)
+        )
 
     def lookup_transform(self, timestamp: Time | None = None) -> bool:
         """

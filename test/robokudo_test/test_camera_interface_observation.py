@@ -741,7 +741,6 @@ def test_opencv_reader_stores_camera_observation(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
     )
     interface._has_new_data = True
-    interface.lookup_viewpoint = False
     interface.rk_logger = logging.getLogger("robokudo-opencv-camera-test")
     cas = CAS()
     timestamp_nanoseconds = 123_456_789

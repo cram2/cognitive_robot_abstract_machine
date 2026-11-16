@@ -30,7 +30,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
-from robokudo.io.camera_interface import CameraInterface
+from robokudo.descriptors.camera_configs.components import TfComponent
+from robokudo.io.camera_interface import CameraInterface, ROSCameraInterface
 
 # %% frames
 
@@ -115,8 +116,24 @@ def camera_interface(*, located_through_tf: bool = False) -> CameraInterface:
     :param located_through_tf: Whether the camera pose is looked up through TF.
     :return: A camera interface that places its camera against the test frames.
     """
-    interface = CameraInterface(BaseCameraConfig(interface_type="test"))
-    interface.lookup_viewpoint = located_through_tf
+    if located_through_tf:
+        return ros_camera_interface(lookup_viewpoint=True)
+    return CameraInterface(BaseCameraConfig(interface_type="test"))
+
+
+def ros_camera_interface(*, lookup_viewpoint: bool) -> ROSCameraInterface:
+    """
+    :param lookup_viewpoint: Whether the camera pose is looked up through TF.
+    :return: A ROS camera interface without subscriptions or TF listener, for the
+        test frames.
+    """
+    interface = object.__new__(ROSCameraInterface)
+    interface.camera_config = TfComponent(
+        tf_from=FrameName.CAMERA,
+        tf_to=FrameName.WORLD,
+        lookup_viewpoint=lookup_viewpoint,
+    )
+    interface.lookup_viewpoint = lookup_viewpoint
     return interface
 
 

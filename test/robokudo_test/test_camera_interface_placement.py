@@ -22,6 +22,7 @@ from ._perception_world import (
     camera_interface,
     camera_pose,
     place_camera_of,
+    ros_camera_interface,
     world_with_a_head_camera,
 )
 
@@ -227,6 +228,30 @@ class TestCameraOfASharedWorld:
 
         place_camera_of(
             cas, world, world_T_camera, camera_interface(located_through_tf=False)
+        )
+
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        assert camera_body.parent_connection.parent is world.get_body_by_name(
+            FrameName.WORLD
+        )
+        assert world.get_semantic_annotations_by_type(Camera) == [
+            cas.camera_observation.camera
+        ]
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+    def test_shared_world_gets_a_ros_camera_without_tf_lookup(
+        self, *, shared_world: SharedWorld
+    ) -> None:
+        """
+        A ROS camera that does not look up its pose through TF gets a body and an
+        annotation in a shared world.
+        """
+        world = shared_world.world
+        cas = CAS()
+        world_T_camera = camera_pose(x=1.0)
+
+        place_camera_of(
+            cas, world, world_T_camera, ros_camera_interface(lookup_viewpoint=False)
         )
 
         camera_body = world.get_body_by_name(FrameName.CAMERA)
