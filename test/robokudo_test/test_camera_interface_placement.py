@@ -133,35 +133,37 @@ class TestCameraOfTheWorld:
     Cameras another process attached to the world.
     """
 
-    def test_camera_of_the_world_is_located_by_the_world(self) -> None:
+    def test_camera_of_the_world_keeps_its_attachment_at_the_measured_pose(
+        self,
+    ) -> None:
         """
-        A robot's camera keeps its attachment and is located by the world.
+        A robot's camera keeps its attachment, and its pose is the measured one.
         """
         world = world_with_a_head_camera()
         camera_body = world.get_body_by_name(FrameName.CAMERA)
         camera_pose_before = camera_body.global_transform.to_np()
+        world_T_camera = camera_pose(x=4.0)
 
-        pose = bound_pose(world, camera_pose(x=4.0), located_through_tf=True)
+        pose = bound_pose(world, world_T_camera, located_through_tf=True)
 
         assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
-        assert pose.reference_frame is world.root
+        assert pose.reference_frame is world.get_body_by_name(FrameName.WORLD)
         assert pose.child_frame is camera_body
-        assert np.allclose(pose.to_np(), camera_pose_before)
+        assert np.allclose(pose.to_np(), world_T_camera.to_np())
 
-    def test_camera_of_the_world_needs_no_known_world_frame(self) -> None:
+    def test_camera_of_the_world_needs_a_known_world_frame(self) -> None:
         """
-        A robot's camera is located even against a world frame the world lacks.
+        A robot's camera cannot be placed against a world frame the world lacks.
         """
         world = world_with_a_head_camera()
 
-        pose = bound_pose(
-            world,
-            camera_pose(),
-            located_through_tf=True,
-            world_frame="frame_unknown_to_the_world",
-        )
-
-        assert pose.child_frame is world.get_body_by_name(FrameName.CAMERA)
+        with pytest.raises(UnknownWorldFrameError):
+            bound_pose(
+                world,
+                camera_pose(),
+                located_through_tf=True,
+                world_frame="frame_unknown_to_the_world",
+            )
 
 
 # %% camera of a shared world
@@ -238,16 +240,20 @@ class TestCameraOfASharedWorld:
         ]
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
-    def test_camera_of_a_robot_in_a_shared_world_is_located_by_the_world(
+    def test_camera_of_a_robot_in_a_shared_world_is_at_the_measured_pose(
         self, *, shared_world_with_a_robot: SharedWorld
     ) -> None:
         """
-        A robot's camera in a shared world is located by that world.
+        A robot's camera in a shared world keeps its attachment, and its pose is the
+        measured one.
         """
         world = shared_world_with_a_robot.world
         camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_pose_before = camera_body.global_transform.to_np()
+        world_T_camera = camera_pose(x=4.0)
 
-        pose = bound_pose(world, camera_pose(x=4.0), located_through_tf=True)
+        pose = bound_pose(world, world_T_camera, located_through_tf=True)
 
         assert pose.child_frame is camera_body
-        assert np.allclose(pose.to_np(), camera_body.global_transform.to_np())
+        assert np.allclose(pose.to_np(), world_T_camera.to_np())
+        assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
