@@ -58,7 +58,7 @@ class DebugOutput:
     plots_trajectory: bool = False
     """
     Whether Giskard records the trajectory of the goal and plots it to a pdf once the
-    robot stopped.
+    robot stopped; the result of the goal arrives only once the plot is drawn.
     """
 
 

@@ -9,10 +9,7 @@ from dataclasses import dataclass
 
 from cramph.executor import StatechartExecutor
 from semantic_digital_twin.adapters.ros import background_node
-from giskardpy.middleware.ros2.goal_plot_directory import (
-    GoalPlotDirectory,
-    GoalPlotKind,
-)
+from giskardpy.middleware.ros2.plot_archive import GoalPlotKind, RunPlotDirectory
 
 
 @dataclass(kw_only=True)
@@ -26,19 +23,16 @@ class PostGoalPlotter(ABC):
     The executor holding the data that is plotted.
     """
 
+    plot_directory: RunPlotDirectory
+    """
+    Where the plot of each goal is written.
+    """
+
     @abstractmethod
     def plot(self, *, goal_id: int) -> None:
         """
         Plot the data recorded for the goal with the given id.
         """
-
-    def create_file_name(self, *, plot_kind: GoalPlotKind, goal_id: int) -> str:
-        """
-        :return: The pdf of the goal with id `goal_id` among the plots of `plot_kind`;
-            its folder is created if missing.
-        """
-        directory = GoalPlotDirectory.from_plot_kind(plot_kind=plot_kind)
-        return str(directory.goal_plot_path(goal_id=goal_id))
 
 
 @dataclass(kw_only=True)
@@ -55,11 +49,11 @@ class GoalGanttChartPlotter(PostGoalPlotter):
     def plot(self, *, goal_id: int) -> None:
         if not self.executor.statechart.state_history:
             return
-        file_name = self.create_file_name(
+        file_name = self.plot_directory.goal_plot_path(
             plot_kind=GoalPlotKind.GANTT_CHART, goal_id=goal_id
         )
         self.executor.statechart.plot_gantt_chart(
-            path=file_name,
+            path=str(file_name),
             context=self.executor.context,
             second_length_in_cm=self.second_length_in_cm,
         )
@@ -73,8 +67,8 @@ class MotionStatechartPlotter(PostGoalPlotter):
     """
 
     def plot(self, *, goal_id: int) -> None:
-        file_name = self.create_file_name(
+        file_name = self.plot_directory.goal_plot_path(
             plot_kind=GoalPlotKind.MOTION_STATECHART, goal_id=goal_id
         )
-        self.executor.statechart.draw(file_name=file_name)
+        self.executor.statechart.draw(file_name=str(file_name))
         background_node.get_node().get_logger().info(f"saved {file_name}")

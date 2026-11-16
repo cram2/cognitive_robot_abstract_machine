@@ -31,7 +31,7 @@ from semantic_digital_twin.input_synchronization import (
     InputSynchronizer,
     WorldStateInputs,
 )
-from giskardpy.middleware.ros2.goal_plot_directory import GoalPlotDirectory
+from giskardpy.middleware.ros2.plot_archive import GoalPlotKind, RunPlotDirectory
 from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.middleware.ros2.motion_server import MotionServer
 from giskardpy.motion_statechart.debug_expression_publisher import (
@@ -736,7 +736,7 @@ def motion_server(init_background_node, tmp_path: Path) -> MotionServerFixture:
         cycle_counter=cycle_counter,
         debug_expression_publishing=debug_expression_publishing,
         trajectory_recording=trajectory_recording,
-        trajectory_plot_directory=GoalPlotDirectory(path=tmp_path),
+        plot_directory=RunPlotDirectory(path=tmp_path),
     )
     return MotionServerFixture(
         executor=executor,
@@ -1031,8 +1031,9 @@ class TestTrajectoryPlot:
         """
         :return: Where the plot of the goal that ran last is expected.
         """
-        return motion_server.motion_server.trajectory_plot_directory.goal_plot_path(
-            goal_id=motion_server.action_server.goal_id
+        return motion_server.motion_server.plot_directory.goal_plot_path(
+            plot_kind=GoalPlotKind.TRAJECTORY,
+            goal_id=motion_server.action_server.goal_id,
         )
 
     @pytest.mark.parametrize("plots_trajectory", [True, False])

@@ -31,9 +31,10 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
-from giskardpy.middleware.ros2.goal_plot_directory import (
-    GoalPlotDirectory,
+from giskardpy.middleware.ros2.plot_archive import (
     GoalPlotKind,
+    PlotArchive,
+    RunPlotDirectory,
 )
 from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.motion_control import WorldStateTrajectoryRecording
@@ -123,13 +124,12 @@ class MotionServer:
     for its plot.
     """
 
-    trajectory_plot_directory: GoalPlotDirectory = field(
-        default_factory=lambda: GoalPlotDirectory.from_plot_kind(
-            plot_kind=GoalPlotKind.TRAJECTORY
-        )
+    plot_directory: RunPlotDirectory = field(
+        default_factory=lambda: PlotArchive().start_run()
     )
     """
-    Where the trajectory plot of each goal that asks for one is written.
+    Where the debug plots of the goals this server runs are written, apart from those of
+    every other server.
     """
 
     idle_frequency: float = 20.0
@@ -320,7 +320,7 @@ class MotionServer:
 
     def write_trajectory_plot(self) -> None:
         """
-        Plot the trajectory the goal recorded into :attr:`trajectory_plot_directory`.
+        Plot the trajectory the goal recorded into :attr:`plot_directory`.
 
         A plot that fails is only reported as a warning, because it is debug output and
         does not change what the motion did.
@@ -330,7 +330,9 @@ class MotionServer:
             return
         logger = background_node.get_node().get_logger()
         goal_id = self.action_server.goal_id
-        file_name = self.trajectory_plot_directory.goal_plot_path(goal_id=goal_id)
+        file_name = self.plot_directory.goal_plot_path(
+            plot_kind=GoalPlotKind.TRAJECTORY, goal_id=goal_id
+        )
         try:
             plotter.plot_trajectory(file_name=str(file_name))
         except Exception as exception:
