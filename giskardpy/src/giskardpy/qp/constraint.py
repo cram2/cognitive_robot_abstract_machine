@@ -84,7 +84,7 @@ class GiskardConstraint(ABC):
     """
 
     @abstractmethod
-    def kept_fraction_of_demand(self, reachable_change: Scalar) -> Scalar:
+    def kept_fraction_of_demand(self, *, reachable_change: Scalar) -> Scalar:
         """
         :param reachable_change: The largest change of the expression that may be
             demanded within the control horizon.
@@ -94,7 +94,7 @@ class GiskardConstraint(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardEqualityConstraint(GiskardConstraint):
     """
     A constraint that drives the expression to a single target value.
@@ -110,11 +110,13 @@ class GiskardEqualityConstraint(GiskardConstraint):
     How the bound is limited to what may be demanded within the control horizon.
     """
 
-    def kept_fraction_of_demand(self, reachable_change: Scalar) -> Scalar:
-        return self.bound_cap.kept_fraction(self.bound, reachable_change)
+    def kept_fraction_of_demand(self, *, reachable_change: Scalar) -> Scalar:
+        return self.bound_cap.kept_fraction(
+            bound=self.bound, reachable_change=reachable_change
+        )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardInequalityConstraint(GiskardConstraint):
     """
     A constraint that keeps the expression between a lower and upper bound.
@@ -130,9 +132,11 @@ class GiskardInequalityConstraint(GiskardConstraint):
     The highest allowed value of the expression.
     """
 
-    def kept_fraction_of_demand(self, reachable_change: Scalar) -> Scalar:
+    def kept_fraction_of_demand(self, *, reachable_change: Scalar) -> Scalar:
         # a positive lower or a negative upper bound demands motion
         demanded_change = sm.max(
             sm.max(sm.Scalar(self.lower_bound), -sm.Scalar(self.upper_bound)), 0
         )
-        return ScalarBoundCap().kept_fraction(demanded_change, reachable_change)
+        return ScalarBoundCap().kept_fraction(
+            bound=demanded_change, reachable_change=reachable_change
+        )
