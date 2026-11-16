@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.io import camera_interface
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
@@ -10,10 +11,20 @@ from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
 # %% ROS node ownership
 
 
-@dataclass
-class CameraConfigWithoutTF:
+@dataclass(kw_only=True)
+class CameraConfigWithoutTF(TfComponent):
     """
     Minimal camera config that does not request TF lookup.
+    """
+
+    tf_from: str = "camera_optical_frame"
+    """
+    Optical frame of the camera.
+    """
+
+    lookup_viewpoint: bool = False
+    """
+    Whether to look the camera pose up through TF.
     """
 
     interface_type: str = "ROSCameraInterface"

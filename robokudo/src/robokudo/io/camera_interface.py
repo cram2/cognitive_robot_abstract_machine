@@ -44,6 +44,7 @@ from typing_extensions import Any, TYPE_CHECKING
 from krrood.ormatic.utils import classproperty
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
+from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.exceptions import (
     CameraDataMissing,
     CameraPoseMissing,
@@ -408,7 +409,7 @@ class ROSCameraInterface(CameraInterface):
     transform lookups and camera intrinsics handling.
     """
 
-    def __init__(self, camera_config: Any, node: Node | None = None) -> None:
+    def __init__(self, camera_config: TfComponent, node: Node | None = None) -> None:
         """
         Initialize the ROS camera interface.
 
@@ -421,29 +422,26 @@ class ROSCameraInterface(CameraInterface):
         """
         ROS node for communication with ROS.
         """
-        self.lookup_viewpoint: bool = False
+        self.lookup_viewpoint: bool = camera_config.lookup_viewpoint
         """
         Whether the camera pose is looked up through TF.
         """
-        if hasattr(self.camera_config, "lookup_viewpoint"):
-            self.lookup_viewpoint = self.camera_config.lookup_viewpoint
-
-            self.tf_from: str = (
-                normalize_ros_frame_id(camera_config.tf_from)
-                if self.lookup_viewpoint
-                else camera_config.tf_from
-            )
-            """
-            Transform source frame.
-            """
-            self.tf_to: str = (
-                normalize_ros_frame_id(camera_config.tf_to)
-                if self.lookup_viewpoint
-                else camera_config.tf_to
-            )
-            """
-            Transform target frame.
-            """
+        self.tf_from: str = (
+            normalize_ros_frame_id(camera_config.tf_from)
+            if self.lookup_viewpoint
+            else camera_config.tf_from
+        )
+        """
+        Transform source frame.
+        """
+        self.tf_to: str = (
+            normalize_ros_frame_id(camera_config.tf_to)
+            if self.lookup_viewpoint
+            else camera_config.tf_to
+        )
+        """
+        Transform target frame.
+        """
         self._world_T_camera: TransformStamped | None = None
         """
         Camera pose from the most recent successful TF lookup, stamped with the time TF
