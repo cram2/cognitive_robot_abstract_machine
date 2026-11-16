@@ -14,6 +14,7 @@ from typing_extensions import Any, Dict, List, Optional, Set
 
 from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin, DeepCopyOfField
 from krrood.patterns.role import Role
 
 
@@ -35,7 +36,7 @@ class RoleTakerInfo:
 
 
 @dataclass(kw_only=True)
-class ClassInfo:
+class ClassInfo(DataclassDeepcopyMixin):
     """
     Maintains all metadata, inheritance, and property associations for an OWL class.
     Used during the code generation process to represent a Python class.
@@ -124,25 +125,12 @@ class ClassInfo:
     class). They hold for every member of the class but do not make an individual a member, so they are not used for
     classification.
     """
-    ontology: Optional[OntologyInfo] = field(default=None, repr=False)
+    ontology: OntologyInfo | None = field(
+        default=None, repr=False, metadata={DeepCopyOfField: DeepCopyOfField.SHARED}
+    )
     """
-    The ontology the class belongs to.
+    The ontology the class belongs to, which a copy of the class keeps.
     """
-
-    def __deepcopy__(self, memo):
-        """
-        Copy everything but the ontology the class belongs to.
-        """
-        # Custom deepcopy to avoid copying the ontology reference
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for name, value in self.__dict__.items():
-            if name == "ontology":
-                setattr(result, name, self.ontology)
-            else:
-                setattr(result, name, deepcopy(value, memo))
-        return result
 
     def __hash__(self):
         """
@@ -152,7 +140,7 @@ class ClassInfo:
 
 
 @dataclass(kw_only=True)
-class PropertyInfo:
+class PropertyInfo(DataclassDeepcopyMixin):
     """
     Maintains metadata, domains, ranges, and inheritance for an OWL property.
     Used during the code generation process to represent a Python property or descriptor.
@@ -298,9 +286,11 @@ class PropertyInfo:
     """
     The names of the descriptor classes of every property chain implying the property.
     """
-    ontology: Optional[OntologyInfo] = field(default=None, repr=False)
+    ontology: OntologyInfo | None = field(
+        default=None, repr=False, metadata={DeepCopyOfField: DeepCopyOfField.SHARED}
+    )
     """
-    The ontology the property belongs to.
+    The ontology the property belongs to, which a copy of the property keeps.
     """
     _sorted_superproperties: List[str] = field(default_factory=list, init=False)
     """
@@ -350,21 +340,6 @@ class PropertyInfo:
             stack.extend(name_to_bases.get(base, []))
         self._all_superproperties = sorted(ancestors)
         return self._all_superproperties
-
-    def __deepcopy__(self, memo):
-        """
-        Copy everything but the ontology the property belongs to.
-        """
-        # Custom deepcopy to avoid copying the ontology reference
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        for name, value in self.__dict__.items():
-            if name == "ontology":
-                setattr(result, name, self.ontology)
-            else:
-                setattr(result, name, deepcopy(value, memo))
-        return result
 
     def __hash__(self):
         """

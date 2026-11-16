@@ -80,3 +80,25 @@ def test_a_copied_property_shares_its_ontology():
     )
     copy = deepcopy(original)
     assert (copy.ontology is ontology, copy is not original) == (True, True)
+
+
+def test_a_copied_property_of_an_ontology_shares_only_the_ontology():
+    """
+    A deep copy of a property the ontology holds keeps the ontology but none of the
+    property's own lists.
+    """
+    original = PropertyInfo(
+        name="knows",
+        uri="http://example.org/person#knows",
+        type=PropertyType.OBJECT_PROPERTY,
+        superproperties=["relatedTo"],
+    )
+    ontology = OntologyInfo(
+        graph=rdflib.Graph(), original_properties={original.name: original}
+    )
+    copy = ontology.properties[original.name]
+    assert (
+        copy.ontology is ontology,
+        copy.superproperties == original.superproperties,
+        copy.superproperties is original.superproperties,
+    ) == (True, True, False)
