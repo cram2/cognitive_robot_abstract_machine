@@ -499,9 +499,9 @@ def build_component_scene_stage_with_an_instanceable_component() -> Usd.Stage:
 
 def build_component_scene_stage_with_an_articulated_component() -> Usd.Stage:
     """
-    A minimal in-memory scene with a chair component and a cabinet component that
-    holds a carcass mesh of its own and a door link, which a revolute joint with an
-    unset ``body0`` connects to the cabinet.
+    A minimal in-memory scene with a chair component and a cabinet component that holds
+    a carcass mesh of its own and a door link, which a revolute joint with an unset
+    ``body0`` connects to the cabinet.
 
     :return: The built in-memory stage.
     """
@@ -520,4 +520,48 @@ def build_component_scene_stage_with_an_articulated_component() -> Usd.Stage:
     joint.CreateLocalRot0Attr(Gf.Quatf(1, 0, 0, 0))
     joint.CreateLocalPos1Attr(Gf.Vec3f(0.0, 0.0, 0.0))
     joint.CreateLocalRot1Attr(Gf.Quatf(1, 0, 0, 0))
+    return stage
+
+
+def build_component_scene_stage_with_a_scaled_articulated_component() -> Usd.Stage:
+    """
+    The scene of :func:`build_component_scene_stage_with_an_articulated_component`, with
+    the cabinet scaled, so its door joint's offsets would have to scale with it.
+
+    :return: The built in-memory stage.
+    """
+    stage = build_component_scene_stage_with_an_articulated_component()
+    cabinet = UsdGeom.Xformable(stage.GetPrimAtPath("/scene/cabinet"))
+    [scale] = [
+        operation
+        for operation in cabinet.GetOrderedXformOps()
+        if operation.GetOpType() == UsdGeom.XformOp.TypeScale
+    ]
+    scale.Set(Gf.Vec3f(2.0, 2.0, 2.0))
+    return stage
+
+
+def build_component_scene_stage_with_a_joint_moving_its_component() -> Usd.Stage:
+    """
+    The scene of :func:`build_component_scene_stage_with_an_articulated_component`, with
+    the cabinet itself as its door joint's ``body1``.
+
+    :return: The built in-memory stage.
+    """
+    stage = build_component_scene_stage_with_an_articulated_component()
+    joint = UsdPhysics.Joint(stage.GetPrimAtPath("/scene/cabinet/door_joint"))
+    joint.GetBody1Rel().SetTargets(["/scene/cabinet"])
+    return stage
+
+
+def build_component_scene_stage_with_a_joint_into_another_component() -> Usd.Stage:
+    """
+    The scene of :func:`build_component_scene_stage_with_an_articulated_component`, with
+    the chair, another component, as the cabinet's door joint's ``body0``.
+
+    :return: The built in-memory stage.
+    """
+    stage = build_component_scene_stage_with_an_articulated_component()
+    joint = UsdPhysics.Joint(stage.GetPrimAtPath("/scene/cabinet/door_joint"))
+    joint.CreateBody0Rel().SetTargets(["/scene/chair"])
     return stage

@@ -20,9 +20,12 @@ from semantic_digital_twin.adapters.package_resolver import (
     PathResolver,
 )
 from semantic_digital_twin.adapters.usd.exceptions import (
+    ScaledArticulatedUsdComponentError,
     UnreadUsdPhysicsJointsError,
     UnsupportedUsdGeometryTypeError,
     UnsupportedUsdPhysicsJointTypeError,
+    UsdJointChildIsComponentError,
+    UsdJointLinkOutsideComponentError,
     UsdPhysicsJointMissingChildBodyError,
 )
 from semantic_digital_twin.world_source import WorldModelParser
@@ -1128,6 +1131,12 @@ class USDComponentParser(USDStageParser):
 
         :raises UnreadUsdPhysicsJointsError: If the stage contains physics joints outside
             every component.
+        :raises UsdJointChildIsComponentError: If a physics joint's ``body1`` is its own
+            component.
+        :raises UsdJointLinkOutsideComponentError: If a physics joint inside a
+            component connects a link outside it.
+        :raises ScaledArticulatedUsdComponentError: If a link a physics joint inside a
+            component connects is scaled.
         :raises UnsupportedUsdPhysicsJointTypeError: If a component contains a physics
             joint of a type this parser does not build a Connection for.
         :raises UsdPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
@@ -1152,6 +1161,10 @@ class USDComponentParser(USDStageParser):
         connection_specifications_with_endpoints = []
         for component_prim in content.component_prims:
             joint_prims = joints_by_component[component_prim.GetPath()]
+            for joint_prim in joint_prims:
+                self._validate_joint_inside_component(
+                    component_prim=component_prim, joint_prim=joint_prim
+                )
             component_body = self._create_free_body(
                 prim=component_prim,
                 name=self._name_below_scene_root(prim=component_prim),
@@ -1249,19 +1262,72 @@ class USDComponentParser(USDStageParser):
             )
         return joints_by_component
 
+    def _validate_joint_inside_component(
+        self, *, component_prim: Usd.Prim, joint_prim: Usd.Prim
+    ) -> None:
+        """
+        :param component_prim: A component of the scene.
+        :param joint_prim: A physics joint prim inside the component.
+        :raises UsdJointChildIsComponentError: If the joint's ``body1`` is the
+            component.
+        :raises UsdJointLinkOutsideComponentError: If the joint connects a link outside
+            the component.
+        :raises ScaledArticulatedUsdComponentError: If a link the joint connects is
+            scaled; an unset ``body0`` is the component.
+        """
+        joint = UsdPhysics.Joint(joint_prim)
+        component_path = component_prim.GetPath()
+        child_paths = self._link_paths(relationship=joint.GetBody1Rel())
+        if component_path in child_paths:
+            raise UsdJointChildIsComponentError(
+                file_path=self.source_description,
+                joint_path=str(joint_prim.GetPath()),
+                component_path=str(component_path),
+            )
+        parent_paths = self._link_paths(relationship=joint.GetBody0Rel()) or [
+            component_path
+        ]
+        for link_path in parent_paths + child_paths:
+            if not link_path.HasPrefix(component_path):
+                raise UsdJointLinkOutsideComponentError(
+                    file_path=self.source_description,
+                    joint_path=str(joint_prim.GetPath()),
+                    component_path=str(component_path),
+                    link_path=str(link_path),
+                )
+            link_to_world = self._local_to_world(
+                prim=self.stage.GetPrimAtPath(link_path)
+            )
+            if not np.allclose(Gf.Transform(link_to_world).GetScale(), 1.0):
+                raise ScaledArticulatedUsdComponentError(
+                    file_path=self.source_description,
+                    joint_path=str(joint_prim.GetPath()),
+                    scaled_prim_path=str(link_path),
+                )
+
+    def _link_paths(self, *, relationship: Usd.Relationship) -> list[Sdf.Path]:
+        """
+        :param relationship: A physics joint's ``body0`` or ``body1`` relationship.
+        :return: The paths of the root prims of the links it targets.
+        """
+        return [
+            self._link_prim(prim_path=target).GetPath()
+            for target in relationship.GetTargets()
+        ]
+
     def _linked_prim_paths(self, *, joint_prims: list[Usd.Prim]) -> frozenset[Sdf.Path]:
         """
         :param joint_prims: Physics joint prims.
         :return: The paths of the root prims of the links the joints connect.
         """
         return frozenset(
-            self._link_prim(prim_path=target).GetPath()
+            link_path
             for joint_prim in joint_prims
             for relationship in (
                 UsdPhysics.Joint(joint_prim).GetBody0Rel(),
                 UsdPhysics.Joint(joint_prim).GetBody1Rel(),
             )
-            for target in relationship.GetTargets()
+            for link_path in self._link_paths(relationship=relationship)
         )
 
     def _scene_content(self, *, scene_root: Usd.Prim) -> UsdSceneContent:

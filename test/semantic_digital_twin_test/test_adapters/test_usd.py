@@ -7,9 +7,12 @@ import pytest
 from PIL import Image
 
 from semantic_digital_twin.adapters.usd.exceptions import (
+    ScaledArticulatedUsdComponentError,
     UnsupportedUsdGeometryTypeError,
     UnreadUsdPhysicsJointsError,
     UnsupportedUsdPhysicsJointTypeError,
+    UsdJointChildIsComponentError,
+    UsdJointLinkOutsideComponentError,
     UsdPhysicsJointMissingChildBodyError,
 )
 from semantic_digital_twin.adapters.usd.parser import (
@@ -33,6 +36,9 @@ from .usd_stages import (
     PXR_AVAILABLE,
     USD_SEMANTICS_AVAILABLE,
     build_component_scene_stage,
+    build_component_scene_stage_with_a_joint_into_another_component,
+    build_component_scene_stage_with_a_joint_moving_its_component,
+    build_component_scene_stage_with_a_scaled_articulated_component,
     build_component_scene_stage_with_an_articulated_component,
     build_component_scene_stage_with_an_instanceable_component,
     build_component_scene_stage_without_a_default_prim,
@@ -329,8 +335,8 @@ def test_component_parser_names_the_root_after_the_prefix_without_a_default_prim
 
 def test_component_parser_raises_on_physics_joints_outside_every_component():
     """
-    A stage with physics joints outside every component is rejected instead of parsed
-    as rigid objects.
+    A stage with physics joints outside every component is rejected instead of parsed as
+    rigid objects.
     """
     stage = build_single_joint_stage("FixedJoint")
 
@@ -399,6 +405,48 @@ def test_component_parser_keeps_a_component_without_joints_free_next_to_one_with
     ]
     assert isinstance(chair_connection, Connection6DoF)
     assert chair_connection.parent is world.root
+
+
+def test_component_parser_raises_on_a_joint_inside_a_scaled_component():
+    """
+    A component with joints whose links are scaled is rejected, since the joints'
+    offsets would not scale with them.
+    """
+    with pytest.raises(ScaledArticulatedUsdComponentError) as excinfo:
+        parse_components(
+            build_component_scene_stage_with_a_scaled_articulated_component()
+        )
+
+    assert excinfo.value.joint_path == "/scene/cabinet/door_joint"
+    assert excinfo.value.scaled_prim_path == "/scene/cabinet"
+
+
+def test_component_parser_raises_on_a_joint_whose_child_is_its_component():
+    """
+    A joint whose ``body1`` is its own component is rejected, since the component is
+    already attached to the root.
+    """
+    with pytest.raises(UsdJointChildIsComponentError) as excinfo:
+        parse_components(
+            build_component_scene_stage_with_a_joint_moving_its_component()
+        )
+
+    assert excinfo.value.joint_path == "/scene/cabinet/door_joint"
+    assert excinfo.value.component_path == "/scene/cabinet"
+
+
+def test_component_parser_raises_on_a_joint_connecting_a_link_of_another_component():
+    """
+    A joint inside one component that targets a link outside it is rejected.
+    """
+    with pytest.raises(UsdJointLinkOutsideComponentError) as excinfo:
+        parse_components(
+            build_component_scene_stage_with_a_joint_into_another_component()
+        )
+
+    assert excinfo.value.joint_path == "/scene/cabinet/door_joint"
+    assert excinfo.value.component_path == "/scene/cabinet"
+    assert excinfo.value.link_path == "/scene/chair"
 
 
 def test_component_parser_reads_the_geometry_of_an_instanceable_component():

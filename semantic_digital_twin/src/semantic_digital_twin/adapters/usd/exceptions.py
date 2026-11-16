@@ -109,8 +109,8 @@ class UnsupportedUsdGeometryTypeError(ParsingError):
 @dataclass(kw_only=True)
 class UnreadUsdPhysicsJointsError(ParsingError):
     """
-    Raised when a stage has physics joints the parser cannot attach to anything, such
-    as joints outside every component of a scene.
+    Raised when a stage has physics joints the parser cannot attach to anything, such as
+    joints outside every component of a scene.
     """
 
     joint_paths: list[str]
@@ -129,4 +129,105 @@ class UnreadUsdPhysicsJointsError(ParsingError):
         return (
             "Give the prim holding the joints and the links they connect the kind "
             "'component', or parse the stage with USDParser."
+        )
+
+
+@dataclass(kw_only=True)
+class ScaledArticulatedUsdComponentError(ParsingError):
+    """
+    Raised when a link a physics joint inside a component connects is scaled, by its own
+    transform or an ancestor's.
+
+    The joint's authored offsets are lengths in the link's scaled frame, which the
+    link's body does not have.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    scaled_prim_path: str
+    """
+    The stage path of the root prim of the scaled link.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' that "
+            f"connects '{self.scaled_prim_path}', which is scaled, so the joint's "
+            f"offsets would not be scaled with it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Author the scale on the geometry below the links instead of on the "
+            "component, its links or their ancestors."
+        )
+
+
+@dataclass(kw_only=True)
+class UsdJointChildIsComponentError(ParsingError):
+    """
+    Raised when the ``body1`` of a physics joint inside a component is the component
+    itself, which is already attached to the scene's root.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    component_path: str
+    """
+    The stage path of the component prim.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' "
+            f"whose body1 is its own component '{self.component_path}', which is "
+            f"already attached to the scene's root."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Target a link below the component with the joint's body1, or make the "
+            "part the joint moves a component of its own."
+        )
+
+
+@dataclass(kw_only=True)
+class UsdJointLinkOutsideComponentError(ParsingError):
+    """
+    Raised when a physics joint inside a component targets a link outside that
+    component, such as a link of another component.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    component_path: str
+    """
+    The stage path of the component holding the joint.
+    """
+
+    link_path: str
+    """
+    The stage path of the root prim of the link outside the component.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' "
+            f"inside the component '{self.component_path}' that connects "
+            f"'{self.link_path}', which is outside it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Make the joint connect links of its own component only, or make one "
+            "component holding both links."
         )
