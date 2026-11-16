@@ -127,7 +127,7 @@ def test_a_configuration_is_reached_through_the_parallel_gripper_command_server_
     assert type(task) is RobotiqGripperActionServerTask
     assert (task.action_topic, task.target_position) == (
         gripper.parallel_gripper_command_topic,
-        gripper.separation_at(configuration.joint_state),
+        configuration.joint_state.target_value(gripper.knuckle_joint),
     )
 
 

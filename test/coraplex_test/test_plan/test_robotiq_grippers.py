@@ -69,8 +69,8 @@ def test_a_real_robot_moves_its_gripper_through_the_parallel_gripper_command_ser
 
     assert type(action.goal) is RobotiqGripperActionServerTask
     assert action.goal.action_topic == gripper.parallel_gripper_command_topic
-    assert action.goal.target_position == gripper.separation_at(
-        configuration.joint_state
+    assert action.goal.target_position == configuration.joint_state.target_value(
+        gripper.commanded_connection
     )
 
 
@@ -128,8 +128,8 @@ def test_a_real_robot_opens_and_shuts_its_gripper_on_a_grasp_through_the_paralle
         for node in action.descendants
         if isinstance(node, RobotiqGripperActionServerTask)
     ] == [
-        arm.end_effector.separation_at(
-            arm.end_effector.default_configuration(state).joint_state
+        arm.end_effector.default_configuration(state).joint_state.target_value(
+            arm.end_effector.commanded_connection
         )
         for state in (GripperState.OPEN, GripperState.CLOSE)
     ]

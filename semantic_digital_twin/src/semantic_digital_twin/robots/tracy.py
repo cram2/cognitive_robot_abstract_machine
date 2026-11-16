@@ -45,6 +45,7 @@ from semantic_digital_twin.robots.robotiq_85_gripper import (
 from semantic_digital_twin.robots.ur10e_arm import UR10eArm
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -251,6 +252,10 @@ class TracyLeftGripper(
     def parallel_gripper_command_topic(cls) -> str:
         return TracyParallelGripperCommandTopic.LEFT_GRIPPER
 
+    @property
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        return self.knuckle_joint
+
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -311,6 +316,10 @@ class TracyRightGripper(
     @classproperty
     def parallel_gripper_command_topic(cls) -> str:
         return TracyParallelGripperCommandTopic.RIGHT_GRIPPER
+
+    @property
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        return self.knuckle_joint
 
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()

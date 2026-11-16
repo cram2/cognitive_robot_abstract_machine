@@ -23,7 +23,6 @@ from giskardpy.motion_statechart.ros2_nodes.ros_tasks import ActionServerTask
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
-from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robotiq_85_gripper import (
     HasParallelGripperCommandServer,
 )
@@ -57,7 +56,8 @@ class RobotiqGripperActionServerTask(
 
     target_position: float
     """
-    How far apart the fingertips' facing surfaces are to stand, in metres.
+    The position to bring the connection the server's controller commands to, in that
+    connection's own units: radians for the knuckle joint of a Robotiq 2F-85.
     """
 
     target_velocity: float = 10.0
@@ -90,17 +90,19 @@ class RobotiqGripperActionServerTask(
     ) -> StatechartNode:
         """
         Differs from :meth:`MovesGripperToConfiguration.moving_gripper_to` in driving a
-        two-finger :class:`HasParallelGripperCommandServer` through its server, to the
-        width of `configuration`; a stall always counts as done.
+        :class:`HasParallelGripperCommandServer` through its server, to the position
+        `configuration` gives its
+        :attr:`~HasParallelGripperCommandServer.commanded_connection`; a stall always
+        counts as done.
 
         Any other configuration is reached as :meth:`MoveFingers.moving_gripper_to`
         reaches it.
+
+        :raises ConnectionNotInJointStateError: If `configuration` sets no position for
+            the commanded connection.
         """
         end_effector = configuration.end_effector
-        if not (
-            isinstance(end_effector, HasParallelGripperCommandServer)
-            and isinstance(end_effector, HasTwoFingers)
-        ):
+        if not isinstance(end_effector, HasParallelGripperCommandServer):
             return MoveFingers.moving_gripper_to(
                 configuration, stall_minimum_time, tolerate_stall
             )
@@ -108,7 +110,9 @@ class RobotiqGripperActionServerTask(
             action_topic=end_effector.action_topic_serving(
                 configuration.joint_state.state_type
             ),
-            target_position=end_effector.separation_at(configuration.joint_state),
+            target_position=configuration.joint_state.target_value(
+                end_effector.commanded_connection
+            ),
         )
 
     def build_action_goal(self) -> None:

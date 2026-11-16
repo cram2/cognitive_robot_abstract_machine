@@ -41,6 +41,14 @@ class HasParallelGripperCommandServer(HasGripperActionServers, ABC):
         The name the driver serves the parallel gripper command action under.
         """
 
+    @property
+    @abstractmethod
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        """
+        The connection the driver's controller commands, whose position, in its own
+        units, a goal of the parallel gripper command action gives.
+        """
+
     def action_topic_serving(self, state_type: JointStateType | None) -> str:
         return self.parallel_gripper_command_topic
 

@@ -217,6 +217,10 @@ class TiagoGripper(EndEffector, HasParallelGripperCommandServer, ABC):
         mimics.
         """
 
+    @property
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        return self._world.get_connection_by_name(self.finger_joint)
+
     def setup_hardware_interfaces(self):
         connection: ActiveConnection = self._world.get_connection_by_name(
             self.finger_joint
