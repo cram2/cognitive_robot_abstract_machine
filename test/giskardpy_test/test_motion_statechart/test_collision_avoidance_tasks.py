@@ -39,6 +39,7 @@ from cramph.node import CancelStatechart, StatechartNode
 from cramph.orm.ormatic_interface import StatechartMappingDAO
 from giskardpy.orm.ormatic_interface import Base
 from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.patterns.called_positionally import called_positionally
 from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -145,7 +146,9 @@ def test_external_collision_avoidance(
         pacer=SimulationPacer(real_time_factor=2),
         extensions=[MotionControl()],
     )
-    statechart = Statechart(context=statechart_origin.create_building_context(executor))
+    statechart = Statechart(
+        context=statechart_origin.create_building_context(executor=executor)
+    )
     statechart.add_nodes(
         nodes=[
             UpdateTemporaryCollisionRules(
@@ -175,7 +178,9 @@ def test_external_collision_avoidance(
     statechart.add_node(node=EndMotion.when_true(node=local_min))
     statechart.add_node(node=CancelStatechart.when_true(node=distance_violated))
 
-    executor.compile(statechart=statechart_origin.hand_over(statechart, executor))
+    executor.compile(
+        statechart=statechart_origin.hand_over(statechart=statechart, executor=executor)
+    )
 
     executor.tick_until_end(timeout=500)
     collisions = executor.context.world.collision_manager.compute_collisions()
@@ -363,7 +368,9 @@ def test_external_collision_avoidance_with_weight_above_ca(
         pacer=SimulationPacer(real_time_factor=1),
         extensions=[MotionControl()],
     )
-    statechart = Statechart(context=statechart_origin.create_building_context(executor))
+    statechart = Statechart(
+        context=statechart_origin.create_building_context(executor=executor)
+    )
     statechart.add_nodes(
         nodes=[
             UpdateTemporaryCollisionRules(
@@ -394,7 +401,9 @@ def test_external_collision_avoidance_with_weight_above_ca(
     statechart.add_node(node=EndMotion.when_true(node=local_min))
     statechart.add_node(node=CancelStatechart.when_true(node=distance_violated))
 
-    executor.compile(statechart=statechart_origin.hand_over(statechart, executor))
+    executor.compile(
+        statechart=statechart_origin.hand_over(statechart=statechart, executor=executor)
+    )
 
     executor.tick_until_end(timeout=500)
     collisions = executor.context.world.collision_manager.compute_collisions()
@@ -622,7 +631,9 @@ def test_self_collision_avoidance(
         context=StatechartContext(world=self_collision_bot_world),
         extensions=[MotionControl()],
     )
-    statechart = Statechart(context=statechart_origin.create_building_context(executor))
+    statechart = Statechart(
+        context=statechart_origin.create_building_context(executor=executor)
+    )
     statechart.add_nodes(
         nodes=[
             UpdateTemporaryCollisionRules(
@@ -641,7 +652,9 @@ def test_self_collision_avoidance(
     )
     statechart.add_node(node=EndMotion.when_true(node=local_min))
 
-    executed_statechart = statechart_origin.hand_over(statechart, executor)
+    executed_statechart = statechart_origin.hand_over(
+        statechart=statechart, executor=executor
+    )
     executor.compile(statechart=executed_statechart)
 
     # 4 because of the base nodes + 1 task avoiding every self collision + 1 for CancelStatechart
@@ -1053,7 +1066,7 @@ def test_only_closest_objects_with_collision_data_weigh_anything(
 # %% collision check counting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionCheckCountingObserver(CollisionConsumer):
     """
     Passive collision consumer that records how often collisions were computed.
@@ -1067,9 +1080,11 @@ class CollisionCheckCountingObserver(CollisionConsumer):
     Number of collision computations observed while registered.
     """
 
+    @called_positionally
     def on_compute_collisions(self, collision_results: CollisionCheckingResult):
         self.collision_check_count += 1
 
+    @called_positionally
     def on_world_model_update(self, world: World):
         pass
 
@@ -1269,7 +1284,9 @@ def executor_driving_into_obstacles(
         context=StatechartContext(world=cylinder_bot_world),
         extensions=[MotionControl()],
     )
-    statechart = Statechart(context=statechart_origin.create_building_context(executor))
+    statechart = Statechart(
+        context=statechart_origin.create_building_context(executor=executor)
+    )
     # In force for the whole motion, next to the steps below.
     statechart.add_node(
         node=UpdateTemporaryCollisionRules(
@@ -1307,7 +1324,9 @@ def executor_driving_into_obstacles(
     statechart.add_node(node=(local_min := LocalMinimumReached()))
     statechart.add_node(node=EndMotion.when_true(node=local_min))
 
-    executor.compile(statechart=statechart_origin.hand_over(statechart, executor))
+    executor.compile(
+        statechart=statechart_origin.hand_over(statechart=statechart, executor=executor)
+    )
     return executor
 
 
@@ -1507,7 +1526,7 @@ def test_end_effector_rules_free_only_that_end_effector(pr2_world_copy) -> None:
     robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
     end_effector = robot.left_arm.end_effector
 
-    node = UpdateTemporaryCollisionRules.for_end_effector(end_effector)
+    node = UpdateTemporaryCollisionRules.for_end_effector(end_effector=end_effector)
 
     assert [type(rule) for rule in node.temporary_rules] == [
         AllowCollisionForEndEffector

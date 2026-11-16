@@ -39,8 +39,6 @@ dependencies = [
     "scikit-learn>=1.7",
     "stepmix>=3.0.0",
     "jax>=0.6.0",
-    "jaxtyping>=0.3.2",
-    "equinox>=0.12.1",
     "mlflow>=2.22.0",
     "optax>=0.2.4",
     "pyjpt; sys_platform == 'linux'",

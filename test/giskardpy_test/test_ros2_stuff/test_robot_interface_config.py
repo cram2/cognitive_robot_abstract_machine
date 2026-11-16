@@ -65,7 +65,7 @@ def test_attaching_lets_the_interface_reach_the_server_config():
         qp_controller_config=QPControllerConfig(target_frequency=50),
     )
 
-    interface.attach(giskard)
+    interface.attach(giskard=giskard)
 
     assert interface.server_config is server_config
 
@@ -186,7 +186,7 @@ def test_a_world_with_a_differential_drive_robot_controls_its_drive(
 # %% in closed loop only commanded joints are controlled
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GroupCommandingInterface(ClosedLoopRobotInterfaceConfig):
     """
     An interface that commands one group of joints.
@@ -260,7 +260,7 @@ def test_closed_loop_does_not_control_a_drive_nothing_commands(
 # %% commanding the drive
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveCommandingInterface(ClosedLoopRobotInterfaceConfig):
     """
     An interface that commands the drive of the robot without naming the drive.
@@ -301,7 +301,7 @@ def test_a_drive_command_without_a_drive_in_a_world_without_a_drive_raises(
 # %% reading the robot's own parts from the robot
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartReadingInterface(GroupCommandingInterface):
     """
     An interface that reads every part of the robot from the robot itself, on the topics
@@ -382,7 +382,7 @@ def test_the_base_pose_is_read_by_both_loops_from_one_source(
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BaseReadingInterface(GroupCommandingInterface):
     """
     An interface that reads only the robot's base from the robot itself, leaving its
@@ -391,7 +391,7 @@ class BaseReadingInterface(GroupCommandingInterface):
 
     def setup(self):
         super().setup()
-        self.sync_robot_part(self.robot.mobile_base)
+        self.sync_robot_part(robot_part=self.robot.mobile_base)
 
 
 @pytest.fixture()
@@ -432,7 +432,7 @@ def test_syncing_one_part_leaves_the_other_parts_reading_the_world(
 # %% reading the robot from a joint state topic
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControlLoopMimic:
     """
     Holds the inputs a control loop reads in every cycle.
@@ -444,7 +444,7 @@ class ControlLoopMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionServerMimic:
     """
     Holds the inputs read between goals and the control loop that executes a goal.
@@ -461,7 +461,7 @@ class MotionServerMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContextMimic:
     """
     Holds the world a motion is executed in.
@@ -473,7 +473,7 @@ class ContextMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutorMimic:
     """
     Holds the context of the motion.
@@ -485,7 +485,7 @@ class ExecutorMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotMimic:
     """
     A robot that is only known by its name.
@@ -497,7 +497,7 @@ class RobotMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardMimic:
     """
     Offers the parts of Giskard that a robot interface configures.
@@ -519,14 +519,14 @@ class GiskardMimic:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointStateTopicInterface(ClosedLoopRobotInterfaceConfig):
     """
     Reads the state of the robot from a single joint state topic.
     """
 
     def setup(self):
-        self.sync_joint_state_topic("joint_states")
+        self.sync_joint_state_topic(topic_name="joint_states")
 
 
 def test_closed_loop_does_not_rewrite_a_joint_state_it_already_wrote(
@@ -536,7 +536,7 @@ def test_closed_loop_does_not_rewrite_a_joint_state_it_already_wrote(
     control_loop_inputs = WorldStateInputs(world=mini_world)
     interface = JointStateTopicInterface()
     interface.attach(
-        GiskardMimic(
+        giskard=GiskardMimic(
             executor=ExecutorMimic(context=ContextMimic(world=mini_world)),
             robot=RobotMimic(name="robot"),
             motion_server=MotionServerMimic(

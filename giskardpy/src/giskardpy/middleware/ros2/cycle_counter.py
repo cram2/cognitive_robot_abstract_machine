@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CycleCounter:
     """
     Counts how often the motion server made progress.

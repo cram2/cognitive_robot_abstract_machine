@@ -1,29 +1,15 @@
+"""
+Drawing a rustworkx graph as a layered diagram with matplotlib.
+"""
+
 from __future__ import annotations
 
-from collections import defaultdict
+import sys
+from collections import OrderedDict, defaultdict
 from textwrap import fill
 
+import numpy as np
 from typing_extensions import TYPE_CHECKING, Any
-
-try:
-    import matplotlib as mpl
-
-    # Ensure a non-interactive backend for headless environments
-    # Needs to be done before importing pyplot
-    try:
-        mpl.use("Agg")
-    except Exception:
-        pass
-    from matplotlib import pyplot as plt
-    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
-    from matplotlib.path import Path
-except ModuleNotFoundError:
-    mpl = None
-
-try:
-    import numpy as np
-except ModuleNotFoundError:
-    np = None
 
 from krrood.rustworkx_utils.utils import ColorLegend
 
@@ -77,7 +63,18 @@ class GraphVisualizer:
         self.ctx: dict[str, Any] = {}
 
     def render(self):
-        self._check_dependencies()
+        """
+        Draw the graph rooted at :attr:`node` and save it to the configured file.
+
+        :return: The figure and axes the graph is drawn on.
+        :raises ModuleNotFoundError: If matplotlib is not installed.
+        """
+        import matplotlib
+
+        if "matplotlib.pyplot" not in sys.modules:
+            # A non-interactive backend for headless environments; it can only be chosen
+            # without closing open figures before pyplot is loaded.
+            matplotlib.use("Agg")
         self._build_rooted_subgraph()
         self._layer_nodes()
         self._order_layers_barycentric()
@@ -96,19 +93,6 @@ class GraphVisualizer:
         self._draw_legend(fig=fig, ax=ax)
         self._style_and_save(fig=fig, ax=ax)
         return fig, ax
-
-    @classmethod
-    def _check_dependencies(cls):
-        if mpl is None:
-            raise ModuleNotFoundError(
-                "matplotlib must be installed to visualize the graph. (pip install matplotlib)",
-                name="matplotlib",
-            )
-        elif np is None:
-            raise ModuleNotFoundError(
-                "numpy must be installed to visualize the graph. (pip install numpy)",
-                name="numpy",
-            )
 
     def _build_rooted_subgraph(self):
         root = self.node.root
@@ -274,6 +258,8 @@ class GraphVisualizer:
                     ordered_nodes.append(id_to_node[nid])
                     coords.append((x, y))
         if not ordered_nodes:
+            from matplotlib import pyplot as plt
+
             fig, ax = plt.subplots(figsize=(self.params["figsize"] or (6, 4)))
             self.ctx.update(dict(empty=True, fig=fig, ax=ax))
             return
@@ -359,6 +345,8 @@ class GraphVisualizer:
         self.ctx["figsize"] = (base_w * w_scale, base_h * h_scale)
 
     def _setup_figure(self):
+        from matplotlib import pyplot as plt
+
         figsize = self.ctx.get("figsize", self.params["figsize"])
         fig, ax = plt.subplots(figsize=figsize)
         xlim = self.ctx.get("xlim", (0.0, self.ctx["x_extent"]))
@@ -507,6 +495,8 @@ class GraphVisualizer:
         ax.set_ylim(self.ctx["ylim"])
 
     def _draw_wrap_boxes(self, *, ax):
+        from matplotlib.patches import FancyBboxPatch
+
         ordered_nodes = self.ctx["ordered_nodes"]
         id_map = self.ctx["id_map"]
         obstacles_rects = self.ctx["obstacles_rects"]
@@ -647,6 +637,9 @@ class GraphVisualizer:
         return False
 
     def _draw_edges(self, *, ax):
+        from matplotlib.patches import FancyArrowPatch
+        from matplotlib.path import Path
+
         edge_style = self.params["edge_style"]
         curve_scale = float(self.params["curve_scale"])
         edges = self.ctx["edges"]
@@ -751,11 +744,9 @@ class GraphVisualizer:
                     ax.add_patch(arrow)
                 else:
                     # Short straight segment: draw straight with cropped endpoints
-                    from matplotlib.path import Path as MPath
-
                     verts = [tuple(start), tuple(end)]
-                    codes = [MPath.MOVETO, MPath.LINETO]
-                    path = MPath(verts, codes)
+                    codes = [Path.MOVETO, Path.LINETO]
+                    path = Path(verts, codes)
                     arrow = FancyArrowPatch(
                         path=path,
                         arrowstyle="-|>",
@@ -946,8 +937,6 @@ class GraphVisualizer:
                             )
                             ax.add_patch(arrow)
                             continue
-                from matplotlib.path import Path as MPath
-
                 # Crop endpoints of the orthogonal path so it meets node borders
                 pts = list(best)
                 # Pre-cropping deduplication to ensure non-zero first/last segments
@@ -1014,11 +1003,11 @@ class GraphVisualizer:
 
                 def add_moveto(pt):
                     verts.append(pt)
-                    codes.append(MPath.MOVETO)
+                    codes.append(Path.MOVETO)
 
                 def add_lineto(pt):
                     verts.append(pt)
-                    codes.append(MPath.LINETO)
+                    codes.append(Path.LINETO)
 
                 add_moveto(pts[0])
                 for i in range(1, len(pts)):
@@ -1028,7 +1017,7 @@ class GraphVisualizer:
                     b = pts[i]
                     ori = "v" if abs(a[0] - b[0]) < 1e-12 else "h"
                     prev_ortho_segments.append((ori, a[0], a[1], b[0], b[1], u, v))
-                path = MPath(verts, codes)
+                path = Path(verts, codes)
                 arrow = FancyArrowPatch(
                     path=path,
                     arrowstyle="-|>",
@@ -1157,8 +1146,8 @@ class GraphVisualizer:
         self.ctx["any_enclosed"] = any_enclosed
 
     def _draw_legend(self, *, fig, ax):
-        from collections import OrderedDict
         from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
 
         ordered_nodes = self.ctx["ordered_nodes"]
         colors = self.ctx["colors"]
@@ -1171,7 +1160,7 @@ class GraphVisualizer:
             return
         handles = []
         for lbl, col in fam_to_color.items():
-            patch = mpl.patches.Patch(facecolor=col, edgecolor="black", label=lbl)
+            patch = Patch(facecolor=col, edgecolor="black", label=lbl)
             handles.append(patch)
         # Add enclosed marker legend if applicable
         if self.ctx.get("any_enclosed", False):
@@ -1220,6 +1209,8 @@ class GraphVisualizer:
         legend.get_title().set_color("black")
 
     def _style_and_save(self, *, fig, ax):
+        from matplotlib import pyplot as plt
+
         # White backgrounds
         fig.patch.set_facecolor("white")
         ax.set_facecolor("white")
