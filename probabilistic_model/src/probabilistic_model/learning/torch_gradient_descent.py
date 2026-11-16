@@ -92,14 +92,13 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
         for _ in progress_bar:
             loss = self.step(optimizer=optimizer, arguments=arguments)
             progress_bar.set_postfix_str(f"Loss: {loss}")
-        return self.trained_layer()
+        return self.trained_root()
 
     def minimize_until_converged(
         self,
         *arguments: torch.Tensor,
         convergence: Convergence | None = None,
-        batch_size: int | None = None,
-        seed: int = 69,
+        mini_batches: MiniBatches | None = None,
     ) -> TrainingRun[LayerType]:
         """
         Minimize the :attr:`loss` on shuffled mini-batches, one optimizer step per
@@ -109,22 +108,20 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
             per training example each.
         :param convergence: When training stops, :class:`Convergence` with its defaults
             if ``None``.
-        :param batch_size: The number of rows of every step, all rows if ``None``.
-        :param seed: The seed of the shuffling of the rows.
+        :param mini_batches: How the rows are split into the batches of every epoch,
+            :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
         :return: The trained circuit and the losses of its epochs.
         """
         training = TorchGradientDescentTraining(
             arguments=arguments,
-            mini_batches=MiniBatches(
-                number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
-            ),
+            mini_batches=MiniBatches() if mini_batches is None else mini_batches,
             gradient_descent=self,
             optimizer=self.optimizer_type(self.parameters, lr=self.learning_rate),
         )
         history = (
             Convergence() if convergence is None else convergence
         ).history_until_converged(training=training)
-        return TrainingRun(trained_layer=self.trained_layer(), history=history)
+        return TrainingRun(trained_root=self.trained_root(), history=history)
 
     def step(
         self, *, optimizer: torch.optim.Optimizer, arguments: tuple[torch.Tensor, ...]
@@ -153,7 +150,7 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
                 parameter.copy_(valid)
         return loss.item()
 
-    def trained_layer(self) -> LayerType:
+    def trained_root(self) -> LayerType:
         """
         :return: The root of a copy of the circuit with the current parameters.
         """

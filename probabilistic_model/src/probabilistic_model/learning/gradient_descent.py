@@ -153,7 +153,7 @@ class TrainingRun(Generic[LayerType], SubClassSafeGeneric):
     A circuit trained until convergence, with the losses of the epochs it took.
     """
 
-    trained_layer: LayerType
+    trained_root: LayerType
     """
     The root of the trained circuit.
     """
@@ -270,8 +270,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
         self,
         *arguments: jax.Array,
         convergence: Convergence | None = None,
-        batch_size: int | None = None,
-        seed: int = 69,
+        mini_batches: MiniBatches | None = None,
     ) -> TrainingRun[LayerType]:
         """
         Minimize the :attr:`loss` on shuffled mini-batches, one compiled step per batch,
@@ -281,22 +280,20 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
             per training example each.
         :param convergence: When training stops, :class:`Convergence` with its defaults
             if ``None``.
-        :param batch_size: The number of rows of every step, all rows if ``None``.
-        :param seed: The seed of the shuffling of the rows.
+        :param mini_batches: How the rows are split into the batches of every epoch,
+            :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
         :return: The trained circuit and the losses of its epochs.
         """
         training = GradientDescentTraining(
             arguments=arguments,
-            mini_batches=MiniBatches(
-                number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
-            ),
+            mini_batches=MiniBatches() if mini_batches is None else mini_batches,
             gradient_descent=self,
         )
         history = (
             Convergence() if convergence is None else convergence
         ).history_until_converged(training=training)
         return TrainingRun(
-            trained_layer=self.layer.copy_with_circuit_parameters(
+            trained_root=self.layer.copy_with_circuit_parameters(
                 training.state.parameters
             ),
             history=history,

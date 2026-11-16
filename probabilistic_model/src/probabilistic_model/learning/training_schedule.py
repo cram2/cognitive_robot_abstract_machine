@@ -104,11 +104,6 @@ class MiniBatches:
     Splits the rows of the training arrays into shuffled mini-batches, anew every epoch.
     """
 
-    number_of_rows: int
-    """
-    The number of rows every training array has.
-    """
-
     batch_size: int | None = None
     """
     The number of rows of every batch but the last, all rows if ``None``.
@@ -137,9 +132,10 @@ class MiniBatches:
         :param arguments: The training arrays, one row per training example each.
         :return: The batches of one epoch, each holding the same rows of every array.
         """
-        order = self.random_number_generator.permutation(self.number_of_rows)
-        step = self.number_of_rows if self.batch_size is None else self.batch_size
-        for start in range(0, self.number_of_rows, step):
+        number_of_rows = arguments[0].shape[0]
+        order = self.random_number_generator.permutation(number_of_rows)
+        step = number_of_rows if self.batch_size is None else self.batch_size
+        for start in range(0, number_of_rows, step):
             rows = order[start : start + step]
             yield tuple(
                 array_namespace(argument).take(
@@ -188,4 +184,4 @@ class MiniBatchTraining(ABC):
         total_loss = 0.0
         for batch in self.mini_batches.batches_of_epoch(arguments=self.arguments):
             total_loss += self.step_on_batch(batch=batch) * batch[0].shape[0]
-        return total_loss / self.mini_batches.number_of_rows
+        return total_loss / self.arguments[0].shape[0]

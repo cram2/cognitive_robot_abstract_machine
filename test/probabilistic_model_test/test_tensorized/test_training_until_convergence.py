@@ -60,7 +60,7 @@ def scripted_training(losses: list[float]) -> ScriptedLossTraining:
     """
     return ScriptedLossTraining(
         arguments=(np.zeros(1),),
-        mini_batches=MiniBatches(number_of_rows=1),
+        mini_batches=MiniBatches(),
         losses=losses,
     )
 
@@ -132,9 +132,7 @@ def test_the_batches_of_an_epoch_hold_every_row_once():
     rows = np.arange(10.0)
 
     batches = list(
-        MiniBatches(number_of_rows=10, batch_size=4, seed=0).batches_of_epoch(
-            arguments=(rows,)
-        )
+        MiniBatches(batch_size=4, seed=0).batches_of_epoch(arguments=(rows,))
     )
 
     assert [len(batch) for (batch,) in batches] == [4, 4, 2]
@@ -148,9 +146,9 @@ def test_the_batches_keep_the_rows_of_all_arguments_together():
     data = np.arange(10.0)
     labels = np.arange(10.0) * 2
 
-    for batch_data, batch_labels in MiniBatches(
-        number_of_rows=10, batch_size=3, seed=0
-    ).batches_of_epoch(arguments=(data, labels)):
+    for batch_data, batch_labels in MiniBatches(batch_size=3, seed=0).batches_of_epoch(
+        arguments=(data, labels)
+    ):
         np.testing.assert_array_equal(batch_labels, batch_data * 2)
 
 
@@ -161,9 +159,7 @@ def test_without_a_batch_size_an_epoch_is_one_batch_of_every_row():
     rows = np.arange(10.0)
 
     batches = list(
-        MiniBatches(number_of_rows=10, batch_size=None, seed=0).batches_of_epoch(
-            arguments=(rows,)
-        )
+        MiniBatches(batch_size=None, seed=0).batches_of_epoch(arguments=(rows,))
     )
 
     assert len(batches) == 1
@@ -202,9 +198,11 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
         run = GradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize_until_converged(
-            events, convergence=training_convergence, batch_size=100
+            events,
+            convergence=training_convergence,
+            mini_batches=MiniBatches(batch_size=100),
         )
-        after = float(jnp.mean(run.trained_layer.log_likelihood_of_nodes(events)[:, 0]))
+        after = float(jnp.mean(run.trained_root.log_likelihood_of_nodes(events)[:, 0]))
     assert after > before + minimum_improvement
 
 
@@ -232,6 +230,10 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     before = float(circuit.log_likelihood(events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
         circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
-    ).minimize_until_converged(events, convergence=training_convergence, batch_size=100)
-    after = float(run.trained_layer.log_likelihood_of_nodes(events)[:, 0].mean())
+    ).minimize_until_converged(
+        events,
+        convergence=training_convergence,
+        mini_batches=MiniBatches(batch_size=100),
+    )
+    after = float(run.trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
     assert after > before + minimum_improvement
