@@ -54,7 +54,9 @@ results: tuple[VerbalizationResult, ...] = (
         IsSameSemanticEntity,
         "a first entity is the same semantic entity as a second entity",
     ),
-    VerbalizationResult(IsSubClassOrRole, "a type is a subclass or role of object"),
+    VerbalizationResult(
+        IsSubClassOrRole, "a type is a subclass of or a role for object"
+    ),
     VerbalizationResult(IsReachable, "a location is reachable for a body"),
     VerbalizationResult(WorksIn, "an employee works in a department"),
     VerbalizationResult(

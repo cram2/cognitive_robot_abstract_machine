@@ -96,13 +96,13 @@ class IsSubClassOrRole(Predicate):
     def _verbalization_fragment_(
         cls, *, fields: RenderedFields
     ) -> VerbalizationFragment:
-        """:return: the clause *"<sub_class> is a subclass or role of
+        """:return: the clause *"<sub_class> is a subclass of or a role for
         <super_class>"*."""
         return clause(
             Noun(content=fields["sub_class"]),
             Copula(),
-            Noun(content="subclass or role"),
-            Prepositions.OF,
+            Noun(content="subclass of or a role"),
+            Prepositions.FOR,
             Noun(content=fields["super_class"]),
         )
 
