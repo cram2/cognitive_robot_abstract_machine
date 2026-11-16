@@ -142,6 +142,8 @@ class ResetStateContextManager:
 
     On leaving the context, even through an exception, every degree of freedom still in
     the world gets back the state it had on entering, and the state change is notified.
+    A degree of freedom added inside the context keeps its state, having none to go back
+    to.
     """
 
     world: World
@@ -149,15 +151,22 @@ class ResetStateContextManager:
     The world whose state is reset.
     """
 
-    state_on_entering: dict[UUID, npt.NDArray[np.float64]] = field(
-        default_factory=dict, init=False, repr=False
+    degree_of_freedom_ids_on_entering: list[UUID] = field(
+        default_factory=list, init=False, repr=False
     )
     """
-    The state of every degree of freedom when the context was entered.
+    The degrees of freedom of the world when the context was entered, in the order of
+    the columns of :attr:`state_on_entering`.
+    """
+
+    state_on_entering: npt.NDArray[np.float64] = field(init=False, repr=False)
+    """
+    The state of every degree of freedom when the context was entered, one column each.
     """
 
     def __enter__(self) -> None:
-        self.state_on_entering = dict(self.world.state.items())
+        self.degree_of_freedom_ids_on_entering = self.world.state.keys()
+        self.state_on_entering = self.world.state._data.copy()
 
     def __exit__(
         self,
@@ -165,9 +174,17 @@ class ResetStateContextManager:
         exc_val: Exception | None,
         exc_tb: type | None,
     ) -> None:
-        for degree_of_freedom_id, state in self.state_on_entering.items():
-            if degree_of_freedom_id in self.world.state:
-                self.world.state[degree_of_freedom_id] = state
+        if self.world.state.keys() == self.degree_of_freedom_ids_on_entering:
+            self.world.state._data[:] = self.state_on_entering
+        else:
+            # the model changed inside the context, so the columns no longer line up
+            for column, degree_of_freedom_id in enumerate(
+                self.degree_of_freedom_ids_on_entering
+            ):
+                if degree_of_freedom_id in self.world.state:
+                    self.world.state[degree_of_freedom_id] = self.state_on_entering[
+                        :, column
+                    ]
         self.world.notify_state_change()
 
 

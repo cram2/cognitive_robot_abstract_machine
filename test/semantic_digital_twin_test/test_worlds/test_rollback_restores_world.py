@@ -113,6 +113,41 @@ def test_reset_state_context_restores_by_degree_of_freedom(free_item_world):
     )
 
 
+def test_reset_state_context_restores_state_without_model_change(free_item_world):
+    world, item, _, arm_joint = free_item_world
+    pose_before = item.global_transform.to_np()
+
+    with world.reset_state_context():
+        arm_joint.position = -0.3
+        item.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=5.0, reference_frame=item.parent_connection.parent
+        )
+
+    assert (arm_joint.position, item.global_transform.to_np().tolist()) == (
+        0.7,
+        pose_before.tolist(),
+    )
+
+
+def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
+    free_item_world,
+):
+    world, _, table, _ = free_item_world
+
+    with world.reset_state_context():
+        with world.modify_world():
+            drawer_joint = RevoluteConnection.create_with_dofs(
+                world=world,
+                parent=table,
+                child=Body(name=PrefixedName("drawer")),
+                axis=Vector3.Z(),
+            )
+            world.add_connection(drawer_joint)
+        drawer_joint.position = 0.4
+
+    assert drawer_joint.position == 0.4
+
+
 # %% histories that were cleared
 
 
