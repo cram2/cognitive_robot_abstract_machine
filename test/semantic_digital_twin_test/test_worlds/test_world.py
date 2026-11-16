@@ -80,6 +80,7 @@ from semantic_digital_twin.world_description.world_modification import (
     AddConnectionModification,
     AddKinematicStructureEntityModification,
     AttributeUpdateModification,
+    RemoveConnectionModification,
     RemoveKinematicStructureEntityModification,
 )
 from semantic_digital_twin.world_description.world_state import (
@@ -2988,7 +2989,7 @@ def test_world_does_not_record_removing_a_kinematic_structure_entity_it_does_not
     assert body in world.kinematic_structure_entities
 
 
-def test_world_removing_a_connection_after_its_child_records_only_the_child():
+def test_world_removing_a_connection_after_its_child_records_it_once():
     """
     A connection that left the world with its child is not removed a second time, so the
     order of the two removals leaves a history that still rebuilds the world.
@@ -3005,7 +3006,7 @@ def test_world_removing_a_connection_after_its_child_records_only_the_child():
     assert [
         type(modification)
         for modification in recorded_modifications(world)[modifications_before_removal:]
-    ] == [RemoveKinematicStructureEntityModification]
+    ] == [RemoveConnectionModification, RemoveKinematicStructureEntityModification]
     assert_rebuilds_to_same_structure(world, World(name="other"))
 
 

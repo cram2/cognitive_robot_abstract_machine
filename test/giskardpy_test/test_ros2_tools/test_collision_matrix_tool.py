@@ -12,6 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typing_extensions import Any, Iterator
 
+from krrood.patterns.called_positionally import called_positionally
+
 # Mock PyQt5
 QtWidgets = MagicMock()
 
@@ -20,18 +22,23 @@ class MockQWidget:
     def __init__(self, *args, **kwargs):
         pass
 
+    @called_positionally
     def setLayout(self, layout):
         pass
 
+    @called_positionally
     def setWindowTitle(self, title):
         pass
 
+    @called_positionally
     def setMinimumSize(self, w, h):
         pass
 
+    @called_positionally
     def setCentralWidget(self, widget):
         pass
 
+    @called_positionally
     def setDisabled(self, active):
         pass
 
@@ -147,7 +154,7 @@ def test_load_urdf(interface):
     pr2_xacro_path = (
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     )
-    interface.load_urdf(pr2_xacro_path)
+    interface.load_urdf(urdf_path=pr2_xacro_path)
     assert len(interface.world.bodies) > 0
 
 
@@ -162,14 +169,16 @@ def test_add_remove_pair(interface):
         mock_cc.return_value.body_a = body_a
         mock_cc.return_value.body_b = body_b
 
-        interface.add_pair(body_a, body_b, DisableCollisionReason.Never)
+        interface.add_pair(
+            body_a=body_a, body_b=body_b, reason=DisableCollisionReason.Never
+        )
         assert (
-            interface.get_reason_for_pair(body_a, body_b)
+            interface.get_reason_for_pair(body_a=body_a, body_b=body_b)
             == DisableCollisionReason.Never
         )
 
-        interface.remove_pair(body_a, body_b)
-        assert interface.get_reason_for_pair(body_a, body_b) is None
+        interface.remove_pair(body_a=body_a, body_b=body_b)
+        assert interface.get_reason_for_pair(body_a=body_a, body_b=body_b) is None
 
 
 def test_compute_self_collision_matrix(interface):
@@ -188,14 +197,14 @@ def test_disable_enable_body(interface):
     interface.self_collision_matrix_rule = MagicMock()
 
     interface.remove_body(
-        body
+        body=body
     )  # Implementation: adds to allowed_collision_bodies (disables it)
     interface.self_collision_matrix_rule.allowed_collision_bodies.add.assert_called_with(
         body
     )
 
     interface.add_body(
-        body
+        body=body
     )  # Implementation: discards from allowed_collision_bodies (enables it)
     interface.self_collision_matrix_rule.allowed_collision_bodies.discard.assert_called_with(
         body
@@ -247,7 +256,7 @@ def test_load_urdf_and_compute_srdf_pr2(interface):
     pr2_xacro_path = (
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     )
-    interface.load_urdf(pr2_xacro_path)
+    interface.load_urdf(urdf_path=pr2_xacro_path)
     assert len(interface.world.bodies) > 0
 
     progess_mock = MagicMock()

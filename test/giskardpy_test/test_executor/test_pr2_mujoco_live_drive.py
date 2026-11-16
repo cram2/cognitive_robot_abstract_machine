@@ -82,7 +82,7 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
         )
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end(timeout=tick_limit)
-        MotionControl.set_velocity_acceleration_jerk_to_zero(world)
+        MotionControl.set_velocity_acceleration_jerk_to_zero(world=world)
         world.notify_state_change()
         pacer.wait_for_standstill()
         x, y, _ = simulation.simulator.get_body_position(
