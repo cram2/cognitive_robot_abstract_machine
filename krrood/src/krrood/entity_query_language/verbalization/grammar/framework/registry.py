@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
-import sys
 from dataclasses import dataclass
 
 from krrood.entity_query_language.verbalization import grammar as grammar_package
@@ -45,14 +44,13 @@ class PhraseRuleRegistry:
     @classmethod
     def loaded_rules(cls) -> list[PhraseRule]:
         """
-        :return: One instance of every concrete :class:`PhraseRule` subclass bound under
-            its name in its loaded module when this is called: those of the grammar
-            package, and those of any other module, such as a krrood part's own
+        :return: One instance of every concrete :class:`PhraseRule` subclass loaded when
+            this is called whose :attr:`PhraseRule.joins_grammar` is ``True``: those of the
+            grammar package, and those of any other module, such as a krrood part's own
             constructs.
         """
         return [
             rule_class()
             for rule_class in concrete_subclasses(PhraseRule)
-            if vars(sys.modules[rule_class.__module__]).get(rule_class.__name__)
-            is rule_class
+            if rule_class.joins_grammar
         ]

@@ -81,15 +81,16 @@ def test_registry_includes_a_module_level_rule_defined_outside_the_grammar_packa
     }
 
 
-def test_registry_completeness_check_ignores_phrase_rule_subclasses_defined_outside_grammar():
+def test_registry_excludes_a_rule_that_opts_out_of_the_grammar():
     """
-    A ``PhraseRule`` subclass a function defines, as tests do to exercise the dispatch
-    contract, is neither part of the grammar package's rules nor loaded into the
-    grammar, however long it stays alive.
+    A ``PhraseRule`` subclass that sets ``joins_grammar`` to ``False``, as tests do for
+    the rules they define to exercise the dispatch contract, is neither part of the
+    grammar package's rules nor loaded into the grammar, however long it stays alive.
     """
 
     class TransientNonGrammarRule(PhraseRule):
         construct = object
+        joins_grammar = False
 
         def build(self, node, context):
             raise NotImplementedError
@@ -101,20 +102,41 @@ def test_registry_completeness_check_ignores_phrase_rule_subclasses_defined_outs
     }
 
 
-def test_registry_excludes_a_rule_class_created_dynamically():
+def test_registry_excludes_the_subclasses_of_a_rule_that_opts_out():
     """
-    A ``PhraseRule`` subclass built with :func:`type`, which no module binds, is not
-    loaded into the grammar.
+    A rule inherits the opt-out of its base, so a test base rule covers the rules built
+    on it.
     """
-    dynamic_rule = type(
-        "DynamicRule",
-        (PhraseRule,),
-        {"construct": object, "build": lambda self, node, context: None},
-    )
 
-    assert dynamic_rule not in {
+    class OptedOutBase(PhraseRule, ABC):
+        joins_grammar = False
+
+    class InheritingRule(OptedOutBase):
+        construct = object
+
+        def build(self, node, context):
+            raise NotImplementedError
+
+    assert InheritingRule not in {
         type(rule) for rule in PhraseRuleRegistry.loaded_rules()
     }
+
+
+def test_registry_includes_a_rule_that_does_not_opt_out():
+    """
+    A concrete ``PhraseRule`` subclass joins the grammar unless it opts out.
+    """
+
+    class UnrelatedConstruct:
+        pass
+
+    class DefaultRule(PhraseRule):
+        construct = UnrelatedConstruct
+
+        def build(self, node, context):
+            raise NotImplementedError
+
+    assert DefaultRule in {type(rule) for rule in PhraseRuleRegistry.loaded_rules()}
 
 
 def test_maxima_returns_all_co_maximal_candidates():
@@ -147,12 +169,14 @@ def test_select_raises_on_equally_specific_rule_collision():
 
     class FirstRule(PhraseRule):
         construct = Node
+        joins_grammar = False
 
         def build(self, node, context):
             raise NotImplementedError
 
     class SecondRule(PhraseRule):
         construct = Node
+        joins_grammar = False
 
         def build(self, node, context):
             raise NotImplementedError
