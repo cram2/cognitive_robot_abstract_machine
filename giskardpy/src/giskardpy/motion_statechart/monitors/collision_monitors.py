@@ -63,7 +63,7 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
         """
         manager = self.context.require_extension(
             extension_type=MotionControlContext
-        ).get_or_create_external_collision_manager(self.context)
+        ).get_or_create_external_collision_manager(context=self.context)
 
         manager.register_group_of_body(self.body)
         group = manager.get_collision_group(self.body)
@@ -121,7 +121,7 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
         """
         manager = self.context.require_extension(
             extension_type=MotionControlContext
-        ).get_or_create_self_collision_manager(self.context)
+        ).get_or_create_self_collision_manager(context=self.context)
 
         manager.register_groups_of_body_combination(self.body_a, self.body_b)
         combination = manager.body_pair_to_group_pair(self.body_a, self.body_b)

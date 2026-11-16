@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from cramph.statechart import Statechart
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpression:
     """
     Symbolic expressions used for debugging only.
@@ -81,7 +81,7 @@ class DebugExpression:
         return self.expression.evaluate()
 
     @classmethod
-    def collect_from(cls, statechart: Statechart) -> list[DebugExpression]:
+    def collect_from(cls, *, statechart: Statechart) -> list[DebugExpression]:
         """
         :param statechart: The statechart whose nodes registered debug expressions.
         :return: The debug expressions of every motion node of `statechart`, in node
@@ -121,7 +121,7 @@ class MotionNodeArtifacts(NodeArtifacts):
     """
 
     @classmethod
-    def from_node_artifacts(cls, artifacts: NodeArtifacts) -> Self:
+    def from_node_artifacts(cls, *, artifacts: NodeArtifacts) -> Self:
         """
         :param artifacts: The artifacts a node built.
         :return: `artifacts` itself if it already describes motion, otherwise motion
@@ -139,7 +139,7 @@ class MotionNodeArtifacts(NodeArtifacts):
 
         :return: The builder for this collection of artifacts.
         """
-        return GeometricConstraintBuilder(self.constraints)
+        return GeometricConstraintBuilder(collection=self.constraints)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
@@ -157,8 +157,8 @@ class MotionStatechartNode(StatechartNode):
         return super().artifacts
 
     def apply_artifacts(self, *, artifacts: NodeArtifacts) -> None:
-        motion_artifacts = MotionNodeArtifacts.from_node_artifacts(artifacts)
-        motion_artifacts.constraints.link_to_motion_statechart_node(self)
+        motion_artifacts = MotionNodeArtifacts.from_node_artifacts(artifacts=artifacts)
+        motion_artifacts.constraints.link_to_motion_statechart_node(node=self)
         super().apply_artifacts(artifacts=motion_artifacts)
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -320,10 +320,10 @@ class ConvergingTask(ABC, Task):
         artifacts = super().build()
         if not isinstance(artifacts, MotionNodeArtifacts) or artifacts.error is None:
             raise MissingErrorSignalError(node=self)
-        artifacts.observation = self.goal_reached_at(artifacts.error)
+        artifacts.observation = self.goal_reached_at(error=artifacts.error)
         return artifacts
 
-    def goal_reached_at(self, error: Scalar) -> Scalar:
+    def goal_reached_at(self, *, error: Scalar) -> Scalar:
         """
         :param error: An error of this task, in its own units.
         :return: Whether this task observes its goal as reached at that error.
