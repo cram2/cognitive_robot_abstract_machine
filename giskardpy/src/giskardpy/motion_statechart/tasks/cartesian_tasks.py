@@ -36,14 +36,16 @@ from giskardpy.motion_statechart.mixins import (
     HasGoalPointParameter,
     HasGoalPointsParameter,
     HasGoalPoseParameter,
-    HasPoseCruiseVelocityParameters,
-    HasPoseThresholdParameters,
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
     HasCruiseVelocityParameter,
     HasRootLinkParameter,
     HasThresholdParameter,
     HasTipLinkParameter,
-    HasAngularVelocityLimitParameter,
-    HasLinearVelocityLimitParameter,
+    HasMaxAngularVelocityParameter,
+    HasMaxLinearVelocityParameter,
     HasWeightParameter,
     HasKinematicChainParameters,
 )
@@ -563,8 +565,8 @@ class CartesianPositionStraight(CartesianTask, HasGoalPointParameter):
         Start the line at the pose the tip has now.
 
         A line starts where the tip is when the motion begins, no matter how much
-        earlier the statechart was built, and independently of :attr:`binding_policy`,
-        which only decides when the goal is computed.
+        earlier the statechart was built, and independently of
+        :attr:`goal_binding_policy`, which only decides when the goal is computed.
         """
         super().on_start()
         self._line_start_binding.bind(self.context.world)
@@ -685,8 +687,10 @@ class CartesianPose(
     HasTipLinkParameter,
     HasGoalPoseParameter,
     HasGoalBindingPolicyParameter,
-    HasPoseThresholdParameters,
-    HasPoseCruiseVelocityParameters,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
     HasWeightParameter,
 ):
     """
@@ -734,7 +738,7 @@ class CartesianPose(
                 cruise_velocity=self.cruise_linear_velocity,
                 threshold=self.position_threshold,
                 weight=self.weight,
-                binding_policy=self.binding_policy,
+                goal_binding_policy=self.goal_binding_policy,
             ),
             CartesianOrientation(
                 name=f"{self.name}/orientation",
@@ -744,7 +748,7 @@ class CartesianPose(
                 cruise_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,
-                binding_policy=self.binding_policy,
+                goal_binding_policy=self.goal_binding_policy,
             ),
         ]
 
@@ -874,7 +878,13 @@ class HoldOrientation(HoldLink, HasThresholdParameter, HasCruiseVelocityParamete
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HoldPose(HoldLink, HasPoseThresholdParameters, HasPoseCruiseVelocityParameters):
+class HoldPose(
+    HoldLink,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
     Keeps a link at the pose it had when this task started.
     """
@@ -965,7 +975,7 @@ class RigidCoupling(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianPositionVelocityLimit(
-    Task, HasKinematicChainParameters, HasLinearVelocityLimitParameter
+    Task, HasKinematicChainParameters, HasMaxLinearVelocityParameter
 ):
     """
     Limit the Cartesian (translational) velocity of a tip link relative to a root link,
@@ -1014,7 +1024,7 @@ class CartesianPositionVelocityLimit(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianRotationVelocityLimit(
-    Task, HasKinematicChainParameters, HasAngularVelocityLimitParameter
+    Task, HasKinematicChainParameters, HasMaxAngularVelocityParameter
 ):
     """
     Limit the angular velocity of a tip link relative to a root link, in rad/s.
@@ -1064,8 +1074,8 @@ class CartesianRotationVelocityLimit(
 class CartesianVelocityLimit(
     Parallel,
     HasKinematicChainParameters,
-    HasLinearVelocityLimitParameter,
-    HasAngularVelocityLimitParameter,
+    HasMaxLinearVelocityParameter,
+    HasMaxAngularVelocityParameter,
     HasWeightParameter,
 ):
     """
@@ -1146,7 +1156,7 @@ class CartesianPoseStraight(CartesianPose):
                 cruise_velocity=self.cruise_linear_velocity,
                 threshold=self.position_threshold,
                 weight=self.weight,
-                binding_policy=self.binding_policy,
+                goal_binding_policy=self.goal_binding_policy,
             ),
             CartesianOrientation(
                 name=f"{self.name}/orientation",
@@ -1156,6 +1166,6 @@ class CartesianPoseStraight(CartesianPose):
                 cruise_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,
-                binding_policy=self.binding_policy,
+                goal_binding_policy=self.goal_binding_policy,
             ),
         ]

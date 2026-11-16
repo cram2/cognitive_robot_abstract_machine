@@ -18,7 +18,8 @@ from giskardpy.motion_statechart.mixins import (
     HasGoalPointParameter,
     HasGoalPoseParameter,
     HasKinematicChainParameters,
-    HasPoseThresholdParameters,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
     HasThresholdParameter,
 )
 from krrood_spatial_math.spatial_types import Vector3, Point3
@@ -49,7 +50,10 @@ class RootRelativeGoalMonitor(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class PoseReached(
-    RootRelativeGoalMonitor, HasGoalPoseParameter, HasPoseThresholdParameters
+    RootRelativeGoalMonitor,
+    HasGoalPoseParameter,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
 ):
     """
     Observes ``True`` once the tip link has reached :attr:`goal_pose` within the

@@ -12,20 +12,24 @@ documentation in every class that takes it.
 ## Where the mixins live
 
 Action parameter mixins
-: {mod}`coraplex.robot_plans.mixins` declares them as subclasses of
-  {class}`~coraplex.robot_plans.mixins.DesignatorParameterMixin`, sorted by what they describe: what an action acts on,
-  where it goes, which robot state it sets, and the values that tune how it carries the action out.
+: {mod}`coraplex.robot_plans.mixins` declares them, sorted by what they describe: what an action acts on, where it
+  goes, which robot state it sets, and the values that tune how it carries the action out.
 
 Node parameter mixins
 : {mod}`giskardpy.motion_statechart.mixins` declares the parameters that unrelated tasks, goals and monitors share,
   such as the links of the kinematic chain they control, their goal, their threshold and their reference velocity.
   Each kind of goal has a mixin of its own, such as a goal pose, a goal point or a goal joint state.
 
-One parameter or a bundle
-: A mixin named `Has…Parameter` declares exactly one parameter and inherits no other parameter mixin. A mixin named
-  `Has…Parameters` bundles parameters that always come together: it either declares them itself, as
-  {class}`~giskardpy.motion_statechart.mixins.HasPoseThresholdParameters` does, or combines single parameter mixins
-  without adding any, as {class}`~giskardpy.motion_statechart.mixins.HasKinematicChainParameters` does.
+One parameter per mixin
+: Every parameter mixin derives from {class}`~krrood.patterns.mixin.ParameterMixin`. A mixin named
+  `Has{Parameter}Parameter` declares exactly one parameter, named by the mixin in snake case, and inherits no other
+  parameter mixin: {class}`~coraplex.robot_plans.mixins.HasPlanarGoalPoseParameter` declares `planar_goal_pose`.
+  So the name of a parameter tells which mixin to inherit, and the name of a mixin tells which parameter it adds.
+
+The kinematic chain
+: {class}`~giskardpy.motion_statechart.mixins.HasKinematicChainParameters` is the one bundle. It declares nothing of
+  its own and combines {class}`~giskardpy.motion_statechart.mixins.HasRootLinkParameter` and
+  {class}`~giskardpy.motion_statechart.mixins.HasTipLinkParameter`, which a node always takes together.
 
 Mixins shared by both
 : An action that passes a parameter on unchanged to the node it builds takes that node's mixin, rather than

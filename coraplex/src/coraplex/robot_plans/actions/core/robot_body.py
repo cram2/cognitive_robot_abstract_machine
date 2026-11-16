@@ -21,7 +21,7 @@ from coraplex.robot_plans.actions.base import (
 from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpening
 from coraplex.robot_plans.mixins import (
     HasArmParameter,
-    HasGripperCollisionParameter,
+    HasAllowGripperCollisionParameter,
     HasGripperConfigurationParameter,
     HasTorsoStateParameter,
     MovesToolCenterPoint,
@@ -32,9 +32,10 @@ from cramph.node import StatechartNode
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.mixins import (
     HasGoalPoseParameter,
-    HasJointVelocityLimitParameter,
+    HasMaxJointVelocityParameter,
     HasThresholdParameter,
-    HasTwoFingerGripperParameters,
+    HasTwoFingerGripperParameter,
+    HasWidthParameter,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -66,12 +67,12 @@ class SetGripperAction(OperatesGripper, GoalAction, HasGripperConfigurationParam
     """
 
     def create_goal(self) -> StatechartNode:
-        return self.gripper_goal_type.moving_gripper_to(self.configuration)
+        return self.gripper_goal_type.moving_gripper_to(self.gripper_configuration)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class MoveFingersToWidthAction(
-    GoalAction, HasTwoFingerGripperParameters, HasThresholdParameter
+    GoalAction, HasTwoFingerGripperParameter, HasWidthParameter, HasThresholdParameter
 ):
     """
     Closes a two-finger gripper until its fingertips stand a given distance apart,
@@ -106,10 +107,12 @@ class MoveFingersToWidthAction(
         :raises WidthBeyondGripperOpening: If :attr:`width` is wider than the gripper
             opens.
         """
-        if self.width > self.gripper.separation_when_open:
-            raise WidthBeyondGripperOpening(gripper=self.gripper, width=self.width)
+        if self.width > self.two_finger_gripper.separation_when_open:
+            raise WidthBeyondGripperOpening(
+                gripper=self.two_finger_gripper, width=self.width
+            )
         return MoveGripper(
-            gripper=self.gripper,
+            two_finger_gripper=self.two_finger_gripper,
             width=max(0.0, self.width - 2 * self.squeeze),
             threshold=self.threshold,
             tolerate_finger_stall=self.squeeze > 0.0,
@@ -118,7 +121,7 @@ class MoveFingersToWidthAction(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ParkArmsAction(ParallelAction, HasJointVelocityLimitParameter):
+class ParkArmsAction(ParallelAction, HasMaxJointVelocityParameter):
     """
     Park the arms of the robot.
     """
@@ -212,7 +215,7 @@ class MoveManipulatorAction(
     GoalAction,
     HasArmParameter,
     HasGoalPoseParameter,
-    HasGripperCollisionParameter,
+    HasAllowGripperCollisionParameter,
 ):
     """
     Move the end effector of :attr:`arm` to :attr:`goal_pose`.
@@ -234,7 +237,7 @@ class MoveManipulatorAction(
             goal_pose=self.goal_pose,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         for node in self.keep_base_still():
             goal.add_node(node)

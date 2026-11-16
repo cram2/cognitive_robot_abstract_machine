@@ -5,6 +5,7 @@ from types import ModuleType
 import pytest
 
 from coraplex.robot_plans import mixins
+from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
@@ -21,28 +22,35 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
 )
 from coraplex.robot_plans.mixins import (
-    DesignatorParameterMixin,
+    ApproachesGrasps,
+    HasApproachClearanceParameter,
     HasArmParameter,
-    HasGraspApproachParameters,
     HasGraspCandidateParameter,
     HasGripperConfigurationParameter,
-    HasPlaceTuningParameters,
+    HasMaxPlacingLinearVelocityParameter,
     HasPlanarGoalPoseParameter,
+    HasRetreatDistanceParameter,
     MovesToolCenterPoint,
 )
 from giskardpy.motion_statechart.tasks.drive_tasks import DrivenBaseGoal
 from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart import mixins as node_mixins
 from giskardpy.motion_statechart.mixins import (
-    HasFingerStallToleranceParameters,
+    HasFingerStallMinimumTimeParameter,
     HasGoalPoseParameter,
-    HasJointVelocityLimitParameter,
-    HasPoseThresholdParameters,
+    HasMaxJointVelocityParameter,
+    HasKinematicChainParameters,
+    HasOrientationThresholdParameter,
+    HasPositionThresholdParameter,
     HasThresholdParameter,
-    HasTwoFingerGripperParameters,
+    HasTolerateFingerStallParameter,
+    HasTwoFingerGripperParameter,
+    HasWidthParameter,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.code_generation.naming import to_snake_case
+from krrood.patterns.mixin import ParameterMixin
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
@@ -55,8 +63,8 @@ def parameter_mixins(designator_type: type) -> set[type]:
         base
         for base in designator_type.__mro__
         if base.__module__ == mixins.__name__
-        and issubclass(base, DesignatorParameterMixin)
-        and base is not DesignatorParameterMixin
+        and issubclass(base, ParameterMixin)
+        and not issubclass(base, Action)
     }
 
 
@@ -124,45 +132,52 @@ def combined_mixins(mixin: type) -> set[type]:
     return {base for base in mixin.__mro__[1:] if base in all_parameter_mixins()}
 
 
+def parameter_name(mixin: type) -> str:
+    """
+    :param mixin: A mixin named ``Has{Parameter}Parameter``.
+    :return: The field name its class name spells, in snake case.
+    """
+    return to_snake_case(mixin.__name__.removeprefix("Has").removesuffix("Parameter"))
+
+
 @pytest.mark.parametrize(
     "mixin",
     parameter_mixins_named("Parameter"),
 )
-def test_a_single_parameter_mixin_declares_one_field_and_combines_none(mixin: type):
+def test_a_parameter_mixin_declares_the_one_field_it_is_named_for(mixin: type):
     """
-    A mixin named for one parameter holds that parameter and nothing it inherits.
+    The name of a mixin spells the field it adds, and it adds nothing it inherits.
     """
-    assert len(own_fields(mixin)) == 1
+    assert own_fields(mixin) == {parameter_name(mixin)}
     assert combined_mixins(mixin) == set()
+
+
+def test_the_kinematic_chain_is_the_only_bundle_of_parameters():
+    """
+    The bundle declares no field of its own; its fields are those of the single
+    parameter mixins it combines.
+    """
+    assert parameter_mixins_named("Parameters") == [HasKinematicChainParameters]
+    assert own_fields(HasKinematicChainParameters) == set()
 
 
 @pytest.mark.parametrize(
     "mixin",
-    parameter_mixins_named("Parameters"),
+    sorted(all_parameter_mixins(), key=lambda mixin: mixin.__qualname__),
 )
-def test_a_bundle_either_declares_its_fields_or_combines_single_parameter_mixins(
-    mixin: type,
-):
-    """
-    A bundle holds parameters that always come together: either as fields of its own, or
-    as the single parameter mixins it combines, never both.
-    """
-    combined = combined_mixins(mixin)
-    if combined:
-        assert own_fields(mixin) == set()
-        assert all(base.__name__.endswith("Parameter") for base in combined)
-        assert len(combined) > 1
-    else:
-        assert len(own_fields(mixin)) > 1
+def test_every_parameter_mixin_is_a_parameter_mixin(mixin: type):
+    assert issubclass(mixin, ParameterMixin)
 
 
 def test_action_inherits_parameter_mixins():
     assert parameter_mixins(PickUpAction) >= {
         HasArmParameter,
         HasGraspCandidateParameter,
-        HasGraspApproachParameters,
+        HasApproachClearanceParameter,
+        HasRetreatDistanceParameter,
     }
-    assert issubclass(PickUpAction, HasPoseThresholdParameters)
+    assert issubclass(PickUpAction, ApproachesGrasps)
+    assert issubclass(PickUpAction, HasPositionThresholdParameter)
 
 
 def test_pick_up_action_takes_its_grasp_and_arm(pr2_apartment_context):
@@ -171,11 +186,11 @@ def test_pick_up_action_takes_its_grasp_and_arm(pr2_apartment_context):
     grasp = milk.grasp_candidates()[0]
     arm = robot.left_arm
 
-    action = PickUpAction(grasp=grasp, arm=arm)
+    action = PickUpAction(grasp_candidate=grasp, arm=arm)
 
     parameters = action.designator_parameter
     assert parameters["arm"] is arm
-    assert parameters["grasp"] is grasp
+    assert parameters["grasp_candidate"] is grasp
 
 
 def test_open_action_takes_hold_of_its_handle_by_a_grasp():
@@ -201,7 +216,7 @@ def test_move_to_reach_takes_no_approach_it_would_not_use():
     It moves straight to the tool frame goal of its grasp frame, which neither a
     clearance nor a retreat distance shapes.
     """
-    assert not issubclass(MoveToReach, HasGraspApproachParameters)
+    assert not issubclass(MoveToReach, ApproachesGrasps)
 
 
 def test_set_gripper_action_takes_the_configuration_it_reaches():
@@ -220,8 +235,10 @@ def test_inherited_parameters_keep_their_declared_types():
 
     assert types["arm"] is HasArmParameter.__annotations__["arm"]
     assert (
-        types["placing_linear_velocity"]
-        == HasPlaceTuningParameters.__annotations__["placing_linear_velocity"]
+        types["max_placing_linear_velocity"]
+        == HasMaxPlacingLinearVelocityParameter.__annotations__[
+            "max_placing_linear_velocity"
+        ]
     )
 
 
@@ -233,7 +250,8 @@ def test_behaviours_driving_a_tool_center_point_carry_their_own_tolerances():
     The goal tolerances belong to driving an arm to a goal, so an action that does that
     has them without naming a second mixin.
     """
-    assert issubclass(MovesToolCenterPoint, HasPoseThresholdParameters)
+    assert issubclass(MovesToolCenterPoint, HasPositionThresholdParameter)
+    assert issubclass(MovesToolCenterPoint, HasOrientationThresholdParameter)
 
 
 def test_a_tool_center_point_comes_closer_to_its_goal_than_a_pose_goal_requires():
@@ -246,7 +264,7 @@ def test_behaviours_without_a_tool_center_point_goal_have_no_tolerances():
     goal tolerances.
     """
     for action_type in (ParkArmsAction, SetGripperAction):
-        assert not issubclass(action_type, HasPoseThresholdParameters)
+        assert not issubclass(action_type, HasPositionThresholdParameter)
         assert "position_threshold" not in field_names(action_type)
 
 
@@ -257,8 +275,8 @@ def test_navigation_actions_take_the_same_goal():
     for navigation in (NavigateAction, PathPlanningNavigateAction):
         assert issubclass(navigation, HasPlanarGoalPoseParameter)
         assert (
-            field_types(navigation)["goal_pose"]
-            == HasPlanarGoalPoseParameter.__annotations__["goal_pose"]
+            field_types(navigation)["planar_goal_pose"]
+            == HasPlanarGoalPoseParameter.__annotations__["planar_goal_pose"]
         )
 
 
@@ -268,11 +286,14 @@ def test_navigation_actions_take_the_same_goal():
 @pytest.mark.parametrize(
     "action_type, node_type, mixin",
     [
-        (MoveFingersToWidthAction, MoveGripper, HasTwoFingerGripperParameters),
+        (MoveFingersToWidthAction, MoveGripper, HasTwoFingerGripperParameter),
+        (MoveFingersToWidthAction, MoveGripper, HasWidthParameter),
         (MoveFingersToWidthAction, MoveGripper, HasThresholdParameter),
-        (PickUpAction, MoveFingers, HasFingerStallToleranceParameters),
-        (GraspingAction, MoveFingers, HasFingerStallToleranceParameters),
-        (ParkArmsAction, MoveFingers, HasJointVelocityLimitParameter),
+        (PickUpAction, MoveFingers, HasTolerateFingerStallParameter),
+        (PickUpAction, MoveFingers, HasFingerStallMinimumTimeParameter),
+        (GraspingAction, MoveFingers, HasTolerateFingerStallParameter),
+        (GraspingAction, MoveFingers, HasFingerStallMinimumTimeParameter),
+        (ParkArmsAction, MoveFingers, HasMaxJointVelocityParameter),
         (DrivesBase, DrivenBaseGoal, HasThresholdParameter),
         (MoveManipulatorAction, CartesianPose, HasGoalPoseParameter),
     ],

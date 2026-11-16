@@ -372,7 +372,7 @@ class ConvergingTask(Task, HasThresholdParameter, ABC):
 class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC):
     """
     A node whose goal is given in a frame that may move, and which reads where that
-    frame lies as :attr:`binding_policy` says.
+    frame lies as :attr:`goal_binding_policy` says.
     """
 
     root_T_goal_reference_frame: HomogeneousTransformationMatrix | None = field(
@@ -382,7 +382,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
     )
     """
     The pose of :attr:`goal_reference_frame` relative to :attr:`goal_binding_root`, as
-    :attr:`binding_policy` fixes it; None until this node is set up.
+    :attr:`goal_binding_policy` fixes it; None until this node is set up.
     """
 
     _goal_reference_frame_binding: ForwardKinematicsBinding = field(
@@ -441,7 +441,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
 
     def on_start(self) -> None:
         super().on_start()
-        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
+        if self.goal_binding_policy == GoalBindingPolicy.Bind_on_start:
             self._goal_reference_frame_binding.bind(self.context.world)
 
 

@@ -44,7 +44,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.robot_plans.mixins import HasGraspApproachParameters
+from coraplex.robot_plans.mixins import ApproachesGrasps
 from cramph.composites import Parallel, Sequence, StartedWhenTrue
 from cramph.context import ContextExtension, StatechartContext
 from cramph.node import StatechartNode
@@ -398,7 +398,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     # reaching out, and a simulated drive arrives at once.
                     ParkArmsAction(arms=robot.all_arms),
                     NavigateAction(
-                        goal_pose=Pose2D.from_pose(
+                        planar_goal_pose=Pose2D.from_pose(
                             ScenePose.GARMI_AT_DRAWER.value.pose(world.root)
                         )
                     ),
@@ -418,7 +418,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                         holding_end_effector=left_hand,
                                     ),
                                     SetGripperAction(
-                                        configuration=left_hand.default_configuration(
+                                        gripper_configuration=left_hand.default_configuration(
                                             GripperState.OPEN
                                         )
                                     ),
@@ -461,10 +461,10 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     ),
                     # Back off the handle the way the hand came in.
                     MoveManipulatorAction(
-                        goal_pose=HasGraspApproachParameters.pre_grasp_pose(
-                            handle_grasp.grasp_pose,
-                            left_hand,
-                            HandDistance.HANDLE_RELEASE_CLEARANCE.value,
+                        goal_pose=ApproachesGrasps.pre_grasp_pose(
+                            reference_T_grasp=handle_grasp.grasp_pose,
+                            end_effector=left_hand,
+                            distance=HandDistance.HANDLE_RELEASE_CLEARANCE.value,
                         ),
                         arm=left_arm,
                         allow_gripper_collision=True,
@@ -473,7 +473,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                         nodes=[
                             ParkArmsAction(arms=robot.all_arms),
                             NavigateAction(
-                                goal_pose=Pose2D.from_pose(
+                                planar_goal_pose=Pose2D.from_pose(
                                     ScenePose.GARMI_AT_COUNTER.value.pose(world.root)
                                 )
                             ),
@@ -519,10 +519,10 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         )
         if self.grasp_selection is GraspSelection.GIVEN:
             return [
-                PickUpAction(grasp=milk_grasp, arm=right_arm),
+                PickUpAction(grasp_candidate=milk_grasp, arm=right_arm),
                 Parallel(
                     nodes=[
-                        GraspingAction(grasp=handle_grasp, arm=left_arm),
+                        GraspingAction(grasp_candidate=handle_grasp, arm=left_arm),
                         ParkArmsAction(arms=[right_arm]),
                         handle_contact,
                     ]
@@ -532,7 +532,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             Parallel(
                 nodes=[
                     a(GraspingAction)(
-                        grasp=self._grasps_by_closeness(
+                        grasp_candidate=self._grasps_by_closeness(
                             handle_grasp.graspable, left_arm
                         ),
                         arm=left_arm,
@@ -540,7 +540,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     Sequence(
                         nodes=[
                             a(PickUpAction)(
-                                grasp=self._grasps_by_closeness(
+                                grasp_candidate=self._grasps_by_closeness(
                                     milk_grasp.graspable, right_arm
                                 ),
                                 arm=right_arm,

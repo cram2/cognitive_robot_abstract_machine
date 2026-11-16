@@ -1252,7 +1252,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_pose=tip_goal2,
-            binding_policy=GoalBindingPolicy.Bind_at_build,
+            goal_binding_policy=GoalBindingPolicy.Bind_at_build,
         )
         motion_statechart.add_node(cart_goal2)
 
@@ -1383,7 +1383,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_point=tip_goal1,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_goal1)
 
@@ -1391,7 +1391,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_point=tip_goal2,
-            binding_policy=GoalBindingPolicy.Bind_at_build,
+            goal_binding_policy=GoalBindingPolicy.Bind_at_build,
         )
         motion_statechart.add_node(cart_goal2)
 
@@ -1437,7 +1437,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_point=tip_goal1,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_goal1)
 
@@ -1445,7 +1445,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_point=tip_goal2,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_goal2)
 
@@ -1486,14 +1486,14 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_point=tip_goal1,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
 
         cart_goal2 = CartesianPosition(
             root_link=root,
             tip_link=tip,
             goal_point=tip_goal2,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(seq := Sequence(nodes=[cart_goal1, cart_goal2]))
 
@@ -1543,7 +1543,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_orientation=tip_rot1,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_goal1)
 
@@ -1551,7 +1551,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_orientation=tip_rot2,
-            binding_policy=GoalBindingPolicy.Bind_at_build,
+            goal_binding_policy=GoalBindingPolicy.Bind_at_build,
         )
         motion_statechart.add_node(cart_goal2)
 
@@ -1600,7 +1600,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_orientation=tip_rot1,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_goal1)
 
@@ -1608,7 +1608,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_orientation=tip_rot2,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_goal2)
 
@@ -1651,7 +1651,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_point=goal_point,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
             threshold=0.015,
         )
         motion_statechart.add_node(cart_straight)
@@ -1687,7 +1687,7 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_pose=goal_pose,
-            binding_policy=GoalBindingPolicy.Bind_on_start,
+            goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(cart_straight)
         motion_statechart.add_node(EndMotion.when_true(cart_straight))
@@ -2152,14 +2152,14 @@ class TestDiffDriveBaseGoal:
         )
 
     @pytest.mark.parametrize(
-        "binding_policy, expected_x",
+        "goal_binding_policy, expected_x",
         [
             (GoalBindingPolicy.Bind_on_start, 1.5),
             (GoalBindingPolicy.Bind_at_build, 0.5),
         ],
     )
     def test_a_goal_relative_to_a_moving_frame_is_bound_by_its_policy(
-        self, cylinder_bot_diff_world, binding_policy, expected_x
+        self, cylinder_bot_diff_world, goal_binding_policy, expected_x
     ) -> None:
         """
         The second leg is given relative to the base, which the first leg moves before
@@ -2188,7 +2188,7 @@ class TestDiffDriveBaseGoal:
                     MobileBase
                 )[0],
                 goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
-                binding_policy=binding_policy,
+                goal_binding_policy=goal_binding_policy,
             )
         )
         second_leg.start_condition = first_leg.observes_true

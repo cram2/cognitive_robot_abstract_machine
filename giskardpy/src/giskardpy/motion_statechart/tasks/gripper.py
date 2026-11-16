@@ -8,11 +8,13 @@ from cramph.composites import Parallel
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.mixins import (
-    HasFingerStallToleranceParameters,
+    HasTolerateFingerStallParameter,
+    HasFingerStallMinimumTimeParameter,
     HasGoalStateParameter,
-    HasJointVelocityLimitParameter,
+    HasMaxJointVelocityParameter,
     HasThresholdParameter,
-    HasTwoFingerGripperParameters,
+    HasTwoFingerGripperParameter,
+    HasWidthParameter,
 )
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
@@ -48,8 +50,8 @@ class MovesGripperToConfiguration(ABC):
         """
         :param configuration: The configuration to bring the gripper of its end effector
             into.
-        :param finger_stall_minimum_time: See :attr:`~giskardpy.motion_statechart.mixins.HasFingerStallToleranceParameters.finger_stall_minimum_time`.
-        :param tolerate_finger_stall: See :attr:`~giskardpy.motion_statechart.mixins.HasFingerStallToleranceParameters.tolerate_finger_stall`.
+        :param finger_stall_minimum_time: See :attr:`~giskardpy.motion_statechart.mixins.HasFingerStallMinimumTimeParameter.finger_stall_minimum_time`.
+        :param tolerate_finger_stall: See :attr:`~giskardpy.motion_statechart.mixins.HasTolerateFingerStallParameter.tolerate_finger_stall`.
         :return: A new node bringing the gripper into `configuration`.
         """
 
@@ -61,8 +63,9 @@ class MovesGripperToConfiguration(ABC):
 class MoveFingers(
     Parallel,
     MovesGripperToConfiguration,
-    HasJointVelocityLimitParameter,
-    HasFingerStallToleranceParameters,
+    HasMaxJointVelocityParameter,
+    HasTolerateFingerStallParameter,
+    HasFingerStallMinimumTimeParameter,
     ABC,
 ):
     """
@@ -92,7 +95,7 @@ class MoveFingers(
         end_effector = configuration.end_effector
         if isinstance(end_effector, HasTwoFingers):
             return MoveGripper(
-                gripper=end_effector,
+                two_finger_gripper=end_effector,
                 width=end_effector.separation_at(configuration.joint_state),
                 max_joint_velocity=configuration.finger_velocity,
                 finger_stall_minimum_time=finger_stall_minimum_time,
@@ -165,7 +168,9 @@ class MoveFingers(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveGripper(MoveFingers, HasTwoFingerGripperParameters, HasThresholdParameter):
+class MoveGripper(
+    MoveFingers, HasTwoFingerGripperParameter, HasWidthParameter, HasThresholdParameter
+):
     """
     Open or close a two-finger gripper until its fingertips' facing surfaces stand
     :attr:`width` apart, with an error in metres.
@@ -178,14 +183,14 @@ class MoveGripper(MoveFingers, HasTwoFingerGripperParameters, HasThresholdParame
 
     @property
     def finger_connections(self) -> list[ActiveConnection1DOF]:
-        return self.gripper.finger_connections
+        return self.two_finger_gripper.finger_connections
 
     def create_finger_task(self) -> DistanceAlongAxis:
         """
         :return: A new task bringing the facing points of the fingertips :attr:`width`
             apart along the axis the fingers close along.
         """
-        fingertips = self.gripper.fingertips
+        fingertips = self.two_finger_gripper.fingertips
         return DistanceAlongAxis(
             name=f"{self.name}/width",
             root_link=fingertips.tool_frame,

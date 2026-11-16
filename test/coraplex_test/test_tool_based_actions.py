@@ -418,7 +418,9 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     plan = Sequence(
         nodes=[
             NavigateAction(
-                goal_pose=Pose2D.from_xy_yaw(x=1.85, y=2.2, reference_frame=world.root)
+                planar_goal_pose=Pose2D.from_xy_yaw(
+                    x=1.85, y=2.2, reference_frame=world.root
+                )
             ),
             wiping,
         ]

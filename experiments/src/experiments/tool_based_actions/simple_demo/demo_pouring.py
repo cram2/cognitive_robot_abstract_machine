@@ -66,14 +66,14 @@ def main() -> None:
     plan = Sequence(
         nodes=[
             SetGripperAction(
-                configuration=pr2.right_arm.end_effector.default_configuration(
+                gripper_configuration=pr2.right_arm.end_effector.default_configuration(
                     GripperState.CLOSE
                 )
             ),
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2D.from_xy_yaw(
                     *BASE_POSITION_XYZ[:2], reference_frame=world.root
                 )
             ),

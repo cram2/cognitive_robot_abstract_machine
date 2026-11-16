@@ -72,7 +72,7 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
     world, robot, extensions, handle = pr2_at_drawer
     arm = left_or_only_arm(robot)
     grasp = GraspCandidate.from_body_origin(handle)
-    action = action_type(grasp=grasp, arm=arm)
+    action = action_type(grasp_candidate=grasp, arm=arm)
     statechart_of(simulated_executor(extensions), action)
 
     *_, letting_go, back_off = action.nodes
@@ -98,7 +98,8 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
     world, robot, extensions, handle = pr2_at_drawer
     end_effector = left_or_only_arm(robot).end_effector
     action = OpenAction(
-        grasp=GraspCandidate.from_body_origin(handle), arm=left_or_only_arm(robot)
+        grasp_candidate=GraspCandidate.from_body_origin(handle),
+        arm=left_or_only_arm(robot),
     )
     grasp_pose = Pose(reference_frame=handle.root)
 
@@ -134,7 +135,7 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
         ),
         handle.root,
     )
-    action = OpenAction(grasp=GraspCandidate(handle, grasp_pose), arm=arm)
+    action = OpenAction(grasp_candidate=GraspCandidate(handle, grasp_pose), arm=arm)
 
     tool_goal = world.transform(
         arm.end_effector.tool_frame_goal_for_grasp(grasp_pose), world.root

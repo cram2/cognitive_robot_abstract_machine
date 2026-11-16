@@ -193,7 +193,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             goal_pose=plan_node.goal_pose,
             position_threshold=plan_node.position_threshold,
             orientation_threshold=plan_node.orientation_threshold,
-            binding_policy=plan_node.binding_policy,
+            goal_binding_policy=plan_node.goal_binding_policy,
         )
         # the tasks of a pose goal come before the nodes accompanying it
         for task, straight_task in zip(list(plan_node.nodes), straight.create_tasks()):

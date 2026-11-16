@@ -94,7 +94,7 @@ def _random_navigate_action(world: World):
     Return an underspecified :class:`NavigateAction` with randomised pose.
     """
     action = a(NavigateAction)(
-        goal_pose=a(Pose2D.from_xy_yaw)(
+        planar_goal_pose=a(Pose2D.from_xy_yaw)(
             x=..., y=..., yaw=..., reference_frame=world.root
         ),
     )

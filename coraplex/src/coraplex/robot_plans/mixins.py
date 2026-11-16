@@ -22,7 +22,11 @@ from giskardpy.motion_statechart.tasks.gripper import (
     MovesGripperToConfiguration,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.mixins import HasPoseThresholdParameters
+from giskardpy.motion_statechart.mixins import (
+    HasOrientationThresholdParameter,
+    HasPositionThresholdParameter,
+)
+from krrood.patterns.mixin import ParameterMixin
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPositionVelocityLimit,
@@ -33,7 +37,12 @@ from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.robots.robot_parts import Arm, Camera, EndEffector
+from semantic_digital_twin.robots.robot_parts import (
+    AbstractRobot,
+    Arm,
+    Camera,
+    EndEffector,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -46,19 +55,11 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass(kw_only=True, eq=False)
-class DesignatorParameterMixin:
-    """
-    Base of the reusable action parameters: mixins that each add the fields of one
-    parameter, and the helpers that read them, to an action.
-    """
-
-
 # %% what an action acts on
 
 
 @dataclass(kw_only=True, eq=False)
-class HasArmParameter(DesignatorParameterMixin):
+class HasArmParameter(ParameterMixin):
     """
     Mixin for actions that operate one of the robot's arms.
     """
@@ -70,25 +71,35 @@ class HasArmParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasCameraParameter(DesignatorParameterMixin):
+class HasCameraParameter(ParameterMixin):
     """
     Mixin for actions that point a camera.
     """
 
     camera: Camera | None = None
     """
-    The camera the action points; ``None`` selects the robot's default camera.
+    The camera the action points; ``None`` stands for the robot's default camera, see
+    :meth:`pointed_camera`.
     """
+
+    def pointed_camera(self, *, robot: AbstractRobot) -> Camera:
+        """
+        :param robot: The robot carrying the camera.
+        :return: :attr:`camera`, or the default camera of `robot` if none was given.
+        """
+        if self.camera is None:
+            return robot.get_default_camera()
+        return self.camera
 
 
 @dataclass(kw_only=True, eq=False)
-class HasGraspCandidateParameter(DesignatorParameterMixin):
+class HasGraspCandidateParameter(ParameterMixin):
     """
     Mixin for actions that close a gripper on something. The grasp names the object it
     is on, so that is not asked for separately.
     """
 
-    grasp: GraspCandidate
+    grasp_candidate: GraspCandidate
     """
     The grasp to take hold by.
 
@@ -98,7 +109,7 @@ class HasGraspCandidateParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasToolParameter(DesignatorParameterMixin):
+class HasToolParameter(ParameterMixin):
     """
     Mixin for actions that manipulate an object with a held tool.
     """
@@ -113,12 +124,12 @@ class HasToolParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasPlanarGoalPoseParameter(DesignatorParameterMixin):
+class HasPlanarGoalPoseParameter(ParameterMixin):
     """
     Mixin for actions that drive the robot's base to a spot on the floor.
     """
 
-    goal_pose: Pose2D
+    planar_goal_pose: Pose2D
     """
     Where the robot's base ends up on the floor, and which way the robot faces, given as
     the heading of the pose.
@@ -126,12 +137,12 @@ class HasPlanarGoalPoseParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasLookTargetParameter(DesignatorParameterMixin):
+class HasLookTargetParameter(ParameterMixin):
     """
     Mixin for actions that orient the robot toward a pose.
     """
 
-    target: Pose
+    look_target: Pose
     """
     The pose the action orients the robot toward.
     """
@@ -141,19 +152,19 @@ class HasLookTargetParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasGripperConfigurationParameter(DesignatorParameterMixin):
+class HasGripperConfigurationParameter(ParameterMixin):
     """
     Mixin for actions that bring a gripper into a configuration.
     """
 
-    configuration: GripperConfiguration
+    gripper_configuration: GripperConfiguration
     """
     The configuration the gripper is to reach.
     """
 
 
 @dataclass(kw_only=True, eq=False)
-class HasTorsoStateParameter(DesignatorParameterMixin):
+class HasTorsoStateParameter(ParameterMixin):
     """
     Mixin for actions that set the torso to a defined state.
     """
@@ -165,7 +176,7 @@ class HasTorsoStateParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasGripperCollisionParameter(DesignatorParameterMixin):
+class HasAllowGripperCollisionParameter(ParameterMixin):
     """
     Mixin for actions that may permit the gripper to collide with the environment.
     """
@@ -180,7 +191,7 @@ class HasGripperCollisionParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasGraspDetectionThresholdParameter(DesignatorParameterMixin):
+class HasGraspDetectionThresholdParameter(ParameterMixin):
     """
     Mixin for actions that check whether an object is held between the gripper's
     fingers.
@@ -198,19 +209,26 @@ class HasGraspDetectionThresholdParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasReachTuningParameters(DesignatorParameterMixin):
+class HasMaxPreApproachLinearVelocityParameter(ParameterMixin):
     """
-    Mixin for actions that reach towards a target, with tunable approach speeds.
+    Mixin for actions that move the gripper to a pre-grasp pose before a grasp.
     """
 
-    pre_approach_linear_velocity: float | None = None
+    max_pre_approach_linear_velocity: float | None = None
     """
     Maximum linear speed (in m/s) for the initial pre-pose approach, enforced via
     :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
     ``None`` leaves the speed unconstrained.
     """
 
-    final_approach_linear_velocity: float | None = None
+
+@dataclass(kw_only=True, eq=False)
+class HasMaxFinalApproachLinearVelocityParameter(ParameterMixin):
+    """
+    Mixin for actions that move the gripper from a pre-grasp pose onto a grasp.
+    """
+
+    max_final_approach_linear_velocity: float | None = None
     """
     Maximum linear speed (in m/s) for the final approach onto the target pose, enforced
     via
@@ -220,13 +238,12 @@ class HasReachTuningParameters(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasPickUpTuningParameters(DesignatorParameterMixin):
+class HasMaxGraspClosingVelocityParameter(ParameterMixin):
     """
-    Mixin for actions that take hold of an object, with tunable grasp and lift speeds
-    and target-object friction.
+    Mixin for actions that close the fingers onto an object.
     """
 
-    grasp_closing_velocity: float | None = None
+    max_grasp_closing_velocity: float | None = None
     """
     Maximum finger joint velocity (in m/s) used while closing onto the object, enforced
     via
@@ -234,12 +251,26 @@ class HasPickUpTuningParameters(DesignatorParameterMixin):
     leaves the speed unconstrained.
     """
 
-    lift_linear_velocity: float | None = None
+
+@dataclass(kw_only=True, eq=False)
+class HasMaxLiftLinearVelocityParameter(ParameterMixin):
+    """
+    Mixin for actions that lift a grasped object.
+    """
+
+    max_lift_linear_velocity: float | None = None
     """
     Maximum linear speed (in m/s) for lifting the object clear of the table after
     grasping, enforced via
     :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
     ``None`` leaves the speed unconstrained.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasObjectFrictionParameter(ParameterMixin):
+    """
+    Mixin for actions that take hold of an object whose friction may be set for them.
     """
 
     object_friction: float | None = None
@@ -253,13 +284,12 @@ class HasPickUpTuningParameters(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasPlaceTuningParameters(DesignatorParameterMixin):
+class HasMaxPlacingLinearVelocityParameter(ParameterMixin):
     """
-    Mixin for actions that put an object down, with tunable transport, placing, release
-    and retract speeds.
+    Mixin for actions that lower a held object onto where it is put down.
     """
 
-    placing_linear_velocity: float | None = None
+    max_placing_linear_velocity: float | None = None
     """
     Maximum linear speed (in m/s) for the final descent onto the target location,
     enforced via
@@ -267,7 +297,14 @@ class HasPlaceTuningParameters(DesignatorParameterMixin):
     ``None`` leaves the speed unconstrained.
     """
 
-    transport_linear_velocity: float | None = None
+
+@dataclass(kw_only=True, eq=False)
+class HasMaxTransportLinearVelocityParameter(ParameterMixin):
+    """
+    Mixin for actions that carry a held object above where it is put down.
+    """
+
+    max_transport_linear_velocity: float | None = None
     """
     Maximum linear speed (in m/s) for carrying the held object above the target
     location, before the final descent, enforced via
@@ -275,7 +312,14 @@ class HasPlaceTuningParameters(DesignatorParameterMixin):
     ``None`` leaves the speed unconstrained.
     """
 
-    release_opening_velocity: float | None = None
+
+@dataclass(kw_only=True, eq=False)
+class HasMaxReleaseOpeningVelocityParameter(ParameterMixin):
+    """
+    Mixin for actions that open the gripper to let go of an object.
+    """
+
+    max_release_opening_velocity: float | None = None
     """
     Maximum finger joint velocity (in m/s) used while opening the gripper to release
     the object, enforced via
@@ -283,7 +327,14 @@ class HasPlaceTuningParameters(DesignatorParameterMixin):
     leaves the speed unconstrained.
     """
 
-    retract_linear_velocity: float | None = None
+
+@dataclass(kw_only=True, eq=False)
+class HasMaxRetractLinearVelocityParameter(ParameterMixin):
+    """
+    Mixin for actions that withdraw the gripper from an object they let go of.
+    """
+
+    max_retract_linear_velocity: float | None = None
     """
     Maximum linear speed (in m/s) for retracting the end effector away from the placed
     object, enforced via
@@ -292,7 +343,31 @@ class HasPlaceTuningParameters(DesignatorParameterMixin):
     """
 
 
-# %% grasp approach poses
+# %% grasp approach
+
+
+@dataclass(kw_only=True, eq=False)
+class HasApproachClearanceParameter(ParameterMixin):
+    """
+    Mixin for actions that stop the gripper short of an object before moving onto it.
+    """
+
+    approach_clearance: float = 0.1
+    """
+    The gap in meters between the object and the gripper at the pre-grasp pose.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasRetreatDistanceParameter(ParameterMixin):
+    """
+    Mixin for actions that raise the gripper once it leaves a grasp.
+    """
+
+    retreat_distance: float = 0.1
+    """
+    How far in meters the gripper rises when it leaves a grasp or a placed object.
+    """
 
 
 @dataclass
@@ -317,50 +392,50 @@ class GraspPoseSequence:
     """
 
 
-@dataclass(kw_only=True, eq=False)
-class HasGraspApproachParameters(DesignatorParameterMixin):
+# %% behaviour shared by actions
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ApproachesGrasps(
+    Action, HasApproachClearanceParameter, HasRetreatDistanceParameter, ABC
+):
     """
-    Turns a grasp frame (x-axis along the approach, see
+    An action that turns a grasp frame (x-axis along the approach, see
     :class:`~semantic_digital_twin.grasping.grasp_candidates.GraspCandidate`) into the
     tool frame goals that approach it, reach it and withdraw from it.
     """
 
-    approach_clearance: float = 0.1
-    """
-    The gap in meters between the object and the gripper at the pre-grasp pose.
-    """
-
-    retreat_distance: float = 0.1
-    """
-    How far in meters the gripper rises when it leaves a grasp or a placed object.
-    """
-
     def grasp_pose_sequence(
         self,
+        *,
         reference_T_grasp: Pose,
         end_effector: EndEffector,
-        grasp: GraspCandidate | None = None,
+        grasp_candidate: GraspCandidate | None = None,
     ) -> GraspPoseSequence:
         """
         :param reference_T_grasp: The grasp frame to reach; for a release, where the
             object is to be put.
         :param end_effector: The end effector that is to reach it.
-        :param grasp: The grasp whose object the pre-grasp pose has to stay outside of;
-            ``None`` keeps only :attr:`approach_clearance`.
+        :param grasp_candidate: The grasp whose object the pre-grasp pose has to stay
+            outside of; ``None`` keeps only :attr:`approach_clearance`.
         :return: The tool frame goals around the grasp.
         """
         tool_goal = end_effector.tool_frame_goal_for_grasp(reference_T_grasp)
         return GraspPoseSequence(
             pre_grasp=self.pre_grasp_pose(
-                reference_T_grasp, end_effector, self._approach_distance(grasp)
+                reference_T_grasp=reference_T_grasp,
+                end_effector=end_effector,
+                distance=self._approach_distance(grasp_candidate=grasp_candidate),
             ),
             grasp=tool_goal,
-            retreat=self._retreat_pose(reference_T_grasp, tool_goal),
+            retreat=self._retreat_pose(
+                reference_T_grasp=reference_T_grasp, tool_goal=tool_goal
+            ),
         )
 
     @staticmethod
     def pre_grasp_pose(
-        reference_T_grasp: Pose, end_effector: EndEffector, distance: float
+        *, reference_T_grasp: Pose, end_effector: EndEffector, distance: float
     ) -> Pose:
         """
         The goal back along the direction the gripper approaches a grasp from, aimed at
@@ -376,22 +451,29 @@ class HasGraspApproachParameters(DesignatorParameterMixin):
             (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
         )
 
-    def _approach_distance(self, grasp: GraspCandidate | None) -> float:
+    def _approach_distance(self, *, grasp_candidate: GraspCandidate | None) -> float:
         """
-        :param grasp: The grasp on the object, or ``None`` when there is no object.
+        :param grasp_candidate: The grasp on the object, or ``None`` when there is no
+            object.
         :return: The distance in meters from the grasp back to the pre-grasp pose: the
             distance to the object's bounding box along the approach, plus
             :attr:`approach_clearance`.
         """
-        if grasp is None or not grasp.graspable.root.has_collision():
+        if (
+            grasp_candidate is None
+            or not grasp_candidate.graspable.root.has_collision()
+        ):
             return self.approach_clearance
         return (
-            self.distance_to_boundary(grasp.graspable.root, grasp.grasp_pose)
+            self.distance_to_boundary(
+                body=grasp_candidate.graspable.root,
+                reference_T_grasp=grasp_candidate.grasp_pose,
+            )
             + self.approach_clearance
         )
 
     @staticmethod
-    def distance_to_boundary(body: Body, reference_T_grasp: Pose) -> float:
+    def distance_to_boundary(*, body: Body, reference_T_grasp: Pose) -> float:
         """
         The distance the gripper has to retrace from a grasp before it leaves the
         bounding box of `body`.
@@ -428,7 +510,7 @@ class HasGraspApproachParameters(DesignatorParameterMixin):
         ]
         return max(min(distances, default=0.0), 0.0)
 
-    def _retreat_pose(self, reference_T_grasp: Pose, tool_goal: Pose) -> Pose:
+    def _retreat_pose(self, *, reference_T_grasp: Pose, tool_goal: Pose) -> Pose:
         """
         The tool frame goal :attr:`retreat_distance` above the grasp along the world's
         z-axis (a grasp frame's own z-axis can lie flat).
@@ -452,11 +534,10 @@ class HasGraspApproachParameters(DesignatorParameterMixin):
         )
 
 
-# %% behaviour shared by actions
-
-
 @dataclass(eq=False, repr=False, kw_only=True)
-class MovesToolCenterPoint(Action, HasPoseThresholdParameters, ABC):
+class MovesToolCenterPoint(
+    Action, HasPositionThresholdParameter, HasOrientationThresholdParameter, ABC
+):
     """
     An action that moves an arm's tool center point.
     """

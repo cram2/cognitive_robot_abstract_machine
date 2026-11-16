@@ -70,7 +70,9 @@ def test_garmi_opens_its_gripper_through_the_franka_driver(garmi_extensions) -> 
         Sequence(
             nodes=[
                 SetGripperAction(
-                    configuration=gripper.default_configuration(GripperState.OPEN)
+                    gripper_configuration=gripper.default_configuration(
+                        GripperState.OPEN
+                    )
                 )
             ]
         ),
@@ -100,7 +102,7 @@ def test_garmi_shuts_its_gripper_with_a_grasp_of_the_franka_driver_while_doing_m
                 Parallel(
                     nodes=[
                         MoveGripper(
-                            gripper=gripper,
+                            two_finger_gripper=gripper,
                             width=gripper.separation_in(GripperState.CLOSE),
                         )
                     ]
@@ -139,7 +141,11 @@ def test_garmi_closes_its_fingers_to_a_width_with_a_grasp_of_the_franka_driver(
     plan = prepared(
         Sequence(
             nodes=[
-                Parallel(nodes=[MoveFingersToWidthAction(gripper=gripper, width=0.03)])
+                Parallel(
+                    nodes=[
+                        MoveFingersToWidthAction(two_finger_gripper=gripper, width=0.03)
+                    ]
+                )
             ]
         ),
         real_garmi_executor(garmi_extensions),

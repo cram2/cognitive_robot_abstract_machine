@@ -445,7 +445,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     )
 
     plan = PickUpAction(
-        grasp=milk.grasp_candidates()[0],
+        grasp_candidate=milk.grasp_candidates()[0],
         arm=view.right_arm,
     )
     targets = [

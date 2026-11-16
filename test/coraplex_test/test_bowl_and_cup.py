@@ -218,10 +218,10 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
         nodes=[
             # The arms start stretched out, which would reach into the counter.
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(goal_pose=in_front_of_the_closed_drawer),
+            NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
             OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(goal_pose=in_front_of_the_open_drawer),
+            NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
             Parallel(
                 nodes=[
                     HoldPose(
@@ -232,7 +232,7 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
                 ]
             ),
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(goal_pose=facing_the_kitchen_island),
+            NavigateAction(planar_goal_pose=facing_the_kitchen_island),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             Parallel(
                 nodes=[

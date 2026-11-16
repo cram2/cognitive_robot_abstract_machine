@@ -801,7 +801,9 @@ def _joint_and_base_cases() -> list[NodeRoundTripCase]:
             MoveGripper,
             lambda world: [
                 MoveGripper(
-                    gripper=world.get_semantic_annotations_by_type(EndEffector)[0],
+                    two_finger_gripper=world.get_semantic_annotations_by_type(
+                        EndEffector
+                    )[0],
                     width=0.04,
                 )
             ],

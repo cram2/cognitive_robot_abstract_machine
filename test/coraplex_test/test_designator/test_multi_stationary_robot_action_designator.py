@@ -203,7 +203,7 @@ def test_reach_action_multi(stationary_block_context):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             ReachAction(
-                grasp=GraspCandidate(box, grasp_pose),
+                grasp_candidate=GraspCandidate(box, grasp_pose),
                 arm=left_or_only_arm(view),
             ),
         ]
@@ -225,7 +225,7 @@ def test_move_gripper_multi(stationary_block_context):
     world, view, extensions = stationary_block_context
 
     plan = SetGripperAction(
-        configuration=left_or_only_arm(view).end_effector.default_configuration(
+        gripper_configuration=left_or_only_arm(view).end_effector.default_configuration(
             GripperState.OPEN
         )
     )
@@ -239,7 +239,7 @@ def test_move_gripper_multi(stationary_block_context):
         assert connection.position == pytest.approx(target, abs=0.01)
 
     plan = SetGripperAction(
-        configuration=left_or_only_arm(view).end_effector.default_configuration(
+        gripper_configuration=left_or_only_arm(view).end_effector.default_configuration(
             GripperState.CLOSE
         )
     )
@@ -255,7 +255,8 @@ def test_grasping(stationary_block_context):
 
     box_body = world.get_body_by_name("box1")
     description = GraspingAction(
-        grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(robot_view)
+        grasp_candidate=top_down_grasp(world, box_body),
+        arm=left_or_only_arm(robot_view),
     )
     plan = Sequence(nodes=[ParkArmsAction(arms=robot_view.all_arms), description])
     run_plan(plan, extensions)
@@ -276,7 +277,8 @@ def test_pick_up_multi(stationary_block_context):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(
-                grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
+                grasp_candidate=top_down_grasp(world, box_body),
+                arm=left_or_only_arm(view),
             ),
         ]
     )
@@ -316,7 +318,8 @@ def test_place_multi(stationary_block_context, place_position):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(
-                grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
+                grasp_candidate=top_down_grasp(world, box_body),
+                arm=left_or_only_arm(view),
             ),
             PlaceAction(
                 arm=left_or_only_arm(view),
@@ -453,7 +456,7 @@ def test_a_pick_in_physics_leaves_the_box_to_the_grip(
     arm = left_or_only_arm(view)
     stood_on = box.parent_connection.parent
     resting_height = box.global_pose.position.to_np().flatten()[2]
-    pick = PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm)
+    pick = PickUpAction(grasp_candidate=grasp_near_the_top(world, box), arm=arm)
     plan = Sequence(nodes=[ParkArmsAction(arms=view.all_arms), pick])
 
     perform_in_physics(plan, extensions, simulation)
@@ -487,7 +490,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=view.all_arms),
-            PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm),
+            PickUpAction(grasp_candidate=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
                 arm=arm,
                 goal_pose=Pose(target, reference_frame=world.root),
@@ -555,7 +558,7 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
     box_body = world.get_body_by_name("box1")
     pick_up = StatementNode(
         statement=a(PickUpAction)(
-            grasp=variable(
+            grasp_candidate=variable(
                 GraspCandidate,
                 domain=graspable_annotation(world, box_body).grasp_candidates(),
             ),
@@ -573,6 +576,6 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
         LifeCycleValues.FAILED,
         LifeCycleValues.SUCCEEDED,
     ]
-    assert second.grasp is not first.grasp
+    assert second.grasp_candidate is not first.grasp_candidate
     [grasping] = [node for node in second.nodes if isinstance(node, GraspingAction)]
     assert grasping.life_cycle_state == LifeCycleValues.SUCCEEDED

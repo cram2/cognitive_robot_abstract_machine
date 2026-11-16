@@ -66,7 +66,7 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     )
 
     navigate_action = a(NavigateAction)(
-        goal_pose=target_location,
+        planar_goal_pose=target_location,
     )
     # navigate_action.resolve()
 
@@ -97,7 +97,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     grasp_variable = variable_from(milk.grasp_candidates())
 
     pick_up_description = a(PickUpAction)(
-        grasp=grasp_variable,
+        grasp_candidate=grasp_variable,
         arm=variable_from(robot_view.all_arms),
         approach_clearance=0.05,
     )

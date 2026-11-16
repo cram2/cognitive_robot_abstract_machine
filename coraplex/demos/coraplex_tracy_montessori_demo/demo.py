@@ -451,7 +451,7 @@ class ShapeSortingPlan:
         for piece, hole in self.scene.holes_of_pieces.items():
             [grasp] = piece.grasp_candidates()
             arm = self.scene.sorting_arm(robot)
-            actions.append(PickUpAction(grasp=grasp, arm=arm))
+            actions.append(PickUpAction(grasp_candidate=grasp, arm=arm))
             actions.append(
                 PlaceAction(
                     arm=arm,

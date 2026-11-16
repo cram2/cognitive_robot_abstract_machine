@@ -102,7 +102,7 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 pose = Pose2D.from_xy_yaw(1.3, 2, reference_frame=world.root)
 
 # This is the Designator Description
-plan = NavigateAction(goal_pose=pose)
+plan = NavigateAction(planar_goal_pose=pose)
 ```
 
 What we now did was: create the pose where we want to move the robot, create a description describing a navigation with
@@ -149,7 +149,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 
 configuration = pr2.left_arm.end_effector.default_configuration(GripperState.OPEN)
 
-run(SetGripperAction(configuration=configuration))
+run(SetGripperAction(gripper_configuration=configuration))
 ```
 
 ## Park Arms
@@ -190,10 +190,10 @@ milk = world.get_semantic_annotations_by_type(Milk)[0]
 run(Sequence(nodes=[ParkArmsAction(arms=pr2.all_arms),
      MoveTorsoAction(torso_state=TorsoState.HIGH),
      NavigateAction(
-         goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root)
+         planar_goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root)
      ),
      PickUpAction(
-         grasp=next(iter(milk.grasp_candidates())),
+         grasp_candidate=next(iter(milk.grasp_candidates())),
          arm=arm,
      ),
      PlaceAction(
@@ -210,7 +210,7 @@ Look at lets the robot look at a specific point, for example if it should look a
 from coraplex.robot_plans.actions.core.navigation import LookAtAction
 
 target_location = Pose.from_xyz_rpy(3, 2, 1, reference_frame=world.root)
-run(LookAtAction(target=target_location))
+run(LookAtAction(look_target=target_location))
 ```
 
 ## Detect
@@ -231,8 +231,8 @@ milk = world.get_semantic_annotations_by_type(Milk)[0]
 
 run(Sequence(nodes=[
     ParkArmsAction(arms=pr2.all_arms),
-    NavigateAction(goal_pose=Pose.from_xyz_rpy(1.7, 2, 0, reference_frame=world.root)),
-    LookAtAction(target=Pose(reference_frame=milk.root)),
+    NavigateAction(planar_goal_pose=Pose.from_xyz_rpy(1.7, 2, 0, reference_frame=world.root)),
+    LookAtAction(look_target=Pose(reference_frame=milk.root)),
     DetectAction(technique=DetectionTechnique.TYPES, object_sem_annotation=Milk),
 ]))
 ```
@@ -285,7 +285,7 @@ with world.modify_world():
 run(Sequence(nodes=[
     MoveTorsoAction(torso_state=TorsoState.HIGH),
     ParkArmsAction(arms=pr2.all_arms),
-    NavigateAction(goal_pose=Pose2D.from_pose(Pose.from_xyz_quaternion(1.7074915981292725, 2.6873629093170166, 0.0, -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root))),
+    NavigateAction(planar_goal_pose=Pose2D.from_pose(Pose.from_xyz_quaternion(1.7074915981292725, 2.6873629093170166, 0.0, -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root))),
     OpenAction.from_handle(handle, pr2.right_arm)]))
 ```
 
@@ -303,6 +303,6 @@ from cramph.composites import Sequence
 run(Sequence(nodes=[
     MoveTorsoAction(torso_state=TorsoState.HIGH),
     ParkArmsAction(arms=pr2.all_arms),
-    NavigateAction(goal_pose=Pose2D.from_pose(Pose.from_xyz_quaternion(1.72, 2.65, 0.0, -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root))),
+    NavigateAction(planar_goal_pose=Pose2D.from_pose(Pose.from_xyz_quaternion(1.72, 2.65, 0.0, -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root))),
     CloseAction.from_handle(handle, pr2.right_arm)]))
 ```

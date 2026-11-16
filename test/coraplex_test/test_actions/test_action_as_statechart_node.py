@@ -684,7 +684,9 @@ def test_a_pick_up_and_its_grasp_and_reach_let_the_gripper_touch(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
 
     _expanded(pick_up, extensions)
 
@@ -704,7 +706,9 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
         goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
@@ -720,7 +724,9 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
 def test_opening_lets_the_gripper_on_the_handle_touch(pr2_apartment_context) -> None:
     world, robot, extensions = pr2_apartment_context
     handle = _handle_annotation(world, "handle_cab10_m")
-    action = OpenAction(grasp=handle.grasp_candidates()[0], arm=robot.right_arm)
+    action = OpenAction(
+        grasp_candidate=handle.grasp_candidates()[0], arm=robot.right_arm
+    )
 
     _expanded(action, extensions)
 
@@ -787,7 +793,9 @@ def test_a_pick_up_grasps_reattaches_and_lifts_as_its_own_steps(
 ) -> None:
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
 
     _expanded(pick_up, extensions)
 
@@ -806,7 +814,9 @@ def test_a_place_reattaches_and_retracts_as_its_own_steps(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
         goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),

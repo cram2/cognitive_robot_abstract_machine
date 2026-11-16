@@ -114,7 +114,7 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
             torso,
             StatementNode(
                 statement=a(NavigateAction)(
-                    goal_pose=variable(
+                    planar_goal_pose=variable(
                         Pose2D, domain=[_pose_in_front_of_the_robot(world, robot)]
                     )
                 )
@@ -145,7 +145,9 @@ def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before
         nodes=[
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
-                statement=a(NavigateAction)(goal_pose=variable(Pose2D, domain=location))
+                statement=a(NavigateAction)(
+                    planar_goal_pose=variable(Pose2D, domain=location)
+                )
             ),
         ]
     )
@@ -192,7 +194,9 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
         goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
@@ -213,7 +217,9 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
         goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
@@ -244,8 +250,12 @@ def test_a_place_after_several_pick_ups_moves_only_the_arm_it_is_given(
     statechart.add_node(
         Sequence(
             nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
+                PickUpAction(
+                    grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+                ),
+                PickUpAction(
+                    grasp_candidate=spoon.grasp_candidates()[0], arm=robot.right_arm
+                ),
                 place_milk,
             ]
         )
@@ -278,14 +288,18 @@ def test_a_place_after_an_earlier_place_moves_only_the_arm_it_is_given(
     statechart.add_node(
         Sequence(
             nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
+                PickUpAction(
+                    grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+                ),
                 PlaceAction(
                     arm=robot.left_arm,
                     goal_pose=Pose.from_xyz_rpy(
                         0.8, -1.5, 0.7, reference_frame=world.root
                     ),
                 ),
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
+                PickUpAction(
+                    grasp_candidate=spoon.grasp_candidates()[0], arm=robot.right_arm
+                ),
                 place_spoon,
             ]
         )
@@ -356,8 +370,12 @@ def test_a_sent_plan_compiles_without_what_its_actions_read_to_expand(
         Sequence(
             nodes=[
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
-                NavigateAction(goal_pose=_pose_in_front_of_the_robot(world, robot)),
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
+                NavigateAction(
+                    planar_goal_pose=_pose_in_front_of_the_robot(world, robot)
+                ),
+                PickUpAction(
+                    grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+                ),
             ]
         ),
     )
@@ -380,7 +398,7 @@ def test_an_underspecified_node_is_sent_as_a_node_choosing_its_child(
     itself, and not the statement it is grounded from.
     """
     world, robot, extensions = pr2_apartment_context
-    node = StatementNode(statement=a(NavigateAction)(goal_pose=...))
+    node = StatementNode(statement=a(NavigateAction)(planar_goal_pose=...))
 
     received = from_json(json.loads(json.dumps(to_json(node))))
 
@@ -401,7 +419,7 @@ def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
                 statement=a(NavigateAction)(
-                    goal_pose=variable(
+                    planar_goal_pose=variable(
                         Pose2D, domain=[_pose_in_front_of_the_robot(world, robot)]
                     )
                 )
@@ -540,7 +558,7 @@ def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empt
         lambda ros_node, context: GiskardTickingTheGoalUntilItEnded(),
     )
     plan = StatementNode(
-        statement=a(NavigateAction)(goal_pose=variable(Pose2D, domain=[]))
+        statement=a(NavigateAction)(planar_goal_pose=variable(Pose2D, domain=[]))
     )
     executor = robot_executor(extensions)
     executor.compile(statechart_of(executor, plan))
@@ -562,7 +580,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     sent = Statechart(context=simulated_executor(extensions).context)
     sent.add_node(
         action := SetGripperAction(
-            configuration=robot.left_arm.end_effector.default_configuration(
+            gripper_configuration=robot.left_arm.end_effector.default_configuration(
                 GripperState.OPEN
             )
         )
@@ -590,7 +608,8 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     sent = Statechart(context=simulated_executor(extensions).context)
     sent.add_node(
         action := FaceAndLookAtAction(
-            face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
+            face_at=FaceAtAction(look_target=target),
+            look_at=LookAtAction(look_target=target),
         )
     )
 

@@ -112,7 +112,7 @@ class SearchAction(SequentialAction):
         ]
         return cls(
             navigate=a(NavigateAction)(
-                goal_pose=variable(
+                planar_goal_pose=variable(
                     Pose2D,
                     domain=VisibilityLocation(
                         target_pose=target_location, context=context
@@ -122,7 +122,7 @@ class SearchAction(SequentialAction):
             looks=[
                 LookAtAndDetectAction(
                     look_at=LookAtAction(
-                        target=Pose.from_xyz_rpy(
+                        look_target=Pose.from_xyz_rpy(
                             target_location.x + x_offset,
                             target_location.y + y_offset,
                             target_location.z,

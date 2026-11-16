@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, ConvergingTask
 from giskardpy.motion_statechart.mixins import (
-    HasPoseCruiseVelocityParameters,
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
     HasKinematicChainParameters,
 )
 from krrood_spatial_math.spatial_types import Point3, Vector3
@@ -15,7 +16,8 @@ from krrood_spatial_math.spatial_types import Point3, Vector3
 class GraspBar(
     ConvergingTask,
     HasKinematicChainParameters,
-    HasPoseCruiseVelocityParameters,
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
 ):
     """
     Like a CartesianPose but with more freedom: the tip link is allowed to be at any

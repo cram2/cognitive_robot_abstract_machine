@@ -136,14 +136,14 @@ plan = Sequence(
         ParkArmsAction(arms=pr2.all_arms),
         MoveTorsoAction(torso_state=TorsoState.HIGH),
         NavigateAction(
-            goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=world.root)
+            planar_goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=world.root)
         ),
         PickUpAction(
-            grasp=milk.grasp_candidates()[0],
+            grasp_candidate=milk.grasp_candidates()[0],
             arm=pr2.right_arm,
         ),
         NavigateAction(
-            goal_pose=Pose2D.from_xy_yaw(x=4.0, y=4.0, reference_frame=world.root)
+            planar_goal_pose=Pose2D.from_xy_yaw(x=4.0, y=4.0, reference_frame=world.root)
         ),
         PlaceAction(
             arm=pr2.right_arm,

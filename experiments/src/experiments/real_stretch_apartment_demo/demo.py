@@ -170,27 +170,27 @@ class StretchApartmentDemonstration(RobotDemonstration):
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
                 SetGripperAction(
-                    configuration=arm.end_effector.default_configuration(
+                    gripper_configuration=arm.end_effector.default_configuration(
                         GripperState.CLOSE
                     )
                 ),
                 NavigateAction(
-                    goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2D.from_xy_yaw(
                         x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
                 LookAtAction(
-                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                    look_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        goal_pose=Pose2D.from_xy_yaw(
+                        planar_goal_pose=Pose2D.from_xy_yaw(
                             x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                         )
                     )
                 ),
                 LookAtAction(
-                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                    look_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
                 ),
                 DetectAction(
                     technique=DetectionTechnique.TYPES,
@@ -199,12 +199,12 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     accept_first_if_multiple=True,
                 ),
                 PickUpAction(
-                    grasp=cereal.grasp_candidates()[0],
+                    grasp_candidate=cereal.grasp_candidates()[0],
                     arm=arm,
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2D.from_xy_yaw(
                         x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
@@ -219,27 +219,27 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 SetGripperAction(
-                    configuration=arm.end_effector.default_configuration(
+                    gripper_configuration=arm.end_effector.default_configuration(
                         GripperState.CLOSE
                     )
                 ),
                 NavigateAction(
-                    goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2D.from_xy_yaw(
                         x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
                 LookAtAction(
-                    target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                    look_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        goal_pose=Pose2D.from_xy_yaw(
+                        planar_goal_pose=Pose2D.from_xy_yaw(
                             x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                         )
                     )
                 ),
                 LookAtAction(
-                    target=Pose.from_xyz_rpy(reference_frame=bedside_table_body)
+                    look_target=Pose.from_xyz_rpy(reference_frame=bedside_table_body)
                 ),
                 DetectAction(
                     technique=DetectionTechnique.TYPES,
@@ -249,13 +249,13 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(PickUpAction)(
-                        grasp=cereal.grasp_candidates()[0],
+                        grasp_candidate=cereal.grasp_candidates()[0],
                         arm=arm,
                     )
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2D.from_xy_yaw(
                         x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
@@ -267,7 +267,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 SetGripperAction(
-                    configuration=arm.end_effector.default_configuration(
+                    gripper_configuration=arm.end_effector.default_configuration(
                         GripperState.CLOSE
                     )
                 ),

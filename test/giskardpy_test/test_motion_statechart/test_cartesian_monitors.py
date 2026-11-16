@@ -63,7 +63,7 @@ def test_position_reached(pr2_world_state_reset: World):
         root_link=root,
         tip_link=tip,
         goal_point=goal_point,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
+        goal_binding_policy=GoalBindingPolicy.Bind_at_build,
     )
     statechart.add_nodes([drive, monitor])
     statechart.add_node(EndMotion.when_true(monitor))
@@ -74,11 +74,11 @@ def test_position_reached(pr2_world_state_reset: World):
 
 
 @pytest.mark.parametrize(
-    "binding_policy",
+    "goal_binding_policy",
     [GoalBindingPolicy.Bind_at_build, GoalBindingPolicy.Bind_on_start],
 )
 def test_position_reached_binding_policies(
-    pr2_world_state_reset: World, binding_policy: GoalBindingPolicy
+    pr2_world_state_reset: World, goal_binding_policy: GoalBindingPolicy
 ):
     """
     The robot is driven toward a goal expressed relative to the tip.
@@ -96,13 +96,13 @@ def test_position_reached_binding_policies(
         root_link=root,
         tip_link=tip,
         goal_point=goal_point,
-        binding_policy=binding_policy,
+        goal_binding_policy=goal_binding_policy,
     )
     monitor = PositionReached(
         root_link=root,
         tip_link=tip,
         goal_point=goal_point,
-        binding_policy=binding_policy,
+        goal_binding_policy=goal_binding_policy,
     )
     statechart.add_nodes([drive, monitor])
     statechart.add_node(EndMotion.when_true(monitor))
@@ -131,7 +131,7 @@ def test_orientation_reached(pr2_world_state_reset: World):
         root_link=root,
         tip_link=tip,
         goal_orientation=goal_orientation,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
+        goal_binding_policy=GoalBindingPolicy.Bind_at_build,
     )
     statechart.add_nodes([drive, monitor])
     statechart.add_node(EndMotion.when_true(monitor))
@@ -157,7 +157,7 @@ def test_pose_reached(pr2_world_state_reset: World):
         root_link=root,
         tip_link=tip,
         goal_pose=goal_pose,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
+        goal_binding_policy=GoalBindingPolicy.Bind_at_build,
     )
     statechart.add_nodes([drive, monitor])
     statechart.add_node(EndMotion.when_true(monitor))

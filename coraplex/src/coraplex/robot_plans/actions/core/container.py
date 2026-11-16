@@ -15,8 +15,9 @@ from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction
 from coraplex.robot_plans.mixins import (
+    ApproachesGrasps,
+    HasApproachClearanceParameter,
     HasArmParameter,
-    HasGraspApproachParameters,
     HasGraspCandidateParameter,
     MovesToolCenterPoint,
     OperatesGripper,
@@ -47,16 +48,12 @@ class MovesContainerByItsHandle(
     SequentialAction,
     HasGraspCandidateParameter,
     HasArmParameter,
+    HasApproachClearanceParameter,
     ABC,
 ):
     """
-    An action that takes hold of a container's handle by :attr:`grasp`, moves the
-    container with it, lets go and clears the handle.
-    """
-
-    approach_clearance: float = HasGraspApproachParameters.approach_clearance
-    """
-    The gap in meters between the handle and the gripper before it closes on it.
+    An action that takes hold of a container's handle by :attr:`grasp_candidate`, moves
+    the container with it, lets go and clears the handle.
     """
 
     release_clearance: float = 0.05
@@ -80,7 +77,7 @@ class MovesContainerByItsHandle(
             Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
         )
         return a(cls)(
-            grasp=flat_variable(
+            grasp_candidate=flat_variable(
                 GraspsByCloseness(
                     graspable=handle,
                     standing_position=where_the_robot_stands,
@@ -101,7 +98,7 @@ class MovesContainerByItsHandle(
         """
         The connection the container moves along while its handle is held.
         """
-        return self.grasp.graspable.root.get_first_parent_connection_of_type(
+        return self.grasp_candidate.graspable.root.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
 
@@ -116,13 +113,13 @@ class MovesContainerByItsHandle(
         :return: The pose the tool frame backs off to, in `grasp_pose`'s frame.
         """
         distance = (
-            HasGraspApproachParameters.distance_to_boundary(
-                self.mechanism.child, grasp_pose
+            ApproachesGrasps.distance_to_boundary(
+                body=self.mechanism.child, reference_T_grasp=grasp_pose
             )
             + self.release_clearance
         )
-        return HasGraspApproachParameters.pre_grasp_pose(
-            grasp_pose, end_effector, distance
+        return ApproachesGrasps.pre_grasp_pose(
+            reference_T_grasp=grasp_pose, end_effector=end_effector, distance=distance
         )
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -136,7 +133,7 @@ class MovesContainerByItsHandle(
         end_effector = self.arm.end_effector
         return [
             GraspingAction(
-                grasp=self.grasp,
+                grasp_candidate=self.grasp_candidate,
                 arm=self.arm,
                 approach_clearance=self.approach_clearance,
             ),
@@ -145,7 +142,7 @@ class MovesContainerByItsHandle(
                 end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(
-                self.back_off_pose(self.grasp.grasp_pose, end_effector),
+                self.back_off_pose(self.grasp_candidate.grasp_pose, end_effector),
                 self.arm,
             ),
         ]
@@ -163,7 +160,7 @@ class OpenAction(MovesContainerByItsHandle):
     def _create_mechanism_goal(self) -> MotionStatechartNode:
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
-            environment_link=self.grasp.graspable.root,
+            environment_link=self.grasp_candidate.graspable.root,
             goal_position=self.mechanism.dof.limits.upper.position,
         )
 
@@ -183,6 +180,6 @@ class CloseAction(MovesContainerByItsHandle):
     def _create_mechanism_goal(self) -> MotionStatechartNode:
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
-            environment_link=self.grasp.graspable.root,
+            environment_link=self.grasp_candidate.graspable.root,
             goal_position=self.closed_joint_position,
         )

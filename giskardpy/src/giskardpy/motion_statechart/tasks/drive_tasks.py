@@ -313,7 +313,7 @@ class DrivenBaseGoal(
     The base is moved relative to the body it is attached to, as it is whenever the
     tasks are built, so the goal follows a base moved under another parent while the
     statechart runs. Where the goal lies is read from its reference frame as
-    :attr:`binding_policy` says.
+    :attr:`goal_binding_policy` says.
     """
 
     mobile_base: MobileBase

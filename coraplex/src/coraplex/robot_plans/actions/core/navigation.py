@@ -80,7 +80,7 @@ class NavigateAction(DrivesBase, GoalAction, HasPlanarGoalPoseParameter):
     def create_goal(self) -> StatechartNode:
         return self.base_goal_type.moving_base_of(
             self.robot,
-            self.robot.mobile_base.pose_facing(self.goal_pose),
+            self.robot.mobile_base.pose_facing(self.planar_goal_pose),
             self.threshold,
         )
 
@@ -93,7 +93,7 @@ class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
     """
 
     def create_steps(self) -> list[StatechartNode]:
-        camera = self.camera or self.robot.get_default_camera()
+        camera = self.pointed_camera(robot=self.robot)
         pointing = Pointing(
             root_link=self.robot.get_torso().root,
             tip_link=camera.root,
@@ -104,16 +104,16 @@ class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
 
     def _world_P_target(self) -> Point3:
         """
-        :return: Where :attr:`target` is in the world frame, as an expression of where
+        :return: Where :attr:`look_target` is in the world frame, as an expression of where
             the body it is given relative to stands while the look runs.
         """
-        target_frame = self.target.reference_frame or self.world.root
+        target_frame = self.look_target.reference_frame or self.world.root
         world_T_target_frame = self.world.compose_forward_kinematics_expression(
             self.world.root, target_frame
         )
         world_T_target_frame.reference_frame = self.world.root
         world_T_target_frame.child_frame = target_frame
-        return world_T_target_frame @ self.target.position
+        return world_T_target_frame @ self.look_target.position
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -146,10 +146,10 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
 
     def _target_at_base_height(self) -> Point3:
         """
-        :return: :attr:`target` moved vertically to the height of the base, which can
+        :return: :attr:`look_target` moved vertically to the height of the base, which can
             only turn about the vertical and so can only point level.
         """
-        root_P_target = self.world.transform(self.target, self.world.root).position
+        root_P_target = self.world.transform(self.look_target, self.world.root).position
         root_P_target.z = self.robot.root.global_pose.z
         return root_P_target
 
@@ -247,7 +247,7 @@ class PathPlanningNavigateAction(
             )
             for waypoint, next_waypoint in zip(waypoints[1:], waypoints[2:])
         ]
-        return poses + [self.goal_pose]
+        return poses + [self.planar_goal_pose]
 
     def _waypoints(self) -> list[Point2]:
         """
@@ -264,7 +264,7 @@ class PathPlanningNavigateAction(
             bloat_obstacles=self.robot.mobile_base.base_radius,
         )
         return free_space.path_from_to(
-            Point2.from_pose(base_pose), self.goal_pose.position
+            Point2.from_pose(base_pose), self.planar_goal_pose.position
         )
 
 
@@ -299,17 +299,19 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
 
     def create_steps(self) -> list[StatechartNode]:
         return [
-            NavigateAction(goal_pose=self._pose_infront_of_elevator),
+            NavigateAction(planar_goal_pose=self._pose_infront_of_elevator),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self._current_floor),
                 monitored_node=NavigateAction(
-                    goal_pose=Pose2D(reference_frame=self.elevator.root)
+                    planar_goal_pose=Pose2D(reference_frame=self.elevator.root)
                 ),
             ),
             *self.reattach(self.robot.root, self.elevator.root),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self.target_floor),
-                monitored_node=NavigateAction(goal_pose=self._pose_infront_of_elevator),
+                monitored_node=NavigateAction(
+                    planar_goal_pose=self._pose_infront_of_elevator
+                ),
             ),
             *self.reattach(self.robot.root, self.world.root),
         ]

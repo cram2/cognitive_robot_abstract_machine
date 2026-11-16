@@ -24,9 +24,9 @@ from types import ModuleType
 
 from coraplex.robot_plans import mixins as action_mixins
 from coraplex.robot_plans.actions.base import Action
-from coraplex.robot_plans.mixins import DesignatorParameterMixin
 from docutils import nodes
 from giskardpy.motion_statechart import mixins as node_mixins
+from krrood.patterns.mixin import ParameterMixin
 from krrood.patterns.path_enumeration import PathEnumeration
 from krrood.utils import recursive_subclasses
 from sphinx.application import Sphinx
@@ -105,7 +105,7 @@ class ParameterTakingPackage(StrEnum):
 
 
 @dataclass
-class Parameter:
+class ParameterDeclaration:
     """
     A parameter as a class body declares it.
     """
@@ -132,7 +132,7 @@ class Parameter:
 
     @classmethod
     @cache
-    def declared_by(cls, declaring_class: type) -> list[Self]:
+    def class_body_declarations(cls, *, declaring_class: type) -> list[Self]:
         """
         :param declaring_class: A dataclass.
         :return: The parameters the body of *declaring_class* declares, in their order
@@ -152,7 +152,7 @@ class Parameter:
                 default=(
                     None if statement.value is None else ast.unparse(statement.value)
                 ),
-                documentation=cls.documentation_of(following),
+                documentation=cls.field_docstring(statement=following),
             )
             for statement, following in zip(body, [*body[1:], None])
             if isinstance(statement, ast.AnnAssign)
@@ -161,7 +161,7 @@ class Parameter:
         ]
 
     @staticmethod
-    def documentation_of(statement: ast.stmt | None) -> str:
+    def field_docstring(*, statement: ast.stmt | None) -> str:
         """
         :param statement: The statement that follows a field declaration, or ``None``
             when the field ends the class body.
@@ -181,7 +181,7 @@ class Parameter:
 
 
 @dataclass
-class ParameterMixin:
+class ParameterMixinDescription:
     """
     A mixin that declares parameters of actions or nodes.
     """
@@ -206,7 +206,7 @@ class ParameterMixin:
     The docstring of the mixin, on one line.
     """
 
-    parameters: list[Parameter]
+    parameters: list[ParameterDeclaration]
     """
     The parameters the mixin declares.
     """
@@ -224,7 +224,7 @@ class MixinModule(ABC):
     """
 
     @abstractmethod
-    def is_parameter_mixin(self, candidate: type) -> bool:
+    def is_parameter_mixin(self, *, candidate: type) -> bool:
         """
         :param candidate: A class the module defines.
         :return: Whether *candidate* is a parameter mixin.
@@ -248,25 +248,27 @@ class MixinModule(ABC):
         return [
             candidate
             for candidate in self.defined_classes()
-            if self.is_parameter_mixin(candidate)
+            if self.is_parameter_mixin(candidate=candidate)
         ]
 
-    def parameter_mixins(self) -> list[ParameterMixin]:
+    def parameter_mixins(self) -> list[ParameterMixinDescription]:
         """
         :return: The parameter mixins the module defines, in their order there.
         """
         return [
-            ParameterMixin(
+            ParameterMixinDescription(
                 name=mixin.__name__,
                 framework=Framework.defining(mixin),
-                section=self.section_of(mixin),
+                section=self.section_heading(mixin=mixin),
                 documentation=" ".join(inspect.getdoc(mixin).split()),
-                parameters=Parameter.declared_by(mixin),
+                parameters=ParameterDeclaration.class_body_declarations(
+                    declaring_class=mixin
+                ),
             )
             for mixin in self.parameter_mixin_classes()
         ]
 
-    def section_of(self, mixin: type) -> str:
+    def section_heading(self, *, mixin: type) -> str:
         """
         :param mixin: A class the module defines.
         :return: The heading of the ``# %%`` section that declares *mixin*.
@@ -287,11 +289,9 @@ class ActionMixinModule(MixinModule):
     behaviours that actions share.
     """
 
-    def is_parameter_mixin(self, candidate: type) -> bool:
-        return (
-            issubclass(candidate, DesignatorParameterMixin)
-            and candidate is not DesignatorParameterMixin
-            and not issubclass(candidate, Action)
+    def is_parameter_mixin(self, *, candidate: type) -> bool:
+        return issubclass(candidate, ParameterMixin) and not issubclass(
+            candidate, Action
         )
 
     def behaviours(self) -> list[type]:
@@ -312,8 +312,8 @@ class NodeMixinModule(MixinModule):
     The module of the giskardpy motion statechart node parameter mixins.
     """
 
-    def is_parameter_mixin(self, candidate: type) -> bool:
-        return True
+    def is_parameter_mixin(self, *, candidate: type) -> bool:
+        return issubclass(candidate, ParameterMixin)
 
 
 # %% classes taking parameter mixins
@@ -331,13 +331,13 @@ class RedeclaredParameter:
     The name of the class that declares the parameter again.
     """
 
-    parameter: Parameter
+    parameter: ParameterDeclaration
     """
     The parameter as that class declares it.
     """
 
     @classmethod
-    def nearest_to(cls, taking_class: type, parameter_name: str) -> Self:
+    def nearest_redeclaration(cls, *, taking_class: type, parameter_name: str) -> Self:
         """
         :param taking_class: A class that takes the parameter.
         :param parameter_name: The name of the parameter.
@@ -348,7 +348,9 @@ class RedeclaredParameter:
             cls(declaring_class=ancestor.__name__, parameter=parameter)
             for ancestor in taking_class.__mro__
             if dataclasses.is_dataclass(ancestor)
-            for parameter in Parameter.declared_by(ancestor)
+            for parameter in ParameterDeclaration.class_body_declarations(
+                declaring_class=ancestor
+            )
             if parameter.name == parameter_name
         )
 
@@ -418,10 +420,12 @@ class ParameterisedClass:
             redeclared_parameters=[
                 declaration
                 for mixin in taken_mixins
-                for parameter in Parameter.declared_by(mixin)
+                for parameter in ParameterDeclaration.class_body_declarations(
+                    declaring_class=mixin
+                )
                 if (
-                    declaration := RedeclaredParameter.nearest_to(
-                        taking_class, parameter.name
+                    declaration := RedeclaredParameter.nearest_redeclaration(
+                        taking_class=taking_class, parameter_name=parameter.name
                     )
                 ).declaring_class
                 != mixin.__name__
@@ -438,7 +442,7 @@ class ParameterMixinMap:
     Which actions and nodes take which parameter mixin.
     """
 
-    parameter_mixins: list[ParameterMixin]
+    parameter_mixins: list[ParameterMixinDescription]
     """
     The coraplex parameter mixins, followed by the giskardpy ones.
     """

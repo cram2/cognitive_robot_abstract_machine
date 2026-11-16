@@ -55,7 +55,7 @@ from cramph.composites import Sequence
 from cramph.statechart import Statechart
 from krrood_spatial_math.spatial_types import Pose2D
 
-navigate = NavigateAction(goal_pose=Pose2D.from_xy_yaw(1, 1, reference_frame=world.root))
+navigate = NavigateAction(planar_goal_pose=Pose2D.from_xy_yaw(1, 1, reference_frame=world.root))
 park = ParkArmsAction(arms=pr2.all_arms)
 
 plan = Sequence(nodes=[navigate, park])

@@ -14,8 +14,11 @@ from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.mixins import (
     HasArmParameter,
-    HasGraspApproachParameters,
-    HasPlaceTuningParameters,
+    ApproachesGrasps,
+    HasMaxPlacingLinearVelocityParameter,
+    HasMaxTransportLinearVelocityParameter,
+    HasMaxReleaseOpeningVelocityParameter,
+    HasMaxRetractLinearVelocityParameter,
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
@@ -37,8 +40,11 @@ class PlaceAction(
     SequentialAction,
     HasArmParameter,
     HasGoalPoseParameter,
-    HasGraspApproachParameters,
-    HasPlaceTuningParameters,
+    ApproachesGrasps,
+    HasMaxPlacingLinearVelocityParameter,
+    HasMaxTransportLinearVelocityParameter,
+    HasMaxReleaseOpeningVelocityParameter,
+    HasMaxRetractLinearVelocityParameter,
 ):
     """
     Puts down what :attr:`arm` holds, so that the object ends up at :attr:`goal_pose`
@@ -58,26 +64,28 @@ class PlaceAction(
         # A release runs the grasp backwards: down from above the target, then out
         # along the way the grasp was approached.
         poses = self.grasp_pose_sequence(
-            grasp.moved_to(self.goal_pose), self.arm.end_effector, grasp
+            reference_T_grasp=grasp.moved_to(self.goal_pose),
+            end_effector=self.arm.end_effector,
+            grasp_candidate=grasp,
         )
 
         return [
             self.tool_center_point_goal(
                 poses.retreat,
                 self.arm,
-                max_linear_velocity=self.transport_linear_velocity,
+                max_linear_velocity=self.max_transport_linear_velocity,
             ),
             self.tool_center_point_goal(
                 poses.grasp,
                 self.arm,
-                max_linear_velocity=self.placing_linear_velocity,
+                max_linear_velocity=self.max_placing_linear_velocity,
             ),
             Parallel(
                 nodes=[
                     self.gripper_goal_type.moving_gripper_to(
                         self.arm.end_effector.default_configuration(
                             GripperState.OPEN,
-                            finger_velocity=self.release_opening_velocity,
+                            finger_velocity=self.max_release_opening_velocity,
                         )
                     ),
                     # Keeps the gripper in place while it opens, whatever else
@@ -90,7 +98,7 @@ class PlaceAction(
             self.tool_center_point_goal(
                 poses.pre_grasp,
                 self.arm,
-                max_linear_velocity=self.retract_linear_velocity,
+                max_linear_velocity=self.max_retract_linear_velocity,
             ),
         ]
 
@@ -116,7 +124,7 @@ class PlaceAction(
                 continue
             if isinstance(previous, PlaceAction):
                 raise ObjectIsNotHeld(self.arm)
-            return previous.grasp
+            return previous.grasp_candidate
         end_effector = self.arm.end_effector
         held_body = end_effector.held_body
         if held_body is None:

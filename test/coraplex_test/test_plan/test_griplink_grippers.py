@@ -109,7 +109,7 @@ def test_the_real_daisy_moves_its_gripper_to_a_preset_state_through_the_griplink
     configuration = gripper.default_configuration(GripperState.CLOSE)
 
     action = prepared(
-        SetGripperAction(configuration=configuration),
+        SetGripperAction(gripper_configuration=configuration),
         real_daisy_executor(daisy_extensions),
     )
 
@@ -129,7 +129,7 @@ def test_the_real_daisy_moves_its_gripper_to_a_width_through_the_griplink_server
     )
 
     action = prepared(
-        SetGripperAction(configuration=configuration),
+        SetGripperAction(gripper_configuration=configuration),
         real_daisy_executor(daisy_extensions),
     )
 
@@ -145,7 +145,7 @@ def test_a_daisy_driven_by_a_standalone_giskard_moves_its_fingers_with_a_giskard
     )
 
     action = prepared(
-        SetGripperAction(configuration=configuration),
+        SetGripperAction(gripper_configuration=configuration),
         robot_executor(daisy_extensions),
     )
 
@@ -162,7 +162,8 @@ def test_the_real_daisy_opens_and_shuts_its_gripper_on_a_grasp_through_the_gripl
     arm = world_of(daisy_extensions).get_semantic_annotations_by_type(DAiSy)[0].left_arm
 
     action = prepared(
-        GraspingAction(grasp=grasp, arm=arm), real_daisy_executor(daisy_extensions)
+        GraspingAction(grasp_candidate=grasp, arm=arm),
+        real_daisy_executor(daisy_extensions),
     )
 
     assert action.gripper_goal_type is GriplinkActionServerTask

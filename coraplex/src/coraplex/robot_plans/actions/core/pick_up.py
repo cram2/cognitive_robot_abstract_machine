@@ -8,14 +8,20 @@ import numpy as np
 from coraplex.robot_plans.actions.base import ParallelAction, SequentialAction
 from cramph.composites import Parallel
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.mixins import HasFingerStallToleranceParameters
+from giskardpy.motion_statechart.mixins import (
+    HasTolerateFingerStallParameter,
+    HasFingerStallMinimumTimeParameter,
+)
 from coraplex.robot_plans.mixins import (
     HasArmParameter,
-    HasGraspApproachParameters,
+    ApproachesGrasps,
     HasGraspCandidateParameter,
     HasGraspDetectionThresholdParameter,
-    HasPickUpTuningParameters,
-    HasReachTuningParameters,
+    HasMaxGraspClosingVelocityParameter,
+    HasMaxLiftLinearVelocityParameter,
+    HasObjectFrictionParameter,
+    HasMaxPreApproachLinearVelocityParameter,
+    HasMaxFinalApproachLinearVelocityParameter,
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
@@ -44,8 +50,9 @@ class ReachAction(
     SequentialAction,
     HasGraspCandidateParameter,
     HasArmParameter,
-    HasGraspApproachParameters,
-    HasReachTuningParameters,
+    ApproachesGrasps,
+    HasMaxPreApproachLinearVelocityParameter,
+    HasMaxFinalApproachLinearVelocityParameter,
     HasGraspDetectionThresholdParameter,
 ):
     """
@@ -73,14 +80,16 @@ class ReachAction(
 
     def create_steps(self) -> list[StatechartNode]:
         poses = self.grasp_pose_sequence(
-            self.grasp.grasp_pose, self.arm.end_effector, self.grasp
+            reference_T_grasp=self.grasp_candidate.grasp_pose,
+            end_effector=self.arm.end_effector,
+            grasp_candidate=self.grasp_candidate,
         )
         pre_pose = poses.retreat if self.reverse_reach_order else poses.pre_grasp
         children = [
             self.tool_center_point_goal(
                 pre_pose,
                 self.arm,
-                max_linear_velocity=self.pre_approach_linear_velocity,
+                max_linear_velocity=self.max_pre_approach_linear_velocity,
             ),
         ]
         if self.open_gripper_at_pre_pose:
@@ -93,7 +102,7 @@ class ReachAction(
             self.tool_center_point_goal(
                 poses.grasp,
                 self.arm,
-                max_linear_velocity=self.final_approach_linear_velocity,
+                max_linear_velocity=self.max_final_approach_linear_velocity,
             )
         )
         return children
@@ -106,11 +115,15 @@ class PickUpAction(
     SequentialAction,
     HasGraspCandidateParameter,
     HasArmParameter,
-    HasGraspApproachParameters,
-    HasReachTuningParameters,
-    HasPickUpTuningParameters,
+    ApproachesGrasps,
+    HasMaxPreApproachLinearVelocityParameter,
+    HasMaxFinalApproachLinearVelocityParameter,
+    HasMaxGraspClosingVelocityParameter,
+    HasMaxLiftLinearVelocityParameter,
+    HasObjectFrictionParameter,
     HasGraspDetectionThresholdParameter,
-    HasFingerStallToleranceParameters,
+    HasTolerateFingerStallParameter,
+    HasFingerStallMinimumTimeParameter,
 ):
     """
     Let the robot pick up an object: take hold of it and lift it clear of its support.
@@ -131,24 +144,24 @@ class PickUpAction(
                 reference_frame=graspable.root,
             ),
         )
-        return cls(grasp=grasp, arm=arm)
+        return cls(grasp_candidate=grasp, arm=arm)
 
     def _grasp_steps(self) -> list[StatechartNode]:
         """
         A pick-up is a grasp the world is then told about: the object hangs off the tool
         frame afterwards, which is what makes it move with the arm.
 
-        :return: The steps taking :attr:`grasp`, without lifting the object.
+        :return: The steps taking :attr:`grasp_candidate`, without lifting the object.
         """
         return [
             GraspingAction(
-                grasp=self.grasp,
+                grasp_candidate=self.grasp_candidate,
                 arm=self.arm,
                 approach_clearance=self.approach_clearance,
                 retreat_distance=self.retreat_distance,
-                pre_approach_linear_velocity=self.pre_approach_linear_velocity,
-                final_approach_linear_velocity=self.final_approach_linear_velocity,
-                grasp_closing_velocity=self.grasp_closing_velocity,
+                max_pre_approach_linear_velocity=self.max_pre_approach_linear_velocity,
+                max_final_approach_linear_velocity=self.max_final_approach_linear_velocity,
+                max_grasp_closing_velocity=self.max_grasp_closing_velocity,
                 finger_stall_minimum_time=self.finger_stall_minimum_time,
                 tolerate_finger_stall=self.tolerate_finger_stall,
                 grasp_detection_threshold=self.grasp_detection_threshold,
@@ -156,7 +169,7 @@ class PickUpAction(
                 orientation_threshold=self.orientation_threshold,
             ),
             *self.reattach(
-                self.grasp.graspable.root,
+                self.grasp_candidate.graspable.root,
                 self.arm.end_effector.tool_frame,
             ),
         ]
@@ -171,14 +184,16 @@ class PickUpAction(
 
     def create_steps(self) -> list[StatechartNode]:
         lift_to_pose = self.grasp_pose_sequence(
-            self.grasp.grasp_pose, self.arm.end_effector, self.grasp
+            reference_T_grasp=self.grasp_candidate.grasp_pose,
+            end_effector=self.arm.end_effector,
+            grasp_candidate=self.grasp_candidate,
         ).retreat
         return [
             *self._grasp_steps(),
             self.tool_center_point_goal(
                 lift_to_pose,
                 self.arm,
-                max_linear_velocity=self.lift_linear_velocity,
+                max_linear_velocity=self.max_lift_linear_velocity,
             ),
         ]
 
@@ -190,11 +205,15 @@ class GraspingAction(
     SequentialAction,
     HasGraspCandidateParameter,
     HasArmParameter,
-    HasGraspApproachParameters,
-    HasReachTuningParameters,
-    HasPickUpTuningParameters,
+    ApproachesGrasps,
+    HasMaxPreApproachLinearVelocityParameter,
+    HasMaxFinalApproachLinearVelocityParameter,
+    HasMaxGraspClosingVelocityParameter,
+    HasMaxLiftLinearVelocityParameter,
+    HasObjectFrictionParameter,
     HasGraspDetectionThresholdParameter,
-    HasFingerStallToleranceParameters,
+    HasTolerateFingerStallParameter,
+    HasFingerStallMinimumTimeParameter,
 ):
     """
     Let the robot take hold of an object: reach onto a grasp and close on it.
@@ -213,12 +232,12 @@ class GraspingAction(
     def create_steps(self) -> list[StatechartNode]:
         return [
             ReachAction(
-                grasp=self.grasp,
+                grasp_candidate=self.grasp_candidate,
                 arm=self.arm,
                 approach_clearance=self.approach_clearance,
                 retreat_distance=self.retreat_distance,
-                pre_approach_linear_velocity=self.pre_approach_linear_velocity,
-                final_approach_linear_velocity=self.final_approach_linear_velocity,
+                max_pre_approach_linear_velocity=self.max_pre_approach_linear_velocity,
+                max_final_approach_linear_velocity=self.max_final_approach_linear_velocity,
                 open_gripper_at_pre_pose=True,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,
@@ -227,7 +246,8 @@ class GraspingAction(
             self.closing_step(
                 self.gripper_goal_type.moving_gripper_to(
                     self.arm.end_effector.default_configuration(
-                        GripperState.CLOSE, finger_velocity=self.grasp_closing_velocity
+                        GripperState.CLOSE,
+                        finger_velocity=self.max_grasp_closing_velocity,
                     ),
                     finger_stall_minimum_time=self.finger_stall_minimum_time,
                     tolerate_finger_stall=self.tolerate_finger_stall,
@@ -246,7 +266,9 @@ class GraspingAction(
                 closing_goal,
                 self.tool_center_point_goal(
                     self.grasp_pose_sequence(
-                        self.grasp.grasp_pose, self.arm.end_effector, self.grasp
+                        reference_T_grasp=self.grasp_candidate.grasp_pose,
+                        end_effector=self.arm.end_effector,
+                        grasp_candidate=self.grasp_candidate,
                     ).grasp,
                     self.arm,
                 ),

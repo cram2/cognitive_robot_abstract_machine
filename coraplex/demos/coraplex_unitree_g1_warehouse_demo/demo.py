@@ -167,17 +167,23 @@ def build_statechart(
         Sequence(
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
-                NavigateAction(goal_pose=standing_pose_in_front_of(source, world)),
+                NavigateAction(
+                    planar_goal_pose=standing_pose_in_front_of(source, world)
+                ),
                 PickUpAction(
-                    grasp=GraspCandidate.from_body_origin(parcel),
+                    grasp_candidate=GraspCandidate.from_body_origin(parcel),
                     arm=robot.torso.left_arm,
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 straighten_torso(robot),
                 NavigateAction(
-                    goal_pose=Pose2D.from_xy_yaw(yaw=turn, reference_frame=robot.root)
+                    planar_goal_pose=Pose2D.from_xy_yaw(
+                        yaw=turn, reference_frame=robot.root
+                    )
                 ),
-                NavigateAction(goal_pose=standing_pose_in_front_of(destination, world)),
+                NavigateAction(
+                    planar_goal_pose=standing_pose_in_front_of(destination, world)
+                ),
                 PlaceAction(
                     arm=robot.torso.left_arm,
                     goal_pose=Pose(

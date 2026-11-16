@@ -51,7 +51,7 @@ def _half_open(gripper: HasTwoFingers, **parameters) -> MoveGripper:
     :return: A goal standing the fingertips of `gripper` half as wide apart as it opens.
     """
     return MoveGripper(
-        gripper=gripper, width=gripper.separation_when_open / 2, **parameters
+        two_finger_gripper=gripper, width=gripper.separation_when_open / 2, **parameters
     )
 
 

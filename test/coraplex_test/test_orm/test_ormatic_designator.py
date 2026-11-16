@@ -35,7 +35,9 @@ def simple_plan(pr2_apartment_context):
     plan = Sequence(
         nodes=[
             NavigateAction(
-                goal_pose=Pose2D.from_xy_yaw(1.6, 1.9, reference_frame=world.root)
+                planar_goal_pose=Pose2D.from_xy_yaw(
+                    1.6, 1.9, reference_frame=world.root
+                )
             ),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(arms=robot_view.all_arms),

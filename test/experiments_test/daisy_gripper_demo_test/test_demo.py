@@ -142,8 +142,8 @@ def test_each_gripper_moves_alone_then_both_together_presets_before_flex(
 ) -> None:
     commands = [
         (
-            type(action.configuration.end_effector),
-            action.configuration.joint_state.state_type,
+            type(action.gripper_configuration.end_effector),
+            action.gripper_configuration.joint_state.state_type,
             isinstance(motion, Parallel),
         )
         for _, motion, _ in gripper_steps(plan)

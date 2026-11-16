@@ -114,7 +114,9 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     expand(Sequence(nodes=[place]), extensions)
     grasp = place._grasp_on_the_held_object()
     poses = place.grasp_pose_sequence(
-        grasp.moved_to(target), robot.left_arm.end_effector, grasp
+        reference_T_grasp=grasp.moved_to(target),
+        end_effector=robot.left_arm.end_effector,
+        grasp_candidate=grasp,
     )
 
     tool_goals = [goal.goal_pose for goal in _tool_goals_of(place)]
@@ -143,13 +145,15 @@ def test_place_uses_the_grasp_its_pick_up_will_take(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(arm=robot.left_arm, goal_pose=target)
     expand(Sequence(nodes=[pick_up, place]), extensions)
 
     np.testing.assert_allclose(
         place._grasp_on_the_held_object().grasp_pose.to_np(),
-        pick_up.grasp.grasp_pose.to_np(),
+        pick_up.grasp_candidate.grasp_pose.to_np(),
         atol=1e-9,
     )
 
@@ -165,12 +169,16 @@ def test_a_place_uses_the_grasp_of_the_latest_pick_up_of_its_arm(
     spoon = world.get_semantic_annotations_by_type(Spoon)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     first_place = PlaceAction(arm=robot.left_arm, goal_pose=target)
-    second_pick_up = PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.left_arm)
+    second_pick_up = PickUpAction(
+        grasp_candidate=spoon.grasp_candidates()[0], arm=robot.left_arm
+    )
     second_place = PlaceAction(arm=robot.left_arm, goal_pose=target)
     expand(
         Sequence(
             nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
+                PickUpAction(
+                    grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+                ),
                 first_place,
                 second_pick_up,
                 second_place,
@@ -180,7 +188,7 @@ def test_a_place_uses_the_grasp_of_the_latest_pick_up_of_its_arm(
     )
 
     assert first_place._grasp_on_the_held_object().graspable is milk
-    assert second_place._grasp_on_the_held_object() is second_pick_up.grasp
+    assert second_place._grasp_on_the_held_object() is second_pick_up.grasp_candidate
 
 
 def test_a_place_ignores_the_pick_up_of_the_other_arm(pr2_apartment_context):
@@ -192,20 +200,24 @@ def test_a_place_ignores_the_pick_up_of_the_other_arm(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     spoon = world.get_semantic_annotations_by_type(Spoon)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(arm=robot.left_arm, goal_pose=target)
     expand(
         Sequence(
             nodes=[
                 pick_up,
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
+                PickUpAction(
+                    grasp_candidate=spoon.grasp_candidates()[0], arm=robot.right_arm
+                ),
                 place,
             ]
         ),
         extensions,
     )
 
-    assert place._grasp_on_the_held_object() is pick_up.grasp
+    assert place._grasp_on_the_held_object() is pick_up.grasp_candidate
 
 
 def test_a_pick_up_in_the_plan_outranks_what_the_gripper_holds_while_it_is_built(
@@ -218,12 +230,14 @@ def test_a_pick_up_in_the_plan_outranks_what_the_gripper_holds_while_it_is_built
     world, robot, milk, extensions = pr2_holding_milk
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     first_place = PlaceAction(arm=robot.left_arm, goal_pose=target)
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     second_place = PlaceAction(arm=robot.left_arm, goal_pose=target)
     expand(Sequence(nodes=[first_place, pick_up, second_place]), extensions)
 
-    assert first_place._grasp_on_the_held_object() is not pick_up.grasp
-    assert second_place._grasp_on_the_held_object() is pick_up.grasp
+    assert first_place._grasp_on_the_held_object() is not pick_up.grasp_candidate
+    assert second_place._grasp_on_the_held_object() is pick_up.grasp_candidate
 
 
 def test_a_place_reattaches_what_its_arm_picked_up(pr2_apartment_context):
@@ -234,7 +248,9 @@ def test_a_place_reattaches_what_its_arm_picked_up(pr2_apartment_context):
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(arm=robot.left_arm, goal_pose=target)
     expand(Sequence(nodes=[pick_up, place]), extensions)
 
@@ -264,7 +280,9 @@ def test_a_second_place_after_one_pick_up_is_refused(pr2_apartment_context):
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     first_place = PlaceAction(arm=robot.left_arm, goal_pose=target)
     second_place = PlaceAction(arm=robot.left_arm, goal_pose=target)
 

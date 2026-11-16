@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
+from krrood.patterns.mixin import ParameterMixin
 from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
@@ -21,7 +22,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasRootLinkParameter:
+class HasRootLinkParameter(ParameterMixin):
     """
     A node acting on a kinematic chain, expressed relative to its root.
     """
@@ -33,7 +34,7 @@ class HasRootLinkParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasTipLinkParameter:
+class HasTipLinkParameter(ParameterMixin):
     """
     A node moving the tip of a kinematic chain.
     """
@@ -55,7 +56,7 @@ class HasKinematicChainParameters(HasRootLinkParameter, HasTipLinkParameter):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasWeightParameter:
+class HasWeightParameter(ParameterMixin):
     """
     A node whose constraints compete with those of other nodes.
     """
@@ -70,7 +71,7 @@ class HasWeightParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalPoseParameter:
+class HasGoalPoseParameter(ParameterMixin):
     """
     A node bringing something to a pose.
     """
@@ -82,7 +83,7 @@ class HasGoalPoseParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalPointParameter:
+class HasGoalPointParameter(ParameterMixin):
     """
     A node bringing the tip of a kinematic chain to a point, or aiming it at one.
     """
@@ -94,7 +95,7 @@ class HasGoalPointParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalPointsParameter:
+class HasGoalPointsParameter(ParameterMixin):
     """
     A node moving the tip of a kinematic chain along a sequence of points.
     """
@@ -106,7 +107,7 @@ class HasGoalPointsParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalOrientationParameter:
+class HasGoalOrientationParameter(ParameterMixin):
     """
     A node turning the tip of a kinematic chain to an orientation.
     """
@@ -118,7 +119,7 @@ class HasGoalOrientationParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalStateParameter:
+class HasGoalStateParameter(ParameterMixin):
     """
     A node moving joints to positions of their own.
     """
@@ -130,19 +131,19 @@ class HasGoalStateParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalBindingPolicyParameter:
+class HasGoalBindingPolicyParameter(ParameterMixin):
     """
     A node whose goal is given relative to a frame that may move.
     """
 
-    binding_policy: GoalBindingPolicy = GoalBindingPolicy.Bind_on_start
+    goal_binding_policy: GoalBindingPolicy = GoalBindingPolicy.Bind_on_start
     """
     When the pose of the frame the goal is given in is read.
     """
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasThresholdParameter:
+class HasThresholdParameter(ParameterMixin):
     """
     A node that counts its goal as reached once its error is small enough.
     """
@@ -154,15 +155,21 @@ class HasThresholdParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasPoseThresholdParameters:
+class HasPositionThresholdParameter(ParameterMixin):
     """
-    A node that counts a pose as reached once both its position and its orientation
-    are close enough.
+    A node that counts a goal position as reached once it is close enough.
     """
 
     position_threshold: float = 0.01
     """
     Distance at or below which the position counts as reached, in meters.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasOrientationThresholdParameter(ParameterMixin):
+    """
+    A node that counts a goal orientation as reached once it is close enough.
     """
 
     orientation_threshold: float = 0.01
@@ -175,7 +182,7 @@ class HasPoseThresholdParameters:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasCruiseVelocityParameter:
+class HasCruiseVelocityParameter(ParameterMixin):
     """
     A node that approaches its goal at a set speed.
     """
@@ -188,15 +195,22 @@ class HasCruiseVelocityParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasPoseCruiseVelocityParameters:
+class HasCruiseLinearVelocityParameter(ParameterMixin):
     """
-    A node that approaches a goal position and a goal orientation at a set speed each.
+    A node that approaches a goal position at a set speed.
     """
 
     cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
     How fast the goal position is approached, in m/s; not strictly enforced, a velocity
     limit sets a strict one.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasCruiseAngularVelocityParameter(ParameterMixin):
+    """
+    A node that approaches a goal orientation at a set speed.
     """
 
     cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION
@@ -207,7 +221,7 @@ class HasPoseCruiseVelocityParameters:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasLinearVelocityLimitParameter:
+class HasMaxLinearVelocityParameter(ParameterMixin):
     """
     A node capping how fast the tip of a kinematic chain moves.
     """
@@ -219,7 +233,7 @@ class HasLinearVelocityLimitParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasAngularVelocityLimitParameter:
+class HasMaxAngularVelocityParameter(ParameterMixin):
     """
     A node capping how fast the tip of a kinematic chain turns.
     """
@@ -231,7 +245,7 @@ class HasAngularVelocityLimitParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasJointVelocityLimitParameter:
+class HasMaxJointVelocityParameter(ParameterMixin):
     """
     A node that may cap how fast the joints it drives move.
     """
@@ -247,14 +261,21 @@ class HasJointVelocityLimitParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasTwoFingerGripperParameters:
+class HasTwoFingerGripperParameter(ParameterMixin):
     """
-    A node bringing the fingertips of a two-finger gripper to a given width.
+    A node moving the fingers of a two-finger gripper.
     """
 
-    gripper: HasTwoFingers
+    two_finger_gripper: HasTwoFingers
     """
     The gripper whose fingers move.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasWidthParameter(ParameterMixin):
+    """
+    A node bringing the fingertips of a two-finger gripper to a given width.
     """
 
     width: float
@@ -265,7 +286,7 @@ class HasTwoFingerGripperParameters:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasFingerStallToleranceParameters:
+class HasTolerateFingerStallParameter(ParameterMixin):
     """
     A node closing fingers that may stop short of their goal on an object between them.
     """
@@ -274,6 +295,13 @@ class HasFingerStallToleranceParameters:
     """
     Whether fingers that have stopped approaching their goal count as done, even short
     of it.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasFingerStallMinimumTimeParameter(ParameterMixin):
+    """
+    A node telling fingers that stopped short of their goal from fingers still moving.
     """
 
     finger_stall_minimum_time: float | None = None

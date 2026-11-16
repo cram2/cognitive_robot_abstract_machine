@@ -157,7 +157,7 @@ plan = Sequence(
         # Stack Box 2
         ParkArmsAction(arms=tracy.all_arms),
         PickUpAction(
-            grasp=GraspCandidate(
+            grasp_candidate=GraspCandidate(
                 box2_annotation,
                 Pose.from_xyz_rpy(
                     pitch=np.pi / 2, reference_frame=box2_annotation.root
@@ -174,7 +174,7 @@ plan = Sequence(
         # Stack Box 3
         ParkArmsAction(arms=tracy.all_arms),
         PickUpAction(
-            grasp=GraspCandidate(
+            grasp_candidate=GraspCandidate(
                 box3_annotation,
                 Pose.from_xyz_rpy(
                     pitch=np.pi / 2, reference_frame=box3_annotation.root

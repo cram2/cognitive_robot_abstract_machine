@@ -14,7 +14,10 @@ from coraplex.locations.locations import ReachabilityLocation
 from cramph.context import StatechartContext
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
-from coraplex.robot_plans.mixins import HasGraspApproachParameters
+from coraplex.robot_plans.mixins import (
+    HasApproachClearanceParameter,
+    HasRetreatDistanceParameter,
+)
 from coraplex.robot_plans.actions.composite.carrying import CarryAction
 from coraplex.robot_plans.actions.composite.facing import FaceAndLookAtAction
 from coraplex.robot_plans.actions.core.container import OpenAction
@@ -87,7 +90,7 @@ class TransportAction(SequentialAction):
             place=a(MoveAndPlaceAction)(
                 carry=a(CarryAction)(
                     navigate=a(NavigateAction)(
-                        goal_pose=variable(
+                        planar_goal_pose=variable(
                             Pose2D,
                             domain=ReachabilityLocation(
                                 target_pose=goal_pose,
@@ -99,8 +102,8 @@ class TransportAction(SequentialAction):
                     holding_arms=[arm],
                 ),
                 face_and_look_at=a(FaceAndLookAtAction)(
-                    face_at=a(FaceAtAction)(target=goal_pose),
-                    look_at=a(LookAtAction)(target=goal_pose),
+                    face_at=a(FaceAtAction)(look_target=goal_pose),
+                    look_at=a(LookAtAction)(look_target=goal_pose),
                 ),
                 place=a(PlaceAction)(arm=arm, goal_pose=goal_pose),
             ),
@@ -177,12 +180,12 @@ class MoveAndPlaceAction(SequentialAction):
         """
         return cls(
             carry=CarryAction(
-                navigate=NavigateAction(goal_pose=standing_position),
+                navigate=NavigateAction(planar_goal_pose=standing_position),
                 holding_arms=[arm],
             ),
             face_and_look_at=FaceAndLookAtAction(
-                face_at=FaceAtAction(target=goal_pose),
-                look_at=LookAtAction(target=goal_pose),
+                face_at=FaceAtAction(look_target=goal_pose),
+                look_at=LookAtAction(look_target=goal_pose),
             ),
             place=PlaceAction(arm=arm, goal_pose=goal_pose),
         )
@@ -222,8 +225,8 @@ class MoveAndPickUpAction(SequentialAction):
         standing_position: Pose2D,
         grasp: GraspCandidate,
         arm: Arm,
-        approach_clearance: float = HasGraspApproachParameters.approach_clearance,
-        retreat_distance: float = HasGraspApproachParameters.retreat_distance,
+        approach_clearance: float = HasApproachClearanceParameter.approach_clearance,
+        retreat_distance: float = HasRetreatDistanceParameter.retreat_distance,
     ) -> Self:
         """
         :param standing_position: Where the robot stands while picking up.
@@ -235,13 +238,13 @@ class MoveAndPickUpAction(SequentialAction):
         """
         object_pose = Pose(reference_frame=grasp.graspable.root)
         return cls(
-            navigate=NavigateAction(goal_pose=standing_position),
+            navigate=NavigateAction(planar_goal_pose=standing_position),
             face_and_look_at=FaceAndLookAtAction(
-                face_at=FaceAtAction(target=object_pose),
-                look_at=LookAtAction(target=object_pose),
+                face_at=FaceAtAction(look_target=object_pose),
+                look_at=LookAtAction(look_target=object_pose),
             ),
             pick_up=PickUpAction(
-                grasp=grasp,
+                grasp_candidate=grasp,
                 arm=arm,
                 approach_clearance=approach_clearance,
                 retreat_distance=retreat_distance,
@@ -276,13 +279,13 @@ class MoveAndPickUpAction(SequentialAction):
             ),
         )
         return a(cls)(
-            navigate=a(NavigateAction)(goal_pose=standing_position),
+            navigate=a(NavigateAction)(planar_goal_pose=standing_position),
             face_and_look_at=a(FaceAndLookAtAction)(
-                face_at=a(FaceAtAction)(target=object_pose),
-                look_at=a(LookAtAction)(target=object_pose),
+                face_at=a(FaceAtAction)(look_target=object_pose),
+                look_at=a(LookAtAction)(look_target=object_pose),
             ),
             pick_up=a(PickUpAction)(
-                grasp=flat_variable(
+                grasp_candidate=flat_variable(
                     GraspsByCloseness(
                         graspable=graspable,
                         standing_position=standing_position,
@@ -334,12 +337,12 @@ class MoveAndOpenAction(SequentialAction):
         """
         handle_pose = Pose(reference_frame=grasp.graspable.root)
         return cls(
-            navigate=NavigateAction(goal_pose=standing_position),
+            navigate=NavigateAction(planar_goal_pose=standing_position),
             face_and_look_at=FaceAndLookAtAction(
-                face_at=FaceAtAction(target=handle_pose),
-                look_at=LookAtAction(target=handle_pose),
+                face_at=FaceAtAction(look_target=handle_pose),
+                look_at=LookAtAction(look_target=handle_pose),
             ),
-            open_container=OpenAction(grasp=grasp, arm=arm),
+            open_container=OpenAction(grasp_candidate=grasp, arm=arm),
         )
 
     @classmethod
@@ -374,13 +377,13 @@ class MoveAndOpenAction(SequentialAction):
             ),
         )
         return a(cls)(
-            navigate=a(NavigateAction)(goal_pose=standing_position),
+            navigate=a(NavigateAction)(planar_goal_pose=standing_position),
             face_and_look_at=a(FaceAndLookAtAction)(
-                face_at=a(FaceAtAction)(target=handle_pose),
-                look_at=a(LookAtAction)(target=handle_pose),
+                face_at=a(FaceAtAction)(look_target=handle_pose),
+                look_at=a(LookAtAction)(look_target=handle_pose),
             ),
             open_container=a(OpenAction)(
-                grasp=flat_variable(
+                grasp_candidate=flat_variable(
                     GraspsByCloseness(
                         graspable=handle,
                         standing_position=standing_position,
