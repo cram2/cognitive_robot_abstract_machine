@@ -1,3 +1,7 @@
+"""
+Tests for creating semantic annotations together with their bodies and connections.
+"""
+
 import unittest
 from dataclasses import dataclass, field
 
@@ -1483,6 +1487,33 @@ def test_drawer_without_a_movable_joint_has_no_opening_ratio():
 
     with pytest.raises(MissingMovableJointError):
         drawer.opening_ratio
+
+
+def test_a_door_on_its_hinge_reports_how_far_it_stands_open():
+    """
+    A door, like a drawer, stands at ``0`` at the lower limit of its joint and at ``1``
+    at the upper one.
+    """
+    world = _world_with_root()
+    with world.modify_world():
+        door = Door.create_with_new_body_in_world(
+            name="door",
+            world=world,
+            scale=Scale(0.03, 1, 2),
+            parent_connection_specification=RevoluteConnectionSpecification(
+                axis=Vector3.Z(),
+                dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    lower_position=0.0, upper_position=1.5, maximum_speed=1.0
+                ),
+            ),
+        )
+    limits = door.movable_joint.dof.limits
+
+    door.movable_joint.position = limits.lower.position
+    assert door.opening_ratio == 0
+
+    door.movable_joint.position = limits.upper.position
+    assert door.opening_ratio == 1
 
 
 @pytest.mark.parametrize("operate_doors", [Elevator.open, Elevator.close])

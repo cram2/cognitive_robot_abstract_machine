@@ -16,6 +16,7 @@ from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
+from krrood.patterns.called_positionally import called_positionally
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -88,6 +89,7 @@ class TopicSubscriberNode(TopicNode[MsgType]):
             qos_profile=self.qos_profile,
         )
 
+    @called_positionally
     def callback(self, msg: MsgType):
         self.__last_msg = msg
 

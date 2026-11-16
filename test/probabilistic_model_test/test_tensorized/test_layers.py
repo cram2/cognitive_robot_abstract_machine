@@ -252,6 +252,22 @@ def test_attaching_a_child_layer_stores_its_factors(
     assert (factors.rows.tolist(), factors.columns.tolist()) == ([0, 0, 0], [0, 1, 2])
 
 
+def test_a_cross_product_multiplies_every_combination_of_child_nodes():
+    """
+    The cross product of a layer of two and a layer of three nodes has a node for each
+    of the six pairs, whose log-likelihood is the sum of the pair's log-likelihoods.
+    """
+    first = uniform_layer_of(0, [(0, 1), (0, 2)])
+    second = uniform_layer_of(1, [(0, 1), (0, 2), (0, 4)])
+    product = ProductLayer.cross_product(child_layers=[first, second])
+    events = np.array([[0.5, 0.5]])
+    expected = (
+        first.log_likelihood_of_nodes(events)[:, :, None]
+        + second.log_likelihood_of_nodes(events)[:, None, :]
+    ).reshape(1, -1)
+    np.testing.assert_allclose(product.log_likelihood_of_nodes(events), expected)
+
+
 # %% truncation of input layers in a circuit
 
 
