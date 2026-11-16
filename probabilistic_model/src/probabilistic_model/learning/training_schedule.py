@@ -5,11 +5,12 @@ array backend that trains.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
 from array_api_compat import array_namespace, device
-from typing_extensions import Callable, Iterator
+from typing_extensions import Iterator
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -80,15 +81,15 @@ class Convergence:
         )
 
     def history_until_converged(
-        self, *, train_one_epoch: Callable[[], float]
+        self, *, training: MiniBatchTraining
     ) -> ConvergenceHistory:
         """
-        :param train_one_epoch: Trains one epoch and returns its average loss.
+        :param training: The training to run epoch by epoch.
         :return: The losses of the epochs trained until convergence or the epoch limit.
         """
         epoch_losses: list[float] = []
         while len(epoch_losses) < self.maximum_epochs:
-            epoch_losses.append(train_one_epoch())
+            epoch_losses.append(training.train_one_epoch())
             if self.has_converged(epoch_losses=epoch_losses):
                 return ConvergenceHistory(epoch_losses=epoch_losses, converged=True)
         return ConvergenceHistory(epoch_losses=epoch_losses, converged=False)
@@ -148,3 +149,43 @@ class MiniBatches:
                 )
                 for argument in arguments
             )
+
+
+# %% training on mini-batches
+
+
+@dataclass(kw_only=True)
+class MiniBatchTraining(ABC):
+    """
+    Training that updates parameters once per mini-batch of the training arrays.
+    """
+
+    arguments: tuple[BackendArray, ...]
+    """
+    The training arrays, one row per training example each.
+    """
+
+    mini_batches: MiniBatches
+    """
+    How the rows of :attr:`arguments` are split into the batches of every epoch.
+    """
+
+    @abstractmethod
+    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float:
+        """
+        Update the parameters by one step on a batch.
+
+        :param batch: The same rows of every training array.
+        :return: The loss of the batch before the step.
+        """
+
+    def train_one_epoch(self) -> float:
+        """
+        Take one step on every batch of an epoch.
+
+        :return: The average loss over the rows of the epoch.
+        """
+        total_loss = 0.0
+        for batch in self.mini_batches.batches_of_epoch(arguments=self.arguments):
+            total_loss += self.step_on_batch(batch=batch) * batch[0].shape[0]
+        return total_loss / self.mini_batches.number_of_rows

@@ -17,7 +17,11 @@ from probabilistic_model.learning.gradient_descent import (
     Loss,
     TrainingRun,
 )
-from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.learning.training_schedule import (
+    Convergence,
+    MiniBatches,
+    MiniBatchTraining,
+)
 
 
 # %% gradient descent
@@ -109,24 +113,17 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
         :param seed: The seed of the shuffling of the rows.
         :return: The trained circuit and the losses of its epochs.
         """
-        optimizer = self.optimizer_type(self.parameters, lr=self.learning_rate)
-        mini_batches = MiniBatches(
-            number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
+        training = TorchGradientDescentTraining(
+            arguments=arguments,
+            mini_batches=MiniBatches(
+                number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
+            ),
+            gradient_descent=self,
+            optimizer=self.optimizer_type(self.parameters, lr=self.learning_rate),
         )
-
-        def train_one_epoch() -> float:
-            """
-            :return: The average loss over the rows of one epoch of steps.
-            """
-            total_loss = 0.0
-            for batch in mini_batches.batches_of_epoch(arguments=arguments):
-                loss = self.step(optimizer=optimizer, arguments=batch)
-                total_loss += loss * batch[0].shape[0]
-            return total_loss / mini_batches.number_of_rows
-
         history = (
             Convergence() if convergence is None else convergence
-        ).history_until_converged(train_one_epoch=train_one_epoch)
+        ).history_until_converged(training=training)
         return TrainingRun(trained_layer=self.trained_layer(), history=history)
 
     def step(
@@ -163,3 +160,26 @@ class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric):
         return self.layer.copy_with_circuit_parameters(
             [parameter.detach() for parameter in self.parameters]
         )
+
+
+# %% training on mini-batches
+
+
+@dataclass(kw_only=True)
+class TorchGradientDescentTraining(MiniBatchTraining):
+    """
+    Mini-batch training by :class:`TorchGradientDescent`, one optimizer step per batch.
+    """
+
+    gradient_descent: TorchGradientDescent
+    """
+    The gradient descent whose parameters are updated.
+    """
+
+    optimizer: torch.optim.Optimizer
+    """
+    The optimizer of the parameters of :attr:`gradient_descent`.
+    """
+
+    def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> float:
+        return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)

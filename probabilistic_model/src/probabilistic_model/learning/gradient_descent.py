@@ -19,12 +19,13 @@ from array_api_compat import array_namespace
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import Generic, Self, TypeVar
+from typing_extensions import Callable, Generic, Self, TypeVar
 
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
     MiniBatches,
+    MiniBatchTraining,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -284,28 +285,20 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
         :param seed: The seed of the shuffling of the rows.
         :return: The trained circuit and the losses of its epochs.
         """
-        compiled_step = jax.jit(self.step)
-        mini_batches = MiniBatches(
-            number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
+        training = GradientDescentTraining(
+            arguments=arguments,
+            mini_batches=MiniBatches(
+                number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
+            ),
+            gradient_descent=self,
         )
-        state = self.initial_state()
-
-        def train_one_epoch() -> float:
-            """
-            :return: The average loss over the rows of one epoch of steps.
-            """
-            nonlocal state
-            total_loss = 0.0
-            for batch in mini_batches.batches_of_epoch(arguments=arguments):
-                state = compiled_step(state, *batch)
-                total_loss += float(state.loss) * batch[0].shape[0]
-            return total_loss / mini_batches.number_of_rows
-
         history = (
             Convergence() if convergence is None else convergence
-        ).history_until_converged(train_one_epoch=train_one_epoch)
+        ).history_until_converged(training=training)
         return TrainingRun(
-            trained_layer=self.layer.copy_with_circuit_parameters(state.parameters),
+            trained_layer=self.layer.copy_with_circuit_parameters(
+                training.state.parameters
+            ),
             history=history,
         )
 
@@ -319,3 +312,39 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
             self.optimizer.init(self.initial_parameters),
             jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
         )
+
+
+# %% training on mini-batches
+
+
+@dataclass(kw_only=True)
+class GradientDescentTraining(MiniBatchTraining):
+    """
+    Mini-batch training by :class:`GradientDescent`, one compiled step per batch.
+    """
+
+    gradient_descent: GradientDescent
+    """
+    The gradient descent whose steps are taken.
+    """
+
+    compiled_step: Callable[..., TrainingState] = field(init=False)
+    """
+    :meth:`GradientDescent.step`, compiled once for every shape of batch.
+    """
+
+    state: TrainingState = field(init=False)
+    """
+    The state after the last step.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Compile the step and start from the state before training.
+        """
+        self.compiled_step = jax.jit(self.gradient_descent.step)
+        self.state = self.gradient_descent.initial_state()
+
+    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> float:
+        self.state = self.compiled_step(self.state, *batch)
+        return float(self.state.loss)

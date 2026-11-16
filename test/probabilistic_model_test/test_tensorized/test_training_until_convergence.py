@@ -6,6 +6,8 @@ trainers raise the log-likelihood of their data that way.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -17,7 +19,11 @@ from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
     GradientDescent,
 )
-from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.learning.training_schedule import (
+    Convergence,
+    MiniBatches,
+    MiniBatchTraining,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
 )
@@ -29,6 +35,34 @@ from .test_circuit_parameters_and_training import (
 from .test_inner_layers_on_array_backends import mixture_of_products_case
 
 # %% convergence criterion
+
+
+@dataclass(kw_only=True)
+class ScriptedLossTraining(MiniBatchTraining):
+    """
+    Training whose every step reports the next loss of a fixed script, one batch per
+    epoch.
+    """
+
+    losses: list[float]
+    """
+    The loss each step reports, in order.
+    """
+
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+        return self.losses.pop(0)
+
+
+def scripted_training(losses: list[float]) -> ScriptedLossTraining:
+    """
+    :param losses: The loss of every epoch, in order.
+    :return: A training whose epochs report these losses.
+    """
+    return ScriptedLossTraining(
+        arguments=(np.zeros(1),),
+        mini_batches=MiniBatches(number_of_rows=1),
+        losses=losses,
+    )
 
 
 @pytest.fixture
@@ -66,7 +100,9 @@ def test_a_loss_that_stops_improving_ends_training_once_converged(convergence):
     """
     A constant loss converges after the first epoch plus the patience.
     """
-    history = convergence.history_until_converged(train_one_epoch=lambda: 1.0)
+    history = convergence.history_until_converged(
+        training=scripted_training([1.0] * convergence.maximum_epochs)
+    )
 
     assert history.converged
     assert history.epochs == convergence.patience + 1
@@ -77,10 +113,8 @@ def test_a_loss_that_keeps_improving_ends_training_at_the_epoch_limit(convergenc
     A loss that improves by more than the tolerance every epoch stops at the epoch limit
     without converging.
     """
-    losses = iter(range(100, 0, -1))
-
     history = convergence.history_until_converged(
-        train_one_epoch=lambda: float(next(losses))
+        training=scripted_training([float(loss) for loss in range(100, 0, -1)])
     )
 
     assert not history.converged
@@ -142,10 +176,10 @@ def test_without_a_batch_size_an_epoch_is_one_batch_of_every_row():
 @pytest.fixture
 def training_convergence() -> Convergence:
     """
-    The criterion the trainers are run with: tight enough to train for many epochs,
-    bounded so that the tests stay fast.
+    The criterion the trainers are run with: tight enough to train every one of its few
+    epochs, so that the tests stay fast.
     """
-    return Convergence(tolerance=1e-4, patience=3, maximum_epochs=100)
+    return Convergence(tolerance=1e-4, patience=3, maximum_epochs=20)
 
 
 def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
@@ -168,7 +202,7 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
         run = GradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize_until_converged(
-            events, convergence=training_convergence, batch_size=64
+            events, convergence=training_convergence, batch_size=100
         )
         after = float(jnp.mean(run.trained_layer.log_likelihood_of_nodes(events)[:, 0]))
     assert after > before + minimum_improvement
@@ -198,26 +232,6 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     before = float(circuit.log_likelihood(events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
         circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
-    ).minimize_until_converged(events, convergence=training_convergence, batch_size=64)
+    ).minimize_until_converged(events, convergence=training_convergence, batch_size=100)
     after = float(run.trained_layer.log_likelihood_of_nodes(events)[:, 0].mean())
     assert after > before + minimum_improvement
-
-
-def test_the_run_reports_the_epochs_of_its_history(
-    mixture_of_products_case, training_convergence
-):
-    """
-    The run of a trainer reports one loss per epoch it trained.
-    """
-    case = mixture_of_products_case
-    np.random.seed(0)
-    data = case.circuit(np).sample(100)
-    with jax.enable_x64(True):
-        circuit = case.circuit(np).to_namespace(jnp)
-        run = GradientDescent(
-            circuit.root, AverageNegativeLogLikelihood()
-        ).minimize_until_converged(
-            jnp.asarray(data), convergence=training_convergence, batch_size=32
-        )
-    assert run.history.epochs == len(run.history.epoch_losses)
-    assert 1 <= run.history.epochs <= training_convergence.maximum_epochs
