@@ -164,7 +164,7 @@ class KeepHeldBodyUpright(AlignPlanes):
             tip=self.tip_link,
             float_variable_data=self.context.float_variable_data,
         )
-        self._tool_T_held_body.bind(self.context.world)
+        self._tool_T_held_body.bind(world=self.context.world)
         self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3.Z(
             reference_frame=self.tip_link
         )
@@ -176,5 +176,6 @@ class KeepHeldBodyUpright(AlignPlanes):
         super().on_start()
         held_body = self.end_effector.held_body
         self._tool_T_held_body.change_tip(
-            self.root_link if held_body is None else held_body, self.context.world
+            tip=self.root_link if held_body is None else held_body,
+            world=self.context.world,
         )

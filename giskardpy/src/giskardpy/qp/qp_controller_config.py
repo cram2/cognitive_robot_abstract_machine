@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPControllerConfig:
     """
     Configuration for the QPController.
@@ -197,7 +197,7 @@ class QPControllerConfig:
         """
         return self.prediction_horizon - self.number_of_resting_steps
 
-    def horizon_weight_scale(self, step: int) -> float:
+    def horizon_weight_scale(self, *, step: int) -> float:
         """
         :param step: Index of a prediction horizon step.
         :return: The fraction of a dof weight applied at that step, growing linearly
@@ -217,7 +217,8 @@ class QPControllerConfig:
         their :meth:`horizon_weight_scale`.
         """
         inverse_scales = [
-            1 / self.horizon_weight_scale(step) for step in range(self.control_horizon)
+            1 / self.horizon_weight_scale(step=step)
+            for step in range(self.control_horizon)
         ]
         return inverse_scales[0] / (sum(inverse_scales) / self.control_horizon)
 
@@ -254,21 +255,23 @@ class QPControllerConfig:
         )
 
     def set_dof_weight(
-        self, dof_name: PrefixedName, derivative: Derivatives, weight: float
+        self, *, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
         """
         Sets the objective weight of a single degree-of-freedom derivative.
         """
         self.dof_weights[dof_name][derivative] = weight
 
-    def set_dof_weights(self, dof_name: PrefixedName, weight_map: DerivativeMap[float]):
+    def set_dof_weights(
+        self, *, dof_name: PrefixedName, weight_map: DerivativeMap[float]
+    ):
         """
         Sets the objective weights of all derivatives of a degree of freedom.
         """
         self.dof_weights[dof_name] = weight_map
 
     def get_degree_of_freedom_weight(
-        self, dof_name: PrefixedName, derivative: Derivatives
+        self, *, dof_name: PrefixedName, derivative: Derivatives
     ) -> float:
         """
         Returns the objective weight of a single degree-of-freedom derivative.

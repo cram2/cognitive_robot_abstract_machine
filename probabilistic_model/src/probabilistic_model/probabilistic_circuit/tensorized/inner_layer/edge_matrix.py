@@ -14,6 +14,7 @@ from types import ModuleType
 
 import numpy as np
 import numpy.typing as npt
+import array_api_compat
 from array_api_compat import array_namespace
 from typing_extensions import Self
 
@@ -423,7 +424,10 @@ class SparseEdgeMatrix(EdgeMatrix):
         namespace = array_namespace(values)
         batch_shape = tuple(values.shape[:-1])
         result = namespace.full(
-            batch_shape + (0,), reduction.identity, dtype=values.dtype
+            batch_shape + (0,),
+            reduction.identity,
+            dtype=values.dtype,
+            device=array_api_compat.device(values),
         )
         for positions in reversed(self.entry_positions_by_rank):
             entries = values[..., positions]
@@ -441,6 +445,7 @@ class SparseEdgeMatrix(EdgeMatrix):
             batch_shape + (self.matrix_shape[0] - result.shape[-1],),
             reduction.identity,
             dtype=values.dtype,
+            device=array_api_compat.device(values),
         )
         result = namespace.concat([result, rows_without_edges], axis=-1)
         return result[..., self.entry_count_ranks]
@@ -519,6 +524,8 @@ class DenseEdgeMatrix(EdgeMatrix):
     ) -> BackendArray:
         namespace = array_namespace(values)
         masked = namespace.where(
-            namespace.asarray(self.is_edge), values, reduction.identity
+            namespace.asarray(self.is_edge, device=array_api_compat.device(values)),
+            values,
+            reduction.identity,
         )
         return reduction.reduce_last_axis(namespace, masked)

@@ -62,7 +62,7 @@ def default_joint_state(default_daisy_pose: dict[str, float]) -> dict[str, float
     return default_daisy_pose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DAiSyTester(GiskardTester):
     def setup_giskard(self) -> Giskard:
         return Giskard(

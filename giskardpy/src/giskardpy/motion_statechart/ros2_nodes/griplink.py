@@ -75,7 +75,7 @@ class GriplinkStatus(IntEnum):
 # %% griplink message types
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GriplinkGoal:
     """
     A griplink action goal; every griplink action addresses one port of the controller.
@@ -87,7 +87,7 @@ class GriplinkGoal:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GriplinkResult:
     """
     The result every griplink action reports: a status code, a human-readable message
@@ -110,7 +110,7 @@ class GriplinkResult:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GriplinkFeedback:
     """
     The feedback every griplink action streams: the controller's device state.
@@ -122,7 +122,7 @@ class GriplinkFeedback:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GriplinkResultResponse:
     """
     The response the action client resolves a result future with, wrapping the
@@ -140,7 +140,7 @@ class GriplinkResultResponse:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GriplinkAction:
     """
     A griplink action, carrying the goal, result and feedback message classes the action
@@ -206,6 +206,7 @@ class GriplinkActionServerTask(
     @classmethod
     def moving_gripper_to(
         cls,
+        *,
         configuration: GripperConfiguration,
         stall_minimum_time: float | None = None,
         tolerate_stall: bool = False,
@@ -222,16 +223,22 @@ class GriplinkActionServerTask(
         """
         match configuration:
             case GriplinkPresetConfiguration():
-                return GriplinkPresetActionServerTask.from_configuration(configuration)
+                return GriplinkPresetActionServerTask.from_configuration(
+                    configuration=configuration
+                )
             case GriplinkFlexConfiguration():
-                return GriplinkFlexActionServerTask.from_configuration(configuration)
+                return GriplinkFlexActionServerTask.from_configuration(
+                    configuration=configuration
+                )
         return MoveFingers.moving_gripper_to(
-            configuration, stall_minimum_time, tolerate_stall
+            configuration=configuration,
+            stall_minimum_time=stall_minimum_time,
+            tolerate_stall=tolerate_stall,
         )
 
     @classmethod
     @abstractmethod
-    def from_configuration(cls, configuration: GriplinkGripperConfiguration) -> Self:
+    def from_configuration(cls, *, configuration: GriplinkGripperConfiguration) -> Self:
         """
         :param configuration: The configuration to bring the gripper into.
         :return: A new task bringing the gripper into `configuration` through the
@@ -242,7 +249,7 @@ class GriplinkActionServerTask(
 
     @classmethod
     def endpoint_serving(
-        cls, configuration: GriplinkGripperConfiguration
+        cls, *, configuration: GriplinkGripperConfiguration
     ) -> GriplinkEndpoint:
         """
         :param configuration: The configuration to bring the gripper into.
@@ -293,8 +300,8 @@ class GriplinkPresetActionServerTask(GriplinkActionServerTask):
         return frozenset((GriplinkCommand.GRIP, GriplinkCommand.RELEASE))
 
     @classmethod
-    def from_configuration(cls, configuration: GriplinkPresetConfiguration) -> Self:
-        endpoint = cls.endpoint_serving(configuration)
+    def from_configuration(cls, *, configuration: GriplinkPresetConfiguration) -> Self:
+        endpoint = cls.endpoint_serving(configuration=configuration)
         return cls(
             action_topic=endpoint.action_topic,
             message_type=cls.action_types[endpoint.command],
@@ -361,8 +368,8 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
         return frozenset((GriplinkCommand.FLEXGRIP, GriplinkCommand.FLEXRELEASE))
 
     @classmethod
-    def from_configuration(cls, configuration: GriplinkFlexConfiguration) -> Self:
-        endpoint = cls.endpoint_serving(configuration)
+    def from_configuration(cls, *, configuration: GriplinkFlexConfiguration) -> Self:
+        endpoint = cls.endpoint_serving(configuration=configuration)
         return cls(
             action_topic=endpoint.action_topic,
             message_type=cls.action_types[endpoint.command],
@@ -396,14 +403,34 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
             self.grip_velocity = default_velocity
         if self.grip_acceleration is None:
             self.grip_acceleration = default_acceleration
-        self._check_within(self.grip_position, "grip_position", -0.005, 0.12)
-        self._check_within(self.grip_force, "grip_force", 30.0, 300.0)
-        self._check_within(self.grip_velocity, "grip_velocity", 0.005, 0.35)
-        self._check_within(self.grip_acceleration, "grip_acceleration", 0.1, 4.0)
+        self._check_within(
+            value=self.grip_position,
+            parameter_name="grip_position",
+            lower_bound=-0.005,
+            upper_bound=0.12,
+        )
+        self._check_within(
+            value=self.grip_force,
+            parameter_name="grip_force",
+            lower_bound=30.0,
+            upper_bound=300.0,
+        )
+        self._check_within(
+            value=self.grip_velocity,
+            parameter_name="grip_velocity",
+            lower_bound=0.005,
+            upper_bound=0.35,
+        )
+        self._check_within(
+            value=self.grip_acceleration,
+            parameter_name="grip_acceleration",
+            lower_bound=0.1,
+            upper_bound=4.0,
+        )
 
     @staticmethod
     def _check_within(
-        value: float, parameter_name: str, lower_bound: float, upper_bound: float
+        *, value: float, parameter_name: str, lower_bound: float, upper_bound: float
     ) -> None:
         """
         :param value: The parameter value to check.
@@ -430,23 +457,23 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
         if self.message_type is Flexgrip:
             self._action_goal = Flexgrip.Goal(
                 port=0,
-                position=self._to_micrometres(self.grip_position),
-                force=self._to_millinewtons(self.grip_force),
-                speed=self._to_micrometres(self.grip_velocity),
-                acceleration=self._to_micrometres(self.grip_acceleration),
+                position=self._to_micrometres(value=self.grip_position),
+                force=self._to_millinewtons(value=self.grip_force),
+                speed=self._to_micrometres(value=self.grip_velocity),
+                acceleration=self._to_micrometres(value=self.grip_acceleration),
             )
         elif self.message_type is Flexrelease:
             self._action_goal = Flexrelease.Goal(
                 port=0,
-                position=self._to_micrometres(self.grip_position),
-                speed=self._to_micrometres(self.grip_velocity),
-                acceleration=self._to_micrometres(self.grip_acceleration),
+                position=self._to_micrometres(value=self.grip_position),
+                speed=self._to_micrometres(value=self.grip_velocity),
+                acceleration=self._to_micrometres(value=self.grip_acceleration),
             )
         else:
             raise UnknownGriplinkActionError(message_type=self.message_type)
 
     @staticmethod
-    def _to_micrometres(value: float) -> int:
+    def _to_micrometres(*, value: float) -> int:
         """
         :param value: A length in metres or its per-second derivations.
         :return: The value the griplink controller expects, in the matching µm-scaled
@@ -455,7 +482,7 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
         return round(value * 1_000_000)
 
     @staticmethod
-    def _to_millinewtons(value: float) -> int:
+    def _to_millinewtons(*, value: float) -> int:
         """
         :param value: A force in newtons.
         :return: The force the griplink controller expects, in integer millinewtons.
