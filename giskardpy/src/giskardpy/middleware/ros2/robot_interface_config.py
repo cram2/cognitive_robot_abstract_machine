@@ -151,14 +151,16 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     def connect(self) -> None:
         """
-        Release every joint the robot class declared as controlled, then let
-        :meth:`setup` declare the ones that are commanded.
+        Release every joint the robot class declared as controlled, let :meth:`setup`
+        declare the ones that are commanded, and compensate the actuation delays it
+        configured.
         """
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
                 self.world.degrees_of_freedom, False
             )
         self.setup()
+        self.control_loop.compensate_dead_time()
 
     @abstractmethod
     def setup(self) -> None:
@@ -352,6 +354,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         *,
         controller_manager_name: str = "controller_manager",
         whitelist: list[str] | None = None,
+        actuation_delay: timedelta | None = None,
     ) -> None:
         """
         Tell Giskard to read and command the robot through the active controllers of a
@@ -360,6 +363,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param controller_manager_name: The controller manager node, including the
             namespace it runs in.
         :param whitelist: The names of the controllers to consider, all if ``None``.
+        :param actuation_delay: how long the robot takes to execute a command sent to a
+            joint group velocity controller, which Giskard then compensates; ``None``
+            compensates nothing.
         """
         controller_manager = ControllerManager(
             name=controller_manager_name, ros_graph=RosGraph(background_node.get_node())
@@ -383,6 +389,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                             controller_name=controller.name
                         ),
                         command_format=command_format,
+                        actuation_delay=actuation_delay,
                     )
                 case ControllerType.DIFF_DRIVE:
                     command_format = TwistStampedFormat()

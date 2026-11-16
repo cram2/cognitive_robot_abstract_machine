@@ -19,6 +19,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.time import Time
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 executor: MultiThreadedExecutor | None = None
@@ -62,7 +63,15 @@ def ros_clock_seconds() -> float:
     :return: Seconds since the epoch of the ROS clock.
     :raises ROSNodeNotRegisteredError: If :func:`init_node` has not registered a node.
     """
-    return get_node().get_clock().now().nanoseconds * 1e-9
+    return ros_time_seconds(get_node().get_clock().now())
+
+
+def ros_time_seconds(time: Time) -> float:
+    """
+    :param time: A time of any ROS clock, e.g. read from it or from a header stamp.
+    :return: Seconds since the epoch of the clock the time belongs to.
+    """
+    return time.nanoseconds * 1e-9
 
 
 def spinner_thread_target(node: Node) -> None:

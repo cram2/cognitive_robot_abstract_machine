@@ -320,10 +320,16 @@ class DiscoveringInterface(ClosedLoopRobotInterfaceConfig):
     The controllers to consider, all if ``None``.
     """
 
+    actuation_delay: timedelta | None = None
+    """
+    The actuation delay of the discovered velocity controllers, ``None`` for none.
+    """
+
     def setup(self) -> None:
         self.discover_interfaces_from_controller_manager(
             controller_manager_name=self.controller_manager_name,
             whitelist=self.whitelist,
+            actuation_delay=self.actuation_delay,
         )
 
 
@@ -496,6 +502,36 @@ def test_a_whitelisted_controller_that_is_not_active_raises(
 
     with pytest.raises(ControllersNotActiveError):
         giskard.setup()
+
+
+def test_a_discovered_velocity_controller_compensates_the_given_actuation_delay(
+    serve, pr2_world_specification
+) -> None:
+    """
+    A robot set up through discovery can compensate its actuation delay too.
+    """
+    manager = ControllerManagerMimic(
+        name="controller_manager",
+        controllers=[
+            ControllerMimic(
+                name="head_velocity_controller",
+                controller_type=ControllerType.JOINT_GROUP_VELOCITY,
+                joints=[PR2Joint.HEAD_PAN],
+            )
+        ],
+    )
+    start(serve, manager)
+    interface = DiscoveringInterface(
+        controller_manager_name=manager.name, actuation_delay=timedelta(seconds=0.3)
+    )
+    giskard = closed_loop_pr2(interface, pr2_world_specification)
+
+    giskard.setup()
+
+    assert [
+        publisher.actuation_delay
+        for publisher in giskard.motion_server.control_loop.command_publishers
+    ] == [interface.actuation_delay]
 
 
 # %% discovering the drive

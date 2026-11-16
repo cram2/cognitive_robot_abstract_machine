@@ -5,13 +5,12 @@ The loop that executes a compiled motion statechart on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import timedelta
-from time import monotonic
 
 from cramph.executor import StatechartExecutor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
+from giskardpy.middleware.ros2.cycle_timing import CycleTiming
 from giskardpy.middleware.ros2.dead_time_compensation import DeadTimeCompensation
 from giskardpy.middleware.ros2.exceptions import (
     ClientDisconnectedError,
@@ -24,6 +23,9 @@ from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates
 from giskardpy.motion_control import MotionControl
 from semantic_digital_twin.adapters.ros import background_node
+from semantic_digital_twin.adapters.ros.input_synchronization import (
+    JointStateInputSynchronizer,
+)
 from semantic_digital_twin.world import World
 
 
@@ -80,26 +82,14 @@ class ControlLoop:
     Sends the computed velocities to the robot at the end of every cycle.
     """
 
-    dead_time_compensation: DeadTimeCompensation = field(init=False)
-    """
-    Moves the measured joint positions forward to where the robot will be once the
-    command of the cycle takes effect.
-    """
-
-    computation_time: timedelta = field(init=False, default=timedelta(0))
-    """
-    How long the previous cycle took from reading the inputs to publishing its commands.
-    """
-
-    def __post_init__(self):
-        """
-        Compensate the dead time of the inputs and publishers of this loop.
-        """
-        self.dead_time_compensation = DeadTimeCompensation(
-            world=self.world,
-            inputs=self.inputs,
-            command_publishers=self.command_publishers,
+    cycle_timing: CycleTiming = field(
+        default_factory=lambda: CycleTiming(
+            clock=background_node.get_node().get_clock()
         )
+    )
+    """
+    Times every cycle from its start to publishing its commands.
+    """
 
     @property
     def world(self) -> World:
@@ -127,33 +117,36 @@ class ControlLoop:
         :raises WorldModelModifiedDuringMotionError: If another process modified the
             world model.
         """
+        self.cycle_timing.start_cycle()
         self.apply_world_updates()
-        cycle_start = monotonic()
-        self.synchronize_inputs()
+        self.inputs.synchronize()
         self.raise_if_canceled()
         self.raise_if_client_disconnected()
         self.executor.tick()
         self.publish_commands()
-        self.computation_time = timedelta(seconds=monotonic() - cycle_start)
+        self.cycle_timing.finish_cycle()
         self.feedback_publisher.publish_if_changed()
         self.cycle_counter.tick()
 
-    def synchronize_inputs(self) -> None:
+    def compensate_dead_time(self) -> None:
         """
-        Write the inputs into the world, move the measured joint positions forward to
-        when the command of this cycle takes effect, and announce the state.
+        Move the measured joint positions forward to where the robot will be once the
+        command of a cycle takes effect, in every cycle from now on.
 
-        The command is expected to be published as long after now as the previous cycle
-        took to compute its command.
+        Call it once every joint state input and command publisher has been added.
         """
-        wrote_inputs = self.inputs.apply_inputs()
-        predicted_positions = self.dead_time_compensation.predict_positions(
-            command_publish_time=background_node.ros_clock_seconds()
-            + self.computation_time.total_seconds()
+        self.inputs.add_input(
+            DeadTimeCompensation(
+                world=self.world,
+                joint_states=[
+                    synchronizer
+                    for synchronizer in self.inputs.synchronizers
+                    if isinstance(synchronizer, JointStateInputSynchronizer)
+                ],
+                command_publishers=self.command_publishers,
+                cycle_timing=self.cycle_timing,
+            )
         )
-        if not (wrote_inputs or predicted_positions):
-            return
-        self.inputs.announce_state()
 
     def apply_world_updates(self) -> None:
         """

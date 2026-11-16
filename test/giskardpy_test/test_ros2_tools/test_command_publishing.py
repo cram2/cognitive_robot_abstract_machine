@@ -164,6 +164,7 @@ def build_group_publisher(
     minimum_valid_velocity: float = 0.0,
     minimum_velocity_overrides: dict[str, float] | None = None,
     command_format: GroupCommandFormat | None = None,
+    actuation_delay: timedelta | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over a chain of freshly created connections.
@@ -174,6 +175,7 @@ def build_group_publisher(
         minimum_valid_velocity,
         minimum_velocity_overrides,
         command_format,
+        actuation_delay,
     )
 
 
@@ -183,6 +185,7 @@ def group_publisher_for(
     minimum_valid_velocity: float = 0.0,
     minimum_velocity_overrides: dict[str, float] | None = None,
     command_format: GroupCommandFormat | None = None,
+    actuation_delay: timedelta | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over connections that already exist in a world.
@@ -195,6 +198,7 @@ def group_publisher_for(
             default=minimum_valid_velocity, overrides=minimum_velocity_overrides
         ),
         command_format=command_format or Float64MultiArrayFormat(),
+        actuation_delay=actuation_delay,
     )
 
 
@@ -810,7 +814,7 @@ def test_publishing_records_the_commanded_velocities(init_background_node):
         ConnectionSpec(name="joint_a", velocity=0.1),
         ConnectionSpec(name="joint_b", velocity=-0.2),
     ]
-    controller = build_group_publisher(specs)
+    controller = build_group_publisher(specs, actuation_delay=timedelta(seconds=0.3))
 
     publish_group(controller)
 
@@ -819,12 +823,29 @@ def test_publishing_records_the_commanded_velocities(init_background_node):
     )
 
 
+def test_the_history_holds_the_velocity_the_robot_executes(init_background_node):
+    """
+    A command raised to the minimum velocity and scaled to the joint is remembered as
+    the velocity it moves the raw degree of freedom at.
+    """
+    [spec] = [ConnectionSpec(name="joint_a", velocity=0.002, multiplier=2.0)]
+    controller = build_group_publisher(
+        [spec], minimum_valid_velocity=0.03, actuation_delay=timedelta(seconds=0.3)
+    )
+
+    [sent_velocity] = publish_group(controller)
+
+    assert controller.command_history.held_commands[-1].velocities == pytest.approx(
+        [sent_velocity / spec.multiplier]
+    )
+
+
 def test_stopping_records_zero_velocities(init_background_node):
     """
     A stopped robot is remembered as resting from then on.
     """
     specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
-    controller = build_group_publisher(specs)
+    controller = build_group_publisher(specs, actuation_delay=timedelta(seconds=0.3))
 
     publish_group(controller)
     stop_group_message(controller)
@@ -832,6 +853,20 @@ def test_stopping_records_zero_velocities(init_background_node):
     assert controller.command_history.held_commands[-1].velocities == pytest.approx(
         [0.0]
     )
+
+
+def test_a_publisher_without_actuation_delay_remembers_no_commands(
+    init_background_node,
+):
+    """
+    Without a delay to compensate, nothing ever reads the history.
+    """
+    controller = build_group_publisher([ConnectionSpec(name="joint_a", velocity=0.1)])
+
+    publish_group(controller)
+    stop_group_message(controller)
+
+    assert len(controller.command_history.held_commands) == 0
 
 
 def test_a_long_actuation_delay_keeps_the_commands_it_needs(init_background_node):

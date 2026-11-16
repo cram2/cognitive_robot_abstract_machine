@@ -9,9 +9,11 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from nav_msgs.msg import Odometry
+from rclpy.time import Time
 from sensor_msgs.msg import JointState
 from typing_extensions import Union
 
+from semantic_digital_twin.adapters.ros.background_node import ros_time_seconds
 from semantic_digital_twin.adapters.ros.latest_message_subscriber import (
     LatestMessageSubscriber,
     MessageType,
@@ -87,7 +89,7 @@ class JointPositionMeasurement:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     """
     Writes the positions of a joint state message into the world state.
@@ -107,17 +109,16 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
             connection: ActiveConnection1DOF = self.world.get_connection_by_name(
                 joint_name
             )
-            if not self.writes(connection):
+            if not self.writes(connection=connection):
                 continue
             self.world.state[connection.raw_dof.id].position = position
             positions[connection.raw_dof.id] = position
         self.latest_measurement = JointPositionMeasurement(
-            measurement_time=message.header.stamp.sec
-            + message.header.stamp.nanosec * 1e-9,
+            measurement_time=ros_time_seconds(Time.from_msg(message.header.stamp)),
             positions=positions,
         )
 
-    def writes(self, connection: ActiveConnection1DOF) -> bool:
+    def writes(self, *, connection: ActiveConnection1DOF) -> bool:
         """
         Whether the position this synchronizer received for a connection is its to
         write.
@@ -182,7 +183,11 @@ class SubscribedJointPositionSource(
     The connections of the part this source is attached to.
     """
 
-    def writes(self, connection: ActiveConnection1DOF) -> bool:
+    def writes(self, *, connection: ActiveConnection1DOF) -> bool:
+        """
+        Unlike :meth:`JointStateInputSynchronizer.writes`, writes only the connections
+        of the part this source is attached to.
+        """
         return connection in self.connections
 
 
