@@ -15,16 +15,16 @@ from ...dataset.semantic_world_like_classes import Body
 
 def test_expression_contributes_itself():
     body = variable(Body, domain=[])
-    assert SymbolicExpression._as_operand_(body.size) is body.size
+    assert SymbolicExpression._as_operand_(value=body.size) is body.size
 
 
 def test_match_contributes_the_query_it_stands_for():
     match = a(Body)(name="Body1")
-    assert SymbolicExpression._as_operand_(match) is match._symbolic_expression_
+    assert SymbolicExpression._as_operand_(value=match) is match._symbolic_expression_
 
 
 def test_value_standing_for_nothing_symbolic_is_a_literal():
-    operand = SymbolicExpression._as_operand_(5)
+    operand = SymbolicExpression._as_operand_(value=5)
     assert isinstance(operand, Literal)
     assert operand._value_ == 5
 
@@ -34,13 +34,13 @@ def test_value_standing_for_nothing_symbolic_is_a_literal():
 
 def test_new_kind_of_operand_contributes_the_expression_it_stands_for():
     body = variable(Body, domain=[])
-    stand_in = ExpressionStandIn(body.size)
-    assert SymbolicExpression._as_operand_(stand_in) is body.size
+    stand_in = ExpressionStandIn(expression=body.size)
+    assert SymbolicExpression._as_operand_(value=stand_in) is body.size
 
 
 def test_new_kind_of_operand_filters_as_the_expression_it_stands_for():
-    bodies = [Body("Body1", size=1), Body("Body2", size=2)]
+    bodies = [Body(name="Body1", size=1), Body(name="Body2", size=2)]
     body = variable(Body, domain=bodies)
-    size = ExpressionStandIn(body.size)
+    size = ExpressionStandIn(expression=body.size)
     query = entity(body).where(body.size == 2, variable(int, domain=[2]) == size)
     assert query.tolist() == [bodies[1]]

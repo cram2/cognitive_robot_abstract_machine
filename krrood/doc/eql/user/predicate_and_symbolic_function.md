@@ -29,7 +29,7 @@ One of the most useful built-in predicates is `HasType`, which checks if a varia
 from krrood.entity_query_language.predicate import HasType
 
 # Filter 'v' to only include objects that are instances of 'Handle'
-query = entity(v).where(HasType(v, ExampleHandle))
+query = entity(v).where(HasType(variable=v, types_=ExampleHandle))
 ```
 
 ```{hint}

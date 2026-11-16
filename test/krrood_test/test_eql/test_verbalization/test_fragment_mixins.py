@@ -54,27 +54,26 @@ def test_number_field_is_defined_once_on_hasnumber():
         assert "number" not in cls.__dict__.get("__annotations__", {})
 
 
-def test_number_is_keyword_only_and_text_is_positional():
+def test_number_and_text_are_keyword_only():
     """
-    The migration keeps the construction contract: ``text`` positional (so
-    ``WordFragment("x")`` keeps working), ``number`` keyword-only (so it never disturbs
-    required-field ordering).
+    Fragments are built by keyword, so ``text`` and the inherited ``number`` are both
+    keyword-only and ``number`` never disturbs the field order.
     """
-    assert _field(WordFragment, "text").kw_only is False
-    assert _field(RoleFragment, "text").kw_only is False
+    assert _field(WordFragment, "text").kw_only is True
+    assert _field(RoleFragment, "text").kw_only is True
     for cls in (WordFragment, RoleFragment, NounPhrase):
         assert _field(cls, "number").kw_only is True
         assert _field(cls, "number").default is GrammaticalNumber.SINGULAR
 
 
-def test_positional_construction_preserved():
+def test_keyword_construction_defaults_the_number():
     """
-    The existing positional constructions still build (``text`` first), with the
-    inherited ``number`` defaulting to SINGULAR.
+    A fragment built from its ``text`` alone takes the inherited ``number`` default,
+    SINGULAR.
     """
-    assert WordFragment("the").text == "the"
-    assert WordFragment("the").number is GrammaticalNumber.SINGULAR
-    role = RoleFragment("Robot", SemanticRole.VARIABLE)
+    assert WordFragment(text="the").text == "the"
+    assert WordFragment(text="the").number is GrammaticalNumber.SINGULAR
+    role = RoleFragment(text="Robot", role=SemanticRole.VARIABLE)
     assert (role.text, role.role, role.number) == (
         "Robot",
         SemanticRole.VARIABLE,
@@ -97,6 +96,6 @@ def test_number_passed_by_keyword():
         is GrammaticalNumber.PLURAL
     )
     assert (
-        NounPhrase(head=WordFragment("x"), number=GrammaticalNumber.PLURAL).number
+        NounPhrase(head=WordFragment(text="x"), number=GrammaticalNumber.PLURAL).number
         is GrammaticalNumber.PLURAL
     )

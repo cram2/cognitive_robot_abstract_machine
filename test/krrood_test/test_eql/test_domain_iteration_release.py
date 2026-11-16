@@ -22,7 +22,7 @@ from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.factories import an, entity, variable
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FrameLocalHeavyObject:
     """
     Stand-in for a resource a domain generator holds only as a frame local (e.g. a deep-
@@ -32,7 +32,7 @@ class FrameLocalHeavyObject:
     payload: bytes = field(default_factory=lambda: bytes(2048))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FrameBuildingLazyDomain:
     """
     A domain whose ``__iter__`` builds a heavy object as a frame local and yields values
@@ -76,7 +76,7 @@ def test_re_enterable_lazy_iterable_replays_after_source_release():
     the full domain.
     """
     lazy_iterable = ReEnterableLazyIterable()
-    lazy_iterable.set_iterable([0, 1, 2, 3])
+    lazy_iterable.set_iterable(iterable=[0, 1, 2, 3])
 
     partial = []
     for value in lazy_iterable:

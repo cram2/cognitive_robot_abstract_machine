@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
 from dataclasses import dataclass
-from typing_extensions import Self, Union
+from typing_extensions import Self
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
@@ -25,18 +26,21 @@ from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
     MobileBase,
     EndEffector,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
 
 
 class JustinJoint(JointName):
@@ -99,7 +103,6 @@ class JustinJoint(JointName):
 
 @dataclass(eq=False)
 class JustinLeftThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -122,7 +125,6 @@ class JustinLeftThumb(Finger):
 
 @dataclass(eq=False)
 class JustinLeftIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -143,7 +145,6 @@ class JustinLeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class JustinLeftMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -166,7 +167,6 @@ class JustinLeftMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class JustinLeftRingFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -187,7 +187,6 @@ class JustinLeftRingFinger(Finger):
 
 @dataclass(eq=False)
 class JustinRightThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -210,7 +209,6 @@ class JustinRightThumb(Finger):
 
 @dataclass(eq=False)
 class JustinRightIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -231,7 +229,6 @@ class JustinRightIndexFinger(Finger):
 
 @dataclass(eq=False)
 class JustinRightMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -254,7 +251,6 @@ class JustinRightMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class JustinRightRingFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -285,7 +281,6 @@ class JustinLeftHand(
         JustinLeftRingFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -336,7 +331,6 @@ class JustinRightHand(
         JustinRightMiddleFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -379,7 +373,6 @@ class JustinRightHand(
 
 @dataclass(eq=False)
 class JustinLeftArm(Arm[JustinLeftHand]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -405,7 +398,6 @@ class JustinLeftArm(Arm[JustinLeftHand]):
 
 @dataclass(eq=False)
 class JustinRightArm(Arm[JustinRightHand]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -430,19 +422,21 @@ class JustinRightArm(Arm[JustinRightHand]):
 
 
 @dataclass(eq=False)
-class JustinCamera(Camera):
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
-
+class JustinCamera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            root=cls.create_optical_body(
+                robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
+                HomogeneousTransformationMatrix(),
+            ),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(
+                    horizontal_angle=0.99483, vertical_angle=0.75049
+                )
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
             default_camera=True,
@@ -457,7 +451,6 @@ class JustinCamera(Camera):
 
 @dataclass(eq=False)
 class JustinNeck(Neck[JustinCamera]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -478,7 +471,6 @@ class JustinNeck(Neck[JustinCamera]):
 class JustinTorso(
     Torso, HasLeftRightArm[JustinLeftArm, JustinRightArm], HasNeck[JustinNeck]
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -497,7 +489,6 @@ class JustinTorso(
 
 @dataclass(eq=False)
 class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
-
     @classproperty
     def forward_axis(cls) -> Vector3:
         return Vector3.X()

@@ -3,14 +3,14 @@ from dataclasses import dataclass
 from krrood.class_diagrams.exceptions import MockedClassInstantiationError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockedModule:
     """
     Base class for mocking modules.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockedClass:
     """
     Base class for mocking classes.

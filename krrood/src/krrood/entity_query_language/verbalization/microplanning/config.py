@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing_extensions import Iterator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RenderConfiguration:
     """
     Mutable render-mode flags for the current verbalization pass — the small set that

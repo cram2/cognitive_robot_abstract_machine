@@ -20,7 +20,7 @@ from semantic_digital_twin.exceptions import (
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -262,9 +262,9 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def to_position_dict(self) -> dict[PrefixedName, float]:
         with self.world_lock:
             return {
-                self._world.get_degree_of_freedom_by_id(dof_id)
-                .name: self[dof_id]
-                .position
+                self._world.get_degree_of_freedom_by_id(dof_id).name: self[
+                    dof_id
+                ].position
                 for dof_id in self._ids
             }
 
@@ -640,6 +640,33 @@ class WorldStateTrajectory:
             self._data.append(state._data.copy())
             self._times_cache = None
             self._data_cache = None
+
+    def records_degrees_of_freedom_of(self, state: WorldState) -> bool:
+        """
+        :param state: The state to compare the recorded states with.
+        :return: Whether `state` holds the degrees of freedom of the recorded states, in
+            the same order.
+        """
+        with self.world_lock():
+            return state.ids == self._ids
+
+    def adopt_world_model_of(self, state: WorldState) -> None:
+        """
+        Take the current model of the world of `state` as the one every appended state
+        must have.
+
+        :param state: A state of the world model to record from now on.
+        :raises WrongWorldModelVersion: If `state` does not hold the degrees of freedom
+            of the recorded states, see :meth:`records_degrees_of_freedom_of`.
+        """
+        with self.world_lock():
+            current_world_model_version = state._world.get_world_model_manager().version
+            if not self.records_degrees_of_freedom_of(state):
+                raise WrongWorldModelVersion(
+                    expected_version=self._world_version,
+                    actual_version=current_world_model_version,
+                )
+            self._world_version = current_world_model_version
 
     def keys(self) -> Iterator[float]:
         with self.world_lock():

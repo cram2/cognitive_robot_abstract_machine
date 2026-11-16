@@ -3,17 +3,21 @@
 # Built before the imports below, which read a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
 
 import os
 import shutil
 from pathlib import Path
 
+import numpy as np
 import pytest
 import sqlalchemy
+import trimesh
 from typing_extensions import Callable
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
@@ -33,7 +37,7 @@ def pytest_configure(config):
     # Build the symbol graph
     SymbolGraph.clear()
     class_diagram = ClassDiagram(
-        recursive_subclasses(Symbol) + [World],
+        classes=recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
     SymbolGraph(_class_diagram=class_diagram)
@@ -72,7 +76,7 @@ def table_world():
     )
     table_path = os.path.join(urdf_dir, "table.urdf")
 
-    return URDFParser.from_file(file_path=table_path).parse()
+    return URDFParser.from_file(file_path=table_path).create_world()
 
 
 # %% ROS packages holding mesh files
@@ -110,3 +114,26 @@ def installed_mesh_file(mesh_package_installer, tmp_path) -> Path:
         is registered in an ament prefix.
     """
     return mesh_package_installer(tmp_path)
+
+
+# %% flat meshes
+
+
+@pytest.fixture
+def millimetre_wall_strip() -> trimesh.Trimesh:
+    """
+    A flat, zero-volume quad one millimetre wide and 2.8 metres tall, as architectural
+    USD scenes contain, in which V-HACD finds no convex parts.
+    """
+    return trimesh.Trimesh(
+        vertices=np.array(
+            [
+                [0.001, 0.0, 2.8],
+                [0.0, 0.0, 2.8],
+                [0.001, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+        ),
+        faces=np.array([[2, 1, 0], [1, 2, 3]]),
+        process=False,
+    )

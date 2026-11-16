@@ -14,20 +14,20 @@ This module provides an annotator for:
 
 from __future__ import annotations
 
-import copy
+# %% Imports
 from enum import StrEnum
 from timeit import default_timer
 
 import cv2
 import numpy
-import open3d as o3d
+import open3d
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
-from robokudo.utils.annotator_helper import scale_camera_intrinsics
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
 if TYPE_CHECKING:
@@ -35,7 +35,8 @@ if TYPE_CHECKING:
 
 
 class ImagePreprocessorAnnotator(BaseAnnotator):
-    """RGB-D image preprocessor and point cloud generator.
+    """
+    RGB-D image preprocessor and point cloud generator.
 
     This annotator:
 
@@ -95,7 +96,9 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         """
 
         self.depth: npt.NDArray | None = None
-        """Optional depth image currently being worked with"""
+        """
+        Optional depth image currently being worked with
+        """
 
         self.display_mode: ImagePreprocessorAnnotator.ViewMode = self.ViewMode.COLOR
         """
@@ -103,7 +106,8 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         """
 
     def update(self) -> Status:
-        """Process RGB-D images and generate point cloud.
+        """
+        Process RGB-D images and generate point cloud.
 
         The method:
 
@@ -120,8 +124,16 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
 
         self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.camera_intrinsics = copy.deepcopy(
-            self.get_cas().get(CASViews.CAMERA_INTRINSIC)
+        cas = self.get_cas()
+        color_to_depth_ratio = cas.color_to_depth_ratio
+        pointcloud_camera_model = (
+            cas.require_camera_observation().effective_camera_model.scaled(
+                scale_x=color_to_depth_ratio.horizontal,
+                scale_y=color_to_depth_ratio.vertical,
+            )
+        )
+        self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+            pointcloud_camera_model
         )
 
         if self.display_mode is self.ViewMode.DEPTH:
@@ -129,43 +141,30 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         else:
             self.get_annotator_output_struct().set_image(self.color)
 
-        scale_camera_intrinsics(self)
-
         resized_color = None
-        try:
-            resized_color = get_scaled_color_image_for_depth_image(
-                self.get_cas(), self.color
-            )
-        except ColorToDepthRatioMissing:
-            self.rk_logger.error(
-                "No color to depth ratio set by your camera driver! Can't preprocess."
-            )
-            raise
+        resized_color = get_scaled_color_image_for_depth_image(
+            self.get_cas(), self.color
+        )
 
-        # o3d expects color images in RGB order
+        # open3d expects color images in RGB order
         color_rgb = cv2.cvtColor(resized_color, cv2.COLOR_BGR2RGB)
-        o3d_color = o3d.geometry.Image(color_rgb)
-        o3d_depth = None
-        try:
-            o3d_depth = o3d.geometry.Image(
-                self.depth
-            )  # Please note that depth values should be in mm
-        except RuntimeError:
-            # Even though you might have a uint16 already, it might be required to explicitly cast to uint16
-            # (Note: the byteorder field might be different after the cast to make o3d happy)
-            o3d_depth = o3d.geometry.Image(self.depth.astype(numpy.uint16))
-        rgbd_image = o3d.geometry.RGBDImage.create_from_color_and_depth(
-            o3d_color,
-            o3d_depth,
+        open3d_color_image = open3d.geometry.Image(color_rgb)
+        native_depth = numpy.ascontiguousarray(
+            self.depth, dtype=self.depth.dtype.newbyteorder("=")
+        )
+        open3d_depth_image = open3d.geometry.Image(native_depth)
+        rgbd_image = open3d.geometry.RGBDImage.create_from_color_and_depth(
+            open3d_color_image,
+            open3d_depth_image,
             convert_rgb_to_intensity=False,
             depth_trunc=self.descriptor.parameters.depth_trunc,
         )
 
-        cloud = o3d.geometry.PointCloud.create_from_rgbd_image(
+        cloud = open3d.geometry.PointCloud.create_from_rgbd_image(
             rgbd_image, self.camera_intrinsics
         )
 
-        self.get_cas().set(CASViews.POINTCLOUD_CAMERA_INTRINSIC, self.camera_intrinsics)
+        cas.pointcloud_camera_model = pointcloud_camera_model
 
         self.get_cas().set_ref(CASViews.CLOUD, cloud)
         self.get_annotator_output_struct().set_geometries(

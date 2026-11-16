@@ -6,8 +6,9 @@ import numpy as np
 import rustworkx as rx
 from matplotlib import pyplot as plt
 from random_events.variable import Symbolic, Variable
-from typing_extensions import Any, Self, Iterable
+from typing_extensions import Any, Self
 
+from probabilistic_model.graph import DirectedAcyclicGraph
 from probabilistic_model.distributions.distributions import SymbolicDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -78,7 +79,7 @@ class Node:
 
 
 @dataclass
-class BayesianNetwork:
+class BayesianNetwork(DirectedAcyclicGraph[Node]):
     """
     Class for Bayesian Networks that are rooted, tree shaped and have univariate inner
     nodes.
@@ -87,27 +88,6 @@ class BayesianNetwork:
     inference. Bayesian Networks can be converted to a probabilistic circuit which can
     perform inference.
     """
-
-    graph: rx.PyDAG[Node] = field(default_factory=lambda: rx.PyDAG(multigraph=False))
-    """
-    The graph to check connectivity from.
-    """
-
-    def __len__(self):
-        """
-        Return the number of nodes in the graph.
-
-        :return: The number of nodes in the graph.
-        """
-        return len(self.graph)
-
-    def __iter__(self):
-        """
-        Return an iterator over the nodes in the graph.
-
-        :return: An iterator over the nodes in the graph.
-        """
-        return iter(self.graph.nodes())
 
     @property
     def leaves(self) -> list[Node]:
@@ -128,8 +108,7 @@ class BayesianNetwork:
             and self.root
         )
 
-    def add_node(self, node: Node):
-
+    def add_node(self, node: Node) -> None:
         if node.bayesian_network is self and node.index is not None:
             return
         elif node.bayesian_network is not None and node.bayesian_network is not self:
@@ -141,26 +120,7 @@ class BayesianNetwork:
 
         # write self as the nodes bn
         node.bayesian_network = self
-
-    def add_nodes_from(self, nodes: Iterable[Node]):
-        [self.add_node(node) for node in nodes]
-
-    def add_edge(self, parent: Node, child: Node):
-        self.add_node(parent)
-        self.add_node(child)
-        self.graph.add_edge(parent.index, child.index, None)
-
-    def add_edges_from(self, edges: Iterable[tuple[Node, Node]]):
-        [self.add_edge(*edge) for edge in edges]
-
-    def successors(self, node: Node) -> list[Node]:
-        return self.graph.successors(node.index)
-
-    def descendants(self, unit: Node) -> set[Node]:
-        return {self.graph[unit] for unit in rx.descendants(self.graph, unit.index)}
-
-    def predecessors(self, unit: Node) -> list[Node]:
-        return self.graph.predecessors(unit.index)
+        self.indices[node] = node.index
 
     def in_edges(self, node: Node) -> list[tuple[Node, Node, float | None]]:
         return [
@@ -171,26 +131,6 @@ class BayesianNetwork:
             )
             for parent_index, _, edge_data in self.graph.in_edges(node.index)
         ]
-
-    def nodes(self) -> list[Node]:
-        """
-        Return an iterator over the nodes.
-
-        :return: An iterator over the nodes.
-        """
-        return self.graph.nodes()
-
-    def edges(self) -> list[tuple[Node, Node]]:
-        return [
-            (self.graph[parent], self.graph[child])
-            for parent, child in self.graph.edge_list()
-        ]
-
-    def in_degree(self, node: Node):
-        return self.graph.in_degree(node.index)
-
-    def has_edge(self, parent: Node, child: Node) -> bool:
-        return self.graph.has_edge(parent.index, child.index)
 
     @property
     def root(self) -> Root:

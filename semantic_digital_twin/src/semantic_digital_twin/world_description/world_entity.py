@@ -17,35 +17,36 @@ import trimesh.boolean
 from typing_extensions import TYPE_CHECKING
 from typing_extensions import TypeVar, Any, Self, ClassVar
 
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     ReferenceWriter,
     SubclassJSONSerializer,
     to_json,
     from_json,
-    list_like_classes,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
 from krrood.patterns.caching import memoize
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
+from krrood.patterns.identifier_and_name import HasID, HasName
+from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityReference,
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import (
-    AlreadyBelongsToAWorldError,
-    ReferenceFrameMismatchError,
-)
+from semantic_digital_twin.exceptions import AlreadyBelongsToAWorldError
+from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from semantic_digital_twin.mixin import HasSimulatorProperties, UniqueSimulatorProperty
 from semantic_digital_twin.world_description.connection_properties import (
     ServoGains,
     VelocityServoGains,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
+    GenericSpatialType,
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
@@ -69,7 +70,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False)
-class WorldEntity(Symbol):
+class WorldEntity(Symbol, HasName[PrefixedName]):
     """
     A class representing an entity in the world.
 
@@ -140,7 +141,7 @@ class WorldEntity(Symbol):
 
 
 @dataclass(eq=False)
-class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
+class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
     """
     A WorldEntity that has a unique identifier.
 
@@ -166,7 +167,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
     def to_json(self, **kwargs) -> dict[str, Any]:
         result = super().to_json(**kwargs)
         introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
+        for field_ in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_.public_name)
 
             if isinstance(value, (list, set)):
@@ -201,12 +202,14 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
         :param from_json_kwargs: The kwargs passed to the _from_json method.
         :return: The instance of WorldEntityWithIDKwargsTracker.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs)
-        tracker.add(self.id, self)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(
+            from_json_kwargs=from_json_kwargs
+        )
+        tracker.add(key=self.id, tracked_object=self)
         return tracker
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         """
         .. warn::
 
@@ -214,13 +217,15 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
             Whenever this happens, the UUIDs are resolved to WorldEntityWithID objects, which leads to undefined
             behavior.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
 
         half_initialized_instance = cls.__new__(cls)
         half_initialized_instance.id = from_json(data["id"], **kwargs)
-        if tracker.has(half_initialized_instance.id):
-            return tracker.get(half_initialized_instance.id)
-        tracker.add(half_initialized_instance.id, half_initialized_instance)
+        if tracker.has(key=half_initialized_instance.id):
+            return tracker.get(key=half_initialized_instance.id)
+        tracker.add(
+            key=half_initialized_instance.id, tracked_object=half_initialized_instance
+        )
 
         fields_ = {f.name: f for f in fields(cls)}
 
@@ -253,12 +258,12 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
     @classmethod
     def _item_from_json(cls, data: dict[str, Any], **kwargs) -> Any:
-        state = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        state = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         obj = from_json(data, **kwargs)
 
         if isinstance(obj, uuid.UUID):
             obj = from_json(data, **kwargs)
-            return state.get(obj)
+            return state.get(key=obj)
         else:
             return obj
 
@@ -279,10 +284,10 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer):
 
         result = {}
         introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
+        for field_ in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 current_result = value.__class__(
                     [_resolve_item(item, world) for item in value]
                 )
@@ -314,19 +319,19 @@ class ReferencedWorldEntity(SubclassJSONSerializer):
     """
 
     def to_json(self, **kwargs) -> dict[str, Any]:
-        return DataclassJSONSerializer.to_json(self, **kwargs)
+        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
         """
         :return: The entity of the reader's world that the reference refers to.
         :raises MissingWorldError: If the keyword arguments carry no world to find the
             entity in.
         :raises WorldEntityWithIDNotInKwargs: If the world holds no entity with the id.
         """
-        reference = DataclassJSONSerializer.from_json(data, clazz=cls, **kwargs)
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
-        return tracker.get(reference.id, name=reference.name)
+        reference = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
+        return tracker.get(key=reference.id, name=reference.name)
 
 
 @dataclass
@@ -336,8 +341,8 @@ class WorldEntityReferenceWriter(ReferenceWriter[WorldEntityWithID]):
     has the world the entities belong to.
     """
 
-    def write_reference(self, entity: WorldEntityWithID) -> dict[str, Any]:
-        return ReferencedWorldEntity(id=entity.id, name=entity.name).to_json()
+    def write_reference(self, *, obj: WorldEntityWithID) -> dict[str, Any]:
+        return ReferencedWorldEntity(id=obj.id, name=obj.name).to_json()
 
 
 @dataclass(eq=False)
@@ -368,7 +373,9 @@ class WorldEntityWithSimulatorProperties(WorldEntityWithID, HasSimulatorProperti
 
 
 @dataclass(eq=False)
-class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
+class KinematicStructureEntity(
+    WorldEntityWithSimulatorProperties, CartesianFrame3D[PrefixedName], ABC
+):
     """
     An entity that is part of the kinematic structure of the world.
     """
@@ -387,6 +394,9 @@ class KinematicStructureEntity(ABC, WorldEntityWithSimulatorProperties):
     def remove_from_world(self):
         super().remove_from_world()
         self.index = None
+
+    def express_in_own_frame(self, value: GenericSpatialType) -> GenericSpatialType:
+        return self._world.transform(value, self)
 
     @property
     @abstractmethod
@@ -762,7 +772,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     def __cached_hash__(self):
         introspector = DataclassOnlyIntrospector()
         result = [self.__class__]
-        for field_ in introspector.discover(self.__class__):
+        for field_ in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_.public_name)
             if isinstance(value, (list, set)):
                 result.extend(
@@ -823,10 +833,10 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
 
         result = []
         introspector = DataclassOnlyIntrospector()
-        for field_ in introspector.discover(self.__class__):
+        for field_ in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for item in value:
                     result.extend(_resolve_item(item))
             else:
@@ -919,12 +929,12 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         dependencies = set()
         introspector = DataclassOnlyIntrospector()
 
-        for field_info in introspector.discover(self.__class__):
+        for field_info in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_info.public_name)
 
             if isinstance(value, SemanticAnnotation):
                 dependencies.add(value)
-            elif isinstance(value, list_like_classes):
+            elif isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for item in value:
                     if isinstance(item, SemanticAnnotation):
                         dependencies.add(item)
@@ -1042,7 +1052,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         for field_ in self._serialized_fields():
             value = getattr(self, field_.name)
             if isinstance(value, WorldEntityWithID):
-                WorldEntityReference(field_.name).write(result, value)
+                WorldEntityReference(subject=field_.name).write(
+                    data=result, identified_object=value
+                )
             else:
                 result[field_.name] = to_json(value, **kwargs)
         return result
@@ -1051,9 +1063,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         arguments = {}
         for field_ in cls._serialized_fields():
-            reference = WorldEntityReference(field_.name)
+            reference = WorldEntityReference(subject=field_.name)
             if reference.id_key in data:
-                arguments[field_.name] = reference.resolve(data, **kwargs)
+                arguments[field_.name] = reference.resolve(data=data, **kwargs)
             elif field_.name in data:
                 arguments[field_.name] = from_json(data[field_.name], **kwargs)
         return cls(**arguments)
@@ -1136,7 +1148,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         """
         position = parent_T_child.position[:3]
         orientation = parent_T_child.quaternion
-        return Matrix.vstack([position, orientation]).T
+        return Matrix.vstack(list_of_matrices=[position, orientation]).T
 
     def origin_as_position_quaternion(self) -> Matrix:
         return self._as_position_quaternion(self.origin_expression)
@@ -1186,7 +1198,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
             connection.
         """
 
-    def _find_references_in_world(self, world: World) -> tuple[
+    def _find_references_in_world(
+        self, world: World
+    ) -> tuple[
         KinematicStructureEntity,
         KinematicStructureEntity,
         HomogeneousTransformationMatrix,
@@ -1247,12 +1261,13 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         """
         Create a copy of this connection re-parented under ``new_parent``, using
         ``parent_T_connection_expression`` as the new parent offset and keeping the same
-        child and ``connection_T_child_expression``.
+        name, child and ``connection_T_child_expression``.
 
         Subclasses carrying extra state (e.g. an active degree of freedom) override this
         to preserve it. Used to move a branch without collapsing its connection.
         """
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,

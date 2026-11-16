@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class BooleanPredicate(ABC):
     """
     How a boolean attribute reads as a predicate when it holds.
@@ -66,7 +66,7 @@ class BooleanPredicate(ABC):
         would be wrong."""
 
     @abstractmethod
-    def predicate_object(self, attribute: Attribute) -> VerbalizationFragment | None:
+    def predicate_object(self, *, attribute: Attribute) -> VerbalizationFragment | None:
         """:param attribute: The boolean attribute node, supplying the owner class and name for the
         default surface when the predicate names none.
 
@@ -76,7 +76,7 @@ class BooleanPredicate(ABC):
         """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AdjectivalPredicate(BooleanPredicate):
     """
     The attribute reads as a predicative adjective — *"is operational"*.
@@ -93,15 +93,15 @@ class AdjectivalPredicate(BooleanPredicate):
     def bare_head(self) -> VerbalizationFragment:
         return WordFragment(text=Copula.lemma)
 
-    def predicate_object(self, attribute: Attribute) -> VerbalizationFragment:
+    def predicate_object(self, *, attribute: Attribute) -> VerbalizationFragment:
         if self.adjective is not None:
-            return Adjective(self.adjective).as_fragment()
+            return Adjective(word=self.adjective).as_fragment()
         return RoleFragment.for_attribute(
-            attribute._owner_class_, attribute._attribute_name_
+            owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PossessivePredicate(BooleanPredicate):
     """
     The attribute reads as something the subject *has* — *"has milk"*, *"has a
@@ -120,23 +120,23 @@ class PossessivePredicate(BooleanPredicate):
     """
 
     def head(self) -> VerbalizationFragment:
-        return Verb("have").as_fragment()
+        return Verb(lemma="have").as_fragment()
 
     def bare_head(self) -> VerbalizationFragment:
-        return WordFragment(text=Verb("have").lemma)
+        return WordFragment(text=Verb(lemma="have").lemma)
 
-    def predicate_object(self, attribute: Attribute) -> VerbalizationFragment:
+    def predicate_object(self, *, attribute: Attribute) -> VerbalizationFragment:
         if self.noun is not None:
-            return Noun(self.noun, definiteness=self.definiteness).as_fragment()
+            return Noun(content=self.noun, definiteness=self.definiteness).as_fragment()
         return NounPhrase(
             head=RoleFragment.for_attribute(
-                attribute._owner_class_, attribute._attribute_name_
+                owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
             ),
             definiteness=self.definiteness,
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class VerbalPredicate(BooleanPredicate):
     """
     The attribute reads as an action the subject performs — *"produces milk"*,
@@ -161,14 +161,14 @@ class VerbalPredicate(BooleanPredicate):
     """
 
     def head(self) -> VerbalizationFragment:
-        return Verb(self.verb).as_fragment()
+        return Verb(lemma=self.verb).as_fragment()
 
     def bare_head(self) -> VerbalizationFragment:
         return WordFragment(text=self.verb)
 
-    def predicate_object(self, attribute: Attribute) -> VerbalizationFragment | None:
+    def predicate_object(self, *, attribute: Attribute) -> VerbalizationFragment | None:
         if self.object_noun is None:
             return None
         return Noun(
-            self.object_noun, definiteness=self.object_definiteness
+            content=self.object_noun, definiteness=self.object_definiteness
         ).as_fragment()

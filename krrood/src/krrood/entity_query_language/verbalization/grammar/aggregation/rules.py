@@ -23,7 +23,7 @@ class AggregatorRule(PhraseRule):
 
     construct = Aggregator
 
-    def build(self, node: Aggregator, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Aggregator, context: RuleContext) -> VerbalizationFragment:
         """:return: the definite noun phrase for *node* — *"the <aggregation> of <child>"* — or the
         bare aggregation word for a childless aggregate.
 
@@ -33,10 +33,10 @@ class AggregatorRule(PhraseRule):
         # The aggregation word owns its complement realisation (the "of" and the child's number);
         # the rule only chooses the structure — a childless aggregate is the bare word, otherwise a
         # definite noun phrase around the lexicon-built complement.
-        kind = Aggregations.for_aggregator(type(node))
+        kind = Aggregations.for_aggregator(aggregator_type=type(node))
         if not kind.has_child:
             return kind.as_fragment()  # childless aggregate, e.g. "count of all"
-        child_fragment = context.child(node._child_, number=kind.child_number)
+        child_fragment = context.child(node=node._child_, number=kind.child_number)
         # In a fronted *"whose <aggregate> is …"* group filter the aggregate is a possession of the
         # group key, so it drops its determiner (*"sum of salaries"*) and does not register for
         # coreference — the reported column stays the canonical full mention.
@@ -44,7 +44,7 @@ class AggregatorRule(PhraseRule):
             return NounPhrase(
                 head=kind.as_fragment(),
                 definiteness=Definiteness.BARE,
-                modifiers=kind.complement(child_fragment),
+                modifiers=kind.complement(child=child_fragment),
                 subject_of_modifiers=False,
             )
         # A computed quantity is a referring expression: named in full when first introduced (the
@@ -53,7 +53,7 @@ class AggregatorRule(PhraseRule):
         return NounPhrase(
             head=kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
-            modifiers=kind.complement(child_fragment),
+            modifiers=kind.complement(child=child_fragment),
             referent_id=node._id_,
             subject_of_modifiers=False,
         )

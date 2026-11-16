@@ -16,14 +16,13 @@ from dataclasses import dataclass, field
 from typing_extensions import Self, TypeVar, Generic, Union
 
 from control_msgs.msg import MultiDOFCommand
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.publisher import Publisher
-from std_msgs.msg import Float64, Float64MultiArray
+from std_msgs.msg import Float64MultiArray
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
-from giskardpy.middleware.ros2.ros2_interface import get_parameters
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -35,7 +34,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 # %% minimum velocities
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MinimumVelocity:
     """
     Smallest velocity magnitude a hardware interface still reacts to.
@@ -46,7 +45,7 @@ class MinimumVelocity:
     Velocities below this magnitude are increased to it. ``0.0`` disables the minimum.
     """
 
-    def enforce_on_vector(self, velocities: list[float]) -> list[float]:
+    def enforce_on_vector(self, *, velocities: list[float]) -> list[float]:
         """
         Scale a velocity vector up to :attr:`magnitude`, keeping its direction.
 
@@ -59,7 +58,7 @@ class MinimumVelocity:
         scale = self.magnitude / norm
         return [velocity * scale for velocity in velocities]
 
-    def enforce_on_scalar(self, velocity: float) -> float:
+    def enforce_on_scalar(self, *, velocity: float) -> float:
         """
         Increase a single velocity to :attr:`magnitude`, keeping its sign.
 
@@ -73,7 +72,7 @@ class MinimumVelocity:
         return velocity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointMinimumVelocity(MinimumVelocity):
     """
     Minimum velocity of a single joint, overriding the default of its publisher.
@@ -85,7 +84,7 @@ class JointMinimumVelocity(MinimumVelocity):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointMinimumVelocities:
     """
     Minimum velocities of the joints a publisher commands.
@@ -103,7 +102,7 @@ class JointMinimumVelocities:
 
     @classmethod
     def from_magnitudes(
-        cls, default: float = 0.0, overrides: dict[str, float] | None = None
+        cls, *, default: float = 0.0, overrides: dict[str, float] | None = None
     ) -> Self:
         """
         Build minimum velocities from a default magnitude and per-joint magnitudes.
@@ -113,14 +112,14 @@ class JointMinimumVelocities:
         :return: The built minimum velocities.
         """
         return cls(
-            default=MinimumVelocity(default),
+            default=MinimumVelocity(magnitude=default),
             overrides=[
-                JointMinimumVelocity(magnitude, joint_name=joint_name)
+                JointMinimumVelocity(magnitude=magnitude, joint_name=joint_name)
                 for joint_name, magnitude in (overrides or {}).items()
             ],
         )
 
-    def of(self, connection: ActiveConnection1DOF) -> MinimumVelocity:
+    def of(self, *, connection: ActiveConnection1DOF) -> MinimumVelocity:
         """
         Minimum velocity that applies to the given connection.
 
@@ -133,7 +132,7 @@ class JointMinimumVelocities:
         return self.default
 
     def validate_overrides_apply_to(
-        self, connections: list[ActiveConnection1DOF]
+        self, *, connections: list[ActiveConnection1DOF]
     ) -> None:
         """
         Make sure every override is used by one of the given connections.
@@ -159,7 +158,7 @@ class JointMinimumVelocities:
 # %% reading the commanded velocities
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateVelocityReader:
     """
     Reads the velocities of a fixed set of degrees of freedom.
@@ -208,7 +207,7 @@ class StateVelocityReader:
         self.model_version = self.world.get_world_model_manager().version
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointVelocityCommand:
     """
     The velocity to send for a single joint.
@@ -224,7 +223,7 @@ class JointVelocityCommand:
     Minimum velocity of this joint.
     """
 
-    def from_state_velocity(self, state_velocity: float) -> float:
+    def from_state_velocity(self, *, state_velocity: float) -> float:
         """
         Scale a raw state velocity to the joint and raise it to the minimum.
 
@@ -232,12 +231,13 @@ class JointVelocityCommand:
         :return: The velocity to send to the joint's hardware interface.
         """
         return self.minimum_velocity.enforce_on_scalar(
-            state_velocity * self.connection.multiplier
+            velocity=state_velocity * self.connection.multiplier
         )
 
     @classmethod
     def for_connections(
         cls,
+        *,
         connections: list[ActiveConnection1DOF],
         minimum_velocities: JointMinimumVelocities,
     ) -> list[Self]:
@@ -250,26 +250,28 @@ class JointVelocityCommand:
             connection.
         :return: One command per connection, in the same order.
         """
-        minimum_velocities.validate_overrides_apply_to(connections)
+        minimum_velocities.validate_overrides_apply_to(connections=connections)
         return [
-            cls(connection, minimum_velocities.of(connection))
+            cls(
+                connection=connection,
+                minimum_velocity=minimum_velocities.of(connection=connection),
+            )
             for connection in connections
         ]
 
 
-# %% message formats of group controllers
+# %% message formats
 
 CommandMessage = TypeVar("CommandMessage")
 """
-The ROS message type a group controller consumes.
+The ROS message type a controller consumes.
 """
 
 
-@dataclass
-class GroupCommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
+@dataclass(kw_only=True)
+class CommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
     """
-    Builds the message a joint group velocity controller consumes from the velocities of
-    the joints it commands.
+    The message format a controller consumes.
 
     Each subclass binds the message type it builds, so the type a format publishes and
     the type it packs are the same declaration.
@@ -282,8 +284,19 @@ class GroupCommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
         """
         return cls.get_generic_type_parameters()[0]
 
+
+# %% message formats of group controllers
+
+
+@dataclass(kw_only=True)
+class GroupCommandFormat(CommandFormat[CommandMessage], ABC):
+    """
+    Builds the message a joint group velocity controller consumes from the velocities of
+    the joints it commands.
+    """
+
     @abstractmethod
-    def create_message(self, velocities: list[float]) -> CommandMessage:
+    def create_message(self, *, velocities: list[float]) -> CommandMessage:
         """
         Pack the velocities into a fresh message of :meth:`message_type`.
 
@@ -293,19 +306,19 @@ class GroupCommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Float64MultiArrayFormat(GroupCommandFormat[Float64MultiArray]):
     """
     Commands a controller that consumes :class:`std_msgs.msg.Float64MultiArray`.
     """
 
-    def create_message(self, velocities: list[float]) -> Float64MultiArray:
+    def create_message(self, *, velocities: list[float]) -> Float64MultiArray:
         message = Float64MultiArray()
         message.data = velocities
         return message
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultiDOFCommandFormat(GroupCommandFormat[MultiDOFCommand]):
     """
     Commands a controller that consumes :class:`control_msgs.msg.MultiDOFCommand`.
@@ -314,16 +327,60 @@ class MultiDOFCommandFormat(GroupCommandFormat[MultiDOFCommand]):
         joint order.
     """
 
-    def create_message(self, velocities: list[float]) -> MultiDOFCommand:
+    def create_message(self, *, velocities: list[float]) -> MultiDOFCommand:
         message = MultiDOFCommand()
         message.values = velocities
+        return message
+
+
+# %% message formats of drives
+
+
+@dataclass(kw_only=True)
+class DriveCommandFormat(CommandFormat[CommandMessage], ABC):
+    """
+    Builds the message a drive controller consumes from the twist the drive is
+    commanded.
+    """
+
+    @abstractmethod
+    def create_message(self, *, twist: Twist, frame_id: str) -> CommandMessage:
+        """
+        :param twist: The commanded twist.
+        :param frame_id: The frame the twist is expressed in.
+        :return: The message to publish.
+        """
+
+
+@dataclass(kw_only=True)
+class TwistFormat(DriveCommandFormat[Twist]):
+    """
+    Commands a drive controller that consumes :class:`geometry_msgs.msg.Twist`.
+    """
+
+    def create_message(self, *, twist: Twist, frame_id: str) -> Twist:
+        return twist
+
+
+@dataclass(kw_only=True)
+class TwistStampedFormat(DriveCommandFormat[TwistStamped]):
+    """
+    Commands a drive controller that consumes :class:`geometry_msgs.msg.TwistStamped`,
+    stamped with the current time.
+    """
+
+    def create_message(self, *, twist: Twist, frame_id: str) -> TwistStamped:
+        message = TwistStamped()
+        message.header.stamp = background_node.get_node().get_clock().now().to_msg()
+        message.header.frame_id = frame_id
+        message.twist = twist
         return message
 
 
 # %% publishers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CommandPublisher(ABC):
     """
     Sends the velocities computed by the controller to the robot.
@@ -342,93 +399,7 @@ class CommandPublisher(ABC):
         """
 
 
-@dataclass
-class JointVelocityCommandPublisher(CommandPublisher):
-    """
-    Publishes one velocity per joint, each on its own topic.
-    """
-
-    world: World
-    """
-    The world holding the commanded velocities.
-    """
-
-    namespaces: list[str]
-    """
-    Namespaces of the velocity controllers; each offers a ``command`` topic and a
-    ``joint`` parameter.
-    """
-
-    minimum_velocities: JointMinimumVelocities = field(
-        default_factory=JointMinimumVelocities
-    )
-    """
-    Minimum velocities of the commanded joints.
-    """
-
-    connections: list[ActiveConnection1DOF] = field(init=False, default_factory=list)
-    """
-    The controlled connections, in the same order as ``namespaces``.
-    """
-
-    publishers: list[Publisher] = field(init=False, default_factory=list)
-    """
-    The command publishers, in the same order as ``namespaces``.
-    """
-
-    commands: list[JointVelocityCommand] = field(init=False, default_factory=list)
-    """
-    What to send for every connection.
-    """
-
-    velocity_reader: StateVelocityReader = field(init=False)
-    """
-    Reads the commanded velocities from the world state.
-    """
-
-    message: Float64 = field(init=False, default_factory=Float64)
-    """
-    The message reused for every publication.
-    """
-
-    def __post_init__(self):
-        for namespace in self.namespaces:
-            self.publishers.append(
-                rospy.get_node().create_publisher(Float64, f"/{namespace}/command", 10)
-            )
-            joint_name = (
-                get_parameters(parameters=["joint"], node_name=namespace)
-                .values[0]
-                .string_value
-            )
-            connection: ActiveConnection1DOF = self.world.get_connection_by_name(
-                joint_name
-            )
-            connection.has_hardware_interface = True
-            self.connections.append(connection)
-        self.commands = JointVelocityCommand.for_connections(
-            self.connections, self.minimum_velocities
-        )
-        self.velocity_reader = StateVelocityReader(
-            world=self.world,
-            degrees_of_freedom=[connection.raw_dof for connection in self.connections],
-        )
-
-    def publish(self) -> None:
-        state_velocities = self.velocity_reader.velocities()
-        for publisher, command, state_velocity in zip(
-            self.publishers, self.commands, state_velocities
-        ):
-            self.message.data = command.from_state_velocity(state_velocity)
-            publisher.publish(self.message)
-
-    def stop(self) -> None:
-        self.message.data = 0.0
-        for publisher in self.publishers:
-            publisher.publish(self.message)
-
-
-@dataclass
+@dataclass(kw_only=True)
 class JointGroupVelocityCommandPublisher(CommandPublisher):
     """
     Publishes the velocities of a group of joints as a single message.
@@ -477,42 +448,45 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
-        self.command_publisher = rospy.get_node().create_publisher(
+        self.command_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
         )
         for connection in self.connections:
             connection.has_hardware_interface = True
         self.commands = JointVelocityCommand.for_connections(
-            self.connections, self.minimum_velocities
+            connections=self.connections, minimum_velocities=self.minimum_velocities
         )
         self.velocity_reader = StateVelocityReader(
             world=self.world,
             degrees_of_freedom=[connection.raw_dof for connection in self.connections],
         )
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"Created publisher for {self.command_topic} for "
             f"{[connection.name.name for connection in self.connections]}"
         )
 
     def publish(self) -> None:
         velocities = [
-            command.from_state_velocity(state_velocity)
+            command.from_state_velocity(state_velocity=state_velocity)
             for command, state_velocity in zip(
                 self.commands, self.velocity_reader.velocities()
             )
         ]
-        self.command_publisher.publish(self.command_format.create_message(velocities))
+        self.command_publisher.publish(
+            self.command_format.create_message(velocities=velocities)
+        )
 
     def stop(self) -> None:
         self.command_publisher.publish(
-            self.command_format.create_message([0.0] * len(self.commands))
+            self.command_format.create_message(velocities=[0.0] * len(self.commands))
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveVelocityCommandPublisher(CommandPublisher):
     """
-    Publishes the velocity of a drive connection as a twist.
+    Publishes the velocity of a drive connection as a twist, expressed in the frame of
+    the body the drive moves.
     """
 
     world: World
@@ -540,14 +514,20 @@ class DriveVelocityCommandPublisher(CommandPublisher):
     Minimum magnitude of the commanded rotational velocity.
     """
 
+    command_format: DriveCommandFormat = field(default_factory=TwistFormat)
+    """
+    Message format the controller on ``command_topic`` consumes.
+    """
+
     velocity_reader: StateVelocityReader = field(init=False)
     """
     Reads the commanded velocities of the drivable axes, rotation last.
     """
 
-    message: Twist = field(init=False, default_factory=Twist)
+    twist: Twist = field(init=False, default_factory=Twist)
     """
-    The message reused for every publication.
+    The twist reused for every publication, which :attr:`command_format` turns into the
+    message it publishes.
     """
 
     velocity_publisher: Publisher = field(init=False)
@@ -556,8 +536,8 @@ class DriveVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
-        self.velocity_publisher = rospy.get_node().create_publisher(
-            Twist, self.command_topic, 10
+        self.velocity_publisher = background_node.get_node().create_publisher(
+            self.command_format.message_type(), self.command_topic, 10
         )
         self.connection.has_hardware_interface = True
         self.velocity_reader = StateVelocityReader(
@@ -565,7 +545,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
             degrees_of_freedom=self.translation_degrees_of_freedom()
             + [self.connection.yaw],
         )
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"Created publisher for {self.command_topic}."
         )
 
@@ -582,18 +562,28 @@ class DriveVelocityCommandPublisher(CommandPublisher):
     def publish(self) -> None:
         velocities = self.velocity_reader.velocities()
         linear_velocities = self.minimum_linear_velocity.enforce_on_vector(
-            velocities[:-1]
+            velocities=velocities[:-1]
         )
-        self.message.linear.x = linear_velocities[0]
+        self.twist.linear.x = linear_velocities[0]
         if len(linear_velocities) > 1:
-            self.message.linear.y = linear_velocities[1]
-        self.message.angular.z = self.minimum_angular_velocity.enforce_on_scalar(
-            velocities[-1]
+            self.twist.linear.y = linear_velocities[1]
+        self.twist.angular.z = self.minimum_angular_velocity.enforce_on_scalar(
+            velocity=velocities[-1]
         )
-        self.velocity_publisher.publish(self.message)
+        self._publish_twist()
 
     def stop(self) -> None:
-        self.message.linear.x = 0.0
-        self.message.linear.y = 0.0
-        self.message.angular.z = 0.0
-        self.velocity_publisher.publish(self.message)
+        self.twist.linear.x = 0.0
+        self.twist.linear.y = 0.0
+        self.twist.angular.z = 0.0
+        self._publish_twist()
+
+    def _publish_twist(self) -> None:
+        """
+        Publish :attr:`twist` in the format the controller consumes.
+        """
+        self.velocity_publisher.publish(
+            self.command_format.create_message(
+                twist=self.twist, frame_id=self.connection.child.name.name
+            )
+        )

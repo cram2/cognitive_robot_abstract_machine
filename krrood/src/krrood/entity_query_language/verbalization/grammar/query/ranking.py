@@ -29,7 +29,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RankingRequest:
     """
     A query's ranking together with the selection type label — the input a ranking form
@@ -42,7 +42,7 @@ class RankingRequest:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RankingSurface:
     """
     The placed pieces of a ranking phrase, for the selection noun phrase to carry.
@@ -102,7 +102,7 @@ def _key_attribute(order_key: SymbolicExpression) -> VerbalizationFragment:
     chain, _ = walk_chain(order_key)
     attribute = chain[-1]
     return RoleFragment.for_attribute(
-        attribute._owner_class_, attribute._attribute_name_
+        owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
     )
 
 
@@ -116,7 +116,7 @@ class RankingForm(SpecificityRule):
     a new subclass; nothing else changes (open/closed). Mirrors ``grammar/conditions/placement.py``.
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(3))
+    >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
 
     The family's alternatives are its three templates, and a descending ranking by an
@@ -128,13 +128,13 @@ class RankingForm(SpecificityRule):
     ...     RankingPlan, SortDirection, RankingKeyRelation)
     >>> plan = RankingPlan(limit_number=3, direction=SortDirection.DESCENDING,
     ...     relation=RankingKeyRelation.ATTRIBUTE, order_key=None)
-    >>> RankingForm.most_applicable(RankingRequest(plan=plan)).__name__
+    >>> RankingForm.most_applicable(request=RankingRequest(plan=plan)).__name__
     'AttributeRankedByForm'
     """
 
     @classmethod
     @abstractmethod
-    def applies(cls, request: RankingRequest) -> bool:
+    def applies(cls, *, request: RankingRequest) -> bool:
         """:return: ``True`` when this form renders *request*.
 
         This is the per-form guard that decides whether the ranking takes this form's surface; the
@@ -144,7 +144,7 @@ class RankingForm(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def render(cls, request: RankingRequest) -> RankingSurface:
+    def render(cls, *, request: RankingRequest) -> RankingSurface:
         """:return: *request* rendered into the selection's ranking pieces.
 
         It produces the ranking pieces the selection noun carries — here the *"top three"* qualifier
@@ -158,12 +158,12 @@ class LeadingRankForm(RankingForm):
     selection itself, and the unrelated-key fallback (key suppressed).
 
     >>> robot = variable(Robot, [])
-    >>> verbalize_expression(entity(robot).limit(2))
+    >>> verbalize_expression(entity(robot).limit(n=2))
     'Find the first two Robots'
     """
 
     @classmethod
-    def applies(cls, request: RankingRequest) -> bool:
+    def applies(cls, *, request: RankingRequest) -> bool:
         """:return: Always ``True`` — the unguarded base every specific form refines.
 
         Being the always-matching base, this is the decision that routes any ranking with no more
@@ -173,7 +173,7 @@ class LeadingRankForm(RankingForm):
         return True
 
     @classmethod
-    def render(cls, request: RankingRequest) -> RankingSurface:
+    def render(cls, *, request: RankingRequest) -> RankingSurface:
         """:return: The quality (+ count) leading the noun, with no key named.
 
         It emits the leading qualifier *"first two"* placed before the head, with no trailing key
@@ -183,7 +183,9 @@ class LeadingRankForm(RankingForm):
         quality = _quality(request.plan.direction, n).as_fragment()
         pre_head = quality if n == 1 else PhraseFragment(parts=[quality, _cardinal(n)])
         return RankingSurface(
-            pre_head=pre_head, number=GrammaticalNumber.of(n > 1), modifiers=[]
+            pre_head=pre_head,
+            number=GrammaticalNumber.of(is_plural=n > 1),
+            modifiers=[],
         )
 
 
@@ -192,12 +194,12 @@ class AttributeSuperlativeForm(LeadingRankForm):
     *"the Employee with the highest salary"* / *"… with the lowest salary"*.
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(1))
+    >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=1))
     'Find the Employee with the highest salary'
     """
 
     @classmethod
-    def applies(cls, request: RankingRequest) -> bool:
+    def applies(cls, *, request: RankingRequest) -> bool:
         """:return: ``True`` for an attribute key with *n = 1*.
 
         This is the decision that routes a single result ordered by an attribute to the superlative
@@ -208,7 +210,7 @@ class AttributeSuperlativeForm(LeadingRankForm):
         return plan.relation is RankingKeyRelation.ATTRIBUTE and plan.limit_number == 1
 
     @classmethod
-    def render(cls, request: RankingRequest) -> RankingSurface:
+    def render(cls, *, request: RankingRequest) -> RankingSurface:
         """:return: The superlative attached to the key — *"with the highest/lowest <attribute>"*.
 
         It emits no leading qualifier; instead it attaches a post-nominal modifier such as *"with the
@@ -238,12 +240,12 @@ class AttributeRankedByForm(LeadingRankForm):
     *"the bottom three Employees by salary"*.
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(3))
+    >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
     """
 
     @classmethod
-    def applies(cls, request: RankingRequest) -> bool:
+    def applies(cls, *, request: RankingRequest) -> bool:
         """:return: ``True`` for an attribute key with *n > 1*.
 
         This is the decision that routes several results ordered by an attribute to the *"by
@@ -254,7 +256,7 @@ class AttributeRankedByForm(LeadingRankForm):
         return plan.relation is RankingKeyRelation.ATTRIBUTE and plan.limit_number > 1
 
     @classmethod
-    def render(cls, request: RankingRequest) -> RankingSurface:
+    def render(cls, *, request: RankingRequest) -> RankingSurface:
         """:return: The count leading the noun with the key named — *"top/bottom <n> … by <attribute>"*.
 
         It emits both a leading qualifier — *"bottom three"* (ascending) or the class example's
@@ -292,7 +294,7 @@ def ranking_surface(request: RankingRequest) -> RankingSurface:
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(
-    ...     the(entity(employee)).ordered_by(employee.salary, descending=True).limit(3))
+    ...     the(entity(employee)).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
     """
-    return RankingForm.most_applicable(request).render(request)
+    return RankingForm.most_applicable(request=request).render(request=request)

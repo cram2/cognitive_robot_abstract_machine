@@ -33,18 +33,21 @@ def _to_text(fragment) -> str:
 
 
 def test_fold_word_and_role_are_leaves():
-    assert _to_text(WordFragment("the")) == "the"
-    assert _to_text(RoleFragment("Robot", SemanticRole.VARIABLE)) == "Robot"
+    assert _to_text(WordFragment(text="the")) == "the"
+    assert _to_text(RoleFragment(text="Robot", role=SemanticRole.VARIABLE)) == "Robot"
 
 
 def test_fold_phrase_recurses_and_joins_with_separator():
     phrase = PhraseFragment(
-        parts=[WordFragment("the"), RoleFragment("Robot", SemanticRole.VARIABLE)],
+        parts=[
+            WordFragment(text="the"),
+            RoleFragment(text="Robot", role=SemanticRole.VARIABLE),
+        ],
         separator=" ",
     )
     assert _to_text(phrase) == "the Robot"
 
-    nested = PhraseFragment(parts=[WordFragment("a"), phrase], separator="-")
+    nested = PhraseFragment(parts=[WordFragment(text="a"), phrase], separator="-")
     assert _to_text(nested) == "a-the Robot"
 
 
@@ -57,7 +60,7 @@ def test_fold_passes_already_folded_children_to_phrase_handler():
         return sep.join(parts)
 
     fold_fragment(
-        PhraseFragment(parts=[WordFragment("x"), WordFragment("y")]),
+        PhraseFragment(parts=[WordFragment(text="x"), WordFragment(text="y")]),
         word=lambda t: t.upper(),
         role=lambda t, r, ref: t,
         phrase=phrase_handler,
@@ -67,7 +70,9 @@ def test_fold_passes_already_folded_children_to_phrase_handler():
 
 
 def test_fold_gives_block_handler_the_raw_block():
-    block = BlockFragment(header=WordFragment("If"), items=[WordFragment("a")])
+    block = BlockFragment(
+        header=WordFragment(text="If"), items=[WordFragment(text="a")]
+    )
     captured = {}
 
     def block_handler(b):
@@ -90,8 +95,8 @@ def test_fold_gives_block_handler_the_raw_block():
 def test_fold_counts_leaves_via_a_numeric_algebra():
     tree = PhraseFragment(
         parts=[
-            WordFragment("a"),
-            PhraseFragment(parts=[WordFragment("b"), WordFragment("c")]),
+            WordFragment(text="a"),
+            PhraseFragment(parts=[WordFragment(text="b"), WordFragment(text="c")]),
         ]
     )
     count = fold_fragment(
@@ -106,10 +111,12 @@ def test_fold_counts_leaves_via_a_numeric_algebra():
 
 def test_flatten_matches_manual_fold():
     block = BlockFragment(
-        header=WordFragment("Find a Robot"),
+        header=WordFragment(text="Find a Robot"),
         items=[
-            PhraseFragment(parts=[WordFragment("whose"), WordFragment("battery")]),
-            WordFragment("is high"),
+            PhraseFragment(
+                parts=[WordFragment(text="whose"), WordFragment(text="battery")]
+            ),
+            WordFragment(text="is high"),
         ],
     )
     # Block items are comma-joined, header prefixed with a space.
@@ -119,5 +126,7 @@ def test_flatten_matches_manual_fold():
 
 
 def test_flatten_headerless_block_is_comma_joined_items():
-    block = BlockFragment(header=None, items=[WordFragment("a"), WordFragment("b")])
+    block = BlockFragment(
+        header=None, items=[WordFragment(text="a"), WordFragment(text="b")]
+    )
     assert flatten_fragment_to_plain_text(block) == "a, b"

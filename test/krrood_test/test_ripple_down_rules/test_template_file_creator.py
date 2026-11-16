@@ -18,27 +18,45 @@ from .datasets import Part, PhysicalObject, Robot
 def test_func_name_with_one_type():
     # Test the function name
     world = World()
-    case_query: CaseQuery = CaseQuery(world, "views", (Handle,), False)
+    case_query: CaseQuery = CaseQuery(
+        original_case=world,
+        attribute_name="views",
+        _attribute_types=(Handle,),
+        mutually_exclusive=False,
+    )
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conclusion, case_query)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conclusion, case_query=case_query
+    )
     assert func_name == "world_views_of_type_handle"
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conditions, case_query)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conditions, case_query=case_query
+    )
     assert func_name == "conditions_for_world_views_of_type_handle"
 
 
 def test_func_name_with_two_type():
     # Test the function name
     world = World()
-    case_query: CaseQuery = CaseQuery(world, "views", (Handle, Container), False)
+    case_query: CaseQuery = CaseQuery(
+        original_case=world,
+        attribute_name="views",
+        _attribute_types=(Handle, Container),
+        mutually_exclusive=False,
+    )
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conclusion, case_query)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conclusion, case_query=case_query
+    )
     assert func_name in [
         "world_views_of_type_handle_or_container",
         "world_views_of_type_container_or_handle",
     ]
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conditions, case_query)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conditions, case_query=case_query
+    )
     assert func_name in [
         "conditions_for_world_views_of_type_handle_or_container",
         "conditions_for_world_views_of_type_container_or_handle",
@@ -49,13 +67,20 @@ def test_func_name_with_not_needed_types():
     # Test the function name
     world = World()
     case_query: CaseQuery = CaseQuery(
-        world, "views", (Handle, list, bool, type(None)), False
+        original_case=world,
+        attribute_name="views",
+        _attribute_types=(Handle, list, bool, type(None)),
+        mutually_exclusive=False,
     )
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conclusion, case_query)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conclusion, case_query=case_query
+    )
     assert func_name == "world_views_of_type_handle"
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conditions, case_query)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conditions, case_query=case_query
+    )
     assert func_name == "conditions_for_world_views_of_type_handle"
 
 
@@ -65,7 +90,7 @@ def test_rdr_decorator_func_name():
             pass
 
         def select_objects_that_are_parts_of_robot(
-            self, objects: list[PhysicalObject], robot: Robot
+            self, *, objects: list[PhysicalObject], robot: Robot
         ) -> list[PhysicalObject]:
             pass
 
@@ -73,13 +98,17 @@ def test_rdr_decorator_func_name():
     cq = create_case_query_from_method(
         example.is_a_robot, {"output_": None}, bool, True, func_args=(), func_kwargs={}
     )
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conclusion, cq)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conclusion, case_query=cq
+    )
     assert func_name == "example_is_a_robot"
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conditions, cq)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conditions, case_query=cq
+    )
     assert func_name == "conditions_for_example_is_a_robot"
 
-    objects = [Part("Object1"), Part("Object2"), Part("Object3")]
-    robot = Robot("Robot1", objects[:2])
+    objects = [Part(name="Object1"), Part(name="Object2"), Part(name="Object3")]
+    robot = Robot(name="Robot1", _contained_objects=objects[:2])
     cq = create_case_query_from_method(
         example.select_objects_that_are_parts_of_robot,
         {"output_": None},
@@ -89,9 +118,13 @@ def test_rdr_decorator_func_name():
         func_kwargs={},
     )
 
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conclusion, cq)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conclusion, case_query=cq
+    )
     assert func_name == "example_select_objects_that_are_parts_of_robot"
-    func_name = TemplateFileCreator.get_func_name(PromptFor.Conditions, cq)
+    func_name = TemplateFileCreator.get_func_name(
+        prompt_for=PromptFor.Conditions, case_query=cq
+    )
     assert func_name == "conditions_for_example_select_objects_that_are_parts_of_robot"
 
 
@@ -104,7 +137,9 @@ def test_load():
     source_code = dedent(source_code)
     with open("test.py", "w") as f:
         f.write(source_code)
-    code_lines, updates = TemplateFileCreator.load("test.py", "test_func")
+    code_lines, updates = TemplateFileCreator.load(
+        file_path="test.py", func_name="test_func"
+    )
     assert code_lines == func_code.splitlines()
     assert make_set(updates.keys()) == {"test_func", "World"}
     assert updates["test_func"](world) == world

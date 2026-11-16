@@ -1,0 +1,48 @@
+name: Find API breaks in pull requests
+
+# Runs the pull request's code, so it only gets a read-only token. pr_api_break_label.yml
+# sets the label when this workflow uploads the api-break artifact.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  find-api-breaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install griffe==2.4.1
+
+      # griffe reads the source without importing it. Every package is on the search path,
+      # so members inherited across packages resolve. HEAD^1 is the base side of the
+      # pull request's merge commit, so only the pull request's own changes are compared.
+      - name: Compare the public API of every package with the base branch
+        run: |
+          search_paths=()
+          for source in */src; do search_paths+=(--search "$source"); done
+          for package_init in */src/*/__init__.py; do
+            package_directory="$(dirname "$package_init")"
+            if ! git cat-file -e "HEAD^1:$package_init" 2>/dev/null; then
+              continue
+            fi
+            if ! griffe check "$(basename "$package_directory")" "${search_paths[@]}" \
+                --against HEAD^1 --format github; then
+              touch api-break-found
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-break
+          path: api-break-found
+          if-no-files-found: ignore

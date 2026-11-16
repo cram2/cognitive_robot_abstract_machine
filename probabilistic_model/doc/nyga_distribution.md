@@ -57,32 +57,24 @@ dataset
 The idea is to create as many components in a mixture of uniform distributions as is necessary 
 to achieve a good fit to the data. 
 The fitness of the model is measured by the weighted log likelihood of the data under the model (compare with {prf:ref}`def-mle`).
-The weighted log likelihood is derived from the weighted likelihood. 
-The weighted likelihood of the data under the model is given by
+Every sample $d_i$ carries a weight $w_i$, for example the number of times it occurs in the data.
+The weighted log likelihood of the data under the model is given by
 
 $$
-L(\mathcal{D}| \boldsymbol{\Theta}) = \prod_{i=1}^N  w_i \, p(d_i),
+log \left( L(\mathcal{D}| \boldsymbol{\Theta}) \right) =  \sum_{i=1}^N w_i \, log(p(d_i)),
 $$
 
 where $\boldsymbol{\Theta}$ represents the parameters of the model.
 
-By applying the logarithm to the weighted likelihood, we get the log likelihood
-
-$$
-log \left( L(\mathcal{D}| \boldsymbol{\Theta}) \right) =  \sum_{i=1}^N log(w_i) + log(p(d_i)).
-$$
-
-
 When the uniform distribution is assumed for the data, the weighted log likelihood is given by
 
-\begin{align*}
-log \left(L(\mathcal{D}| \boldsymbol{\Theta}) \right) &= \sum_{i=1}^N log(w_i) + log \left(\frac{1}{b-a} \right)\\
-&= \sum_{i=1}^N log(w_i) + \sum_{i=1}^N - log \left(b-a \right).
-\end{align*}
+$$
+log \left(L(\mathcal{D}| \boldsymbol{\Theta}) \right) = \sum_{i=1}^N w_i \, log \left(\frac{1}{b-a} \right).
+$$
 
 Since the density of the uniform distribution is constant, the weighted log likelihood can be restated as
 
-$$ \sum_{i=1}^N log(w_i) -N log \left(b-a \right),$$
+$$ - W \, log \left(b-a \right), \qquad W = \sum_{i=1}^N w_i,$$
  
 which is particularly easy to calculate. 
 
@@ -145,72 +137,82 @@ Furthermore, we can observe that the density is constant for every sample in the
 Plugging it in, we get the likelihood for the split
 
 \begin{align*}
-log \left( L(\mathcal{D}| d_1, d_{split}, d_N) \right) &= \sum_{i=1}^N log(w_i) + log(p(x_i))\\
-&=  \sum_{i=1}^{left} log(w_i) + log(p(x_i)) + \sum_{i=right}^{N} log(w_i) + log(p(x_i)) \\
-&=  \sum_{i=1}^{left} log(w_i) + log(w_{left} \cdot p_{left}(x_i)) + \sum_{i=right}^{N} log(w_i) + log(w_{right} \cdot p_{right}(x_i)) \\
-&=  \underbrace{\sum_{i=1}^{left} log(w_i) + log(w_{left}) + log(U_{left})}_{\text{Left Hand Side (LHS)}} + \underbrace{\sum_{i=right}^{N} log(w_i) + log(w_{right}) + log(U_{right})}_{\text{Right Hand Side (RHS)}} \\
-LHS &=  L \cdot ( log(w_{left}) + log(U_{left})) + \sum_{i=1}^{left} log(w_i)\\
-&= L \cdot \left( log \left( \sum_{i=1}^{left} w_i \right) - log \left( \sum_{i=1}^{N} w_i \right) - log(D_{split} - D_{left}) \right) + \sum_{i=1}^{left} log(w_i)\\
-RHS &= (N - R) \cdot \left( log \left( \sum_{i=right}^{N} w_i \right) - log \left( \sum_{i=1}^{N} w_i \right) - log(D_{right} - D_{split}) \right) + \sum_{i=right}^{N} log(w_i)\\
+log \left( L(\mathcal{D}| d_1, d_{split}, d_N) \right) &= \sum_{i=1}^{k} w_i \, log(p_{left}(d_i)) + \sum_{i=k+1}^{N} w_i \, log(p_{right}(d_i)) \\
+&=  \underbrace{W_{left} \left( log(w_{left}) - log(d_{split} - d_1) \right)}_{\text{Left Hand Side (LHS)}} + \underbrace{W_{right} \left( log(w_{right}) - log(d_N - d_{split}) \right)}_{\text{Right Hand Side (RHS)}},
 \end{align*}
 
+where $W_{left} = \sum_{i=1}^{k} w_i$ and $W_{right} = \sum_{i=k+1}^{N} w_i$ are the weights on either side of the split.
 
 The most likely split is selected, and the process is repeated recursively on the left and right side of the split.
 
-If the likelihood improvement of the best split, compared to no splitting, is smaller than a given threshold, the process is terminated. 
 The likelihood to compare against is given by the weighted log likelihood of a uniform without splitting, i.e.
 
 $$
-log \left( L(\mathcal{D}|, d_1, d_N) \right) = \sum_{i=1}^N log(w_i) - N \,log \left(d_N - d_1 \right).
+log \left( L(\mathcal{D}| d_1, d_N) \right) = - W \,log \left(d_N - d_1 \right).
 $$
 
-The best threshold is given by selecting the maximum weighted likelihood improvement over all possible splits.
-The improvement value is given by
+The gain of a split is the difference of the two. With $q = W_{left} / W$ and
+$\lambda = (d_{split} - d_1) / (d_N - d_1)$ it equals
 
 $$
-max \left( log \left( L(\mathcal{D}| d_1, d_{split}, d_N) \right) \right) > log(\epsilon) + log \left( L(\mathcal{D}|, d_1, d_N) \right)
+gain = W \cdot KL \left( Bernoulli(q) \, || \, Bernoulli(\lambda) \right) \geq 0,
 $$
 
+so a split never lowers the likelihood.
+A threshold on the likelihood alone would therefore never stop the induction.
+Instead, every split has to pay for the two parameters it adds, its boundary and its weight, with the penalty of the
+Bayesian information criterion {cite}`schwarz1978estimating`. 
+A split is made if and only if
 
-In simpler terms, the induction is terminated as soon as the likelihood does not improve by more than $\epsilon\,\%$ 
-anymore if a split is made. 
+$$
+gain \cdot \frac{n}{W} > \alpha \, log(n), \qquad n = \frac{W^2}{\sum_{i=1}^N w_i^2},
+$$
 
-This parameter is referenced to as `min_likelihood_improvement` in the code.
+where $n$ is the effective sample size of the weights. 
+For samples that are weighted by how often they occur, $n = W$ and the criterion reads $gain > \alpha \, log(W)$.
+The factor $\alpha$ is referenced to as `split_penalty_factor` in the code, and $\alpha = 1$ is exactly the Bayesian 
+information criterion.
+
+The recursive splitting is greedy and therefore not guaranteed to find the partition with the highest penalized
+likelihood. 
+Since the boundaries are fixed by the indices of the data, the best partition can also be found exactly by dynamic 
+programming {cite}`jackson2005algorithm` with the pruning of {cite}`killick2012optimal`. 
+It is slower on large datasets, so the induction searches for the best partition only up to
+`maximum_unique_values_for_optimal_partition` unique values and splits greedily above that.
+
 This algorithm is implemented in the [NygaInduction](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/learning/nyga_induction/index.html#probabilistic_model.learning.nyga_induction.NygaInduction).
 
 # Theory Example
 
-Consider the dataset $\mathcal{D} = \{ 1, 2, 3, 4, 7, 9 \}$ with uniform log_weights, i.e., $w_i = 1, \forall i$.
+Consider the dataset $\mathcal{D} = \{ 1, 2, 3, 4, 7, 9 \}$ with uniform weights, i.e., $w_i = 1, \forall i$, and
+hence $W = 6$.
 
 The log likelihood of a uniform distribution without a split over $\mathcal{D}$ is given by
 
 \begin{align*}
-log \left( L(\mathcal{D}| \boldsymbol{\Theta}) \right) &= \sum_{i=1}^6 log(1) - log(9-1) \\
+log \left( L(\mathcal{D}| \boldsymbol{\Theta}) \right) &= - 6 \, log(9-1) \\
 &\approx -12.48
 \end{align*}
 
 We can now calculate every possible split and get the list $splits = [1.5,\, 2.5,\, 3.5,\, 5.5,\, 8]$
 Let's calculate the log likelihood for every split.
 
-1. Iteration: $k=1, D_{split} = 1.5$
+1. Iteration: $k=1, d_{split} = 1.5$
 
 \begin{align*}
- log \left( L(\mathcal{D}| 1, 1.5, 9) \right) &= LHS + RHS \\
- LHS &= L \cdot \left( log \left( \sum_{i=1}^{left} w_i \right) - log \left( \sum_{i=1}^{N} w_i \right) - log(D_{split} - D_{left}) \right) + \sum_{i=1}^{left} log(w_i) \\
- &= 1 \cdot \left( log \left( \sum_{i=1}^{1} 1 \right) - log \left( \sum_{i=1}^{6} 1 \right) - log(1.5 - 1) \right) + \sum_{i=1}^{1} log(1) \\
- &=  log (1) - log(6) - log(0.5) + log(1) \\
+ LHS &= W_{left} \left( log(w_{left}) - log(d_{split} - d_1) \right) \\
+ &= 1 \cdot \left( log \left( \frac{1}{6} \right) - log(1.5 - 1) \right) \\
  &\approx -1.1\\
- RHS &= (N - R) \cdot \left( log \left( \sum_{i=right}^{N} w_i \right) - log \left( \sum_{i=1}^{N} w_i \right) - log(D_{right} - D_{split}) \right) + \sum_{i=right}^{N} log(w_i)\\
- &= (6 - 1) \cdot \left( log \left( \sum_{i=2}^{6} 1 \right) - log \left( \sum_{i=1}^{6} 1 \right) - log(9 - 1.5) \right) + \sum_{i=2}^{6} log(1)\\
- &= 5 \cdot \left( log(5) - log(6) - log(7.5) \right) \\
+ RHS &= W_{right} \left( log(w_{right}) - log(d_N - d_{split}) \right) \\
+ &= 5 \cdot \left( log \left( \frac{5}{6} \right) - log(9 - 1.5) \right) \\
  &\approx -10.99 \\
- log \left( L(\mathcal{D}| 1, 1.5, 9) \right) &= -1.1 -10.99  \\
- &\approx -12.09
+ log \left( L(\mathcal{D}| 1, 1.5, 9) \right) &\approx -1.0986 - 10.9861  \\
+ &\approx -12.08
 \end{align*}
 
 
 
-2. Iteration  $k=2,  D_{split} = 2.5$
+2. Iteration  $k=2,  d_{split} = 2.5$
 
 \begin{align*}
  LHS &= 2 \left( log(2) - log(6) - log(1.5) \right)\\
@@ -220,7 +222,7 @@ Let's calculate the log likelihood for every split.
  log \left( L(\mathcal{D}| 1, 2.5, 9) \right) &\approx -12.12
 \end{align*}
 
-3. Iteration $k=3,  D_{split} = 3.5$
+3. Iteration $k=3,  d_{split} = 3.5$
 
 \begin{align*}
  LHS &= 3 \left( log(3) - log(6) - log(2.5) \right)\\
@@ -230,7 +232,7 @@ Let's calculate the log likelihood for every split.
  log \left( L(\mathcal{D}| 1, 3.5, 9) \right) &\approx -12.02
 \end{align*}
 
-4. Iteration $k=4,  D_{split} = 5.5$
+4. Iteration $k=4,  d_{split} = 5.5$
 
 \begin{align*}
  LHS &= 4 \left( log(4) - log(6) - log(4.5) \right)\\
@@ -240,7 +242,7 @@ Let's calculate the log likelihood for every split.
  log \left( L(\mathcal{D}| 1, 5.5, 9) \right) &\approx -12.34
 \end{align*}
 
-5. Iteration $k=5,  D_{split} = 8$
+5. Iteration $k=5,  d_{split} = 8$
 
 \begin{align*}
  LHS &= 5 \left( log(5) - log(6) - log(7) \right)\\
@@ -251,12 +253,13 @@ Let's calculate the log likelihood for every split.
 \end{align*}
 
 
-We can see that the split at 3.5 has the highest likelihood. But how much better is it? 
-The relative improvement is given by
+We can see that the split at 3.5 has the highest likelihood. But is it worth its two parameters?
+Its gain is
 $$
-\frac{exp(-12.02) }{exp(-12.48)} = 1.58,
+-12.0220 - (-12.4766) \approx 0.45,
 $$
-which means that the resulting likelihood is 58% higher than the likelihood without a split.
+while the penalty with $\alpha = 1$ is $log(6) \approx 1.79$. 
+Six samples are too few to justify a split, so the induction keeps a single uniform distribution.
 
 ## Practical Example
 
@@ -271,7 +274,7 @@ import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
-distribution = NygaInduction(Continuous("x"), min_samples_per_quantile=100, min_likelihood_improvement=0.01)
+distribution = NygaInduction(Continuous("x"), minimum_samples_per_quantile=100)
 distribution = distribution.fit(dataset)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()

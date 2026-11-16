@@ -3,9 +3,11 @@ from pathlib import Path
 PACKAGES = [
     "cognitive_robot_abstract_machine",
     "coraplex",
+    "cramph",
     "experiments",
     "giskardpy",
     "krrood",
+    "krrood_spatial_math",
     "physics_simulators",
     "probabilistic_model",
     "random_events",

@@ -6,8 +6,12 @@ defaults:
 on:
   workflow_call:
     inputs:
-      lib:
-        description: "Library folder name (relative to repo root)"
+      name:
+        description: "Name of the job's test group, which its cache is saved under"
+        required: true
+        type: string
+      libs:
+        description: "JSON list of the library folder names (relative to repo root) whose tests the job runs"
         required: true
         type: string
       repo_lowercase:
@@ -18,13 +22,34 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Fails a job that is still running after an hour. A runner that runs out of disk or memory
+    # stops responding, and its job would otherwise only end at GitHub's six-hour limit.
+    timeout-minutes: 60
     container:
       image: ${{ inputs.repo_lowercase }}
+      # The host's root, so free_runner_disk.sh can delete what the runner image installs and
+      # show_runner_resources.sh can measure the disk the job shares with it. Writable, since
+      # the runner's machine is discarded after the job.
+      options: --volume /:/host
+    env:
+      # The tests never run on a GPU, so torch (pulled in through robokudo -> ultralytics) is
+      # installed from the CPU only PyTorch index. The CUDA build from PyPI adds several GB of
+      # nvidia wheels and exhausts the runner disk ("No space left on device").
+      # unsafe-best-match lets every other package still come from PyPI, since the PyTorch index
+      # also mirrors outdated versions of common packages such as packaging.
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
     steps:
       - uses: actions/checkout@v4
         with:
           path: cognitive_robot_abstract_machine
           submodules: recursive
+
+      - name: Free disk space
+        run: cognitive_robot_abstract_machine/scripts/free_runner_disk.sh
+
+      - name: Show runner resources
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Install dependencies
         env:
@@ -44,7 +69,7 @@ jobs:
           python -c "import sys; print(sys.executable)"
 
       - name: Install drake
-        if: ${{ inputs.lib == 'semantic_digital_twin' }}
+        if: ${{ contains(fromJSON(inputs.libs), 'semantic_digital_twin') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
@@ -53,30 +78,30 @@ jobs:
           uv pip install drake
 
       - name: Install robokudo optional requirements
-        if: ${{ inputs.lib == 'robokudo' }}
+        if: ${{ contains(fromJSON(inputs.libs), 'robokudo') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
-          # --no-sources keeps the editable workspace packages from being reinstalled from their paths;
-          # the CPU-only torch index avoids downloading the CUDA libraries onto the runner disk.
-          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources --extra-index-url https://download.pytorch.org/whl/cpu
+          # --no-sources keeps the editable workspace packages from being reinstalled from their paths.
+          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources
 
       - name: Restore cache
         uses: actions/cache/restore@v4
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ${{ runner.os }}-cache-${{ inputs.name }}-${{ github.ref_name }}-${{ github.run_id }}
+          # Only this library's own cache: a prefix shared with another library, such as
+          # krrood's with krrood_spatial_math's, restores a cache without this library's files.
           restore-keys: |
-            ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}
-            ${{ runner.os }}-cache-${{ inputs.lib }}
-            ${{ runner.os }}-cache-
+            ${{ runner.os }}-cache-${{ inputs.name }}-${{ github.ref_name }}-
+            ${{ runner.os }}-cache-${{ inputs.name }}-
 
       - name: Run CPP tests
-        if: ${{inputs.lib == 'random_events'}}
+        if: ${{ contains(fromJSON(inputs.libs), 'random_events') }}
         run: |
-          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/src/random_events_lib
+          cd cognitive_robot_abstract_machine/random_events/src/random_events_lib
           sudo apt-get install -y g++ unzip zip
           BAZEL_VERSION=7.0.0
           curl -L -o bazel.sh \
@@ -91,32 +116,54 @@ jobs:
       - name: Check the generated rules in AGENTS.md
         # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
         # edit or a forgotten regeneration fails here.
-        if: ${{ inputs.lib == 'krrood' }}
+        if: ${{ contains(fromJSON(inputs.libs), 'krrood') }}
         run: |
           source /opt/ros/cram-env/bin/activate
           cd cognitive_robot_abstract_machine
           krrood agents-md --check
+
+      - name: Check the generated skills
+        # Every SKILL.md of a skill declared in agent_skills.py is generated; a hand edit
+        # or a forgotten regeneration fails here.
+        if: ${{ contains(fromJSON(inputs.libs), 'krrood') }}
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          cd cognitive_robot_abstract_machine
+          krrood skills --check
 
       - name: Run tests
         run: |
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           echo "PYTHONPATH: $PYTHONPATH"
-          if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
-            export QT_QPA_PLATFORM=offscreen
-          fi
-          # The MuJoCo video-recorder tests render offscreen; xvfb provides a display, so MuJoCo
-          # would otherwise pick its windowed GLFW backend and fail to create a context on the
-          # runner. EGL renders headlessly. Must be set before Python imports mujoco, which locks
-          # the GL backend at import, so it cannot be done from inside the test process.
-          if [[ "${{ inputs.lib }}" == "semantic_digital_twin" ]]; then
-            export MUJOCO_GL=egl
-          fi
-          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          # One pytest run per library, each in a subshell so a library's environment stays its
+          # own; every library runs even after another one failed.
+          failed=0
+          for lib in ${{ join(fromJSON(inputs.libs), ' ') }}; do
+            (
+              if [[ "$lib" == "probabilistic_model" ]]; then
+                export QT_QPA_PLATFORM=offscreen
+              fi
+              # The MuJoCo video-recorder tests render offscreen; xvfb provides a display, so MuJoCo
+              # would otherwise pick its windowed GLFW backend and fail to create a context on the
+              # runner. EGL renders headlessly. Must be set before Python imports mujoco, which locks
+              # the GL backend at import, so it cannot be done from inside the test process.
+              if [[ "$lib" == "semantic_digital_twin" ]]; then
+                export MUJOCO_GL=egl
+              fi
+              python -m pytest -n auto cognitive_robot_abstract_machine/test/${lib}_test
+            ) || failed=1
+          done
+          exit $failed
+
+      - name: Show runner resources after the job
+        # Runs after a failure too, so a job that ran out of disk shows what filled it.
+        if: always()
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Save cache
         uses: actions/cache/save@v4
         if: always()
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ${{ runner.os }}-cache-${{ inputs.name }}-${{ github.ref_name }}-${{ github.run_id }}

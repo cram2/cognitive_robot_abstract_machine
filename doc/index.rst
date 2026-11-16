@@ -42,6 +42,10 @@ CRAM consists of the following sub-packages:
    and optimization-based task-space control to control the whole
    body of a robot.
 
+-  `cramph <https://cram2.github.io/cognitive_robot_abstract_machine/cramph>`__
+   is a generic statechart engine. Giskardpy composes its motions
+   out of cramph statecharts.
+
 -  `KRROOD <https://cram2.github.io/cognitive_robot_abstract_machine/krrood>`__
    is a Python framework that integrates symbolic knowledge
    representation, powerful querying, and rule-based reasoning through

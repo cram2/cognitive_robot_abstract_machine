@@ -59,6 +59,46 @@ query = entity(r).where(not_(r.name == "R2D2"))
 Negation can be particularly useful for "anti-joins" or excluding specific subsets from your results.
 ```
 
+## Quantifiers (FOR ALL and EXISTS)
+
+`for_all(x, condition)` holds when the condition holds for **every** value of `x`, and `exists(x, condition)` holds when
+it holds for **at least one** value of `x`. The values of `x` may depend on another variable, as when `x` ranges over a
+collection attribute with `variable_from`:
+
+```python
+student = variable(Student, domain=students)
+course = variable_from(student.takes_course)
+
+# Students none of whose courses is "Databases"
+query = an(entity(student).where(for_all(course, course.name != "Databases")))
+
+# Students taking at least one "Logic" course
+query = an(entity(student).where(exists(course, course.name == "Logic")))
+
+# Students taking no "Logic" course
+query = an(entity(student).where(not_(exists(course, course.name == "Logic"))))
+```
+
+A quantifier is evaluated once for each binding of its **outer-visible** variables: those that also occur somewhere
+else in the same query, whether selected (like `student` above) or used by another condition. So the three queries above
+range over each student's own courses. A variable that occurs only inside the quantifier, including inside the
+quantified variable's own domain expression, is local to the quantifier and is quantified together with it: in
+`for_all(cabinets.container, ...)`, where `cabinets` appears nowhere else, the condition must hold for the containers of
+all cabinets. Over an empty collection, `for_all` is true and `exists` is false.
+
+`exists` only filters the outer bindings. Each one appears in the results at most once, however many values of the
+quantified variable satisfy the condition, and the local variables never appear in the results. If you need those
+values, write the condition without `exists` (a join) instead. `not_(exists(...))` keeps the outer bindings for which no
+value satisfies the condition, including those whose collection is empty.
+
+```python
+# One row per student taking a "Logic" course
+query = an(entity(student).where(exists(course, course.name == "Logic")))
+
+# One row per (student, course) pair whose course is "Logic": a join, so the course is in the results
+query = set_of(student, course).where(course.name == "Logic")
+```
+
 ## Full Example: Complex Logic
 
 Let's build a query that combines all these operators.
@@ -96,3 +136,5 @@ for robot in query.evaluate():
 - {py:class}`~krrood.entity_query_language.operators.core_logical_operators.AND`
 - {py:class}`~krrood.entity_query_language.operators.core_logical_operators.OR`
 - {py:class}`~krrood.entity_query_language.operators.core_logical_operators.Not`
+- {py:class}`~krrood.entity_query_language.operators.logical_quantifiers.ForAll`
+- {py:class}`~krrood.entity_query_language.operators.logical_quantifiers.Exists`

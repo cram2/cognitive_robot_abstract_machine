@@ -7,12 +7,7 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
-    OrthogonalProjection,
-    Point2,
-    Point3,
-    Pose,
-)
+from krrood_spatial_math.spatial_types import OrthogonalProjection, Point2, Point3, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 

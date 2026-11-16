@@ -28,9 +28,11 @@ if TYPE_CHECKING:
 
 class Case(UserDict):
     """
-    A collection of attributes that represents a set of attributes of a case. This is a dictionary where the keys are
-    the names of the attributes and the values are the attributes. All are stored in lower case, and can be accessed
-    using the dot notation as well as the dictionary access notation.
+    A collection of attributes that represents a set of attributes of a case.
+
+    This is a dictionary where the keys are the names of the attributes and the values
+    are the attributes. All are stored in lower case, and can be accessed using the dot
+    notation as well as the dictionary access notation.
     """
 
     def __init__(
@@ -57,13 +59,14 @@ class Case(UserDict):
 
     @classmethod
     def from_obj(
-        cls, obj: Any, obj_name: str | None = None, max_recursion_idx: int = 3
+        cls, *, obj: Any, obj_name: str | None = None, max_recursion_idx: int = 3
     ) -> Case:
         """
         Create a case from an object.
 
         :param obj: The object to create a case from.
-        :param max_recursion_idx: The maximum recursion index to prevent infinite recursion.
+        :param max_recursion_idx: The maximum recursion index to prevent infinite
+            recursion.
         :param obj_name: The name of the object.
         :return: The case that represents the object.
         """
@@ -102,7 +105,8 @@ class Case(UserDict):
         """
         Create a deep copy of the case.
 
-        :param memo: A dictionary to keep track of objects that have already been copied.
+        :param memo: A dictionary to keep track of objects that have already been
+            copied.
         :return: A deep copy of the case.
         """
         new_case = Case(
@@ -132,7 +136,7 @@ class Case(UserDict):
         return new_case
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseAttributeValue:
     """
     Encapsulates a single value of a case attribute, it adds an id to the value.
@@ -142,6 +146,7 @@ class CaseAttributeValue:
     """
     The row id of the column value.
     """
+
     value: Any
     """
     The value of the column.
@@ -161,13 +166,16 @@ class CaseAttribute(list):
     """
     A boolean indicating whether the case attribute can be None or not.
     """
+
     mutually_exclusive: bool = False
     """
-    A boolean indicating whether the case attribute is mutually exclusive or not. (i.e. can only have one value)
+    A boolean indicating whether the case attribute is mutually exclusive or not.
+
+    (i.e. can only have one value)
     """
 
     @classmethod
-    def from_obj(cls, values: list[Any]) -> CaseAttribute:
+    def from_obj(cls, *, values: list[Any]) -> CaseAttribute:
         return cls(make_list(values))
 
     @property
@@ -179,7 +187,7 @@ class CaseAttribute(list):
         """
         return {self.__class__.__name__: self}
 
-    def filter_by(self, condition: CallableExpression) -> CaseAttribute:
+    def filter_by(self, *, condition: CallableExpression) -> CaseAttribute:
         """
         Filter the column by a condition.
 
@@ -232,7 +240,8 @@ def create_case(
     :param recursion_idx: The current recursion index.
     :param max_recursion_idx: The maximum recursion index to prevent infinite recursion.
     :param obj_name: The name of the object.
-    :param parent_is_iterable: Boolean indicating whether the parent object is iterable or not.
+    :param parent_is_iterable: Boolean indicating whether the parent object is iterable
+        or not.
     :return: The case that represents the object.
     """
     obj_name = obj_name or obj.__class__.__name__
@@ -254,8 +263,9 @@ def create_case(
             _name=obj_name,
             original_object=obj,
             **{
-                obj_name
-                or obj.__class__.__name__: make_list(obj) if parent_is_iterable else obj
+                obj_name or obj.__class__.__name__: make_list(obj)
+                if parent_is_iterable
+                else obj
             },
         )
     case = Case(type(obj), _id=id(obj), _name=obj_name, original_object=obj)
@@ -307,7 +317,8 @@ def create_or_update_case_from_attribute(
     :param obj_name: The parent object name.
     :param recursion_idx: The recursion index to prevent infinite recursion.
     :param max_recursion_idx: The maximum recursion index.
-    :param parent_is_iterable: Boolean indicating whether the parent object is iterable or not.
+    :param parent_is_iterable: Boolean indicating whether the parent object is iterable
+        or not.
     :param case: The case to update.
     :return: The updated/created case.
     """
@@ -388,7 +399,8 @@ def show_current_and_corner_cases(
     last_evaluated_rule: Rule | None = None,
 ) -> str:
     """
-    Get the the data to show of the new case and if last evaluated rule exists also show that of the corner case.
+    Get the the data to show of the new case and if last evaluated rule exists also show
+    that of the corner case.
 
     :param case: The new case.
     :param targets: The target attribute of the case.

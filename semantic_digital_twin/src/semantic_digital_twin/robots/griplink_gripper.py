@@ -3,10 +3,11 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Self
 
 from krrood.ormatic.utils import classproperty
+
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -16,6 +17,33 @@ from semantic_digital_twin.datastructures.robots.gripper_configuration import (
 from semantic_digital_twin.robots.robot_parts import EndEffector
 
 # %% griplink action server endpoints
+
+
+class GriplinkCommand(StrEnum):
+    """
+    The commands a griplink action server executes, each named as its ROS action in
+    ``griplink_interfaces.action``.
+    """
+
+    GRIP = "Grip"
+    """
+    Closes the gripper with a stored grip preset.
+    """
+
+    RELEASE = "Release"
+    """
+    Opens the gripper with a stored grip preset.
+    """
+
+    FLEXGRIP = "Flexgrip"
+    """
+    Closes the gripper to a commanded opening width.
+    """
+
+    FLEXRELEASE = "Flexrelease"
+    """
+    Opens the gripper to a commanded opening width.
+    """
 
 
 @dataclass(frozen=True)
@@ -29,10 +57,9 @@ class GriplinkEndpoint:
     ROS action topic the griplink server for one gripper listens on.
     """
 
-    message_type: type
+    command: GriplinkCommand
     """
-    The griplink ROS action this endpoint's server executes (``Grip``/``Release``/
-    ``Flexgrip``/``Flexrelease``).
+    The command this endpoint's server executes.
     """
 
 

@@ -128,5 +128,5 @@ class ModelController:
         with open(file_path, "r") as file:
             data = json.load(file)
             # Currently assuming ProbabilisticCircuit as in the original app.py
-            model = ProbabilisticCircuit.from_json(data)
+            model = ProbabilisticCircuit.from_json(data=data)
             self.set_model(model)

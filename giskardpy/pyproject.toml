@@ -30,14 +30,16 @@ dependencies = [
     "trimesh>=3.20.2",
     "lxml>=4.5.0",
     "sortedcontainers>=2.4.0",
-    "piqp",
+    "piqp>=0.7",
     "pycollada>=0.7.2",
     "line_profiler>=4.1.3",
     "urdf-parser-py>=0.0.4",
     "giskardpy_bullet_bindings==1.0.1",
     "PyQT5>=5.15.11",
-    "krrood",
-    "semantic_digital_twin",
+    "krrood>=26.10.0",
+    "semantic_digital_twin>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
+    "cramph>=26.10.0",
 ]
 license = "LGPL-3.0-only"
 
@@ -54,7 +56,9 @@ version = {attr = "giskardpy._version.__version__"}
 
 [dependency-groups]
 workspace = [
+    "cramph",
     "krrood",
+    "krrood_spatial_math",
     "semantic_digital_twin",
 ]
 

@@ -12,7 +12,7 @@ KeyType = TypeVar("KeyType")
 TrackedType = TypeVar("TrackedType")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DeserializedObjectTracker(
     Generic[KeyType, TrackedType], SubClassSafeGeneric, SerializationKeywordArgument
 ):
@@ -33,7 +33,7 @@ class DeserializedObjectTracker(
     """
 
     @classmethod
-    def from_kwargs(cls, from_json_kwargs: dict[str, Any]) -> Self:
+    def from_kwargs(cls, *, from_json_kwargs: dict[str, Any]) -> Self:
         """
         Retrieves the tracker from the keyword arguments of a ``from_json`` call, and
         adds a new one to them if there is none, so that calls receiving them share it.
@@ -46,7 +46,7 @@ class DeserializedObjectTracker(
             from_json_kwargs[keyword] = cls()
         return from_json_kwargs[keyword]
 
-    def add(self, key: KeyType, tracked_object: TrackedType) -> None:
+    def add(self, *, key: KeyType, tracked_object: TrackedType) -> None:
         """
         Makes an object available to every later reference to its key.
 
@@ -55,36 +55,39 @@ class DeserializedObjectTracker(
         """
         self.tracked_objects[key] = tracked_object
 
-    def has(self, key: KeyType) -> bool:
+    def has(self, *, key: KeyType) -> bool:
         """
         :param key: The key the document refers to an object with.
         :return: Whether :meth:`get` finds an object for the key.
         """
-        return key in self.tracked_objects or self._has_untracked(key)
+        return key in self.tracked_objects or self._has_untracked(key=key)
 
-    def get(self, key: KeyType) -> TrackedType:
+    def get(self, *, key: KeyType, name: Any = None) -> TrackedType:
         """
         :param key: The key the document refers to an object with.
+        :param name: The name the reference to the object went by, which says which
+            object was meant when it cannot be found.
         :return: The object added for the key, or else the one :meth:`_get_untracked` finds.
         """
         if key in self.tracked_objects:
             return self.tracked_objects[key]
-        return self._get_untracked(key)
+        return self._get_untracked(key=key, name=name)
 
-    def _has_untracked(self, key: KeyType) -> bool:
+    def _has_untracked(self, *, key: KeyType) -> bool:
         """
         :param key: A key no object was added for.
         :return: Whether :meth:`_get_untracked` finds an object for the key.
         """
         return False
 
-    def _get_untracked(self, key: KeyType) -> TrackedType:
+    def _get_untracked(self, *, key: KeyType, name: Any = None) -> TrackedType:
         """
         Finds an object that was not deserialized from the document, for trackers that
         know another source of objects.
 
         :param key: A key no object was added for.
+        :param name: The name the reference to the object went by.
         :return: The object for the key.
         :raises UntrackedObjectError: If there is no such object.
         """
-        raise UntrackedObjectError(key=key)
+        raise UntrackedObjectError(key=key, name=name)

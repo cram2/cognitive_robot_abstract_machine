@@ -1,13 +1,19 @@
+"""
+The DAiSy dual-arm robot: its semantic parts, joint names, controllers and griplink
+grippers.
+"""
+
 from __future__ import annotations
 
+# %% Imports
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
 from typing_extensions import Self
 
-from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
 from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -21,10 +27,12 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     StaticJointState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.griplink_gripper import (
+    GriplinkCommand,
     GriplinkEndpoint,
     GriplinkGripper,
 )
@@ -35,14 +43,32 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
     EndEffector,
     Finger,
+    RobotCamera,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
+
+
+class DAiSyController(StrEnum):
+    """
+    The ros2_control controllers of the DAiSy, as its controller manager names them.
+    """
+
+    LEFT_FORWARD_VELOCITY = "left_forward_velocity_controller"
+    """
+    Commands the joint velocities of the left arm.
+    """
+
+    RIGHT_FORWARD_VELOCITY = "right_forward_velocity_controller"
+    """
+    Commands the joint velocities of the right arm.
+    """
 
 
 class DAiSyJoint(JointName):
@@ -173,16 +199,17 @@ class DAiSyLeftGripper(
         """
         return {
             GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/release", message_type=Release
+                action_topic="/left_gripper/release", command=GriplinkCommand.RELEASE
             ),
             GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/grip", message_type=Grip
+                action_topic="/left_gripper/grip", command=GriplinkCommand.GRIP
             ),
             GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/flexgrip", message_type=Flexgrip
+                action_topic="/left_gripper/flexgrip", command=GriplinkCommand.FLEXGRIP
             ),
             GripperState.FLEXOPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/flexrelease", message_type=Flexrelease
+                action_topic="/left_gripper/flexrelease",
+                command=GriplinkCommand.FLEXRELEASE,
             ),
         }
 
@@ -190,6 +217,11 @@ class DAiSyLeftGripper(
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
+        """
+        The gripper stands open with its fingers at the start of their travel and closed
+        where the facing surfaces of their tips meet, 28 mm along it; further travel
+        carries the fingers past each other.
+        """
         left_gripper_joints = [
             self._world.get_connection_by_name(DAiSyJoint.LEFT_GRIPPER_FINGER),
         ]
@@ -202,25 +234,18 @@ class DAiSyLeftGripper(
 
         gripper_close = JointState.from_mapping(
             name=PrefixedName("left_gripper_close", prefix=self.name.name),
-            mapping=dict(
-                zip(
-                    left_gripper_joints,
-                    [
-                        0.04,
-                    ],
-                )
-            ),
+            mapping=dict(zip(left_gripper_joints, [0.028])),
             state_type=GripperState.CLOSE,
         )
         return [gripper_open, gripper_close]
 
     @property
     def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+        return Vector3.Z(reference_frame=self.tool_frame)
 
     @property
     def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+        return Vector3.X(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -249,16 +274,17 @@ class DAiSyRightGripper(
         """
         return {
             GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/release", message_type=Release
+                action_topic="/right_gripper/release", command=GriplinkCommand.RELEASE
             ),
             GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/grip", message_type=Grip
+                action_topic="/right_gripper/grip", command=GriplinkCommand.GRIP
             ),
             GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/flexgrip", message_type=Flexgrip
+                action_topic="/right_gripper/flexgrip", command=GriplinkCommand.FLEXGRIP
             ),
             GripperState.FLEXOPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/flexrelease", message_type=Flexrelease
+                action_topic="/right_gripper/flexrelease",
+                command=GriplinkCommand.FLEXRELEASE,
             ),
         }
 
@@ -266,6 +292,11 @@ class DAiSyRightGripper(
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
+        """
+        The gripper stands open with its fingers at the start of their travel and closed
+        where the facing surfaces of their tips meet, 28 mm along it; further travel
+        carries the fingers past each other.
+        """
         right_gripper_joints = [
             self._world.get_connection_by_name(DAiSyJoint.RIGHT_GRIPPER_FINGER),
         ]
@@ -278,7 +309,7 @@ class DAiSyRightGripper(
 
         gripper_close = JointState.from_mapping(
             name=PrefixedName("right_gripper_close", prefix=self.name.name),
-            mapping=dict(zip(right_gripper_joints, [0.04])),
+            mapping=dict(zip(right_gripper_joints, [0.028])),
             state_type=GripperState.CLOSE,
         )
 
@@ -286,11 +317,11 @@ class DAiSyRightGripper(
 
     @property
     def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+        return Vector3.Z(reference_frame=self.tool_frame)
 
     @property
     def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+        return Vector3.X(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -386,7 +417,8 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
         )
 
 
-class DAiSyCamera(Camera):
+@dataclass(eq=False)
+class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
     """
     DAiSy does not currently have a dedicated camera.
 
@@ -399,19 +431,18 @@ class DAiSyCamera(Camera):
     def setup_joint_states(self) -> list[JointState]:
         return []
 
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
-
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_link"
+            root=cls.create_optical_body(
+                robot_root._world.get_body_in_branch_by_name(robot_root, "camera_link"),
+                HomogeneousTransformationMatrix(),
             ),
-            field_of_view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
+            ),
             minimal_height=1.4,
             maximal_height=1.4,
             default_camera=True,

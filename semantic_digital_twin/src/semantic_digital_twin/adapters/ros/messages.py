@@ -40,7 +40,7 @@ class MetaData(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             node_name=data["node_name"],
             process_id=data["process_id"],
@@ -201,7 +201,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         state = data.get(SnapshotField.STATE, {})
         return cls(
             modifications=[

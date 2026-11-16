@@ -1,0 +1,81 @@
+# Labels that actions/labeler adds to a pull request from the files it changes.
+# Every key is an existing repository label; the labeler does not create labels.
+
+# %% packages
+
+Giskard:
+  - changed-files:
+      - any-glob-to-any-file: ['giskardpy/**', 'test/giskardpy_test/**']
+
+semDT:
+  - changed-files:
+      - any-glob-to-any-file: ['semantic_digital_twin/**', 'test/semantic_digital_twin_test/**']
+
+KRROOD:
+  - changed-files:
+      - any-glob-to-any-file: ['krrood/**', 'test/krrood_test/**']
+
+CoraPlex:
+  - changed-files:
+      - any-glob-to-any-file: ['coraplex/**', 'test/coraplex_test/**', 'test/pycram_test/**']
+
+Robokudo:
+  - changed-files:
+      - any-glob-to-any-file: ['robokudo/**', 'test/robokudo_test/**']
+
+Segmind:
+  - changed-files:
+      - any-glob-to-any-file: ['segmind/**', 'test/segmind_test/**']
+
+Experiment:
+  - changed-files:
+      - any-glob-to-any-file: ['experiments/**', 'test/experiments_test/**']
+
+Probabilistic_model:
+  - changed-files:
+      - any-glob-to-any-file: ['probabilistic_model/**', 'test/probabilistic_model_test/**']
+
+cramera:
+  - changed-files:
+      - any-glob-to-any-file: ['cramera/**', 'test/cramera_test/**']
+
+Cramph:
+  - changed-files:
+      - any-glob-to-any-file: ['cramph/**', 'test/cramph_test/**']
+
+Multiverse:
+  - changed-files:
+      - any-glob-to-any-file: ['multiverse_simulators/**', 'test/multiverse_simulators_test/**']
+
+# %% topics across packages
+
+mujoco:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*mujoco*', '**/*mujoco*/**']
+
+Causal:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*causal*', '**/*causal*/**']
+
+# a single changed file has to match every glob, so agent instructions and test data never count as documentation
+documentation:
+  - changed-files:
+      - all-globs-to-any-file: ['{doc/**,*/doc/**,**/*.md,**/*.rst}', '!AGENTS.md', '!CLAUDE.md', '!.claude/**', '!test/**']
+
+# %% repository tooling
+
+dev-tools:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'scripts/**'
+          - '.pre-commit-config.yaml'
+          - '.pre-commit-hooks.yaml'
+          - 'pyproject.toml'
+          - 'pytest.ini'
+          - 'test/conftest.py'
+          - 'test/orm_interface_build.py'
+
+agents:
+  - changed-files:
+      - any-glob-to-any-file: ['AGENTS.md', 'CLAUDE.md', 'agent_rules.py', '.claude/**']

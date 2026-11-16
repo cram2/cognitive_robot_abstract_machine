@@ -36,7 +36,7 @@ def test_a_referenced_object_is_written_as_its_reference(element):
 
     data = to_json(create_element_in_every_position(element), **writer.create_kwargs())
 
-    assert data["direct"] == writer.write_reference(element)
+    assert data["direct"] == writer.write_reference(obj=element)
 
 
 def test_every_position_refers_to_the_object_the_reader_has(element):
@@ -51,7 +51,7 @@ def test_every_position_refers_to_the_object_the_reader_has(element):
         )
     )
     tracker = ReaderOwnedElementTracker()
-    tracker.add(element.key, element)
+    tracker.add(key=element.key, tracked_object=element)
 
     result = from_json(data, **tracker.create_kwargs())
 
@@ -72,5 +72,10 @@ def test_a_reference_writer_is_found_only_for_its_referenced_type(element):
     writer = ReaderOwnedElementReferenceWriter()
     kwargs = writer.create_kwargs()
 
-    assert ReferenceWriter.find_for(element, kwargs) is writer
-    assert ReferenceWriter.find_for(ElementHolder(element=element), kwargs) is None
+    assert ReferenceWriter.find_for(obj=element, to_json_kwargs=kwargs) is writer
+    assert (
+        ReferenceWriter.find_for(
+            obj=ElementHolder(element=element), to_json_kwargs=kwargs
+        )
+        is None
+    )

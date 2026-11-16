@@ -5,14 +5,14 @@ import signal
 import subprocess
 import sys
 import time
+from contextlib import ExitStack, contextmanager
 from importlib.resources import files
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typing_extensions import Any, Iterator
 
-# Mock PyQt5 and ROS 2 before importing the tool
-sys.modules["giskardpy.middleware.ros2"] = MagicMock()
-sys.modules["giskardpy.middleware.ros2.rospy"] = MagicMock()
+from krrood.patterns.called_positionally import called_positionally
 
 # Mock PyQt5
 QtWidgets = MagicMock()
@@ -22,18 +22,23 @@ class MockQWidget:
     def __init__(self, *args, **kwargs):
         pass
 
+    @called_positionally
     def setLayout(self, layout):
         pass
 
+    @called_positionally
     def setWindowTitle(self, title):
         pass
 
+    @called_positionally
     def setMinimumSize(self, w, h):
         pass
 
+    @called_positionally
     def setCentralWidget(self, widget):
         pass
 
+    @called_positionally
     def setDisabled(self, active):
         pass
 
@@ -51,11 +56,37 @@ QtWidgets.QLabel = MockQWidget
 QtWidgets.QFrame = MockQWidget
 QtWidgets.QScrollArea = MockQWidget
 
-sys.modules["PyQt5"] = MagicMock()
-sys.modules["PyQt5.QtCore"] = MagicMock()
-sys.modules["PyQt5.QtCore"].Qt = MagicMock()
-sys.modules["PyQt5.QtGui"] = MagicMock()
-sys.modules["PyQt5.QtWidgets"] = QtWidgets
+
+@contextmanager
+def substituted_modules(substitutes: dict[str, Any]) -> Iterator[None]:
+    """
+    Makes imports of the given module names resolve to their substitutes inside the
+    block, and to what they resolved to before once it is left.
+
+    A submodule of a package that is imported already is also substituted as the
+    attribute of that package, which ``from package import submodule`` reads first.
+
+    :param substitutes: The substitute of each module name.
+    """
+    replaced_modules = {
+        name: sys.modules[name] for name in substitutes if name in sys.modules
+    }
+    with ExitStack() as package_attributes:
+        for name, substitute in substitutes.items():
+            package_name, _, attribute = name.rpartition(".")
+            if package_name in sys.modules and package_name not in substitutes:
+                package_attributes.enter_context(
+                    patch.object(
+                        sys.modules[package_name], attribute, substitute, create=True
+                    )
+                )
+        sys.modules.update(substitutes)
+        try:
+            yield
+        finally:
+            for name in substitutes:
+                del sys.modules[name]
+            sys.modules.update(replaced_modules)
 
 
 # Import the tool
@@ -70,7 +101,18 @@ def import_tool(path):
 tool_path = os.path.abspath(
     files("giskardpy").joinpath("../../scripts/ros2-tools/collision_matrix_tool.py")
 )
-tool = import_tool(tool_path)
+# Mock PyQt5 and ROS 2 only while importing the tool
+with substituted_modules(
+    {
+        "giskardpy.middleware.ros2": MagicMock(),
+        "semantic_digital_twin.adapters.ros.background_node": MagicMock(),
+        "PyQt5": MagicMock(),
+        "PyQt5.QtCore": MagicMock(),
+        "PyQt5.QtGui": MagicMock(),
+        "PyQt5.QtWidgets": QtWidgets,
+    }
+):
+    tool = import_tool(tool_path)
 from collision_matrix_tool import SelfCollisionMatrixInterface, DisableCollisionReason
 
 STARTUP_TIMEOUT_SECONDS = 120
@@ -112,7 +154,7 @@ def test_load_urdf(interface):
     pr2_xacro_path = (
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     )
-    interface.load_urdf(pr2_xacro_path)
+    interface.load_urdf(urdf_path=pr2_xacro_path)
     assert len(interface.world.bodies) > 0
 
 
@@ -127,14 +169,16 @@ def test_add_remove_pair(interface):
         mock_cc.return_value.body_a = body_a
         mock_cc.return_value.body_b = body_b
 
-        interface.add_pair(body_a, body_b, DisableCollisionReason.Never)
+        interface.add_pair(
+            body_a=body_a, body_b=body_b, reason=DisableCollisionReason.Never
+        )
         assert (
-            interface.get_reason_for_pair(body_a, body_b)
+            interface.get_reason_for_pair(body_a=body_a, body_b=body_b)
             == DisableCollisionReason.Never
         )
 
-        interface.remove_pair(body_a, body_b)
-        assert interface.get_reason_for_pair(body_a, body_b) is None
+        interface.remove_pair(body_a=body_a, body_b=body_b)
+        assert interface.get_reason_for_pair(body_a=body_a, body_b=body_b) is None
 
 
 def test_compute_self_collision_matrix(interface):
@@ -153,14 +197,14 @@ def test_disable_enable_body(interface):
     interface.self_collision_matrix_rule = MagicMock()
 
     interface.remove_body(
-        body
+        body=body
     )  # Implementation: adds to allowed_collision_bodies (disables it)
     interface.self_collision_matrix_rule.allowed_collision_bodies.add.assert_called_with(
         body
     )
 
     interface.add_body(
-        body
+        body=body
     )  # Implementation: discards from allowed_collision_bodies (enables it)
     interface.self_collision_matrix_rule.allowed_collision_bodies.discard.assert_called_with(
         body
@@ -212,7 +256,7 @@ def test_load_urdf_and_compute_srdf_pr2(interface):
     pr2_xacro_path = (
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     )
-    interface.load_urdf(pr2_xacro_path)
+    interface.load_urdf(urdf_path=pr2_xacro_path)
     assert len(interface.world.bodies) > 0
 
     progess_mock = MagicMock()

@@ -1,17 +1,17 @@
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from uuid import UUID
 
 import matplotlib
 import numpy as np
 
-from giskardpy.utils.utils import create_path
 
 # Force non-interactive backend to avoid GUI backend requirements in headless/test environments.
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
     WorldState,
@@ -387,6 +387,6 @@ class WorldStateTrajectoryPlotter:
 
         if self.legend:
             self._create_legend(figure, axes)
-        create_path(file_name)
+        Path(file_name).parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name)
         plt.close()

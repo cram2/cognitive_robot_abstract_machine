@@ -23,10 +23,9 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.contact import ContactParameters
 from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint, HSRBSpringJoint
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -98,14 +97,25 @@ def _hold_the_arm_out_sideways(hsrb: HSRB) -> dict[str, float]:
 # %% the hand's states
 
 
-def test_the_open_hand_spreads_its_fingers_as_far_as_the_hand_motor_turns(hsrb):
-    hand_motor = hsrb._world.get_connection_by_name(HSRBJoint.HAND_MOTOR)
+def test_the_open_hand_turns_its_motor_and_both_springs_to_their_upper_limits(
+    hsrb,
+) -> None:
+    world = hsrb._world
+    motor_and_springs = [
+        world.get_connection_by_name(joint_name)
+        for joint_name in [
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        ]
+    ]
 
     opened = hsrb.end_effector.get_joint_state_by_type(GripperState.OPEN)
 
-    assert opened.target_values == [hand_motor.raw_dof.limits.upper.position] * len(
-        opened.connections
-    )
+    assert dict(zip(opened.connections, opened.target_values)) == {
+        connection: connection.raw_dof.limits.upper.position
+        for connection in motor_and_springs
+    }
 
 
 # %% the servos the HSRB declares
@@ -127,7 +137,11 @@ def test_every_commanded_joint_the_hand_and_the_drive_are_driven_by_one_servo(hs
     }
     hand = {
         world.get_connection_by_name(joint_name).raw_dof
-        for joint_name in [HSRBJoint.HAND_MOTOR, *HSRBSpringJoint]
+        for joint_name in [
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        ]
     }
 
     def driven_by(servo_type: type) -> list[str]:
@@ -288,8 +302,8 @@ def test_the_arm_comes_to_rest_held_out_sideways(hsrb):
 
 def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
     """
-    Hold the hand out level in front of the HSRB, open, and stand a carton on a
-    support between its fingers, as a front grasp finds an object on a table.
+    Hold the hand out level in front of the HSRB, open, and stand a carton on a support
+    between its fingers, as a front grasp finds an object on a table.
 
     :param carton_scale: The carton's width, depth and height.
     :return: The carton.
@@ -358,8 +372,8 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
 )
 def test_the_closed_hand_keeps_a_carton_while_the_arm_lifts_it(hsrb):
     """
-    MuJoCo's default friction cone lets a held object slide out under its own weight,
-    so the simulation resolves friction exactly, as a demo carrying objects does.
+    MuJoCo's default friction cone lets a held object slide out under its own weight, so
+    the simulation resolves friction exactly, as a demo carrying objects does.
     """
     carton = _carton_between_the_open_fingers(hsrb, Scale(0.06, 0.06, 0.2))
     lift = 0.15
@@ -432,6 +446,44 @@ def test_the_drive_moves_the_base_at_the_commanded_velocity(hsrb):
         simulation.stop_simulation()
 
     assert reached == pytest.approx((0.4, -0.2, 0.0), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_floor_the_wheels_stand_on_does_not_hold_the_base_back(hsrb):
+    """
+    The drive holds its base at its height, so the floor cannot carry the base and would
+    only drag it: the base gets as far as without a floor to collide with.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+    with world.modify_world():
+        Floor.create_with_new_body_from_polytope_in_world(
+            name="floor",
+            world=world,
+            floor_polytope=[
+                Point3(-3, -3, 0),
+                Point3(3, -3, 0),
+                Point3(3, 3, 0),
+                Point3(-3, 3, 0),
+            ],
+        )
+    hsrb_on_the_floor = RobotSpecification(HSRB).spawn(world)
+
+    reached = []
+    for robot in (hsrb, hsrb_on_the_floor):
+        simulation = MujocoSim(world=robot._world, headless=True)
+        simulation.start_stepped_simulation()
+        try:
+            _drive_at(simulation, robot, (0.2, -0.1, 0.0), timedelta(seconds=2))
+            reached.append(_simulated_base_pose(simulation, robot))
+        finally:
+            simulation.stop_simulation()
+    reached_without_a_floor, reached_on_the_floor = reached
+
+    assert reached_on_the_floor == pytest.approx(reached_without_a_floor, abs=0.005)
 
 
 @pytest.mark.skipif(

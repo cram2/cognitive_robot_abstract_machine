@@ -1,0 +1,13 @@
+[project]
+name = "Beta"
+dynamic = ["version"]
+dependencies = [
+    "alpha ; sys_platform == 'linux'",
+    "beta",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "beta._version.__version__"}

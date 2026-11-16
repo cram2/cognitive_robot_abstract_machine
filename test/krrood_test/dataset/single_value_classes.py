@@ -19,7 +19,7 @@ import numpy as np
 # %% standard library values with a native SQL type
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredDate:
     """
     Holds a calendar date.
@@ -31,7 +31,7 @@ class StoredDate:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredTime:
     """
     Holds a time of day.
@@ -43,7 +43,7 @@ class StoredTime:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredTimedelta:
     """
     Holds a duration.
@@ -55,7 +55,7 @@ class StoredTimedelta:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredDecimal:
     """
     Holds an exact decimal number.
@@ -70,7 +70,7 @@ class StoredDecimal:
 # %% standard library values stored through a custom type
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredDateTime:
     """
     Holds a point in time, with or without a timezone.
@@ -82,7 +82,7 @@ class StoredDateTime:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredTimezone:
     """
     Holds a fixed-offset timezone.
@@ -94,7 +94,7 @@ class StoredTimezone:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredZoneInfo:
     """
     Holds an IANA timezone.
@@ -106,7 +106,7 @@ class StoredZoneInfo:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredPurePath:
     """
     Holds a path that is not bound to the file system.
@@ -118,7 +118,7 @@ class StoredPurePath:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredIPv4Address:
     """
     Holds an IPv4 address.
@@ -130,7 +130,7 @@ class StoredIPv4Address:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredIPv6Address:
     """
     Holds an IPv6 address.
@@ -142,7 +142,7 @@ class StoredIPv6Address:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredIPv4Network:
     """
     Holds an IPv4 network.
@@ -154,7 +154,7 @@ class StoredIPv4Network:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredIPv6Network:
     """
     Holds an IPv6 network.
@@ -166,7 +166,7 @@ class StoredIPv6Network:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredFraction:
     """
     Holds a rational number.
@@ -178,7 +178,7 @@ class StoredFraction:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredComplex:
     """
     Holds a complex number.
@@ -190,7 +190,7 @@ class StoredComplex:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredByteArray:
     """
     Holds a mutable byte sequence.
@@ -202,7 +202,7 @@ class StoredByteArray:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredRange:
     """
     Holds a range of integers.
@@ -214,7 +214,7 @@ class StoredRange:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredSlice:
     """
     Holds a slice.
@@ -226,7 +226,7 @@ class StoredSlice:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredPattern:
     """
     Holds a compiled regular expression.
@@ -238,7 +238,7 @@ class StoredPattern:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredRanges:
     """
     Holds a list of ranges.
@@ -253,7 +253,7 @@ class StoredRanges:
 # %% numpy values
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredArray:
     """
     Holds a numpy array.
@@ -267,7 +267,7 @@ class StoredArray:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredFloat16:
     """
     Holds a numpy half precision float.
@@ -279,7 +279,7 @@ class StoredFloat16:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredFloat32:
     """
     Holds a numpy single precision float.
@@ -291,7 +291,7 @@ class StoredFloat32:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredFloat64:
     """
     Holds a numpy double precision float.
@@ -303,7 +303,7 @@ class StoredFloat64:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredInt8:
     """
     Holds a numpy 8 bit integer.
@@ -315,7 +315,7 @@ class StoredInt8:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredInt16:
     """
     Holds a numpy 16 bit integer.
@@ -327,7 +327,7 @@ class StoredInt16:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredInt32:
     """
     Holds a numpy 32 bit integer.
@@ -339,7 +339,7 @@ class StoredInt32:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredInt64:
     """
     Holds a numpy 64 bit integer.
@@ -351,7 +351,7 @@ class StoredInt64:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredUInt8:
     """
     Holds a numpy 8 bit unsigned integer.
@@ -363,7 +363,7 @@ class StoredUInt8:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredUInt16:
     """
     Holds a numpy 16 bit unsigned integer.
@@ -375,7 +375,7 @@ class StoredUInt16:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredUInt32:
     """
     Holds a numpy 32 bit unsigned integer.
@@ -387,7 +387,7 @@ class StoredUInt32:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredBool:
     """
     Holds a numpy boolean.
@@ -399,7 +399,7 @@ class StoredBool:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StoredDatetime64:
     """
     Holds a numpy point in time.

@@ -12,7 +12,7 @@ class Measurable(Interface):
     length: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Rod(Measurable):
     length: float
 
@@ -27,4 +27,4 @@ def test_an_interface_cannot_be_instantiated():
 
 def test_a_class_implementing_an_interface_can_be_instantiated():
     length = 2.0
-    assert Rod(length).length == length
+    assert Rod(length=length).length == length

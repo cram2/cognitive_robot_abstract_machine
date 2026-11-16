@@ -45,7 +45,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
 
     planner = QueryPlanner
 
-    def realize(self, node: Query, plan: QueryPlan) -> VerbalizationFragment:
+    def realize(self, *, node: Query, plan: QueryPlan) -> VerbalizationFragment:
         """
         The unconstrained aggregate value — *"the <aggregation> <leaf>"*; a constrained
         one adds an *"among <population> …"* scope (see :meth:`_among_population`).
@@ -56,29 +56,29 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         """
         aggregation_data = plan.aggregation_data
         if aggregation_data.leaf is None:
-            return self.context.child(aggregation_data.aggregator)
+            return self.context.child(node=aggregation_data.aggregator)
 
         aggregation_kind = Aggregations.for_aggregator(
-            type(aggregation_data.aggregator)
+            aggregator_type=type(aggregation_data.aggregator)
         )
         leaf_fragment = RoleFragment.for_attribute(
-            aggregation_data.leaf._owner_class_,
-            aggregation_data.leaf._attribute_name_,
+            owner=aggregation_data.leaf._owner_class_,
+            attribute_name=aggregation_data.leaf._attribute_name_,
             number=aggregation_kind.child_number,
         )
 
         aggregate = NounPhrase(
             head=aggregation_kind.as_fragment(),
             definiteness=Definiteness.DEFINITE,
-            modifiers=aggregation_kind.compact_complement(leaf_fragment),
+            modifiers=aggregation_kind.compact_complement(leaf=leaf_fragment),
         )
 
         if not aggregation_data.is_constrained_or_grouped:
             return aggregate
-        return self._among_population(node, plan, aggregate)
+        return self._among_population(node=node, plan=plan, aggregate=aggregate)
 
     def _among_population(
-        self, node: Query, plan: QueryPlan, aggregate: VerbalizationFragment
+        self, *, node: Query, plan: QueryPlan, aggregate: VerbalizationFragment
     ) -> VerbalizationFragment:
         """
         Build the *"among <population> …"* scope of a constrained aggregation — the source
@@ -101,7 +101,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
         """
         source = plan.aggregation_data.source
         source_fragment = (
-            self.context.child(source, number=GrammaticalNumber.PLURAL)
+            self.context.child(node=source, number=GrammaticalNumber.PLURAL)
             if source is not None
             else FallbackNouns.ENTITY.plural_fragment()
         )
@@ -111,8 +111,8 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
             source_fragment,
         ]
 
-        composer = ClauseComposer(self.context)
-        rendered = composer.restriction(plan)
+        composer = ClauseComposer(context=self.context)
+        rendered = composer.restriction(plan=plan)
         if rendered is not None:
             parts.extend(rendered.inline_modifiers)
             # This aggregate value is an inline noun phrase, so the "whose" block flattens inline.
@@ -121,7 +121,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
             if rendered.residual is not None:
                 parts += [Keywords.SUCH_THAT.as_fragment(), rendered.residual]
 
-        having = composer.having(node)
+        having = composer.having(node=node)
         if having is not None:
             parts.append(having)
 

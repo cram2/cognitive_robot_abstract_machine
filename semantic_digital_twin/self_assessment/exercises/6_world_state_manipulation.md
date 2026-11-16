@@ -28,7 +28,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import PrismaticConnection
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -60,11 +60,11 @@ root_C_slider: PrismaticConnection = ...
 world = World()
 red_box = ShapeCollection([Box(
     scale=Scale(0.1, 0.1, 0.1),
-    color=Color(1.0, 0.0, 0.0),
+    color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
 )])
 green_box = ShapeCollection([Box(
     scale=Scale(0.1, 0.1, 0.1),
-    color=Color(0.0, 1.0, 0.0),
+    color=Color.from_rgba(red=0.0, green=1.0, blue=0.0),
 )])
 root = Body(name=PrefixedName("root"), visual=red_box, collision=red_box)
 slider = Body(name=PrefixedName("slider"), visual=green_box, collision=green_box)

@@ -14,6 +14,7 @@ It supports:
 
 from __future__ import annotations
 
+# %% Imports
 import cv2
 import numpy as np
 from typing_extensions import TYPE_CHECKING
@@ -26,6 +27,8 @@ if TYPE_CHECKING:
     import cv2.typing as cv2t
     import numpy.typing as npt
     from robokudo.cas import CAS
+    from robokudo.types.cv import ColorToDepthRatio
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 
 def crop_image(image: npt.NDArray, xy: tuple, wh: tuple) -> npt.NDArray:
@@ -71,7 +74,7 @@ def get_scaled_color_image_for_depth_image(
     If the color-to-depth ratio is not 1,1, we will usually scale the color image to the
     same size the depth image has. This method will get check if a conversion is
     required and will return the correct size. This is usually called before
-    o3d.geometry.RGBDImage.create_from_color_and_depth is called, so that depth and
+    open3d.geometry.RGBDImage.create_from_color_and_depth is called, so that depth and
     color image match.
 
     :param cas: The CAS holding the color-to-depth ratio.
@@ -80,7 +83,7 @@ def get_scaled_color_image_for_depth_image(
         unchanged color_image is returned.
     :raises ColorToDepthRatioMissing: If color-to-depth ratio not set in CAS
     """
-    color_to_depth_ratio = cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
+    color_to_depth_ratio = cas.color_to_depth_ratio
 
     if color_to_depth_ratio is None:
         raise ColorToDepthRatioMissing(
@@ -334,3 +337,18 @@ def adjust_mask(mask: npt.NDArray, offset: int, fill_value: int = 0) -> npt.NDAr
         new_mask = mask
 
     return new_mask
+
+
+def project_to_color_pixels(
+    points: npt.NDArray[np.float64],
+    camera_model: PinholeCameraModel,
+    color_to_depth_ratio: ColorToDepthRatio,
+) -> npt.NDArray[np.int_]:
+    """
+    :param points: Points in front of the camera in the camera frame, one point per row.
+    :param camera_model: Calibration of the camera at depth image resolution.
+    :param color_to_depth_ratio: Scale from color to depth image resolution.
+    :return: The (x, y) color image pixel of each point, one pixel per row.
+    """
+    projected = points @ camera_model.intrinsic_matrix.T
+    return color_to_depth_ratio.color_pixels(projected[:, :2] / projected[:, 2:])

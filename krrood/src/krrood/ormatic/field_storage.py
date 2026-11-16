@@ -74,7 +74,7 @@ class FieldStorage(enum.Enum):
 # %% the field to decide on
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldToStore:
     """
     A field of a mapped class, together with the ORMatic instance whose mapped classes and
@@ -122,25 +122,25 @@ class FieldToStore:
         """
         return self.type_endpoint in self.sqlalchemy_builtins
 
-    def is_mapped(self, clazz: type) -> bool:
+    def is_mapped(self, *, clazz: type) -> bool:
         """
         :return: True if a table maps the class.
         """
         return clazz in self.ormatic.mapped_classes
 
-    def has_type_mapping(self, clazz: type) -> bool:
+    def has_type_mapping(self, *, clazz: type) -> bool:
         """
         :return: True if the type mappings give a column type for the class.
         """
         return clazz in self.ormatic.type_mappings
 
-    def has_json_serializer(self, clazz: type) -> bool:
+    def has_json_serializer(self, *, clazz: type) -> bool:
         """
         :return: True if a JSON serializer is registered for the class hierarchy.
         """
-        return JSONSerializableTypeRegistry().has_type_specific_serializer(clazz)
+        return JSONSerializableTypeRegistry().has_type_specific_serializer(clazz=clazz)
 
-    def is_stored_as_a_value(self, clazz: type) -> bool:
+    def is_stored_as_a_value(self, *, clazz: type) -> bool:
         """
         Whether values of the class are stored whole in their owner's row, so a free type
         parameter of the class leaves nothing undecided about how to store them.
@@ -148,8 +148,8 @@ class FieldToStore:
         :return: True if no table maps the class and a type mapping or a JSON serializer
             stores it.
         """
-        return not self.is_mapped(clazz) and (
-            self.has_type_mapping(clazz) or self.has_json_serializer(clazz)
+        return not self.is_mapped(clazz=clazz) and (
+            self.has_type_mapping(clazz=clazz) or self.has_json_serializer(clazz=clazz)
         )
 
     @property
@@ -165,8 +165,8 @@ class FieldToStore:
         return (
             self.wrapped_field.is_underspecified_generic
             and isclass(type_endpoint)
-            and not self.is_mapped(type_endpoint)
-            and not self.is_stored_as_a_value(type_endpoint)
+            and not self.is_mapped(clazz=type_endpoint)
+            and not self.is_stored_as_a_value(clazz=type_endpoint)
             and not any(
                 issubclass(type_endpoint, alternative_mapping.original_class())
                 for alternative_mapping in self.ormatic.alternative_mappings
@@ -197,7 +197,7 @@ class FieldStorageRule(SpecificityRule, ABC):
 
     @classmethod
     @abstractmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         """
         :param field_to_store: The field to decide on.
         :return: True if the field is stored the way this rule stands for.
@@ -205,7 +205,7 @@ class FieldStorageRule(SpecificityRule, ABC):
 
     @classmethod
     @abstractmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         """
         :param field_to_store: A field this rule applies to.
         :return: A sentence for the log saying how the field is stored.
@@ -220,11 +220,11 @@ class NotStoredRule(FieldStorageRule):
     storage = FieldStorage.NOT_STORED
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         return field_to_store.cannot_be_stored
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         if issubclass(field_to_store.type_endpoint, dict):
             return "Not storing, since dictionaries cannot be stored."
         return "Not storing the underspecified generic field."
@@ -238,14 +238,14 @@ class TypeRule(FieldStorageRule):
     storage = FieldStorage.TYPE
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         return (
             field_to_store.wrapped_field.is_type_type
             and not field_to_store.cannot_be_stored
         )
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         return "Storing as type."
 
 
@@ -257,7 +257,7 @@ class BuiltinRule(FieldStorageRule):
     storage = FieldStorage.BUILTIN
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         return (
             field_to_store.holds_a_storable_value
             and not field_to_store.wrapped_field.is_container
@@ -265,7 +265,7 @@ class BuiltinRule(FieldStorageRule):
         )
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         return "Storing as builtin type."
 
 
@@ -277,15 +277,15 @@ class ManyToOneRule(FieldStorageRule):
     storage = FieldStorage.MANY_TO_ONE
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         return (
             field_to_store.holds_a_storable_value
             and not field_to_store.wrapped_field.is_container
-            and field_to_store.is_mapped(field_to_store.type_endpoint)
+            and field_to_store.is_mapped(clazz=field_to_store.type_endpoint)
         )
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         return "Storing as many to one relationship."
 
 
@@ -297,16 +297,16 @@ class ManyToManyRule(FieldStorageRule):
     storage = FieldStorage.MANY_TO_MANY
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         return (
             field_to_store.holds_a_storable_value
             and field_to_store.wrapped_field.is_container
             and not field_to_store.wrapped_field.is_optional
-            and field_to_store.is_mapped(field_to_store.type_endpoint)
+            and field_to_store.is_mapped(clazz=field_to_store.type_endpoint)
         )
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         return "Storing as many to many relationship."
 
 
@@ -318,58 +318,60 @@ class CustomTypeRule(FieldStorageRule):
     storage = FieldStorage.CUSTOM_TYPE
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         type_endpoint = field_to_store.type_endpoint
         return (
             field_to_store.holds_a_storable_value
             and not field_to_store.wrapped_field.is_container
             and not field_to_store.holds_a_sqlalchemy_builtin
-            and not field_to_store.is_mapped(type_endpoint)
-            and field_to_store.has_type_mapping(type_endpoint)
+            and not field_to_store.is_mapped(clazz=type_endpoint)
+            and field_to_store.has_type_mapping(clazz=type_endpoint)
         )
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         column_type = field_to_store.ormatic.type_mappings[field_to_store.type_endpoint]
         return f"Storing as custom type {column_type.__name__}."
 
 
 class JSONRule(FieldStorageRule):
     """
-    Values that krrood's JSON serializer writes: collections of builtins or of mapped
-    types, and values or collections of a type with a JSON serializer of its own.
+    Values that krrood's JSON serializer writes: collections of builtins, of classes or
+    of mapped types, and values or collections of a type with a JSON serializer of its
+    own.
     """
 
     storage = FieldStorage.JSON
 
     @classmethod
-    def applies(cls, field_to_store: FieldToStore) -> bool:
+    def applies(cls, *, field_to_store: FieldToStore) -> bool:
         type_endpoint = field_to_store.type_endpoint
         if not field_to_store.holds_a_storable_value or field_to_store.is_mapped(
-            type_endpoint
+            clazz=type_endpoint
         ):
             return False
         if field_to_store.wrapped_field.is_container:
             return (
                 field_to_store.wrapped_field.is_collection_of_builtins
-                or field_to_store.has_type_mapping(type_endpoint)
-                or field_to_store.has_json_serializer(type_endpoint)
+                or field_to_store.wrapped_field.is_collection_of_types
+                or field_to_store.has_type_mapping(clazz=type_endpoint)
+                or field_to_store.has_json_serializer(clazz=type_endpoint)
             )
         return (
             not field_to_store.holds_a_sqlalchemy_builtin
-            and not field_to_store.has_type_mapping(type_endpoint)
-            and field_to_store.has_json_serializer(type_endpoint)
+            and not field_to_store.has_type_mapping(clazz=type_endpoint)
+            and field_to_store.has_json_serializer(clazz=type_endpoint)
         )
 
     @classmethod
-    def describe(cls, field_to_store: FieldToStore) -> str:
+    def describe(cls, *, field_to_store: FieldToStore) -> str:
         return "Storing as JSON."
 
 
 # %% classification
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldClassifier:
     """
     Decides how each field is stored by asking the :class:`FieldStorageRule` family.
@@ -380,17 +382,17 @@ class FieldClassifier:
     The ORMatic instance whose mapped classes and type mappings the rules consult.
     """
 
-    def classify(self, wrapped_field: WrappedField) -> FieldStorage:
+    def classify(self, *, wrapped_field: WrappedField) -> FieldStorage:
         """
         :param wrapped_field: The field to decide on.
         :return: How the field is stored, or :attr:`FieldStorage.NOT_STORED` if no rule
             applies.
         :raises AmbiguousRuleError: If more than one rule applies.
         """
-        field_to_store = FieldToStore(wrapped_field, self.ormatic)
-        rule = FieldStorageRule.most_applicable(field_to_store)
+        field_to_store = FieldToStore(wrapped_field=wrapped_field, ormatic=self.ormatic)
+        rule = FieldStorageRule.most_applicable(field_to_store=field_to_store)
         if rule is None:
             logger.info("Not storing, since no rule handles the field's type.")
             return FieldStorage.NOT_STORED
-        logger.info(rule.describe(field_to_store))
+        logger.info(rule.describe(field_to_store=field_to_store))
         return rule.storage

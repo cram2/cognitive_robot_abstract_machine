@@ -26,7 +26,7 @@ from krrood.entity_query_language.verbalization.navigation_path import build_pat
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Container:
     """
     A thing whose geometry and capacity are computed by methods rather than stored in

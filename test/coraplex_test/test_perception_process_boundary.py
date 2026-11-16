@@ -102,7 +102,7 @@ def test_detection_crosses_a_process_boundary(
     A pipeline that shares no interpreter state with the test is discovered through the
     middleware alone, and what it reports arrives intact.
     """
-    world, view, context = pr2_apartment_context
+    world, view, extensions = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
@@ -123,7 +123,7 @@ def test_absent_perception_source_is_reported(
     block forever or return an empty result that reads like "saw nothing".
     """
     pytest.importorskip("robokudo_msgs")
-    world, view, context = pr2_apartment_context
+    world, view, extensions = pr2_apartment_context
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
     with pytest.raises(PerceptionSourceUnavailable):
@@ -139,7 +139,7 @@ def test_untyped_detection_crosses_a_process_boundary(
     The shape the real Stretch engine produces: a pipeline in another process that
     localizes without recognizing, so the annotation has to come from what was asked for.
     """
-    world, view, context = pr2_apartment_context
+    world, view, extensions = pr2_apartment_context
     pipeline_process_reporting("")
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 

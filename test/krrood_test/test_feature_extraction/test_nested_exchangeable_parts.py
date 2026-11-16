@@ -149,7 +149,7 @@ def test_a_nested_query_samples_back_into_an_instance(
         ),
         number_of_samples=1,
     )
-    sampled = next(iter(backend.evaluate(nested_query)))
+    sampled = next(iter(backend.evaluate(expression=nested_query)))
     assert len(sampled.rooms) == 2
     for room in sampled.rooms:
         assert len(room.objects) == 2
@@ -270,7 +270,7 @@ def test_three_level_query_samples_back_into_an_instance(
         ),
         number_of_samples=1,
     )
-    sampled = next(iter(backend.evaluate(three_level_query)))
+    sampled = next(iter(backend.evaluate(expression=three_level_query)))
     assert len(sampled.floors) == 2
     for floor in sampled.floors:
         assert len(floor.rooms) == 2

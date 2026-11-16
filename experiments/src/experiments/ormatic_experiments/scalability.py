@@ -18,7 +18,7 @@ import plotly.graph_objects as go
 import tqdm
 
 import coraplex.orm.ormatic_interface  # type: ignore
-import coraplex.plans.underspecified
+from cramph.composites import StatementNode
 import semantic_digital_twin  # type: ignore
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -35,7 +35,7 @@ from krrood.ormatic.helper import (
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.type_dict import TypeDict
 from krrood.utils import recursive_subclasses
-from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.robot_plans.actions.base import Action
 
 
 def build_cram_class_sets() -> tuple[set[type], list[type], dict]:
@@ -223,15 +223,15 @@ def _ormatic_scalability_experiment(
     begin = time.perf_counter()
 
     class_diagram = ClassDiagram(
-        list(sorted(filtered_classes, key=lambda c: c.__name__, reverse=True))
+        classes=list(sorted(filtered_classes, key=lambda c: c.__name__, reverse=True))
     )
 
     class_diagram_creation_time = time.perf_counter()
 
     ormatic = ORMatic(
-        class_diagram,
+        class_dependency_graph=class_diagram,
         interface_information=OrmaticInterfaceInformation(
-            type_mappings=TypeDict(type_mappings),
+            type_mappings=TypeDict(_dict=type_mappings),
             alternative_mappings=alternative_mappings,
         ),
     )
@@ -240,7 +240,7 @@ def _ormatic_scalability_experiment(
     ormatic_reasoning_time = time.perf_counter()
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py") as f:
-        ormatic.to_sqlalchemy_file(f)
+        ormatic.to_sqlalchemy_file(file=f)
 
     writing_to_file_time = time.perf_counter()
 
@@ -382,10 +382,7 @@ def plot_scalability(table: ExperimentsTable) -> go.Figure:
 
 def main():
     classes, alternative_mappings, type_mappings = build_cram_class_sets()
-    required_classes = [
-        coraplex.plans.underspecified.UnderspecifiedNode,
-        ActionDescription,
-    ]
+    required_classes = [StatementNode, Action]
     results = []
     for class_drop_probability in tqdm.tqdm(
         [

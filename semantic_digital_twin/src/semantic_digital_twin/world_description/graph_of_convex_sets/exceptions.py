@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 from semantic_digital_twin.exceptions import UsageError
-from semantic_digital_twin.spatial_types import Point
+from krrood_spatial_math.spatial_types import Point
 from semantic_digital_twin.world_description.geometry import AxisAlignedBox
 
 

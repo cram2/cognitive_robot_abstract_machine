@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .annotation_only_referenced_type import TypeReferencedOnlyInAnnotations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassWithTypeCheckingOnlyAnnotation:
     """
     A dataclass whose field type is available only under ``TYPE_CHECKING``.

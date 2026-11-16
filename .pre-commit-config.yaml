@@ -10,9 +10,27 @@ repos:
         language: system
         types: [python]
         exclude: (?x)^(.*/ormatic_interface\.py|test/krrood_test/test_development_tools/dataset/.*)$
+      - id: krrood-check
+        name: Check the staged code against the rules that have a checker
+        entry: krrood check
+        language: system
+        types: [python]
+        exclude: (?x)^(.*/ormatic_interface\.py|test/krrood_test/test_development_tools/dataset/.*)$
       - id: krrood-agents-md
         name: Update the rules in AGENTS.md
         entry: krrood agents-md
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: krrood-skills
+        name: Update the generated skills
+        entry: krrood skills
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: sync-version
+        name: Sync VERSION into every package and its workspace dependency bounds
+        entry: python scripts/sync_version.py
         language: system
         pass_filenames: false
         always_run: true

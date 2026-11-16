@@ -12,7 +12,7 @@ from semantic_digital_twin.world_description.geometry import Color
 
 def test_a_hex_string_names_one_channel_per_pair_of_digits():
     color = Color.from_hex("#4080C0")
-    assert color.to_rgb() == (0x40 / 255, 0x80 / 255, 0xC0 / 255)
+    assert color.to_rgb() == pytest.approx((0x40 / 255, 0x80 / 255, 0xC0 / 255))
 
 
 def test_a_hex_string_without_an_alpha_pair_is_fully_opaque():

@@ -85,8 +85,10 @@ def test_concurrent_jacobians_over_shared_variables_stay_correct():
         power = thread_index + 1
         try:
             expression = (x**power) * y + x * y
-            jacobian = expression.jacobian([x, y])
-            compiled = jacobian.compile(sm.VariableParameters.from_lists([x, y]))
+            jacobian = expression.jacobian(variables=[x, y])
+            compiled = jacobian.compile(
+                parameters=sm.VariableParameters.from_lists([x, y])
+            )
             result = compiled(np.array([x_value, y_value]))
             expected_dx = power * x_value ** (power - 1) * y_value + y_value
             expected_dy = x_value**power + x_value
@@ -126,7 +128,7 @@ def test_concurrent_calls_to_a_shared_compiled_function_are_correct():
     thread can no longer observe another thread's in-flight input or result.
     """
     x = sm.FloatVariable(name="shared_compiled_function_x")
-    compiled = (x * x).compile(sm.VariableParameters.from_lists([x]))
+    compiled = (x * x).compile(parameters=sm.VariableParameters.from_lists([x]))
     thread_count = 16
     calls_per_thread = 50
     errors: list[BaseException] = []

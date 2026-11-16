@@ -66,4 +66,4 @@ Source documentation is located in the `doc` directory. Instructions for buildin
 
 ## Examples
 
-Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/language.html).
+Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/plan.html).

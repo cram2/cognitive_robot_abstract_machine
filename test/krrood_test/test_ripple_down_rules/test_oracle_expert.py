@@ -23,7 +23,7 @@ class AnimalClass(Enum):
     arachnid = "arachnid"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Animal:
     """
     A minimal case mimicking a real-world animal entity with a mix of simple attributes,
@@ -36,7 +36,7 @@ class Animal:
     animal_class: AnimalClass | None = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RuleWithCornerCase:
     """
     A minimal stand-in for a ripple-down-rule node, carrying only the one field
@@ -47,18 +47,25 @@ class RuleWithCornerCase:
 
 
 def make_case_query(case: Animal, target: AnimalClass) -> CaseQuery:
-    return CaseQuery(case, "animal_class", (AnimalClass,), True, _target=target)
+    return CaseQuery(
+        original_case=case,
+        attribute_name="animal_class",
+        _attribute_types=(AnimalClass,),
+        mutually_exclusive=True,
+        _target=target,
+    )
 
 
 class TestOracleBuildsAConditionTrueForTheCaseAndFalseForTheCornerCase:
-
     def test_condition_is_true_for_the_case_and_false_for_the_corner_case(self):
         case = Animal(name="dog", has_fur=True, leg_count=4)
         corner_case = Animal(name="parrot", has_fur=False, leg_count=2)
         case_query = make_case_query(case, target=AnimalClass.mammal)
         last_evaluated_rule = RuleWithCornerCase(corner_case=corner_case)
 
-        condition = Oracle().ask_for_conditions(case_query, last_evaluated_rule)
+        condition = Oracle().ask_for_conditions(
+            case_query=case_query, last_evaluated_rule=last_evaluated_rule
+        )
 
         assert condition(case) is True
         assert condition(corner_case) is False
@@ -69,7 +76,9 @@ class TestOracleBuildsAConditionTrueForTheCaseAndFalseForTheCornerCase:
         case_query = make_case_query(case, target=AnimalClass.mammal)
         last_evaluated_rule = RuleWithCornerCase(corner_case=corner_case)
 
-        condition = Oracle().ask_for_conditions(case_query, last_evaluated_rule)
+        condition = Oracle().ask_for_conditions(
+            case_query=case_query, last_evaluated_rule=last_evaluated_rule
+        )
 
         assert "case.name" in condition.user_input
 
@@ -83,25 +92,27 @@ class TestOracleBuildsAConditionTrueForTheCaseAndFalseForTheCornerCase:
         case_query = make_case_query(case, target=AnimalClass.mammal)
         last_evaluated_rule = RuleWithCornerCase(corner_case=corner_case)
 
-        condition = Oracle().ask_for_conditions(case_query, last_evaluated_rule)
+        condition = Oracle().ask_for_conditions(
+            case_query=case_query, last_evaluated_rule=last_evaluated_rule
+        )
 
         assert "case.animal_class" not in condition.user_input
         assert "case.name" in condition.user_input
 
 
 class TestOracleReturnsAnUnconditionalRuleWithNoCornerCase:
-
     def test_returns_an_unconditional_rule_when_no_rule_was_evaluated_yet(self):
         case = Animal(name="dog", has_fur=True, leg_count=4)
         case_query = make_case_query(case, target=AnimalClass.mammal)
 
-        condition = Oracle().ask_for_conditions(case_query, last_evaluated_rule=None)
+        condition = Oracle().ask_for_conditions(
+            case_query=case_query, last_evaluated_rule=None
+        )
 
         assert condition(case) is True
 
 
 class TestOracleRaisesWhenNoAttributeDistinguishesTheCaseFromItsCornerCase:
-
     def test_raises_when_the_case_and_corner_case_are_identical(self):
         case = Animal(name="dog", has_fur=True, leg_count=4)
         corner_case = Animal(name="dog", has_fur=True, leg_count=4)
@@ -109,29 +120,34 @@ class TestOracleRaisesWhenNoAttributeDistinguishesTheCaseFromItsCornerCase:
         last_evaluated_rule = RuleWithCornerCase(corner_case=corner_case)
 
         with pytest.raises(NoDistinguishingAttributeFound):
-            Oracle().ask_for_conditions(case_query, last_evaluated_rule)
+            Oracle().ask_for_conditions(
+                case_query=case_query, last_evaluated_rule=last_evaluated_rule
+            )
 
 
 class TestOracleNeverGuessesAConclusion:
-
     def test_returns_the_known_target_as_the_conclusion(self):
         case = Animal(name="dog", has_fur=True, leg_count=4)
         case_query = make_case_query(case, target=AnimalClass.mammal)
 
-        conclusion = Oracle().ask_for_conclusion(case_query)
+        conclusion = Oracle().ask_for_conclusion(case_query=case_query)
 
         assert conclusion(case) == AnimalClass.mammal
 
     def test_raises_when_the_case_query_has_no_known_target(self):
         case = Animal(name="dog", has_fur=True, leg_count=4)
-        case_query = CaseQuery(case, "animal_class", (AnimalClass,), True)
+        case_query = CaseQuery(
+            original_case=case,
+            attribute_name="animal_class",
+            _attribute_types=(AnimalClass,),
+            mutually_exclusive=True,
+        )
 
         with pytest.raises(OracleCannotInferConclusionWithoutTarget):
-            Oracle().ask_for_conclusion(case_query)
+            Oracle().ask_for_conclusion(case_query=case_query)
 
 
 class TestOracleFitsASingleClassRDRWithoutAnyPreRecordedAnswers:
-
     def test_fits_and_classifies_a_small_multi_class_dataset(self):
         cases = [
             Animal(name="dog", has_fur=True, leg_count=4),
@@ -148,12 +164,18 @@ class TestOracleFitsASingleClassRDRWithoutAnyPreRecordedAnswers:
             AnimalClass.arachnid,
         ]
         case_queries = [
-            CaseQuery(case, "animal_class", (AnimalClass,), True, _target=target)
+            CaseQuery(
+                original_case=case,
+                attribute_name="animal_class",
+                _attribute_types=(AnimalClass,),
+                mutually_exclusive=True,
+                _target=target,
+            )
             for case, target in zip(cases, targets)
         ]
 
         scrdr = SingleClassRDR()
-        scrdr.fit(case_queries, expert=Oracle())
+        scrdr.fit(case_queries=case_queries, expert=Oracle())
 
         for case, target in zip(cases, targets):
-            assert scrdr.classify(case) == target
+            assert scrdr.classify(case=case) == target

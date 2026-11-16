@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from functools import wraps
 
+import numpy as np
+import numpy.typing as npt
 from typing_extensions import Any, Self, TYPE_CHECKING
 
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     shallow_diff_json,
     JSONAttributeDiff,
-    list_like_classes,
     JSONData,
     to_json,
     from_json,
@@ -296,18 +298,36 @@ class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
 
 @dataclass
 class RemoveDegreeOfFreedomModification(WorldModification):
+    """
+    Removal of a degree of freedom from the world.
+    """
 
     degree_of_freedom_id: UUID
+    """
+    The UUID of the degree of freedom that was removed.
+    """
 
     degree_of_freedom: DegreeOfFreedom | None = field(default=None, repr=False)
     """
     The degree of freedom that was removed, kept so this modification can be reverted.
     """
 
+    state_before_removal: npt.NDArray[np.float64] | None = field(
+        default=None, repr=False
+    )
+    """
+    The position and derivatives the degree of freedom had when it was removed, given
+    back to it when this modification is reverted.
+    """
+
     @classmethod
     def from_kwargs(cls, kwargs: dict[str, Any]):
         dof = kwargs["dof"]
-        return cls(degree_of_freedom_id=dof.id, degree_of_freedom=dof)
+        return cls(
+            degree_of_freedom_id=dof.id,
+            degree_of_freedom=dof,
+            state_before_removal=dof._world.state[dof.id].data.copy(),
+        )
 
     def apply(self, world: World):
         world.remove_degree_of_freedom(
@@ -316,6 +336,8 @@ class RemoveDegreeOfFreedomModification(WorldModification):
 
     def revert(self, world: World):
         world.add_degree_of_freedom(self.degree_of_freedom)
+        if self.state_before_removal is not None:
+            world.state[self.degree_of_freedom_id] = self.state_before_removal
 
 
 @dataclass
@@ -366,7 +388,7 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             semantic_annotation_json=data["semantic_annotation_json"],
             semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
@@ -375,7 +397,6 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
 
 @dataclass
 class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerializer):
-
     semantic_annotation_id: UUID
 
     semantic_annotation_json: JSONData | None = field(default=None)
@@ -411,7 +432,7 @@ class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerial
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
             semantic_annotation_json=data["semantic_annotation_json"],
@@ -556,9 +577,9 @@ class SetDofHasHardwareInterface(WorldModification):
 
     def apply(self, world: World):
         for dof_id in self.degree_of_freedom_ids:
-            world.get_degree_of_freedom_by_id(dof_id).has_hardware_interface = (
-                self.value
-            )
+            world.get_degree_of_freedom_by_id(
+                dof_id
+            ).has_hardware_interface = self.value
 
     def revert(self, world: World):
         dofs_by_previous_value: dict[bool, list[DegreeOfFreedom]] = {}
@@ -636,7 +657,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
         for diff in self.updated_kwargs_json_list:
             current_value = getattr(entity, diff.attribute_name)
-            if isinstance(current_value, list_like_classes):
+            if isinstance(current_value, CollectionKind.ELEMENT_SEQUENCE.value):
                 self._apply_to_list(world, current_value, diff, **kwargs)
             else:
                 obj = self._resolve_item(
@@ -676,7 +697,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         **kwargs,
     ):
         diff.apply_to_list(
-            current_value,
+            items=current_value,
             removed_items=[
                 self._resolve_item(world, from_json(raw_json, **kwargs))
                 for raw_json in diff.removed_values
@@ -705,7 +726,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             entity_id=from_json(data["entity_id"], **kwargs),
             updated_kwargs_json_list=from_json(
@@ -729,6 +750,8 @@ def synchronized_attribute_modification(func):
 
     @wraps(func)
     def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
+        if not self._world._model_manager._active_world_model_update_context_manager_ids:
+            raise MissingWorldModificationContextError(func)
 
         object_before_change = to_json(self)
         result = func(self, *args, **kwargs)
@@ -744,11 +767,6 @@ def synchronized_attribute_modification(func):
         current_model_modification_block = (
             self._world.get_world_model_manager().current_model_modification_block
         )
-        if (
-            not self._world._model_manager._active_world_model_update_context_manager_ids
-        ):
-            raise MissingWorldModificationContextError(func)
-
         current_model_modification_block.append(
             AttributeUpdateModification.from_kwargs(
                 {

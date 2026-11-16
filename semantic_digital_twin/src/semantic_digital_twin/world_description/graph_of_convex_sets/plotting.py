@@ -39,7 +39,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from typing_extensions import Iterable, Sequence, Self
 
-from semantic_digital_twin.spatial_types import Point, Point3
+from krrood_spatial_math.spatial_types import Point, Point3
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
 )
@@ -307,8 +307,7 @@ class NavigationPath:
             )
         return sum(
             float(
-                ((following.x - current.x) ** 2 + (following.y - current.y) ** 2)
-                ** 0.5
+                ((following.x - current.x) ** 2 + (following.y - current.y) ** 2) ** 0.5
             )
             for current, following in zip(self.waypoints, self.waypoints[1:])
         )

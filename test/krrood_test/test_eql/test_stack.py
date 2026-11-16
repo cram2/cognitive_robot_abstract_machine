@@ -24,7 +24,7 @@ from krrood.entity_query_language.factories import entity, inference
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Person(Symbol):
     name: str
 
@@ -35,18 +35,34 @@ class Person(Symbol):
 
 
 def test_stack_frame_is_method_true():
-    frame = StackFrame("f.py", 1, "m", None, Person, None, None)
+    frame = StackFrame(
+        filename="f.py",
+        lineno=1,
+        function_name="m",
+        code_snippet=None,
+        class_object=Person,
+        function_object=None,
+        module_name=None,
+    )
     assert frame.is_method is True
 
 
 def test_stack_frame_is_method_false():
-    frame = StackFrame("f.py", 1, "f", None, None, None, None)
+    frame = StackFrame(
+        filename="f.py",
+        lineno=1,
+        function_name="f",
+        code_snippet=None,
+        class_object=None,
+        function_object=None,
+        module_name=None,
+    )
     assert frame.is_method is False
 
 
 def test_stack_frame_from_frame_info_free_function():
     fi = inspect.stack()[0]
-    frame = StackFrame.from_frame_info(fi)
+    frame = StackFrame.from_frame_info(frame_info=fi)
 
     assert frame.function_name == "test_stack_frame_from_frame_info_free_function"
     assert frame.class_object is None
@@ -62,7 +78,7 @@ def test_stack_frame_from_frame_info_class_method():
     class Inner:
         def capture(self):
             fi = inspect.stack()[0]
-            captured.append(StackFrame.from_frame_info(fi))
+            captured.append(StackFrame.from_frame_info(frame_info=fi))
 
     Inner().capture()
 
@@ -79,7 +95,7 @@ def test_stack_frame_from_frame_info_classmethod():
         @classmethod
         def capture(cls):
             fi = inspect.stack()[0]
-            captured.append(StackFrame.from_frame_info(fi))
+            captured.append(StackFrame.from_frame_info(frame_info=fi))
 
     Inner.capture()
 
@@ -90,7 +106,7 @@ def test_stack_frame_from_frame_info_classmethod():
 
 def test_stack_frame_code_snippet_stripped():
     fi = inspect.stack()[0]
-    frame = StackFrame.from_frame_info(fi)
+    frame = StackFrame.from_frame_info(frame_info=fi)
     assert frame.code_snippet is not None
     assert frame.code_snippet == frame.code_snippet.strip()
 
@@ -115,13 +131,13 @@ def _make_frame(**kwargs) -> StackFrame:
 
 
 def test_call_stack_len():
-    stack = CallStack([_make_frame() for _ in range(5)])
+    stack = CallStack(frames=[_make_frame() for _ in range(5)])
     assert len(stack) == 5
 
 
 def test_call_stack_iter():
     frames = [_make_frame(lineno=i) for i in range(3)]
-    assert list(CallStack(frames)) == frames
+    assert list(CallStack(frames=frames)) == frames
 
 
 def test_call_stack_filter_removes_site_packages():
@@ -131,7 +147,7 @@ def test_call_stack_filter_removes_site_packages():
         ),
         _make_frame(filename="/my/project/bar.py", module_name="project.bar"),
     ]
-    filtered = CallStack(frames).filter()
+    filtered = CallStack(frames=frames).filter()
     assert len(filtered) == 1
     assert filtered.frames[0].filename == "/my/project/bar.py"
 
@@ -141,7 +157,7 @@ def test_call_stack_filter_removes_dist_packages():
         _make_frame(filename="/usr/lib/dist-packages/pkg.py"),
         _make_frame(filename="/app/mycode.py"),
     ]
-    filtered = CallStack(frames).filter()
+    filtered = CallStack(frames=frames).filter()
     assert len(filtered) == 1
 
 
@@ -150,13 +166,13 @@ def test_call_stack_filter_by_package():
         _make_frame(filename="/project/krrood/core.py"),
         _make_frame(filename="/project/tests/test_foo.py"),
     ]
-    filtered = CallStack(frames).filter(package="krrood")
+    filtered = CallStack(frames=frames).filter(package="krrood")
     assert len(filtered) == 1
     assert "krrood" in filtered.frames[0].filename
 
 
 def test_call_stack_filter_returns_new_instance():
-    stack = CallStack([_make_frame()])
+    stack = CallStack(frames=[_make_frame()])
     filtered = stack.filter()
     assert filtered is not stack
 
@@ -167,14 +183,14 @@ def test_call_stack_root_frame_in_returns_outermost():
         _make_frame(function_name="middle", module_name="mylib.high"),
         _make_frame(function_name="outermost", module_name="tests"),
     ]
-    root = CallStack(frames).root_frame_in("mylib")
+    root = CallStack(frames=frames).root_frame_in(package="mylib")
     assert root is not None
     assert root.function_name == "middle"  # last in list that matches mylib
 
 
 def test_call_stack_root_frame_in_no_match():
     frames = [_make_frame(module_name="tests")]
-    assert CallStack(frames).root_frame_in("mylib") is None
+    assert CallStack(frames=frames).root_frame_in(package="mylib") is None
 
 
 def test_call_stack_root_frame_in_none_module_name_skipped():
@@ -182,7 +198,7 @@ def test_call_stack_root_frame_in_none_module_name_skipped():
         _make_frame(module_name=None),
         _make_frame(module_name="mylib.x"),
     ]
-    root = CallStack(frames).root_frame_in("mylib")
+    root = CallStack(frames=frames).root_frame_in(package="mylib")
     assert root is not None
     assert root.module_name == "mylib.x"
 
@@ -200,7 +216,7 @@ def test_call_stack_classes_distinct_ordered():
         _make_frame(class_object=A),  # duplicate — should not appear twice
         _make_frame(class_object=None),
     ]
-    classes = CallStack(frames).classes()
+    classes = CallStack(frames=frames).classes()
     assert classes == [A, B]
 
 
@@ -216,18 +232,18 @@ def test_call_stack_functions_distinct_ordered():
         _make_frame(function_object=g),
         _make_frame(function_object=f),  # duplicate
     ]
-    fns = CallStack(frames).functions()
+    fns = CallStack(frames=frames).functions()
     assert fns == [f, g]
 
 
 def test_call_stack_is_from_method_true():
     frames = [_make_frame(), _make_frame(class_object=Person)]
-    assert CallStack(frames).is_from_method() is True
+    assert CallStack(frames=frames).is_from_method() is True
 
 
 def test_call_stack_is_from_method_false():
     frames = [_make_frame(), _make_frame()]
-    assert CallStack(frames).is_from_method() is False
+    assert CallStack(frames=frames).is_from_method() is False
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +334,7 @@ def test_root_frame_in_finds_frame_in_test_module():
     explanation = explain_inference(grace)
     assert explanation is not None
     # "test_stack" appears in the module name of frames from this file
-    root = explanation.root_frame_in("test_stack")
+    root = explanation.root_frame_in(package="test_stack")
     assert root is not None
     assert "test_stack" in root.filename
 
@@ -328,7 +344,7 @@ def test_root_frame_in_returns_none_for_unknown_package():
     hank = list(query.evaluate())[0]
     explanation = explain_inference(hank)
     assert explanation is not None
-    assert explanation.root_frame_in("nonexistent_package_xyz") is None
+    assert explanation.root_frame_in(package="nonexistent_package_xyz") is None
 
 
 def test_root_frame_in_outermost_wins():
@@ -347,7 +363,7 @@ def test_root_frame_in_outermost_wins():
     iris = list(query.evaluate())[0]
     explanation = explain_inference(iris)
     assert explanation is not None
-    root = explanation.root_frame_in("test_stack")
+    root = explanation.root_frame_in(package="test_stack")
     # The outermost test_stack frame is the test function itself, not inner()
     assert root is not None
     assert root.function_name == "test_root_frame_in_outermost_wins"

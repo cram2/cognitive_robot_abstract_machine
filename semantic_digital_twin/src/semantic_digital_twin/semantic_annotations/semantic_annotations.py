@@ -2,18 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import (
-    List,
-    Iterable,
-    Iterator,
-    Optional,
-    Self,
-    Tuple,
-    TYPE_CHECKING,
-    Union,
-)
+from typing_extensions import Iterable, Iterator, Self, TYPE_CHECKING
 
-import math
 
 import numpy as np
 
@@ -55,23 +45,22 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasSink,
     HasShelfLayers,
     HasGraspCandidates,
-    HasPinchableWall,
     HasRim,
+    HasDrawnGraspsByDefault,
 )
-from krrood.entity_query_language.factories import and_, or_
-from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGrasp,
-    any_surface_grasp,
-    from_any_side,
+from semantic_digital_twin.grasping.grasp_strategies import (
+    GraspABar,
+    GraspAcrossTheLength,
+    GraspStrategy,
+    PinchARim,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -115,42 +104,9 @@ class Handle(HasGraspCandidates):
     open or close an object.
     """
 
-    def default_grasp_candidates(self) -> list[GraspCandidate]:
-        """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
-        """
-        return self.drawn_grasp_candidates()
-
-    def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        lowest_height: float = 0.1,
-        highest_height: float = 0.9,
-        shallowest_depth: float = 0.0,
-        deepest_depth: float = 0.5,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :param lowest_height: The lowest height to grasp the handle at, as a fraction
-            of its bounding box from its bottom to its top.
-        :param highest_height: The height to grasp the handle below, as such a
-            fraction.
-        :param shallowest_depth: The least depth to close the fingers at, as a fraction
-            of the handle's thinnest extent.
-        :param deepest_depth: The depth to close the fingers short of, as such a
-            fraction.
-        :return: The handle between the two heights, closing on it between the two
-            depths.
-        """
-        thinnest_extent = float(min(self.grasp_surface().extents))
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= lowest_height,
-            grasp.height < highest_height,
-            grasp.depth >= shallowest_depth * thinnest_extent,
-            grasp.depth < deepest_depth * thinnest_extent,
-            *from_any_side(grasp),
-        )
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        return GraspABar()
 
     @classmethod
     def _create_handle_geometry(
@@ -212,6 +168,36 @@ class Handle(HasGraspCandidates):
             name, handle_event, connection_specification=connection_specification
         )
 
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        The grasps at the centre of the handle's bar that close around it, one
+        approaching from each of the four sides around it.
+
+        The bar runs along the longest extent of the root's collision geometry.
+
+        :raises NoGraspGeometry: If the root body has no collision geometry to tell
+            which way the bar runs.
+        """
+        if not self.root.has_collision():
+            raise NoGraspGeometry(self)
+        mesh = self.root.combined_mesh
+        bar_axis = np.argmax(mesh.extents)
+        bar_direction = Vector3.from_iterable(np.eye(3)[bar_axis])
+        across_bar = np.delete(np.eye(3), bar_axis, axis=0)
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    position=Point3.from_iterable(mesh.bounds.mean(axis=0)),
+                    orientation=RotationMatrix.from_vectors(
+                        x=approach, y=bar_direction.cross(approach)
+                    ).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+            for approach in map(Vector3.from_iterable, [*across_bar, *-across_bar])
+        ]
+
 
 @dataclass(eq=False)
 class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
@@ -221,6 +207,19 @@ class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
 
     It typically has a front door that opens to reveal racks for loading dirty items and
     a control panel for selecting wash cycles.
+    """
+
+    @classproperty
+    def _hole_direction_axis(cls) -> Vector3:
+        return Vector3.NEGATIVE_X()
+
+
+@dataclass(eq=False)
+class WashingMachine(HasCaseAsRootBody, HasDoors, HasDrawers):
+    """
+    A washing machine is a household appliance that washes laundry in a drum.
+
+    It typically has a front door to load the drum and a pull-out detergent drawer.
     """
 
     @classproperty
@@ -351,7 +350,7 @@ class EntryWay(Aperture):
         return RegionSpecification.box(
             name,
             scale or Scale(),
-            color=color or Color(R=1.0, G=1.0, B=1.0, A=0.2),
+            color=color or Color.from_rgba(red=1.0, green=1.0, blue=1.0, opacity=0.2),
             connection_specification=connection_specification,
         )
 
@@ -553,18 +552,6 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
         """
         return HomogeneousTransformationMatrix()
 
-    @property
-    def opening_ratio(self) -> float:
-        """
-        :return: How far this drawer stands pulled out, as a fraction of its travel.
-        """
-        if self.movable_joint is None:
-            raise MissingMovableJointError(self)
-        limits = self.movable_joint.dof.limits
-        return (self.movable_joint.position - limits.lower.position) / (
-            limits.upper.position - limits.lower.position
-        )
-
 
 @dataclass(eq=False)
 class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
@@ -675,6 +662,19 @@ class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
 
 @dataclass(eq=False)
 class Fridge(Cabinet): ...
+
+
+@dataclass(eq=False)
+class TumbleDryer(HasCaseAsRootBody, HasDoors, HasDrawers):
+    """
+    A tumble dryer is a household appliance that dries laundry in a rotating drum.
+
+    It typically has a front door to load the drum and a pull-out water tank.
+    """
+
+    @classproperty
+    def _hole_direction_axis(cls) -> Vector3:
+        return Vector3.NEGATIVE_X()
 
 
 @dataclass(eq=False)
@@ -826,7 +826,7 @@ class Wall(HasApertures):
             for door in self._world.get_semantic_annotations_by_type(Door)
             if door.entry_way
             and InsideOf(
-                door.entry_way.root, self.root, minimum_containment_ratio=0.1
+                body=door.entry_way.root, other=self.root, minimum_containment_ratio=0.1
             )()
         ]
 
@@ -1022,32 +1022,14 @@ class Plate(HasSupportingSurface, Tableware):
 
 
 @dataclass(eq=False)
-class Rim(HasPinchableWall):
+class Rim(HasDrawnGraspsByDefault):
     """
     The upper edge of an open container's wall, which a gripper pinches from above.
     """
 
-    def default_grasp_candidates(self) -> list[GraspCandidate]:
-        """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
-        """
-        return self.drawn_grasp_candidates()
-
-    def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        lowest_height: float = 0.25,
-        highest_height: float = 0.75,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param require_lifting: Whether to ask only for grasps that lift the container.
-        :param lowest_height: The lowest height to pinch the rim at, as a fraction of
-            its height.
-        :param highest_height: The height to pinch the rim below, as such a fraction.
-        :return: The rim between the two heights, pinched across its wall.
-        :raises NoGraspGeometry: If the rim has no wall to measure.
-        """
-        return self.wall_grasp_statement(lowest_height, highest_height, require_lifting)
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        return PinchARim()
 
 
 @dataclass(eq=False)
@@ -1261,7 +1243,7 @@ class Desk(Table, HasLegs):
 
 
 @dataclass(eq=False)
-class Chair(Furniture):
+class Chair(Furniture, HasRootBody):
     """
     Abstract class for chairs.
     """
@@ -1448,64 +1430,9 @@ class Cutlery(HasHandle, Tableware):
             )
         ]
 
-    def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        lowest_height: float = 0.2,
-        highest_height: float = 0.8,
-        shallowest_depth: float = 0.2,
-        deepest_depth: float = 0.6,
-        azimuth_tolerance: float = np.pi / 16,
-        largest_pitch: float = 0.6,
-        largest_roll: float = np.pi / 8,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :param lowest_height: The lowest height to grasp at, as a fraction of the grasp
-            surface's bounding box from its bottom to its top.
-        :param highest_height: The height to grasp below, as such a fraction.
-        :param shallowest_depth: The least depth to close the fingers at, as a fraction
-            of the piece's length.
-        :param deepest_depth: The depth to close the fingers short of, as such a
-            fraction.
-        :param azimuth_tolerance: How far off its length axis the piece may be seen
-            from, either way, in radians.
-        :param largest_pitch: How far the approach may tilt off vertical, in radians.
-        :param largest_roll: How far the fingers may turn off closing across the
-            length, either way, in radians.
-        :return: Seen along its length from either end, the stretch between the two
-            depths, closing across it.
-        :raises NoGraspGeometry: If the root body has no shape to measure.
-        """
-        lowest, highest = self.grasp_surface().bounds
-        extents = highest - lowest
-        length_axis = max(
-            (Vector3.X().to_np()[:3], Vector3.Y().to_np()[:3]),
-            key=lambda axis: np.dot(extents, axis),
-        )
-        length = float(np.dot(extents, length_axis))
-        azimuth_of_length_axis = math.atan2(length_axis[1], length_axis[0])
-        end_azimuths = (azimuth_of_length_axis, azimuth_of_length_axis + np.pi)
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= lowest_height,
-            grasp.height < highest_height,
-            grasp.depth >= shallowest_depth * length,
-            grasp.depth < deepest_depth * length,
-            or_(
-                *(
-                    and_(
-                        grasp.azimuth >= end_azimuth - azimuth_tolerance,
-                        grasp.azimuth < end_azimuth + azimuth_tolerance,
-                    )
-                    for end_azimuth in end_azimuths
-                )
-            ),
-            grasp.pitch >= 0.0,
-            grasp.pitch < largest_pitch,
-            grasp.roll >= np.pi / 2 - largest_roll,
-            grasp.roll < np.pi / 2 + largest_roll,
-        )
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        return GraspAcrossTheLength()
 
 
 @dataclass(eq=False)

@@ -11,36 +11,36 @@ if TYPE_CHECKING:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyConf:
     name: str = MISSING
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HandleConf(BodyConf): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContainerConf(BodyConf): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection:
     parent: BodyConf = MISSING
     child: BodyConf = MISSING
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedConnectionConf(Connection):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrismaticConnectionConf(Connection):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldConf(CaseConf):
     bodies: list[BodyConf] = field(default_factory=list)
     connections: list[Connection] = field(default_factory=list)

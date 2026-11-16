@@ -17,6 +17,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoActuator,
     GeomVisibilityAndCollisionType,
     MujocoCamera,
+    MujocoContactDimensionality,
     MujocoEquality,
     MujocoGeom,
     MujocoBody,
@@ -25,10 +26,10 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoTendon,
 )
 from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
-from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
+from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Point3,
@@ -177,17 +178,10 @@ class MJCFParser(WorldModelParser):
             file_path, use_visual_as_collision_backup=use_visual_as_collision_backup
         )
 
-    def parse(self) -> World:
-        """
-        Parse the MJCF file and convert it into a World object.
-
-        The world is built per call, so parsing repeatedly yields independent worlds
-        that share no entity identifiers.
-
-        :return: The World object representing the MJCF scene.
-        """
+    def create_world(self) -> World:
         self.world = World()
         worldbody: mujoco.MjsBody = self.spec.worldbody
+        self._name_unnamed_bodies()
         with self.world.modify_world():
             self.parse_equalities()
             self.parse_tendons()
@@ -212,6 +206,21 @@ class MJCFParser(WorldModelParser):
                 self.parse_actuator(mujoco_actuator=mujoco_actuator)
 
         return self.world
+
+    def _name_unnamed_bodies(self) -> None:
+        """
+        Name every unnamed body of the scene after its parent, uniquely, since the world
+        tells its bodies apart by name.
+        """
+        taken = {mujoco_body.name for mujoco_body in self.spec.bodies}
+        for mujoco_body in self.spec.bodies[1:]:
+            if mujoco_body.name:
+                continue
+            index = 0
+            while f"{mujoco_body.parent.name}_body_{index}" in taken:
+                index += 1
+            mujoco_body.name = f"{mujoco_body.parent.name}_body_{index}"
+            taken.add(mujoco_body.name)
 
     @staticmethod
     def _compose_frame_chain(
@@ -273,7 +282,11 @@ class MJCFParser(WorldModelParser):
             shape.origin.reference_frame = body
             shape.add_simulator_property(
                 ContactParameters(
-                    friction=ContactFriction(*mujoco_geom.friction.tolist()),
+                    friction=MujocoContactDimensionality(
+                        mujoco_geom.condim
+                    ).acting_friction(
+                        friction=ContactFriction(*mujoco_geom.friction.tolist())
+                    ),
                     stiffness=ContactStiffness(
                         time_constant=timedelta(seconds=mujoco_geom.solref[0]),
                         damping_ratio=mujoco_geom.solref[1],
@@ -471,7 +484,7 @@ class MJCFParser(WorldModelParser):
         for i in range(len(size)):
             if numpy.isclose(size[i], 0.0):
                 size[i] = 100.0  # Handle infinite size
-        color = Color(*mujoco_geom.rgba)
+        color = Color.from_rgba(*mujoco_geom.rgba)
         match mujoco_geom.type:
             case mujoco.mjtGeom.mjGEOM_PLANE:
                 return Box(
@@ -532,7 +545,7 @@ class MJCFParser(WorldModelParser):
                     texture_name = mujoco_material.textures[1]
                     mujoco_texture: mujoco.MjsTexture = self.spec.texture(texture_name)
                     if mujoco_texture is None:
-                        color = Color(*mujoco_material.rgba)
+                        color = Color.from_rgba(*mujoco_material.rgba)
                         return Mesh(
                             filename=filename,
                             origin=origin_transform,
@@ -915,7 +928,7 @@ class MJCFParser(WorldModelParser):
                     margin=tendon.margin,
                     material=tendon.material,
                     range=tendon.range.tolist(),
-                    rgba=Color(*tendon.rgba),
+                    rgba=Color.from_rgba(*tendon.rgba),
                     solver_impedance_friction=tendon.solimp_friction.tolist(),
                     solver_impedance_limit=tendon.solimp_limit.tolist(),
                     solver_reference_friction=tendon.solref_friction.tolist(),

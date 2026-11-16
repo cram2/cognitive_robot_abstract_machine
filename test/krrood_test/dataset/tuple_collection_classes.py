@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class TupleCollectionMember:
     """
     A flat value object referenced from a tuple-valued collection field.
@@ -22,7 +22,7 @@ class TupleCollectionMember:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TupleCollectionOwner:
     """
     An object whose collection of mapped members is a ``tuple`` rather than a ``list``.

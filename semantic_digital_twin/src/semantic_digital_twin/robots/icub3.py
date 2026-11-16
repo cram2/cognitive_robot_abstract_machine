@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
 
 import numpy as np
 from dataclasses import dataclass
-from typing_extensions import Self, Union
+from typing_extensions import Self
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import (
@@ -27,18 +28,21 @@ from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
     MobileBase,
     EndEffector,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
 
 
 class ICub3Joint(JointName):
@@ -135,7 +139,6 @@ class ICub3Joint(JointName):
 
 @dataclass(eq=False)
 class ICub3LeftThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -158,7 +161,6 @@ class ICub3LeftThumb(Finger):
 
 @dataclass(eq=False)
 class ICub3LeftIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -181,7 +183,6 @@ class ICub3LeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3LeftMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -204,7 +205,6 @@ class ICub3LeftMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3LeftRingFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -227,7 +227,6 @@ class ICub3LeftRingFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3LeftLittleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -250,7 +249,6 @@ class ICub3LeftLittleFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3RightThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -273,7 +271,6 @@ class ICub3RightThumb(Finger):
 
 @dataclass(eq=False)
 class ICub3RightIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -296,7 +293,6 @@ class ICub3RightIndexFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3RightMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -319,7 +315,6 @@ class ICub3RightMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3RightRingFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -342,7 +337,6 @@ class ICub3RightRingFinger(Finger):
 
 @dataclass(eq=False)
 class ICub3RightLittleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -374,7 +368,6 @@ class ICub3LeftHand(
         ICub3LeftLittleFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -449,7 +442,6 @@ class ICub3RightHand(
         ICub3RightLittleFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -515,7 +507,6 @@ class ICub3RightHand(
 
 @dataclass(eq=False)
 class ICub3LeftArm(Arm[ICub3LeftHand]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -541,7 +532,6 @@ class ICub3LeftArm(Arm[ICub3LeftHand]):
 
 @dataclass(eq=False)
 class ICub3RightArm(Arm[ICub3RightHand]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -566,19 +556,21 @@ class ICub3RightArm(Arm[ICub3RightHand]):
 
 
 @dataclass(eq=False)
-class ICub3Camera(Camera):
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
-
+class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            root=cls.create_optical_body(
+                robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
+                HomogeneousTransformationMatrix(),
+            ),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(
+                    horizontal_angle=0.99483, vertical_angle=0.75049
+                )
+            ),
             minimal_height=0.75049,
             maximal_height=0.99483,
             default_camera=True,
@@ -593,7 +585,6 @@ class ICub3Camera(Camera):
 
 @dataclass(eq=False)
 class ICub3Neck(Neck[ICub3Camera]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -614,7 +605,6 @@ class ICub3Neck(Neck[ICub3Camera]):
 class ICub3Torso(
     Torso, HasLeftRightArm[ICub3LeftArm, ICub3RightArm], HasNeck[ICub3Neck]
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -633,7 +623,6 @@ class ICub3Torso(
 
 @dataclass(eq=False)
 class ICub3MobileBase(MobileBase[OmniDrive]):
-
     @classproperty
     def forward_axis(cls) -> Vector3:
         return Vector3.X()

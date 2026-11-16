@@ -30,7 +30,7 @@ def test_a_stalled_motion_is_a_failure_a_plan_can_recover_from():
     A plan chooses an alternative by catching :class:`PlanFailure`, so a stall has to be
     one rather than a motion error the plan would have to name separately.
     """
-    assert isinstance(MotionMadeNoProgress(stalled_motion()), PlanFailure)
+    assert isinstance(MotionMadeNoProgress(no_progress=stalled_motion()), PlanFailure)
 
 
 def test_a_stalled_motion_keeps_the_stall_it_was_made_from():
@@ -40,7 +40,7 @@ def test_a_stalled_motion_keeps_the_stall_it_was_made_from():
     """
     stall = stalled_motion()
 
-    assert MotionMadeNoProgress(stall).no_progress is stall
+    assert MotionMadeNoProgress(no_progress=stall).no_progress is stall
 
 
 def test_a_stalled_motion_reports_what_the_stall_reported():
@@ -49,7 +49,7 @@ def test_a_stalled_motion_reports_what_the_stall_reported():
     """
     stall = stalled_motion()
 
-    gave_up = MotionMadeNoProgress(stall)
+    gave_up = MotionMadeNoProgress(no_progress=stall)
 
     assert gave_up.error_message() == stall.error_message()
     assert gave_up.suggest_correction() == stall.suggest_correction()

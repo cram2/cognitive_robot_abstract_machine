@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 290" role="img" aria-label="Life cycle of a statement: it waits, asks for the next candidate, tries it as the remainder in a world copy, adopts it if it passes, runs it; a failed trial asks for the next candidate, a failed or stalled child makes it wait again, and running out of candidates fails it with EmptyUnderspecified.">
+<style>
+.background { fill: #ffffff; }
+.box { fill: #ffffff; stroke: #98a5ac; stroke-width: 1.2; }
+.choose { fill: #ffffff; stroke: #17212a; stroke-width: 1.6; }
+.start { fill: #d7eeef; stroke: #0e7882; stroke-width: 1.6; }
+.later { fill: #ffffff; stroke: #0e7882; stroke-width: 1.3; stroke-dasharray: 5 3; }
+.ok { fill: #dcf0e2; stroke: #2c8448; stroke-width: 1.4; }
+.fail { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; }
+.run { fill: #dde8f7; stroke: #2d69b8; stroke-width: 1.4; }
+.wait { fill: #f6ead3; stroke: #a86d12; stroke-width: 1.6; }
+.ghost { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.gap { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; stroke-dasharray: 5 3; }
+.trialbox { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1.4; }
+.zone { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1; stroke-dasharray: 6 4; opacity: 0.9; }
+.template { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 6 4; }
+.rootmark { fill: none; stroke: #0e7882; stroke-width: 1.4; stroke-dasharray: 6 4; }
+.root { fill: #d7eeef; stroke: #0e7882; stroke-width: 2.2; }
+.edge { stroke: #98a5ac; stroke-width: 1.2; fill: none; }
+.flow { stroke: #17212a; stroke-width: 1.4; fill: none; }
+.flow-bad { stroke: #bf3f2b; stroke-width: 1.4; fill: none; }
+.flow-accent { stroke: #0e7882; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+.marker-line { stroke: #5b6971; stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.head { fill: #17212a; }
+.head-bad { fill: #bf3f2b; }
+text { fill: #17212a; }
+.h { font: 600 14px "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif; }
+.t { font: 500 12px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.tn { font: 500 11px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.s { font: 11px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #5b6971; }
+.lab { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #17212a; }
+.lab-bad { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #bf3f2b; }
+.lab-accent { font: 500 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #0e7882; }
+.lab-trial { font: 600 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #6b4fc0; }
+.num { font: 600 13px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.gridcell { fill: #ffffff; stroke: #98a5ac; stroke-width: 1; }
+</style>
+<rect class="background" x="0" y="0" width="1040" height="290"/>
+        <defs>
+          <marker id="f2-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="f2-arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head-bad" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <path class="flow-bad" d="M 950 110 V 42 Q 950 32 940 32 H 85 Q 75 32 75 42 V 108" marker-end="url(#f2-arrow-bad)"/>
+        <text class="lab-bad" x="512" y="24" text-anchor="middle">child failed or stalled: the statement waits again and grounds on its own</text>
+        <path class="flow-bad" d="M 470 110 C 470 72, 290 72, 290 108" marker-end="url(#f2-arrow-bad)"/>
+        <text class="lab-bad" x="380" y="68" text-anchor="middle">fails: discarded, next one</text>
+
+        <rect class="wait" x="20" y="110" width="110" height="52" rx="6"/>
+        <text class="t" x="75" y="132" text-anchor="middle">waiting</text>
+        <text class="s" x="75" y="150" text-anchor="middle">no child running</text>
+        <rect class="box" x="200" y="110" width="140" height="52" rx="6"/>
+        <text class="t" x="270" y="132" text-anchor="middle">next_candidate()</text>
+        <text class="s" x="270" y="150" text-anchor="middle">ranked by the query</text>
+        <rect class="trialbox" x="410" y="110" width="160" height="52" rx="6"/>
+        <text class="t" x="490" y="132" text-anchor="middle">trial</text>
+        <text class="s" x="490" y="150" text-anchor="middle">remainder, world copy</text>
+        <rect class="box" x="640" y="110" width="170" height="52" rx="6"/>
+        <text class="t" x="725" y="132" text-anchor="middle">adopt</text>
+        <text class="s" x="725" y="150" text-anchor="middle">rewrite + Stalled monitor</text>
+        <rect class="run" x="880" y="110" width="140" height="52" rx="6"/>
+        <text class="t" x="950" y="132" text-anchor="middle">running</text>
+        <text class="s" x="950" y="150" text-anchor="middle">the candidate's steps</text>
+
+        <line class="flow" x1="130" y1="136" x2="198" y2="136" marker-end="url(#f2-arrow)"/>
+        <text class="lab" x="165" y="128" text-anchor="middle">asks</text>
+        <line class="flow" x1="340" y1="136" x2="408" y2="136" marker-end="url(#f2-arrow)"/>
+        <text class="lab" x="375" y="128" text-anchor="middle">proposal</text>
+        <line class="flow" x1="570" y1="136" x2="638" y2="136" marker-end="url(#f2-arrow)"/>
+        <text class="lab" x="605" y="128" text-anchor="middle">passes</text>
+        <line class="flow" x1="810" y1="136" x2="878" y2="136" marker-end="url(#f2-arrow)"/>
+        <text class="lab" x="845" y="128" text-anchor="middle">starts</text>
+
+        <text class="s" x="75" y="182" text-anchor="middle">on the robot, Giskard</text>
+        <text class="s" x="75" y="196" text-anchor="middle">holds it still meanwhile</text>
+
+        <line class="flow-bad" x1="270" y1="162" x2="270" y2="220" marker-end="url(#f2-arrow-bad)"/>
+        <text class="lab-bad" x="278" y="196">none left</text>
+        <rect class="fail" x="170" y="222" width="200" height="48" rx="6"/>
+        <text class="t" x="270" y="242" text-anchor="middle">FAILED</text>
+        <text class="s" x="270" y="259" text-anchor="middle">executor: EmptyUnderspecified</text>
+
+        <line class="flow" x1="950" y1="162" x2="950" y2="220" marker-end="url(#f2-arrow)"/>
+        <rect class="ok" x="890" y="222" width="120" height="40" rx="6"/>
+        <text class="t" x="950" y="247" text-anchor="middle">SUCCEEDED</text>
+      </svg>

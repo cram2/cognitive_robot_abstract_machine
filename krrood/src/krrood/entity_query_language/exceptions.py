@@ -9,11 +9,14 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any, Callable
 
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
+    import random_events.variable
+    from probabilistic_model.causal_structure.identification import Identification
+
     from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.query.query import (
         Query,
@@ -41,7 +44,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuantificationNotSatisfiedError(DataclassException, ABC):
     """
     Represents a custom exception where the quantification constraints are not
@@ -63,7 +66,7 @@ class QuantificationNotSatisfiedError(DataclassException, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GreaterThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     """
     Represents an error when the number of solutions exceeds the expected threshold.
@@ -78,7 +81,7 @@ class GreaterThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
     """
     Represents an error that occurs when the number of solutions found is lower than the
@@ -102,7 +105,7 @@ class LessThanExpectedNumberOfSolutions(QuantificationNotSatisfiedError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultipleSolutionFound(GreaterThanExpectedNumberOfSolutions):
     """
     Raised when a query unexpectedly yields more than one solution where a single result
@@ -114,7 +117,7 @@ class MultipleSolutionFound(GreaterThanExpectedNumberOfSolutions):
     expected_number: int = 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSolutionFound(LessThanExpectedNumberOfSolutions):
     """
     Raised when a query does not yield any solution.
@@ -126,14 +129,14 @@ class NoSolutionFound(LessThanExpectedNumberOfSolutions):
     found_number: int = 0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LogicalError(DataclassException):
     """
     Raised when there is an error in the logical structure/evaluation of the query.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VariableCannotBeEvaluated(DataclassException):
     """
     Raised when a variable cannot be evaluated due to missing or invalid information in
@@ -153,7 +156,7 @@ class VariableCannotBeEvaluated(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UsageError(DataclassException):
     """
     Raised when there is an incorrect usage of the entity query language API.
@@ -162,7 +165,7 @@ class UsageError(DataclassException):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TryingToModifyAnAlreadyBuiltQuery(UsageError):
     """
     Raised when trying to build an already built `Query`.
@@ -183,7 +186,7 @@ class TryingToModifyAnAlreadyBuiltQuery(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SymbolicDunderAccessError(AttributeError, UsageError):
     """
     Raised when a dunder attribute is accessed symbolically on a query variable.
@@ -214,7 +217,7 @@ class SymbolicDunderAccessError(AttributeError, UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedExpressionTypeForDistinct(UsageError):
     """
     Raised when an expression type is not supported for distinct operation.
@@ -232,7 +235,7 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoConditionsProvided(UsageError):
     """
     Raised when no conditions are provided to the where/having statement of a query.
@@ -253,7 +256,7 @@ class NoConditionsProvided(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousQueryAttribute(UsageError):
     """
     Raised when a condition takes an attribute from a query that selects several
@@ -287,7 +290,7 @@ class AmbiguousQueryAttribute(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotNumberLikeFieldError(UsageError):
     """
     Raised when accessing a field expected to be number-like (see
@@ -314,7 +317,7 @@ class NotNumberLikeFieldError(UsageError):
         return f"give the queried type a number-valued '{self.attribute._attribute_name_}' field."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultipleValuesAlongAccessPath(UsageError):
     """
     Raised when a chain is followed from a value outside query evaluation and a step maps
@@ -345,7 +348,7 @@ class MultipleValuesAlongAccessPath(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoValueAlongAccessPath(UsageError):
     """
     Raised when a chain is followed from a value outside query evaluation and a step maps
@@ -381,7 +384,7 @@ class NoValueAlongAccessPath(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnselectedQueryVariable(UsageError):
     """
     Raised when a query over several variables is indexed by a variable it does not
@@ -414,7 +417,7 @@ class UnselectedQueryVariable(UsageError):
         return f"Index the query by one of the variables it selects: {selected}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReadOnlyMapping(UsageError):
     """
     Raised when a value is written back through a chain whose step computes or picks its
@@ -439,7 +442,7 @@ class ReadOnlyMapping(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NestedAggregationError(UsageError):
     """
     Raised when an aggregation is nested within another aggregation.
@@ -466,7 +469,7 @@ class NestedAggregationError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AggregationUsageError(UsageError):
     """
     Raised when there is an incorrect usage of aggregation in the entity query language
@@ -481,7 +484,7 @@ class AggregationUsageError(UsageError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
     """
     Raised when there is an aggregation over a grouped_by variable that is not Count.
@@ -506,7 +509,7 @@ class UnsupportedAggregationOfAGroupedByVariable(AggregationUsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonAggregatedSelectedVariablesError(AggregationUsageError):
     """
     Raised when a non-aggregated and not grouped_by variable(s) is selected along with
@@ -541,7 +544,7 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonAggregatorInHavingConditionsError(AggregationUsageError):
     """
     Raised when a non-aggregator is used in a having condition.
@@ -558,7 +561,7 @@ class NonAggregatorInHavingConditionsError(AggregationUsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AggregatorInWhereConditionsError(AggregationUsageError):
     """
     Raised when an aggregator is used in a where condition.
@@ -581,7 +584,7 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrongSelectableType(UsageError):
     """
     Raised when a wrong variable type is given to the select() statement.
@@ -600,7 +603,7 @@ class WrongSelectableType(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LiteralConditionError(UsageError):
     """
     Raised when a literal (i.e. a non-variable) condition is given to the query.
@@ -610,7 +613,7 @@ class LiteralConditionError(UsageError):
         >>> query = an(entity(body, a))
     This could also happen when you are using a predicate or a symbolic_function and all the given arguments are literals.
     Example:
-        >>> predicate = HasType(Body("Body1"), Body)
+        >>> predicate = HasType(variable=Body("Body1"), types_=Body)
         >>> query = an(entity(let(Body, None), predicate))
     So make sure that at least one of the arguments to the predicate or symbolic function are variables.
 
@@ -638,7 +641,7 @@ class LiteralConditionError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CannotProcessResultOfGivenChildType(UsageError):
     """
     Raised when the entity query language API cannot process the results of a given
@@ -662,7 +665,7 @@ class CannotProcessResultOfGivenChildType(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonPositiveLimitValue(UsageError):
     """
     Raised when a limit value for the query results is not positive.
@@ -682,7 +685,7 @@ class NonPositiveLimitValue(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedOperation(UsageError):
     """
     Raised when an operation is not supported by the entity query language API.
@@ -694,7 +697,7 @@ class UnsupportedOperation(UsageError):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnSupportedOperand(UnsupportedOperation):
     """
     Raised when an operand is not supported by the operation.
@@ -720,7 +723,7 @@ class UnSupportedOperand(UnsupportedOperation):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedNegation(UnsupportedOperation):
     """
     Raised when negating quantifiers.
@@ -745,7 +748,7 @@ class UnsupportedNegation(UnsupportedOperation):
         return "negate the conditions instead: `not_(condition)` instead of `not_(an(entity(..., condition)))`."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuantificationSpecificationError(UsageError):
     """
     Raised when the quantification constraints specified on the query results are
@@ -755,7 +758,7 @@ class QuantificationSpecificationError(UsageError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuantificationConsistencyError(QuantificationSpecificationError):
     """
     Raised when the quantification constraints specified on the query results are
@@ -767,7 +770,7 @@ class QuantificationConsistencyError(QuantificationSpecificationError):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidQuantificationRangeError(QuantificationConsistencyError):
     """
     Raised when the upper quantification bound is smaller than the lower bound.
@@ -792,7 +795,7 @@ class InvalidQuantificationRangeError(QuantificationConsistencyError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NegativeQuantificationError(QuantificationConsistencyError):
     """
     Raised when the quantification constraints specified on the query results have a
@@ -808,7 +811,7 @@ class NegativeQuantificationError(QuantificationConsistencyError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidChildType(UsageError):
     """
     Raised when an invalid entity type is given to the quantification operation.
@@ -833,7 +836,7 @@ class InvalidChildType(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoExpressionFoundForGivenID(DataclassException):
     """
     Raised when no expression is found for the given expression ID.
@@ -856,7 +859,7 @@ class NoExpressionFoundForGivenID(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassDiagramError(DataclassException):
     """
     An error related to the class diagram.
@@ -865,7 +868,7 @@ class ClassDiagramError(DataclassException):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoneWrappedFieldError(ClassDiagramError):
     """
     Raised when a field of a class is not wrapped by a WrappedField.
@@ -883,7 +886,7 @@ class NoneWrappedFieldError(ClassDiagramError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelfReferentialInsertionError(DataclassException):
     """
     Raised when insert_at would create a self-referential selector node.
@@ -905,7 +908,7 @@ class SelfReferentialInsertionError(DataclassException):
         return "Provide a condition that is a different node than the anchor."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoChildToReplace(DataclassException):
     """
     Raised when trying to replace a child of an expression that has no children.
@@ -933,7 +936,7 @@ class NoChildToReplace(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenerativeBackendQueryIsNotUnderspecifiedVariable(DataclassException):
     """
     Exception raised when a query is not a match inside a generative backend.
@@ -951,7 +954,7 @@ class GenerativeBackendQueryIsNotUnderspecifiedVariable(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelectiveBackendCannotResolveEllipsisMatch(DataclassException):
     """
     Exception raised when a match with an ``...`` (Ellipsis) attribute is evaluated with
@@ -974,7 +977,7 @@ class SelectiveBackendCannotResolveEllipsisMatch(DataclassException):
         return "Evaluate with a GenerativeBackend (or ProbabilisticBackend) instead."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BackendCannotEvaluateCause(DataclassException):
     """
     Raised when a match with a :class:`~krrood.entity_query_language.operators.causal.Cause`
@@ -1004,7 +1007,33 @@ class BackendCannotEvaluateCause(DataclassException):
         return "Evaluate with a ProbabilisticBackend backed by a CausalCircuit-aware model registry."
 
 
-@dataclass
+@dataclass(kw_only=True)
+class BackendCannotReadState(DataclassException):
+    """
+    Raised when an evaluation is given a state to read ground terms from, but its
+    backend computes values where no state can reach them, such as in a database.
+    """
+
+    backend_type: type[QueryBackend]
+    """
+    The type of the backend that cannot read the state.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.backend_type.__name__} cannot read a state: it computes the values "
+            f"of attributes, indexes and calls without reading them through the "
+            f"evaluation context."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Evaluate with a backend whose reads_state holds, such as "
+            "EntityQueryLanguageBackend, or evaluate without a state."
+        )
+
+
+@dataclass(kw_only=True)
 class BackendCannotEvaluateProbabilisticQuery(DataclassException):
     """
     Raised when a
@@ -1036,7 +1065,7 @@ class BackendCannotEvaluateProbabilisticQuery(DataclassException):
         return "Evaluate with a ProbabilisticBackend backed by a model registry, e.g. .evaluate(backend=ProbabilisticBackend(...))."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvidenceHasZeroProbability(DataclassException):
     """
     Raised when a
@@ -1060,7 +1089,7 @@ class EvidenceHasZeroProbability(DataclassException):
         return "Condition on evidence that the model or the domain can satisfy."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CalledMatchMultipleTimes(DataclassException):
     """
     Exception raised when a match expression is called multiple times.
@@ -1079,7 +1108,7 @@ class CalledMatchMultipleTimes(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousQuerySubject(UsageError):
     """
     Raised when a condition uses a query that selects several variables as a value,
@@ -1105,7 +1134,7 @@ class AmbiguousQuerySubject(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PositionalArgumentsInMatchPattern(DataclassException, TypeError):
     """
     Raised when the parentheses that state a match's pattern are given positional
@@ -1136,7 +1165,7 @@ class PositionalArgumentsInMatchPattern(DataclassException, TypeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CalledMatchAfterResolution(DataclassException):
     """
     Raised when a match expression is called with keyword arguments after it was already
@@ -1162,7 +1191,7 @@ class CalledMatchAfterResolution(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
     DataclassException
 ):
@@ -1183,7 +1212,7 @@ class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundPatternVariable(UsageError):
     """
     Raised when an instance is constructed from bindings that leave a variable of the
@@ -1208,7 +1237,7 @@ class UnboundPatternVariable(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoAttributeWithAccessPathName(UsageError):
     """
     Raised when a match's pattern assigns a variable to no attribute whose access path
@@ -1238,7 +1267,7 @@ class NoAttributeWithAccessPathName(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CausesEffectRequiresEqualityComparator(UsageError):
     """
     Raised when a :func:`~krrood.entity_query_language.query.match.Match.causes_effect`
@@ -1270,7 +1299,7 @@ class CausesEffectRequiresEqualityComparator(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoCausesEffectConditionForCause(DataclassException):
     """
     Raised when a :class:`~krrood.entity_query_language.operators.causal.Cause` (``cause``)
@@ -1298,7 +1327,7 @@ class NoCausesEffectConditionForCause(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoCauseVariablesForRanking(DataclassException):
     """
     Raised when
@@ -1319,7 +1348,7 @@ class NoCauseVariablesForRanking(DataclassException):
         return "Mark at least one field with cause before calling rank_causes()."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MatchTypeCannotBeDetermined(DataclassException):
     """
     Raised when a match fails at inferring its type.
@@ -1344,7 +1373,47 @@ class MatchTypeCannotBeDetermined(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
+class ResultTypeIsNotAType(DataclassException):
+    """
+    Raised when an instantiated variable is given a result type that is not a type.
+    """
+
+    result_type: Any
+    """
+    The value given as the result type.
+    """
+
+    def error_message(self) -> str:
+        return f"The result type of an instantiated variable must be a type, got {self.result_type!r}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Pass the type of the built value as the result type, and a function or factory "
+            "method that builds it as the factory."
+        )
+
+
+@dataclass(kw_only=True)
+class ResultTypeCannotBeDetermined(DataclassException):
+    """
+    Raised when the type of the values an instantiated variable binds is neither given
+    nor named by the return annotation of the callable that builds them.
+    """
+
+    factory: Callable[..., Any]
+    """
+    The callable whose return annotation names no type.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot determine the type of the values {self.factory!r} builds: its return annotation names no type."
+
+    def suggest_correction(self) -> str:
+        return f"Annotate the return type of {self.factory!r} with the type it builds."
+
+
+@dataclass(kw_only=True)
 class ModelingError(DataclassException):
     """
     Exception raised when there's an error in the model (classes, functions, etc.)
@@ -1352,7 +1421,7 @@ class ModelingError(DataclassException):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrongPropertyReturnStatementImplementation(ModelingError):
     """
     Exception raised when the implementation of a return statement of a property of a
@@ -1385,7 +1454,7 @@ class WrongPropertyReturnStatementImplementation(ModelingError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoReturnStatementInProperty(ModelingError):
     """
     Exception raised when the implementation of a property has no return statement.
@@ -1407,3 +1476,94 @@ class NoReturnStatementInProperty(ModelingError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass(kw_only=True)
+class EffectNotIdentified(DataclassException):
+    """
+    Raised when the causal structure learned for a query's class does not identify the
+    effect of a cause on the query's effect by adjusting for the variables the query
+    names.
+    """
+
+    cause: random_events.variable.Variable
+    """
+    The cause variable.
+    """
+
+    effect: random_events.variable.Variable
+    """
+    The effect variable.
+    """
+
+    identification: Identification
+    """
+    What the learned structure says about the effect: a
+    :class:`~probabilistic_model.causal_structure.identification.PartiallyIdentifiedEffect`
+    or an
+    :class:`~probabilistic_model.causal_structure.identification.UnidentifiedEffect`.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure does not identify the effect of "
+            f"'{self.cause.name}' on '{self.effect.name}': {self.identification}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name more of the variables in the query, add domain causal knowledge that "
+            "orients the undirected edges, or mark the confounders yourself."
+        )
+
+
+@dataclass(kw_only=True)
+class VariableNotInCausalGraph(DataclassException):
+    """
+    Raised when a causal query's cause or effect has no node in the causal structure
+    learned for its class.
+    """
+
+    variable: random_events.variable.Variable
+    """
+    The variable.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure has no node for the variable "
+            f"'{self.variable.name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Learn the structure over the variables the query's model is fitted on."
+
+
+@dataclass(kw_only=True)
+class NoLearnedCausalStructure(DataclassException):
+    """
+    Raised when a causal query needs the learned causal structure of its class and the
+    backend has none for that class.
+    """
+
+    expression: Query
+    """
+    The query.
+    """
+
+    queried_class: type
+    """
+    The class the query asks about.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.expression} needs a learned causal structure, and the backend has "
+            f"none for {self.queried_class.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Learn the structure of the class and give it to the ProbabilisticBackend "
+            "in causal_structures."
+        )

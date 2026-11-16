@@ -59,9 +59,10 @@ class StepMixModel(GaussianMixtureLearningMethod):
     )
     """
     The mixture to fit, by default started from the best of ten k-means runs, since a
-    single random start often ends in a poor local optimum. Its ``init_params`` is one
-    of :class:`InitializationMethod`. Each :meth:`fit` replaces it by a copy fitted
-    on the data.
+    single random start often ends in a poor local optimum.
+
+    Its ``init_params`` is one of :class:`InitializationMethod`. Each :meth:`fit`
+    replaces it by a copy fitted on the data.
     """
 
     covariance_type: CovarianceType = CovarianceType.FULL
@@ -76,8 +77,8 @@ class StepMixModel(GaussianMixtureLearningMethod):
 
     clipped_probability: float = 1e-12
     """
-    StepMix clips categorical probabilities to at least ``1e-15``; probabilities up
-    to this are read as zero.
+    StepMix clips categorical probabilities to at least ``1e-15``; probabilities up to
+    this are read as zero.
     """
 
     def fit(

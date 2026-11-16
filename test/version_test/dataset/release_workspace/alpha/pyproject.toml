@@ -1,0 +1,23 @@
+[project]
+name = "alpha"
+dynamic = ["version"]
+dependencies = [
+    "beta[extra, another]>=1.0",  # an old bound is replaced
+    "unversioned",
+    "third-party>=2.0",
+    "alpha-plugin; python_version >= '3.12'",
+]
+
+[project.optional-dependencies]
+extra = ["third-party"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "alpha._version.__version__"}
+
+[dependency-groups]
+workspace = [
+    "beta",
+]

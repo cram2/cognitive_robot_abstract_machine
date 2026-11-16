@@ -203,11 +203,16 @@ def test_the_quantifier(session, database):
 def test_equal(session, database):
     # Create the world with its bodies and connections
     world = World(
-        1,
-        [Body("Container1"), Body("Container2"), Body("Handle1"), Body("Handle2")],
+        id=1,
+        bodies=[
+            Body(name="Container1"),
+            Body(name="Container2"),
+            Body(name="Handle1"),
+            Body(name="Handle2"),
+        ],
     )
-    c1_c2 = PrismaticConnection(world.bodies[0], world.bodies[1])
-    c2_h2 = FixedConnection(world.bodies[1], world.bodies[3])
+    c1_c2 = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
+    c2_h2 = FixedConnection(parent=world.bodies[1], child=world.bodies[3])
     world.connections = [c1_c2, c2_h2]
 
     dao = to_dao(world)
@@ -253,17 +258,17 @@ def test_complicated_equal(session, database):
     correctly and returns the same result as EQL evaluation.
     """
     world = World(
-        1,
-        [
-            Container("Container1"),
-            Container("Container2"),
-            Handle("Handle1"),
-            Handle("Handle2"),
+        id=1,
+        bodies=[
+            Container(name="Container1"),
+            Container(name="Container2"),
+            Handle(name="Handle1"),
+            Handle(name="Handle2"),
         ],
     )
-    c1_c2 = PrismaticConnection(world.bodies[0], world.bodies[1])
-    c2_h2 = FixedConnection(world.bodies[1], world.bodies[3])
-    c1_h2_fixed = FixedConnection(world.bodies[0], world.bodies[3])
+    c1_c2 = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
+    c2_h2 = FixedConnection(parent=world.bodies[1], child=world.bodies[3])
+    c1_h2_fixed = FixedConnection(parent=world.bodies[0], child=world.bodies[3])
     world.connections = [c1_c2, c2_h2, c1_h2_fixed]
 
     dao = to_dao(world)
@@ -348,7 +353,7 @@ def test_translate_limit(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b)).limit(5)
+    query = an(entity(b)).limit(n=5)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).limit(5)
@@ -365,7 +370,7 @@ def test_order_by(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size))
+    query = an(entity(b).ordered_by(variable=b.size))
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size)
@@ -384,7 +389,7 @@ def test_order_by_descending(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size, descending=True))
+    query = an(entity(b).ordered_by(variable=b.size, descending=True))
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size.desc())
@@ -597,7 +602,7 @@ def test_where_and_order_by(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).where(b.size > 5).ordered_by(b.size))
+    query = an(entity(b).where(b.size > 5).ordered_by(variable=b.size))
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).where(BodyDAO.size > 5).order_by(BodyDAO.size)
@@ -618,7 +623,7 @@ def test_limit_and_order_by(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size)).limit(2)
+    query = an(entity(b).ordered_by(variable=b.size)).limit(n=2)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size).limit(2)
@@ -639,7 +644,7 @@ def test_where_and_limit(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).where(b.size > 10)).limit(2)
+    query = an(entity(b).where(b.size > 10)).limit(n=2)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).where(BodyDAO.size > 10).limit(2)
@@ -703,7 +708,7 @@ def test_order_by_descending_and_limit(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size, descending=True)).limit(2)
+    query = an(entity(b).ordered_by(variable=b.size, descending=True)).limit(n=2)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size.desc()).limit(2)
@@ -791,9 +796,9 @@ def test_set_of_with_join(session):
 
 
 def test_set_of_multi_variable(session, database):
-    world = World(1, [Container("Container1"), Handle("Handle1")])
-    fc = FixedConnection(world.bodies[0], world.bodies[1])
-    pc = PrismaticConnection(world.bodies[0], world.bodies[1])
+    world = World(id=1, bodies=[Container(name="Container1"), Handle(name="Handle1")])
+    fc = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
+    pc = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
     world.connections = [fc, pc]
 
     dao = to_dao(world)
@@ -915,14 +920,14 @@ def test_set_of_same_table_twice(session):
     This uses two KRROODPose variables to test the same pattern.
     """
     world = World(
-        1,
-        [
-            Container("Container1"),
-            Container("Container2"),
+        id=1,
+        bodies=[
+            Container(name="Container1"),
+            Container(name="Container2"),
         ],
     )
-    fc1 = FixedConnection(world.bodies[0], world.bodies[1])
-    fc2 = FixedConnection(world.bodies[1], world.bodies[0])
+    fc1 = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
+    fc2 = FixedConnection(parent=world.bodies[1], child=world.bodies[0])
     world.connections = [fc1, fc2]
 
     fc_pick = variable(FixedConnection, domain=world.connections)
@@ -955,14 +960,14 @@ def test_plan_like_query(session):
     Uses MoveAction/GraspConfig to simulate PickUpAction/NavigateAction pattern.
     """
     world = World(
-        1,
-        [
-            Container("StartPos"),
-            Container("EndPos"),
+        id=1,
+        bodies=[
+            Container(name="StartPos"),
+            Container(name="EndPos"),
         ],
     )
-    fc1 = FixedConnection(world.bodies[0], world.bodies[1])
-    fc2 = FixedConnection(world.bodies[1], world.bodies[0])
+    fc1 = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
+    fc2 = FixedConnection(parent=world.bodies[1], child=world.bodies[0])
     world.connections = [fc1, fc2]
 
     move_pick = variable(type_=MoveAction, domain=[])
@@ -1009,13 +1014,13 @@ def test_set_of_multi_variable_evaluate(session, database):
     Verify that evaluate() for set_of with multiple variables returns dicts.
     """
     world = World(
-        1,
-        [
-            Container("Container1"),
-            Handle("Handle1"),
+        id=1,
+        bodies=[
+            Container(name="Container1"),
+            Handle(name="Handle1"),
         ],
     )
-    fc = FixedConnection(world.bodies[0], world.bodies[1])
+    fc = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
     world.connections = [fc]
 
     dao = to_dao(world)
@@ -1119,7 +1124,7 @@ def test_big_query_select_part(session):
             move_pick.grasp_config.approach_direction,
         )
         .where(move_pick.grasp_config.rotate_gripper < 0.9)
-        .ordered_by(move_pick.robot_x)
+        .ordered_by(variable=move_pick.robot_x)
     )
 
     translator = eql_to_sql(query, session)
@@ -1299,10 +1304,12 @@ def test_entity_from_multi_hop_attribute(session, database):
     pose_low = KRROODPoseDAO(position=position_low, orientation=orientation)
     pose_high = KRROODPoseDAO(position=position_high, orientation=orientation)
     body = BodyDAO(name="TestBody", size=1)
-    session.add_all([
-        NestedActionDAO(obj=body, pose=pose_low),
-        NestedActionDAO(obj=body, pose=pose_high),
-    ])
+    session.add_all(
+        [
+            NestedActionDAO(obj=body, pose=pose_low),
+            NestedActionDAO(obj=body, pose=pose_high),
+        ]
+    )
     session.commit()
 
     a = variable(NestedAction, domain=[])
@@ -1325,8 +1332,12 @@ def test_entity_with_relationship_selected_variable(session, database):
     After the fix, GraspConfigDAO must be joined with MoveActionDAO via the FK so only
     the grasp_config linked to a high-robot_x move is returned.
     """
-    grasp_matching = GraspConfigDAO(rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0)
-    grasp_not_matching = GraspConfigDAO(rotate_gripper=0.9, approach_direction=0.0, manipulation_offset=0.0)
+    grasp_matching = GraspConfigDAO(
+        rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0
+    )
+    grasp_not_matching = GraspConfigDAO(
+        rotate_gripper=0.9, approach_direction=0.0, manipulation_offset=0.0
+    )
     session.add(grasp_matching)
     session.add(grasp_not_matching)
 
@@ -1377,26 +1388,30 @@ def test_count_all_derives_dao_from_where_clause(session, database):
 
 def test_order_by_aggregate(session, database):
     """
-    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True)
-    raises an error because _apply_clauses calls translate_attribute() on a Count
-    aggregator instead of _translate_comparator_operand().
+    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c,
+    descending=True) raises an error because _apply_clauses calls translate_attribute()
+    on a Count aggregator instead of _translate_comparator_operand().
 
     After the fix, the translator must emit: SELECT size, COUNT(*) FROM BodyDAO GROUP BY
     size ORDER BY COUNT(*) DESC and return rows ordered with the most-frequent size
     first.
     """
-    session.add_all([
-        BodyDAO(name="Body1", size=10),
-        BodyDAO(name="Body2", size=10),
-        BodyDAO(name="Body3", size=10),
-        BodyDAO(name="Body4", size=20),
-        BodyDAO(name="Body5", size=20),
-    ])
+    session.add_all(
+        [
+            BodyDAO(name="Body1", size=10),
+            BodyDAO(name="Body2", size=10),
+            BodyDAO(name="Body3", size=10),
+            BodyDAO(name="Body4", size=20),
+            BodyDAO(name="Body5", size=20),
+        ]
+    )
     session.commit()
 
     b = variable(type_=Body, domain=[])
     c = count(b)
-    query = an(set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True))
+    query = an(
+        set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c, descending=True)
+    )
 
     translator = eql_to_sql(query, session)
     results = translator.evaluate()
@@ -1423,8 +1438,12 @@ def test_exists_in_where_clause(session, database):
 
     so only MoveActions that have an associated GraspConfig are returned.
     """
-    grasp_a = GraspConfigDAO(rotate_gripper=0.1, approach_direction=0.0, manipulation_offset=0.0)
-    grasp_b = GraspConfigDAO(rotate_gripper=0.5, approach_direction=0.0, manipulation_offset=0.0)
+    grasp_a = GraspConfigDAO(
+        rotate_gripper=0.1, approach_direction=0.0, manipulation_offset=0.0
+    )
+    grasp_b = GraspConfigDAO(
+        rotate_gripper=0.5, approach_direction=0.0, manipulation_offset=0.0
+    )
     session.add_all([grasp_a, grasp_b])
 
     move_with_grasp_a = MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0)

@@ -13,6 +13,7 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     BulletCollisionDetector,
     clear_cache,
     convert_to_decomposed_obj_and_save_in_tmp,
+    convert_to_obj_and_save_in_tmp,
     create_shape_from_geometry,
     trimesh_quantized_hash,
 )
@@ -23,9 +24,14 @@ from semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd import (
 )
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import world_setup_simple
-from semantic_digital_twin.world_description.geometry import Mesh, Shape
+from semantic_digital_twin.world_description.geometry import (
+    Mesh,
+    MeshFileFormat,
+    Scale,
+    Shape,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -44,7 +50,7 @@ def clean_cache(cache_dir):
 @pytest.fixture
 def non_convex_mesh():
     stl_path = "package://iai_objects/objects/jeroen_cup.stl"
-    world_with_stl = STLParser(stl_path).parse()
+    world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
 
@@ -245,3 +251,69 @@ def test_a_decomposition_appears_in_the_cache_only_once_it_is_finished(
     assert sum(1 for line in open(cached) if line.startswith("o ")) == len(
         decomposer.apply_to_mesh(non_convex_mesh)
     )
+
+
+# %% mesh files Bullet cannot read
+
+
+def bounds_of(shape: pb.CollisionShape) -> list[list[float]]:
+    """
+    :return: The lower and upper corner of the shape's axis-aligned bounding box.
+    """
+    return [
+        corner.to_np()[:3].tolist()
+        for corner in shape.get_aabb(pb.Transform.identity())
+    ]
+
+
+def test_mesh_in_a_file_bullet_cannot_read_collides_like_the_same_mesh_in_obj(
+    monkeypatch,
+):
+    monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
+    box = trimesh.creation.box(extents=(1.0, 2.0, 3.0))
+    meshes = [
+        Mesh.from_trimesh(mesh=box, scale=Scale(2.0, 1.0, 1.0), file_type=file_format)
+        for file_format in (MeshFileFormat.GLB, MeshFileFormat.OBJ)
+    ]
+
+    glb_shape, obj_shape = [
+        create_shape_from_geometry(geometry=mesh) for mesh in meshes
+    ]
+
+    assert bounds_of(glb_shape) == bounds_of(obj_shape)
+
+
+def test_a_cached_copy_of_a_mesh_is_not_taken_for_its_decomposition(
+    clean_cache, cache_dir, non_convex_mesh
+):
+    decomposer = DecomposerWatchingTheCache(
+        cache_file=cache_dir / f"{trimesh_quantized_hash(non_convex_mesh.mesh)}.obj"
+    )
+    convert_to_obj_and_save_in_tmp(mesh=non_convex_mesh, cache_dir=cache_dir)
+
+    decomposition = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=decomposer, cache_dir=cache_dir
+    )
+
+    assert sum(1 for line in open(decomposition) if line.startswith("o ")) == len(
+        decomposer.apply_to_mesh(non_convex_mesh)
+    )
+
+
+def test_a_cached_decomposition_is_not_taken_for_a_copy_of_the_mesh(
+    clean_cache, cache_dir, non_convex_mesh
+):
+    decomposer = DecomposerWatchingTheCache(
+        cache_file=cache_dir / f"{trimesh_quantized_hash(non_convex_mesh.mesh)}.obj"
+    )
+    convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=decomposer, cache_dir=cache_dir
+    )
+
+    copy = trimesh.load(
+        convert_to_obj_and_save_in_tmp(mesh=non_convex_mesh, cache_dir=cache_dir),
+        force="mesh",
+        process=False,
+    )
+
+    assert len(copy.faces) == len(non_convex_mesh.unscaled_mesh.faces)

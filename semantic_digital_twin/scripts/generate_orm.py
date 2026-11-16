@@ -29,6 +29,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
 from semantic_digital_twin.testing import StateChangeCounter
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import (
     ResetStateContextManager,
     WorldEntityRebinding,
@@ -45,6 +46,7 @@ ignore_classes = {
     WorldEntityRebinding,
     StateChangeCounter,
     ForwardKinematicsManager,
+    RayTracer,
     MeshFileStorage,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     SemanticDirection,
@@ -56,6 +58,7 @@ ignore_classes = {
 }
 
 
+# %% Interface generation
 def generate_orm():
     """
     Generate the ORM classes for the coraplex package.
@@ -64,7 +67,7 @@ def generate_orm():
     logging.getLogger("krrood").setLevel(logging.DEBUG)
 
     ormatic = ORMatic.from_package(
-        [semantic_digital_twin],
+        packages=[semantic_digital_twin],
         ormatic_interface_dependencies=[],
         ignored_classes=ignore_classes,
         type_mappings={
@@ -81,7 +84,7 @@ def generate_orm():
     )
 
     with open(ormatic_interface_path, "w") as f:
-        ormatic.to_sqlalchemy_file(f)
+        ormatic.to_sqlalchemy_file(file=f)
 
 
 if __name__ == "__main__":

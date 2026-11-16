@@ -20,7 +20,7 @@ class SourceLinkResolver(Protocol):
     attribute cannot be located.
     """
 
-    def resolve(self, reference: SourceReference) -> str | None:
+    def resolve(self, *, reference: SourceReference) -> str | None:
         """
         Resolve *reference* to a URL string.
 
@@ -30,7 +30,7 @@ class SourceLinkResolver(Protocol):
         ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AutoAPIResolver:
     """
     Resolves source references to Sphinx AutoAPI documentation pages.
@@ -48,7 +48,7 @@ class AutoAPIResolver:
     warning if it does not.
     """
 
-    def resolve(self, reference: SourceReference) -> str | None:
+    def resolve(self, *, reference: SourceReference) -> str | None:
         """
         Resolve *reference* to a Sphinx AutoAPI page URL.
 
@@ -86,7 +86,7 @@ class AutoAPIResolver:
         return url
 
     @classmethod
-    def for_in_site_docs(cls, levels_up: int = 2) -> AutoAPIResolver:
+    def for_in_site_docs(cls, *, levels_up: int = 2) -> AutoAPIResolver:
         """
         Build a resolver for links rendered *inside* the documentation site itself.
 
@@ -107,7 +107,7 @@ class AutoAPIResolver:
         return cls(base_url="/".join([".."] * levels_up) or ".")
 
     @classmethod
-    def for_package(cls, package_name: str, port: int = 63342) -> AutoAPIResolver:
+    def for_package(cls, *, package_name: str, port: int = 63342) -> AutoAPIResolver:
         """
         Build a resolver for *package_name*'s locally built Sphinx docs, with the base
         URL targeting the JetBrains IDE built-in HTTP server.

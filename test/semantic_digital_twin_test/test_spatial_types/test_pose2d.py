@@ -5,16 +5,12 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
-    Point2,
-    Pose2D,
-    Pose,
-    Point3,
-    Quaternion,
-)
-from semantic_digital_twin.spatial_types.spatial_types import RotationMatrix
+from krrood_spatial_math.spatial_types import Point2, Pose2D, Pose, Point3, Quaternion
+from krrood_spatial_math.spatial_types import RotationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+from .reference_implementations import quaternion_from_rpy
+from .utils_for_tests import compare_orientations
 
 
 class TestPose2DConstruction:
@@ -113,7 +109,7 @@ class TestPose2DToPose:
         assert np.allclose(r.to_np()[:3, :3], np.eye(3), atol=1e-6)
 
     def test_to_homogeneous_matrix(self):
-        from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+        from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
         p2 = Pose2D.from_xy_yaw(x=1, y=2, yaw=0)
         m = p2.homogeneous_matrix
@@ -134,9 +130,10 @@ class TestPose2DToPose:
         assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
-        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0.3)
         q = p2.orientation
         assert isinstance(q, Quaternion)
+        compare_orientations(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
 
 
 class TestPose2DFromPosition:

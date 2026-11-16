@@ -13,9 +13,9 @@ def create_world_with_handles_and_containers(world_conf: WorldConf) -> World:
 
     for body in world_conf.bodies:
         if isinstance(body, HandleConf):
-            world.bodies.append(Handle(body.name, world=world))
+            world.bodies.append(Handle(name=body.name, world=world))
         elif isinstance(body, ContainerConf):
-            world.bodies.append(Container(body.name, world=world))
+            world.bodies.append(Container(name=body.name, world=world))
     for connection in world_conf.connections:
         parent = next(
             (b for b in world.bodies if b.name == connection.parent.name), None

@@ -105,7 +105,7 @@ for result in query.evaluate():
 query = set_of(r.type, c := count(r)) \
     .grouped_by(r.type) \
     .having(c > 5) \
-    .ordered_by(c, descending=True)
+    .ordered_by(variable=c, descending=True)
 ```
 
 ```{note}

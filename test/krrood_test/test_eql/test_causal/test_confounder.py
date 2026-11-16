@@ -14,7 +14,7 @@ def test_confounder_is_a_confounder_instance_with_no_type_of_its_own():
 # %% flowing through Match (backfilled with a fresh, per-attribute copy on resolution)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Trial:
     treatment: float
     season: str

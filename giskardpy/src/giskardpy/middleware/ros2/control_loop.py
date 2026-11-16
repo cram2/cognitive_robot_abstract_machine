@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from giskardpy.executor import Executor
+from cramph.executor import StatechartExecutor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
@@ -15,10 +15,11 @@ from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates
+from giskardpy.motion_control import MotionControl
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControlLoop:
     """
     Runs a compiled motion statechart until it ends.
@@ -27,7 +28,7 @@ class ControlLoop:
     resulting velocities back to the robot.
     """
 
-    executor: Executor
+    executor: StatechartExecutor
     """
     Computes the next command from the motion statechart.
     """
@@ -84,7 +85,7 @@ class ControlLoop:
         """
         while True:
             self.run_cycle()
-            if self.executor.motion_statechart.is_end_motion():
+            if self.executor.statechart.is_ended():
                 return
             self.executor.pacer.sleep()
 
@@ -126,7 +127,7 @@ class ControlLoop:
         """
         if not self.action_server.is_cancel_requested():
             return
-        self.action_server.loginfo("canceled")
+        self.action_server.loginfo(message="canceled")
         raise ExecutionCanceledException(
             action_server_name=self.action_server.action_name,
             goal_id=self.action_server.goal_id,
@@ -138,7 +139,7 @@ class ControlLoop:
         """
         if not self.client_watchdog.is_client_gone():
             return
-        self.action_server.loginfo("client disconnected")
+        self.action_server.loginfo(message="client disconnected")
         raise ClientDisconnectedError(client=self.client_watchdog.client)
 
     def publish_commands(self) -> None:
@@ -154,5 +155,5 @@ class ControlLoop:
         """
         for command_publisher in self.command_publishers:
             command_publisher.stop()
-        self.executor.set_velocity_acceleration_jerk_to_zero()
+        MotionControl.set_velocity_acceleration_jerk_to_zero(world=self.world)
         self.world.notify_state_change()

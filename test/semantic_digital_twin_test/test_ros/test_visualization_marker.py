@@ -16,7 +16,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldHasMultipleTfPublishersError
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -171,7 +171,7 @@ def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_w
     region = Region(
         name=PrefixedName("region"),
         area=ShapeCollection(
-            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color(A=1.0))]
+            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(opacity=1.0))]
         ),
     )
     connection = FixedConnection(parent=cylinder_bot_world.root, child=region)
@@ -213,7 +213,7 @@ def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_w
 
 
 def test_trimesh(rclpy_node):
-    world = STLParser("package://iai_objects/objects/milk.stl").parse()
+    world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     visual: Mesh = world.root.visual.shapes[0]
     world.root.visual.shapes[0] = visual
     with world.modify_world():
@@ -257,11 +257,14 @@ def world_with_visible_bodies(*names: str) -> tuple[World, list[Body]]:
 
 def published_child_frames(tf_publisher: TFPublisher) -> set[str]:
     """
-    The tf frames the publisher broadcasts a transform for.
+    The tf frames the publisher broadcasts a transform for, on every state change or
+    once per model change.
     """
+    callback = tf_publisher.tf_model_callback
     return {
         transform.child_frame_id
-        for transform in tf_publisher.tf_model_callback.tf_message.transforms
+        for message in (callback.tf_message, callback.static_tf_message)
+        for transform in message.transforms
     }
 
 
@@ -281,6 +284,22 @@ def test_markers_are_stamped_with_the_frame_names_the_tf_publisher_publishes(
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
     assert marker_frames(viz) == published_child_frames(tf_publisher)
+
+
+def test_markers_of_equally_named_bodies_do_not_replace_each_other(rclpy_node):
+    """
+    RViz identifies a marker by its namespace and id, so a marker sharing both with
+    another one replaces it.
+    """
+    world, bodies = world_with_visible_bodies("milk", "milk")
+
+    viz = VizMarkerPublisher(_world=world, node=rclpy_node)
+
+    assert sorted((marker.ns, marker.id) for marker in viz.markers.markers) == sorted(
+        (viz.tf_publisher.tf_model_callback.frame_names.assign(body), shape_index)
+        for body in bodies
+        for shape_index, _ in enumerate(body.visual.shapes)
+    )
 
 
 def test_the_tf_publisher_of_the_world_is_adopted(rclpy_node):
