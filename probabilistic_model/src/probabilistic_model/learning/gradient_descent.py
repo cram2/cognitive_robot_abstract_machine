@@ -7,9 +7,9 @@ apply.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import functools
 from dataclasses import dataclass, field
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax
@@ -17,7 +17,9 @@ import tqdm
 import array_api_compat
 from array_api_compat import array_namespace
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from typing_extensions import Generic, TypeVar
+from random_events.variable import Symbolic
+from sortedcontainers import SortedSet
+from typing_extensions import Generic, Self, TypeVar
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -59,27 +61,66 @@ class AverageNegativeLogLikelihood(Loss[LayerType]):
         return -array_namespace(log_likelihoods).mean(log_likelihoods)
 
 
-@dataclass
-class ClassConditionalAverageNegativeLogLikelihood(Loss[LayerType]):
+@dataclass(kw_only=True)
+class CrossEntropy(Loss[LayerType]):
     """
-    The negative average log-likelihood of each row under the node of its class.
+    The average negative log-probability of the category of the predicted variable in
+    each row given its other values, the discriminative loss of a RAT-SPN classifier
+    (Peharz et al., 2019, equation 4) with the prior the circuit holds.
     """
 
-    def evaluate(
-        self, layer: LayerType, data: BackendArray, labels: BackendArray
-    ) -> BackendArray:
-        log_likelihoods = layer.log_likelihood_of_nodes(data)
-        namespace = array_namespace(log_likelihoods)
-        rows = namespace.arange(
-            labels.shape[0], device=array_api_compat.device(log_likelihoods)
+    predicted_column: int
+    """
+    The column of the predicted variable in the encoded data.
+    """
+
+    number_of_categories: int
+    """
+    The number of categories of the predicted variable, encoded as their positions in
+    its domain.
+    """
+
+    @classmethod
+    def from_predicted_variable(
+        cls, *, predicted_variable: Symbolic, variables: SortedSet
+    ) -> Self:
+        """
+        :param predicted_variable: The symbolic variable the circuit classifies into.
+        :param variables: The variables of the circuit, which include the predicted
+            variable.
+        :return: The cross entropy of the predicted variable of the circuit.
+        """
+        return cls(
+            predicted_column=variables.index(predicted_variable),
+            number_of_categories=len(predicted_variable.domain.simple_sets),
         )
-        return -namespace.mean(log_likelihoods[rows, labels])
+
+    def evaluate(self, layer: LayerType, data: BackendArray) -> BackendArray:
+        log_likelihoods = layer.log_likelihood_of_nodes(data)[:, 0]
+        namespace = array_namespace(log_likelihoods)
+        data = namespace.asarray(data, device=array_api_compat.device(log_likelihoods))
+        is_predicted_column = (
+            namespace.arange(data.shape[1], device=array_api_compat.device(data))
+            == self.predicted_column
+        )
+        log_likelihoods_of_categories = [
+            layer.log_likelihood_of_nodes(
+                namespace.where(
+                    is_predicted_column, namespace.full_like(data, category), data
+                )
+            )[:, 0]
+            for category in range(self.number_of_categories)
+        ]
+        marginal = functools.reduce(namespace.logaddexp, log_likelihoods_of_categories)
+        return namespace.mean(marginal - log_likelihoods)
 
 
 # %% gradient descent
 
 
-class TrainingState(eqx.Module):
+@jax.tree_util.register_dataclass
+@dataclass
+class TrainingState:
     """
     The values one compiled training step reads and returns.
     """
@@ -136,10 +177,23 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
     The parameter arrays of the circuit before training.
     """
 
+    zero_probability_entries: list[jax.Array] = field(init=False)
+    """
+    Where every parameter array is ``-inf`` before training, a log-probability or log-
+    weight of zero probability, which training keeps.
+    """
+
     def __post_init__(self) -> None:
+        """
+        Default the optimizer and record the parameters before training and their
+        :attr:`zero_probability_entries`.
+        """
         if self.optimizer is None:
             self.optimizer = optax.adam(1e-3)
         self.initial_parameters = list(self.layer.circuit_parameters)
+        self.zero_probability_entries = [
+            jnp.isneginf(parameter) for parameter in self.initial_parameters
+        ]
 
     def loss_of_parameters(
         self, parameters: list[jax.Array], *arguments: jax.Array
@@ -165,9 +219,14 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
         updates, optimizer_state = self.optimizer.update(
             gradients, state.optimizer_state, state.parameters
         )
-        parameters = self.layer.projected_circuit_parameters(
-            optax.apply_updates(state.parameters, updates)
-        )
+        updated = [
+            jnp.where(zero_probability, -jnp.inf, parameter)
+            for zero_probability, parameter in zip(
+                self.zero_probability_entries,
+                optax.apply_updates(state.parameters, updates),
+            )
+        ]
+        parameters = self.layer.projected_circuit_parameters(updated)
         return TrainingState(parameters, optimizer_state, loss)
 
     def minimize(self, epochs: int, *arguments: jax.Array) -> LayerType:

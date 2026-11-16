@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 # %% exceptions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultipleRootsError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a region graph has more than one node without parents.
@@ -35,29 +35,7 @@ class MultipleRootsError(ProbabilisticModelException, ValueError):
         return "Connect every region to the single root region of the graph."
 
 
-@dataclass
-class UnequalFactorSizesError(ProbabilisticModelException, ValueError):
-    """
-    Exception raised when the regions a partition multiplies have different numbers of
-    nodes, so that their layers cannot be multiplied node by node.
-    """
-
-    numbers_of_nodes: list[int]
-    """
-    The number of nodes of the layer of every region the partition multiplies.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"The regions of a partition have layers of {self.numbers_of_nodes} nodes, "
-            f"but they must all have the same number."
-        )
-
-    def suggest_correction(self) -> str:
-        return "Give the input and sum layers of a partition's regions equal sizes."
-
-
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedRegionVariableError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a leaf region holds a variable that no input layer of a region
@@ -77,3 +55,25 @@ class UnsupportedRegionVariableError(ProbabilisticModelException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Use continuous or symbolic variables."
+
+
+@dataclass(kw_only=True)
+class PredictedVariableInRegionGraphError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when the variable a region graph circuit predicts is also one of
+    the variables the region graph partitions.
+    """
+
+    predicted_variable: Variable
+    """
+    The variable the circuit predicts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The predicted variable {self.predicted_variable.name} is one of the "
+            f"variables of the region graph."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Build the region graph over the other variables only."
