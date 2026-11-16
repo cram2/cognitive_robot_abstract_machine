@@ -125,6 +125,19 @@ class ExecutionException(GiskardException):
 
 
 @dataclass
+class InterruptedExecutionException(ExecutionException):
+    """
+    Ends a goal because of something outside Giskard, such as a cancellation, a lost
+    client or a missing world update, rather than because of a fault in Giskard.
+    """
+
+    print_stack_trace: bool = field(default=False, kw_only=True)
+    """
+    Off, because the interruption is an expected outcome that its message explains.
+    """
+
+
+@dataclass
 class NoActiveGoalToCancelError(ExecutionException):
     """
     Raised when a goal cancellation is requested but no goal is active.
@@ -138,12 +151,10 @@ class NoActiveGoalToCancelError(ExecutionException):
 
 
 @dataclass
-class ExecutionCanceledException(ExecutionException):
+class ExecutionCanceledException(InterruptedExecutionException):
     """
     Raised when the execution of a goal is canceled.
     """
-
-    print_stack_trace: bool = field(default=False, kw_only=True)
 
     action_server_name: str
     """
@@ -163,15 +174,13 @@ class ExecutionCanceledException(ExecutionException):
 
 
 @dataclass
-class ClientDisconnectedError(ExecutionException):
+class ClientDisconnectedError(InterruptedExecutionException):
     """
     Raised when the client that sent the running goal disconnected.
 
     Nobody is waiting for the motion any more, so it is stopped instead of being run to
     its end.
     """
-
-    print_stack_trace: bool = field(default=False, kw_only=True)
 
     client: MetaData
     """
@@ -207,7 +216,7 @@ class NoWatchedClientError(GiskardException):
 
 
 @dataclass
-class WorldModelModifiedDuringMotionError(ExecutionException):
+class WorldModelModifiedDuringMotionError(InterruptedExecutionException):
     """
     Raised when another process modified the world model while a motion was running.
 
@@ -217,8 +226,6 @@ class WorldModelModifiedDuringMotionError(ExecutionException):
     again.
     """
 
-    print_stack_trace: bool = field(default=False, kw_only=True)
-
     def error_message(self) -> str:
         return "The world model was modified by another process during the motion."
 
@@ -227,15 +234,13 @@ class WorldModelModifiedDuringMotionError(ExecutionException):
 
 
 @dataclass
-class RequiredWorldUpdateNotReceivedError(ExecutionException):
+class RequiredWorldUpdateNotReceivedError(InterruptedExecutionException):
     """
     Raised when a goal names a change of the client's world that never arrived.
 
     The goal refers to a world the client already changed, so executing it against the
     world Giskard has would act on something else than what was asked for.
     """
-
-    print_stack_trace: bool = field(default=False, kw_only=True)
 
     publisher_name: str
     """
@@ -271,13 +276,11 @@ class RequiredWorldUpdateNotReceivedError(ExecutionException):
 
 
 @dataclass
-class RequiredWorldUpdateNotAppliedError(ExecutionException):
+class RequiredWorldUpdateNotAppliedError(InterruptedExecutionException):
     """
     Raised when a goal names a change of the client's world, and an update of the client
     could not be applied to Giskard's world, which may differ from it since.
     """
-
-    print_stack_trace: bool = field(default=False, kw_only=True)
 
     publisher_name: str
     """
@@ -309,15 +312,13 @@ class RequiredWorldUpdateNotAppliedError(ExecutionException):
 
 
 @dataclass
-class GiskardWorldUpdateNotReceivedError(ExecutionException):
+class GiskardWorldUpdateNotReceivedError(InterruptedExecutionException):
     """
     Raised when the changes Giskard made during a goal never reached the client.
 
     Reading the world of the client after such a goal would show a world that Giskard
     has already moved on from.
     """
-
-    print_stack_trace: bool = field(default=False, kw_only=True)
 
     awaited_sequence_number: int
     """

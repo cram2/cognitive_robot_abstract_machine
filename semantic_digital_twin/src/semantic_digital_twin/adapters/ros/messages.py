@@ -7,7 +7,12 @@ from uuid import UUID
 
 from typing_extensions import Any, Self, get_args, get_type_hints
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
+from krrood.adapters.json_serializer import (
+    JSONData,
+    SubclassJSONSerializer,
+    to_json,
+    from_json,
+)
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.ros.exceptions import (
     WorldUpdateReferencesUnknownEntityError,
@@ -191,7 +196,7 @@ class ReceivedMessage:
     the message is applied, against the world as it is then.
     """
 
-    content: dict[str, Any]
+    content: JSONData
     """The serialized message."""
 
     publisher: MetaData
@@ -201,7 +206,7 @@ class ReceivedMessage:
     """The position of the message in the stream of its publisher."""
 
     @classmethod
-    def from_json(cls, content: dict[str, Any]) -> Self:
+    def from_json(cls, content: JSONData) -> Self:
         """
         :param content: A serialized message.
         :return: The message with its origin and position read.
