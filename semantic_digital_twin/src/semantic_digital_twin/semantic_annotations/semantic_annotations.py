@@ -552,18 +552,6 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
         """
         return HomogeneousTransformationMatrix()
 
-    @property
-    def opening_ratio(self) -> float:
-        """
-        :return: How far this drawer stands pulled out, as a fraction of its travel.
-        """
-        if self.movable_joint is None:
-            raise MissingMovableJointError(self)
-        limits = self.movable_joint.dof.limits
-        return (self.movable_joint.position - limits.lower.position) / (
-            limits.upper.position - limits.lower.position
-        )
-
 
 @dataclass(eq=False)
 class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):

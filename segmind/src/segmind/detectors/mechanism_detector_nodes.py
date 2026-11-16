@@ -1,6 +1,6 @@
 """
-Detecting a moving part of the scene, such as a drawer or a door, being opened, being
-closed, and leaving either.
+Detecting a moving part of the scene, such as a drawer or a door, being opened and being
+closed.
 
 What is read here is how far a part stands along the joint it moves on, rather than a
 relation between two bodies.
@@ -9,65 +9,44 @@ relation between two bodies.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
 
 from segmind.datastructures.events import (
     ClosedEvent,
     DetectionEvent,
     OpenedEvent,
-    PartlyOpenEvent,
+    OpeningEvent,
 )
 from segmind.detectors.base import AbstractDetector, SegmindContext
-from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+from semantic_digital_twin.semantic_annotations.mixins import HasMovableJoint
 from semantic_digital_twin.world_description.world_entity import Body
-
-
-class MechanismState(StrEnum):
-    """
-    How far a moving part stands along its joint.
-    """
-
-    OPEN = "open"
-    """
-    At least as far out as counts as open.
-    """
-
-    CLOSED = "closed"
-    """
-    At most as far out as counts as closed.
-    """
-
-    PARTLY_OPEN = "partly open"
-    """
-    In between.
-    """
 
 
 @dataclass(eq=False, repr=False)
 class OpeningDetector(AbstractDetector):
     """
-    Reports a moving part coming to stand open, closed, or partly open from either.
+    Reports a moving part, such as a door or a drawer, coming to stand open or closed.
 
-    The part is a body moving on a joint of its own, a drawer on its rails or a door on
-    its hinge, and how far it stands is the share of its joint's travel it stands out.
-    The state a part is first seen in is where the run starts, and is not reported.
+    How far a part stands open is the
+    :attr:`~semantic_digital_twin.semantic_annotations.mixins.HasMovableJoint.opening_ratio`
+    of the annotation the part is the root of. The state a part is first seen in is
+    where the run starts, and is not reported.
     """
 
     open_ratio: float = field(default=0.9, kw_only=True)
     """
-    The share of its travel from which on a part counts as open.
+    The opening ratio from which on a part counts as open.
     """
 
     closed_ratio: float = field(default=0.05, kw_only=True)
     """
-    The share of its travel up to which a part counts as closed.
+    The opening ratio up to which a part counts as closed.
     """
 
-    states: dict[Body, MechanismState] = field(
+    last_states: dict[Body, type[OpeningEvent] | None] = field(
         default_factory=dict, init=False, repr=False
     )
     """
-    The state each part was last seen in.
+    Whether each part was last seen open, closed, or, as ``None``, in between.
     """
 
     def update_context_and_events(
@@ -76,44 +55,38 @@ class OpeningDetector(AbstractDetector):
         tracked_objects: list[Body],
     ) -> list[DetectionEvent]:
         """
-        Detects parts whose state changed since they were last seen.
+        Detects parts that came to stand open or closed since they were last seen.
 
         :param segmind_context: The shared SegmindContext; nothing in it is needed.
-        :param tracked_objects: The bodies to check; those not moving on a joint of
-            their own are left out.
-        :return: One event per part whose state changed.
+        :param tracked_objects: The bodies to check; those that are not the root of a
+            part moving on its joint are left out.
+        :return: One event per part that came to stand open or closed.
         """
         events: list[DetectionEvent] = []
-        for body in tracked_objects:
-            joint = body.parent_connection
-            if not isinstance(joint, ActiveConnection1DOF):
+        tracked = set(tracked_objects)
+        for moving_part in self.context.world.get_semantic_annotations_by_type(
+            HasMovableJoint
+        ):
+            body = moving_part.root
+            if body not in tracked or moving_part.movable_joint is None:
                 continue
-            state = self.state_of(joint)
-            seen_before = body in self.states
-            changed = self.states.get(body) is not state
-            self.states[body] = state
-            if not (seen_before and changed):
-                continue
-            match state:
-                case MechanismState.OPEN:
-                    events.append(OpenedEvent(tracked_object=body))
-                case MechanismState.CLOSED:
-                    events.append(ClosedEvent(tracked_object=body))
-                case MechanismState.PARTLY_OPEN:
-                    events.append(PartlyOpenEvent(tracked_object=body))
+            opening_ratio = moving_part.opening_ratio
+            state = self.state_at(opening_ratio=opening_ratio)
+            seen_before = body in self.last_states
+            changed = self.last_states.get(body) is not state
+            self.last_states[body] = state
+            if seen_before and changed and state is not None:
+                events.append(state(tracked_object=body, opening_ratio=opening_ratio))
         return events
 
-    def state_of(self, joint: ActiveConnection1DOF) -> MechanismState:
+    def state_at(self, *, opening_ratio: float) -> type[OpeningEvent] | None:
         """
-        :param joint: The joint a part moves on.
-        :return: The state the part stands in.
+        :param opening_ratio: How far a part stands open.
+        :return: The event a part standing at ``opening_ratio`` is reported with, or
+            ``None`` when it stands between closed and open.
         """
-        limits = joint.dof.limits
-        ratio = (joint.position - limits.lower.position) / (
-            limits.upper.position - limits.lower.position
-        )
-        if ratio >= self.open_ratio:
-            return MechanismState.OPEN
-        if ratio <= self.closed_ratio:
-            return MechanismState.CLOSED
-        return MechanismState.PARTLY_OPEN
+        if opening_ratio >= self.open_ratio:
+            return OpenedEvent
+        if opening_ratio <= self.closed_ratio:
+            return ClosedEvent
+        return None
