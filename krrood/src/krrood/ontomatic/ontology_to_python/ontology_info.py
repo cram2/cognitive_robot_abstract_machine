@@ -15,6 +15,7 @@ from typing_extensions import Any, Dict, List, Optional, Set
 from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin, DeepCopyOfField
+from krrood.patterns.hashed_by_identity import HashedByIdentity
 from krrood.patterns.role import Role
 
 
@@ -35,8 +36,8 @@ class RoleTakerInfo:
     """
 
 
-@dataclass(kw_only=True)
-class ClassInfo(DataclassDeepcopyMixin):
+@dataclass(kw_only=True, eq=False)
+class ClassInfo(DataclassDeepcopyMixin, HashedByIdentity):
     """
     Maintains all metadata, inheritance, and property associations for an OWL class.
     Used during the code generation process to represent a Python class.
@@ -132,15 +133,9 @@ class ClassInfo(DataclassDeepcopyMixin):
     The ontology the class belongs to, which a copy of the class keeps.
     """
 
-    def __hash__(self):
-        """
-        Class information is hashed by identity.
-        """
-        return hash(id(self))
 
-
-@dataclass(kw_only=True)
-class PropertyInfo(DataclassDeepcopyMixin):
+@dataclass(kw_only=True, eq=False)
+class PropertyInfo(DataclassDeepcopyMixin, HashedByIdentity):
     """
     Maintains metadata, domains, ranges, and inheritance for an OWL property.
     Used during the code generation process to represent a Python property or descriptor.
@@ -341,15 +336,9 @@ class PropertyInfo(DataclassDeepcopyMixin):
         self._all_superproperties = sorted(ancestors)
         return self._all_superproperties
 
-    def __hash__(self):
-        """
-        Property information is hashed by identity.
-        """
-        return hash(id(self))
 
-
-@dataclass(kw_only=True)
-class OntologyInfo:
+@dataclass(kw_only=True, eq=False)
+class OntologyInfo(HashedByIdentity):
     """Information about the ontology."""
 
     graph: rdflib.Graph
@@ -440,12 +429,6 @@ class OntologyInfo:
             name: set(class_information.all_base_classes)
             for name, class_information in self.classes.items()
         }
-
-    def __hash__(self):
-        """
-        Ontology information is hashed by identity.
-        """
-        return hash(id(self))
 
     @staticmethod
     def topological_order(*, items: Dict[str, Any], dependency_key: str) -> List[str]:

@@ -102,3 +102,41 @@ def test_a_copied_property_of_an_ontology_shares_only_the_ontology():
         copy.superproperties == original.superproperties,
         copy.superproperties is original.superproperties,
     ) == (True, True, False)
+
+
+# %% identity
+
+
+def test_a_class_is_equal_only_to_itself():
+    """
+    Two classes with the same information are two distinct classes, as they are hashed
+    by their identity.
+    """
+    assert ClassInfo(name="Person", uri="http://example.org/person#Person") != (
+        ClassInfo(name="Person", uri="http://example.org/person#Person")
+    )
+
+
+def test_a_property_is_equal_only_to_itself():
+    """
+    Two properties with the same information are two distinct properties, as they are
+    hashed by their identity.
+    """
+    assert PropertyInfo(
+        name="knows",
+        uri="http://example.org/person#knows",
+        type=PropertyType.OBJECT_PROPERTY,
+    ) != PropertyInfo(
+        name="knows",
+        uri="http://example.org/person#knows",
+        type=PropertyType.OBJECT_PROPERTY,
+    )
+
+
+def test_an_ontology_is_equal_only_to_itself():
+    """
+    Two ontologies of the same graph are two distinct ontologies, as they are hashed by
+    their identity.
+    """
+    graph = rdflib.Graph()
+    assert OntologyInfo(graph=graph) != OntologyInfo(graph=graph)
