@@ -79,7 +79,10 @@ from semantic_digital_twin.world_description.geometry import (
     MeshFileFormat,
     Color,
 )
-from semantic_digital_twin.world_description.contact import ContactParameters
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Region,
     Body,
@@ -164,6 +167,70 @@ class MujocoActuatorProperty(StrEnum):
     """
     Whether :attr:`TARGET` names a joint or a tendon.
     """
+
+
+class MujocoContactDimensionality(IntEnum):
+    """
+    The dimensions MuJoCo resolves a contact in, its ``condim``, which decide which
+    friction coefficients of the contact act. MuJoCo resolves a contact in
+    :attr:`SLIDING` unless told otherwise, and in the more dimensions of its two geoms.
+
+    For more information, see:
+    https://mujoco.readthedocs.io/en/stable/modeling.html#contact
+    """
+
+    FRICTIONLESS = 1
+    """
+    Only the push along the contact normal; no friction acts.
+    """
+
+    SLIDING = 3
+    """
+    Sliding friction acts; the bodies are free to turn against each other.
+    """
+
+    SLIDING_AND_TORSIONAL = 4
+    """
+    Sliding and torsional friction act, so the bodies also resist turning around the
+    contact normal.
+    """
+
+    SLIDING_TORSIONAL_AND_ROLLING = 6
+    """
+    Sliding, torsional and rolling friction act, so the bodies also resist rolling over
+    each other.
+    """
+
+    @classmethod
+    def from_friction(cls, *, friction: ContactFriction) -> MujocoContactDimensionality:
+        """
+        :param friction: The friction a geom offers.
+        :return: The fewest dimensions in which every coefficient of `friction` that is
+            not zero acts.
+        """
+        if friction.rolling != 0:
+            return cls.SLIDING_TORSIONAL_AND_ROLLING
+        if friction.torsional != 0:
+            return cls.SLIDING_AND_TORSIONAL
+        if friction.sliding != 0:
+            return cls.SLIDING
+        return cls.FRICTIONLESS
+
+    def acting_friction(self, *, friction: ContactFriction) -> ContactFriction:
+        """
+        :param friction: The coefficients a geom declares.
+        :return: The coefficients of `friction` that act in these dimensions, the others
+            zero.
+        """
+        return ContactFriction(
+            sliding=friction.sliding if self >= self.SLIDING else 0.0,
+            torsional=(
+                friction.torsional if self >= self.SLIDING_AND_TORSIONAL else 0.0
+            ),
+            rolling=(
+                friction.rolling if self >= self.SLIDING_TORSIONAL_AND_ROLLING else 0.0
+            ),
+        )
 
 
 class GeomVisibilityAndCollisionType(IntEnum):
@@ -2772,6 +2839,9 @@ class MujocoBuilder(MultiSimBuilder):
         contact = shape.get_simulator_property_of_type(ContactParameters)
         if contact is not None:
             geom_props["friction"] = contact.friction.to_list()
+            geom_props["condim"] = MujocoContactDimensionality.from_friction(
+                friction=contact.friction
+            )
             if contact.stiffness is not None:
                 geom_props["solref"] = contact.stiffness.to_list()
             if contact.impedance is not None:
