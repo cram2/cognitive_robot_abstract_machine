@@ -60,7 +60,10 @@ from semantic_digital_twin.exceptions import (
     WorldHasNoUniqueRootError,
     NoControlledConnectionInChainError,
 )
-from semantic_digital_twin.mixin import HasSimulatorProperties
+from semantic_digital_twin.mixin import (
+    HasSimulatorProperties,
+    SimulatorAdditionalProperty,
+)
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
@@ -102,6 +105,8 @@ from semantic_digital_twin.world_description.world_modification import (
     WorldModification,
     WorldModelModificationBlock,
     SetDofHasHardwareInterface,
+    AddWorldSimulatorPropertyModification,
+    RemoveWorldSimulatorPropertyModification,
     AddDegreeOfFreedomModification,
     RemoveDegreeOfFreedomModification,
     AddKinematicStructureEntityModification,
@@ -1293,8 +1298,12 @@ class World(HasSimulatorProperties):
         Removes the subtree rooted at ``root`` from the world.
 
         Removes ``root`` together with all of its descendant kinematic structure
-        entities, every connection within the branch, and the branch's connection to its
-        parent. The removals are performed atomically.
+        entities, every connection within the branch, the branch's connection to its
+        parent, and every actuator driving a degree of freedom of those connections. The
+        removals are performed atomically.
+
+        .. note:: An actuator that drives only degrees of freedom no connection uses,
+            such as a MuJoCo tendon's, belongs to no branch; remove it explicitly.
 
         :param root: The root entity of the branch to be removed.
         """
@@ -1308,13 +1317,42 @@ class World(HasSimulatorProperties):
             if parent_connection is not None
             else connections
         )
+        branch_dofs = {dof for connection in connections for dof in connection.dofs}
+        actuators = [
+            actuator
+            for actuator in self.actuators
+            if any(dof in branch_dofs for dof in actuator.dofs)
+        ]
         with self.modify_world():
+            for actuator in actuators:
+                self.remove_actuator(actuator)
             for connection in connections:
                 self.remove_connection(connection)
             for kinematic_structure_entity in kinematic_structure_entities:
                 self.remove_kinematic_structure_entity(kinematic_structure_entity)
 
     # %% Other Atomic World Modifications
+    @atomic_world_modification(modification=AddWorldSimulatorPropertyModification)
+    def add_simulator_property(
+        self, simulator_property: SimulatorAdditionalProperty
+    ) -> None:
+        """
+        :meth:`HasSimulatorProperties.add_simulator_property`, recorded as a
+        modification of the world, so that it is published and can be rolled back.
+        """
+        super().add_simulator_property(simulator_property)
+
+    @atomic_world_modification(modification=RemoveWorldSimulatorPropertyModification)
+    def remove_simulator_property(
+        self, simulator_property: SimulatorAdditionalProperty
+    ) -> None:
+        """
+        Detach a property from the world itself, recorded as a modification.
+
+        :param simulator_property: The property to detach, or one equal to it.
+        """
+        self.simulator_additional_properties.remove(simulator_property)
+
     @atomic_world_modification(modification=SetDofHasHardwareInterface)
     def set_dofs_has_hardware_interface(
         self, dofs: Iterable[DegreeOfFreedom], value: bool
@@ -1625,15 +1663,17 @@ class World(HasSimulatorProperties):
         """
         Find this world's entity with the given id, if it holds one.
 
-        .. note:: Semantic annotations are searched in :attr:`semantic_annotations`
-            rather than in the hash table. Their hash describes their content instead
-            of their id, so annotations of the same type over the same kinematic
-            structure entities share one table key and all but the last one added are
-            missing from it.
+        .. note:: Most entities hash like their id and are found in the hash table
+            directly. Connections hash by their parent and child, and semantic
+            annotations by their content, so annotations over the same entities share
+            one table key; those are searched among all entities instead.
 
         :param entity_id: The id of the entity to find.
         :return: The entity of this world carrying that id, or None if it holds none.
         """
+        entity = self._world_entity_hash_table.get(hash(entity_id))
+        if isinstance(entity, WorldEntityWithID) and entity.id == entity_id:
+            return entity
         return next(
             (
                 entity
@@ -1839,8 +1879,6 @@ class World(HasSimulatorProperties):
             if root_connection:
                 self.add_connection(root_connection)
 
-            for simulator_property in other.simulator_additional_properties:
-                self.add_simulator_property(simulator_property)
             other.simulator_additional_properties.clear()
             other.clear()
 
@@ -2662,12 +2700,7 @@ class World(HasSimulatorProperties):
         if me_id in memo:
             return memo[me_id]
 
-        new_world = World(
-            name=self.name,
-            simulator_additional_properties=deepcopy(
-                self.simulator_additional_properties
-            ),
-        )
+        new_world = World(name=self.name)
         memo[me_id] = new_world
 
         with new_world.modify_world():
