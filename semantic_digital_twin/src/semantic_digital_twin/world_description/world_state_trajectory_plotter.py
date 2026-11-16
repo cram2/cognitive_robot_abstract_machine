@@ -365,7 +365,7 @@ class WorldStateTrajectoryPlotter:
         """
         return len(self.world_state_trajectory.times) > 1
 
-    def plot_trajectory(self, *, file_name: str) -> None:
+    def plot_trajectory(self, *, file_name: Path) -> None:
         """
         Plot the recorded trajectory, one subplot per derivative in
         :attr:`derivatives_to_plot`, and save it to `file_name`; nothing is plotted
@@ -397,6 +397,6 @@ class WorldStateTrajectoryPlotter:
 
         if self.legend:
             self._create_legend(figure, axes)
-        Path(file_name).parent.mkdir(parents=True, exist_ok=True)
+        file_name.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name)
         plt.close()

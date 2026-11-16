@@ -558,7 +558,7 @@ class FailingTrajectoryPlotter(WorldStateTrajectoryPlotter):
     Fails while drawing its plot, standing in for a broken plotting backend.
     """
 
-    def plot_trajectory(self, *, file_name: str) -> None:
+    def plot_trajectory(self, *, file_name: Path) -> None:
         """
         Fail instead of plotting.
         """
@@ -594,7 +594,7 @@ class StopObservingTrajectoryPlotter(WorldStateTrajectoryPlotter):
     How often the robot was stopped when the plot was asked for; None until then.
     """
 
-    def plot_trajectory(self, *, file_name: str) -> None:
+    def plot_trajectory(self, *, file_name: Path) -> None:
         """
         Note how often the robot was stopped instead of plotting.
         """

@@ -8,6 +8,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 
 import rustworkx as rx
 from typing_extensions import (
@@ -990,7 +991,7 @@ class Statechart(SubclassJSONSerializer):
         for node in self.nodes:
             node.cleanup()
 
-    def draw(self, *, file_name: str) -> None:
+    def draw(self, *, file_name: Path) -> None:
         """
         Uses graphviz to draw the statechart and safe it at `file_name`.
 
@@ -1034,8 +1035,8 @@ class Statechart(SubclassJSONSerializer):
     def plot_gantt_chart(
         self,
         *,
-        path: str = "./ganttchart.pdf",
-        context: StatechartContext = None,
+        path: Path = Path("ganttchart.pdf"),
+        context: StatechartContext | None = None,
         second_length_in_cm: float = 2.0,
     ) -> None:
         """

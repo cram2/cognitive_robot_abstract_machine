@@ -1972,7 +1972,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
 
     plotter = WorldStateTrajectoryPlotter()
     plotter.world_state_trajectory = traj
-    plotter.plot_trajectory(file_name=str(tmp_path / "traj.pdf"))
+    plotter.plot_trajectory(file_name=tmp_path / "traj.pdf")
 
     # Verify world version consistency
     assert traj._world_version == world.get_world_model_manager().version

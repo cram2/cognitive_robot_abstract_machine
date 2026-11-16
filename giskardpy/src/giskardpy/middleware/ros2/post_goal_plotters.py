@@ -53,7 +53,7 @@ class GoalGanttChartPlotter(PostGoalPlotter):
             plot_kind=GoalPlotKind.GANTT_CHART, goal_id=goal_id
         )
         self.executor.statechart.plot_gantt_chart(
-            path=str(file_name),
+            path=file_name,
             context=self.executor.context,
             second_length_in_cm=self.second_length_in_cm,
         )
@@ -70,5 +70,5 @@ class MotionStatechartPlotter(PostGoalPlotter):
         file_name = self.plot_directory.goal_plot_path(
             plot_kind=GoalPlotKind.MOTION_STATECHART, goal_id=goal_id
         )
-        self.executor.statechart.draw(file_name=str(file_name))
+        self.executor.statechart.draw(file_name=file_name)
         background_node.get_node().get_logger().info(f"saved {file_name}")

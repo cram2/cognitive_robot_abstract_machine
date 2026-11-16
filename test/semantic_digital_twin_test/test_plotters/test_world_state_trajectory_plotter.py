@@ -2,6 +2,11 @@
 Tests of the plot of a world state trajectory.
 """
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -16,80 +21,97 @@ from semantic_digital_twin.world_description.world_state_trajectory_plotter impo
     WorldStateTrajectoryPlotter,
 )
 
+# %% helpers
 
-def _axes_width_in(ax: plt.Axes) -> float:
+
+@dataclass(kw_only=True)
+class RenderedPlot:
+    """
+    The figure a plotter drew, kept open for inspection.
+    """
+
+    figure: plt.Figure
+    """
+    The whole figure.
+    """
+
+    axes: list[plt.Axes]
+    """
+    The subplots of :attr:`figure`, top to bottom.
+    """
+
+
+def _axes_width_in_inches(axis: plt.Axes) -> float:
     """
     Return the drawable width of an axes in inches based on its position box.
     """
-    fig = ax.figure
-    fig.canvas.draw()
-    bbox = ax.get_position()  # fraction of figure
-    return bbox.width * fig.get_figwidth()
+    figure = axis.figure
+    figure.canvas.draw()
+    position = axis.get_position()  # fraction of figure
+    return position.width * figure.get_figwidth()
 
 
-def _build_simple_trajectory(world_setup, duration_s: float = 3.0, dt: float = 0.1):
-    world, l1, l2, bf, r1, r2 = world_setup
+def _record_trajectory(
+    world_setup, duration: float = 3.0, time_step: float = 0.1
+) -> WorldStateTrajectory:
+    """
+    Record `duration` seconds of the test world, in which one degree of freedom moves
+    and all others stay where they are; the recording starts at a time other than zero.
+    """
+    world, _, _, _, right_parent, right_child = world_setup
 
     # Start at a non-zero time to verify normalization in the plotter
-    t0 = 10.0
+    start_time = 10.0
 
-    # Use the prismatic connection r1->r2 for a changing DOF
-    prismatic = world.get_connection(r1, r2)
-    dof_change = prismatic.dof.id
+    moving_degree_of_freedom_id = world.get_connection(right_parent, right_child).dof.id
 
-    # Create a second DOF that remains constant to test suppression behavior
-    second = world.get_connection(l1, l2)
-    dof_constant = second.dof.id
-
-    # Offset initial position of the changing DOF to exercise center_positions
-    world.state[dof_change].position = 5.0
+    # Offset initial position of the moving DOF to exercise center_positions
+    world.state[moving_degree_of_freedom_id].position = 5.0
     world.notify_state_change()
 
-    traj = WorldStateTrajectory.from_world_state(world.state, t0)
+    trajectory = WorldStateTrajectory.from_world_state(world.state, start_time)
 
-    # Apply jerk command to first DOF only; keep others zero
-    cmd = np.zeros(len(world.state))
-    # First index in state is r1->r2 dof (by construction of test world), but be robust by using index map
-    first_idx = traj._index[dof_change]
-    cmd[first_idx] = 10.0
+    # Apply a jerk command to the moving DOF only; keep the others zero
+    command = np.zeros(len(world.state))
+    command[trajectory._index[moving_degree_of_freedom_id]] = 10.0
 
-    steps = int(np.ceil(duration_s / dt))
-    t = t0
-    for _ in range(steps):
-        t += dt
-        world.apply_control_commands(cmd, dt, Derivatives.jerk)
-        traj.append(world.state, t)
+    step_count = int(np.ceil(duration / time_step))
+    time = start_time
+    for _ in range(step_count):
+        time += time_step
+        world.apply_control_commands(command, time_step, Derivatives.jerk)
+        trajectory.append(world.state, time)
 
-    return world, traj, dof_change, dof_constant, dt
+    return trajectory
 
 
 def _render_plot(
-    plotter: WorldStateTrajectoryPlotter, traj: WorldStateTrajectory, monkeypatch
-):
+    plotter: WorldStateTrajectoryPlotter,
+    trajectory: WorldStateTrajectory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> RenderedPlot:
     """
-    Plot `traj` with `plotter` without writing a file.
-
-    :return: The figure and its axes, under the keys ``fig`` and ``axes``.
+    Plot `trajectory` with `plotter` without writing a file.
     """
-    captured = {}
-
     # Avoid file output and figure closing during tests
     monkeypatch.setattr(plt, "savefig", lambda *args, **kwargs: None)
     monkeypatch.setattr(plt, "close", lambda *args, **kwargs: None)
-    plotter.world_state_trajectory = traj
-    plotter.plot_trajectory(file_name="/dev/null")
+    plotter.world_state_trajectory = trajectory
+    plotter.plot_trajectory(file_name=Path("/dev/null"))
 
-    # Get the current figure created by the plotter
-    fig = plt.gcf()
-    captured["fig"] = fig
-    captured["axes"] = fig.get_axes()
-    return captured
+    figure = plt.gcf()
+    return RenderedPlot(figure=figure, axes=figure.get_axes())
+
+
+# %% layout
 
 
 def test_physical_width_and_time_normalization(world_setup, monkeypatch):
-    world, traj, dof_change, dof_constant, dt = _build_simple_trajectory(
-        world_setup, duration_s=5.0, dt=0.2
-    )
+    """
+    The time axis starts at zero whenever the recording started, and one second is as
+    wide as configured.
+    """
+    trajectory = _record_trajectory(world_setup, duration=5.0, time_step=0.2)
 
     second_width_in_cm = 2.0
     plotter = WorldStateTrajectoryPlotter(
@@ -99,26 +121,27 @@ def test_physical_width_and_time_normalization(world_setup, monkeypatch):
         subplot_height_in_cm=4.0,
     )
 
-    rendered = _render_plot(plotter, traj, monkeypatch)
-    axes = rendered["axes"]
+    axes = _render_plot(plotter, trajectory, monkeypatch).axes
     assert len(axes) == 2  # two stacked subplots
 
     # All subplots share the same x-limits; they should start at 0 (normalized time)
-    x0, x1 = axes[-1].get_xlim()
-    assert x0 == pytest.approx(0.0, abs=1e-9)
-    expected_duration = traj.times[-1] - traj.times[0]
-    assert x1 == pytest.approx(expected_duration, rel=1e-6, abs=1e-6)
+    x_start, x_end = axes[-1].get_xlim()
+    assert x_start == pytest.approx(0.0, abs=1e-9)
+    expected_duration = trajectory.times[-1] - trajectory.times[0]
+    assert x_end == pytest.approx(expected_duration, rel=1e-6, abs=1e-6)
 
     # Check the physical width in inches matches seconds * cm-per-second / 2.54
-    fig = rendered["fig"]
-    main_ax = axes[0]
-    actual_w_in = _axes_width_in(main_ax)
-    expected_w_in = expected_duration * (second_width_in_cm / 2.54)
-    assert actual_w_in == pytest.approx(expected_w_in, rel=0.1, abs=0.1)
+    actual_width = _axes_width_in_inches(axes[0])
+    expected_width = expected_duration * (second_width_in_cm / 2.54)
+    assert actual_width == pytest.approx(expected_width, rel=0.1, abs=0.1)
 
 
 def test_subplot_titles_labels_and_shared_xlabel(world_setup, monkeypatch):
-    _, traj, *_ = _build_simple_trajectory(world_setup, duration_s=2.0, dt=0.1)
+    """
+    Each subplot is titled and labelled after its derivative, and only the bottom one
+    carries the time label.
+    """
+    trajectory = _record_trajectory(world_setup, duration=2.0, time_step=0.1)
 
     plotter = WorldStateTrajectoryPlotter(
         derivatives_to_plot=[
@@ -129,36 +152,40 @@ def test_subplot_titles_labels_and_shared_xlabel(world_setup, monkeypatch):
         legend=False,
     )
 
-    rendered = _render_plot(plotter, traj, monkeypatch)
-    axes = rendered["axes"]
+    axes = _render_plot(plotter, trajectory, monkeypatch).axes
     assert len(axes) == 3
 
     # Titles should be derivative names; y-labels are derivative-specific
-    titles = [ax.get_title() for ax in axes]
+    titles = [axis.get_title() for axis in axes]
     assert titles[0].lower().find("position") >= 0
     assert titles[1].lower().find("velocity") >= 0
     assert titles[2].lower().find("acceleration") >= 0
 
-    ylabels = [ax.get_ylabel() for ax in axes]
+    y_labels = [axis.get_ylabel() for axis in axes]
     # Expect non-empty labels and they may differ per derivative
-    assert all(isinstance(lbl, str) and len(lbl) > 0 for lbl in ylabels)
+    assert all(isinstance(label, str) and len(label) > 0 for label in y_labels)
 
     # Only the bottom subplot should carry the shared x label
-    xlabels = [ax.get_xlabel() for ax in axes]
-    assert xlabels[0] == ""
-    assert xlabels[1] == ""
-    assert xlabels[2] == "Time [s]"
+    x_labels = [axis.get_xlabel() for axis in axes]
+    assert x_labels[0] == ""
+    assert x_labels[1] == ""
+    assert x_labels[2] == "Time [s]"
 
     # Grid should be visible on both axes directions
-    for ax in axes:
-        assert any(gl.get_visible() for gl in ax.get_xgridlines())
-        assert any(gl.get_visible() for gl in ax.get_ygridlines())
+    for axis in axes:
+        assert any(line.get_visible() for line in axis.get_xgridlines())
+        assert any(line.get_visible() for line in axis.get_ygridlines())
+
+
+# %% which degrees of freedom are drawn
 
 
 def test_center_positions_and_suppression_rules(world_setup, monkeypatch):
-    world, traj, dof_change, dof_constant, dt = _build_simple_trajectory(
-        world_setup, duration_s=1.0, dt=0.1
-    )
+    """
+    Centered positions start at zero, and degrees of freedom that never move are left
+    out.
+    """
+    trajectory = _record_trajectory(world_setup, duration=1.0, time_step=0.1)
 
     plotter = WorldStateTrajectoryPlotter(
         derivatives_to_plot=[Derivatives.position, Derivatives.velocity],
@@ -168,24 +195,24 @@ def test_center_positions_and_suppression_rules(world_setup, monkeypatch):
         plot_constant_lines=False,
     )
 
-    rendered = _render_plot(plotter, traj, monkeypatch)
-    pos_ax, vel_ax = rendered["axes"]
+    position_axis, velocity_axis = _render_plot(plotter, trajectory, monkeypatch).axes
 
     # For center_positions=True, the position series should be shifted by initial value
     # Extract first plotted line data and verify it has zero at time 0 approximately
-    pos_lines = pos_ax.get_lines()
-    assert len(pos_lines) >= 1
-    t_data, y_data = pos_lines[0].get_xdata(), pos_lines[0].get_ydata()
+    position_lines = position_axis.get_lines()
+    assert len(position_lines) >= 1
+    times = position_lines[0].get_xdata()
+    positions = position_lines[0].get_ydata()
     # The first y should be approx 0 after centering (time normalized to 0)
     # Note: Due to potential downsampling, check the minimum x index
-    idx0 = int(np.argmin(t_data))
-    assert y_data[idx0] == pytest.approx(0.0, abs=1e-6)
+    first_index = int(np.argmin(times))
+    assert positions[first_index] == pytest.approx(0.0, abs=1e-6)
 
-    # With plot_0_lines=False, DOFs that are always equal to their initial position
-    # should be suppressed in the position subplot, and strictly zero series suppressed in velocity
-    # Changing DOF should appear once; constant DOF should not
-    assert len(pos_lines) == 1
-    assert len(vel_ax.get_lines()) == 1
+    # With plot_constant_lines=False, DOFs that are always equal to their initial
+    # position are suppressed in the position subplot, and strictly zero series in
+    # velocity; the moving DOF appears once, the constant DOF not at all
+    assert len(position_lines) == 1
+    assert len(velocity_axis.get_lines()) == 1
 
 
 # %% trajectories too short to plot
@@ -200,7 +227,7 @@ def test_a_trajectory_of_one_state_is_not_plotted(world_setup, tmp_path):
     plotter.reset(world.state)
     file_name = tmp_path / "trajectory.pdf"
 
-    plotter.plot_trajectory(file_name=str(file_name))
+    plotter.plot_trajectory(file_name=file_name)
 
     assert not plotter.has_trajectory_to_plot
     assert not file_name.exists()

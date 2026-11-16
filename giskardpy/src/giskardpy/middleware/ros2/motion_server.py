@@ -334,7 +334,7 @@ class MotionServer:
             plot_kind=GoalPlotKind.TRAJECTORY, goal_id=goal_id
         )
         try:
-            plotter.plot_trajectory(file_name=str(file_name))
+            plotter.plot_trajectory(file_name=file_name)
         except Exception as exception:
             logger.warning(
                 f"Could not plot the trajectory of goal #{goal_id}: {exception}"
