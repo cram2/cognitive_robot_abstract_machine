@@ -138,7 +138,7 @@ class MovesContainerByItsHandle(
                 approach_clearance=self.approach_clearance,
             ),
             self._create_mechanism_goal(),
-            self.gripper_goal_type.moving_gripper_to(
+            self.gripper_goal_type.create_gripper_goal(
                 configuration=end_effector.default_configuration(GripperState.OPEN)
             ),
             self.tool_center_point_goal(

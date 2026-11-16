@@ -38,10 +38,14 @@ from semantic_digital_twin.robots.robot_parts import (
     Finger,
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
-from semantic_digital_twin.robots.robotiq_85_gripper import Robotiq85Gripper
+from semantic_digital_twin.robots.robotiq_85_gripper import (
+    HasParallelGripperCommandServer,
+    Robotiq85Gripper,
+)
 from semantic_digital_twin.robots.ur10e_arm import UR10eArm
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -81,6 +85,16 @@ class TracyController(StrEnum):
     """
     Commands the joint velocities of one arm; each arm's controller manager loads one.
     """
+
+
+class TracyParallelGripperCommandTopic(StrEnum):
+    """
+    The names the drivers of the Tracy's grippers serve their parallel gripper command
+    actions under, one driver per gripper.
+    """
+
+    LEFT_GRIPPER = "left_gripper/robotiq_gripper_controller/gripper_cmd"
+    RIGHT_GRIPPER = "right_gripper/robotiq_gripper_controller/gripper_cmd"
 
 
 class TracyJoint(JointName):
@@ -231,8 +245,17 @@ class TracyRightGripperRightFinger(Finger):
 
 @dataclass(eq=False)
 class TracyLeftGripper(
-    Robotiq85Gripper[TracyLeftGripperLeftFinger, TracyLeftGripperRightFinger]
+    Robotiq85Gripper[TracyLeftGripperLeftFinger, TracyLeftGripperRightFinger],
+    HasParallelGripperCommandServer,
 ):
+    @classproperty
+    def parallel_gripper_command_topic(cls) -> str:
+        return TracyParallelGripperCommandTopic.LEFT_GRIPPER
+
+    @property
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        return self.knuckle_joint
+
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -287,8 +310,17 @@ class TracyLeftGripper(
 
 @dataclass(eq=False)
 class TracyRightGripper(
-    Robotiq85Gripper[TracyRightGripperLeftFinger, TracyRightGripperRightFinger]
+    Robotiq85Gripper[TracyRightGripperLeftFinger, TracyRightGripperRightFinger],
+    HasParallelGripperCommandServer,
 ):
+    @classproperty
+    def parallel_gripper_command_topic(cls) -> str:
+        return TracyParallelGripperCommandTopic.RIGHT_GRIPPER
+
+    @property
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        return self.knuckle_joint
+
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
