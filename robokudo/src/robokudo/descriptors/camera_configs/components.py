@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # %% Imports
+import math
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -83,6 +84,18 @@ class TfComponent:
     """
     How long to wait for TF to provide the camera pose at the acquisition time of a
     frame; a frame without one by then is dropped.
+    """
+
+    tolerated_camera_pose_distance: float = 0.05
+    """
+    How far, in meters, the world may place a camera another process attached away from
+    where TF places it before a warning is logged.
+    """
+
+    tolerated_camera_pose_angle: float = math.radians(5.0)
+    """
+    How far, in radians, the world may turn a camera another process attached away from
+    how TF turns it before a warning is logged.
     """
 
 

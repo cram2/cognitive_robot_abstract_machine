@@ -15,6 +15,7 @@ from sensor_msgs.msg import CameraInfo
 
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.cas import CAS
+from robokudo.defs import PACKAGE_NAME
 from robokudo.types.image import ImageRotation
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import TfComponent
@@ -37,6 +38,9 @@ from semantic_digital_twin.datastructures.camera_model import (
     PinholeCameraModel,
     RationalPolynomialCameraDistortion,
 )
+from semantic_digital_twin.adapters.ros.ros2_to_semdt_converters import (
+    TransformToSemDTConverter,
+)
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -47,8 +51,8 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
-class SynchronizedImageConfiguration:
+@dataclass(kw_only=True)
+class SynchronizedImageConfiguration(TfComponent):
     """
     Provide the options consumed by the RGB-D reader's frame conversion.
     """
@@ -279,10 +283,12 @@ def test_ros_frame_alias_reuses_robot_optical_body(
     assert len(runtime_world.bodies) == 3
 
 
-def test_tf_binding_locates_robot_camera_by_the_world(runtime_world: World) -> None:
+def test_tf_binding_places_robot_camera_where_tf_located_it(
+    runtime_world: World,
+) -> None:
     """
-    A robot optical body keeps its parent and is located by the world, not by the
-    sampled TF pose.
+    A robot optical body keeps its parent, and its pose is the sampled TF pose, not the
+    one the world currently gives it.
     """
     reference, camera_body = _mounted_camera_bodies(runtime_world)
     original_parent = camera_body.parent_connection
@@ -307,11 +313,42 @@ def test_tf_binding_locates_robot_camera_by_the_world(runtime_world: World) -> N
         world_T_camera=numeric_pose,
     )
 
-    assert pose.reference_frame is runtime_world.root
+    assert pose.reference_frame is reference
     assert pose.child_frame is camera_body
     assert camera_body.parent_connection is original_parent
     assert len(runtime_world.connections) == 2
-    np.testing.assert_allclose(pose.to_np(), camera_body.global_transform.to_np())
+    np.testing.assert_allclose(pose.to_np(), numeric_pose.to_np())
+
+
+def test_tf_binding_keeps_robot_camera_attached_to_the_world_frame(
+    runtime_world: World,
+) -> None:
+    """
+    A camera another process attached directly below the world frame is not moved to
+    the sampled TF pose.
+    """
+    reference = Body(name=PrefixedName(name="map"))
+    camera_body = Body(name=PrefixedName(name="color_optical_frame"))
+    with runtime_world.modify_world():
+        runtime_world.add_body(reference)
+        runtime_world.add_body(camera_body)
+        runtime_world.add_connection(
+            Connection6DoF.create_with_dofs(
+                parent=reference, child=camera_body, world=runtime_world
+            )
+        )
+    camera_pose_before = camera_body.global_transform.to_np()
+
+    CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
+        world=runtime_world,
+        world_frame="map",
+        camera_frame="color_optical_frame",
+        world_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.4),
+    )
+
+    np.testing.assert_array_equal(
+        camera_body.global_transform.to_np(), camera_pose_before
+    )
 
 
 def test_mismatched_pose_child_is_rejected_at_acquisition(
@@ -445,6 +482,19 @@ def test_camera_observation_connects_new_camera_in_rooted_world_without_pose(
 # %% Live reader contracts
 
 
+def tf_sample(*, x: float, y: float, z: float, stamp: Time) -> TransformStamped:
+    """
+    :return: A camera pose as TF provides it for ``stamp``, without rotation.
+    """
+    sample = TransformStamped()
+    sample.header.stamp = stamp
+    sample.transform.translation.x = x
+    sample.transform.translation.y = y
+    sample.transform.translation.z = z
+    sample.transform.rotation.w = 1.0
+    return sample
+
+
 def test_live_reader_rejects_tf_source_for_a_different_optical_frame(
     runtime_world: World,
     camera_info: CameraInfo,
@@ -487,16 +537,19 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.4, pos_y=0.2, pos_z=1.3
-    )
     interface.color = np.zeros(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
     )
     interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
     interface.camera_info = camera_info
     interface.timestamp = Time(sec=10, nanosec=20)
-    interface._world_T_camera_timestamp = interface.timestamp
+    interface._world_T_camera = tf_sample(
+        x=0.4, y=0.2, z=1.3, stamp=interface.timestamp
+    )
+    interface.tf_wrapper = Mock()
+    interface.tf_wrapper.lookup_transform.return_value = tf_sample(
+        x=0.0, y=0.0, z=0.0, stamp=interface.timestamp
+    )
     interface.lock = Lock()
     cas = CAS()
 
@@ -523,16 +576,15 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.4, pos_y=0.2, pos_z=1.3
-    )
     interface.color = np.zeros(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
     )
     interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
     interface.camera_info = camera_info
     interface.timestamp = Time(sec=10, nanosec=20)
-    interface._world_T_camera_timestamp = interface.timestamp
+    interface._world_T_camera = tf_sample(
+        x=0.4, y=0.2, z=1.3, stamp=interface.timestamp
+    )
     interface.lock = Lock()
     cas = CAS()
 
@@ -802,10 +854,9 @@ def transform_camera() -> ROSCameraInterface:
     camera.tf_from = "camera_optical_frame"
     camera.tf_to = "map"
     camera.camera_config = TfComponent(tf_from=camera.tf_from, tf_to=camera.tf_to)
-    camera.tf_buffer = Mock()
-    camera.tf_buffer.can_transform.return_value = False
+    camera.tf_wrapper = Mock()
+    camera.tf_wrapper.wait_for_transform.return_value = False
     camera._world_T_camera = None
-    camera._world_T_camera_timestamp = None
     return camera
 
 
@@ -815,40 +866,46 @@ def test_unavailable_transform_returns_false(
     """
     An unavailable sample is reported without attempting its lookup.
     """
-    transform_camera.tf_buffer.can_transform.return_value = False
+    transform_camera.tf_wrapper.wait_for_transform.return_value = False
     assert transform_camera.lookup_transform() is False
-    transform_camera.tf_buffer.lookup_transform.assert_not_called()
+    transform_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 def test_available_transform_updates_pose(transform_camera: ROSCameraInterface) -> None:
     """
-    A sampled pose is cached as a homogeneous transformation matrix.
+    A sampled pose is cached as TF provides it.
     """
-    sample = TransformStamped()
-    sample.transform.translation.x = 1.0
-    sample.transform.translation.y = 2.0
-    sample.transform.translation.z = 3.0
-    sample.transform.rotation.w = 1.0
-    transform_camera.tf_buffer.can_transform.return_value = True
-    transform_camera.tf_buffer.lookup_transform.return_value = sample
+    sample = tf_sample(x=1.0, y=2.0, z=3.0, stamp=Time(nanosec=123))
+    transform_camera.tf_wrapper.wait_for_transform.return_value = True
+    transform_camera.tf_wrapper.lookup_transform.return_value = sample
     timestamp = ROSClockTime(nanoseconds=123)
-    assert transform_camera.lookup_transform(timestamp) is True
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=sample.transform.translation.x,
-        pos_y=sample.transform.translation.y,
-        pos_z=sample.transform.translation.z,
-        quat_x=sample.transform.rotation.x,
-        quat_y=sample.transform.rotation.y,
-        quat_z=sample.transform.rotation.z,
-        quat_w=sample.transform.rotation.w,
-    )
-    np.testing.assert_array_equal(
-        transform_camera._world_T_camera.to_np(), expected_pose.to_np()
-    )
-    transform_camera.tf_buffer.lookup_transform.assert_called_once_with(
+    assert transform_camera.lookup_transform(timestamp=timestamp) is True
+    assert transform_camera._world_T_camera is sample
+    transform_camera.tf_wrapper.lookup_transform.assert_called_once_with(
         target_frame=transform_camera.tf_to,
         source_frame=transform_camera.tf_from,
         time=timestamp,
+    )
+
+
+def test_cached_sample_is_bound_as_the_camera_pose(
+    transform_camera: ROSCameraInterface,
+) -> None:
+    """
+    The camera pose of a frame is the TF sample cached for its acquisition time.
+    """
+    stamp = Time(sec=1)
+    transform_camera._world_T_camera = tf_sample(x=1.0, y=2.0, z=3.0, stamp=stamp)
+    world = World()
+
+    pose = transform_camera.world_T_camera_from_tf(world=world, timestamp=stamp)
+
+    transform_camera.tf_wrapper.wait_for_transform.assert_not_called()
+    np.testing.assert_array_equal(
+        pose.to_np(),
+        TransformToSemDTConverter.convert(
+            data=transform_camera._world_T_camera.transform, world=world
+        ).to_np(),
     )
 
 
@@ -860,8 +917,8 @@ def test_disabled_lookup_does_not_access_buffer(
     """
     transform_camera.lookup_viewpoint = False
     assert transform_camera.lookup_transform() is True
-    transform_camera.tf_buffer.can_transform.assert_not_called()
-    transform_camera.tf_buffer.lookup_transform.assert_not_called()
+    transform_camera.tf_wrapper.wait_for_transform.assert_not_called()
+    transform_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 def test_transform_lookup_errors_propagate(
@@ -870,10 +927,138 @@ def test_transform_lookup_errors_propagate(
     """
     A buffer failure after its availability check reaches the caller.
     """
-    transform_camera.tf_buffer.can_transform.return_value = True
-    transform_camera.tf_buffer.lookup_transform.side_effect = LookupException
+    transform_camera.tf_wrapper.wait_for_transform.return_value = True
+    transform_camera.tf_wrapper.lookup_transform.side_effect = LookupException
     with pytest.raises(LookupException):
         transform_camera.lookup_transform()
+
+
+# %% Disagreement between the world and TF
+@pytest.fixture
+def robot_camera() -> ROSCameraInterface:
+    """
+    Provide an interface locating the robot camera of :func:`_mounted_camera_bodies`
+    through a controlled TF buffer.
+    """
+    camera = ROSCameraInterface.__new__(ROSCameraInterface)
+    camera.lookup_viewpoint = True
+    camera.tf_from = "color_optical_frame"
+    camera.tf_to = "map"
+    camera.camera_config = TfComponent(tf_from=camera.tf_from, tf_to=camera.tf_to)
+    camera.tf_wrapper = Mock()
+    camera.rk_logger = logging.getLogger(PACKAGE_NAME)
+    return camera
+
+
+def warnings_after_comparing_with_tf(
+    *,
+    camera: ROSCameraInterface,
+    world: World,
+    latest_tf_sample: TransformStamped,
+    caplog: pytest.LogCaptureFixture,
+) -> list[logging.LogRecord]:
+    """
+    :return: The warnings logged when ``camera`` compares the pose ``world`` gives its
+        camera with ``latest_tf_sample``.
+    """
+    camera.tf_wrapper.lookup_transform.return_value = latest_tf_sample
+    world_T_camera = camera.bind_world_T_camera(
+        world=world,
+        world_frame=camera.tf_to,
+        camera_frame=camera.tf_from,
+        world_T_camera=TransformToSemDTConverter.convert(
+            data=latest_tf_sample.transform, world=world
+        ),
+    )
+    with caplog.at_level(logging.WARNING):
+        camera.warn_if_world_disagrees_with_tf(
+            world=world, world_T_camera=world_T_camera
+        )
+    return [record for record in caplog.records if record.levelno == logging.WARNING]
+
+
+def test_world_agreeing_with_tf_logs_no_warning(
+    runtime_world: World,
+    robot_camera: ROSCameraInterface,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    A robot camera the world places where TF does raises no warning.
+    """
+    _mounted_camera_bodies(runtime_world)
+
+    warnings = warnings_after_comparing_with_tf(
+        camera=robot_camera,
+        world=runtime_world,
+        latest_tf_sample=tf_sample(x=0.0, y=0.0, z=0.0, stamp=Time()),
+        caplog=caplog,
+    )
+
+    assert warnings == []
+
+
+def test_world_placing_the_camera_beyond_tolerance_logs_a_warning(
+    runtime_world: World,
+    robot_camera: ROSCameraInterface,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    A robot camera the world places farther from TF than tolerated raises a warning.
+    """
+    _mounted_camera_bodies(runtime_world)
+    distance = 2 * robot_camera.camera_config.tolerated_camera_pose_distance
+
+    warnings = warnings_after_comparing_with_tf(
+        camera=robot_camera,
+        world=runtime_world,
+        latest_tf_sample=tf_sample(x=distance, y=0.0, z=0.0, stamp=Time()),
+        caplog=caplog,
+    )
+
+    assert len(warnings) == 1
+
+
+def test_world_turning_the_camera_beyond_tolerance_logs_a_warning(
+    runtime_world: World,
+    robot_camera: ROSCameraInterface,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    A robot camera the world turns farther from TF than tolerated raises a warning.
+    """
+    reference, camera_body = _mounted_camera_bodies(runtime_world)
+    head_connection = camera_body.parent_connection.parent.parent_connection
+    head_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        yaw=2 * robot_camera.camera_config.tolerated_camera_pose_angle,
+        reference_frame=reference,
+    )
+
+    warnings = warnings_after_comparing_with_tf(
+        camera=robot_camera,
+        world=runtime_world,
+        latest_tf_sample=tf_sample(x=0.0, y=0.0, z=0.0, stamp=Time()),
+        caplog=caplog,
+    )
+
+    assert len(warnings) == 1
+
+
+def test_camera_on_its_own_mount_is_not_compared_with_tf(
+    runtime_world: World,
+    robot_camera: ROSCameraInterface,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    A camera on the mount perception created follows TF already and is not compared.
+    """
+    warnings_after_comparing_with_tf(
+        camera=robot_camera,
+        world=runtime_world,
+        latest_tf_sample=tf_sample(x=1.0, y=0.0, z=0.0, stamp=Time()),
+        caplog=caplog,
+    )
+
+    robot_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 # %% Isolated semantic world

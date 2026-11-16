@@ -18,7 +18,6 @@ from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCameraConfig
 from robokudo.exceptions import UnknownWorldFrameError
 from robokudo.io.camera_interface import KinectCameraInterface
-from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 from ._perception_world import FrameName, camera_pose
@@ -45,9 +44,9 @@ def camera_interface(node: Node) -> Iterator[KinectCameraInterface]:
     world_T_camera.header.frame_id = FrameName.WORLD
     world_T_camera.child_frame_id = FrameName.CAMERA
     world_T_camera.transform.rotation.w = 1.0
-    camera_interface.tf_buffer.set_transform_static(world_T_camera, "test")
+    camera_interface.tf_wrapper.tf_buffer.set_transform_static(world_T_camera, "test")
     yield camera_interface
-    TFListenerProxy().clear_node(node)
+    camera_interface.tf_wrapper.stop()
 
 
 def receive_a_frame(
@@ -121,7 +120,7 @@ def turning_camera_interface(node: Node) -> Iterator[KinectCameraInterface]:
         )
     )
     yield camera_interface
-    TFListenerProxy().clear_node(node)
+    camera_interface.tf_wrapper.stop()
 
 
 def locate_camera(
@@ -141,7 +140,7 @@ def locate_camera(
     world_T_camera.child_frame_id = FrameName.CAMERA
     world_T_camera.transform.translation.x = x
     world_T_camera.transform.rotation.w = 1.0
-    camera_interface.tf_buffer.set_transform(world_T_camera, "test")
+    camera_interface.tf_wrapper.tf_buffer.set_transform(world_T_camera, "test")
 
 
 def read_frame(camera_interface: KinectCameraInterface) -> CAS:

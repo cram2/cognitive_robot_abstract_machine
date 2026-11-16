@@ -24,6 +24,7 @@ from __future__ import annotations
 
 # %% Imports
 import logging
+import math
 import struct
 from threading import Lock
 
@@ -36,8 +37,8 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
+from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, CameraInfo, Image
-from tf2_ros import Buffer
 from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.ormatic.utils import classproperty
@@ -51,11 +52,14 @@ from robokudo.exceptions import (
 )
 from robokudo.io.exceptions import CameraAnnotationAmbiguous
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
-from robokudo.io.tf_listener_proxy import TFListenerProxy
 from robokudo.types.camera import CameraObservation
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.utils.ros_frames import find_bodies_for_ros_frame, normalize_ros_frame_id
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from semantic_digital_twin.adapters.ros.ros2_to_semdt_converters import (
+    TransformToSemDTConverter,
+)
+from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
@@ -139,8 +143,8 @@ class CameraInterface(object):
         """
         Bind a sampled camera pose to the bodies of ``world``.
 
-        A camera another process attached, such as a robot's camera, is located by
-        ``world``. Any other camera is mounted below the world frame and moved to the
+        A camera another process attached, such as a robot's camera, keeps that
+        attachment. Any other camera is mounted below the world frame and moved to the
         sampled pose, unless ``world`` lacks it and :meth:`adds_missing_camera` is false.
 
         :param world: The world perception perceives into.
@@ -165,18 +169,6 @@ class CameraInterface(object):
             raise InvalidCameraObservation(reason="camera pose frame is ambiguous")
 
         camera_body = camera_matches[0] if camera_matches else None
-        if (
-            camera_body is not None
-            and camera_body.parent_connection is not None
-            and camera_body.parent_connection.name
-            != self._standalone_mount_name(camera_body)
-        ):
-            return HomogeneousTransformationMatrix(
-                data=camera_body.global_transform,
-                reference_frame=world.root,
-                child_frame=camera_body,
-            )
-
         world_body = reference_matches[0] if reference_matches else None
         if (
             world_body is None
@@ -209,7 +201,10 @@ class CameraInterface(object):
                     name=self._standalone_mount_name(camera_body),
                 )
                 world.add_connection(mount)
-        elif camera_body.parent_connection.parent is world_body:
+        elif (
+            self.is_mounted_standalone(camera_body=camera_body)
+            and camera_body.parent_connection.parent is world_body
+        ):
             mount = camera_body.parent_connection
 
         bound_world_T_camera = HomogeneousTransformationMatrix(
@@ -221,6 +216,18 @@ class CameraInterface(object):
             with world.modify_world():
                 mount.origin = bound_world_T_camera
         return bound_world_T_camera
+
+    @classmethod
+    def is_mounted_standalone(cls, *, camera_body: Body) -> bool:
+        """
+        :return: Whether ``camera_body`` hangs on the adjustable mount perception
+            created for it, rather than on an attachment another process made.
+        """
+        return (
+            camera_body.parent_connection is not None
+            and camera_body.parent_connection.name
+            == cls._standalone_mount_name(camera_body)
+        )
 
     @staticmethod
     def _standalone_mount_name(camera_body: Body) -> PrefixedName:
@@ -437,13 +444,10 @@ class ROSCameraInterface(CameraInterface):
             """
             Transform target frame.
             """
-        self._world_T_camera: HomogeneousTransformationMatrix | None = None
+        self._world_T_camera: TransformStamped | None = None
         """
-        Camera pose from the most recent successful TF lookup.
-        """
-        self._world_T_camera_timestamp: builtin_interfaces.msg.Time | None = None
-        """
-        Time TF provided :attr:`_world_T_camera` for.
+        Camera pose from the most recent successful TF lookup, stamped with the time TF
+        provided it for.
         """
         self.timestamp: builtin_interfaces.msg.Time | None = None
         """
@@ -454,9 +458,9 @@ class ROSCameraInterface(CameraInterface):
         Guards the latest frame against being replaced while it is read.
         """
         if self.lookup_viewpoint:
-            self.tf_buffer: Buffer = TFListenerProxy().buffer_for_node(self.node)
+            self.tf_wrapper: TFWrapper = TFWrapper(node=self.node)
             """
-            TF buffer populated by the per-node transform listener.
+            Looks the camera pose up in TF.
             """
 
     def has_new_data(self) -> bool:
@@ -468,7 +472,9 @@ class ROSCameraInterface(CameraInterface):
         with self.lock:
             if not self._has_new_data:
                 return False
-            self._has_new_data = self.lookup_transform(Time.from_msg(self.timestamp))
+            self._has_new_data = self.lookup_transform(
+                timestamp=Time.from_msg(self.timestamp)
+            )
             return self._has_new_data
 
     def adds_missing_camera(self, *, world: World) -> bool:
@@ -481,7 +487,7 @@ class ROSCameraInterface(CameraInterface):
             and WorldSynchronizer.all_callbacks_of_this_type_from_world(world)
         )
 
-    def lookup_transform(self, timestamp: Time | None = None) -> bool:
+    def lookup_transform(self, *, timestamp: Time | None = None) -> bool:
         """
         Cache a camera pose when the requested TF sample is available, waiting for it at
         most the configured camera pose timeout.
@@ -492,7 +498,7 @@ class ROSCameraInterface(CameraInterface):
         if not self.lookup_viewpoint:
             return True
         timestamp = timestamp if timestamp is not None else Time()
-        if not self.tf_buffer.can_transform(
+        if not self.tf_wrapper.wait_for_transform(
             target_frame=self.tf_to,
             source_frame=self.tf_from,
             time=timestamp,
@@ -501,20 +507,8 @@ class ROSCameraInterface(CameraInterface):
             ),
         ):
             return False
-        world_T_camera = self.tf_buffer.lookup_transform(
+        self._world_T_camera = self.tf_wrapper.lookup_transform(
             target_frame=self.tf_to, source_frame=self.tf_from, time=timestamp
-        )
-        self._world_T_camera_timestamp = world_T_camera.header.stamp
-        translation = world_T_camera.transform.translation
-        rotation = world_T_camera.transform.rotation
-        self._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=float(translation.x),
-            pos_y=float(translation.y),
-            pos_z=float(translation.z),
-            quat_x=float(rotation.x),
-            quat_y=float(rotation.y),
-            quat_z=float(rotation.z),
-            quat_w=float(rotation.w),
         )
         return True
 
@@ -531,15 +525,62 @@ class ROSCameraInterface(CameraInterface):
         """
         if not self.lookup_viewpoint:
             return None
-        if self._world_T_camera_timestamp != timestamp and not self.lookup_transform(
-            Time.from_msg(timestamp)
-        ):
+        if (
+            self._world_T_camera is None
+            or self._world_T_camera.header.stamp != timestamp
+        ) and not self.lookup_transform(timestamp=Time.from_msg(timestamp)):
             raise CameraPoseMissing()
-        return self.bind_world_T_camera(
+        world_T_camera = self.bind_world_T_camera(
             world=world,
             world_frame=self.tf_to,
             camera_frame=self.tf_from,
-            world_T_camera=self._world_T_camera,
+            world_T_camera=TransformToSemDTConverter.convert(
+                data=self._world_T_camera.transform, world=world
+            ),
+        )
+        self.warn_if_world_disagrees_with_tf(world=world, world_T_camera=world_T_camera)
+        return world_T_camera
+
+    def warn_if_world_disagrees_with_tf(
+        self, *, world: World, world_T_camera: HomogeneousTransformationMatrix
+    ) -> None:
+        """
+        Log a warning if the world currently places a camera another process attached
+        farther from TF's latest camera pose than the configured tolerances allow.
+
+        :param world: The world perception perceives into.
+        :param world_T_camera: Camera pose bound to ``world``.
+        """
+        camera_body = world_T_camera.child_frame
+        if (
+            camera_body is None
+            or camera_body.parent_connection is None
+            or self.is_mounted_standalone(camera_body=camera_body)
+        ):
+            return
+        latest_world_T_camera = TransformToSemDTConverter.convert(
+            data=self.tf_wrapper.lookup_transform(
+                target_frame=self.tf_to, source_frame=self.tf_from
+            ).transform,
+            world=world,
+        )
+        disagreement = HomogeneousTransformationMatrix(
+            data=np.linalg.inv(latest_world_T_camera.to_np())
+            @ np.linalg.inv(world_T_camera.reference_frame.global_transform.to_np())
+            @ camera_body.global_transform.to_np()
+        )
+        distance = float(disagreement.position.norm())
+        angle = float(disagreement.axis_angle.angle)
+        if (
+            distance <= self.camera_config.tolerated_camera_pose_distance
+            and angle <= self.camera_config.tolerated_camera_pose_angle
+        ):
+            return
+        self.rk_logger.warning(
+            f"The world places camera '{self.tf_from}' {distance:.3f} m and "
+            f"{math.degrees(angle):.1f} degrees away from where TF places it in "
+            f"'{self.tf_to}'; perceived objects follow TF and may be misplaced "
+            f"relative to the robot in the world."
         )
 
     def validate_camera_frame_for_tf(self, camera_frame: str) -> None:

@@ -375,7 +375,7 @@ class TestJoiningSharedWorld:
 
 
 class TestJoiningAWorldWithARobot:
-    def test_camera_follows_the_head_the_other_process_moves(
+    def test_frame_is_placed_where_tf_located_the_camera_of_the_moved_head(
         self,
         shared_world_with_a_robot: SharedWorld,
         robokudo_joined_to_a_robot: RoboKudo,
@@ -396,10 +396,12 @@ class TestJoiningAWorldWithARobot:
             lambda: np.allclose(camera_body.global_transform.to_np(), moved_camera_pose)
         )
 
-        cas = cas_seen_from(robokudo_joined_to_a_robot.world, camera_pose(x=4.0))
+        world_T_camera = camera_pose(x=4.0)
+
+        cas = cas_seen_from(robokudo_joined_to_a_robot.world, world_T_camera)
 
         assert np.allclose(
-            cas.camera_observation.world_T_camera.to_np(), moved_camera_pose
+            cas.camera_observation.world_T_camera.to_np(), world_T_camera.to_np()
         )
 
     def test_perceived_object_reaches_the_shared_world_where_the_robot_saw_it(
@@ -419,7 +421,14 @@ class TestJoiningAWorldWithARobot:
 
         put_pass_into_world(
             robokudo_joined_to_a_robot,
-            cas_seen_from(robokudo_joined_to_a_robot.world, camera_pose()),
+            cas_seen_from(
+                robokudo_joined_to_a_robot.world,
+                HomogeneousTransformationMatrix(
+                    data=shared.get_body_by_name(
+                        FrameName.CAMERA
+                    ).global_transform.to_np()
+                ),
+            ),
             hypothesis,
         )
         body_id = perceived_body_id(robokudo_joined_to_a_robot.world)
