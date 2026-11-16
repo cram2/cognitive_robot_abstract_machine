@@ -317,9 +317,9 @@ class CausalGraphJSONKey(StrEnum):
     The edges, in the graph's order.
     """
 
-    MAXIMUM_UNDIRECTED_EDGES = "maximum_undirected_edges"
+    MAXIMUM_MEMBER_GRAPHS = "maximum_member_graphs"
     """
-    The graph's :attr:`CausalGraph.maximum_undirected_edges`.
+    The graph's :attr:`CausalGraph.maximum_member_graphs`.
     """
 
 
@@ -330,10 +330,10 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
     cannot tell apart, whose undirected edges any of them may orient either way.
     """
 
-    maximum_undirected_edges: int = 12
+    maximum_member_graphs: int = 1000
     """
-    How many undirected edges the graph may have for the directed acyclic graphs it
-    stands for to be listed, each undirected edge doubling their candidates.
+    How many directed acyclic graphs the graph may stand for and still have them
+    listed.
     """
 
     @classmethod
@@ -405,18 +405,16 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             **super().to_json(**kwargs),
             CausalGraphJSONKey.NODES: to_json(self.nodes(), **kwargs),
             CausalGraphJSONKey.EDGES: to_json(self.edges(), **kwargs),
-            CausalGraphJSONKey.MAXIMUM_UNDIRECTED_EDGES: self.maximum_undirected_edges,
+            CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS: self.maximum_member_graphs,
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         graph = cls.from_edges(
             from_json(data[CausalGraphJSONKey.NODES], **kwargs),
             from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
         )
-        graph.maximum_undirected_edges = data[
-            CausalGraphJSONKey.MAXIMUM_UNDIRECTED_EDGES
-        ]
+        graph.maximum_member_graphs = data[CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS]
         return graph
 
     def edge_between(self, first: GraphNode, second: GraphNode) -> GraphEdge | None:
@@ -481,8 +479,8 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :return: Every directed acyclic graph the graph stands for: each orientation of
             the undirected edges that is acyclic and has exactly the graph's unshielded
             colliders.
-        :raises EquivalenceClassTooLarge: If the graph has more than
-            :attr:`maximum_undirected_edges` undirected edges.
+        :raises EquivalenceClassTooLarge: If the graph stands for more than
+            :attr:`maximum_member_graphs` directed acyclic graphs.
         :raises CyclicGraph: If the graph has no undirected edges and a directed cycle.
         :raises InconsistentGraph: If no orientation qualifies.
         """
@@ -498,8 +496,8 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :return: Whether some orientation of the undirected edges qualifies as a member
             graph, as :meth:`member_graphs` describes them. A graph learned from a
             finite sample may have none.
-        :raises EquivalenceClassTooLarge: If the graph has more than
-            :attr:`maximum_undirected_edges` undirected edges.
+        :raises EquivalenceClassTooLarge: If the graph stands for more than
+            :attr:`maximum_member_graphs` directed acyclic graphs.
         :raises CyclicGraph: If the graph has no undirected edges and a directed cycle.
         """
         return bool(self._member_graphs)
@@ -510,11 +508,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :return: The member graphs, as :meth:`member_graphs` describes them, listed
             once; none if no orientation qualifies.
         """
-        undirected = [edge for edge in self.edges() if edge.is_undirected]
-        if len(undirected) > self.maximum_undirected_edges:
-            raise EquivalenceClassTooLarge(
-                len(undirected), self.maximum_undirected_edges
-            )
+        undirected = self.undirected_edges_in_connected_order()
         directed = MemberGraph()
         directed.add_nodes_from(self.nodes())
         directed.add_edges_from(
@@ -526,12 +520,36 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             return [directed]
         colliders = self.unshielded_colliders()
         members = []
-        for reversals in itertools.product((False, True), repeat=len(undirected)):
-            member = directed.copy()
-            member.add_edges_from(
-                (edge.second, edge.first) if reverse else (edge.first, edge.second)
-                for edge, reverse in zip(undirected, reversals)
-            )
-            if member.is_acyclic and (self.colliders_of(member) == colliders):
-                members.append(member)
+        partial_orientations = [directed]
+        while partial_orientations:
+            partial = partial_orientations.pop()
+            oriented_count = len(partial.edges()) - len(directed.edges())
+            if oriented_count == len(undirected):
+                if len(members) == self.maximum_member_graphs:
+                    raise EquivalenceClassTooLarge(self.maximum_member_graphs)
+                members.append(partial)
+                continue
+            edge = undirected[oriented_count]
+            for parent, child in ((edge.second, edge.first), (edge.first, edge.second)):
+                extended = partial.copy()
+                extended.add_edge(parent, child)
+                if extended.is_acyclic and self.colliders_of(extended) == colliders:
+                    partial_orientations.append(extended)
         return members
+
+    def undirected_edges_in_connected_order(self) -> list[GraphEdge]:
+        """
+        :return: The undirected edges, each sharing a node with an earlier one where
+            any of the rest does.
+        """
+        remaining = [edge for edge in self.edges() if edge.is_undirected]
+        ordered, reached = [], set()
+        while remaining:
+            edge = next(
+                (edge for edge in remaining if {edge.first, edge.second} & reached),
+                remaining[0],
+            )
+            remaining.remove(edge)
+            ordered.append(edge)
+            reached |= {edge.first, edge.second}
+        return ordered

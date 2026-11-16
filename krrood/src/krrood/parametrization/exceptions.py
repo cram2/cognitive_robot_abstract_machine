@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import AttributeMatch
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WhereExpressionIsFirstOrder(DataclassException):
     """
     Raised when a quantified `Where` expression is asked to be translated into a random
@@ -41,7 +41,7 @@ class WhereExpressionIsFirstOrder(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WhereExpressionHasNoRandomEventRepresentation(DataclassException):
     """
     Raised when a part of a `Where` expression constrains something that no random event
@@ -67,7 +67,7 @@ class WhereExpressionHasNoRandomEventRepresentation(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyVariableDomain(InputError):
     variable: Variable
 
@@ -78,7 +78,7 @@ class EmptyVariableDomain(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidEllipsis(InputError):
     type_: type
 
@@ -89,7 +89,7 @@ class InvalidEllipsis(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModelVariableNotBound(ProbabilisticModelException):
     """
     Raised when bindings are translated into a sample of a probabilistic model, but
@@ -115,7 +115,7 @@ class ModelVariableNotBound(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ValueOutsideVariableDomain(ProbabilisticModelException):
     """
     Raised when bindings are translated into a sample of a probabilistic model, but a
@@ -147,7 +147,7 @@ class ValueOutsideVariableDomain(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DoRequiresCausalCircuitModel(ProbabilisticModelException):
     """
     Raised when a match has a ``cause`` intervention but the model registry resolved a
@@ -171,7 +171,7 @@ class DoRequiresCausalCircuitModel(ProbabilisticModelException):
         return "Use a model registry that returns a CausalCircuit for this class (see CausalCircuitRegistry)."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultipleEffectVariablesNotSupported(ProbabilisticModelException):
     """
     Raised when a query declares more than one effect variable via
@@ -200,7 +200,7 @@ class MultipleEffectVariablesNotSupported(ProbabilisticModelException):
         return "Declare exactly one effect per query."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointQueryAcrossClassesNotSupported(ProbabilisticModelException):
     """
     Raised when a probabilistic query (``probability_of(...)``, ``average(...)``)
@@ -244,7 +244,7 @@ class JointQueryAcrossClassesNotSupported(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalCircuitRegistryRequiresMatch(ProbabilisticModelException):
     """
     Raised when a
@@ -276,7 +276,7 @@ class RelationalCircuitRegistryRequiresMatch(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousVariableName(ProbabilisticModelException):
     """
     Raised when several attributes of a match have the name of a variable of a
@@ -307,7 +307,7 @@ class AmbiguousVariableName(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DomainElementsIndistinguishableInSamples(ProbabilisticModelException):
     """
     Raised when two elements of the domain of a symbolic variable have hashes that a
@@ -342,7 +342,7 @@ class DomainElementsIndistinguishableInSamples(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AssignedValueHasNoRandomEventRepresentation(DataclassException):
     """
     Raised when an attribute of a match is assigned an expression that no random event
@@ -369,7 +369,7 @@ class AssignedValueHasNoRandomEventRepresentation(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundedParameterError(ProbabilisticModelException):
     """
     Raised when a uniform prior is asked for a parameter that the statement's ``where``
@@ -394,7 +394,7 @@ class UnboundedParameterError(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AttributeNotParameterized(InputError):
     """
     Raised when the random events variable of an attribute is requested from a query

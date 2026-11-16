@@ -185,7 +185,7 @@ class Costmap(Location):
         :raises NonPositiveLimitValue: If asked for fewer than one candidate.
         """
         if number_of_samples < 1:
-            raise NonPositiveLimitValue(number_of_samples)
+            raise NonPositiveLimitValue(wrong_limit_value=number_of_samples)
 
         # An entry is only ever offered once, so the whole map is all there is to
         # sample.

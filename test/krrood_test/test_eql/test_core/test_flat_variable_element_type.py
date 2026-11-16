@@ -15,17 +15,17 @@ from krrood.symbol_graph.symbol_graph import Symbol
 # %% Domain
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Label(Symbol):
     text: str
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Tag(Symbol):
     text: str
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class LabelledCollections(Symbol):
     """
     Holds labels and returns them in collections of differently annotated shapes.
@@ -58,7 +58,7 @@ class LabelledCollections(Symbol):
         """
         :return: A pair whose positions have different types.
         """
-        return Label("first"), Tag("second")
+        return Label(text="first"), Tag(text="second")
 
 
 # %% Element type of a flattened collection

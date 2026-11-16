@@ -21,7 +21,7 @@ import krrood
 from . import quantifier_overloads_fixture
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MypyCheckResult:
     """
     The outcome of running ``mypy`` against a single source file.

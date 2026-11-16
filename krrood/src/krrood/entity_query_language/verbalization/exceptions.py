@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PredicateFragmentRequiredError(DataclassException):
     """
     A :class:`~krrood.entity_query_language.predicate.Verbalizable` predicate was verbalized without
@@ -36,7 +36,9 @@ class PredicateFragmentRequiredError(DataclassException):
     """
 
     node: InstantiatedVariable
-    """The instantiated predicate whose type supplies no verbalization fragment."""
+    """
+    The instantiated predicate whose type supplies no verbalization fragment.
+    """
 
     def error_message(self) -> str:
         return (
@@ -51,7 +53,7 @@ class PredicateFragmentRequiredError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonFragmentPredicateError(DataclassException):
     """
     A predicate's ``_verbalization_fragment_`` returned something that is not a
@@ -62,7 +64,9 @@ class NonFragmentPredicateError(DataclassException):
     """
 
     predicate_type: type
-    """The predicate type whose hook returned a non-fragment."""
+    """
+    The predicate type whose hook returned a non-fragment.
+    """
 
     returned: object
     """
@@ -82,7 +86,7 @@ class NonFragmentPredicateError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnverbalizableExpressionError(DataclassException):
     """
     No grammar rule covers an EQL construct — a coverage gap, surfaced as an error
@@ -90,7 +94,9 @@ class UnverbalizableExpressionError(DataclassException):
     """
 
     node: SymbolicExpression
-    """The EQL expression no grammar rule matched."""
+    """
+    The EQL expression no grammar rule matched.
+    """
 
     def error_message(self) -> str:
         return (
@@ -104,7 +110,7 @@ class UnverbalizableExpressionError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnloweredFragmentError(DataclassException):
     """
     A fragment kind with no fold handler reached a renderer — a realisation pass was
@@ -112,7 +118,9 @@ class UnloweredFragmentError(DataclassException):
     """
 
     fragment: VerbalizationFragment
-    """The un-lowered fragment that reached the renderer."""
+    """
+    The un-lowered fragment that reached the renderer.
+    """
 
     def error_message(self) -> str:
         return (
@@ -124,7 +132,7 @@ class UnloweredFragmentError(DataclassException):
         return "Run the realisation passes (realize_tree) before rendering."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UndeclaredFormPositionError(DataclassException):
     """
     A concrete :class:`~krrood.entity_query_language.verbalization.grammar.conditions.pl
@@ -134,7 +142,9 @@ class UndeclaredFormPositionError(DataclassException):
     """
 
     form: type[ConditionForm]
-    """The condition-form subclass missing its ``position``."""
+    """
+    The condition-form subclass missing its ``position``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -146,7 +156,7 @@ class UndeclaredFormPositionError(DataclassException):
         return "Add e.g. `position = SurfacePosition.WHOSE` to the class body."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownAggregatorError(DataclassException):
     """
     An aggregator type has no verbalization phrase — a coverage gap surfaced when a new
@@ -156,7 +166,9 @@ class UnknownAggregatorError(DataclassException):
     """
 
     aggregator_type: type[Aggregator]
-    """The aggregator type that maps to no aggregation phrase."""
+    """
+    The aggregator type that maps to no aggregation phrase.
+    """
 
     def error_message(self) -> str:
         return (

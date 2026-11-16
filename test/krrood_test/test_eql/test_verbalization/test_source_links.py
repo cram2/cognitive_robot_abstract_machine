@@ -54,14 +54,14 @@ from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 # ── Test fixtures ──────────────────────────────────────────────────────────────
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Sensor:
     level: int
     active: bool
     name: str
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _SensorChild(_Sensor):
     """
     Subclass to verify MRO walking (kept for potential future use).
@@ -78,7 +78,7 @@ class _ConstantResolver:
     def __init__(self, url: str = "http://example.com/source") -> None:
         self._url = url
 
-    def resolve(self, ref: SourceReference) -> str | None:
+    def resolve(self, *, reference: SourceReference) -> str | None:
         return self._url
 
 
@@ -87,7 +87,7 @@ class _NoneResolver:
     Stub resolver that always returns None (no link available).
     """
 
-    def resolve(self, ref: SourceReference) -> str | None:
+    def resolve(self, *, reference: SourceReference) -> str | None:
         return None
 
 
@@ -127,7 +127,7 @@ def test_source_ref_equality():
 
 def test_autoapi_resolver_class_url_structure():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceReference(owner_type=_Sensor))
+    url = r.resolve(reference=SourceReference(owner_type=_Sensor))
     assert url is not None
     assert url.startswith("https://docs.example.com/autoapi/")
     assert "#" in url
@@ -135,7 +135,7 @@ def test_autoapi_resolver_class_url_structure():
 
 def test_autoapi_resolver_class_anchor_contains_qualname():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceReference(owner_type=_Sensor))
+    url = r.resolve(reference=SourceReference(owner_type=_Sensor))
     assert url is not None
     anchor = url.split("#")[1]
     assert "_Sensor" in anchor
@@ -143,7 +143,7 @@ def test_autoapi_resolver_class_anchor_contains_qualname():
 
 def test_autoapi_resolver_attribute_anchor_contains_attr():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceReference(owner_type=_Sensor, attribute="level"))
+    url = r.resolve(reference=SourceReference(owner_type=_Sensor, attribute="level"))
     assert url is not None
     anchor = url.split("#")[1]
     assert "level" in anchor
@@ -153,12 +153,12 @@ def test_autoapi_resolver_strips_trailing_slash_from_base():
     r1 = AutoAPIResolver(base_url="https://docs.example.com/")
     r2 = AutoAPIResolver(base_url="https://docs.example.com")
     ref = SourceReference(owner_type=_Sensor)
-    assert r1.resolve(ref) == r2.resolve(ref)
+    assert r1.resolve(reference=ref) == r2.resolve(reference=ref)
 
 
 def test_autoapi_resolver_module_path_uses_slashes():
     r = AutoAPIResolver(base_url="https://docs.example.com")
-    url = r.resolve(SourceReference(owner_type=_Sensor))
+    url = r.resolve(reference=SourceReference(owner_type=_Sensor))
     assert url is not None
     path_part = url.split("/autoapi/")[1].split("/index.html")[0]
     assert "." not in path_part
@@ -172,7 +172,7 @@ def test_autoapi_resolver_no_warning_when_html_root_not_set(caplog):
 
     r = AutoAPIResolver(base_url="https://docs.example.com")
     with caplog.at_level(logging.WARNING):
-        r.resolve(SourceReference(owner_type=_Sensor))
+        r.resolve(reference=SourceReference(owner_type=_Sensor))
     assert not caplog.records
 
 
@@ -185,7 +185,7 @@ def test_autoapi_resolver_warns_when_local_page_missing(tmp_path):
 
     r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
     with _patch.object(_slr._log, "warning") as mock_warn:
-        url = r.resolve(SourceReference(owner_type=_Sensor))
+        url = r.resolve(reference=SourceReference(owner_type=_Sensor))
     assert url is not None, "resolve() must still return the URL"
     mock_warn.assert_called_once()
     assert "_Sensor" in str(mock_warn.call_args)
@@ -204,7 +204,7 @@ def test_autoapi_resolver_no_warning_when_page_exists(tmp_path):
     page.write_text("")
     r = AutoAPIResolver(base_url="https://docs.example.com", html_root=tmp_path)
     with _patch.object(_slr._log, "warning") as mock_warn:
-        r.resolve(SourceReference(owner_type=_Sensor))
+        r.resolve(reference=SourceReference(owner_type=_Sensor))
     mock_warn.assert_not_called()
 
 
@@ -285,14 +285,14 @@ def test_resolver_url_points_to_existing_page_and_anchor(
     """
     html_root = built_example_domain_autoapi
     resolver = AutoAPIResolver(base_url=str(html_root), html_root=html_root)
-    url = resolver.resolve(reference)
+    url = resolver.resolve(reference=reference)
     assert url is not None
     page_part, _, anchor = url.partition("#")
     page = Path(page_part)
     assert page.is_file(), f"AutoAPI page does not exist: {page}"
-    assert f'id="{anchor}"' in page.read_text(
-        encoding="utf-8"
-    ), f"anchor #{anchor} not found in {page}"
+    assert f'id="{anchor}"' in page.read_text(encoding="utf-8"), (
+        f"anchor #{anchor} not found in {page}"
+    )
 
 
 def test_in_site_docs_links_resolve_within_built_site(built_example_domain_autoapi):
@@ -304,7 +304,7 @@ def test_in_site_docs_links_resolve_within_built_site(built_example_domain_autoa
     html_root = built_example_domain_autoapi
     resolver = AutoAPIResolver.for_in_site_docs()  # base_url="../.."
     text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
-        an(entity(variable(Robot, [])))
+        expression=an(entity(variable(Robot, [])))
     )
     href = re.search(r'href="([^"]+)"', text)
     assert href is not None, f"no hyperlink in output: {text!r}"
@@ -322,13 +322,13 @@ def test_in_site_docs_links_resolve_within_built_site(built_example_domain_autoa
 
 def test_for_in_site_docs_base_url():
     assert AutoAPIResolver.for_in_site_docs().base_url == "../.."
-    assert AutoAPIResolver.for_in_site_docs(0).base_url == "."
-    assert AutoAPIResolver.for_in_site_docs(3).base_url == "../../.."
+    assert AutoAPIResolver.for_in_site_docs(levels_up=0).base_url == "."
+    assert AutoAPIResolver.for_in_site_docs(levels_up=3).base_url == "../../.."
 
 
 def test_for_in_site_docs_emits_relative_url():
     url = AutoAPIResolver.for_in_site_docs().resolve(
-        SourceReference(owner_type=_Sensor)
+        reference=SourceReference(owner_type=_Sensor)
     )
     assert url is not None
     assert url.startswith("../../autoapi/")
@@ -358,7 +358,7 @@ def test_for_package_builds_localhost_resolver(tmp_path):
     fake_module.__file__ = str(package_init)
     with patch.object(_slr, "importlib") as mock_importlib:
         mock_importlib.import_module.return_value = fake_module
-        resolver = AutoAPIResolver.for_package("mypkg", port=9999)
+        resolver = AutoAPIResolver.for_package(package_name="mypkg", port=9999)
 
     assert "localhost:9999" in resolver.base_url
     assert resolver.html_root == project / "doc" / "_build" / "html"
@@ -367,7 +367,7 @@ def test_for_package_builds_localhost_resolver(tmp_path):
 
 def test_autoapi_resolver_for_package_unknown_package_raises():
     with pytest.raises(ImportError):
-        AutoAPIResolver.for_package("_nonexistent_pkg_xyz")
+        AutoAPIResolver.for_package(package_name="_nonexistent_pkg_xyz")
 
 
 def test_autoapi_resolver_for_package_missing_docs_raises(tmp_path):
@@ -389,7 +389,7 @@ def test_autoapi_resolver_for_package_missing_docs_raises(tmp_path):
     with patch.object(_slr, "importlib") as mock_importlib:
         mock_importlib.import_module.return_value = fake_mod
         with pytest.raises(FileNotFoundError, match="_build"):
-            AutoAPIResolver.for_package("fakepkg")
+            AutoAPIResolver.for_package(package_name="fakepkg")
 
 
 # ── Formatter.wrap_link ────────────────────────────────────────────────────────
@@ -397,12 +397,12 @@ def test_autoapi_resolver_for_package_missing_docs_raises(tmp_path):
 
 def test_plain_formatter_wrap_link_is_noop():
     f = PlainFormatter()
-    assert f.wrap_link("Robot", "http://example.com") == "Robot"
+    assert f.wrap_link(text="Robot", url="http://example.com") == "Robot"
 
 
 def test_html_formatter_wrap_link_produces_anchor():
     f = HTMLFormatter()
-    result = f.wrap_link("Robot", "http://example.com")
+    result = f.wrap_link(text="Robot", url="http://example.com")
     assert (
         result
         == '<a target="_blank" rel="noopener" href="http://example.com">Robot</a>'
@@ -412,7 +412,7 @@ def test_html_formatter_wrap_link_produces_anchor():
 def test_html_formatter_wrap_link_preserves_inner_markup():
     f = HTMLFormatter()
     colored = '<span style="color:cornflowerblue">Robot</span>'
-    result = f.wrap_link(colored, "http://example.com")
+    result = f.wrap_link(text=colored, url="http://example.com")
     assert 'href="http://example.com"' in result
     assert "cornflowerblue" in result
 
@@ -422,7 +422,7 @@ def test_ansi_formatter_wrap_link_osc8_enabled():
     object.__setattr__(
         f, "_hyperlinks_enabled", True
     )  # force-enable for test isolation
-    result = f.wrap_link("Robot", "http://example.com")
+    result = f.wrap_link(text="Robot", url="http://example.com")
     assert "\033]8;;http://example.com\033\\" in result
     assert "Robot" in result
     assert result.endswith("\033]8;;\033\\")
@@ -431,7 +431,7 @@ def test_ansi_formatter_wrap_link_osc8_enabled():
 def test_ansi_formatter_wrap_link_osc8_disabled_returns_text():
     f = ANSIFormatter()
     object.__setattr__(f, "_hyperlinks_enabled", False)
-    result = f.wrap_link("Robot", "http://example.com")
+    result = f.wrap_link(text="Robot", url="http://example.com")
     assert result == "Robot"
 
 
@@ -482,50 +482,50 @@ def test_role_fragment_accepts_source_ref():
 
 def test_paragraph_renderer_injects_link_when_resolver_and_ref_present():
     resolver = _ConstantResolver("http://example.com")
-    r = ParagraphRenderer(HTMLFormatter(), resolver)
+    r = ParagraphRenderer(formatter=HTMLFormatter(), link_resolver=resolver)
     ref = SourceReference(owner_type=_Sensor)
     frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
-    result = r.render(frag)
+    result = r.render(fragment=frag)
     assert 'href="http://example.com"' in result
     assert "Sensor" in result
 
 
 def test_paragraph_renderer_no_link_when_no_resolver():
-    r = ParagraphRenderer(HTMLFormatter())
+    r = ParagraphRenderer(formatter=HTMLFormatter())
     ref = SourceReference(owner_type=_Sensor)
     frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
-    result = r.render(frag)
+    result = r.render(fragment=frag)
     assert "<a " not in result
     assert "Sensor" in result
 
 
 def test_paragraph_renderer_no_link_when_resolver_returns_none():
-    r = ParagraphRenderer(HTMLFormatter(), _NoneResolver())
+    r = ParagraphRenderer(formatter=HTMLFormatter(), link_resolver=_NoneResolver())
     ref = SourceReference(owner_type=_Sensor)
     frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref)
-    result = r.render(frag)
+    result = r.render(fragment=frag)
     assert "<a " not in result
 
 
 def test_paragraph_renderer_no_link_when_no_source_ref():
     resolver = _ConstantResolver("http://example.com")
-    r = ParagraphRenderer(HTMLFormatter(), resolver)
+    r = ParagraphRenderer(formatter=HTMLFormatter(), link_resolver=resolver)
     frag = RoleFragment(text="Sensor", role=SemanticRole.VARIABLE)
-    result = r.render(frag)
+    result = r.render(fragment=frag)
     assert "<a " not in result
 
 
 def test_hierarchical_renderer_injects_link():
     resolver = _ConstantResolver("http://example.com")
-    r = HierarchicalRenderer(HTMLFormatter(), resolver)
+    r = HierarchicalRenderer(formatter=HTMLFormatter(), link_resolver=resolver)
     ref = SourceReference(owner_type=_Sensor)
     block = BlockFragment(
         header=RoleFragment(
             text="Sensor", role=SemanticRole.VARIABLE, source_reference=ref
         ),
-        items=[WordFragment("some condition")],
+        items=[WordFragment(text="some condition")],
     )
-    result = r.render(block)
+    result = r.render(fragment=block)
     assert 'href="http://example.com"' in result
 
 
@@ -535,14 +535,16 @@ def test_hierarchical_renderer_injects_link():
 def test_pipeline_html_with_resolver_links_variable_name():
     r = variable(_Sensor, [])
     resolver = _ConstantResolver("http://example.com/sensor")
-    text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(an(entity(r)))
+    text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
+        expression=an(entity(r))
+    )
     assert 'href="http://example.com/sensor"' in text
     assert "_Sensor" in text
 
 
 def test_pipeline_html_without_resolver_no_anchor_tags():
     r = variable(_Sensor, [])
-    text = VerbalizationPipeline.html().verbalize(an(entity(r)))
+    text = VerbalizationPipeline.html().verbalize(expression=an(entity(r)))
     assert "<a " not in text
 
 
@@ -555,7 +557,7 @@ def test_type_valued_literal_is_hyperlinked():
 
     resolver = _ConstantResolver("http://example.com/sensor")
     text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
-        Literal(_value_=_Sensor)
+        expression=Literal(_value_=_Sensor)
     )
     assert 'href="http://example.com/sensor"' in text
     assert "_Sensor" in text
@@ -567,13 +569,13 @@ def test_each_type_in_a_tuple_literal_is_hyperlinked():
     """
     from krrood.entity_query_language.core.variable import Literal
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Valve:
         pressure: int
 
     resolver = _ConstantResolver("http://example.com/type")
     text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
-        Literal(_value_=(_Sensor, _Valve))
+        expression=Literal(_value_=(_Sensor, _Valve))
     )
     # both members are wrapped in their own anchor
     assert text.count('href="http://example.com/type"') == 2
@@ -585,7 +587,7 @@ def test_pipeline_ansi_with_resolver_and_osc8_emits_escape():
     resolver = _ConstantResolver("http://example.com/sensor")
     with patch.dict("os.environ", {"VTE_VERSION": "6800"}, clear=False):
         text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(
-            an(entity(r))
+            expression=an(entity(r))
         )
     assert "\033]8;;" in text
 
@@ -600,7 +602,7 @@ def test_pipeline_ansi_with_resolver_no_osc8_logs_warning_and_no_osc8():
     with patch.dict("os.environ", env, clear=False):
         with _patch.object(pipeline_mod.logger, "warning") as mock_warn:
             text = VerbalizationPipeline.ansi(link_resolver=resolver).verbalize(
-                an(entity(r))
+                expression=an(entity(r))
             )
     assert "\033]8;;" not in text
     mock_warn.assert_called_once()
@@ -628,28 +630,28 @@ def _collect_source_refs(fragment: VerbalizationFragment) -> list[SourceReferenc
 
 def test_variable_fragment_carries_source_ref_for_its_type():
     x = variable(_Sensor, [])
-    frag = EQLVerbalizer().build(x)
+    frag = EQLVerbalizer().build(expression=x)
     refs = _collect_source_refs(frag)
     assert any(r.owner_type is _Sensor and r.attribute is None for r in refs)
 
 
 def test_attribute_fragment_carries_source_ref_with_attribute_name():
     x = variable(_Sensor, [])
-    frag = EQLVerbalizer().build(x.level > 5)
+    frag = EQLVerbalizer().build(expression=x.level > 5)
     refs = _collect_source_refs(frag)
     assert any(r.owner_type is _Sensor and r.attribute == "level" for r in refs)
 
 
 def test_bool_attribute_chain_carries_source_ref():
     x = variable(_Sensor, [])
-    frag = EQLVerbalizer().build(x.active)
+    frag = EQLVerbalizer().build(expression=x.active)
     refs = _collect_source_refs(frag)
     assert any(r.owner_type is _Sensor and r.attribute == "active" for r in refs)
 
 
 def test_comparator_fragment_has_both_class_and_attr_refs():
     x = variable(_Sensor, [])
-    frag = EQLVerbalizer().build(x.level > 0)
+    frag = EQLVerbalizer().build(expression=x.level > 0)
     refs = _collect_source_refs(frag)
     class_refs = [r for r in refs if r.owner_type is _Sensor and r.attribute is None]
     attr_refs = [r for r in refs if r.owner_type is _Sensor and r.attribute == "level"]
@@ -671,7 +673,7 @@ def test_display_opens_browser_outside_jupyter():
     pipeline = VerbalizationPipeline.html(link_resolver=_ConstantResolver())
     with _patch.object(pipeline_mod, "_is_ipython", return_value=False):
         with _patch("webbrowser.open") as mock_open:
-            pipeline.display(an(entity(x)))
+            pipeline.display(expression=an(entity(x)))
 
     mock_open.assert_called_once()
     opened_url = mock_open.call_args[0][0]
@@ -695,7 +697,7 @@ def test_display_writes_full_html_page_to_temp_file():
 
     with _patch.object(pipeline_mod, "_is_ipython", return_value=False):
         with _patch("webbrowser.open", side_effect=fake_open):
-            pipeline.display(an(entity(x)))
+            pipeline.display(expression=an(entity(x)))
 
     assert captured_path, "webbrowser.open was not called"
     path = Path(captured_path[0])
@@ -726,7 +728,7 @@ def test_display_in_jupyter_calls_ipython_display():
                 )
             },
         ):
-            pipeline.display(an(entity(x)))
+            pipeline.display(expression=an(entity(x)))
 
     mock_html_cls.assert_called_once()
     html_arg = mock_html_cls.call_args[0][0]
@@ -742,12 +744,12 @@ def test_display_fragment_works_like_display():
     import krrood.entity_query_language.verbalization.pipeline as pipeline_mod
 
     x = variable(_Sensor, [])
-    fragment = EQLVerbalizer().build(an(entity(x)))
+    fragment = EQLVerbalizer().build(expression=an(entity(x)))
     pipeline = VerbalizationPipeline.html()
 
     with _patch.object(pipeline_mod, "_is_ipython", return_value=False):
         with _patch("webbrowser.open") as mock_open:
-            pipeline.display_fragment(fragment)
+            pipeline.display_fragment(fragment=fragment)
 
     mock_open.assert_called_once()
 
@@ -768,7 +770,7 @@ def test_display_html_page_has_dark_background_style():
 
     with _patch.object(pipeline_mod, "_is_ipython", return_value=False):
         with _patch("webbrowser.open", side_effect=fake_open):
-            pipeline.display(an(entity(x)))
+            pipeline.display(expression=an(entity(x)))
 
     content = Path(captured_path[0]).read_text(encoding="utf-8")
     assert "background" in content

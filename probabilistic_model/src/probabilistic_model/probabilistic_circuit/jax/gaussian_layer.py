@@ -80,7 +80,7 @@ class DifferentiableGaussianLayer(DifferentiableContinuousLayer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             data["variable"],
             jnp.array(data["location"]),

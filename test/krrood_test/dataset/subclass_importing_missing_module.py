@@ -24,7 +24,7 @@ def load_mapping() -> Any:
     return GeneratedMapping
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubclassImportingMissingModule(BaseWithLateBoundAnnotation):
     """
     Inherits the late-bound annotation, from a module holding the missing import.

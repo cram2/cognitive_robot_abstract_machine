@@ -71,8 +71,20 @@ def test_unshielded_colliders_name_both_parents_in_name_order():
     }
 
 
-def test_too_many_undirected_edges_raises():
-    graph = undirected_chain(CausalGraph.maximum_undirected_edges + 1)
+def test_a_long_undirected_chain_has_one_member_graph_per_source():
+    graph = undirected_chain(20)
+
+    assert sorted(
+        node.name
+        for member in graph.member_graphs()
+        for node in member.nodes()
+        if member.in_degree(node) == 0
+    ) == sorted(graph.node_names)
+
+
+def test_more_member_graphs_than_listed_raises():
+    graph = undirected_chain(3)
+    graph.maximum_member_graphs = len(graph.nodes()) - 1
 
     with pytest.raises(EquivalenceClassTooLarge):
         graph.member_graphs()

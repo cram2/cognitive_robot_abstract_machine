@@ -34,7 +34,7 @@ from krrood.entity_query_language.verbalization.rendering.renderer import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Position:
     """
     A 3-D position — three scalar attributes that group into one *"given that"* point.
@@ -45,7 +45,7 @@ class Position:
     z: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pose:
     """
     A pose with two nested sub-objects — a nested match groups attributes per sub-
@@ -58,9 +58,9 @@ class Pose:
 
 def _hierarchical(expression) -> str:
     """:return: *expression* rendered as a plain-text indented bullet list (point per condition)."""
-    return VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(
-        expression
-    )
+    return VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=PlainFormatter())
+    ).verbalize(expression=expression)
 
 
 # %% Generate vs Find
@@ -83,7 +83,7 @@ def test_domain_carrying_match_also_opens_with_generate():
     default: the domain does not by itself make it a search — that is the
     backend's call.
     """
-    search = a(Position)(x=1, y=2).from_([Position(1, 2, 3)])
+    search = a(Position)(x=1, y=2).from_(domain=[Position(x=1, y=2, z=3)])
     assert verbalize_expression(search).startswith("Generate")
 
 
@@ -128,7 +128,7 @@ def test_over_cap_singles_pronominalise_and_coordinate_with_and():
     each pronominalised (*"its x is …"*) and Oxford-coordinated with a closing *"and"*.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Quad:
         x: int
         w: int
@@ -264,7 +264,7 @@ class _Color(enum.Enum):
     BLUE = "blue"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Widget:
     color: _Color
     size: int
@@ -312,13 +312,13 @@ def test_concrete_object_reads_as_a_specific_type():
 # %% object identity: identifying field qualifies "a specific <Type>"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NamedThing:
     name: str
     payload: object
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Coded:
     serial: int = field(metadata=GrammarMetadata(is_identifying_field=True).as_dict())
     name: str = ""
@@ -349,14 +349,14 @@ def test_concrete_object_uses_declared_identifying_attributes():
 # %% "respectively" grouping: atomic scalars only, capped
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Trio:
     a: float
     b: float
     c: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Quint:
     a: int
     b: int

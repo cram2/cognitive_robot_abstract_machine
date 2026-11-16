@@ -11,7 +11,7 @@ from krrood.patterns.identifier_and_name import HasID, HasName
 # %% objects a serialized object refers to
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectReference(ABC):
     """
     How a serialized object points at an object it does not contain: by the object's
@@ -41,7 +41,7 @@ class ObjectReference(ABC):
         """
         return f"{self.subject}_name"
 
-    def write(self, data: dict[str, Any], identified_object: HasID) -> None:
+    def write(self, *, data: dict[str, Any], identified_object: HasID) -> None:
         """
         Put the reference to an object into a serialized object.
 
@@ -54,7 +54,7 @@ class ObjectReference(ABC):
         data[self.name_key] = to_json(identified_object.name)
 
     @abstractmethod
-    def resolve(self, data: dict[str, Any], **kwargs) -> HasID:
+    def resolve(self, *, data: dict[str, Any], **kwargs) -> HasID:
         """
         The object a serialized object refers to.
 

@@ -12,7 +12,7 @@ from itertools import islice
 from typing_extensions import Generic, Iterable, Iterator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SeenSet:
     """
     Coverage index for previously seen partial assignments.
@@ -27,7 +27,7 @@ class SeenSet:
     constraints: list = field(default_factory=list, init=False, repr=False)
     exact: set = field(default_factory=set, init=False, repr=False)
 
-    def add(self, assignment: dict) -> None:
+    def add(self, *, assignment: dict) -> None:
         """
         Add a constraint (partial assignment) to the coverage index.
         """
@@ -49,7 +49,7 @@ class SeenSet:
 
         self.constraints.append(assignment)
 
-    def check(self, assignment: dict) -> bool:
+    def check(self, *, assignment: dict) -> bool:
         """
         Return True if any stored constraint is a subset of the given assignment.
 
@@ -66,7 +66,7 @@ class SeenSet:
 
         # Fast exact-key path when all keys are present
         if self.keys and all(k in assignment for k in self.keys):
-            return self.exact_contains(assignment)
+            return self.exact_contains(assignment=assignment)
 
         # Fallback to coverage check using constraints
         for constraint in self.constraints:
@@ -77,7 +77,7 @@ class SeenSet:
                 return True
         return False
 
-    def exact_contains(self, assignment: dict) -> bool:
+    def exact_contains(self, *, assignment: dict) -> bool:
         """
         Return True if the assignment contains all cache keys and the exact key tuple
         exists in the cache.
@@ -95,7 +95,7 @@ class SeenSet:
         self.exact.clear()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InstanceFilteredDomain(Generic[T]):
     """
     A re-iterable view over a domain that yields only the elements that are instances of
@@ -124,7 +124,7 @@ class InstanceFilteredDomain(Generic[T]):
         return (element for element in self.domain if isinstance(element, self.type_))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReEnterableLazyIterable(Generic[T]):
     """
     A wrapper for an iterable that allows multiple iterations over its elements,
@@ -169,7 +169,7 @@ class ReEnterableLazyIterable(Generic[T]):
     none remain.
     """
 
-    def set_iterable(self, iterable):
+    def set_iterable(self, *, iterable):
         """
         Set the iterable and wrap it in a generator.
 

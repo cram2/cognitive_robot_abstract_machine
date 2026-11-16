@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RoleTakerInAnotherModule:
     original_attribute: str
     attribute_with_annotation_from_role_module: PersonInRoleAndOntology

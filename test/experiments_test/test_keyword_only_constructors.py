@@ -10,5 +10,5 @@ from ..cramph_test.test_statechart.keyword_only_constructors import (
 
 
 def test_every_experiment_node_takes_keyword_arguments_only() -> None:
-    audit = KeywordOnlyConstructorAudit([experiments.sage_10k])
+    audit = KeywordOnlyConstructorAudit(modules=[experiments.sage_10k])
     assert audit.nodes_with_positional_parameters() == []

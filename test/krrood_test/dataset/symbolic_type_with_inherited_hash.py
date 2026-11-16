@@ -13,7 +13,7 @@ import krrood.symbolic_math.symbolic_math as sm
 # %% a symbolic type with the inherited hash
 
 
-@dataclass(eq=False, init=False, repr=False)
+@dataclass(kw_only=True, eq=False, init=False, repr=False)
 class SymbolicTypeWithInheritedHash(sm.SymbolicMathType):
     """
     A symbolic type of any shape that neither compares nor hashes in a way of its own.

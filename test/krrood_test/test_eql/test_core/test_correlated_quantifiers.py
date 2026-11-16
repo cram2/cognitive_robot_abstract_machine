@@ -43,39 +43,39 @@ from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Academic(Symbol):
     name: str
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QuantifiedCourse(Symbol):
     name: str
     taught_by: set[Academic] = field(default_factory=set)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Student(Role[Academic]):
     takes_course: set[QuantifiedCourse] = field(default_factory=set)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StudentFlag(Symbol):
     student: Student
     reason: str
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Box(Symbol):
     size: int
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SalariedWorker(Symbol):
     salary: int
 
 
-@dataclass
+@dataclass(kw_only=True)
 class University:
     """
     The finite domain shared by the correlated quantifier tests.
@@ -90,20 +90,32 @@ class University:
 
 @pytest.fixture
 def university() -> University:
-    turing, minsky, codd = Academic("Turing"), Academic("Minsky"), Academic("Codd")
-    logic = QuantifiedCourse("Logic", {turing})
-    artificial_intelligence = QuantifiedCourse("AI", {turing, minsky})
-    databases = QuantifiedCourse("Databases", {codd})
+    turing, minsky, codd = (
+        Academic(name="Turing"),
+        Academic(name="Minsky"),
+        Academic(name="Codd"),
+    )
+    logic = QuantifiedCourse(name="Logic", taught_by={turing})
+    artificial_intelligence = QuantifiedCourse(name="AI", taught_by={turing, minsky})
+    databases = QuantifiedCourse(name="Databases", taught_by={codd})
     students = [
         Student(
-            role_taker=Academic("Alice"),
+            role_taker=Academic(name="Alice"),
             takes_course={logic, artificial_intelligence},
         ),
-        Student(role_taker=Academic("Bob"), takes_course={artificial_intelligence}),
-        Student(role_taker=Academic("Carol"), takes_course={logic, databases}),
-        Student(role_taker=Academic("Dave"), takes_course=set()),
+        Student(
+            role_taker=Academic(name="Bob"), takes_course={artificial_intelligence}
+        ),
+        Student(role_taker=Academic(name="Carol"), takes_course={logic, databases}),
+        Student(role_taker=Academic(name="Dave"), takes_course=set()),
     ]
-    return University(turing, logic, artificial_intelligence, databases, students)
+    return University(
+        turing=turing,
+        logic=logic,
+        artificial_intelligence=artificial_intelligence,
+        databases=databases,
+        students=students,
+    )
 
 
 def student_names(results) -> list[str]:
@@ -412,10 +424,10 @@ def test_exists_over_an_independent_variable_without_witness_is_empty(university
 
 
 def boxes_and_workers():
-    return [Box(2), Box(5), Box(10)], [
-        SalariedWorker(1),
-        SalariedWorker(4),
-        SalariedWorker(7),
+    return [Box(size=2), Box(size=5), Box(size=10)], [
+        SalariedWorker(salary=1),
+        SalariedWorker(salary=4),
+        SalariedWorker(salary=7),
     ]
 
 
@@ -603,7 +615,7 @@ def test_correlated_exists_in_an_inference_rule_condition(university):
         )
     )
     with query:
-        Add(flags, inference(StudentFlag)(student=student, reason="logic"))
+        Add(left=flags, right=inference(StudentFlag)(student=student, reason="logic"))
     assert flag_pairs(query.evaluate()) == {("Alice", "logic"), ("Carol", "logic")}
 
 
@@ -616,9 +628,12 @@ def test_correlated_exists_in_a_refinement_condition(university):
     flags = deduced_variable(StudentFlag)
     query = an(entity(flags).where(student.name != "Nobody"))
     with query:
-        Add(flags, inference(StudentFlag)(student=student, reason="base"))
+        Add(left=flags, right=inference(StudentFlag)(student=student, reason="base"))
         with refinement(exists(course, course.name == "Databases")):
-            Add(flags, inference(StudentFlag)(student=student, reason="refined"))
+            Add(
+                left=flags,
+                right=inference(StudentFlag)(student=student, reason="refined"),
+            )
     assert flag_pairs(query.evaluate()) == {
         ("Alice", "base"),
         ("Bob", "base"),
@@ -636,9 +651,12 @@ def test_correlated_for_all_in_an_alternative_condition(university):
     flags = deduced_variable(StudentFlag)
     query = an(entity(flags).where(student.name == "Bob"))
     with query:
-        Add(flags, inference(StudentFlag)(student=student, reason="base"))
+        Add(left=flags, right=inference(StudentFlag)(student=student, reason="base"))
         with alternative(for_all(course, course.name != "AI")):
-            Add(flags, inference(StudentFlag)(student=student, reason="alternative"))
+            Add(
+                left=flags,
+                right=inference(StudentFlag)(student=student, reason="alternative"),
+            )
     assert flag_pairs(query.evaluate()) == {
         ("Bob", "base"),
         ("Carol", "alternative"),

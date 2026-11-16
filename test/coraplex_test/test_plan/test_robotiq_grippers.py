@@ -17,7 +17,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
 )
 from cramph.context import ContextExtension
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.ros2_nodes.robotiq import (
     RobotiqGripperActionServerTask,
 )

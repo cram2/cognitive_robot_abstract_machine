@@ -65,7 +65,7 @@ def realize_tree(
     same passes and returns that plain string directly.
 
     >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
-    >>> tree = EQLVerbalizer().build(a(entity(variable(Robot, []))))
+    >>> tree = EQLVerbalizer().build(expression=a(entity(variable(Robot, []))))
     >>> flatten_fragment_to_plain_text(realize_tree(tree))
     'Find a Robot'
     """
@@ -81,7 +81,7 @@ def realize_tree(
     ]
     realised = fragment
     for realisation_pass in pipeline:
-        realised = realisation_pass.process(realised)
+        realised = realisation_pass.process(fragment=realised)
     return realised
 
 
@@ -100,7 +100,7 @@ def realize_subtree(fragment: VerbalizationFragment) -> str:
     children.
 
     >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
-    >>> realize_subtree(EQLVerbalizer().build(a(entity(variable(Robot, [])))))
+    >>> realize_subtree(EQLVerbalizer().build(expression=a(entity(variable(Robot, [])))))
     'Find a Robot'
     """
     return flatten_fragment_to_plain_text(realize_tree(fragment))

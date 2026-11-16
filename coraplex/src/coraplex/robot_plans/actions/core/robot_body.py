@@ -36,7 +36,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointVelocityLimit,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     StaticJointState,
@@ -265,5 +265,5 @@ class MoveManipulatorAction(MovesToolCenterPoint, GoalAction):
             binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         for node in self.keep_base_still():
-            goal.add_node(node)
+            goal.add_node(node=node)
         return goal

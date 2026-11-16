@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FallbackTarget(Symbol):
     """
     A class that no module binds at runtime under the name its annotation uses.

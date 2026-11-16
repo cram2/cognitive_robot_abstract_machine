@@ -9,7 +9,7 @@ from .node_classes import NodeClassesOfModules
 # %% constructor audit
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PositionalConstructorParameters:
     """
     A statechart node class whose constructor still accepts positional arguments.
@@ -26,7 +26,7 @@ class PositionalConstructorParameters:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeywordOnlyConstructorAudit(NodeClassesOfModules):
     """
     Finds the statechart node classes of some modules whose constructors accept
@@ -39,13 +39,19 @@ class KeywordOnlyConstructorAudit(NodeClassesOfModules):
             constructor parameter that is not keyword-only.
         """
         return [
-            PositionalConstructorParameters(node_class, parameter_names)
+            PositionalConstructorParameters(
+                node_class=node_class, parameter_names=parameter_names
+            )
             for node_class in self.node_classes()
-            if (parameter_names := self._positional_parameter_names(node_class))
+            if (
+                parameter_names := self._positional_parameter_names(
+                    node_class=node_class
+                )
+            )
         ]
 
     @staticmethod
-    def _positional_parameter_names(node_class: type) -> list[str]:
+    def _positional_parameter_names(*, node_class: type) -> list[str]:
         """
         :return: The constructor parameters of `node_class` that are not keyword-only.
         """

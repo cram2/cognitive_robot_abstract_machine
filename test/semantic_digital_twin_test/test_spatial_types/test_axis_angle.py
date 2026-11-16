@@ -93,6 +93,6 @@ def test_axis_angle_without_arguments_is_the_identity_rotation():
 def test_axis_angle_survives_json(axis, angle):
     axis_angle = AxisAngle(axis=Vector3(*axis), angle=angle)
 
-    restored = AxisAngle.from_json(axis_angle.to_json())
+    restored = AxisAngle.from_json(data=axis_angle.to_json())
 
     assert np.allclose(restored.to_np(), axis_angle.to_np())

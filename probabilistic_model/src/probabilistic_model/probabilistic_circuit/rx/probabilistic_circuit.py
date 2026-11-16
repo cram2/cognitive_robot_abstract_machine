@@ -455,7 +455,7 @@ class LeafUnit(Unit):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         distribution = from_json(data["distribution"])
         return cls(distribution)
 
@@ -534,7 +534,7 @@ class InnerUnit(Unit, ABC):
         return self
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls()
 
     def add_subcircuit(self, subcircuit: Unit, log_weight: float = None):
@@ -737,7 +737,6 @@ class SumUnit(InnerUnit):
         other_subcircuits = other.subcircuits
 
         for own_index, own_subcircuit in enumerate(own_subcircuits):
-
             # create denominator of weight
             own_index = own_latent_variable.domain.simple_sets[0].element.__class__(
                 own_index
@@ -769,7 +768,6 @@ class SumUnit(InnerUnit):
             proxy_product_node.add_subcircuit(proxy_sum_node)
 
             for other_index, other_subcircuit in enumerate(other_subcircuits):
-
                 # create numerator of weight
                 other_index = other_latent_variable.domain.simple_sets[
                     0
@@ -825,7 +823,6 @@ class SumUnit(InnerUnit):
 
         # if this has only one child
         if len(self.subcircuits) == 1:
-
             # redirect every incoming edge to the child
             incoming_edges = list(self.probabilistic_circuit.in_edges(self))
             for parent, _, data in incoming_edges:
@@ -838,7 +835,6 @@ class SumUnit(InnerUnit):
 
         # for every subcircuit
         for weight, subcircuit in self.log_weighted_subcircuits:
-
             # if the weight is 0, skip this subcircuit
             if weight == -np.inf:
                 # remove the edge
@@ -846,7 +842,6 @@ class SumUnit(InnerUnit):
 
             # if the simplified subcircuit is of the same type as this
             if type(subcircuit) is type(self):
-
                 # type hinting
                 subcircuit: Self
 
@@ -1018,10 +1013,8 @@ class ProductUnit(InnerUnit):
 
         # for every subcircuit
         for subcircuit in self.subcircuits:
-
             # if the simplified subcircuit is of the same type as this
             if type(subcircuit) is type(self):
-
                 # type hinting
                 subcircuit: Self
 
@@ -1944,7 +1937,7 @@ class ProbabilisticCircuit(GroundableCircuit[Unit], SubclassJSONSerializer):
         return cls()
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         result = cls.parameters_from_json(data)
         hash_remap: dict[int, Unit] = dict()
 
@@ -2180,7 +2173,6 @@ class ProbabilisticCircuit(GroundableCircuit[Unit], SubclassJSONSerializer):
         """
         old_leafs = self.leaves
         for leaf in old_leafs:
-
             if isinstance(leaf, UnivariateDiscreteLeaf):
                 leaf: UnivariateDiscreteLeaf
                 sum_leaf = leaf.as_deterministic_sum()
@@ -2344,7 +2336,6 @@ class ShallowProbabilisticCircuit(ProbabilisticCircuit):
 
 @dataclass
 class UnivariateLeaf(LeafUnit):
-
     @property
     def variable(self) -> Variable:
         return self.distribution.variables[0]
@@ -2391,7 +2382,6 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
 @dataclass
 class UnivariateDiscreteLeaf(UnivariateLeaf):
-
     distribution: DiscreteDistribution | None
     __hash__ = Unit.__hash__
 
@@ -2428,9 +2418,9 @@ class UnivariateDiscreteLeaf(UnivariateLeaf):
         :param mixture: The mixture to create the distribution from.
         :return: The discrete distribution.
         """
-        assert (
-            len(mixture.variables) == 1
-        ), "Can only convert univariate sum units to discrete distributions."
+        assert len(mixture.variables) == 1, (
+            "Can only convert univariate sum units to discrete distributions."
+        )
         variable = mixture.variables[0]
         probabilities = MissingDict(float)
 

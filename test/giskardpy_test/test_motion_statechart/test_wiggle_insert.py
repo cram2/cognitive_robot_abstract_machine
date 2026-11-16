@@ -59,8 +59,8 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
         cruise_velocity=0.05,
         threshold=0.02,
     )
-    statechart.add_node(wiggle)
-    statechart.add_node(EndMotion.when_true(wiggle))
+    statechart.add_node(node=wiggle)
+    statechart.add_node(node=EndMotion.when_true(node=wiggle))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()
@@ -129,8 +129,8 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
         noise_angle=0.2,
         cruise_velocity=0.05,
     )
-    statechart.add_node(wiggle)
-    statechart.add_node(EndMotion.when_true(wiggle))
+    statechart.add_node(node=wiggle)
+    statechart.add_node(node=EndMotion.when_true(node=wiggle))
 
     executor.compile(statechart=statechart)
 
@@ -166,42 +166,44 @@ def test_wiggle_insert(hsr_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        motion := Sequence(
-            nodes=[
-                SetSeedConfiguration(
-                    seed_configuration=JointState.from_str_dict(
-                        goal_state, world=hsr_world_state_reset
-                    )
-                ),
-                Parallel(
-                    nodes=[
-                        wiggle := WiggleInsert(
-                            name="wiggle",
-                            root_link=root_link,
-                            tip_link=hpl,
-                            hole_point=hole_point,
-                            weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-                        ),
-                        barrier := Parallel(
-                            nodes=[
-                                CountSimulationTimeSeconds(seconds=5),
-                                CartesianPosition(
-                                    root_link=root_link,
-                                    tip_link=hpl,
-                                    goal_point=Point3(
-                                        x=0.5, z=0.4, reference_frame=root_link
+        node=(
+            motion := Sequence(
+                nodes=[
+                    SetSeedConfiguration(
+                        seed_configuration=JointState.from_str_dict(
+                            goal_state, world=hsr_world_state_reset
+                        )
+                    ),
+                    Parallel(
+                        nodes=[
+                            wiggle := WiggleInsert(
+                                name="wiggle",
+                                root_link=root_link,
+                                tip_link=hpl,
+                                hole_point=hole_point,
+                                weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+                            ),
+                            barrier := Parallel(
+                                nodes=[
+                                    CountSimulationTimeSeconds(seconds=5),
+                                    CartesianPosition(
+                                        root_link=root_link,
+                                        tip_link=hpl,
+                                        goal_point=Point3(
+                                            x=0.5, z=0.4, reference_frame=root_link
+                                        ),
+                                        weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                                     ),
-                                    weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
-                                ),
-                            ],
-                        ),
-                    ]
-                ),
-            ]
+                                ],
+                            ),
+                        ]
+                    ),
+                ]
+            )
         )
     )
     barrier.success_condition = barrier.observes_true
-    statechart.add_node(EndMotion.when_true(motion))
+    statechart.add_node(node=EndMotion.when_true(node=motion))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()

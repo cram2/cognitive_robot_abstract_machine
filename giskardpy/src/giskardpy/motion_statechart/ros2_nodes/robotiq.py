@@ -15,11 +15,11 @@ from rclpy.task import Future
 
 from cramph.data_types import ObservationStateValues
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import ActionServerTask
+from giskardpy.motion_statechart.ros2_nodes.action_servers import ActionServerTask
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )

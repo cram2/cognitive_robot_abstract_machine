@@ -19,7 +19,7 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 # fragment tree, to avoid a cycle) and re-exported here for the ``for_number`` selectors and importers.
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PlainWord:
     """
     A neutral word/phrase with no semantic role.
@@ -33,13 +33,13 @@ class PlainWord:
     def as_fragment(self) -> WordFragment:
         """:return: A neutral word fragment.
 
-        >>> PlainWord("and").as_fragment().text
+        >>> PlainWord(text="and").as_fragment().text
         'and'
         """
         return WordFragment(text=self.text)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PunctuationWord(PlainWord):
     """
     A punctuation token carrying an orthographic spacing feature, so the orthography
@@ -54,13 +54,13 @@ class PunctuationWord(PlainWord):
     def as_fragment(self) -> WordFragment:
         """:return: A role-less word fragment carrying this token's spacing.
 
-        >>> PunctuationWord(",", spacing=Spacing.LEFT).as_fragment().spacing
+        >>> PunctuationWord(text=",", spacing=Spacing.LEFT).as_fragment().spacing
         <Spacing.LEFT: 'left'>
         """
         return WordFragment(text=self.text, spacing=self.spacing)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RoleWord:
     """
     A word/phrase carrying a fixed semantic role.
@@ -81,7 +81,7 @@ class RoleWord:
     def as_fragment(self) -> RoleFragment:
         """:return: A role-tagged fragment, carrying the ``_role_`` its subclass declares.
 
-        >>> KeyWord("Find").as_fragment().role
+        >>> KeyWord(text="Find").as_fragment().role
         <SemanticRole.KEYWORD: 'keyword'>
         """
         return RoleFragment(text=self.text, role=self._role_)
@@ -103,7 +103,7 @@ class LogicalWord(RoleWord):
     _role_ = SemanticRole.LOGICAL
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AggregationWord(RoleWord):
     """
     Aggregation phrase with the ``AGGREGATION`` role.
@@ -137,7 +137,7 @@ class PronounWord(RoleWord):
     _role_ = SemanticRole.VARIABLE
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class OperatorPhrase:
     """
     All eight text variants for one comparison operator, co-located.
@@ -239,7 +239,7 @@ class VocabEnum(Enum):
         """:return: The fragment representing this vocabulary item.
 
         >>> class Connective(VocabEnum):
-        ...     AND = PlainWord("and")
+        ...     AND = PlainWord(text="and")
         >>> Connective.AND.as_fragment().text
         'and'
         """
@@ -250,7 +250,7 @@ class VocabEnum(Enum):
         """:return: The raw English text of this vocabulary item.
 
         >>> class Connective(VocabEnum):
-        ...     AND = PlainWord("and")
+        ...     AND = PlainWord(text="and")
         >>> Connective.AND.text
         'and'
         """

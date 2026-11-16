@@ -111,7 +111,7 @@ class SpecificityRule(ABC):
     which at most one decides for any subject.
 
     An alternative is a concrete subclass that implements the ``applies(...)`` guard (its
-    signature is the family's concern) and whatever payload the family needs. Alternatives
+    keyword-only parameters are the family's concern) and whatever payload the family needs. Alternatives
     register themselves by subclassing and are ranked by class specificity: a more-derived
     alternative, one that subclasses another and refines its guard, outranks the alternative it
     refines. Alternatives that are not in a subclass relationship must have mutually exclusive
@@ -127,8 +127,9 @@ class SpecificityRule(ABC):
 
     @classmethod
     @abstractmethod
-    def applies(cls, *args: Any) -> bool:
+    def applies(cls, **subject: Any) -> bool:
         """
+        :param subject: The subject, keyed by the parameters of the family's guard.
         :return: True when this alternative decides for the given subject.
         """
 
@@ -141,21 +142,22 @@ class SpecificityRule(ABC):
         return concrete_subclasses(cls)
 
     @classmethod
-    def most_applicable(cls, *args: Any) -> type[SpecificityRule] | None:
+    def most_applicable(cls, **subject: Any) -> type[SpecificityRule] | None:
         """
-        :param args: Forwarded to each alternative's ``applies``.
-        :return: The most specific alternative whose ``applies(*args)`` holds, or ``None``.
+        :param subject: Forwarded to each alternative's ``applies``.
+        :return: The most specific alternative whose ``applies(**subject)`` holds, or
+            ``None``.
         :raises AmbiguousRuleError: When several alternatives are equally specific.
         """
         applicable = [
             alternative
             for alternative in cls.alternatives()
-            if alternative.applies(*args)
+            if alternative.applies(**subject)
         ]
         return sole_maximum(
             applicable,
             key=mro_depth,
             collision_error=lambda tied: AmbiguousRuleError(
-                subject=args, candidates=tied
+                subject=subject, candidates=tied
             ),
         )

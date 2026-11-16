@@ -27,10 +27,10 @@ def test_extension(tmp_path):
 
     # create the new ormatic interface
     class_diagram = ClassDiagram(
-        list(sorted(classes, key=lambda c: c.__name__, reverse=True))
+        classes=list(sorted(classes, key=lambda c: c.__name__, reverse=True))
     )
     instance = ORMatic(
-        class_diagram,
+        class_dependency_graph=class_diagram,
         interface_information=OrmaticInterfaceInformation(
             type_mappings=type_mappings,
             alternative_mappings=alternative_mappings,
@@ -42,7 +42,7 @@ def test_extension(tmp_path):
     # write to tempfile
     new_interface_file = tmp_path / "ormatic_interface.py"
     with open(new_interface_file, "w") as f:
-        instance.to_sqlalchemy_file(f)
+        instance.to_sqlalchemy_file(file=f)
 
     # Import the generated module
     spec = importlib.util.spec_from_file_location(

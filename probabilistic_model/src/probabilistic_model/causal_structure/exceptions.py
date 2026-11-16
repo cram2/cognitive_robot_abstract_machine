@@ -111,31 +111,55 @@ class InconsistentGraph(ProbabilisticModelException):
 @dataclass
 class EquivalenceClassTooLarge(ProbabilisticModelException):
     """
-    Raised when a graph has more undirected edges than the graphs it stands for can be
-    listed over.
+    Raised when a graph stands for more directed acyclic graphs than are listed.
     """
 
-    undirected_edge_count: int
+    maximum_member_graphs: int
     """
-    How many undirected edges the graph has.
-    """
-
-    maximum_undirected_edges: int
-    """
-    How many it may have.
+    How many are listed.
     """
 
     def error_message(self) -> str:
         return (
-            f"The graph has {self.undirected_edge_count} undirected edges, more than "
-            f"the {self.maximum_undirected_edges} its member graphs are listed over."
+            f"The graph stands for more than {self.maximum_member_graphs} directed "
+            f"acyclic graphs."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Orient edges with background knowledge, or raise the graph's "
-            "maximum_undirected_edges."
+            "Orient edges with domain causal knowledge, or raise the graph's "
+            "maximum_member_graphs."
         )
+
+
+# %% learning a graph
+
+
+@dataclass
+class TooFewVariablesToScore(ProbabilisticModelException):
+    """
+    Raised when a graph is to be learned by its score over fewer variables than the
+    score is defined for.
+    """
+
+    variable_count: int
+    """
+    How many variables the graph is to be learned over.
+    """
+
+    minimum_variable_count: int
+    """
+    How many the score needs.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The graph score needs at least {self.minimum_variable_count} variables "
+            f"that vary, but the table has {self.variable_count}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Learn the graph of this table with the Peter-Clark algorithm instead."
 
 
 # %% adjustment sets

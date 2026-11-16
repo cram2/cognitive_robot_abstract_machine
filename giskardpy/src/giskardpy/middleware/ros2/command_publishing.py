@@ -21,7 +21,7 @@ from rclpy.publisher import Publisher
 from std_msgs.msg import Float64MultiArray
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -367,7 +367,7 @@ class TwistStampedFormat(DriveCommandFormat[TwistStamped]):
 
     def create_message(self, twist: Twist, frame_id: str) -> TwistStamped:
         message = TwistStamped()
-        message.header.stamp = rospy.get_node().get_clock().now().to_msg()
+        message.header.stamp = background_node.get_node().get_clock().now().to_msg()
         message.header.frame_id = frame_id
         message.twist = twist
         return message
@@ -444,7 +444,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
-        self.command_publisher = rospy.get_node().create_publisher(
+        self.command_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
         )
         for connection in self.connections:
@@ -456,7 +456,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
             world=self.world,
             degrees_of_freedom=[connection.raw_dof for connection in self.connections],
         )
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"Created publisher for {self.command_topic} for "
             f"{[connection.name.name for connection in self.connections]}"
         )
@@ -530,7 +530,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
-        self.velocity_publisher = rospy.get_node().create_publisher(
+        self.velocity_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
         )
         self.connection.has_hardware_interface = True
@@ -539,7 +539,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
             degrees_of_freedom=self.translation_degrees_of_freedom()
             + [self.connection.yaw],
         )
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"Created publisher for {self.command_topic}."
         )
 

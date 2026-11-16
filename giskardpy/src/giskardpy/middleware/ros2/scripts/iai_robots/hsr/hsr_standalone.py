@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from rclpy.node import Node
+
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -6,10 +8,13 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
-def create_giskard() -> Giskard:
+def create_giskard(node: Node) -> Giskard:
     """
     Build a Giskard that simulates the HSR, described by the file its robot class
     declares.
+
+    :param node: The node Giskard runs on, unused because the robot is described by a
+        file.
     """
     return Giskard.standalone(
         world_source=WorldSpecification(

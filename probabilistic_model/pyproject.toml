@@ -53,6 +53,8 @@ dependencies = [
     "superqt",
     "krrood>=26.10.0",
     "causal-learn",
+    "array-api-compat>=1.15",
+    "array-api-extra>=0.11",
 ]
 
 [project.urls]
@@ -68,6 +70,9 @@ include = ["probabilistic_model*"]
 version = {attr = "probabilistic_model._version.__version__"}
 
 [project.optional-dependencies]
+torch = [
+    "torch>=2.4",
+]
 dev = [
     "pytest",
     "pandas>=2.2.3",

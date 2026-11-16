@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CausalRoleMarker(Literal):
     """
     Marks a keyword argument of a match pattern as a variable whose value the query
@@ -49,7 +49,7 @@ class CausalRoleMarker(Literal):
 
     _value_: Any = field(default=Ellipsis, init=False)
 
-    def _as_assigned_variable_(self, attribute_type: type | None) -> Self:
+    def _as_assigned_variable_(self, *, attribute_type: type | None) -> Self:
         """
         :param attribute_type: The type of the attribute this marks.
         :return: This marker if it already has a type, otherwise a fresh copy of it
@@ -60,7 +60,7 @@ class CausalRoleMarker(Literal):
         return type(self)(_type_=attribute_type)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Cause(CausalRoleMarker):
     """
     Marks a :class:`~krrood.entity_query_language.query.match.Match` keyword argument as
@@ -84,7 +84,7 @@ Marks a :class:`~krrood.entity_query_language.query.match.Match` keyword argumen
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Confounder(CausalRoleMarker):
     """
     Marks a :class:`~krrood.entity_query_language.query.match.Match` keyword argument
@@ -109,7 +109,7 @@ variable to adjust for when searching a :class:`Cause` intervention -- see
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CausesEffect(LogicalOperator, UnaryExpression):
     """
     Tags a condition as the effect side of a causal query.
@@ -138,19 +138,24 @@ class CausesEffect(LogicalOperator, UnaryExpression):
             not isinstance(self._child_, BinaryExpression)
             or not self._child_._is_equality_literal_comparator_or_conjunction_()
         ):
-            raise CausesEffectRequiresEqualityComparator(self._child_)
+            raise CausesEffectRequiresEqualityComparator(condition=self._child_)
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        for child_result in self._evaluate_child_as_condition_(self._child_, sources):
+        for child_result in self._evaluate_child_as_condition_(
+            child=self._child_, sources=sources
+        ):
             yield self._build_operation_result_with_truth_(
-                child_result.is_true, child_result.bindings, child_result
+                truth=child_result.is_true,
+                bindings=child_result.bindings,
+                child_result=child_result,
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CauseEffectVariables:
     """
     The cause candidates and effect variable a ``cause`` search resolves to.
@@ -187,7 +192,7 @@ class CauseEffectVariables:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScoredIntervention:
     """
     One cause candidate's best-region search result, scored for comparison against the
@@ -219,7 +224,7 @@ class ScoredIntervention:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CandidateAdjustment:
     """
     One set of a query's variables that the effect of a cause may be identified by
@@ -232,7 +237,7 @@ class CandidateAdjustment:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AdjustmentCandidates:
     """
     What a learned causal structure says one cause candidate adjusts for.
@@ -251,8 +256,8 @@ class AdjustmentCandidates:
     adjustments: list[CandidateAdjustment]
     """
     Each set the effect may be identified by adjusting for: the one chosen set if the
-    effect is identified, one per candidate if it is partially identified, none if it
-    is not identified.
+    effect is identified, one per candidate if it is partially identified, none if it is
+    not identified.
     """
 
     @property
@@ -269,7 +274,7 @@ class AdjustmentCandidates:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionRange:
     """
     The effect's probability under an intervention setting the cause to one region,
@@ -292,7 +297,7 @@ class RegionRange:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InterventionalRange:
     """
     The range an effect's interventional probability lies in, per region of one cause,

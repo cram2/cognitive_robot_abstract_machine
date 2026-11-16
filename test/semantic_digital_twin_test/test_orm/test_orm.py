@@ -179,7 +179,9 @@ def _is_part_whole_relationship(annotation_type, field_name):
     Return whether ``field_name`` on ``annotation_type`` is marked as a part-whole
     relationship.
     """
-    metadata = IsPartWholeRelationship.of_field(annotation_type, field_name)
+    metadata = IsPartWholeRelationship.of_field(
+        clazz=annotation_type, field_name=field_name
+    )
     return metadata is not None
 
 
@@ -208,8 +210,8 @@ def test_part_whole_relationship_field_survives_deepcopy():
         # The marked-field discovery still resolves the same part-whole relationship fields.
         discovered = {
             spec.field.name
-            for spec in WrappedClass(type(copied_door)).fields_with_metadata(
-                IsPartWholeRelationship
+            for spec in WrappedClass(clazz=type(copied_door)).fields_with_metadata(
+                metadata_type=IsPartWholeRelationship
             )
         }
         assert {"handle", "entry_way"} <= discovered
@@ -289,8 +291,8 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     # The marked-field discovery still resolves the same part-whole relationship fields.
     discovered = {
         spec.field.name
-        for spec in WrappedClass(type(reconstructed_door)).fields_with_metadata(
-            IsPartWholeRelationship
+        for spec in WrappedClass(clazz=type(reconstructed_door)).fields_with_metadata(
+            metadata_type=IsPartWholeRelationship
         )
     }
     assert {"handle", "entry_way"} <= discovered

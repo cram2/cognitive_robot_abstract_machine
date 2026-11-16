@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from ungenerated_orm_interface import GeneratedMapping
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OwnerOfAnnotationFromMissingModule:
     """
     Owner of a field whose annotation lives in the missing module.

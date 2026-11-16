@@ -20,7 +20,7 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 # %% storage
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Storage:
     """
     The place a descriptor backed field keeps its value, counting how often it is written.
@@ -40,19 +40,22 @@ class Storage:
 # %% descriptor backed field
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ValueKeptInStorage(DataclassFieldDescriptor):
     """
     A field whose value lives in the storage of its owner.
     """
 
     def read(
-        self, instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage
+        self,
+        *,
+        instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage,
     ) -> int | None:
         return instance.storage.value
 
     def write(
         self,
+        *,
         instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage,
         value: int | None,
     ) -> None:
@@ -60,7 +63,7 @@ class ValueKeptInStorage(DataclassFieldDescriptor):
         instance.storage.number_of_writes += 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HolderOfValueKeptInStorage(DataclassFieldDescriptorOwner):
     """
     A dataclass with a field kept in its storage.
@@ -85,7 +88,7 @@ HolderOfValueKeptInStorage.value = ValueKeptInStorage()
 # %% subclasses of the holder
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubclassOfHolder(HolderOfValueKeptInStorage):
     """
     A subclass that inherits the descriptor backed field unchanged.
@@ -97,7 +100,7 @@ class SubclassOfHolder(HolderOfValueKeptInStorage):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubclassDeclaringTheFieldAgain(HolderOfValueKeptInStorage):
     """
     A subclass that declares the descriptor backed field again without a default.
@@ -109,7 +112,7 @@ class SubclassDeclaringTheFieldAgain(HolderOfValueKeptInStorage):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubclassDeclaringTheFieldAgainWithDefault(HolderOfValueKeptInStorage):
     """
     A subclass that declares the descriptor backed field again with a default of its own.
@@ -121,7 +124,7 @@ class SubclassDeclaringTheFieldAgainWithDefault(HolderOfValueKeptInStorage):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubclassDeclaringTheFieldAgainWithField(HolderOfValueKeptInStorage):
     """
     A subclass that declares the descriptor backed field again through
@@ -140,7 +143,7 @@ The type of the value of :class:`GenericHolderOfValueKeptInStorage`.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenericHolderOfValueKeptInStorage(
     Generic[ValueType], SubClassSafeGeneric, DataclassFieldDescriptorOwner
 ):
@@ -162,7 +165,7 @@ class GenericHolderOfValueKeptInStorage(
 GenericHolderOfValueKeptInStorage.value = ValueKeptInStorage()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IntegerHolderOfValueKeptInStorage(GenericHolderOfValueKeptInStorage[int]):
     """
     A subclass that narrows the type of the descriptor backed field.

@@ -187,7 +187,7 @@ def test_closing_suspended_results_keeps_their_context_current_for_the_cleanup()
         finally:
             contexts_seen_by_cleanup.append(get_evaluation_context())
 
-    results = evaluation_context.iterate_as_current(results_with_cleanup())
+    results = evaluation_context.iterate_as_current(results=results_with_cleanup())
     next(results)
     results.close()
 

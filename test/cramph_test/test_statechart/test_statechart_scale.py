@@ -23,7 +23,7 @@ def _build_chain(statechart: Statechart, length: int) -> list[StatechartNode]:
     previous = None
     for _ in range(length):
         node = ConstTrueNode()
-        statechart.add_node(node)
+        statechart.add_node(node=node)
         if previous is not None:
             node.start_condition = previous.observes_true
         node.success_condition = node.observes_true
@@ -39,11 +39,11 @@ def test_long_sequence_scale(node_count: int):
     Builds a single long Sequence of cheap ConstTrueNode instances, where exactly one
     node is RUNNING at any time, and measures compile/tick time as the graph grows.
     """
-    executor = StatechartExecutor(StatechartContext(world=World()))
+    executor = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=executor.context)
     sequence = Sequence(nodes=[ConstTrueNode() for _ in range(node_count)])
-    msc.add_node(sequence)
-    msc.add_node(EndStatechart.when_true(sequence))
+    msc.add_node(node=sequence)
+    msc.add_node(node=EndStatechart.when_true(node=sequence))
 
     t0 = time.perf_counter()
     executor.compile(statechart=msc)
@@ -73,11 +73,11 @@ def test_many_alternative_branches_scale(branch_length: int):
     Measures compile/tick time as the total, mostly dormant, graph grows.
     """
     branch_count = 10
-    executor = StatechartExecutor(StatechartContext(world=World()))
+    executor = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=executor.context)
 
     gate = ConstFalseNode()
-    msc.add_node(gate)
+    msc.add_node(node=gate)
 
     branches = [_build_chain(msc, branch_length) for _ in range(branch_count)]
     active_branch, dead_branches = branches[0], branches[1:]
@@ -85,7 +85,7 @@ def test_many_alternative_branches_scale(branch_length: int):
     for dead_branch in dead_branches:
         dead_branch[0].start_condition = gate.observes_true
 
-    msc.add_node(EndStatechart.when_true(active_branch[-1]))
+    msc.add_node(node=EndStatechart.when_true(node=active_branch[-1]))
 
     total_nodes = branch_count * branch_length + 2  # + gate + EndStatechart
 

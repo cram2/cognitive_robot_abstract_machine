@@ -103,7 +103,7 @@ def test_rotation_survives_being_stored_as_axis_angle(
 ):
     rotation = rotation_from_axis_angle(axis=Vector3(*axis), angle=angle)
 
-    stored = mapping.from_domain_object(rotation)
+    stored = mapping.from_domain_object(obj=rotation)
     restored = stored.to_domain_object()
 
     assert isinstance(stored.axis_angle, AxisAngle)
@@ -121,7 +121,7 @@ def test_a_twist_survives_being_stored():
         )
     )
 
-    restored = TwistMapping.from_domain_object(twist).to_domain_object()
+    restored = TwistMapping.from_domain_object(obj=twist).to_domain_object()
 
     assert restored.reference_frame is root
     assert np.allclose(restored.to_np(), twist.to_np())

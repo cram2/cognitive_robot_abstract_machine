@@ -62,5 +62,5 @@ def test_bounds_of_the_interval_decide_whether_they_are_inside():
 
 def test_serialization_round_trip(uniform_layer):
     data = json.loads(json.dumps(uniform_layer.to_json()))
-    deserialized = DifferentiableUniformLayer.from_json(data)
+    deserialized = DifferentiableUniformLayer.from_json(data=data)
     assert jnp.allclose(deserialized.interval, uniform_layer.interval)

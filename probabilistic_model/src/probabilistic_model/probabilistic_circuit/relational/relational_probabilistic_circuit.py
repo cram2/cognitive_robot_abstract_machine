@@ -249,8 +249,8 @@ class RelationalProbabilisticCircuit:
         """
         if dataframe_from_parent is not None:
             return dataframe_from_parent
-        dataframe = feature_extractor.create_dataframe(instances)
-        dataframe = feature_extractor.preprocess_dataframe(dataframe)
+        dataframe = feature_extractor.create_dataframe(instances=instances)
+        dataframe = feature_extractor.preprocess_dataframe(df=dataframe)
         return dataframe.sort_index(axis=1)
 
     def _build_child_joint_dataframe(
@@ -283,10 +283,10 @@ class RelationalProbabilisticCircuit:
         """
         rows = []
         for instance in instances:
-            feature_vector = self.feature_extractor.apply_mapping(instance)
+            feature_vector = self.feature_extractor.apply_mapping(instance=instance)
             aggregation_row = [feature_vector[index] for index in aggregation_indices]
             for child in getattr(instance, exchangeable_part):
-                child_features = child_feature_extractor.apply_mapping(child)
+                child_features = child_feature_extractor.apply_mapping(instance=child)
                 rows.append(aggregation_row + child_features)
         child_aggregation_features = child_feature_extractor.aggregation_features
         child_column_names = [
@@ -330,7 +330,7 @@ class RelationalProbabilisticCircuit:
             instances,
             aggregation_indices,
             aggregation_names,
-            FeatureExtractor.from_instances(part_instances),
+            FeatureExtractor.from_instances(instances=part_instances),
         )
         return PartTrainingTable(
             part_instances=part_instances,
@@ -462,7 +462,7 @@ class RelationalProbabilisticCircuit:
         :raises InstanceNotOfClassError: If an instance is not of ``class_``.
         """
         self.class_ = self._class_of(instances, class_)
-        self.feature_extractor = FeatureExtractor.from_instances(instances)
+        self.feature_extractor = FeatureExtractor.from_instances(instances=instances)
         class_dataframe = self._build_class_dataframe(
             self.feature_extractor, instances, dataframe_from_parent
         )

@@ -31,11 +31,13 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkFlexActionServerTask,
     GriplinkPresetActionServerTask,
 )
+from giskardpy.motion_statechart.ros2_nodes.action_servers import (
+    NavigateActionServerTask,
+)
 from giskardpy.motion_statechart.ros2_nodes.robotiq import (
     RobotiqGripperActionServerTask,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
-from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
+from giskardpy.motion_statechart.ros2_nodes.topics import (
     PublishOnStart,
     TopicNode,
     TopicPublisherNode,
@@ -214,7 +216,7 @@ def sending_context(
     context = create_context_with_motion_control(
         request.getfixturevalue(case.world_fixture)
     )
-    RosNodeAccess(rclpy_node).extend_context(context)
+    RosNodeAccess(ros_node=rclpy_node).extend_context(context=context)
     return context
 
 
@@ -224,7 +226,7 @@ def receiving_executor(
 ) -> StatechartExecutor:
     return StatechartExecutor(
         context=StatechartContext(world=request.getfixturevalue(case.world_fixture)),
-        extensions=[RosNodeAccess(rclpy_node), MotionControl()],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl()],
     )
 
 

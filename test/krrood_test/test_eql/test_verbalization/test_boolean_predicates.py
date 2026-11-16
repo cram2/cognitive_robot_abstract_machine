@@ -40,7 +40,7 @@ def _predicate(predicate: BooleanPredicate) -> object:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _InferredForms:
     """
     Boolean fields with no metadata — each resolves by name-shape heuristic.
@@ -59,7 +59,7 @@ class _InferredForms:
     """An adjective-suffix name — inferred as adjectival (*"is operational"*)."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _DeclaredForms:
     """
     Boolean fields each declaring an explicit predicate form.

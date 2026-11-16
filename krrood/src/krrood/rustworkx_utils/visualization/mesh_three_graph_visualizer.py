@@ -14,13 +14,15 @@ if TYPE_CHECKING:
     from flask import Flask
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
-    """Render a live rustworkx graph of world entities with 3d-force-graph, drawing each ``Body``
-    node using its actual :attr:`~semantic_digital_twin.world_description.world_entity.Body.visual`
-    mesh, loaded once in the browser via glTF and spun continuously in real WebGL 3D — rather than
-    :class:`~semantic_digital_twin.visualization.mesh_cytoscape_graph_visualizer.MeshCytoscapeGraphVisualizer`'s
-    server-rendered rotating sprite frames.
+    """
+    Render a live rustworkx graph of world entities with 3d-force-graph, drawing each
+    ``Body`` node using its actual
+    :attr:`~semantic_digital_twin.world_description.world_entity.Body.visual` mesh,
+    loaded once in the browser via glTF and spun continuously in real WebGL 3D — rather
+    than :class:`~semantic_digital_twin.visualization.mesh_cytoscape_graph_visualizer.Me
+    shCytoscapeGraphVisualizer`'s server-rendered rotating sprite frames.
 
     Nodes without visual geometry, and nodes whose payload is not a
     :class:`~semantic_digital_twin.world_description.world_entity.Body`, get a plain sphere instead
@@ -35,52 +37,62 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
     """
 
     required_modules: ClassVar[tuple[str, ...]] = ("flask", "trimesh")
-    """The libraries needed to serve the application and export meshes to glTF."""
+    """
+    The libraries needed to serve the application and export meshes to glTF.
+    """
 
     _mesh_glb_cache: dict[int, bytes | None] = field(
         default_factory=dict, init=False, repr=False
     )
-    """Exported glTF-binary (GLB) bytes for each node index, cached after the first export; ``None``
-    when the node has no visual mesh."""
+    """
+    Exported glTF-binary (GLB) bytes for each node index, cached after the first export;
+    ``None`` when the node has no visual mesh.
+    """
 
     _mesh_export_lock: threading.Lock = field(
         default_factory=threading.Lock, init=False, repr=False
     )
-    """Serializes GLB export across concurrently handled requests; see the class note."""
+    """
+    Serializes GLB export across concurrently handled requests; see the class note.
+    """
 
     mesh_getter: Callable[[Any], trimesh.Trimesh | None] = field(kw_only=True)
     """
-    Method to extract the mesh from a node
+    Method to extract the mesh from a node.
     """
 
     three_version: str = "0.147.0"
-    """The three.js release used for the separately loaded ``GLTFLoader``.
+    """
+    The three.js release used for the separately loaded ``GLTFLoader``.
 
     Pinned to the newest release that still ships the classic, non-module
-    ``examples/js/loaders/GLTFLoader.js`` (three.js moved to ES-modules-only examples at 0.148.0,
-    and dropped the classic ``build/three.min.js`` UMD bundle entirely at 0.161.0); the page
-    template loads scripts as plain ``<script>`` tags with no bundler or import map. Needs to be
-    recent enough for Object3D compatibility with whatever three.js 3d-force-graph bundles
-    internally — 0.128.0 (pre r133) caused ``TypeError: e.removeFromParent is not a function`` when
-    3d-force-graph tried to add a loaded mesh to the scene, since it bundles a newer three.js than
-    that.
+    ``examples/js/loaders/GLTFLoader.js`` (three.js moved to ES-modules-only examples at
+    0.148.0, and dropped the classic ``build/three.min.js`` UMD bundle entirely at
+    0.161.0); the page template loads scripts as plain ``<script>`` tags with no bundler
+    or import map. Needs to be recent enough for Object3D compatibility with whatever
+    three.js 3d-force-graph bundles internally — 0.128.0 (pre r133) caused ``TypeError:
+    e.removeFromParent is not a function`` when 3d-force-graph tried to add a loaded
+    mesh to the scene, since it bundles a newer three.js than that.
     """
 
     mesh_rotation_radians_per_second: float = 0.6
-    """How fast mesh nodes spin around their vertical axis."""
+    """
+    How fast mesh nodes spin around their vertical axis.
+    """
 
     mesh_target_size_units: float = 25.0
-    """The on-screen size every loaded mesh is normalized to, regardless of its real-world
+    """
+    The on-screen size every loaded mesh is normalized to, regardless of its real-world
     dimensions.
 
     A body's visual mesh is scaled in meters (a screw and a wardrobe differ by orders of
-    magnitude), while 3d-force-graph's layout space uses much larger arbitrary units unrelated to
-    any real-world scale (its default node sphere has a radius on the order of a few units) —
-    without normalizing, most real-world meshes would render far too small to see next to the
-    graph's node spacing.
+    magnitude), while 3d-force-graph's layout space uses much larger arbitrary units
+    unrelated to any real-world scale (its default node sphere has a radius on the order
+    of a few units) — without normalizing, most real-world meshes would render far too
+    small to see next to the graph's node spacing.
     """
 
-    def node_extra_data(self, node_index: int) -> dict[str, Any]:
+    def node_extra_data(self, *, node_index: int) -> dict[str, Any]:
         """
         :param node_index: The rustworkx index of the node.
         :return: A ``meshUrl`` field when the node's
@@ -91,7 +103,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
             return {}
         return {"meshUrl": f"mesh/{node_index}.glb"}
 
-    def register_additional_routes(self, application: Flask) -> None:
+    def register_additional_routes(self, *, application: Flask) -> None:
         """
         Serve each node's exported mesh at ``/mesh/<node_index>.glb``.
 
@@ -102,9 +114,9 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
         @application.route("/mesh/<int:node_index>.glb")
         def mesh_glb(node_index: int):
             """
-            Called for each node to convert the mesh attached to it to glb
+            Called for each node to convert the mesh attached to it to glb.
             """
-            glb_bytes = self._mesh_glb(node_index)
+            glb_bytes = self._mesh_glb(node_index=node_index)
             if glb_bytes is None:
                 return Response(status=404)
             return Response(glb_bytes, mimetype="model/gltf-binary")
@@ -210,7 +222,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
 }})();
 """
 
-    def _mesh_glb(self, node_index: int) -> bytes | None:
+    def _mesh_glb(self, *, node_index: int) -> bytes | None:
         """
         :param node_index: The rustworkx index of the node.
         :return: The node's mesh exported as glTF-binary (GLB) bytes, cached after the first

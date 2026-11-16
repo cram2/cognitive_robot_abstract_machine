@@ -13,7 +13,7 @@ from typing_extensions import Any
 # %% setting that runs code
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AttributeSetThroughProperty:
     """
     A lamp whose state is set through a property that also counts the switches.
@@ -45,7 +45,7 @@ class AttributeSetThroughProperty:
         self.switch_count += 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AttributesSetThroughSetattr:
     """
     A record that remembers which of its attributes were set.
@@ -87,7 +87,7 @@ class ElementsSetThroughSetitem(dict):
 # %% setting that only stores the value
 
 
-@dataclass(slots=True)
+@dataclass(kw_only=True, slots=True)
 class SlottedAttributes:
     """
     A point whose coordinate is stored in a slot.
@@ -99,7 +99,7 @@ class SlottedAttributes:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class FrozenAttributes:
     """
     A point whose coordinate never changes on the live object.
@@ -111,7 +111,7 @@ class FrozenAttributes:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ElementsInAnImmutableContainer:
     """
     A segment whose end points are stored in a tuple, which cannot be changed on the
@@ -124,7 +124,7 @@ class ElementsInAnImmutableContainer:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AttributeReadThroughProperty:
     """
     A circle whose diameter is computed and cannot be set on the live object.

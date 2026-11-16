@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pacer(ABC):
     """
     Decides how long a loop waits between two cycles.
@@ -36,7 +36,7 @@ class Pacer(ABC):
     Frequency of the loop in hertz, set by whoever runs the loop; None until then.
     """
 
-    def pace_ticks_of(self, context: StatechartContext) -> None:
+    def pace_ticks_of(self, *, context: StatechartContext) -> None:
         """
         Sets :attr:`target_frequency` to one cycle per tick of `context`.
 
@@ -61,13 +61,13 @@ class Pacer(ABC):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoPacing(Pacer):
     """
     Lets a loop run as fast as the hardware allows.
     """
 
-    def pace_ticks_of(self, context: StatechartContext) -> None:
+    def pace_ticks_of(self, *, context: StatechartContext) -> None:
         """
         Does nothing, since this pacer never waits.
         """
@@ -77,7 +77,7 @@ class NoPacing(Pacer):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScheduledPacer(Pacer, ABC):
     """
     Holds a loop at a fixed cycle duration by sleeping until the next slot.
@@ -111,7 +111,7 @@ class ScheduledPacer(Pacer, ABC):
             self._next_target_time += cycle_duration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealTimePacer(ScheduledPacer):
     """
     Holds a loop at its target frequency in wall clock time.
@@ -122,7 +122,7 @@ class RealTimePacer(ScheduledPacer):
         return 1 / self.target_frequency
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationPacer(ScheduledPacer):
     """
     Runs a loop at a multiple of its target frequency to speed up or slow down a
@@ -136,14 +136,14 @@ class SimulationPacer(ScheduledPacer):
 
     def __post_init__(self) -> None:
         if self.real_time_factor <= 0:
-            raise NonPositiveRealTimeFactorError(self.real_time_factor)
+            raise NonPositiveRealTimeFactorError(real_time_factor=self.real_time_factor)
 
     @property
     def cycle_duration(self) -> float:
         return 1 / (self.target_frequency * self.real_time_factor)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SteppedSimulationPacer(Pacer):
     """
     Holds a loop by stepping a physically simulated world one cycle forward between two
@@ -210,7 +210,7 @@ class SteppedSimulationPacer(Pacer):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutorExtension:
     """
     Adds behaviour to an :class:`Executor` around creating it, compiling a statechart
@@ -219,7 +219,7 @@ class ExecutorExtension:
     Every stage does nothing unless an extension overrides it.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
+    def extend_context(self, *, context: StatechartContext) -> None:
         """
         Called once when the executor is created, before a :class:`StatechartExecutor`
         lets its pacer read the tick duration of `context`.
@@ -228,7 +228,7 @@ class ExecutorExtension:
         """
         return None
 
-    def after_compile(self, executor: Executor) -> None:
+    def after_compile(self, *, executor: Executor) -> None:
         """
         Called once the statechart is compiled, before its first tick.
 
@@ -236,7 +236,7 @@ class ExecutorExtension:
         """
         return None
 
-    def after_run(self, executor: Executor) -> None:
+    def after_run(self, *, executor: Executor) -> None:
         """
         Called once a run stops, see :meth:`Executor.finish_run`.
 
@@ -245,14 +245,14 @@ class ExecutorExtension:
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TickingExecutorExtension(ExecutorExtension):
     """
     Adds behaviour to a :class:`StatechartExecutor` around every tick and every
     recompile, besides the stages of :class:`ExecutorExtension`.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         """
         Called before a statechart that already compiled compiles again, or before a
         node of it chooses its child, either of which blocks the tick. The statechart
@@ -263,7 +263,7 @@ class TickingExecutorExtension(ExecutorExtension):
         """
         return True
 
-    def after_recompile(self, executor: StatechartExecutor) -> None:
+    def after_recompile(self, *, executor: StatechartExecutor) -> None:
         """
         Called every time a statechart that already compiled compiled again, which keeps
         its state, its history and the tick count. Does what :meth:`after_compile` does
@@ -271,9 +271,9 @@ class TickingExecutorExtension(ExecutorExtension):
 
         :param executor: The executor this extension belongs to.
         """
-        self.after_compile(executor)
+        self.after_compile(executor=executor)
 
-    def before_tick(self, executor: StatechartExecutor) -> None:
+    def before_tick(self, *, executor: StatechartExecutor) -> None:
         """
         Called at the start of every tick, before the tick count is advanced.
 
@@ -281,7 +281,7 @@ class TickingExecutorExtension(ExecutorExtension):
         """
         return None
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         """
         Called at the end of every tick, after the statechart was ticked.
 
@@ -296,7 +296,7 @@ GenericExecutorExtension = TypeVar("GenericExecutorExtension", bound=ExecutorExt
 # %% executing a statechart
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Executor(ABC):
     """
     Executes a statechart built in its :attr:`context`: :meth:`compile` takes the
@@ -327,7 +327,7 @@ class Executor(ABC):
         :attr:`context`.
         """
         for default_extension in self.default_context_extensions():
-            self.context.ensure_extension(default_extension)
+            self.context.ensure_extension(extension=default_extension)
         for default_extension in self.default_executor_extensions():
             if not any(
                 type(extension) is type(default_extension)
@@ -335,7 +335,7 @@ class Executor(ABC):
             ):
                 self.extensions.append(default_extension)
         for extension in self.extensions:
-            extension.extend_context(self.context)
+            extension.extend_context(context=self.context)
 
     @abstractmethod
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -352,7 +352,7 @@ class Executor(ABC):
         """
 
     def require_extension(
-        self, extension_type: type[GenericExecutorExtension]
+        self, *, extension_type: type[GenericExecutorExtension]
     ) -> GenericExecutorExtension:
         """
         :param extension_type: The exact type of the requested extension.
@@ -364,7 +364,7 @@ class Executor(ABC):
                 return extension
         raise MissingExecutorExtensionError(expected_extension=extension_type)
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Takes `statechart` as the one :meth:`execute` runs.
 
@@ -381,7 +381,7 @@ class Executor(ABC):
         Tell every extension that :attr:`statechart` is compiled.
         """
         for extension in self.extensions:
-            extension.after_compile(self)
+            extension.after_compile(executor=self)
 
     @abstractmethod
     def execute(self) -> None:
@@ -394,10 +394,10 @@ class Executor(ABC):
         Tell every extension that the run stopped, however it stopped.
         """
         for extension in self.extensions:
-            extension.after_run(self)
+            extension.after_run(executor=self)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartExecutor(Executor, RecompileCallback):
     """
     Compiles a statechart and ticks it, counting the ticks.
@@ -414,7 +414,7 @@ class StatechartExecutor(Executor, RecompileCallback):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self.pacer.pace_ticks_of(self.context)
+        self.pacer.pace_ticks_of(context=self.context)
         self._create_tick_variable()
 
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -440,7 +440,9 @@ class StatechartExecutor(Executor, RecompileCallback):
         Registers the variable counting the ticks in the context.
         """
         self.context.tick_variable = FloatVariable("tick_count")
-        self.context.float_variable_data.register_expression(self.context.tick_variable)
+        self.context.float_variable_data.register_expression(
+            expression=self.context.tick_variable
+        )
 
     @property
     def time(self) -> float:
@@ -458,9 +460,11 @@ class StatechartExecutor(Executor, RecompileCallback):
 
     @tick_count.setter
     def tick_count(self, value: int) -> None:
-        self.context.float_variable_data.set_value(self.context.tick_variable, value)
+        self.context.float_variable_data.set_value(
+            expression=self.context.tick_variable, value=value
+        )
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Compiles `statechart` and ticks it once, so that nodes whose start condition is
         constant true start immediately.
@@ -472,10 +476,10 @@ class StatechartExecutor(Executor, RecompileCallback):
         :raises StatechartOfDifferentContextError: If `statechart` was not built in
             :attr:`context`.
         """
-        super().compile(statechart)
+        super().compile(statechart=statechart)
         self.tick_count = 0
         self.statechart.compiler.compile()
-        self.statechart.compiler.add_recompile_callback(self)
+        self.statechart.compiler.add_recompile_callback(callback=self)
         try:
             self._notify_compiled()
             self.statechart.tick()
@@ -490,7 +494,8 @@ class StatechartExecutor(Executor, RecompileCallback):
         :return: Whether every extension is at rest.
         """
         answers = [
-            extension.before_recompile(self) for extension in self.ticking_extensions
+            extension.before_recompile(executor=self)
+            for extension in self.ticking_extensions
         ]
         return all(answers)
 
@@ -502,7 +507,7 @@ class StatechartExecutor(Executor, RecompileCallback):
         The tick count is not restarted.
         """
         for extension in self.ticking_extensions:
-            extension.after_recompile(self)
+            extension.after_recompile(executor=self)
 
     def tick(self) -> None:
         """
@@ -510,11 +515,11 @@ class StatechartExecutor(Executor, RecompileCallback):
         """
         ticking_extensions = self.ticking_extensions
         for extension in ticking_extensions:
-            extension.before_tick(self)
+            extension.before_tick(executor=self)
         self.tick_count += 1
         self.statechart.tick()
         for extension in ticking_extensions:
-            extension.after_tick(self)
+            extension.after_tick(executor=self)
 
     def execute(self) -> None:
         """
@@ -522,7 +527,7 @@ class StatechartExecutor(Executor, RecompileCallback):
         """
         self.tick_until_end()
 
-    def tick_until_end(self, timeout: int = 1_000) -> None:
+    def tick_until_end(self, *, timeout: int = 1_000) -> None:
         """
         Calls tick until
         :meth:`~cramph.statechart.Statechart.is_ended`

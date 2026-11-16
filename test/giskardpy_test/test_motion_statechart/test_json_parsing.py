@@ -15,7 +15,7 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from cramph.statechart import Statechart
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPositionStraight,
@@ -126,10 +126,10 @@ def test_executing_json_parsed_statechart(tmp_path):
 
     task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 0.5}))
     always_true = ConstTrueNode()
-    statechart.add_node(always_true)
-    statechart.add_node(task1)
+    statechart.add_node(node=always_true)
+    statechart.add_node(node=task1)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
 
     task1.start_condition = always_true.observes_true
     end.start_condition = logic_and(task1.observes_true, always_true.observes_true)
@@ -140,20 +140,20 @@ def test_executing_json_parsed_statechart(tmp_path):
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
     executor = _create_executor(world)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **tracker.create_kwargs()
+        data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
 
     executor.compile(statechart=statechart_copy)
 
-    task1_copy = statechart_copy.get_node_by_index(task1.index)
-    end_copy = statechart_copy.get_node_by_index(end.index)
+    task1_copy = statechart_copy.get_node_by_index(index=task1.index)
+    end_copy = statechart_copy.get_node_by_index(index=end.index)
     assert task1_copy.observation_state == ObservationStateValues.UNKNOWN
     assert end_copy.observation_state == ObservationStateValues.UNKNOWN
     assert task1_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert end_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
-    statechart.draw(str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
     executor.tick_until_end()
-    statechart.draw(str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
     assert task1_copy.observation_state == ObservationStateValues.TRUE
     assert end_copy.observation_state == ObservationStateValues.TRUE
     assert task1_copy.life_cycle_state == LifeCycleValues.RUNNING
@@ -173,9 +173,9 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
         tip_link=tip,
         goal_pose=tip_goal,
     )
-    statechart.add_node(cart_goal)
+    statechart.add_node(node=cart_goal)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = cart_goal.observes_true
 
     json_data = statechart.to_json()
@@ -186,7 +186,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     kwargs = tracker.create_kwargs()
     executor = _create_executor(pr2_world_state_reset)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **kwargs
+        data=new_json_data, context=executor.context, **kwargs
     )
 
     executor.compile(statechart=statechart_copy)
@@ -202,22 +202,22 @@ def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(
     connection = mini_world.connections[0]
     statechart = Statechart(context=_create_executor(mini_world).context)
     statechart.add_nodes(
-        [
+        nodes=[
             task := JointPositionList(
                 goal_state=JointState.from_mapping({connection: 0.5})
             ),
             monitor := LocalMinimumReached(),
-            end := EndMotion.when_true(task),
+            end := EndMotion.when_true(node=task),
         ]
     )
 
     statechart_copy = statechart.create_structure_copy()
 
-    assert type(statechart_copy.get_node_by_index(task.index)) is Task
-    assert type(statechart_copy.get_node_by_index(monitor.index)) is (
+    assert type(statechart_copy.get_node_by_index(index=task.index)) is Task
+    assert type(statechart_copy.get_node_by_index(index=monitor.index)) is (
         StructureCopyMotionStatechartNode
     )
-    assert type(statechart_copy.get_node_by_index(end.index)) is EndMotion
+    assert type(statechart_copy.get_node_by_index(index=end.index)) is EndMotion
 
 
 def test_nested_sequence_goal_json_round_trip_compilation() -> None:
@@ -229,17 +229,19 @@ def test_nested_sequence_goal_json_round_trip_compilation() -> None:
     leaf_node = ConstTrueNode(name="ConstTrue")
     child_sequence = Sequence(nodes=[leaf_node], name="SequentialNode")
     root = Sequence(nodes=[child_sequence], name="ActionNode")
-    statechart.add_node(root)
-    statechart.add_node(still_progressing := StillProgressing(monitored_node=root))
-    statechart.add_node(still_progressing.cancel_motion())
-    statechart.add_node(EndMotion.when_true(root))
+    statechart.add_node(node=root)
+    statechart.add_node(
+        node=(still_progressing := StillProgressing(monitored_node=root))
+    )
+    statechart.add_node(node=still_progressing.cancel_motion())
+    statechart.add_node(node=EndMotion.when_true(node=root))
 
     json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
     executor = _create_executor(World())
-    statechart_copy = Statechart.from_json(new_json_data, context=executor.context)
+    statechart_copy = Statechart.from_json(data=new_json_data, context=executor.context)
     executor.compile(statechart=statechart_copy)
 
 
@@ -256,26 +258,28 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
     goal_pose = Pose.from_xyz_rpy(x=0.5, reference_frame=cylinder_bot_diff_world.root)
     statechart = Statechart(context=_create_executor(cylinder_bot_diff_world).context)
     statechart.add_node(
-        goal := DifferentialDriveBaseGoal(
-            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                MobileBase
-            )[0],
-            goal_pose=goal_pose,
-            threshold=0.05,
+        node=(
+            goal := DifferentialDriveBaseGoal(
+                mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                    MobileBase
+                )[0],
+                goal_pose=goal_pose,
+                threshold=0.05,
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(goal))
+    statechart.add_node(node=EndMotion.when_true(node=goal))
     new_json_data = json.loads(json.dumps(statechart.to_json()))
     statechart.context.cleanup()
 
     executor = _create_executor(cylinder_bot_diff_world)
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **tracker.create_kwargs()
+        data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
-    goal_copy = statechart_copy.get_node_by_index(goal.index)
+    goal_copy = statechart_copy.get_node_by_index(index=goal.index)
     executor.compile(statechart=statechart_copy)
-    executor.tick_until_end(1000)
+    executor.tick_until_end(timeout=1000)
 
     assert [step.name for step in goal_copy.sequence.nodes] == [
         step.name for step in goal.sequence.nodes
@@ -294,38 +298,42 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     bot = cylinder_bot_diff_world.get_body_by_name("bot")
     statechart = Statechart(context=_create_executor(cylinder_bot_diff_world).context)
     statechart.add_node(
-        first_leg := DifferentialDriveBaseGoal(
-            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                MobileBase
-            )[0],
-            goal_pose=Pose.from_xyz_rpy(
-                x=1, reference_frame=cylinder_bot_diff_world.root
-            ),
-            threshold=0.05,
+        node=(
+            first_leg := DifferentialDriveBaseGoal(
+                mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                    MobileBase
+                )[0],
+                goal_pose=Pose.from_xyz_rpy(
+                    x=1, reference_frame=cylinder_bot_diff_world.root
+                ),
+                threshold=0.05,
+            )
         )
     )
     statechart.add_node(
-        second_leg := DifferentialDriveBaseGoal(
-            mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                MobileBase
-            )[0],
-            goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
-            threshold=0.05,
+        node=(
+            second_leg := DifferentialDriveBaseGoal(
+                mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
+                    MobileBase
+                )[0],
+                goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
+                threshold=0.05,
+            )
         )
     )
     second_leg.start_condition = first_leg.observes_true
-    statechart.add_node(EndMotion.when_true(second_leg))
+    statechart.add_node(node=EndMotion.when_true(node=second_leg))
     new_json_data = json.loads(json.dumps(statechart.to_json()))
     statechart.context.cleanup()
 
     executor = _create_executor(cylinder_bot_diff_world)
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **tracker.create_kwargs()
+        data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
-    second_leg_copy = statechart_copy.get_node_by_index(second_leg.index)
+    second_leg_copy = statechart_copy.get_node_by_index(index=second_leg.index)
     executor.compile(statechart=statechart_copy)
-    executor.tick_until_end(2000)
+    executor.tick_until_end(timeout=2000)
 
     assert second_leg_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
     np.testing.assert_allclose(

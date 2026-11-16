@@ -58,14 +58,14 @@ class ProsePattern(StrEnum):
     A comment addressed to a tool rather than a reader.
     """
 
-    def starts(self, line: str) -> bool:
+    def starts(self, *, line: str) -> bool:
         """
         :return: Whether *line* starts with this pattern.
         """
         return re.match(self, line) is not None
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ProseBlock:
     """
     One docstring or run of comment lines in a source file.
@@ -93,7 +93,7 @@ class ProseBlock:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class SourceProse:
     """
     The docstrings and comment blocks of one Python source.
@@ -122,7 +122,7 @@ class SourceProse:
             ):
                 continue
             for index, statement in enumerate(node.body):
-                if not self.is_string(statement):
+                if not self.is_string(statement=statement):
                     continue
                 follows_assignment = index > 0 and isinstance(
                     node.body[index - 1], ast.Assign | ast.AnnAssign
@@ -130,10 +130,10 @@ class SourceProse:
                 if index == 0 or (
                     follows_assignment and isinstance(node, ast.Module | ast.ClassDef)
                 ):
-                    yield self.docstring_block(statement)
+                    yield self.docstring_block(statement=statement)
 
     @staticmethod
-    def is_string(statement: ast.stmt) -> bool:
+    def is_string(*, statement: ast.stmt) -> bool:
         """
         :return: Whether *statement* is a bare string literal.
         """
@@ -144,19 +144,22 @@ class SourceProse:
         )
 
     @staticmethod
-    def docstring_block(statement: ast.Expr) -> ProseBlock:
+    def docstring_block(*, statement: ast.Expr) -> ProseBlock:
         """
         :param statement: A bare string literal.
         :return: It, measured as a docstring.
         """
         prose_lines = 0
         for line in inspect.cleandoc(statement.value.value).splitlines():
-            if ProsePattern.FIELD_LIST_ITEM.starts(line):
+            if ProsePattern.FIELD_LIST_ITEM.starts(line=line):
                 break
             if line.strip() and not line[0].isspace():
                 prose_lines += 1
         return ProseBlock(
-            ProseKind.DOCSTRING, statement.lineno, statement.end_lineno, prose_lines
+            kind=ProseKind.DOCSTRING,
+            first_line=statement.lineno,
+            last_line=statement.end_lineno,
+            prose_lines=prose_lines,
         )
 
     def comment_blocks(self) -> Iterator[ProseBlock]:
@@ -169,21 +172,31 @@ class SourceProse:
             if token.type != tokenize.COMMENT or token.line.strip() != token.string:
                 continue
             if ProsePattern.SECTION_HEADER.starts(
-                token.string
-            ) or ProsePattern.TOOL_DIRECTIVE.starts(token.string):
+                line=token.string
+            ) or ProsePattern.TOOL_DIRECTIVE.starts(line=token.string):
                 continue
             if lines and token.start[0] != lines[-1] + 1:
-                yield ProseBlock(ProseKind.COMMENT, lines[0], lines[-1], len(lines))
+                yield ProseBlock(
+                    kind=ProseKind.COMMENT,
+                    first_line=lines[0],
+                    last_line=lines[-1],
+                    prose_lines=len(lines),
+                )
                 lines = []
             lines.append(token.start[0])
         if lines:
-            yield ProseBlock(ProseKind.COMMENT, lines[0], lines[-1], len(lines))
+            yield ProseBlock(
+                kind=ProseKind.COMMENT,
+                first_line=lines[0],
+                last_line=lines[-1],
+                prose_lines=len(lines),
+            )
 
 
 # %% the check
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ProseLengthChecker(CodeRuleChecker):
     """
     Finds the docstrings and comment blocks holding more prose lines than their limit.
@@ -200,8 +213,8 @@ class ProseLengthChecker(CodeRuleChecker):
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
-        for block in SourceProse(path.read_text()).blocks:
+    def violations(self, *, path: Path) -> Iterator[CodeRuleViolation]:
+        for block in SourceProse(source=path.read_text()).blocks:
             limit = (
                 self.docstring_lines
                 if block.kind is ProseKind.DOCSTRING
@@ -210,9 +223,9 @@ class ProseLengthChecker(CodeRuleChecker):
             if block.prose_lines <= limit:
                 continue
             yield CodeRuleViolation(
-                path,
-                block.first_line,
-                block.last_line,
-                f"{block.kind} has {block.prose_lines} lines of prose, more than "
+                path=path,
+                first_line=block.first_line,
+                last_line=block.last_line,
+                description=f"{block.kind} has {block.prose_lines} lines of prose, more than "
                 f"{limit}; shorten it",
             )

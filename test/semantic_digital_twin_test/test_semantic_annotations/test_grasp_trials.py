@@ -130,7 +130,7 @@ def test_drawn_grasps_lie_where_the_annotation_states(carton):
 
 
 def test_trials_draw_grasps_where_the_strategy_they_are_given_states(carton):
-    strategy = GraspFromAnySide(depth=Bounds(0.5, 0.8))
+    strategy = GraspFromAnySide(depth=Bounds(lower=0.5, upper=0.8))
     trials = GraspTrials(
         graspable=carton,
         performer=RecordingPerformer(),

@@ -93,11 +93,13 @@ def test_a_query_on_a_domain_attribute_reads_the_variable_learned_for_it(
 ):
     instances = rotations_about_varied_axes(rotation_from_axis_angle)
     columns = (
-        FeatureExtractor.from_instances(instances).create_dataframe(instances).columns
+        FeatureExtractor.from_instances(instances=instances)
+        .create_dataframe(instances=instances)
+        .columns
     )
 
     rotation = variable(spatial_type, domain=instances)
-    parameters = ConditionParameters(access_path(rotation) < threshold)
+    parameters = ConditionParameters(condition=access_path(rotation) < threshold)
 
     [queried_name] = parameters.variables
     assert queried_name in columns
@@ -110,17 +112,21 @@ def test_probability_of_a_domain_attribute_is_answered_by_the_learned_model(
 ):
     instances = rotations_about_varied_axes(rotation_from_axis_angle)
     model = JointProbabilityTree().fit(
-        FeatureExtractor.from_instances(instances).create_dataframe(instances)
+        FeatureExtractor.from_instances(instances=instances).create_dataframe(
+            instances=instances
+        )
     )
     rotation = variable(spatial_type, domain=instances)
     condition = access_path(rotation) < threshold
-    [queried_name] = ConditionParameters(condition).variables
+    [queried_name] = ConditionParameters(condition=condition).variables
     [learned_variable] = [
         learned for learned in model.variables if learned.name == queried_name
     ]
 
     result = probability_of(condition).first(
-        backend=ProbabilisticBackend(model_registry=DictRegistry({spatial_type: model}))
+        backend=ProbabilisticBackend(
+            model_registry=DictRegistry(models={spatial_type: model})
+        )
     )
 
     expected = model.probability(
@@ -190,8 +196,8 @@ def test_a_pose_2d_built_by_a_query_takes_the_values_sampled_from_the_learned_mo
     learned through the domain object's mapping.
     """
     model = JointProbabilityTree().fit(
-        FeatureExtractor.from_instances(scattered_poses_2d).create_dataframe(
-            scattered_poses_2d
+        FeatureExtractor.from_instances(instances=scattered_poses_2d).create_dataframe(
+            instances=scattered_poses_2d
         )
     )
     np.random.seed(0)
@@ -202,12 +208,12 @@ def test_a_pose_2d_built_by_a_query_takes_the_values_sampled_from_the_learned_mo
 
     np.random.seed(0)
     [sampled] = ProbabilisticBackend(
-        model_registry=DictRegistry({Pose2D: model}), number_of_samples=1
-    ).evaluate(a(Pose2D)(position=a(Point2)(x=..., y=...), yaw=...))
+        model_registry=DictRegistry(models={Pose2D: model}), number_of_samples=1
+    ).evaluate(expression=a(Pose2D)(position=a(Point2)(x=..., y=...), yaw=...))
 
     [actual] = (
-        FeatureExtractor.from_instances([sampled])
-        .create_dataframe([sampled])
+        FeatureExtractor.from_instances(instances=[sampled])
+        .create_dataframe(instances=[sampled])
         .to_dict(orient="records")
     )
     assert actual == pytest.approx(expected)

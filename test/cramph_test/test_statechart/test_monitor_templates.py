@@ -85,16 +85,16 @@ def observation_for(
     # A template may hand back a node's observation variable unwrapped, which cannot be
     # copied and therefore not substituted into.
     substituted = DerivedConditionVariable.substitute_in(
-        Scalar(artifacts.observation)
+        expression=Scalar(artifacts.observation)
     ).substitute(
-        [
+        old_variables=[
             goal.monitored_node.observation_variable,
             goal.monitored_node.last_observation,
             goal.monitored_node.life_cycle_variable,
             goal.monitor.observation_variable,
             goal.monitor.last_observation,
         ],
-        [
+        new_variables=[
             monitored_observation,
             monitored_observation,
             monitored_life_cycle,
@@ -228,9 +228,9 @@ def compile_chart(nodes: list[StatechartNode]) -> StatechartExecutor:
     :param nodes: The top level nodes of a fresh statechart.
     :return: The executor, after compiling the statechart.
     """
-    executor = StatechartExecutor(StatechartContext(world=World()))
+    executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
-    statechart.add_nodes(nodes)
+    statechart.add_nodes(nodes=nodes)
     executor.compile(statechart=statechart)
     return executor
 
@@ -350,8 +350,8 @@ def test_started_when_true_never_starts_its_node_before_the_monitor_observed_tru
 
 def test_started_when_true_runs_its_node_from_when_the_monitor_observed_true() -> None:
     """
-    The monitored node starts on the monitor observing True, and runs unpaused from
-    then on.
+    The monitored node starts on the monitor observing True, and runs unpaused from then
+    on.
     """
     monitored_node = ConstTrueNode(name="monitored")
     goal = StartedWhenTrue(

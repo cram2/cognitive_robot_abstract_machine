@@ -1,8 +1,10 @@
+"""
+Configuration of the goal lifecycle of the Giskard motion server.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from giskardpy.middleware.ros2.utils.utils import is_in_github_workflow
 
 
 @dataclass
@@ -13,7 +15,7 @@ class GiskardServerConfig:
 
     debug_mode: bool = False
     """
-    Master switch for all debug output; disabled in github workflows.
+    Master switch for all debug output.
     """
 
     plot_trajectory: bool = False
@@ -35,7 +37,3 @@ class GiskardServerConfig:
     """
     Frequency in hertz at which Giskard waits for goals.
     """
-
-    def __post_init__(self):
-        if is_in_github_workflow():
-            self.debug_mode = False

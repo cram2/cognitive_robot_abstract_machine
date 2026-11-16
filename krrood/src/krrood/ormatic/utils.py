@@ -253,10 +253,10 @@ def get_python_type_from_sqlalchemy_column(column: Column):
         try:
             python_type = [column.type.python_type]
         except NotImplementedError:
-            raise UnsupportedColumnType(column.type)
+            raise UnsupportedColumnType(column_type=column.type)
         # SQLAlchemy >= 2.1 reports ``object`` instead of raising for custom types.
         if python_type == [object]:
-            raise UnsupportedColumnType(column.type)
+            raise UnsupportedColumnType(column_type=column.type)
 
     if len(python_type) > 1:
         raise TypeError(f"Multiple types found for column {column.name}")

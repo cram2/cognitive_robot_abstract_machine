@@ -23,7 +23,7 @@ from krrood.patterns.exceptions import UnmemoizableOwnerError
 # %% mimics
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SquaringOwner:
     """
     An owner of a memoized method that is also copied and pickled.
@@ -37,12 +37,12 @@ class SquaringOwner:
     """
 
     @memoize
-    def square(self, value: int) -> int:
+    def square(self, *, value: int) -> int:
         self.computation_count += 1
         return value * value
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SelfReferencingOwner:
     """
     An owner whose memoized result refers back to the owner itself.
@@ -82,11 +82,11 @@ def test_owner_of_a_memoized_method_can_be_deep_copied():
     empty cache instead of inheriting the original's cached values.
     """
     owner = SquaringOwner()
-    assert owner.square(3) == 9
+    assert owner.square(value=3) == 9
 
     copied_owner = deepcopy(owner)
 
-    assert copied_owner.square(3) == 9
+    assert copied_owner.square(value=3) == 9
     assert copied_owner.computation_count == owner.computation_count + 1
     assert owner.computation_count == 1
 
@@ -96,11 +96,11 @@ def test_owner_of_a_memoized_method_can_be_pickled():
     Memoizing a call must not make its owner unpicklable.
     """
     owner = SquaringOwner()
-    assert owner.square(4) == 16
+    assert owner.square(value=4) == 16
 
     restored_owner = pickle.loads(pickle.dumps(owner))
 
-    assert restored_owner.square(4) == 16
+    assert restored_owner.square(value=4) == 16
     assert restored_owner.computation_count == 2
 
 
@@ -111,7 +111,7 @@ def test_owner_is_collected_even_when_its_cached_value_references_it():
     """
     owner = SelfReferencingOwner()
     owner.identity()
-    assert MemoizationCache.existing_for(owner) is not None
+    assert MemoizationCache.existing_for(owner=owner) is not None
     reference = weakref.ref(owner)
 
     del owner

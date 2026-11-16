@@ -155,7 +155,9 @@ with world.modify_world():
     )
 
 # The executor needs the ROS node to reach the real robot
-context = StatechartContext.with_extensions(world, [RobotAccess(tracy)])
+context = StatechartContext.with_extensions(
+    world=world, extensions=[RobotAccess(robot=tracy)]
+)
 executor: PlanExecutor
 if controls_real_robot:
     real_robot_plan_adaptations = [CloseFingersToObjectWidth(), DetectWithRoboKudo()]
@@ -165,10 +167,12 @@ if controls_real_robot:
             0, DriveRobotiqGrippersThroughTheirActionServers()
         )
     executor = RealRobotPlanExecutor(
-        context, ros_node=node, plan_adaptations=real_robot_plan_adaptations
+        context=context,
+        ros_node=node,
+        plan_adaptations=real_robot_plan_adaptations,
     )
 else:
-    executor = KinematicallySimulatedPlanExecutor(context, ros_node=node)
+    executor = KinematicallySimulatedPlanExecutor(context=context, ros_node=node)
 
 plan = Sequence(
     nodes=[
@@ -211,8 +215,8 @@ plan = Sequence(
 try:
     print("Perform Plan")
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    executor.compile(statechart=statechart)
     executor.execute()
 finally:
     executor.close()

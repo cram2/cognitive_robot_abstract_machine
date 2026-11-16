@@ -215,8 +215,8 @@ def run_pose_goal(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     motion_statechart = Statechart(context=executor.context)
-    motion_statechart.add_node(goal)
-    motion_statechart.add_node(EndMotion.when_true(goal))
+    motion_statechart.add_node(node=goal)
+    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=motion_statechart)
 
     root_T_goal = world.compute_forward_kinematics_np(root, tip) @ (

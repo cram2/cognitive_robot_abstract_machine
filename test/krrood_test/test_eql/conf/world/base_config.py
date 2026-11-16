@@ -6,58 +6,58 @@ from omegaconf import MISSING
 from typing_extensions import Callable, Any
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyConf:
     name: str = MISSING
     size: int = field(default=1)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HandleConf(BodyConf): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContainerConf(BodyConf): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionConf:
     parent: BodyConf = MISSING
     child: BodyConf = MISSING
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedConnectionConf(ConnectionConf):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrismaticConnectionConf(ConnectionConf):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RevoluteConnectionConf(ConnectionConf):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewConf: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DrawerConf(ViewConf):
     container: BodyConf = MISSING
     handle: HandleConf = MISSING
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CabinetConf(ViewConf):
     container: ContainerConf = MISSING
     drawers: list[DrawerConf] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseConf:
     factory_method: Callable[[Any], Any] = MISSING
 
@@ -65,7 +65,7 @@ class CaseConf:
         return self.factory_method()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldConf(CaseConf):
     bodies: list[BodyConf] = field(default_factory=list)
     connections: list[ConnectionConf] = field(default_factory=list)

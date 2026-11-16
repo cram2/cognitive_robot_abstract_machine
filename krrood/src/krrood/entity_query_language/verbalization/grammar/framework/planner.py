@@ -15,7 +15,7 @@ TPlan = TypeVar("TPlan")
 """The plan (data record) the assembler realises."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Planner(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     """
     Pure analysis of a single EQL *node* into a plan of type ``P``.

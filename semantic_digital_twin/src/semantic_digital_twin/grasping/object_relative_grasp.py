@@ -156,7 +156,9 @@ def draw_grasps(
     if number_of_grasps == 0:
         return []
     return list(
-        statement.limit(number_of_grasps).evaluate(
-            backend=ProbabilisticBackend(model_registry or UniformPriorRegistry())
+        statement.limit(n=number_of_grasps).evaluate(
+            backend=ProbabilisticBackend(
+                model_registry=model_registry or UniformPriorRegistry()
+            )
         )
     )

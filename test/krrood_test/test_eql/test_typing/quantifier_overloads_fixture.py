@@ -26,14 +26,14 @@ from krrood.entity_query_language.query.match import Match
 from krrood.entity_query_language.query.query import Entity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Robot:
     name: str
     battery: int
 
 
 def make_robot(name: str = "R2") -> Robot:
-    return Robot(name, battery=100)
+    return Robot(name=name, battery=100)
 
 
 # %% Type[T] overload: builds a match that reads like an instance of the class
@@ -73,10 +73,10 @@ constrained = a(Robot)
 assert isinstance(constrained, Match)
 scoped = constrained(name="R2", battery=100)
 assert isinstance(scoped, Match)
-assert_type(scoped.from_([Robot("R2", 100)]), Match[Robot])
+assert_type(scoped.from_(domain=[Robot(name="R2", battery=100)]), Match[Robot])
 assert_type(scoped.where(scoped.battery == 100), Match[Robot])
-assert_type(scoped.ordered_by(scoped.battery), Match[Robot])
-assert_type(scoped.limit(1), Match[Robot])
+assert_type(scoped.ordered_by(variable=scoped.battery), Match[Robot])
+assert_type(scoped.limit(n=1), Match[Robot])
 
 
 # %% bare T overload: quantifying an existing symbolic expression preserves its type

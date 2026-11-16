@@ -12,7 +12,7 @@ from typing_extensions import Any, Iterable, Iterator
 # %% the cartesian product by rank sum
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CartesianProductByRankSum:
     """
     The cartesian product of :attr:`factors`, the tuples with the lowest sum of ranks
@@ -55,15 +55,20 @@ class CartesianProductByRankSum:
             :attr:`factors`.
         """
         for rank_sum in count():
-            for ranks in self._ranks_summing_to(rank_sum, len(self.factors)):
-                if all(self._reaches(index, rank) for index, rank in enumerate(ranks)):
+            for ranks in self._ranks_summing_to(
+                total=rank_sum, parts=len(self.factors)
+            ):
+                if all(
+                    self._reaches(index=index, rank=rank)
+                    for index, rank in enumerate(ranks)
+                ):
                     yield tuple(
                         self.read[index][rank] for index, rank in enumerate(ranks)
                     )
-            if self._has_no_tuple_beyond(rank_sum):
+            if self._has_no_tuple_beyond(rank_sum=rank_sum):
                 return
 
-    def _reaches(self, index: int, rank: int) -> bool:
+    def _reaches(self, *, index: int, rank: int) -> bool:
         """
         Read the factor at `index` until it yielded its value at `rank`, or ran out.
 
@@ -78,7 +83,7 @@ class CartesianProductByRankSum:
             self._exhausted[index] = len(values) == read_before
         return rank < len(values)
 
-    def _has_no_tuple_beyond(self, rank_sum: int) -> bool:
+    def _has_no_tuple_beyond(self, *, rank_sum: int) -> bool:
         """
         Every factor was asked for its value at `rank_sum` while the tuples up to it
         were taken, so each one that has no further value is exhausted by then.
@@ -95,7 +100,7 @@ class CartesianProductByRankSum:
         return all(self._exhausted) and rank_sum >= highest_rank_sum
 
     @classmethod
-    def _ranks_summing_to(cls, total: int, parts: int) -> Iterator[tuple[int, ...]]:
+    def _ranks_summing_to(cls, *, total: int, parts: int) -> Iterator[tuple[int, ...]]:
         """
         :param total: What the ranks add up to.
         :param parts: How many ranks there are.
@@ -106,5 +111,5 @@ class CartesianProductByRankSum:
                 yield ()
             return
         for first in range(total + 1):
-            for rest in cls._ranks_summing_to(total - first, parts - 1):
+            for rest in cls._ranks_summing_to(total=total - first, parts=parts - 1):
                 yield first, *rest

@@ -12,7 +12,6 @@ from uuid import UUID
 import giskardpy_bullet_bindings as bullet
 import numpy as np
 import trimesh
-from giskardpy.utils.utils import create_path
 from krrood.patterns.caching import memoize, clear_memoization_cache
 from semantic_digital_twin.collision_checking.collision_detector import (
     CollisionDetector,
@@ -372,7 +371,7 @@ def save_in_cache(obj_file_name: str, write: Callable[[str], None]) -> str:
         logging.debug(f'Cache hit, loaded "{obj_file_name}".')
         return obj_file_name
 
-    create_path(obj_file_name)
+    Path(obj_file_name).parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         dir=os.path.dirname(obj_file_name), suffix=".obj", delete=False
     ) as unfinished_file:

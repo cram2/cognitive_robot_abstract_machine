@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Person(Symbol):
     """
     Deliberately named like the ``Person`` of the annotation resolution tests.

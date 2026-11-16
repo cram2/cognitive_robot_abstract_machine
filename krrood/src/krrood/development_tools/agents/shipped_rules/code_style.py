@@ -4,10 +4,16 @@ The rules on code style and naming.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 from enum import Enum
 
 
+from krrood.patterns.called_positionally import called_positionally
+from krrood.development_tools.agents.positional_parameters import (
+    PositionalFieldsChecker,
+    PositionalParametersChecker,
+)
 from krrood.development_tools.agents.field_accessor_definition import (
     HandWrittenFieldAccessorChecker,
 )
@@ -46,25 +52,47 @@ class CodeStyleRules(Section):
     )
 
     ACCESS_ATTRIBUTES_DIRECTLY = (
-        f"Access attributes with `.`, never with {CodeReference(getattr).name}, and "
+        f"Access attributes with `.`, never with {CodeReference(target=getattr).name}, and "
         "never wrap "
         "attribute access in try-except"
     )
 
     NO_MUTABLE_DEFAULT_ARGUMENTS = "Never use mutable objects as default arguments"
 
+    KEYWORD_ONLY_DATACLASS_FIELDS = (
+        "Every dataclass is declared with `kw_only=True`, so its fields are passed "
+        f"by keyword. A dataclass an {CodeReference(target=Enum).name} mixes in is exempt, "
+        "since the enum passes its member values positionally",
+        (),
+        PositionalFieldsChecker(),
+    )
+
+    KEYWORD_ONLY_METHOD_PARAMETERS = (
+        "Every parameter of a method after `self` or `cls` is keyword-only: a `*` "
+        "comes before them, as in `def move_to(self, *, target: Pose)`. Dunder "
+        "methods, property setters and deleters, and methods that a standard "
+        "library or third-party base class defines or dispatches to by name, such "
+        f"as the `visit_` methods of {CodeReference(target=ast.NodeVisitor).path}, are "
+        "exempt, since Python or that library passes their arguments positionally. "
+        "Mark any other method a caller outside our control calls positionally, "
+        "such as a method applied as a decorator, with "
+        f"{CodeReference(target=called_positionally).path}",
+        (),
+        PositionalParametersChecker(),
+    )
+
     BUILD_FIELD_DESCRIPTORS_ON_THE_BASE_CLASS = (
         "A descriptor that manages a dataclass field subclasses "
-        f"{CodeReference(DataclassFieldDescriptor).path}, implementing "
-        f"{CodeReference(DataclassFieldDescriptor.read).name} and "
-        f"{CodeReference(DataclassFieldDescriptor.write).name}, and the owning class "
-        f"inherits {CodeReference(DataclassFieldDescriptorOwner).name} so its "
+        f"{CodeReference(target=DataclassFieldDescriptor).path}, implementing "
+        f"{CodeReference(target=DataclassFieldDescriptor.read).name} and "
+        f"{CodeReference(target=DataclassFieldDescriptor.write).name}, and the owning class "
+        f"inherits {CodeReference(target=DataclassFieldDescriptorOwner).name} so its "
         "subclasses keep the descriptor"
     )
 
     NO_HAND_WRITTEN_FIELD_ACCESSORS = (
         f"Never define `__set__` in a class other than "
-        f"{CodeReference(DataclassFieldDescriptor).name}, and never manage a "
+        f"{CodeReference(target=DataclassFieldDescriptor).name}, and never manage a "
         "dataclass field `value` or `_value` with a property setter `value`",
         (),
         HandWrittenFieldAccessorChecker(),
@@ -173,8 +201,8 @@ class NamingRules(Section):
 
     NEVER_SHADOW_BOUND_NAMES = (
         "Never take an identifier the language or something in scope already "
-        f"binds: {CodeReference(Enum).name} reserves `name`, a parameter `field` "
-        f"shadows {CodeReference(dataclasses.field).path}, a field shadows a method of the same name. These "
+        f"binds: {CodeReference(target=Enum).name} reserves `name`, a parameter `field` "
+        f"shadows {CodeReference(target=dataclasses.field).path}, a field shadows a method of the same name. These "
         "fail at runtime or silently, not at import"
     )
 

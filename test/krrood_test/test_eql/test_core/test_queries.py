@@ -53,7 +53,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Noun,
     Verb,
 )
-from krrood.patterns.role_predicates import IsSameSemanticEntity
+from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
 from krrood.entity_query_language.query.quantifiers import (
     ResultQuantificationConstraint,
     Exactly,
@@ -138,9 +138,9 @@ def test_filtering_connections_without_joining_with_parent_or_child_queries(
     C = variable(Connection, domain=world.connections)
     query = an(
         entity(C).where(
-            HasType(C.parent, Container),
+            HasType(variable=C.parent, types_=Container),
             C.parent.name == "Container1",
-            HasType(C.child, Handle),
+            HasType(variable=C.child, types_=Handle),
         )
     )
 
@@ -422,8 +422,8 @@ def test_generate_with_more_than_one_source_optimized(handles_and_containers_wor
     PC = variable(PrismaticConnection, domain=world.connections)
     query = a(
         set_of(FC, PC).where(
-            HasType(FC.parent, Container),
-            HasType(FC.child, Handle),
+            HasType(variable=FC.parent, types_=Container),
+            HasType(variable=FC.child, types_=Handle),
             PC.child == FC.parent,
         )
     )
@@ -612,7 +612,7 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
     """
     world = handles_and_containers_world
 
-    @dataclass
+    @dataclass(kw_only=True)
     class HaveSameFirstCharacter(Predicate):
         body1: Body
         body2: Body
@@ -624,13 +624,13 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
         @classmethod
         def _verbalization_fragment_(cls, fields):
             return clause(
-                Noun(fields["body1"]),
-                Verb("share", number=GrammaticalNumber.PLURAL),
-                Noun("first character"),
+                Noun(content=fields["body1"]),
+                Verb(lemma="share", number=GrammaticalNumber.PLURAL),
+                Noun(content="first character"),
                 Prepositions.WITH,
-                Noun(fields["body2"]),
-                Noun("and"),
-                Noun(fields["body3"]),
+                Noun(content=fields["body2"]),
+                Noun(content="and"),
+                Noun(content=fields["body3"]),
             )
 
     body1 = variable(Body, world.bodies)
@@ -642,9 +642,9 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
             body2 != body3,
             body3 != body1,
             HaveSameFirstCharacter(
-                body1,
-                body2,
-                body3,
+                body1=body1,
+                body2=body2,
+                body3=body3,
             ),
         )
     )
@@ -659,11 +659,12 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
         len([h for h in world.bodies if isinstance(h, Handle)])
     ) + factorial(len([c for c in world.bodies if isinstance(c, Container)]))
     assert len(body_pairs) == expected, "Should generate at least one handle."
-    assert all(HaveSameFirstCharacter(b1, b2, b3)() for b1, b2, b3 in body_pairs), (
-        "All generated items should satisfy the predicate."
-    )
     assert all(
-        not HaveSameFirstCharacter(b1, b2, b3)()
+        HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)()
+        for b1, b2, b3 in body_pairs
+    ), "All generated items should satisfy the predicate."
+    assert all(
+        not HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)()
         for b1 in world.bodies
         for b2 in world.bodies
         for b3 in world.bodies
@@ -677,7 +678,7 @@ def test_select_predicate(handles_and_containers_world):
     """
     world = handles_and_containers_world
 
-    @dataclass
+    @dataclass(kw_only=True)
     class HasName(Predicate):
         body: Body
         name: str
@@ -688,14 +689,14 @@ def test_select_predicate(handles_and_containers_world):
         @classmethod
         def _verbalization_fragment_(cls, fields):
             return clause(
-                Noun(fields["body"]),
-                Verb("have"),
-                Noun.the("name"),
-                Noun(fields["name"]),
+                Noun(content=fields["body"]),
+                Verb(lemma="have"),
+                Noun.the(head="name"),
+                Noun(content=fields["name"]),
             )
 
     body = variable(Body, world.bodies)
-    has_name = HasName(body, "Handle1")
+    has_name = HasName(body=body, name="Handle1")
     query = the(entity(has_name).where(has_name))
 
     handle1 = query.tolist()[0]
@@ -717,7 +718,7 @@ def test_is_same_entity_predicate_in_query(handles_and_containers_world):
     target = world.bodies[0]
 
     body = variable(type_=Body, domain=world.bodies)
-    same = IsSameSemanticEntity(body, target)
+    same = IsSameSemanticEntity(first_entity=body, second_entity=target)
     query = the(entity(same).where(same))
 
     matches = query.tolist()
@@ -729,7 +730,7 @@ def test_is_same_entity_predicate_in_query(handles_and_containers_world):
 def test_literal_predicate(handles_and_containers_world):
     world = handles_and_containers_world
 
-    @dataclass
+    @dataclass(kw_only=True)
     class HasName(Predicate):
         body: Body
         name: str
@@ -740,13 +741,13 @@ def test_literal_predicate(handles_and_containers_world):
         @classmethod
         def _verbalization_fragment_(cls, fields):
             return clause(
-                Noun(fields["body"]),
-                Verb("have"),
-                Noun.the("name"),
-                Noun(fields["name"]),
+                Noun(content=fields["body"]),
+                Verb(lemma="have"),
+                Noun.the(head="name"),
+                Noun(content=fields["name"]),
             )
 
-    has_name = HasName(world.bodies[0], world.bodies[0].name)
+    has_name = HasName(body=world.bodies[0], name=world.bodies[0].name)
     with pytest.raises(LiteralConditionError):
         query = the(entity(variable(Body, world.bodies)).where(has_name))
 
@@ -756,8 +757,10 @@ def test_predicate_taking_one_variable_attribute_twice():
     An attribute filling two arguments of a predicate gives its value to both of them.
     """
     values = [0.0, 1.0, 2.0]
-    position = variable(KRROODPosition, [KRROODPosition(x, x, 0.0) for x in values])
-    query = entity(position).where(IsGreaterThan(position.x, position.x))
+    position = variable(
+        KRROODPosition, [KRROODPosition(x=x, y=x, z=0.0) for x in values]
+    )
+    query = entity(position).where(IsGreaterThan(value=position.x, bound=position.x))
 
     assert query.tolist() == []
 
@@ -768,10 +771,10 @@ def test_predicate_taking_one_variable_attribute_twice_keeps_what_satisfies_it()
     predicate every value satisfies against itself keeps every candidate.
     """
     values = [0.0, 1.0, 2.0]
-    positions = [KRROODPosition(x, x, 0.0) for x in values]
+    positions = [KRROODPosition(x=x, y=x, z=0.0) for x in values]
     position = variable(KRROODPosition, positions)
     query = entity(position).where(
-        IsGreaterThanByMargin(position.x, position.x, margin=-1.0)
+        IsGreaterThanByMargin(value=position.x, bound=position.x, margin=-1.0)
     )
 
     assert query.tolist() == positions
@@ -782,9 +785,11 @@ def test_predicate_argument_left_out_takes_its_default():
     A predicate argument the query does not pass takes the predicate's default.
     """
     values = [0.0, 1.0, 2.0]
-    positions = [KRROODPosition(x, y, 0.0) for x in values for y in values]
+    positions = [KRROODPosition(x=x, y=y, z=0.0) for x in values for y in values]
     position = variable(KRROODPosition, positions)
-    query = entity(position).where(IsGreaterThanByMargin(position.x, position.y))
+    query = entity(position).where(
+        IsGreaterThanByMargin(value=position.x, bound=position.y)
+    )
 
     assert query.tolist() == [
         candidate
@@ -794,28 +799,32 @@ def test_predicate_argument_left_out_takes_its_default():
 
 
 def test_contains_type():
-    fb1_fruits = [Apple("apple"), Body("Body1")]
-    fb2_fruits = [Body("Body3"), Body("Body2")]
-    fb1 = FruitBox("FruitBox1", fb1_fruits)
-    fb2 = FruitBox("FruitBox2", fb2_fruits)
+    fb1_fruits = [Apple(name="apple"), Body(name="Body1")]
+    fb2_fruits = [Body(name="Body3"), Body(name="Body2")]
+    fb1 = FruitBox(name="FruitBox1", fruits=fb1_fruits)
+    fb2 = FruitBox(name="FruitBox2", fruits=fb2_fruits)
 
     fb = variable(FruitBox, domain=None)
-    fruit_box_query = an(entity(fb).where(ContainsType(fb.fruits, Apple)))
+    fruit_box_query = an(
+        entity(fb).where(ContainsType(iterable=fb.fruits, obj_type=Apple))
+    )
 
     query_result = list(fruit_box_query.evaluate())
     assert len(query_result) == 1, "Should generate 1 fruit box."
 
 
 def test_equivalent_to_contains_type_using_exists():
-    fb1_fruits = [Apple("apple"), Body("Body1")]
-    fb2_fruits = [Body("Body3"), Body("Body2")]
-    fb1 = FruitBox("FruitBox1", fb1_fruits)
-    fb2 = FruitBox("FruitBox2", fb2_fruits)
+    fb1_fruits = [Apple(name="apple"), Body(name="Body1")]
+    fb2_fruits = [Body(name="Body3"), Body(name="Body2")]
+    fb1 = FruitBox(name="FruitBox1", fruits=fb1_fruits)
+    fb2 = FruitBox(name="FruitBox2", fruits=fb2_fruits)
 
     fb = variable(FruitBox, domain=None)
     fruit_box_query = an(
         entity(fb).where(
-            exists(var := flat_variable(fb.fruits), HasType(var, Apple)),
+            exists(
+                var := flat_variable(fb.fruits), HasType(variable=var, types_=Apple)
+            ),
         )
     )
 
@@ -829,10 +838,10 @@ def fruit_boxes_with_and_without_apples() -> list[FruitBox]:
     An apple box, a box without apples, a mixed box with an apple, and an empty box.
     """
     return [
-        FruitBox("apples", [Apple("apple1")]),
-        FruitBox("bodies", [Body("body1")]),
-        FruitBox("mixed", [Body("body2"), Apple("apple2")]),
-        FruitBox("empty", []),
+        FruitBox(name="apples", fruits=[Apple(name="apple1")]),
+        FruitBox(name="bodies", fruits=[Body(name="body1")]),
+        FruitBox(name="mixed", fruits=[Body(name="body2"), Apple(name="apple2")]),
+        FruitBox(name="empty", fruits=[]),
     ]
 
 
@@ -844,7 +853,9 @@ def test_exists_over_flat_variable_is_checked_for_each_outer_binding(
     """
     fruit_box = variable(FruitBox, domain=fruit_boxes_with_and_without_apples)
     fruit = flat_variable(fruit_box.fruits)
-    query = an(entity(fruit_box).where(exists(fruit, HasType(fruit, Apple))))
+    query = an(
+        entity(fruit_box).where(exists(fruit, HasType(variable=fruit, types_=Apple)))
+    )
 
     assert query.tolist() == [
         fruit_boxes_with_and_without_apples[0],
@@ -861,7 +872,11 @@ def test_negated_exists_over_flat_variable_is_checked_for_each_outer_binding(
     """
     fruit_box = variable(FruitBox, domain=fruit_boxes_with_and_without_apples)
     fruit = flat_variable(fruit_box.fruits)
-    query = an(entity(fruit_box).where(not_(exists(fruit, HasType(fruit, Apple)))))
+    query = an(
+        entity(fruit_box).where(
+            not_(exists(fruit, HasType(variable=fruit, types_=Apple)))
+        )
+    )
 
     assert query.tolist() == [
         fruit_boxes_with_and_without_apples[1],
@@ -935,18 +950,22 @@ def test_quantified_query(handles_and_containers_world):
         )
         return query
 
-    results = list(get_quantified_query(AtLeast(3)).evaluate())
+    results = list(get_quantified_query(AtLeast(value=3)).evaluate())
     assert len(results) == 3
-    results = list(get_quantified_query(Range(AtLeast(2), AtMost(4))).evaluate())
+    results = list(
+        get_quantified_query(
+            Range(at_least=AtLeast(value=2), at_most=AtMost(value=4))
+        ).evaluate()
+    )
     assert len(results) == 3
     with pytest.raises(LessThanExpectedNumberOfSolutions):
-        list(get_quantified_query(AtLeast(4)).evaluate())
+        list(get_quantified_query(AtLeast(value=4)).evaluate())
     with pytest.raises(GreaterThanExpectedNumberOfSolutions):
-        list(get_quantified_query(AtMost(2)).evaluate())
+        list(get_quantified_query(AtMost(value=2)).evaluate())
     with pytest.raises(GreaterThanExpectedNumberOfSolutions):
-        list(get_quantified_query(Exactly(2)).evaluate())
+        list(get_quantified_query(Exactly(value=2)).evaluate())
     with pytest.raises(LessThanExpectedNumberOfSolutions):
-        list(get_quantified_query(Exactly(4)).evaluate())
+        list(get_quantified_query(Exactly(value=4)).evaluate())
 
 
 def test_order_by(handles_and_containers_world):
@@ -960,15 +979,15 @@ def test_limit(handles_and_containers_world):
     world = handles_and_containers_world
     body = variable(type_=Body, domain=world.bodies)
     query = an(entity(body).where(contains(body.name, "Handle")))
-    assert len(list(query.limit(2).evaluate())) == 2
-    assert len(list(query.limit(1).evaluate())) == 1
-    assert len(list(query.limit(3).evaluate())) == 3
+    assert len(list(query.limit(n=2).evaluate())) == 2
+    assert len(list(query.limit(n=1).evaluate())) == 1
+    assert len(list(query.limit(n=3).evaluate())) == 3
     with pytest.raises(NonPositiveLimitValue):
-        list(query.limit(0).evaluate())
+        list(query.limit(n=0).evaluate())
     with pytest.raises(NonPositiveLimitValue):
-        list(query.limit(-1).evaluate())
+        list(query.limit(n=-1).evaluate())
     with pytest.raises(NonPositiveLimitValue):
-        list(query.limit("0").evaluate())
+        list(query.limit(n="0").evaluate())
 
 
 @pytest.fixture
@@ -1066,9 +1085,9 @@ def test_multiple_dependent_selectables(handles_and_containers_world):
     cabinet_drawers = flat_variable(cabinet.drawers)
     old_evaluate = cabinet_drawers._evaluate__
 
-    def _cabinet_drawers_evaluate__(bindings):
-        assert cabinet._id_ in bindings
-        yield from old_evaluate(bindings)
+    def _cabinet_drawers_evaluate__(*, sources):
+        assert cabinet._id_ in sources
+        yield from old_evaluate(sources=sources)
 
     cabinet_drawers._evaluate__ = _cabinet_drawers_evaluate__
 
@@ -1155,7 +1174,7 @@ def visualize_query_graph(query, **kwargs):
     try:
         from krrood.entity_query_language.query_graph import QueryGraph
 
-        QueryGraph(query).visualize(**kwargs)
+        QueryGraph(query=query).visualize(**kwargs)
     except ImportError as e:
         print(f"Failed to visualize query graph: {e}")
 
@@ -1268,7 +1287,7 @@ def test_order_by_not_evaluated_variable(handles_and_containers_world):
 def test_ordering_the_query_by_the_query_itself(handles_and_containers_world):
     body = variable(Body, domain=handles_and_containers_world.bodies)
     query = entity(body).where(contains(body.name, "Handle"))
-    ordered_query = a(query.ordered_by(query.name[-1], descending=True))
+    ordered_query = a(query.ordered_by(variable=query.name[-1], descending=True))
     filtered_values = [
         b for b in handles_and_containers_world.bodies if "Handle" in b.name
     ]
@@ -1572,7 +1591,7 @@ def test_root_caches_all_descendant_ids_for_nested_queries():
 
 
 def test_indexing_on_dict_field():
-    @dataclass
+    @dataclass(kw_only=True)
     class ItemWithDictionary:
         name: str
         attrs: dict[str, int]
@@ -1580,7 +1599,7 @@ def test_indexing_on_dict_field():
         def __hash__(self):
             return hash(self.name)
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class WorldWithItems:
         items: list[ItemWithDictionary]
 
@@ -1588,10 +1607,10 @@ def test_indexing_on_dict_field():
             return hash(id(self))
 
     world = WorldWithItems(
-        [
-            ItemWithDictionary("A", {"score": 1}),
-            ItemWithDictionary("B", {"score": 2}),
-            ItemWithDictionary("C", {"score": 2}),
+        items=[
+            ItemWithDictionary(name="A", attrs={"score": 1}),
+            ItemWithDictionary(name="B", attrs={"score": 2}),
+            ItemWithDictionary(name="C", attrs={"score": 2}),
         ]
     )
 
@@ -1603,12 +1622,12 @@ def test_indexing_on_dict_field():
 
 
 def test_indexing_2():
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class ShapeWithColor:
         name: str
         color: str
 
-    @dataclass
+    @dataclass(kw_only=True)
     class BodyWithShapes:
         shapes: list[ShapeWithColor]
 
@@ -1618,14 +1637,14 @@ def test_indexing_2():
     world_bodies = [
         BodyWithShapes(
             shapes=[
-                ShapeWithColor("shape1", color="red"),
-                ShapeWithColor("shape2", color="blue"),
+                ShapeWithColor(name="shape1", color="red"),
+                ShapeWithColor(name="shape2", color="blue"),
             ]
         ),
         BodyWithShapes(
             shapes=[
-                ShapeWithColor("shape1", color="green"),
-                ShapeWithColor("shape2", color="black"),
+                ShapeWithColor(name="shape1", color="green"),
+                ShapeWithColor(name="shape2", color="black"),
             ]
         ),
     ]
@@ -1647,21 +1666,42 @@ def test_debugger_issue():
 
 
 def test_presentation_example():
-    @dataclass
+    @dataclass(kw_only=True)
     class Task:
         name: str
         completed: bool
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Robot:
         name: str
         battery: int
         tasks: list[Task]
 
     robots = [
-        Robot("Robot1", 100, [Task("Task1", True), Task("Task2", False)]),
-        Robot("Robot2", 50, [Task("Task3", False), Task("Task4", True)]),
-        Robot("Robot3", 75, [Task("Task5", False), Task("Task6", True)]),
+        Robot(
+            name="Robot1",
+            battery=100,
+            tasks=[
+                Task(name="Task1", completed=True),
+                Task(name="Task2", completed=False),
+            ],
+        ),
+        Robot(
+            name="Robot2",
+            battery=50,
+            tasks=[
+                Task(name="Task3", completed=False),
+                Task(name="Task4", completed=True),
+            ],
+        ),
+        Robot(
+            name="Robot3",
+            battery=75,
+            tasks=[
+                Task(name="Task5", completed=False),
+                Task(name="Task6", completed=True),
+            ],
+        ),
     ]
     r = variable(Robot, robots)
     q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))

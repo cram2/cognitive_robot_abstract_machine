@@ -15,7 +15,7 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 # %% base weighting
 
 
-def test_garmi_giskard_weights_the_velocity_of_its_base(init_rospy):
+def test_garmi_giskard_weights_the_velocity_of_its_base(init_background_node):
     giskard = GarmiGiskard(
         world_source=WorldSpecification(
             robots=[RobotSpecification.specify_real_robot(Garmi)]

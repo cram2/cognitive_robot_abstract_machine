@@ -26,7 +26,7 @@ def main() -> None:
     """
     Prints, one per line, the name of every core exception whose fields resolved.
     """
-    diagram = ClassDiagram(classes_of_module(semantic_digital_twin.exceptions))
+    diagram = ClassDiagram(classes=classes_of_module(semantic_digital_twin.exceptions))
     for wrapped_class in diagram.wrapped_classes:
         wrapped_class.fields
         print(wrapped_class.clazz.__name__)

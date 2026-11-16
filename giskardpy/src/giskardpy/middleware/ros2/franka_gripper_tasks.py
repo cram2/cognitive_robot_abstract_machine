@@ -15,7 +15,7 @@ from franka_msgs.msg import GraspEpsilon
 from rclpy.task import Future
 
 from cramph.data_types import ObservationStateValues
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+from giskardpy.motion_statechart.ros2_nodes.action_servers import (
     Action,
     ActionFeedback,
     ActionGoal,

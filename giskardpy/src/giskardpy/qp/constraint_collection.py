@@ -177,7 +177,9 @@ class ConstraintCollection:
             control horizon; caps the bound on its own if not given
         """
         if task_expression.shape != (1, 1):
-            raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
+            raise InvalidConstraintExpressionShapeError(
+                actual_shape=list(task_expression.shape)
+            )
 
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")
@@ -237,7 +239,9 @@ class ConstraintCollection:
             unless you know what you are doing
         """
         if task_expression.shape != (1, 1):
-            raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
+            raise InvalidConstraintExpressionShapeError(
+                actual_shape=list(task_expression.shape)
+            )
         lower_slack_limit = (
             lower_slack_limit if lower_slack_limit is not None else -float("inf")
         )

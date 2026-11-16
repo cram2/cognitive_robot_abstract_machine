@@ -9,7 +9,7 @@ from krrood.patterns.role import Role
 # ---------------------------------------------------------------------------
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersonForRoleRecursion:
     name: str
 
@@ -20,12 +20,12 @@ class PersonForRoleRecursion:
         return isinstance(other, PersonForRoleRecursion) and self.name == other.name
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StudentForRoleRecursion(Role[PersonForRoleRecursion]):
     student_id: str
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class TeacherForRoleRecursion(Role[PersonForRoleRecursion]):
     employee_id: str
 
@@ -35,16 +35,16 @@ class TeacherForRoleRecursion(Role[PersonForRoleRecursion]):
 # ---------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BaseForRoleRecursion:
     base_attr: str = "base"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IntermediateForRoleRecursion(Role[BaseForRoleRecursion]):
     inter_attr: str = "inter"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class TopForRoleRecursion(Role[IntermediateForRoleRecursion]):
     top_attr: str = "top"

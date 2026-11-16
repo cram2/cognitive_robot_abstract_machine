@@ -14,7 +14,7 @@ def test_average_resolves_to_the_expectation_under_probabilistic_backend():
     circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
     x = variable(Coin)
 
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Coin: circuit}))
 
     # midpoints of Uniform([0, 1]) and Uniform([0, 2]) -- computed in closed form via
     # ProbabilisticModel.moment, not by sampling and averaging rows
@@ -33,7 +33,7 @@ def test_average_with_grouping_is_not_reinterpreted_probabilistically():
     circuit, var_a, _, _ = build_three_independent_variables_circuit()
     x = variable(Coin)
 
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Coin: circuit}))
 
     # ProbabilisticBackend only shortcuts a bare average(...) selection -- one grouped
     # (or filtered/ordered) needs enumerated data to group over, which a bare

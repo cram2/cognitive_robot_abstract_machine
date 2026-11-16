@@ -156,7 +156,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         super().set_up()
         self._control_dt = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).qp_controller_config.control_time_step.total_seconds()
         self._errors_at_last_progress_variables = self._registered_variables(
             "error_at_last_progress"
@@ -258,7 +258,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
             ]
         )
         if self.monitored_tasks:
-            self.context.float_variable_data.register_expression(variables)
+            self.context.float_variable_data.register_expression(expression=variables)
         return variables
 
     def _compile_errors(self) -> None:
@@ -276,9 +276,11 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
             sparse=False,
         )
         self._compiled_errors.bind_args_to_memory_view(
-            0, self.context.world.state.positions
+            arg_idx=0, numpy_array=self.context.world.state.positions
         )
-        self.context.float_variable_data.bind_argument(self._compiled_errors, 1)
+        self.context.float_variable_data.bind_argument(
+            compiled_function=self._compiled_errors, argument_index=1
+        )
 
     def _running(self) -> NDArray[np.bool_]:
         """
@@ -351,11 +353,12 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         if self.monitored_tasks:
             self.context.float_variable_data.set_value(
-                self._errors_at_last_progress_variables, self._errors_at_last_progress
+                expression=self._errors_at_last_progress_variables,
+                value=self._errors_at_last_progress,
             )
             self.context.float_variable_data.set_value(
-                self._seconds_since_last_progress_variables,
-                self._seconds_since_last_progress,
+                expression=self._seconds_since_last_progress_variables,
+                value=self._seconds_since_last_progress,
             )
 
 
@@ -499,7 +502,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         timer = CountSimulationTimeSeconds(
             name=f"{self.name}/timer", seconds=self.timeout.total_seconds()
         )
-        self._add_child_to_statechart(timer)
+        self._add_child_to_statechart(node=timer)
         stall_monitors = self._expand_stall_detection(
             self._find_converging_tasks(self.monitored_node)
         )
@@ -537,7 +540,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         still_working = AnyMonitoredTaskShortOfItsGoal(
             name=f"{self.name}/short_of_its_goal", monitored_tasks=monitored_tasks
         )
-        self._add_children_to_statechart([not_approaching, still_working])
+        self._add_children_to_statechart(nodes=[not_approaching, still_working])
         return [not_approaching, still_working]
 
     def build_artifacts(self) -> NodeArtifacts:

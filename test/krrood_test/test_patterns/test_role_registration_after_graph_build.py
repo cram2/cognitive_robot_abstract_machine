@@ -16,7 +16,7 @@ def test_role_registers_when_class_defined_after_symbol_graph_built():
     diagram on demand.
     """
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class PersistentEntityDefinedBeforeGraph(Symbol):
         name: str
 
@@ -28,10 +28,10 @@ def test_role_registers_when_class_defined_after_symbol_graph_built():
     # Ensure the class diagram has been built before the role class below is defined.
     assert SymbolGraph().class_diagram is not None
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class RoleDefinedAfterGraph(Role[PersistentEntityDefinedBeforeGraph]): ...
 
     role = RoleDefinedAfterGraph(role_taker=entity)
 
-    assert Role.has_role(entity, RoleDefinedAfterGraph)
-    assert role in Role.roles_for(entity, RoleDefinedAfterGraph)
+    assert Role.has_role(role_taker=entity, role_types=RoleDefinedAfterGraph)
+    assert role in Role.roles_for(role_taker=entity, role_type=RoleDefinedAfterGraph)

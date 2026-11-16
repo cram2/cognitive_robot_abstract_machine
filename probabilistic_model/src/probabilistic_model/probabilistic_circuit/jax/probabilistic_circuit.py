@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing_extensions import Self, Any
 
 import optax
@@ -21,9 +22,13 @@ from probabilistic_model.probabilistic_circuit.jax.discrete_layer import (
     DifferentiableDiscreteLayer,
 )
 import jax
-import tqdm
 import jax.numpy as jnp
-import equinox as eqx
+
+from probabilistic_model.learning.gradient_descent import (
+    AverageNegativeLogLikelihood,
+    ClassConditionalAverageNegativeLogLikelihood,
+    GradientDescent,
+)
 
 
 @dataclass
@@ -57,11 +62,11 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         variables = SortedSet(
             from_json(variable, **kwargs) for variable in data["variables"]
         )
-        root = DifferentiableLayer.from_json(data["root"], **kwargs)
+        root = DifferentiableLayer.from_json(data=data["root"], **kwargs)
         return cls(variables, root)
 
     def fit(
@@ -80,28 +85,9 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
             learning rate of 1e-3 is used.
         """
-
-        @eqx.filter_jit
-        def loss(root: DifferentiableLayer, x: jax.Array) -> jax.Array:
-            return -jnp.mean(root.log_likelihood_of_nodes(x))
-
-        if optimizer is None:
-            optimizer = optax.adam(1e-3)
-
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
-
-        progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
-
-        for _ in progress_bar:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(self.root, data)
-
-            updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(self.root, eqx.is_inexact_array)
-            )
-            self.root = eqx.apply_updates(self.root, updates)
-            progress_bar.set_postfix_str(
-                f"Negative average log-likelihood: {loss_value}"
-            )
+        self.root = GradientDescent(
+            self.root, AverageNegativeLogLikelihood(), optimizer
+        ).minimize(epochs, data)
 
 
 @dataclass
@@ -128,9 +114,9 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
             classes are assumed to be uniformly distributed.
         :return: The full probabilistic circuit.
         """
-        assert (
-            len(class_variable.domain.simple_sets) == self.root.number_of_nodes
-        ), "The number of classes must match the number of sum units."
+        assert len(class_variable.domain.simple_sets) == self.root.number_of_nodes, (
+            "The number of classes must match the number of sum units."
+        )
 
         number_of_classes = self.root.number_of_nodes
 
@@ -200,25 +186,6 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
         :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
             learning rate of 1e-3 is used.
         """
-
-        @eqx.filter_jit
-        def loss(root: DifferentiableLayer, x: jax.Array, y: jax.Array) -> jax.Array:
-            return -jnp.mean(root.log_likelihood_of_nodes(x)[y])
-
-        if optimizer is None:
-            optimizer = optax.adam(1e-3)
-
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
-
-        progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
-
-        for _ in progress_bar:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(
-                self.root, data, labels
-            )
-
-            updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(self.root, eqx.is_inexact_array)
-            )
-            self.root = eqx.apply_updates(self.root, updates)
-            progress_bar.set_postfix_str(f"Cross Entropy: {loss_value}")
+        self.root = GradientDescent(
+            self.root, ClassConditionalAverageNegativeLogLikelihood(), optimizer
+        ).minimize(epochs, data, labels)

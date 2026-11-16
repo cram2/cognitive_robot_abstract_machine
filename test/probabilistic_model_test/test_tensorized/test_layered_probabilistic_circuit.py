@@ -1193,7 +1193,7 @@ def test_renaming_keeps_the_column_order(deterministic_mixture, x, y):
 def test_normalize_makes_the_weights_sum_to_one(overlapping_mixture):
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(overlapping_mixture)
     root = layered.root
-    root.log_weights.data = root.log_weights.data + 3.0
+    root.log_weights = root.log_weights + 3.0
     samples = np.array([[0.5, 0.5], [2.0, 1.5]])
     before = layered.log_likelihood(samples)
 

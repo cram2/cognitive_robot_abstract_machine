@@ -12,7 +12,7 @@ from krrood.symbol_graph.symbol_graph import Symbol
 # %% value-equal symbols
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Label(Symbol):
     """
     A symbol that equals every other label with the same text.

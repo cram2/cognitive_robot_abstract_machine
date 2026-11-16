@@ -10,7 +10,7 @@ from dataclasses import dataclass
 # %% values hashed by identity
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IdentityHashedPoint:
     """
     A point on a line that equals and hashes like no other point, whatever its
@@ -26,7 +26,7 @@ class IdentityHashedPoint:
 # %% a holder creating its points on every access
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PointsCreatedOnEveryAccess:
     """
     Hands out new points at the same coordinates every time its points are read.
@@ -42,13 +42,16 @@ class PointsCreatedOnEveryAccess:
         """
         :return: A new point at each of :attr:`coordinates`.
         """
-        return [IdentityHashedPoint(coordinate) for coordinate in self.coordinates]
+        return [
+            IdentityHashedPoint(coordinate=coordinate)
+            for coordinate in self.coordinates
+        ]
 
 
 # %% an object generated around one of the points
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlacementOnAPoint:
     """
     Something put down at a point.
