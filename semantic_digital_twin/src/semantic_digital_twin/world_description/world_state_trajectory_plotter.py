@@ -1,3 +1,7 @@
+"""
+Plots how the degrees of freedom of a world moved over a recorded trajectory.
+"""
+
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -353,30 +357,28 @@ class WorldStateTrajectoryPlotter:
             axis.set_title(str(derivative.name).capitalize())
             axis.set_ylabel(self.y_label.get(derivative, ""))
 
-    def plot_trajectory(self, file_name: str):
+    def plot_trajectory(self, *, file_name: str) -> None:
         """
-        Plots the trajectory and saves the resulting plot to the specified file.
+        Plot the recorded trajectory, one subplot per derivative in
+        :attr:`derivatives_to_plot`, and save it to `file_name`; an empty trajectory is
+        not plotted.
 
-        :param file_name: The name of the file where the plot will be saved.
+        :param file_name: The path the plot is saved to.
         """
-        traj = self.world_state_trajectory
-        if len(traj.times) == 0:
+        trajectory = self.world_state_trajectory
+        if len(trajectory.times) == 0:
             return
-        t0 = float(traj.times[0])
-        t = traj.times - t0
-        duration_s = float(t[-1])
+        times = trajectory.times - float(trajectory.times[0])
+        duration = float(times[-1])
 
-        figure, axes = self._build_figure(duration_s, len(self.derivatives_to_plot))
+        figure, axes = self._build_figure(duration, len(self.derivatives_to_plot))
 
-        dof_ids = self._sort_degrees_of_freedom(traj)
-        styles = self._create_styles_for_degrees_of_freedom(dof_ids)
+        degree_of_freedom_ids = self._sort_degrees_of_freedom(trajectory)
+        styles = self._create_styles_for_degrees_of_freedom(degree_of_freedom_ids)
+        self._plot_derivatives(axes, styles, degree_of_freedom_ids, trajectory, times)
 
-        # Plot per derivative
-        self._plot_derivatives(axes, styles, dof_ids, traj, t)
-
-        # Shared x axis settings (apply to last axis)
-        ticks = self._choose_ticks(duration_s)
-        axes[-1].set_xlim(0.0, duration_s)
+        ticks = self._choose_ticks(duration)
+        axes[-1].set_xlim(0.0, duration)
         axes[-1].set_xticks(ticks)
         axes[-1].set_xticklabels(
             [str(int(x)) if abs(x - int(x)) < 1e-9 else f"{x:.1f}" for x in ticks]

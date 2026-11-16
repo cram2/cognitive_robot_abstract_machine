@@ -6,9 +6,11 @@ and answers each of them.
 from __future__ import annotations
 
 import json
+import tempfile
 import time
 import traceback
 from dataclasses import dataclass, field
+from pathlib import Path
 from threading import Event, Thread
 from typing_extensions import Any
 
@@ -32,6 +34,7 @@ from giskardpy.middleware.ros2.exceptions import (
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.motion_control import WorldStateTrajectoryRecording
 from giskardpy.motion_statechart.debug_expression_publisher import (
     DebugExpressionPublishing,
 )
@@ -110,6 +113,19 @@ class MotionServer:
     """
     The extension of :attr:`executor` that publishes the debug expressions of a goal
     that asks for them.
+    """
+
+    trajectory_recording: WorldStateTrajectoryRecording
+    """
+    The extension of :attr:`executor` that records the trajectory of a goal that asks
+    for its plot.
+    """
+
+    trajectory_plot_directory: Path = field(
+        default_factory=lambda: Path(tempfile.gettempdir()) / "trajectories"
+    )
+    """
+    Where the trajectory plot of each goal that asks for one is written.
     """
 
     idle_frequency: float = 20.0
@@ -214,8 +230,9 @@ class MotionServer:
         """
         Execute the accepted goal and answer the client, whatever happens.
 
-        The statechart of the previous goal is dropped first, so a goal that fails
-        before its own statechart compiled reports no states.
+        A goal that fails before its statechart compiled reports no states. A goal that
+        asks for its trajectory plot gets it once the robot stopped, and is aborted if
+        plotting fails.
         """
         self.executor.statechart = None
         self.outgoing_world_updates.start_goal()
@@ -230,6 +247,9 @@ class MotionServer:
             )
             self.compile_goal(goal=goal)
             self.control_loop.run()
+            if goal.debug_output.plots_trajectory:
+                self.control_loop.stop()
+                self.write_trajectory_plot()
         except Exception as exception:
             if not (
                 isinstance(exception, DataclassException)
@@ -286,11 +306,32 @@ class MotionServer:
             context=self.executor.context, **kwargs
         )
         self.debug_expression_publishing.publishes_markers = (
-            goal.publishes_debug_expressions
+            goal.debug_output.publishes_debug_expressions
+        )
+        self.trajectory_recording.records_trajectory = (
+            goal.debug_output.plots_trajectory
         )
         self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
         background_node.get_node().get_logger().info("Done parsing goal message.")
+
+    def write_trajectory_plot(self) -> None:
+        """
+        Plot the trajectory the goal recorded to ``goal_<goal id>.pdf`` in
+        :attr:`trajectory_plot_directory`; a trajectory of a single state is not
+        plotted.
+        """
+        plotter = self.trajectory_recording.plotter
+        if len(plotter.world_state_trajectory.times) <= 1:
+            return
+        self.trajectory_plot_directory.mkdir(parents=True, exist_ok=True)
+        file_name = (
+            self.trajectory_plot_directory / f"goal_{self.action_server.goal_id}.pdf"
+        )
+        plotter.plot_trajectory(file_name=str(file_name))
+        background_node.get_node().get_logger().info(
+            f"Saved the trajectory plot to {file_name}."
+        )
 
     def finish_goal(self, *, error: Exception | None) -> None:
         """

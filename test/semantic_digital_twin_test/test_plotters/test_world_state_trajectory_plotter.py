@@ -1,3 +1,7 @@
+"""
+Tests of the plot of a world state trajectory.
+"""
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -62,13 +66,18 @@ def _build_simple_trajectory(world_setup, duration_s: float = 3.0, dt: float = 0
 def _render_plot(
     plotter: WorldStateTrajectoryPlotter, traj: WorldStateTrajectory, monkeypatch
 ):
+    """
+    Plot `traj` with `plotter` without writing a file.
+
+    :return: The figure and its axes, under the keys ``fig`` and ``axes``.
+    """
     captured = {}
 
     # Avoid file output and figure closing during tests
     monkeypatch.setattr(plt, "savefig", lambda *args, **kwargs: None)
     monkeypatch.setattr(plt, "close", lambda *args, **kwargs: None)
     plotter.world_state_trajectory = traj
-    plotter.plot_trajectory("/dev/null")
+    plotter.plot_trajectory(file_name="/dev/null")
 
     # Get the current figure created by the plotter
     fig = plt.gcf()

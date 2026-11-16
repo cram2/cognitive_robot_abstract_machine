@@ -1,3 +1,8 @@
+"""
+The executor extensions that turn a motion statechart into commands and record what it
+did.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -239,7 +244,17 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
     Holds the recorded trajectory and plots it.
     """
 
+    records_trajectory: bool = True
+    """
+    Whether every tick appends its world state; while off, the trajectory keeps only the
+    state of the last compile.
+    """
+
     def after_compile(self, *, executor: StatechartExecutor) -> None:
+        """
+        Starts a new trajectory with the current world state, whether or not
+        :attr:`records_trajectory` is on.
+        """
         self.plotter.reset(executor.context.world.state, executor.time)
 
     def after_recompile(self, *, executor: StatechartExecutor) -> None:
@@ -254,6 +269,8 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
         .. note:: A trajectory holds one set of degrees of freedom, so a world whose
             degrees of freedom changed starts the trajectory anew.
         """
+        if not self.records_trajectory:
+            return
         state = executor.context.world.state
         trajectory = self.plotter.world_state_trajectory
         if not trajectory.records_degrees_of_freedom_of(state):

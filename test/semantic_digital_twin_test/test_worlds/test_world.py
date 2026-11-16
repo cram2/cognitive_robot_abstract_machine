@@ -1,3 +1,7 @@
+"""
+Tests of the world: its kinematic structure, its state and their changes.
+"""
+
 from __future__ import annotations
 
 import gc
@@ -1920,6 +1924,9 @@ def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup
 
 
 def test_world_state_trajectory(world_setup, tmp_path):
+    """
+    A world state trajectory records every appended state, and plots them.
+    """
     world, l1, l2, bf, r1, r2 = world_setup
 
     time = 1337.0
@@ -1965,7 +1972,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
 
     plotter = WorldStateTrajectoryPlotter()
     plotter.world_state_trajectory = traj
-    plotter.plot_trajectory(str(tmp_path / "traj.pdf"))
+    plotter.plot_trajectory(file_name=str(tmp_path / "traj.pdf"))
 
     # Verify world version consistency
     assert traj._world_version == world.get_world_model_manager().version

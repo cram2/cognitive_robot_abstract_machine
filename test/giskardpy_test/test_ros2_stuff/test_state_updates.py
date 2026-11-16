@@ -299,7 +299,7 @@ def test_the_client_sees_a_node_run_before_the_goal_ends(
     )
     motion_server.control_loop.inputs.synchronizers.append(following)
     motion_server.action_server.goal_json = json.dumps(
-        MotionGoal.for_motion_statechart(
+        MotionGoal.from_motion_statechart(
             motion_statechart=statechart,
             client=MetaData(node_name="unwatched_client", process_id=0),
         ).to_json()
