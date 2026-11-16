@@ -500,6 +500,12 @@ def test_dead_time_compensation_keeps_a_late_reacting_robot_from_overshooting(
     """
     The joint is held at its goal for a while after reaching it, so that an overshoot is
     not cut short by the end of the motion.
+
+    .. note::
+        May be flaky: the overshoot is usually 1 to 7 mrad, but about one run in twenty
+        reached 11 mrad, past the 10 mrad threshold; that is timing jitter, so rerun it.
+        About 290 mrad means the compensation was off: look for "Not compensating" in
+        the log, which names a rejected joint state stamp.
     """
     tester = late_reacting_robot.tester
     shoulder_pan = tester.world.get_connection_by_name(UniversalRobotJoint.SHOULDER_PAN)
