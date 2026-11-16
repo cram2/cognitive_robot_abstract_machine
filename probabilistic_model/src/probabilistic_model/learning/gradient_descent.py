@@ -21,6 +21,11 @@ from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import Generic, Self, TypeVar
 
+from probabilistic_model.learning.training_schedule import (
+    Convergence,
+    ConvergenceHistory,
+    MiniBatches,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
 )
@@ -141,6 +146,23 @@ class TrainingState:
     """
 
 
+@dataclass(kw_only=True)
+class TrainingRun(Generic[LayerType], SubClassSafeGeneric):
+    """
+    A circuit trained until convergence, with the losses of the epochs it took.
+    """
+
+    trained_layer: LayerType
+    """
+    The root of the trained circuit.
+    """
+
+    history: ConvergenceHistory
+    """
+    The average loss of every epoch and whether training converged.
+    """
+
+
 @dataclass
 class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
     """
@@ -236,13 +258,64 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric):
         :return: The root of the trained circuit.
         """
         compiled_step = jax.jit(self.step)
-        state = TrainingState(
-            self.initial_parameters,
-            self.optimizer.init(self.initial_parameters),
-            jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
-        )
+        state = self.initial_state()
         progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
         for _ in progress_bar:
             state = compiled_step(state, *arguments)
             progress_bar.set_postfix_str(f"Loss: {state.loss}")
         return self.layer.copy_with_circuit_parameters(state.parameters)
+
+    def minimize_until_converged(
+        self,
+        *arguments: jax.Array,
+        convergence: Convergence | None = None,
+        batch_size: int | None = None,
+        seed: int = 69,
+    ) -> TrainingRun[LayerType]:
+        """
+        Minimize the :attr:`loss` on shuffled mini-batches, one compiled step per batch,
+        until the average loss of an epoch converges.
+
+        :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
+            per training example each.
+        :param convergence: When training stops, :class:`Convergence` with its defaults
+            if ``None``.
+        :param batch_size: The number of rows of every step, all rows if ``None``.
+        :param seed: The seed of the shuffling of the rows.
+        :return: The trained circuit and the losses of its epochs.
+        """
+        compiled_step = jax.jit(self.step)
+        mini_batches = MiniBatches(
+            number_of_rows=arguments[0].shape[0], batch_size=batch_size, seed=seed
+        )
+        state = self.initial_state()
+
+        def train_one_epoch() -> float:
+            """
+            :return: The average loss over the rows of one epoch of steps.
+            """
+            nonlocal state
+            total_loss = 0.0
+            for batch in mini_batches.batches_of_epoch(arguments=arguments):
+                state = compiled_step(state, *batch)
+                total_loss += float(state.loss) * batch[0].shape[0]
+            return total_loss / mini_batches.number_of_rows
+
+        history = (
+            Convergence() if convergence is None else convergence
+        ).history_until_converged(train_one_epoch=train_one_epoch)
+        return TrainingRun(
+            trained_layer=self.layer.copy_with_circuit_parameters(state.parameters),
+            history=history,
+        )
+
+    def initial_state(self) -> TrainingState:
+        """
+        :return: The state before the first step: the parameters before training and a
+            fresh optimizer state.
+        """
+        return TrainingState(
+            self.initial_parameters,
+            self.optimizer.init(self.initial_parameters),
+            jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
+        )
