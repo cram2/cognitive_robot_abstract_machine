@@ -54,6 +54,17 @@ def get_node() -> Node:
     return ROSNodeRegistry().get()
 
 
+def ros_clock_seconds() -> float:
+    """
+    The current time of the node's ROS clock, the clock the header stamps of the
+    messages it receives are comparable with.
+
+    :return: Seconds since the epoch of the ROS clock.
+    :raises ROSNodeNotRegisteredError: If :func:`init_node` has not registered a node.
+    """
+    return get_node().get_clock().now().nanoseconds * 1e-9
+
+
 def spinner_thread_target(node: Node) -> None:
     """
     Thread that runs a multithreaded executor in the background.

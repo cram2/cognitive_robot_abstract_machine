@@ -12,7 +12,11 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from collections import deque
 from dataclasses import dataclass, field
+from datetime import timedelta
+
+import numpy as np
 from typing_extensions import Self, TypeVar, Generic, Union
 
 from control_msgs.msg import MultiDOFCommand
@@ -260,6 +264,85 @@ class JointVelocityCommand:
         ]
 
 
+# %% remembering the published commands
+
+
+@dataclass(kw_only=True)
+class HeldCommand:
+    """
+    Velocities a publisher sent, which the robot holds until the next command.
+    """
+
+    publish_time: float
+    """
+    Seconds of the ROS clock at which the command was published.
+    """
+
+    velocities: np.ndarray
+    """
+    The velocity of every commanded degree of freedom.
+    """
+
+
+@dataclass(kw_only=True)
+class CommandHistory:
+    """
+    The commands a publisher sent recently, oldest first.
+
+    Before the oldest remembered command, the commanded degrees of freedom count as
+    resting.
+    """
+
+    kept_duration: timedelta
+    """
+    How long a command is remembered after the next one replaced it.
+    """
+
+    held_commands: deque[HeldCommand] = field(init=False, default_factory=deque)
+    """
+    The remembered commands, oldest first.
+    """
+
+    def record(self, *, publish_time: float, velocities: list[float]) -> None:
+        """
+        Remember a command and forget the ones replaced longer than
+        :attr:`kept_duration` ago.
+
+        :param publish_time: Seconds of the ROS clock at which the command was
+            published.
+        :param velocities: The velocity of every commanded degree of freedom.
+        """
+        self.held_commands.append(
+            HeldCommand(publish_time=publish_time, velocities=np.array(velocities))
+        )
+        oldest_needed_time = publish_time - self.kept_duration.total_seconds()
+        while (
+            len(self.held_commands) > 1
+            and self.held_commands[1].publish_time < oldest_needed_time
+        ):
+            self.held_commands.popleft()
+
+    def displacement(self, *, start_time: float, end_time: float) -> np.ndarray:
+        """
+        How far the commands move every degree of freedom between two times, each
+        command being held until the next one and the newest until ``end_time``.
+
+        :param start_time: Seconds of the ROS clock the displacement starts at.
+        :param end_time: Seconds of the ROS clock the displacement ends at.
+        :return: The displacement of every commanded degree of freedom.
+        """
+        displacement = np.zeros_like(self.held_commands[-1].velocities)
+        held_until = end_time
+        for command in reversed(self.held_commands):
+            held_since = max(command.publish_time, start_time)
+            if held_since < held_until:
+                displacement += command.velocities * (held_until - held_since)
+            if command.publish_time <= start_time:
+                break
+            held_until = min(held_until, command.publish_time)
+        return displacement
+
+
 # %% message formats
 
 CommandMessage = TypeVar("CommandMessage")
@@ -432,6 +515,24 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     Message format the controller on ``command_topic`` consumes.
     """
 
+    actuation_delay: timedelta | None = None
+    """
+    How long the robot takes to execute a published command, compensated by
+    :class:`~giskardpy.middleware.ros2.dead_time_compensation.DeadTimeCompensation`;
+    ``None`` compensates nothing.
+    """
+
+    command_history_margin: timedelta = timedelta(seconds=1)
+    """
+    How much longer than :attr:`actuation_delay` the published commands are remembered,
+    covering the age of a measurement, the computation of a command and one cycle.
+    """
+
+    command_history: CommandHistory = field(init=False)
+    """
+    The commands published recently, as velocities of the raw degrees of freedom.
+    """
+
     commands: list[JointVelocityCommand] = field(init=False, default_factory=list)
     """
     What to send for every connection.
@@ -448,6 +549,17 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     """
 
     def __post_init__(self):
+        """
+        Create the ROS publisher, resolve what to send for every connection and size
+        the command history to the actuation delay.
+
+        :raises UnknownMinimumVelocityJointError: If a minimum velocity override applies
+            to no connection.
+        """
+        self.command_history = CommandHistory(
+            kept_duration=(self.actuation_delay or timedelta(0))
+            + self.command_history_margin
+        )
         self.command_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
         )
@@ -473,19 +585,30 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         )
 
     def publish(self) -> None:
+        state_velocities = self.velocity_reader.velocities()
         velocities = [
             command.from_state_velocity(state_velocity=state_velocity)
-            for command, state_velocity in zip(
-                self.commands, self.velocity_reader.velocities()
-            )
+            for command, state_velocity in zip(self.commands, state_velocities)
         ]
         self.command_publisher.publish(
             self.command_format.create_message(velocities=velocities)
         )
+        self._record_command(velocities=state_velocities)
 
     def stop(self) -> None:
         self.command_publisher.publish(
             self.command_format.create_message(velocities=[0.0] * len(self.commands))
+        )
+        self._record_command(velocities=[0.0] * len(self.commands))
+
+    def _record_command(self, *, velocities: list[float]) -> None:
+        """
+        Remember the command just published, stamped with the current ROS time.
+
+        :param velocities: The published velocity of every raw degree of freedom.
+        """
+        self.command_history.record(
+            publish_time=background_node.ros_clock_seconds(), velocities=velocities
         )
 
 

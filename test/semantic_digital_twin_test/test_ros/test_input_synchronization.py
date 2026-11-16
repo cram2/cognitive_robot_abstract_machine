@@ -17,6 +17,7 @@ from rclpy.subscription import Subscription
 from sensor_msgs.msg import JointState
 
 from semantic_digital_twin.adapters.ros.input_synchronization import (
+    JointPositionMeasurement,
     LatestJointPositionSource,
     LatestJointStateSynchronizer,
     OdometrySynchronizer,
@@ -287,6 +288,28 @@ def test_synchronizer_writes_nothing_without_a_message(rclpy_node, mini_world: W
 
     assert synchronizer.apply() is False
     assert mini_world.state[connection.raw_dof.id].position == position_before_apply
+
+
+def test_a_joint_state_synchronizer_records_the_measurement_it_wrote(
+    rclpy_node, mini_world: World
+):
+    """
+    The measurement keeps the stamp of the message and the positions written.
+    """
+    [connection] = mini_world.connections
+    synchronizer = PendingJointStateSynchronizer(
+        world=mini_world, node=rclpy_node, topic_name="joint_states"
+    )
+    message = joint_state_message(connection.name.name, 0.42)
+    message.header.stamp.sec = 12
+    message.header.stamp.nanosec = 500_000_000
+    synchronizer.latest_message = message
+
+    synchronizer.apply()
+
+    assert synchronizer.latest_measurement == JointPositionMeasurement(
+        measurement_time=12.5, positions={connection.raw_dof.id: 0.42}
+    )
 
 
 # %% writing the joints of one robot part

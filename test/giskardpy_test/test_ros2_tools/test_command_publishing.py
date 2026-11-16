@@ -1,5 +1,10 @@
+"""
+Tests for publishing the commanded velocities to the hardware interfaces of a robot.
+"""
+
 from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing_extensions import Any
 
 from krrood.patterns.called_positionally import called_positionally
@@ -11,6 +16,7 @@ from geometry_msgs.msg import Twist, TwistStamped
 from std_msgs.msg import Float64MultiArray
 
 from giskardpy.middleware.ros2.command_publishing import (
+    CommandHistory,
     DriveVelocityCommandPublisher,
     Float64MultiArrayFormat,
     GroupCommandFormat,
@@ -737,3 +743,115 @@ def test_differential_drive_is_raised_along_x_only(init_background_node):
 
     assert command.linear.x == pytest.approx(-0.05)
     assert command.linear.y == pytest.approx(0.0)
+
+
+# %% command history
+
+
+def test_displacement_integrates_each_command_while_it_is_held():
+    """
+    Each command moves the joint only until the next command replaces it.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=2))
+    history.record(publish_time=10.0, velocities=[1.0])
+    history.record(publish_time=11.0, velocities=[2.0])
+
+    displacement = history.displacement(start_time=10.5, end_time=11.5)
+
+    assert displacement == pytest.approx([0.5 * 1.0 + 0.5 * 2.0])
+
+
+def test_the_newest_command_is_held_until_the_end_time():
+    """
+    Nothing replaces the newest command, so the robot keeps executing it.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=2))
+    history.record(publish_time=10.0, velocities=[1.0, -2.0])
+
+    displacement = history.displacement(start_time=10.0, end_time=10.25)
+
+    assert displacement == pytest.approx([0.25, -0.5])
+
+
+def test_the_robot_rests_before_the_first_command():
+    """
+    Time before any command was published adds no displacement.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=2))
+    history.record(publish_time=10.0, velocities=[1.0])
+
+    displacement = history.displacement(start_time=9.0, end_time=10.5)
+
+    assert displacement == pytest.approx([0.5])
+
+
+def test_commands_replaced_longer_ago_than_the_kept_duration_are_forgotten():
+    """
+    The history stays bounded but keeps the command that is still held across the kept
+    duration.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=1))
+    history.record(publish_time=0.0, velocities=[1.0])
+    history.record(publish_time=5.0, velocities=[2.0])
+    history.record(publish_time=10.0, velocities=[3.0])
+
+    assert history.displacement(start_time=4.0, end_time=6.0) == pytest.approx([2.0])
+    assert history.displacement(start_time=9.5, end_time=10.5) == pytest.approx(
+        [0.5 * 2.0 + 0.5 * 3.0]
+    )
+
+
+def test_publishing_records_the_commanded_velocities(init_background_node):
+    """
+    The history holds the velocities of the raw degrees of freedom, as the world state
+    holds them.
+    """
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=-0.2),
+    ]
+    controller = build_group_publisher(specs)
+
+    publish_group(controller)
+
+    assert controller.command_history.held_commands[-1].velocities == pytest.approx(
+        [spec.velocity for spec in specs]
+    )
+
+
+def test_stopping_records_zero_velocities(init_background_node):
+    """
+    A stopped robot is remembered as resting from then on.
+    """
+    specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
+    controller = build_group_publisher(specs)
+
+    publish_group(controller)
+    stop_group_message(controller)
+
+    assert controller.command_history.held_commands[-1].velocities == pytest.approx(
+        [0.0]
+    )
+
+
+def test_a_long_actuation_delay_keeps_the_commands_it_needs(init_background_node):
+    """
+    The publisher remembers commands for at least its actuation delay, however long.
+    """
+    specs = [ConnectionSpec(name="joint_a", velocity=0.0)]
+    world = build_world_with_joints(specs)
+    controller = JointGroupVelocityCommandPublisher(
+        world=world,
+        command_topic="test_cmd",
+        connections=[world.get_connection_by_name(spec.name) for spec in specs],
+        actuation_delay=timedelta(seconds=5),
+    )
+    controller.command_history.record(publish_time=0.0, velocities=[1.0])
+    controller.command_history.record(publish_time=4.0, velocities=[2.0])
+    controller.command_history.record(publish_time=8.0, velocities=[3.0])
+
+    displacement = controller.command_history.displacement(
+        start_time=8.0 - controller.actuation_delay.total_seconds(), end_time=8.5
+    )
+
+    assert displacement == pytest.approx([1.0 * 1.0 + 2.0 * 4.0 + 3.0 * 0.5])

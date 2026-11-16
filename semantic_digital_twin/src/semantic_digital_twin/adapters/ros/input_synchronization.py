@@ -1,7 +1,12 @@
+"""
+Synchronizers that write ROS topics and tf frames into the world state.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from uuid import UUID
 
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import JointState
@@ -64,13 +69,40 @@ class TopicInputSynchronizer(
 # %% joint states
 
 
+@dataclass(kw_only=True)
+class JointPositionMeasurement:
+    """
+    The joint positions one joint state message reported, as they were written into the
+    world state.
+    """
+
+    measurement_time: float
+    """
+    Seconds of the message's header stamp, the time the positions were sampled at.
+    """
+
+    positions: dict[UUID, float]
+    """
+    The written position of every degree of freedom, by the id of the degree of freedom.
+    """
+
+
 @dataclass
 class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     """
     Writes the positions of a joint state message into the world state.
     """
 
+    latest_measurement: JointPositionMeasurement | None = field(
+        init=False, default=None
+    )
+    """
+    The positions this synchronizer wrote most recently, ``None`` before the first
+    message.
+    """
+
     def apply_message(self, message: JointState) -> None:
+        positions = {}
         for joint_name, position in zip(message.name, message.position):
             connection: ActiveConnection1DOF = self.world.get_connection_by_name(
                 joint_name
@@ -78,6 +110,12 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
             if not self.writes(connection):
                 continue
             self.world.state[connection.raw_dof.id].position = position
+            positions[connection.raw_dof.id] = position
+        self.latest_measurement = JointPositionMeasurement(
+            measurement_time=message.header.stamp.sec
+            + message.header.stamp.nanosec * 1e-9,
+            positions=positions,
+        )
 
     def writes(self, connection: ActiveConnection1DOF) -> bool:
         """
