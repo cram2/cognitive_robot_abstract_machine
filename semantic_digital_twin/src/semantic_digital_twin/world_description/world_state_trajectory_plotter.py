@@ -357,17 +357,25 @@ class WorldStateTrajectoryPlotter:
             axis.set_title(str(derivative.name).capitalize())
             axis.set_ylabel(self.y_label.get(derivative, ""))
 
+    @property
+    def has_trajectory_to_plot(self) -> bool:
+        """
+        Whether the recorded trajectory spans time, which a plot needs; a single state
+        does not.
+        """
+        return len(self.world_state_trajectory.times) > 1
+
     def plot_trajectory(self, *, file_name: str) -> None:
         """
         Plot the recorded trajectory, one subplot per derivative in
-        :attr:`derivatives_to_plot`, and save it to `file_name`; an empty trajectory is
-        not plotted.
+        :attr:`derivatives_to_plot`, and save it to `file_name`; nothing is plotted
+        unless :attr:`has_trajectory_to_plot`.
 
         :param file_name: The path the plot is saved to.
         """
-        trajectory = self.world_state_trajectory
-        if len(trajectory.times) == 0:
+        if not self.has_trajectory_to_plot:
             return
+        trajectory = self.world_state_trajectory
         times = trajectory.times - float(trajectory.times[0])
         duration = float(times[-1])
 

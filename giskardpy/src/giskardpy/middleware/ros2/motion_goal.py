@@ -49,7 +49,7 @@ class DebugOutput:
     What Giskard produces, besides the motion, to debug one goal.
     """
 
-    publishes_debug_expressions: bool = False
+    publishes_expression_markers: bool = False
     """
     Whether Giskard publishes the spatial debug expressions of the running nodes as RViz
     markers while it executes the goal.

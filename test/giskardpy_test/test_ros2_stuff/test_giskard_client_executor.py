@@ -115,7 +115,7 @@ def test_an_extension_is_told_that_an_aborted_goal_stopped(
 @pytest.mark.parametrize(
     "debug_output",
     [
-        DebugOutput(publishes_debug_expressions=True),
+        DebugOutput(publishes_expression_markers=True),
         DebugOutput(plots_trajectory=True),
     ],
 )

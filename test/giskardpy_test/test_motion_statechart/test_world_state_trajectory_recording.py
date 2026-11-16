@@ -50,7 +50,7 @@ def test_a_recording_that_is_off_keeps_only_the_state_of_the_compile():
     """
     While switched off, ticking appends nothing to the trajectory the compile started.
     """
-    recording = WorldStateTrajectoryRecording(records_trajectory=False)
+    recording = WorldStateTrajectoryRecording(appends_every_tick=False)
 
     compile_and_tick(recording=recording, ticks=3)
 
@@ -69,16 +69,16 @@ def test_a_recording_that_is_on_records_every_tick():
     assert len(recording.plotter.world_state_trajectory.times) == 1 + ticks
 
 
-@pytest.mark.parametrize("records_trajectory", [True, False])
+@pytest.mark.parametrize("appends_every_tick", [True, False])
 def test_compiling_drops_the_trajectory_of_the_previous_statechart(
-    *, records_trajectory: bool
+    *, appends_every_tick: bool
 ):
     """
     A compile starts a new trajectory whether or not the recording is switched on.
     """
-    recording = WorldStateTrajectoryRecording(records_trajectory=True)
+    recording = WorldStateTrajectoryRecording(appends_every_tick=True)
     executor = compile_and_tick(recording=recording, ticks=3)
-    recording.records_trajectory = records_trajectory
+    recording.appends_every_tick = appends_every_tick
     statechart = Statechart(context=executor.context)
     statechart.add_node(node=ConstTrueNode())
 

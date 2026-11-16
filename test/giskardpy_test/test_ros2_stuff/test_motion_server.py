@@ -31,6 +31,7 @@ from semantic_digital_twin.input_synchronization import (
     InputSynchronizer,
     WorldStateInputs,
 )
+from giskardpy.middleware.ros2.goal_plot_directory import GoalPlotDirectory
 from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.middleware.ros2.motion_server import MotionServer
 from giskardpy.motion_statechart.debug_expression_publisher import (
@@ -45,6 +46,7 @@ from cramph.statechart import Statechart
 from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import from_json
+from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
@@ -563,10 +565,17 @@ class FailingTrajectoryPlotter(WorldStateTrajectoryPlotter):
         raise BrokenPlotError()
 
 
-class BrokenPlotError(Exception):
+@dataclass(kw_only=True)
+class BrokenPlotError(DataclassException):
     """
     Raised by :class:`FailingTrajectoryPlotter`.
     """
+
+    def error_message(self) -> str:
+        return "The plotting backend is broken."
+
+    def suggest_correction(self) -> str:
+        return "Repair the plotting backend."
 
 
 @dataclass(kw_only=True)
@@ -681,7 +690,7 @@ def motion_server(init_background_node, tmp_path: Path) -> MotionServerFixture:
     debug_expression_publishing = DebugExpressionPublishing(
         ros_node=background_node.get_node(), publishes_markers=False
     )
-    trajectory_recording = WorldStateTrajectoryRecording(records_trajectory=False)
+    trajectory_recording = WorldStateTrajectoryRecording(appends_every_tick=False)
     executor = create_executor(trajectory_recording, debug_expression_publishing)
     world = executor.context.world
     action_server = GoalQueueMimic()
@@ -727,7 +736,7 @@ def motion_server(init_background_node, tmp_path: Path) -> MotionServerFixture:
         cycle_counter=cycle_counter,
         debug_expression_publishing=debug_expression_publishing,
         trajectory_recording=trajectory_recording,
-        trajectory_plot_directory=tmp_path,
+        trajectory_plot_directory=GoalPlotDirectory(path=tmp_path),
     )
     return MotionServerFixture(
         executor=executor,
@@ -992,25 +1001,25 @@ class TestDebugExpressions:
     Each goal decides whether the debug expressions of its running nodes are published.
     """
 
-    @pytest.mark.parametrize("publishes_debug_expressions", [True, False])
+    @pytest.mark.parametrize("publishes_expression_markers", [True, False])
     def test_the_goal_switches_publishing_its_debug_expressions(
-        self, *, motion_server: MotionServerFixture, publishes_debug_expressions
+        self, *, motion_server: MotionServerFixture, publishes_expression_markers
     ):
         """
         The goal's flag overrides whatever the previous goal left the marker publishing
         switched to.
         """
         publishing = motion_server.debug_expression_publishing
-        publishing.publishes_markers = not publishes_debug_expressions
+        publishing.publishes_markers = not publishes_expression_markers
         motion_server.action_server.goal_json = create_goal_json(
             debug_output=DebugOutput(
-                publishes_debug_expressions=publishes_debug_expressions
+                publishes_expression_markers=publishes_expression_markers
             )
         )
 
         motion_server.motion_server.run_idle_cycle()
 
-        assert publishing.publishes_markers is publishes_debug_expressions
+        assert publishing.publishes_markers is publishes_expression_markers
 
 
 class TestTrajectoryPlot:
@@ -1022,9 +1031,8 @@ class TestTrajectoryPlot:
         """
         :return: Where the plot of the goal that ran last is expected.
         """
-        return (
-            motion_server.motion_server.trajectory_plot_directory
-            / f"goal_{motion_server.action_server.goal_id}.pdf"
+        return motion_server.motion_server.trajectory_plot_directory.goal_plot_path(
+            goal_id=motion_server.action_server.goal_id
         )
 
     @pytest.mark.parametrize("plots_trajectory", [True, False])
@@ -1036,14 +1044,14 @@ class TestTrajectoryPlot:
         to.
         """
         recording = motion_server.trajectory_recording
-        recording.records_trajectory = not plots_trajectory
+        recording.appends_every_tick = not plots_trajectory
         motion_server.action_server.goal_json = create_goal_json(
             debug_output=DebugOutput(plots_trajectory=plots_trajectory)
         )
 
         motion_server.motion_server.run_idle_cycle()
 
-        assert recording.records_trajectory is plots_trajectory
+        assert recording.appends_every_tick is plots_trajectory
 
     def test_a_goal_that_asks_for_its_trajectory_plot_gets_it(
         self, *, motion_server: MotionServerFixture
@@ -1090,11 +1098,81 @@ class TestTrajectoryPlot:
 
         assert plotter.stop_count_when_plotted == 1
 
-    def test_a_failing_trajectory_plot_aborts_the_goal(
+    def test_a_canceled_goal_gets_its_trajectory_plot(
         self, *, motion_server: MotionServerFixture
     ):
         """
-        A goal whose plot fails is reported as aborted, not as succeeded.
+        The plot is written whatever the outcome, so a canceled motion can be debugged.
+        """
+        motion_server.control_loop.inputs.synchronizers.append(
+            CycleWatchingGoalCanceler(
+                world=motion_server.executor.context.world,
+                cycle_counter=motion_server.cycle_counter,
+                action_server=motion_server.action_server,
+            )
+        )
+        motion_server.action_server.goal_json = create_goal_json(
+            seconds=1000.0, debug_output=DebugOutput(plots_trajectory=True)
+        )
+
+        motion_server.motion_server.run_idle_cycle()
+
+        assert motion_server.action_server.outcome == GoalOutcome.CANCELED
+        assert self.trajectory_plot_file(motion_server=motion_server).is_file()
+
+    def test_an_aborted_goal_gets_its_trajectory_plot(
+        self, *, motion_server: MotionServerFixture
+    ):
+        """
+        The plot is written whatever the outcome, so a failed motion can be debugged.
+        """
+        motion_server.control_loop.inputs.synchronizers = [
+            CycleWatchingClientDisconnector(
+                world=motion_server.executor.context.world,
+                cycle_counter=motion_server.cycle_counter,
+                client_presence=motion_server.client_presence,
+            )
+        ]
+        motion_server.action_server.goal_json = create_goal_json(
+            seconds=1000.0,
+            client=motion_server.client,
+            debug_output=DebugOutput(plots_trajectory=True),
+        )
+
+        motion_server.motion_server.run_idle_cycle()
+
+        assert motion_server.action_server.outcome == GoalOutcome.ABORTED
+        assert self.trajectory_plot_file(motion_server=motion_server).is_file()
+
+    def test_a_goal_failing_before_it_compiled_gets_no_trajectory_plot(
+        self, *, motion_server: MotionServerFixture
+    ):
+        """
+        A goal that never moved has no trajectory, and must not be given the plot of the
+        goal before it.
+        """
+        motion_server.action_server.goal_json = create_goal_json(
+            debug_output=DebugOutput(plots_trajectory=True)
+        )
+        motion_server.motion_server.run_idle_cycle()
+        motion_server.motion_server.world_update_timeout = 0.2
+        motion_server.action_server.goal_json = create_goal_json(
+            required_position=StreamPosition(
+                origin=MetaData(node_name="client", process_id=1), sequence_number=4
+            ),
+            debug_output=DebugOutput(plots_trajectory=True),
+        )
+
+        motion_server.motion_server.run_idle_cycle()
+
+        assert motion_server.action_server.outcome == GoalOutcome.ABORTED
+        assert not self.trajectory_plot_file(motion_server=motion_server).exists()
+
+    def test_a_failing_trajectory_plot_keeps_the_goal_succeeded(
+        self, *, motion_server: MotionServerFixture
+    ):
+        """
+        The plot is debug output, so its failure does not change what the motion did.
         """
         motion_server.trajectory_recording.plotter = FailingTrajectoryPlotter()
         motion_server.action_server.goal_json = create_goal_json(
@@ -1103,7 +1181,7 @@ class TestTrajectoryPlot:
 
         motion_server.motion_server.run_idle_cycle()
 
-        assert motion_server.action_server.outcome == GoalOutcome.ABORTED
+        assert motion_server.action_server.outcome == GoalOutcome.SUCCEEDED
 
     def test_a_failing_trajectory_plot_keeps_the_server_taking_goals(
         self, *, motion_server: MotionServerFixture

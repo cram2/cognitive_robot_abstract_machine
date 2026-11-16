@@ -186,3 +186,21 @@ def test_center_positions_and_suppression_rules(world_setup, monkeypatch):
     # Changing DOF should appear once; constant DOF should not
     assert len(pos_lines) == 1
     assert len(vel_ax.get_lines()) == 1
+
+
+# %% trajectories too short to plot
+
+
+def test_a_trajectory_of_one_state_is_not_plotted(world_setup, tmp_path):
+    """
+    A single state spans no time, so there is no plot to draw.
+    """
+    world, *_ = world_setup
+    plotter = WorldStateTrajectoryPlotter()
+    plotter.reset(world.state)
+    file_name = tmp_path / "trajectory.pdf"
+
+    plotter.plot_trajectory(file_name=str(file_name))
+
+    assert not plotter.has_trajectory_to_plot
+    assert not file_name.exists()

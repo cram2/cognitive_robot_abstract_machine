@@ -4,14 +4,15 @@ Debug plots Giskard draws of a finished goal.
 
 from __future__ import annotations
 
-import os
-import tempfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from cramph.executor import StatechartExecutor
 from semantic_digital_twin.adapters.ros import background_node
-from giskardpy.utils.utils import create_path
+from giskardpy.middleware.ros2.goal_plot_directory import (
+    GoalPlotDirectory,
+    GoalPlotKind,
+)
 
 
 @dataclass(kw_only=True)
@@ -31,16 +32,13 @@ class PostGoalPlotter(ABC):
         Plot the data recorded for the goal with the given id.
         """
 
-    def create_file_name(self, *, folder_name: str, goal_id: int) -> str:
+    def create_file_name(self, *, plot_kind: GoalPlotKind, goal_id: int) -> str:
         """
-        Build the path of a per-goal pdf inside the temporary directory and make sure
-        its folder exists.
+        :return: The pdf of the goal with id `goal_id` among the plots of `plot_kind`;
+            its folder is created if missing.
         """
-        file_name = os.path.join(
-            tempfile.gettempdir(), folder_name, f"goal_{goal_id}.pdf"
-        )
-        create_path(file_name)
-        return file_name
+        directory = GoalPlotDirectory.from_plot_kind(plot_kind=plot_kind)
+        return str(directory.goal_plot_path(goal_id=goal_id))
 
 
 @dataclass(kw_only=True)
@@ -57,7 +55,9 @@ class GoalGanttChartPlotter(PostGoalPlotter):
     def plot(self, *, goal_id: int) -> None:
         if not self.executor.statechart.state_history:
             return
-        file_name = self.create_file_name(folder_name="gantt_charts", goal_id=goal_id)
+        file_name = self.create_file_name(
+            plot_kind=GoalPlotKind.GANTT_CHART, goal_id=goal_id
+        )
         self.executor.statechart.plot_gantt_chart(
             path=file_name,
             context=self.executor.context,
@@ -74,7 +74,7 @@ class MotionStatechartPlotter(PostGoalPlotter):
 
     def plot(self, *, goal_id: int) -> None:
         file_name = self.create_file_name(
-            folder_name="motion_statecharts", goal_id=goal_id
+            plot_kind=GoalPlotKind.MOTION_STATECHART, goal_id=goal_id
         )
         self.executor.statechart.draw(file_name=file_name)
         background_node.get_node().get_logger().info(f"saved {file_name}")

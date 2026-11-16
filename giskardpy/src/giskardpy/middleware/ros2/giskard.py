@@ -206,7 +206,7 @@ class Giskard:
             ros_node=background_node.get_node(), publishes_markers=False
         )
         self.trajectory_recording = WorldStateTrajectoryRecording(
-            records_trajectory=False
+            appends_every_tick=False
         )
         self.world = self.world_source.create_world()
         with self.world.modify_world():

@@ -6,11 +6,9 @@ and answers each of them.
 from __future__ import annotations
 
 import json
-import tempfile
 import time
 import traceback
 from dataclasses import dataclass, field
-from pathlib import Path
 from threading import Event, Thread
 from typing_extensions import Any
 
@@ -33,7 +31,11 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
-from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.middleware.ros2.goal_plot_directory import (
+    GoalPlotDirectory,
+    GoalPlotKind,
+)
+from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.motion_control import WorldStateTrajectoryRecording
 from giskardpy.motion_statechart.debug_expression_publisher import (
     DebugExpressionPublishing,
@@ -121,8 +123,10 @@ class MotionServer:
     for its plot.
     """
 
-    trajectory_plot_directory: Path = field(
-        default_factory=lambda: Path(tempfile.gettempdir()) / "trajectories"
+    trajectory_plot_directory: GoalPlotDirectory = field(
+        default_factory=lambda: GoalPlotDirectory.from_plot_kind(
+            plot_kind=GoalPlotKind.TRAJECTORY
+        )
     )
     """
     Where the trajectory plot of each goal that asks for one is written.
@@ -230,26 +234,25 @@ class MotionServer:
         """
         Execute the accepted goal and answer the client, whatever happens.
 
-        A goal that fails before its statechart compiled reports no states. A goal that
-        asks for its trajectory plot gets it once the robot stopped, and is aborted if
-        plotting fails.
+        A goal that fails before its statechart compiled reports no states and has no
+        trajectory to plot.
         """
         self.executor.statechart = None
+        self.trajectory_recording.start_trajectory(executor=self.executor)
         self.outgoing_world_updates.start_goal()
         error: Exception | None = None
+        debug_output = DebugOutput()
         try:
             goal = MotionGoal.from_json(
                 data=json.loads(self.action_server.goal_msg.goal)
             )
+            debug_output = goal.debug_output
             self.client_watchdog.watch(client=goal.client)
             self.wait_for_required_world_updates(
                 required_position=goal.required_position
             )
             self.compile_goal(goal=goal)
             self.control_loop.run()
-            if goal.debug_output.plots_trajectory:
-                self.control_loop.stop()
-                self.write_trajectory_plot()
         except Exception as exception:
             if not (
                 isinstance(exception, DataclassException)
@@ -258,7 +261,7 @@ class MotionServer:
                 traceback.print_exc()
             error = exception
         finally:
-            self.finish_goal(error=error)
+            self.finish_goal(error=error, debug_output=debug_output)
 
     def wait_for_required_world_updates(
         self, *, required_position: StreamPosition | None
@@ -306,9 +309,9 @@ class MotionServer:
             context=self.executor.context, **kwargs
         )
         self.debug_expression_publishing.publishes_markers = (
-            goal.debug_output.publishes_debug_expressions
+            goal.debug_output.publishes_expression_markers
         )
-        self.trajectory_recording.records_trajectory = (
+        self.trajectory_recording.appends_every_tick = (
             goal.debug_output.plots_trajectory
         )
         self.executor.compile(statechart=motion_statechart)
@@ -317,25 +320,32 @@ class MotionServer:
 
     def write_trajectory_plot(self) -> None:
         """
-        Plot the trajectory the goal recorded to ``goal_<goal id>.pdf`` in
-        :attr:`trajectory_plot_directory`; a trajectory of a single state is not
-        plotted.
+        Plot the trajectory the goal recorded into :attr:`trajectory_plot_directory`.
+
+        A plot that fails is only reported as a warning, because it is debug output and
+        does not change what the motion did.
         """
         plotter = self.trajectory_recording.plotter
-        if len(plotter.world_state_trajectory.times) <= 1:
+        if not plotter.has_trajectory_to_plot:
             return
-        self.trajectory_plot_directory.mkdir(parents=True, exist_ok=True)
-        file_name = (
-            self.trajectory_plot_directory / f"goal_{self.action_server.goal_id}.pdf"
-        )
-        plotter.plot_trajectory(file_name=str(file_name))
-        background_node.get_node().get_logger().info(
-            f"Saved the trajectory plot to {file_name}."
-        )
+        logger = background_node.get_node().get_logger()
+        goal_id = self.action_server.goal_id
+        file_name = self.trajectory_plot_directory.goal_plot_path(goal_id=goal_id)
+        try:
+            plotter.plot_trajectory(file_name=str(file_name))
+        except Exception as exception:
+            logger.warning(
+                f"Could not plot the trajectory of goal #{goal_id}: {exception}"
+            )
+            return
+        logger.info(f"Saved the trajectory plot to {file_name}.")
 
-    def finish_goal(self, *, error: Exception | None) -> None:
+    def finish_goal(
+        self, *, error: Exception | None, debug_output: DebugOutput
+    ) -> None:
         """
-        Stop the robot, clean up the motion statechart and answer the client.
+        Stop the robot, write the trajectory plot the goal asked for, whatever its
+        outcome, clean up the motion statechart and answer the client.
 
         The client is answered even if cleaning up fails, so that a failure here cannot
         make it wait forever.
@@ -343,6 +353,8 @@ class MotionServer:
         try:
             self.client_watchdog.stop_watching()
             self.control_loop.stop()
+            if debug_output.plots_trajectory:
+                self.write_trajectory_plot()
             if self.executor.statechart is not None:
                 self.executor.statechart.cleanup_nodes()
             self.feedback_publisher.publish()

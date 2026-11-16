@@ -103,9 +103,9 @@ class TestMotionGoalPayload:
     @pytest.mark.parametrize(
         "debug_output",
         [
-            DebugOutput(publishes_debug_expressions=True),
+            DebugOutput(publishes_expression_markers=True),
             DebugOutput(plots_trajectory=True),
-            DebugOutput(publishes_debug_expressions=True, plots_trajectory=True),
+            DebugOutput(publishes_expression_markers=True, plots_trajectory=True),
         ],
     )
     def test_a_goal_says_what_giskard_produces_to_debug_it(
@@ -134,7 +134,7 @@ class TestMotionGoalPayload:
 
         assert goal.debug_output == DebugOutput()
 
-    def test_a_client_that_does_not_send_the_debug_output_gets_none(self):
+    def test_a_client_that_does_not_send_the_debug_output_gets_the_default(self):
         """
         A payload without :attr:`MotionGoalPayloadKey.DEBUG_OUTPUT` asks for the default
         :class:`DebugOutput`.
@@ -142,7 +142,7 @@ class TestMotionGoalPayload:
         goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(),
             client=create_client(),
-            debug_output=DebugOutput(publishes_debug_expressions=True),
+            debug_output=DebugOutput(publishes_expression_markers=True),
         )
         payload = json.loads(json.dumps(goal.to_json()))
         del payload[MotionGoalPayloadKey.DEBUG_OUTPUT]
