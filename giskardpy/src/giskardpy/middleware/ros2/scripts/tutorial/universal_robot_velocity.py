@@ -14,7 +14,7 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControllerManagerInterface(ClosedLoopRobotInterfaceConfig):
     """
     Reads and commands a robot through the active controllers of its ros2_control
@@ -50,7 +50,7 @@ def main() -> None:
     """
     Run the Giskard :func:`create_giskard` builds as a ros node until ROS shuts down.
     """
-    Giskard.launch(create_giskard)
+    Giskard.launch(create_giskard=create_giskard)
 
 
 if __name__ == "__main__":

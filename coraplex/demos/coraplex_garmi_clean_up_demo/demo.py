@@ -443,7 +443,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                     end_effector=left_hand
                                 ),
                             ),
-                            UpdateTemporaryCollisionRules.for_end_effector(left_hand),
+                            UpdateTemporaryCollisionRules.for_end_effector(
+                                end_effector=left_hand
+                            ),
                         ]
                     ),
                     # Left hand closes the drawer while the right arm is parked
@@ -456,7 +458,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                 goal_joint_state=drawer_mechanism.dof.limits.lower.position,
                                 holding_end_effector=left_hand,
                             ),
-                            UpdateTemporaryCollisionRules.for_end_effector(left_hand),
+                            UpdateTemporaryCollisionRules.for_end_effector(
+                                end_effector=left_hand
+                            ),
                         ]
                     ),
                     # Back off the handle the way the hand came in.
@@ -515,7 +519,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                 lower_limit=0.0,
                 upper_limit=HandDistance.HANDLE_CONTACT.value,
             ),
-            monitored_node=UpdateTemporaryCollisionRules.for_end_effector(left_hand),
+            monitored_node=UpdateTemporaryCollisionRules.for_end_effector(
+                end_effector=left_hand
+            ),
         )
         if self.grasp_selection is GraspSelection.GIVEN:
             return [

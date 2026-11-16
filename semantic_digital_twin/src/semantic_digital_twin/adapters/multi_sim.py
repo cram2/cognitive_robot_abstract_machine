@@ -56,6 +56,7 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3,
 )
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -78,7 +79,10 @@ from semantic_digital_twin.world_description.geometry import (
     MeshFileFormat,
     Color,
 )
-from semantic_digital_twin.world_description.contact import ContactParameters
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Region,
     Body,
@@ -163,6 +167,70 @@ class MujocoActuatorProperty(StrEnum):
     """
     Whether :attr:`TARGET` names a joint or a tendon.
     """
+
+
+class MujocoContactDimensionality(IntEnum):
+    """
+    The dimensions MuJoCo resolves a contact in, its ``condim``, which decide which
+    friction coefficients of the contact act. MuJoCo resolves a contact in
+    :attr:`SLIDING` unless told otherwise, and in the more dimensions of its two geoms.
+
+    For more information, see:
+    https://mujoco.readthedocs.io/en/stable/modeling.html#contact
+    """
+
+    FRICTIONLESS = 1
+    """
+    Only the push along the contact normal; no friction acts.
+    """
+
+    SLIDING = 3
+    """
+    Sliding friction acts; the bodies are free to turn against each other.
+    """
+
+    SLIDING_AND_TORSIONAL = 4
+    """
+    Sliding and torsional friction act, so the bodies also resist turning around the
+    contact normal.
+    """
+
+    SLIDING_TORSIONAL_AND_ROLLING = 6
+    """
+    Sliding, torsional and rolling friction act, so the bodies also resist rolling over
+    each other.
+    """
+
+    @classmethod
+    def from_friction(cls, *, friction: ContactFriction) -> MujocoContactDimensionality:
+        """
+        :param friction: The friction a geom offers.
+        :return: The fewest dimensions in which every coefficient of `friction` that is
+            not zero acts.
+        """
+        if friction.rolling != 0:
+            return cls.SLIDING_TORSIONAL_AND_ROLLING
+        if friction.torsional != 0:
+            return cls.SLIDING_AND_TORSIONAL
+        if friction.sliding != 0:
+            return cls.SLIDING
+        return cls.FRICTIONLESS
+
+    def acting_friction(self, *, friction: ContactFriction) -> ContactFriction:
+        """
+        :param friction: The coefficients a geom declares.
+        :return: The coefficients of `friction` that act in these dimensions, the others
+            zero.
+        """
+        return ContactFriction(
+            sliding=friction.sliding if self >= self.SLIDING else 0.0,
+            torsional=(
+                friction.torsional if self >= self.SLIDING_AND_TORSIONAL else 0.0
+            ),
+            rolling=(
+                friction.rolling if self >= self.SLIDING_TORSIONAL_AND_ROLLING else 0.0
+            ),
+        )
 
 
 class GeomVisibilityAndCollisionType(IntEnum):
@@ -1991,6 +2059,9 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
     ``odom`` frame: the servos push its base across the floor at the commanded
     velocity, and the positions the joints reach are the drive's odometry. Otherwise it
     is built as no joint at all and its base stays where it is built.
+
+    The joints hold the base at its height, so no floor can carry it; the bodies the
+    drive carries do not collide with any :class:`Floor`, which would only drag them.
     """
 
     @classproperty
@@ -2015,14 +2086,45 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         :return: Whether servos drive every degree of freedom the drive is commanded
             with.
         """
-        actuated = {
+        return {
+            degree_of_freedom.id for degree_of_freedom in self.connection.active_dofs
+        } <= self._actuated_degree_of_freedom_ids
+
+    @property
+    def _actuated_degree_of_freedom_ids(self) -> set[UUID]:
+        """
+        :return: The id of every degree of freedom of the world a servo drives.
+        """
+        return {
             degree_of_freedom.id
             for actuator in self.world.actuators
             for degree_of_freedom in actuator.dofs
         }
-        return {
-            degree_of_freedom.id for degree_of_freedom in self.connection.active_dofs
-        } <= actuated
+
+    @property
+    def carried_bodies(self) -> list[Body]:
+        """
+        :return: The colliding bodies the drive holds at its base's height: the base
+            and every body hanging from it through joints no servo drives, such as its
+            wheels and casters.
+        """
+        actuated = self._actuated_degree_of_freedom_ids
+        carried = []
+        unvisited = [self.connection.child]
+        while unvisited:
+            entity = unvisited.pop()
+            if isinstance(entity, Body) and entity.collision:
+                carried.append(entity)
+            unvisited += [
+                child
+                for child in entity.child_kinematic_structure_entities
+                if not {
+                    degree_of_freedom.id
+                    for degree_of_freedom in child.parent_connection.dofs
+                }
+                & actuated
+            ]
+        return carried
 
     @property
     def axes(self) -> list[DriveAxis]:
@@ -2047,6 +2149,10 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
                 axis=(child_T_connection[:3, :3] @ axis.direction).tolist(),
                 pos=child_T_connection[:3, 3].tolist(),
             )
+        carried_bodies = self.carried_bodies
+        for floor in self.world.get_semantic_annotations_by_type(Floor):
+            for body in carried_bodies:
+                builder.exclude_contact(body, floor.root)
 
     def home_joint_positions(self) -> list[float]:
         return [self.world.state[axis.measured.id].position for axis in self.axes]
@@ -2733,6 +2839,9 @@ class MujocoBuilder(MultiSimBuilder):
         contact = shape.get_simulator_property_of_type(ContactParameters)
         if contact is not None:
             geom_props["friction"] = contact.friction.to_list()
+            geom_props["condim"] = MujocoContactDimensionality.from_friction(
+                friction=contact.friction
+            )
             if contact.stiffness is not None:
                 geom_props["solref"] = contact.stiffness.to_list()
             if contact.impedance is not None:
@@ -3216,6 +3325,16 @@ class MujocoBuilder(MultiSimBuilder):
         if pair in excluded:
             return
         excluded.add(pair)
+        self.exclude_contact(body_a, body_b)
+
+    def exclude_contact(self, body_a: Body, body_b: Body) -> None:
+        """
+        Tell MuJoCo never to check the two bodies for contact with each other.
+
+        :param body_a: One of the two bodies.
+        :param body_b: The other.
+        """
+        pair = sorted((self.body_spec_of(body_a).name, self.body_spec_of(body_b).name))
         self.spec.add_exclude(name="_".join(pair), bodyname1=pair[0], bodyname2=pair[1])
 
     def _build_equalities(self):

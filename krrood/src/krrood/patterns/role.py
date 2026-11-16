@@ -1,3 +1,7 @@
+"""
+The Role design pattern: objects that extend another object for one context.
+"""
+
 from __future__ import annotations
 
 import sys
@@ -22,40 +26,12 @@ from krrood.utils import get_generic_type_parameters
 @dataclass(kw_only=True, eq=False)
 class Role(Symbol, Generic[T], SubClassSafeGeneric):
     """
-    Base class for the Role design pattern.
+    Context-specific attributes and behaviour added to an existing object, the *role taker*,
+    without changing the taker's identity: a role is never equal to its taker. An
+    undeclared attribute is read from the taker, and assigning one raises
+    :class:`~krrood.patterns.exceptions.RoleAttributeNotDeclaredError`.
 
-    A role adds context-specific attributes and behaviour to an existing object (the *role
-    taker*) without altering the role taker's identity. A role is an ordinary object with
-    its own identity: it is equal only to itself and is **not** equal to its role taker. To
-    ask whether two objects refer to the same underlying entity, use the :class:`IsSameSemanticEntity
-    <krrood.patterns.role_predicates.IsSameSemanticEntity>` predicate.
-
-    **Pure composition.** A role class must not inherit from its role taker type. Role
-    membership is expressed through :meth:`has_role` and :meth:`roles_for`, not through
-    ``isinstance`` checks. Constructing a role always requires the role taker to be passed
-    explicitly.
-
-    **Defining a role.** Inherit from ``Role[T]`` (where ``T`` is the role taker type) and
-    decorate with ``@dataclass(eq=False)``. The role taker is the inherited keyword-only
-    :attr:`role_taker` field; subclasses add only their role-specific fields and never
-    re-declare the taker.
-
-    **Attribute access.** Reading an attribute that is not declared on the role is delegated
-    to the role taker via ``__getattr__`` (role-native attributes are resolved first).
-    Assignments always set the attribute on the role itself and never modify the role taker:
-    only the role's own declared fields may be assigned, and any other name raises
-    :class:`RoleAttributeNotDeclaredError
-    <krrood.patterns.exceptions.RoleAttributeNotDeclaredError>`. To change the role taker,
-    assign through ``role.role_taker``.
-
-    **Distinct identity.** A role is a distinct object from its role taker: they do not
-    compare equal and do not share a hash, so multiple roles (even of the same type) on one
-    taker stay distinct in sets and dicts. Semantic equivalence ("same underlying entity")
-    is expressed through the :class:`IsSameSemanticEntity
-    <krrood.patterns.role_predicates.IsSameSemanticEntity>` predicate, which unwraps roles to their
-    :attr:`root_persistent_entity`:
     >>> from dataclasses import dataclass
-    >>> from krrood.patterns.role_predicates import IsSameSemanticEntity
     >>> @dataclass(unsafe_hash=True)
     ... class Person:
     ...     name: str
@@ -72,7 +48,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     False
     >>> len({person, student})
     2
-    >>> bool(IsSameSemanticEntity(first_entity=person, second_entity=student))
+    >>> Role.is_same_semantic_entity(first_entity=person, second_entity=student)
     True
     """
 
@@ -294,6 +270,20 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
             if isinstance(role, role_types)
         )
 
+    @staticmethod
+    def is_same_semantic_entity(*, first_entity: Any, second_entity: Any) -> bool:
+        """
+        :param first_entity: A role or any other object.
+        :param second_entity: A role or any other object.
+        :return: Whether both resolve to the same object, a role resolving to its
+            :attr:`root_persistent_entity` and any other object to itself.
+        """
+        first_root, second_root = (
+            entity.root_persistent_entity if isinstance(entity, Role) else entity
+            for entity in (first_entity, second_entity)
+        )
+        return first_root is second_root
+
     @property
     def all_role_takers(self) -> list[Any]:
         """
@@ -310,7 +300,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     def __eq__(self, other: Any) -> bool:
         """
         A role is equal only to itself (identity), never to its taker; "same underlying
-        entity?" is answered by the ``IsSameSemanticEntity`` predicate instead.
+        entity?" is answered by :meth:`is_same_semantic_entity` instead.
         """
         return self is other
 

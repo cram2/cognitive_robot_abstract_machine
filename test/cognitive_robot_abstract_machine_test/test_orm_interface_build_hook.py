@@ -13,7 +13,7 @@ from cognitive_robot_abstract_machine.exceptions import (
     UnknownORMBuildChoiceError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
-    WORKSPACE_ORM_INTERFACES,
+    OrmPackage,
     WorkspaceOrmInterfaces,
 )
 
@@ -38,16 +38,20 @@ The option cut short, the way argparse lets a run abbreviate a long option.
 
 
 @pytest.fixture()
-def recorded_builds(monkeypatch) -> list[str]:
+def recorded_builds(monkeypatch) -> list[list[str]]:
     """
     Replace the real build with a recorder, so the guard can be exercised without paying
     for a whole regeneration.
 
-    :return: The list every build appends to.
+    :return: The list every build appends the package names of its interfaces to.
     """
-    builds: list[str] = []
+    builds: list[list[str]] = []
     monkeypatch.setattr(
-        WORKSPACE_ORM_INTERFACES, "regenerate", lambda: builds.append("built")
+        WorkspaceOrmInterfaces,
+        "regenerate",
+        lambda interfaces: builds.append(
+            [interface.package_name for interface in interfaces.interfaces]
+        ),
     )
     monkeypatch.setattr(sys, "argv", [PYTEST_COMMAND])
     monkeypatch.setenv(PytestEnvironmentVariable.ORM_BUILD, OrmBuild.ALWAYS)
@@ -70,21 +74,38 @@ class TestOrmInterfacesBuiltOnlyByTheXdistController:
     def test_worker_leaves_the_interfaces_alone(self, monkeypatch, recorded_builds):
         monkeypatch.setenv(PytestEnvironmentVariable.XDIST_WORKER, "gw0")
 
-        assert regenerate_orm_interfaces() is False
+        assert regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN) is False
         assert recorded_builds == []
 
     def test_controller_builds_them(self, monkeypatch, recorded_builds):
         monkeypatch.delenv(PytestEnvironmentVariable.XDIST_WORKER, raising=False)
 
-        assert regenerate_orm_interfaces() is True
-        assert recorded_builds == ["built"]
+        assert regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN) is True
+        assert recorded_builds == [[OrmPackage.SEMANTIC_DIGITAL_TWIN]]
 
     def test_a_second_ask_does_not_build_again(self, monkeypatch, recorded_builds):
         monkeypatch.delenv(PytestEnvironmentVariable.XDIST_WORKER, raising=False)
-        regenerate_orm_interfaces()
+        regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
-        assert regenerate_orm_interfaces() is True
-        assert recorded_builds == ["built"]
+        assert regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN) is True
+        assert recorded_builds == [[OrmPackage.SEMANTIC_DIGITAL_TWIN]]
+
+
+# %% only the interfaces the tested package needs
+
+
+def test_a_run_builds_only_the_interfaces_its_package_needs(
+    monkeypatch, recorded_builds
+):
+    """
+    A package's tests read its own interface and those it builds on, so a run of them
+    builds nothing a package further down the workspace generates.
+    """
+    monkeypatch.delenv(PytestEnvironmentVariable.XDIST_WORKER, raising=False)
+
+    regenerate_orm_interfaces(OrmPackage.CRAMPH)
+
+    assert recorded_builds == [[OrmPackage.SEMANTIC_DIGITAL_TWIN, OrmPackage.CRAMPH]]
 
 
 # %% the choice a run is started with
@@ -234,5 +255,5 @@ class TestARunThatBuildsNothing:
             sys, "argv", [PYTEST_COMMAND, f"{ORM_BUILD_OPTION}={OrmBuild.NEVER}"]
         )
 
-        assert regenerate_orm_interfaces() is False
+        assert regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN) is False
         assert recorded_builds == []

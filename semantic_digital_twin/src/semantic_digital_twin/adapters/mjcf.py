@@ -17,6 +17,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoActuator,
     GeomVisibilityAndCollisionType,
     MujocoCamera,
+    MujocoContactDimensionality,
     MujocoEquality,
     MujocoGeom,
     MujocoBody,
@@ -262,7 +263,11 @@ class MJCFParser(WorldModelParser):
             shape.origin.reference_frame = body
             shape.add_simulator_property(
                 ContactParameters(
-                    friction=ContactFriction(*mujoco_geom.friction.tolist()),
+                    friction=MujocoContactDimensionality(
+                        mujoco_geom.condim
+                    ).acting_friction(
+                        friction=ContactFriction(*mujoco_geom.friction.tolist())
+                    ),
                     stiffness=ContactStiffness(
                         time_constant=timedelta(seconds=mujoco_geom.solref[0]),
                         damping_ratio=mujoco_geom.solref[1],
