@@ -101,7 +101,7 @@ class PlotterMode(StrEnum):
 # %% the robot under measurement
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealTimeStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
     """
     Simulates the motion in place, at the pace a robot is commanded at.
@@ -115,7 +115,7 @@ class RealTimeStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
         return RealTimePacer()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BenchmarkRobot(GiskardTester):
     """
     A PR2 that runs its motions in place at the pace of a real robot, so the control
@@ -234,7 +234,7 @@ class BenchmarkRobot(GiskardTester):
             extension_type=MotionControlContext
         ).qp_controller_config.control_time_step.total_seconds()
 
-    def get_kinematic_structure_entity(self, name: str) -> KinematicStructureEntity:
+    def get_kinematic_structure_entity(self, *, name: str) -> KinematicStructureEntity:
         """
         The kinematic structure entity of the given name.
 
@@ -243,7 +243,7 @@ class BenchmarkRobot(GiskardTester):
         """
         return self.api.world.get_kinematic_structure_entity_by_name(name)
 
-    def teleport_to_configuration(self, joint_state: dict[str, float]) -> None:
+    def teleport_to_configuration(self, *, joint_state: dict[str, float]) -> None:
         """
         Teleport the robot into the given configuration and reset its odometry.
 
@@ -278,7 +278,7 @@ class BenchmarkRobot(GiskardTester):
         self.api.compile(statechart=motion_statechart)
         self.api.execute()
 
-    def add_environment(self, name: str, package_path: str, pose: Pose) -> None:
+    def add_environment(self, *, name: str, package_path: str, pose: Pose) -> None:
         """
         Load a whole environment into the world, which grows the cost of forward
         kinematics and collision checking.
@@ -363,12 +363,14 @@ class CartesianGoalScenario(BenchmarkScenario):
         return robot.default_joint_state
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
-        tip = robot.get_kinematic_structure_entity("r_gripper_tool_frame")
+        tip = robot.get_kinematic_structure_entity(name="r_gripper_tool_frame")
         motion_statechart = Statechart(context=robot.api.context)
         motion_statechart.add_node(
             node=(
                 cartesian_goal := CartesianPose(
-                    root_link=robot.get_kinematic_structure_entity("base_footprint"),
+                    root_link=robot.get_kinematic_structure_entity(
+                        name="base_footprint"
+                    ),
                     tip_link=tip,
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                         pos_x=-0.2, reference_frame=tip
@@ -400,7 +402,7 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
             pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1.2,
                 z=0.3,
-                reference_frame=robot.get_kinematic_structure_entity("map"),
+                reference_frame=robot.get_kinematic_structure_entity(name="map"),
             ),
         )
 
@@ -409,7 +411,9 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
         motion_statechart.add_node(
             node=CartesianPose(
                 root_link=robot.default_root,
-                tip_link=robot.get_kinematic_structure_entity("r_gripper_tool_frame"),
+                tip_link=robot.get_kinematic_structure_entity(
+                    name="r_gripper_tool_frame"
+                ),
                 goal_pose=Pose.from_xyz_axis_angle(
                     x=0.8,
                     y=-0.38,
@@ -462,12 +466,12 @@ class ApartmentDrivingScenario(BenchmarkScenario):
         )
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
-        base = robot.get_kinematic_structure_entity("base_footprint")
+        base = robot.get_kinematic_structure_entity(name="base_footprint")
         motion_statechart = Statechart(context=robot.api.context)
         motion_statechart.add_node(
             node=(
                 cartesian_goal := CartesianPose(
-                    root_link=robot.get_kinematic_structure_entity("map"),
+                    root_link=robot.get_kinematic_structure_entity(name="map"),
                     tip_link=base,
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=0.4, y=-2.0, reference_frame=base
@@ -501,12 +505,12 @@ class KitchenPointingScenario(BenchmarkScenario):
         )
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
-        camera = robot.get_kinematic_structure_entity("head_mount_kinect_rgb_link")
-        map_frame = robot.get_kinematic_structure_entity("map")
+        camera = robot.get_kinematic_structure_entity(name="head_mount_kinect_rgb_link")
+        map_frame = robot.get_kinematic_structure_entity(name="map")
         pointing_axis = Vector3.X(reference_frame=camera)
         handle_point = robot.api.world.compute_forward_kinematics(
             root=map_frame,
-            tip=robot.get_kinematic_structure_entity("iai_fridge_door_handle"),
+            tip=robot.get_kinematic_structure_entity(name="iai_fridge_door_handle"),
         ).position
         arm_pose = {
             name: position
@@ -535,14 +539,14 @@ class KitchenPointingScenario(BenchmarkScenario):
                                 CartesianPose(
                                     root_link=map_frame,
                                     tip_link=robot.get_kinematic_structure_entity(
-                                        "base_footprint"
+                                        name="base_footprint"
                                     ),
                                     goal_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
                                         y=2.0,
                                         axis=Vector3.Z(),
                                         angle=1,
                                         reference_frame=robot.get_kinematic_structure_entity(
-                                            "base_footprint"
+                                            name="base_footprint"
                                         ),
                                     ),
                                 ),
@@ -585,12 +589,12 @@ class LongSequenceScenario(BenchmarkScenario):
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
         tips = [
-            robot.get_kinematic_structure_entity("l_gripper_tool_frame"),
-            robot.get_kinematic_structure_entity("r_gripper_tool_frame"),
+            robot.get_kinematic_structure_entity(name="l_gripper_tool_frame"),
+            robot.get_kinematic_structure_entity(name="r_gripper_tool_frame"),
         ]
         waypoints = [
             CartesianPose(
-                root_link=robot.get_kinematic_structure_entity("base_footprint"),
+                root_link=robot.get_kinematic_structure_entity(name="base_footprint"),
                 tip_link=tips[index % len(tips)],
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tips[index % len(tips)]
@@ -641,7 +645,7 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
         return robot.default_joint_state
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
-        tip = robot.get_kinematic_structure_entity("r_gripper_tool_frame")
+        tip = robot.get_kinematic_structure_entity(name="r_gripper_tool_frame")
         stages = []
         for offset in self.waypoint_offsets:
             instant_steps = [
@@ -649,7 +653,7 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
                 for _ in range(self.instant_steps_per_waypoint)
             ]
             waypoint = CartesianPose(
-                root_link=robot.get_kinematic_structure_entity("base_footprint"),
+                root_link=robot.get_kinematic_structure_entity(name="base_footprint"),
                 tip_link=tip,
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tip
@@ -762,7 +766,9 @@ class ScenarioRunner:
             plotter_mode=self.plotter_mode, target_frequency=self.target_frequency
         )
         try:
-            robot.teleport_to_configuration(scenario.seed_joint_state(robot))
+            robot.teleport_to_configuration(
+                joint_state=scenario.seed_joint_state(robot)
+            )
             scenario.prepare(robot)
             motion_statechart = scenario.build_motion_statechart(robot)
             profiler = ControlLoopProfiler(

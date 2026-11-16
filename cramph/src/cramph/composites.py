@@ -304,6 +304,8 @@ class ControlStructureNode(CompositeNode, ABC):
         self.nodes.insert(position, node)
         self._place_child_in_statechart(node=node)
         self._wire_children()
+        if self.statechart.compiler.latest_compile_covers(node=self):
+            self.statechart.request_rebuild(node=self)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)

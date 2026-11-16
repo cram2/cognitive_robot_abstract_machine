@@ -12,12 +12,6 @@ from typing_extensions import Any, TypeVar
 
 from probabilistic_model.adapters.converter import Converter
 from probabilistic_model.adapters.exceptions import NoConversionPathError
-from probabilistic_model.adapters.jax_tensorized.jax_to_tensorized import (
-    DifferentiableLayeredCircuitToLayeredCircuitConverter,
-)
-from probabilistic_model.adapters.jax_tensorized.tensorized_to_jax import (
-    LayeredCircuitToDifferentiableLayeredCircuitConverter,
-)
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
@@ -34,16 +28,13 @@ class CircuitRepresentations:
     The representations of circuits and the converters of whole circuits between them.
 
     A circuit converts into every representation that a chain of these converters
-    reaches, for instance a rustworkx circuit into a differentiable circuit through the
-    layered circuit.
+    reaches, for instance a rustworkx circuit into a layered circuit.
     """
 
     converters: list[type[Converter]] = field(
         default_factory=lambda: [
             RustworkxCircuitToLayeredCircuitConverter,
             LayeredCircuitToRustworkxCircuitConverter,
-            DifferentiableLayeredCircuitToLayeredCircuitConverter,
-            LayeredCircuitToDifferentiableLayeredCircuitConverter,
         ]
     )
     """

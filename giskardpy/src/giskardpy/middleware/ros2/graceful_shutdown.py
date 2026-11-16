@@ -5,12 +5,13 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from types import FrameType
 from typing_extensions import TYPE_CHECKING
+from krrood.patterns.called_positionally import called_positionally
 
 if TYPE_CHECKING:
     from signal import _HANDLER as SignalHandler
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GracefulShutdownSignals(AbstractContextManager):
     """
     Turns SIGINT and SIGTERM into a :class:`KeyboardInterrupt` for the duration of a
@@ -45,5 +46,6 @@ class GracefulShutdownSignals(AbstractContextManager):
         signal.signal(signal.SIGTERM, self._original_sigterm_handler)
 
     @staticmethod
+    @called_positionally
     def _raise_keyboard_interrupt(signum: int, frame: FrameType | None) -> None:
         raise KeyboardInterrupt
