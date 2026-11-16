@@ -45,7 +45,7 @@ def test_a_standalone_giskard_simulates_the_robot_of_its_world(
 # %% launching a Giskard
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardBuiltOnItsNode:
     """
     Builds a Giskard that is interrupted as soon as it waits for goals, and remembers
@@ -89,7 +89,7 @@ def test_launching_builds_giskard_on_its_node_and_runs_it_until_shutdown(
     create_giskard = GiskardBuiltOnItsNode(world=mini_world)
     node_name = "launched_giskard"
 
-    Giskard.launch(create_giskard, node_name=node_name)
+    Giskard.launch(create_giskard=create_giskard, node_name=node_name)
 
     assert create_giskard.node_names_when_built == [node_name]
     assert not rclpy.ok()

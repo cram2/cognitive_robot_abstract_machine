@@ -176,7 +176,7 @@ class MotionServer:
         self._background_thread = Thread(target=self.live, name="motion server")
         self._background_thread.start()
 
-    def stop(self, timeout: float = 2.0) -> None:
+    def stop(self, *, timeout: float = 2.0) -> None:
         """
         Make a background :meth:`live` loop return and wait for it to finish.
 
@@ -224,8 +224,10 @@ class MotionServer:
             goal = MotionGoal.from_json(
                 data=json.loads(self.action_server.goal_msg.goal)
             )
-            self.client_watchdog.watch(goal.client)
-            self.wait_for_required_world_updates(goal.required_position)
+            self.client_watchdog.watch(client=goal.client)
+            self.wait_for_required_world_updates(
+                required_position=goal.required_position
+            )
             self.compile_goal(goal=goal)
             self.control_loop.run()
         except Exception as exception:
@@ -239,7 +241,7 @@ class MotionServer:
             self.finish_goal(error=error)
 
     def wait_for_required_world_updates(
-        self, required_position: StreamPosition | None
+        self, *, required_position: StreamPosition | None
     ) -> None:
         """
         Wait until the world contains the change the goal was built on.
@@ -257,7 +259,7 @@ class MotionServer:
         deadline = time.monotonic() + self.world_update_timeout
         while True:
             self.world_updates.apply_all()
-            if self.world_updates.has_applied(required_position):
+            if self.world_updates.has_applied(position=required_position):
                 return
             if self.client_watchdog.is_client_gone():
                 raise ClientDisconnectedError(client=self.client_watchdog.client)
@@ -304,10 +306,10 @@ class MotionServer:
                 self.executor.statechart.cleanup_nodes()
             self.feedback_publisher.publish()
         finally:
-            self.action_server.result_message = self.create_result(error)
+            self.action_server.result_message = self.create_result(error=error)
             self.action_server.send_result()
 
-    def create_result(self, error: Exception | None) -> JsonAction.Result:
+    def create_result(self, *, error: Exception | None) -> JsonAction.Result:
         """
         Mark the goal as canceled, aborted or succeeded and describe its final state.
 
@@ -330,12 +332,12 @@ class MotionServer:
                 background_node.get_node().get_logger().error(f"Goal aborted: {error}")
         states = self.create_states()
         if error is not None:
-            states["error"] = self.serialize_error(error)
+            states["error"] = self.serialize_error(error=error)
         result = JsonAction.Result()
         result.result = json.dumps(states)
         return result
 
-    def serialize_error(self, error: Exception) -> dict[str, Any]:
+    def serialize_error(self, *, error: Exception) -> dict[str, Any]:
         """
         Serialize the error a goal failed with, so that the client can rebuild it.
 

@@ -7,7 +7,6 @@ import numpy as np
 from jax.experimental.sparse import BCOO
 from random_events.interval import Bound
 from random_events.variable import Integer, Symbolic
-from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.converter import LayerConversion
@@ -69,9 +68,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_la
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     SparseEntries,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
+    InnerLayerEdges,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
     SymbolicEncoding,
@@ -123,11 +124,8 @@ class DifferentiableSumLayerToSumLayerConverter(
             entries.append(child_entries)
             offset += child_layer.number_of_nodes
 
-        layer = SumLayer(
-            child_layers,
-            RowGroupedSparseArray.from_entries(
-                SparseEntries.concatenate(entries), (data.number_of_nodes, offset)
-            ),
+        layer = SumLayer.from_entries(
+            child_layers, SparseEntries.concatenate(entries), data.number_of_nodes
         )
         layer.normalize_own()
         return layer
@@ -166,17 +164,15 @@ class DifferentiableProductLayerToProductLayerConverter(
     def convert(
         cls, data: DifferentiableProductLayer, conversion: LayersToTensorized
     ) -> ProductLayer:
+        # the jax layer stores the child node of every edge at (child layer, node)
         indices = np.asarray(data.edges.indices, dtype=np.int64)
-        edges = coo_array(
-            (
-                np.asarray(data.edges.data, dtype=np.int64),
-                (indices[:, 0], indices[:, 1]),
-            ),
-            shape=data.edges.shape,
+        edges = InnerLayerEdges(
+            indices[:, 1], indices[:, 0], np.asarray(data.edges.data, dtype=np.int64)
         )
-        return ProductLayer(
+        return ProductLayer.from_edges(
             [conversion.convert(child_layer) for child_layer in data.child_layers],
             edges,
+            data.edges.shape[1],
         )
 
 

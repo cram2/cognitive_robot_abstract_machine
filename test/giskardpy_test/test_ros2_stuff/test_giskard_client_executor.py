@@ -157,7 +157,7 @@ class TestGiskardClientExecutorClose:
     a node nobody is using any more.
     """
 
-    def test_close_stops_the_heartbeat(self, giskard_command_server):
+    def test_close_stops_the_heartbeat(self, *, giskard_command_server):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
 
@@ -178,7 +178,7 @@ class TestAnnouncingPresence:
     """
 
     def test_a_client_does_not_announce_itself_unless_asked(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
@@ -190,7 +190,7 @@ class TestAnnouncingPresence:
         assert executor.heartbeat_publisher is None
 
     def test_a_client_that_never_announced_itself_can_be_closed(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
@@ -203,7 +203,7 @@ class TestAnnouncingPresence:
         assert executor.heartbeat_publisher is None
 
     def test_a_client_asked_to_on_construction_announces_itself(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
@@ -215,7 +215,9 @@ class TestAnnouncingPresence:
         assert not executor.heartbeat_publisher.timer.is_canceled()
         executor.close()
 
-    def test_a_client_can_start_announcing_itself_later(self, giskard_command_server):
+    def test_a_client_can_start_announcing_itself_later(
+        self, *, giskard_command_server
+    ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
         executor = GiskardClientExecutor(
@@ -227,7 +229,9 @@ class TestAnnouncingPresence:
         assert not executor.heartbeat_publisher.timer.is_canceled()
         executor.close()
 
-    def test_announcing_twice_keeps_the_first_heartbeat(self, giskard_command_server):
+    def test_announcing_twice_keeps_the_first_heartbeat(
+        self, *, giskard_command_server
+    ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
         executor = GiskardClientExecutor(
@@ -249,7 +253,7 @@ class TestGiskardClientExecutorNodeClose:
     """
 
     def test_close_removes_the_node_from_the_shared_executor(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)

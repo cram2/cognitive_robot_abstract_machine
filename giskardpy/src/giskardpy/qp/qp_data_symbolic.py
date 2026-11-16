@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPVariableAccumulator:
     """
     Collects the per-block cost weights, box bounds, and variable names of all decision and slack
@@ -51,7 +51,7 @@ class QPVariableAccumulator:
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QPDataSymbolic:
     """
     Takes free variables and constraints and converts them to a QP problem in the following format, depending on the
@@ -138,6 +138,7 @@ class QPDataSymbolic:
 
     @staticmethod
     def _append_slack_block(
+        *,
         strategy: EnforcementStrategy,
         constraint_names: list[str],
         accumulator: QPVariableAccumulator,
@@ -157,9 +158,9 @@ class QPDataSymbolic:
 
     def __post_init__(self):
         accumulator = self._collect_degree_of_freedom_limits()
-        self._assemble_equality_constraints(accumulator)
-        self._assemble_inequality_constraints(accumulator)
-        self._store_box_constraints(accumulator)
+        self._assemble_equality_constraints(accumulator=accumulator)
+        self._assemble_inequality_constraints(accumulator=accumulator)
+        self._store_box_constraints(accumulator=accumulator)
 
     def _collect_degree_of_freedom_limits(self) -> QPVariableAccumulator:
         """
@@ -180,6 +181,7 @@ class QPDataSymbolic:
 
     def _instantiate_strategy(
         self,
+        *,
         enforcement_strategy: type[EnforcementStrategy],
         constraints: list[GiskardConstraint],
     ) -> EnforcementStrategy:
@@ -194,14 +196,14 @@ class QPDataSymbolic:
         )
 
     def _assemble_equality_constraints(
-        self, accumulator: QPVariableAccumulator
+        self, *, accumulator: QPVariableAccumulator
     ) -> None:
         """
         Builds and stores the equality constraint matrices, slack blocks, bounds, and row names,
         starting with the system dynamics block and followed by the per-strategy equality blocks.
         """
         system_dynamics_strategy = self._instantiate_strategy(
-            SystemDynamicsStrategy, []
+            enforcement_strategy=SystemDynamicsStrategy, constraints=[]
         )
         degree_of_freedom_matrices = [system_dynamics_strategy.create_matrix()]
         slack_matrices = [system_dynamics_strategy.create_slack_matrix()]
@@ -212,9 +214,13 @@ class QPDataSymbolic:
             enforcement_strategy,
             constraints,
         ) in self.constraint_collection.get_equality_constraint_blocks().items():
-            strategy = self._instantiate_strategy(enforcement_strategy, constraints)
+            strategy = self._instantiate_strategy(
+                enforcement_strategy=enforcement_strategy, constraints=constraints
+            )
             matrix, slack_matrix = self._append_slack_block(
-                strategy, self.equality_constraint_names, accumulator
+                strategy=strategy,
+                constraint_names=self.equality_constraint_names,
+                accumulator=accumulator,
             )
             degree_of_freedom_matrices.append(matrix)
             slack_matrices.append(slack_matrix)
@@ -225,7 +231,7 @@ class QPDataSymbolic:
         self.equality_bounds = sm.concatenate(*bounds)
 
     def _assemble_inequality_constraints(
-        self, accumulator: QPVariableAccumulator
+        self, *, accumulator: QPVariableAccumulator
     ) -> None:
         """
         Builds and stores the inequality constraint matrices, slack blocks, lower/upper bounds,
@@ -241,9 +247,13 @@ class QPDataSymbolic:
             enforcement_strategy,
             constraints,
         ) in self.constraint_collection.get_inequality_constraint_blocks().items():
-            strategy = self._instantiate_strategy(enforcement_strategy, constraints)
+            strategy = self._instantiate_strategy(
+                enforcement_strategy=enforcement_strategy, constraints=constraints
+            )
             matrix, slack_matrix = self._append_slack_block(
-                strategy, self.inequality_constraint_names, accumulator
+                strategy=strategy,
+                constraint_names=self.inequality_constraint_names,
+                accumulator=accumulator,
             )
             degree_of_freedom_matrices.append(matrix)
             slack_matrices.append(slack_matrix)
@@ -251,13 +261,13 @@ class QPDataSymbolic:
             upper_bounds.append(strategy.create_upper_bounds())
 
         self.inequality_matrix_degrees_of_freedom = self._stack_rows(
-            degree_of_freedom_matrices
+            blocks=degree_of_freedom_matrices
         )
-        self.inequality_matrix_slack = self._diagonally_stack(slack_matrices)
-        self.inequality_lower_bounds = self._concatenate_blocks(lower_bounds)
-        self.inequality_upper_bounds = self._concatenate_blocks(upper_bounds)
+        self.inequality_matrix_slack = self._diagonally_stack(blocks=slack_matrices)
+        self.inequality_lower_bounds = self._concatenate_blocks(blocks=lower_bounds)
+        self.inequality_upper_bounds = self._concatenate_blocks(blocks=upper_bounds)
 
-    def _store_box_constraints(self, accumulator: QPVariableAccumulator) -> None:
+    def _store_box_constraints(self, *, accumulator: QPVariableAccumulator) -> None:
         """
         Concatenates the accumulated box bounds, weights, and names into the QP's box constraint
         fields.
@@ -269,7 +279,7 @@ class QPDataSymbolic:
         self.box_upper_constraints = sm.concatenate(*accumulator.box_upper_constraints)
 
     @staticmethod
-    def _stack_rows(blocks: list[Matrix]) -> Matrix:
+    def _stack_rows(*, blocks: list[Matrix]) -> Matrix:
         """
         Vertically stacks the constraint matrix blocks, returning an empty matrix when there are
         no blocks.
@@ -277,7 +287,7 @@ class QPDataSymbolic:
         return sm.vstack(blocks) if blocks else sm.Matrix()
 
     @staticmethod
-    def _diagonally_stack(blocks: list[Matrix]) -> Matrix:
+    def _diagonally_stack(*, blocks: list[Matrix]) -> Matrix:
         """
         Diagonally stacks the slack matrix blocks, returning an empty matrix when there are no
         blocks.
@@ -285,7 +295,7 @@ class QPDataSymbolic:
         return sm.diag_stack(blocks) if blocks else sm.Matrix()
 
     @staticmethod
-    def _concatenate_blocks(blocks: list[Vector]) -> Vector:
+    def _concatenate_blocks(*, blocks: list[Vector]) -> Vector:
         """
         Concatenates the bound blocks, returning an empty vector when there are no blocks.
         """

@@ -1,13 +1,18 @@
+"""
+Reading the attribute a property returns from the property's source code.
+"""
+
 import ast
 import inspect
 from functools import lru_cache
 from textwrap import dedent
 
-
 from krrood.entity_query_language.exceptions import (
     WrongPropertyReturnStatementImplementation,
     NoReturnStatementInProperty,
 )
+
+# %% property return statement
 
 
 @lru_cache

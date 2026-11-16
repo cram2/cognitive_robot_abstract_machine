@@ -92,7 +92,7 @@ class ObserverRecordingLifeCycles(StateHistoryObserver):
         self.statechart_ended.append(self.node.statechart.is_ended())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientFollowingTheStates(InputSynchronizer):
     """
     Stands in for a client that follows the states of the running goal in every
@@ -128,20 +128,22 @@ class ClientFollowingTheStates(InputSynchronizer):
     def apply(self) -> bool:
         messages = self.action_server.feedback_messages
         for message in messages[self._read_feedback_count :]:
-            self._follow(feedback_data(message))
+            self._follow(feedback=feedback_data(message))
         self._read_feedback_count = len(messages)
         return False
 
-    def _follow(self, feedback: dict) -> None:
+    def _follow(self, *, feedback: dict) -> None:
         """
         :param feedback: One feedback of the running goal.
         """
-        StatechartStateUpdate.from_json(feedback, statechart=self.statechart).apply()
+        StatechartStateUpdate.from_json(
+            payload=feedback, statechart=self.statechart
+        ).apply()
         if self.child_choice_client is None:
             return
-        for choice in self.child_choice_client.answer(feedback):
+        for choice in self.child_choice_client.answer(feedback=feedback):
             self.server_chooser.receive(
-                ChildChoiceMessage.from_json(
+                message=ChildChoiceMessage.from_json(
                     data=json.loads(json.dumps(choice.to_json()))
                 )
             )
@@ -195,7 +197,9 @@ def test_the_reported_states_are_written_into_the_client_statechart(
     client_statechart: Statechart,
 ) -> None:
     payload = _reported_states(ticks=2)
-    update = StatechartStateUpdate.from_json(payload, statechart=client_statechart)
+    update = StatechartStateUpdate.from_json(
+        payload=payload, statechart=client_statechart
+    )
 
     update.apply()
 
@@ -220,7 +224,9 @@ def test_a_node_giskard_has_not_added_yet_keeps_its_state(
     payload = _reported_states(ticks=2)
     client_statechart.add_node(node=(chosen := CountTicks(ticks=1)))
 
-    StatechartStateUpdate.from_json(payload, statechart=client_statechart).apply()
+    StatechartStateUpdate.from_json(
+        payload=payload, statechart=client_statechart
+    ).apply()
 
     assert chosen.life_cycle_state == LifeCycleValues.NOT_STARTED
 
@@ -234,7 +240,9 @@ def test_states_of_more_nodes_than_the_client_holds_are_rejected() -> None:
     client_statechart.add_node(node=CountTicks(ticks=1))
 
     with pytest.raises(StateUpdateAheadOfStatechartError):
-        StatechartStateUpdate.from_json(payload, statechart=client_statechart).apply()
+        StatechartStateUpdate.from_json(
+            payload=payload, statechart=client_statechart
+        ).apply()
 
 
 def test_the_observers_of_the_client_statechart_learn_the_reported_tick(
@@ -246,7 +254,7 @@ def test_the_observers_of_the_client_statechart_learn_the_reported_tick(
     observer = ObserverRecordingTicks()
     client_statechart.state_history.add_observer(observer=observer)
     update = StatechartStateUpdate.from_json(
-        _reported_states(ticks=3), statechart=client_statechart
+        payload=_reported_states(ticks=3), statechart=client_statechart
     )
 
     update.apply()
@@ -259,8 +267,12 @@ def test_the_same_states_reported_twice_are_recorded_once(
 ) -> None:
     payload = _reported_states(ticks=3)
 
-    StatechartStateUpdate.from_json(payload, statechart=client_statechart).apply()
-    StatechartStateUpdate.from_json(payload, statechart=client_statechart).apply()
+    StatechartStateUpdate.from_json(
+        payload=payload, statechart=client_statechart
+    ).apply()
+    StatechartStateUpdate.from_json(
+        payload=payload, statechart=client_statechart
+    ).apply()
 
     assert len(client_statechart.state_history.items) == 1
 
@@ -318,7 +330,7 @@ def test_the_client_follows_a_child_it_chose_once_giskard_runs_it(
             ]
         )
     )
-    goal = ChoosingGoal.ending_when(EndMotion.when_true)
+    goal = ChoosingGoal.ending_when(end_node_factory=EndMotion.when_true)
     child = CountSimulationTimeSeconds(seconds=0.1)
     following = ClientFollowingTheStates(
         world=motion_server.executor.context.world,

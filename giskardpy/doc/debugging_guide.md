@@ -135,7 +135,7 @@ executor = StatechartExecutor(
 executor.compile(statechart=motion_statechart)
 executor.tick_until_end()
 executor.require_extension(extension_type=DebugExpressionRecording).plotter.plot(
-    "./debug_expressions.pdf"
+    file_name="./debug_expressions.pdf"
 )
 ```
 

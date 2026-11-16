@@ -177,7 +177,7 @@ class Giskard:
 
     @classmethod
     def launch(
-        cls, create_giskard: Callable[[Node], Giskard], node_name: str = "giskard"
+        cls, *, create_giskard: Callable[[Node], Giskard], node_name: str = "giskard"
     ) -> None:
         """
         Run a Giskard as a ros node until ROS shuts down.
@@ -216,7 +216,7 @@ class Giskard:
         self.setup_world_model_ros_interface()
         self.motion_server = self.create_motion_server()
         node_logger.info("Connecting to the robot.")
-        self.robot_interface_config.attach(self)
+        self.robot_interface_config.attach(giskard=self)
         self.robot_interface_config.connect()
         self.sanity_check()
 
@@ -245,7 +245,9 @@ class Giskard:
             world_synchronizer=self.world_synchronizer,
             model_reload_synchronizer=self.model_reload_synchronizer,
         )
-        self.receive_child_choices(world_updates, action_server)
+        self.receive_child_choices(
+            world_updates=world_updates, action_server=action_server
+        )
         control_loop = ControlLoop(
             executor=self.executor,
             action_server=action_server,
@@ -270,7 +272,7 @@ class Giskard:
         )
 
     def receive_child_choices(
-        self, world_updates: IncomingWorldUpdates, action_server: ActionServerHandler
+        self, *, world_updates: IncomingWorldUpdates, action_server: ActionServerHandler
     ) -> None:
         """
         Let the nodes of a goal that choose their child run the children the client
@@ -287,7 +289,7 @@ class Giskard:
             String,
             child_choices_topic(node.get_name()),
             lambda message: chooser.receive(
-                ChildChoiceMessage.from_json(data=json.loads(message.data))
+                message=ChildChoiceMessage.from_json(data=json.loads(message.data))
             ),
             10,
         )

@@ -22,6 +22,7 @@ from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOutcome
 from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.exceptions import GoalRequestNotAnsweredError
+from krrood.patterns.called_positionally import called_positionally
 
 # %% mimics
 
@@ -32,7 +33,7 @@ class FeedbackDeliberatelyRejected(Exception):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServerAnsweringOneGoal:
     """
     Stands in for the motion server: accepts one goal, optionally sends one feedback,
@@ -82,14 +83,14 @@ class ServerAnsweringOneGoal:
         """
         Accept the goal, send the feedback and answer.
         """
-        self._wait_until(self.action_server.has_goal)
+        self._wait_until(condition=self.action_server.has_goal)
         self.action_server.accept_goal()
         self.received_goal_message = self.action_server.goal_msg
         if self.feedback_json is not None:
             self.action_server.send_feedback(
-                JsonAction.Feedback(feedback=self.feedback_json)
+                message=JsonAction.Feedback(feedback=self.feedback_json)
             )
-            self._wait_until(self.action_server.is_cancel_requested)
+            self._wait_until(condition=self.action_server.is_cancel_requested)
         self.cancel_was_requested = self.action_server.is_cancel_requested()
         self.action_server.outcome = (
             GoalOutcome.CANCELED
@@ -99,7 +100,7 @@ class ServerAnsweringOneGoal:
         self.action_server.result_message = JsonAction.Result(result="{}")
         self.action_server.send_result()
 
-    def _wait_until(self, condition: Any) -> None:
+    def _wait_until(self, *, condition: Any) -> None:
         """
         :param condition: Called until it returns True or :attr:`patience` ran out.
         """
@@ -108,7 +109,7 @@ class ServerAnsweringOneGoal:
             sleep(0.01)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServerNeverAnswering:
     """
     An action server on a node that nothing spins, so a client finds it but never gets
@@ -147,7 +148,7 @@ class ServerNeverAnswering:
         self.node.destroy_node()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServerAcceptingLate:
     """
     An action server that accepts every goal only after :attr:`acceptance_delay`, and
@@ -216,6 +217,7 @@ class ServerAcceptingLate:
         self.spin_thread = Thread(target=self.executor.spin, daemon=True)
         self.spin_thread.start()
 
+    @called_positionally
     def _accept_late(self, goal_request: JsonAction.Goal) -> GoalResponse:
         """
         Accept ``goal_request`` once :attr:`acceptance_delay` has passed.
@@ -223,6 +225,7 @@ class ServerAcceptingLate:
         sleep(self.acceptance_delay.total_seconds())
         return GoalResponse.ACCEPT
 
+    @called_positionally
     def _run_goal(self, goal_handle: ServerGoalHandle) -> JsonAction.Result:
         """
         Wait for the goal to be canceled, and record it in :attr:`canceled_goals` if it
@@ -302,9 +305,9 @@ def client_of_server_never_answering(
     A client that gives up on a goal request after half a second.
     """
     client = GiskardActionClient(
-        background_node.get_node(),
-        JsonAction,
-        server_never_answering.action_name,
+        node_handle=background_node.get_node(),
+        action_type=JsonAction,
+        action_name=server_never_answering.action_name,
         goal_response_timeout=timedelta(seconds=0.5),
     )
     yield client
@@ -331,9 +334,9 @@ def client_of_server_accepting_late(
     A client that gives up on a goal request well before the server accepts it.
     """
     client = GiskardActionClient(
-        background_node.get_node(),
-        JsonAction,
-        server_accepting_late.action_name,
+        node_handle=background_node.get_node(),
+        action_type=JsonAction,
+        action_name=server_accepting_late.action_name,
         goal_response_timeout=server_accepting_late.acceptance_delay / 4,
     )
     yield client
@@ -362,7 +365,9 @@ def test_an_error_of_the_feedback_callback_is_raised_to_the_sender_of_the_goal(
     The error a feedback callback raises reaches the caller of :meth:`send_goal`.
     """
     client = GiskardActionClient(
-        background_node.get_node(), JsonAction, "giskard/command"
+        node_handle=background_node.get_node(),
+        action_type=JsonAction,
+        action_name="giskard/command",
     )
 
     with pytest.raises(FeedbackDeliberatelyRejected):
@@ -376,7 +381,9 @@ def test_a_goal_whose_feedback_callback_failed_is_canceled(
     A goal whose feedback callback raised is canceled on the server.
     """
     client = GiskardActionClient(
-        background_node.get_node(), JsonAction, "giskard/command"
+        node_handle=background_node.get_node(),
+        action_type=JsonAction,
+        action_name="giskard/command",
     )
 
     with pytest.raises(FeedbackDeliberatelyRejected):

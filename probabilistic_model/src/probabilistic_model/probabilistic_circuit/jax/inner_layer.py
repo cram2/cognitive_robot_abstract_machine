@@ -97,6 +97,34 @@ class DifferentiableLayer(eqx.Module, SubclassJSONSerializer, ABC):
         return eqx.partition(self, eqx.is_inexact_array)
 
     @property
+    def circuit_parameters(self) -> list[jax.Array]:
+        """
+        :return: The trainable arrays of the circuit rooted at this layer.
+        """
+        parameters, _ = eqx.partition(self, eqx.is_inexact_array)
+        return jax.tree_util.tree_leaves(parameters)
+
+    def projected_circuit_parameters(
+        self, parameters: list[jax.Array]
+    ) -> list[jax.Array]:
+        """
+        :param parameters: Arrays in the order of :attr:`circuit_parameters`.
+        :return: The arrays themselves, since every trainable array of these layers is
+            unconstrained.
+        """
+        return parameters
+
+    def copy_with_circuit_parameters(self, parameters: list[jax.Array]) -> Self:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`circuit_parameters`.
+        :return: The circuit rooted at this layer with these trainable arrays.
+        """
+        trainable, fixed = eqx.partition(self, eqx.is_inexact_array)
+        structure = jax.tree_util.tree_structure(trainable)
+        return eqx.combine(jax.tree_util.tree_unflatten(structure, parameters), fixed)
+
+    @property
     def number_of_trainable_parameters(self):
         """
         :return: The trainable parameters of the layer and all child layers.

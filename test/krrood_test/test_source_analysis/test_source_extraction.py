@@ -1,5 +1,5 @@
 """
-Tests for source extraction in ``krrood.code_generation.source_extraction_utils``.
+Tests for source extraction in :mod:`krrood.source_analysis.source_extraction`.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import inspect
 
 import pytest
 
-from krrood.code_generation.source_extraction_utils import (
+from krrood.source_analysis.source_extraction import (
     LineSpan,
     extract_class_source,
     extract_function_source,

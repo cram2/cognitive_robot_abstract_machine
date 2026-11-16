@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -20,6 +21,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     StateValues,
     TableEntryValues,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    RowReduction,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )
@@ -30,7 +34,7 @@ The representation a probability table stores its log-probabilities in.
 """
 
 
-class ProbabilityTable(HasParameterArrays, ABC, Generic[StoredLogProbabilities]):
+class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC):
     """
     The probability of every state for every node of a discrete layer, a table of shape
     (#nodes, #states).
@@ -282,6 +286,32 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     def parameters(self) -> list[BackendArray]:
         return [self.log_probabilities]
 
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        (log_probabilities,) = parameters
+        return dataclasses.replace(self, log_probabilities=log_probabilities)
+
+    def projected_parameters(
+        self, parameters: list[BackendArray]
+    ) -> list[BackendArray]:
+        """
+        :param parameters: Log-probabilities in the shape of :attr:`log_probabilities`.
+        :return: The log-probabilities normalized per node. A node whose
+            log-probabilities are all ``-inf`` has nothing to normalize and keeps them.
+        """
+        (log_probabilities,) = parameters
+        namespace = self.namespace
+        normalization = namespace.expand_dims(
+            RowReduction.LOG_SUM_EXP.reduce_last_axis(namespace, log_probabilities),
+            axis=1,
+        )
+        return [
+            namespace.where(
+                namespace.isfinite(normalization),
+                log_probabilities - normalization,
+                log_probabilities,
+            )
+        ]
+
     @classmethod
     def from_entries(
         cls,
@@ -320,6 +350,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
                     (self.number_of_nodes, 1),
                     -np.inf,
                     dtype=self.log_probabilities.dtype,
+                    device=self.device,
                 ),
             ],
             axis=1,
@@ -328,7 +359,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return self.namespace.take(padded, columns, axis=1).T
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
-        columns = self.namespace.asarray(np.flatnonzero(selected))
+        columns = self.namespace.asarray(np.flatnonzero(selected), device=self.device)
         return self.namespace.sum(
             self.namespace.exp(
                 self.namespace.take(self.log_probabilities, columns, axis=1)
@@ -338,7 +369,8 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
 
     def dot(self, values: StateValues) -> NodeValues:
         return self.namespace.matmul(
-            self.namespace.exp(self.log_probabilities), self.namespace.asarray(values)
+            self.namespace.exp(self.log_probabilities),
+            self.namespace.asarray(values, device=self.device),
         )
 
     def probabilities_of_node(self, node: int) -> tuple[StateIndices, TableEntryValues]:
@@ -406,6 +438,16 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
             table is a scipy sparse array.
         """
         return [self.log_probabilities.data]
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        """
+        :meth:`HasParameterArrays.copy_with_parameters` that copies the values of the
+        parameters to the host, since the table is a scipy sparse array.
+        """
+        (log_probabilities,) = parameters
+        table = self.log_probabilities.copy()
+        table.data = self.host_copy(log_probabilities)
+        return dataclasses.replace(self, log_probabilities=table)
 
     @classmethod
     def from_entries(
