@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from visualization_msgs.msg import MarkerArray
