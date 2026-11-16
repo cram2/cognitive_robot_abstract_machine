@@ -115,7 +115,7 @@ def test_a_daisy_driven_by_a_standalone_giskard_moves_its_fingers_with_a_giskard
     )
 
     assert type(action.goal) is type(
-        MoveFingers.moving_gripper_to(configuration=configuration)
+        MoveFingers.create_gripper_goal(configuration=configuration)
     )
 
 

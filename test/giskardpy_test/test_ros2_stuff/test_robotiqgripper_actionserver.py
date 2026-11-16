@@ -125,7 +125,9 @@ def test_a_configuration_is_reached_through_the_parallel_gripper_command_server_
     ].left_arm.end_effector
     configuration = gripper.default_configuration(state)
 
-    task = RobotiqGripperActionServerTask.moving_gripper_to(configuration=configuration)
+    task = RobotiqGripperActionServerTask.create_gripper_goal(
+        configuration=configuration
+    )
 
     assert type(task) is RobotiqGripperActionServerTask
     assert (task.action_topic, task.target_position) == (
@@ -141,10 +143,12 @@ def test_a_gripper_without_a_parallel_gripper_command_server_is_reached_with_a_f
         0
     ].left_arm.end_effector.default_configuration(GripperState.CLOSE)
 
-    goal = RobotiqGripperActionServerTask.moving_gripper_to(configuration=configuration)
+    goal = RobotiqGripperActionServerTask.create_gripper_goal(
+        configuration=configuration
+    )
 
     assert type(goal) is type(
-        MoveFingers.moving_gripper_to(configuration=configuration)
+        MoveFingers.create_gripper_goal(configuration=configuration)
     )
 
 

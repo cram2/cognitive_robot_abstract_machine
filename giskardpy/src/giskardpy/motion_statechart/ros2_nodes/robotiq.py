@@ -83,7 +83,7 @@ class RobotiqGripperActionServerTask(
     """
 
     @classmethod
-    def moving_gripper_to(
+    def create_gripper_goal(
         cls,
         *,
         configuration: GripperConfiguration,
@@ -91,13 +91,13 @@ class RobotiqGripperActionServerTask(
         tolerate_stall: bool = False,
     ) -> StatechartNode:
         """
-        Differs from :meth:`MovesGripperToConfiguration.moving_gripper_to` in driving a
-        :class:`HasParallelGripperCommandServer` through its server, to the position
+        Differs from :meth:`MovesGripperToConfiguration.create_gripper_goal` in driving
+        a :class:`HasParallelGripperCommandServer` through its server, to the position
         `configuration` gives its
         :attr:`~HasParallelGripperCommandServer.commanded_connection`; a stall always
         counts as done.
 
-        Any other configuration is reached as :meth:`MoveFingers.moving_gripper_to`
+        Any other configuration is reached as :meth:`MoveFingers.create_gripper_goal`
         reaches it.
 
         :raises ConnectionNotInJointStateError: If `configuration` sets no position for
@@ -105,7 +105,7 @@ class RobotiqGripperActionServerTask(
         """
         end_effector = configuration.end_effector
         if not isinstance(end_effector, HasParallelGripperCommandServer):
-            return MoveFingers.moving_gripper_to(
+            return MoveFingers.create_gripper_goal(
                 configuration=configuration,
                 stall_minimum_time=stall_minimum_time,
                 tolerate_stall=tolerate_stall,
