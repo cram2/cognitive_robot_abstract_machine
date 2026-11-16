@@ -12,6 +12,7 @@ import rdflib
 from rdflib.namespace import RDF, RDFS, OWL
 from typing_extensions import Any, Dict, List, Optional
 
+from krrood.code_generation.naming import to_camel_case, to_snake_case
 from krrood.ontomatic.failures import AmbiguousDescribedClass
 from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
@@ -305,8 +306,8 @@ class PropertyExtractor(GraphExtractor):
             ),
             label=self.metadata_extractor.get_label(uri=property_uri),
             comment=self.metadata_extractor.get_comment(uri=property_uri),
-            field_name=NamingRegistry.to_snake_case(name=name),
-            descriptor_name=NamingRegistry.to_pascal_case(name=name),
+            field_name=to_snake_case(name),
+            descriptor_name=to_camel_case(name),
             superproperties=self.related_names(
                 node=property_uri, relation=RDFS.subPropertyOf
             ),

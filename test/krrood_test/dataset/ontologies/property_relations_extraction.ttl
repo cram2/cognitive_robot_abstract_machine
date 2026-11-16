@@ -22,3 +22,7 @@
 
 :dominates a owl:ObjectProperty, owl:AsymmetricProperty, owl:IrreflexiveProperty .
 :sameAgeAs a owl:ObjectProperty, owl:ReflexiveProperty .
+
+# Names with acronyms, with and without underscores.
+:hasURIValue a owl:DatatypeProperty .
+:part_of_CHEBI a owl:ObjectProperty .

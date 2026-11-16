@@ -37,31 +37,6 @@ def test_the_local_name_follows_the_last_slash():
     )
 
 
-# %% case conversion
-
-
-def test_snake_case_splits_an_acronym_as_one_word():
-    """
-    An acronym inside a name becomes one word of the snake case name.
-    """
-    assert NamingRegistry.to_snake_case(name="hasURIValue") == "has_uri_value"
-
-
-def test_snake_case_lowercases_a_pascal_case_name():
-    """
-    A Pascal case name becomes the same words in snake case.
-    """
-    assert NamingRegistry.to_snake_case(name="HasTopping") == "has_topping"
-
-
-def test_pascal_case_capitalises_the_first_letter_and_keeps_the_rest():
-    """
-    A camel case name becomes Pascal case, keeping the case of the letters after the
-    first.
-    """
-    assert NamingRegistry.to_pascal_case(name="hasURIValue") == "HasURIValue"
-
-
 # %% anonymous class expressions
 
 

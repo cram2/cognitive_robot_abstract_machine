@@ -73,27 +73,6 @@ class NamingRegistry:
             return text.rsplit("#", 1)[1]
         return text.rstrip("/").rsplit("/", 1)[-1]
 
-    @staticmethod
-    def to_snake_case(*, name: str) -> str:
-        """
-        Convert a name like 'worksFor' or 'WorksFor' to 'works_for'.
-        """
-        with_word_breaks = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-        with_all_breaks = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_breaks)
-        return with_all_breaks.lower()
-
-    @staticmethod
-    def to_pascal_case(*, name: str) -> str:
-        """
-        Convert a name like 'worksFor' or 'works_for' to 'WorksFor'.
-        """
-        # If it contains underscores or hyphens, split and capitalize parts
-        parts = re.split(r"[_\-\s]+", name)
-        if len(parts) > 1:
-            return "".join(part.capitalize() for part in parts if part)
-        # Otherwise just capitalize first char
-        return name[:1].upper() + name[1:]
-
 
 # %% anonymous class expressions
 

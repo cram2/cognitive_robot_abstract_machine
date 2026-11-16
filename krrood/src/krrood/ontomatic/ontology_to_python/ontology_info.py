@@ -12,7 +12,7 @@ from functools import cached_property
 import rdflib
 from typing_extensions import Any, Dict, List, Optional, Set
 
-from krrood.ontomatic.naming import NamingRegistry
+from krrood.code_generation.naming import to_camel_case
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin, DeepCopyOfField
 from krrood.patterns.hashed_by_identity import HashedByIdentity
@@ -365,8 +365,8 @@ class OntologyInfo(HashedByIdentity):
         """
         The name of the base class every generated class inherits from.
         """
-        base_class_name = NamingRegistry.to_pascal_case(
-            name=re.sub(r"\W+", " ", self.ontology_label).strip()
+        base_class_name = to_camel_case(
+            re.sub(r"\W+", "_", self.ontology_label).strip("_")
         )
         if not base_class_name.endswith("Thing"):
             base_class_name += "Thing"

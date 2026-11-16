@@ -489,6 +489,33 @@ def test_a_property_keeps_the_nodes_of_its_ranges(
     ) == sorted([property_relations.Place, property_relations.Person])
 
 
+@pytest.mark.parametrize(
+    "property_name, field_name, descriptor_name",
+    [
+        ("hasURIValue", "has_uri_value", "HasURIValue"),
+        ("part_of_CHEBI", "part_of_chebi", "PartOfCHEBI"),
+    ],
+)
+def test_an_acronym_is_one_word_of_the_field_and_kept_in_the_descriptor(
+    property_relations_extractor,
+    property_relations,
+    property_name,
+    field_name,
+    descriptor_name,
+):
+    """
+    An acronym in a property's name is one lower case word of its field and keeps its
+    case in its descriptor class, with or without underscores between the words.
+    """
+    extracted = property_relations_extractor.extract(
+        property_uri=property_relations[property_name]
+    )
+    assert (extracted.field_name, extracted.descriptor_name) == (
+        field_name,
+        descriptor_name,
+    )
+
+
 # %% the whole ontology
 
 

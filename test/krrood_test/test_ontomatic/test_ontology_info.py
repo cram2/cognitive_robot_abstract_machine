@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+import pytest
 import rdflib
 
 from krrood.ontomatic.ontology_to_python.ontology_info import (
@@ -105,3 +106,30 @@ def test_an_ontology_is_equal_only_to_itself():
     """
     graph = rdflib.Graph()
     assert OntologyInfo(graph=graph) != OntologyInfo(graph=graph)
+
+
+# %% base class
+
+
+@pytest.mark.parametrize(
+    "ontology_label, base_class_name",
+    [
+        ("pizza ontology", "PizzaOntologyThing"),
+        ("university-bench", "UniversityBenchThing"),
+        ("SOMA home", "SOMAHomeThing"),
+        ("Thing", "Thing"),
+    ],
+)
+def test_the_base_class_is_named_for_the_ontology_label(
+    ontology_label, base_class_name
+):
+    """
+    The base class is the ontology's label in Pascal case, keeping acronyms, and ends in
+    ``Thing``.
+    """
+    assert (
+        OntologyInfo(
+            graph=rdflib.Graph(), ontology_label=ontology_label
+        ).base_class_name
+        == base_class_name
+    )
