@@ -287,54 +287,6 @@ class PropertyInfo(DataclassDeepcopyMixin, HashedByIdentity):
     """
     The ontology the property belongs to, which a copy of the property keeps.
     """
-    _sorted_superproperties: List[str] = field(default_factory=list, init=False)
-    """
-    The superproperties in topological order, computed once.
-    """
-    _all_superproperties: List[str] = field(default_factory=list, init=False)
-    """
-    The superproperties, directly or not, computed once.
-    """
-
-    @property
-    def sorted_superproperties(self):
-        """
-        Get superproperties sorted by inheritance path length (shortest first).
-        """
-        if not self._sorted_superproperties and self.ontology:
-            self._sorted_superproperties = OntologyInfo.topological_order(
-                items={
-                    superproperty: self.ontology.properties[superproperty]
-                    for superproperty in self.ancestors
-                },
-                dependency_key="superproperties",
-            )
-        return self._sorted_superproperties
-
-    @property
-    def ancestors(self):
-        """
-        Compute full ancestor sets for each class (transitive closure).
-        """
-        if self._all_superproperties:
-            return self._all_superproperties
-        if not self.ontology:
-            return []
-        # Compute full ancestor sets for each class (transitive closure)
-        name_to_bases = {
-            name: set(property_information.superproperties)
-            for name, property_information in self.ontology.properties.items()
-        }
-        ancestors = set()
-        stack = list(self.superproperties)
-        while stack:
-            base = stack.pop()
-            if base in ancestors:
-                continue
-            ancestors.add(base)
-            stack.extend(name_to_bases.get(base, []))
-        self._all_superproperties = sorted(ancestors)
-        return self._all_superproperties
 
 
 @dataclass(kw_only=True, eq=False)
@@ -429,34 +381,3 @@ class OntologyInfo(HashedByIdentity):
             name: set(class_information.all_base_classes)
             for name, class_information in self.classes.items()
         }
-
-    @staticmethod
-    def topological_order(*, items: Dict[str, Any], dependency_key: str) -> List[str]:
-        """Return a topological order based on the dependency names under the dependency key; if cycles, append remaining alphabetically."""
-
-        def dependencies_of(item):
-            """
-            :return: The names of the items the item depends on.
-            """
-            if hasattr(item, dependency_key):
-                return getattr(item, dependency_key, [])
-            return item.get(dependency_key, [])
-
-        remaining = {
-            name: set(dependencies_of(items[name])) & set(items.keys())
-            for name in items
-        }
-        ordered: List[str] = []
-        while remaining:
-            ready = sorted(
-                [name for name, dependencies in remaining.items() if not dependencies]
-            )
-            if not ready:
-                ordered.extend(sorted(remaining.keys()))
-                break
-            for name in ready:
-                ordered.append(name)
-                del remaining[name]
-            for dependencies in remaining.values():
-                dependencies.difference_update(ready)
-        return ordered
