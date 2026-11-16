@@ -1,3 +1,8 @@
+"""
+Grippers driven through a Griplink controller, with the commands, grip presets and
+configurations it accepts.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -6,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum, StrEnum
 from typing import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,

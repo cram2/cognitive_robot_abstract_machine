@@ -1,3 +1,7 @@
+"""
+Rendering of dataclasses created in memory into Python modules.
+"""
+
 from __future__ import annotations
 import os
 from dataclasses import dataclass, fields, field
@@ -37,9 +41,17 @@ class DataclassRenderer:
     """
 
     def __post_init__(self):
+        """
+        Collects the base classes of :attr:`type_` and the imports they need.
+        """
         self._initialized_base_classes()
 
     def _initialized_base_classes(self):
+        """
+        Adds each base of :attr:`type_` to :attr:`base_classes`, by name for a class
+        created in memory and by qualified name otherwise, importing the latter's
+        module.
+        """
         for base in self.type_.__bases__:
             if is_dynamic_class(base):
                 self.base_classes.append(base.__name__)
@@ -66,11 +78,18 @@ class ModuleRenderer:
     """
 
     def _update_imports(self):
+        """
+        Adds the imports of every class in :attr:`classes` to :attr:`imports`.
+        """
         for clazz in self.classes:
             self.imports.update(clazz.imports)
 
     @classmethod
     def from_dataclasses(cls, *, classes: list[type]):
+        """
+        :param classes: The dataclasses to render.
+        :return: A renderer of a module holding the classes, with the imports they need.
+        """
         dataclass_descriptions = [DataclassRenderer(type_=clazz) for clazz in classes]
         result = cls(classes=dataclass_descriptions)
         result._update_imports()

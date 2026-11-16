@@ -43,7 +43,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.variable import Integer
 
-from krrood.class_diagrams.causal_relation import (
+from krrood.entity_query_language.causal_relation import (
     AttributeEndpoint,
     CausalRelation,
     CausalRelationsOfClass,

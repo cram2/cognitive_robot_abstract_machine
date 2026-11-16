@@ -1,3 +1,8 @@
+"""
+The parameters a probabilistic model is queried with, derived from an entity query's
+underspecified attributes, selected attributes or conditions.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -43,7 +48,7 @@ from krrood.parametrization.random_events_translator import (
 )
 from krrood.parametrization.feature_extraction.aggregations import get_aggregation_class
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
-from krrood.symbol_graph.helpers import get_method_return_type
+from krrood.entity_query_language.class_diagram_lookup import get_method_return_type
 from random_events.interval import singleton
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.set import Set

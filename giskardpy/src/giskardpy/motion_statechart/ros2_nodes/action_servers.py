@@ -1,3 +1,8 @@
+"""
+Motion statechart tasks that send a goal to a ROS 2 action server and end with its
+result.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -20,7 +25,7 @@ from std_msgs.msg import Header
 from typing_extensions import TypeVar, Generic
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues

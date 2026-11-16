@@ -1,3 +1,8 @@
+"""
+Motion statechart tasks that keep a robot clear of collisions with itself and its
+environment, and the nodes that update the collision rules they follow.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field, dataclass
@@ -8,7 +13,7 @@ from itertools import combinations
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues

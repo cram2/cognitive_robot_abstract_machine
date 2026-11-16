@@ -10,7 +10,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from krrood.development_tools.agents.rule import ClassNamedDeclaration, Section
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% tools
 
