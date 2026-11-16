@@ -20,17 +20,17 @@ from semantic_digital_twin.adapters.package_resolver import (
     PathResolver,
 )
 from semantic_digital_twin.adapters.usd.exceptions import (
-    ScaledArticulatedUsdComponentError,
-    UnreadUsdPhysicsJointsError,
-    UnsupportedUsdGeometryTypeError,
-    UnsupportedUsdPhysicsJointTypeError,
-    UsdJointChildIsComponentError,
-    UsdJointLinkOutsideComponentError,
-    UsdPhysicsJointMissingChildBodyError,
+    ScaledArticulatedUSDComponentError,
+    UnreadUSDPhysicsJointsError,
+    UnsupportedUSDGeometryTypeError,
+    UnsupportedUSDPhysicsJointTypeError,
+    USDJointChildIsComponentError,
+    USDJointLinkOutsideComponentError,
+    USDPhysicsJointMissingChildBodyError,
 )
 from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.usd_semantics import UsdSemanticLabels
+from semantic_digital_twin.semantic_annotations.usd_semantics import USDSemanticLabels
 from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     FixedConnectionSpecification,
@@ -81,27 +81,27 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _MockedUsdPrim(MockedClass):
+class _MockedUSDPrim(MockedClass):
     """
     Mocked class for Usd.Prim in pxr.
     """
 
 
 @dataclass
-class _MockedUsdStage(MockedClass):
+class _MockedUSDStage(MockedClass):
     """
     Mocked class for Usd.Stage in pxr.
     """
 
 
 @dataclass
-class _MockedUsdModule(MockedModule):
+class _MockedUSDModule(MockedModule):
     """
     Mocked module for pxr.Usd.
     """
 
-    Prim: type[_MockedUsdPrim] = _MockedUsdPrim
-    Stage: type[_MockedUsdStage] = _MockedUsdStage
+    Prim: type[_MockedUSDPrim] = _MockedUSDPrim
+    Stage: type[_MockedUSDStage] = _MockedUSDStage
 
 
 @dataclass
@@ -127,14 +127,14 @@ except ImportError:
         "usd-core is required for USD parsing. Please install it using "
         "'pip install usd-core'"
     )
-    Usd = _MockedUsdModule()
+    Usd = _MockedUSDModule()
     Gf = _MockedGfModule()
 
 try:
     from pxr import UsdSemantics
 except ImportError:
     # UsdSemantics (UsdSemantics.LabelsAPI) is only available from usd-core 24.11
-    # onward; an older install simply never yields UsdSemanticLabels annotations.
+    # onward; an older install simply never yields USDSemanticLabels annotations.
     UsdSemantics = NoneType
 
 
@@ -186,7 +186,7 @@ def _decompose_local_transform(
     return origin, transform.GetScale()
 
 
-class UsdGeomPrimType(StrEnum):
+class USDGeomPrimType(StrEnum):
     """
     The USD prim type names (``UsdGeom.Xxx.Define``'s ``Xxx``) this parser builds a
     Shape for.
@@ -205,16 +205,16 @@ class UsdGeomPrimType(StrEnum):
         :param link_to_world: The enclosing link's local-to-world transform.
         :return: The created shape.
         """
-        builders: dict[UsdGeomPrimType, type[UsdShapeBuilder]] = {
-            UsdGeomPrimType.MESH: UsdMeshShapeBuilder,
-            UsdGeomPrimType.CUBE: UsdCubeShapeBuilder,
-            UsdGeomPrimType.SPHERE: UsdSphereShapeBuilder,
-            UsdGeomPrimType.CYLINDER: UsdCylinderShapeBuilder,
+        builders: dict[USDGeomPrimType, type[USDShapeBuilder]] = {
+            USDGeomPrimType.MESH: USDMeshShapeBuilder,
+            USDGeomPrimType.CUBE: USDCubeShapeBuilder,
+            USDGeomPrimType.SPHERE: USDSphereShapeBuilder,
+            USDGeomPrimType.CYLINDER: USDCylinderShapeBuilder,
         }
         return builders[self](prim, link_to_world).build()
 
 
-class UsdPhysicsJointType(StrEnum):
+class USDPhysicsJointType(StrEnum):
     """
     The USD physics joint prim type names this parser builds a Connection for.
     """
@@ -229,13 +229,13 @@ class UsdPhysicsJointType(StrEnum):
         :return: The specification of the connection this joint type becomes.
         """
         return {
-            UsdPhysicsJointType.FIXED: FixedConnectionSpecification,
-            UsdPhysicsJointType.REVOLUTE: RevoluteConnectionSpecification,
-            UsdPhysicsJointType.PRISMATIC: PrismaticConnectionSpecification,
+            USDPhysicsJointType.FIXED: FixedConnectionSpecification,
+            USDPhysicsJointType.REVOLUTE: RevoluteConnectionSpecification,
+            USDPhysicsJointType.PRISMATIC: PrismaticConnectionSpecification,
         }[self]
 
 
-class UsdAxis(StrEnum):
+class USDAxis(StrEnum):
     """
     A USD local-frame axis token, as authored on a joint's ``axis`` attribute or a
     ``UsdGeom.Cylinder``'s.
@@ -251,15 +251,15 @@ class UsdAxis(StrEnum):
         :return: The unit vector this axis token denotes.
         """
         unit_vectors = {
-            UsdAxis.X: (1.0, 0.0, 0.0),
-            UsdAxis.Y: (0.0, 1.0, 0.0),
-            UsdAxis.Z: (0.0, 0.0, 1.0),
+            USDAxis.X: (1.0, 0.0, 0.0),
+            USDAxis.Y: (0.0, 1.0, 0.0),
+            USDAxis.Z: (0.0, 0.0, 1.0),
         }
         return Vector3(*unit_vectors[self], reference_frame=reference_frame)
 
 
 @dataclass
-class UsdShapeBuilder(ABC):
+class USDShapeBuilder(ABC):
     """
     Builds the :class:`~semantic_digital_twin.world_description.geometry.Shape` one USD
     geometry prim describes, relative to its enclosing link.
@@ -283,7 +283,7 @@ class UsdShapeBuilder(ABC):
 
 
 @dataclass
-class UsdCubeShapeBuilder(UsdShapeBuilder):
+class USDCubeShapeBuilder(USDShapeBuilder):
     """
     Builds the Box shape a ``UsdGeom.Cube`` prim describes.
     """
@@ -298,7 +298,7 @@ class UsdCubeShapeBuilder(UsdShapeBuilder):
 
 
 @dataclass
-class UsdSphereShapeBuilder(UsdShapeBuilder):
+class USDSphereShapeBuilder(USDShapeBuilder):
     """
     Builds the Sphere shape a ``UsdGeom.Sphere`` prim describes.
 
@@ -314,7 +314,7 @@ class UsdSphereShapeBuilder(UsdShapeBuilder):
 
 
 @dataclass
-class UsdCylinderShapeBuilder(UsdShapeBuilder):
+class USDCylinderShapeBuilder(USDShapeBuilder):
     """
     Builds the Cylinder shape a ``UsdGeom.Cylinder`` prim describes.
 
@@ -330,10 +330,10 @@ class UsdCylinderShapeBuilder(UsdShapeBuilder):
         # scale is in the prim's own local axes, unaffected by the alignment rotation
         # below (which only reorients origin), so the axis also picks out which scale
         # components are the cylinder's height vs. its two radial directions.
-        if axis == UsdAxis.X:
+        if axis == USDAxis.X:
             alignment = HomogeneousTransformationMatrix.from_xyz_rpy(pitch=math.pi / 2)
             height_scale, radial_scale = scale[0], (scale[1] + scale[2]) / 2.0
-        elif axis == UsdAxis.Y:
+        elif axis == USDAxis.Y:
             alignment = HomogeneousTransformationMatrix.from_xyz_rpy(roll=-math.pi / 2)
             height_scale, radial_scale = scale[1], (scale[0] + scale[2]) / 2.0
         else:
@@ -348,7 +348,7 @@ class UsdCylinderShapeBuilder(UsdShapeBuilder):
 
 
 @dataclass
-class UsdMeshShapeBuilder(UsdShapeBuilder):
+class USDMeshShapeBuilder(USDShapeBuilder):
     """
     Builds the Mesh shape one USD mesh prim describes, positioned relative to its link.
 
@@ -480,7 +480,7 @@ class UsdMeshShapeBuilder(UsdShapeBuilder):
 
 
 @dataclass(kw_only=True)
-class UsdJointedLinks:
+class USDJointedLinks:
     """
     The link bodies physics joints connect and the connections the joints describe,
     built before any world is modified.
@@ -751,19 +751,19 @@ class USDStageParser(WorldModelParser, ABC):
         :param prim: The prim to create a shape for.
         :param link_to_world: The enclosing link's local-to-world transform.
         :return: The created shape, or ``None`` if ``prim`` is not shape geometry.
-        :raises UnsupportedUsdGeometryTypeError: If ``prim`` is a renderable geometric
+        :raises UnsupportedUSDGeometryTypeError: If ``prim`` is a renderable geometric
             primitive of a type this parser does not build a Shape for.
         """
         type_name = prim.GetTypeName()
         try:
-            geom_type = UsdGeomPrimType(type_name)
+            geom_type = USDGeomPrimType(type_name)
         except ValueError as error:
             if prim.IsA(UsdGeom.Gprim):
-                raise UnsupportedUsdGeometryTypeError(
+                raise UnsupportedUSDGeometryTypeError(
                     file_path=self.source_description,
                     prim_path=str(prim.GetPath()),
                     geometry_type=type_name,
-                    supported_types=list(UsdGeomPrimType),
+                    supported_types=list(USDGeomPrimType),
                 ) from error
             return None
         return geom_type.create_shape(prim, link_to_world)
@@ -788,19 +788,19 @@ class USDStageParser(WorldModelParser, ABC):
         :param link_bodies: The link Bodies created so far, by stage path - extended in
             place as new links are resolved.
         :return: The specification of the joint.
-        :raises UnsupportedUsdPhysicsJointTypeError: If the joint's type has no
+        :raises UnsupportedUSDPhysicsJointTypeError: If the joint's type has no
             Connection counterpart.
-        :raises UsdPhysicsJointMissingChildBodyError: If the joint's ``body1``
+        :raises USDPhysicsJointMissingChildBodyError: If the joint's ``body1``
             relationship has no target.
         """
         try:
-            usd_joint_type = UsdPhysicsJointType(joint_prim.GetTypeName())
+            usd_joint_type = USDPhysicsJointType(joint_prim.GetTypeName())
         except ValueError as error:
-            raise UnsupportedUsdPhysicsJointTypeError(
+            raise UnsupportedUSDPhysicsJointTypeError(
                 file_path=self.source_description,
                 joint_path=str(joint_prim.GetPath()),
                 joint_type=joint_prim.GetTypeName(),
-                supported_types=list(UsdPhysicsJointType),
+                supported_types=list(USDPhysicsJointType),
             ) from error
         specification_type = usd_joint_type.connection_specification_type
 
@@ -808,7 +808,7 @@ class USDStageParser(WorldModelParser, ABC):
         body0_targets = joint.GetBody0Rel().GetTargets()
         body1_targets = joint.GetBody1Rel().GetTargets()
         if not body1_targets:
-            raise UsdPhysicsJointMissingChildBodyError(
+            raise USDPhysicsJointMissingChildBodyError(
                 file_path=self.source_description, joint_path=str(joint_prim.GetPath())
             )
         parent = (
@@ -850,7 +850,7 @@ class USDStageParser(WorldModelParser, ABC):
             if specification_type is RevoluteConnectionSpecification
             else UsdPhysics.PrismaticJoint(joint_prim)
         )
-        axis = UsdAxis(axis_joint.GetAxisAttr().Get()).vector(reference_frame=parent)
+        axis = USDAxis(axis_joint.GetAxisAttr().Get()).vector(reference_frame=parent)
         lower = axis_joint.GetLowerLimitAttr().Get()
         upper = axis_joint.GetUpperLimitAttr().Get()
         if specification_type is RevoluteConnectionSpecification:
@@ -902,14 +902,14 @@ class USDStageParser(WorldModelParser, ABC):
         :return: The root prim of the link the path names.
         """
         prim = self.stage.GetPrimAtPath(prim_path)
-        if prim.GetTypeName() == UsdGeomPrimType.MESH:
+        if prim.GetTypeName() == USDGeomPrimType.MESH:
             # Some joints target a link's mesh prim instead of its enclosing Xform;
             # both resolve to the Xform, so a link is never split into two bodies.
             return prim.GetParent()
         return prim
 
     def _add_jointed_links(
-        self, *, world: World, jointed_links: UsdJointedLinks
+        self, *, world: World, jointed_links: USDJointedLinks
     ) -> None:
         """
         Adds the link bodies of ``jointed_links``, with their semantic labels, and
@@ -995,7 +995,7 @@ class USDStageParser(WorldModelParser, ABC):
     @staticmethod
     def _attach_semantic_labels(*, world: World, prim: Usd.Prim, body: Body) -> None:
         """
-        Attaches a :class:`UsdSemanticLabels` annotation to ``body`` for every
+        Attaches a :class:`USDSemanticLabels` annotation to ``body`` for every
         ``UsdSemantics.LabelsAPI`` taxonomy directly authored on ``prim``, if any.
 
         Must be called inside ``world``'s modification context, alongside adding
@@ -1007,7 +1007,7 @@ class USDStageParser(WorldModelParser, ABC):
         """
         for taxonomy, labels in USDStageParser._read_semantic_labels(prim=prim).items():
             world.add_semantic_annotation(
-                UsdSemanticLabels(root=body, taxonomy=taxonomy, labels=labels)
+                USDSemanticLabels(root=body, taxonomy=taxonomy, labels=labels)
             )
 
     @staticmethod
@@ -1051,9 +1051,9 @@ class USDParser(USDStageParser):
         :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in the
         joints it rejects.
 
-        :raises UnsupportedUsdPhysicsJointTypeError: If the stage contains a physics
+        :raises UnsupportedUSDPhysicsJointTypeError: If the stage contains a physics
             joint of a type this parser does not build a Connection for.
-        :raises UsdPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
+        :raises USDPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
             relationship has no target.
         """
         joint_prims = self._physics_joint_prims()
@@ -1075,18 +1075,16 @@ class USDParser(USDStageParser):
         :return: The parsed world.
         """
         world = self._create_world_with_root_body()
-        # Every joint is described (and so validated) before the world is touched
-        # further: a World left partway through a failed modification is unusable, so
-        # anything that can raise must run before entering another modify_world block.
-        jointed_links = UsdJointedLinks()
-        jointed_links.connections = [
+        link_bodies: dict[str, Body] = {}
+        connections = [
             self._describe_joint(
-                joint_prim=joint_prim,
-                root_body=world.root,
-                link_bodies=jointed_links.link_bodies,
+                joint_prim=joint_prim, root_body=world.root, link_bodies=link_bodies
             )
             for joint_prim in joint_prims
         ]
+        jointed_links = USDJointedLinks(
+            link_bodies=link_bodies, connections=connections
+        )
         with world.modify_world():
             self._attach_root_semantic_labels(world=world)
             self._add_jointed_links(world=world, jointed_links=jointed_links)
@@ -1133,7 +1131,7 @@ class USDParser(USDStageParser):
 
 
 @dataclass(kw_only=True)
-class UsdSceneContent:
+class USDSceneContent:
     """
     What a USD scene holds below its root prim, split at its components.
     """
@@ -1151,7 +1149,7 @@ class UsdSceneContent:
 
 
 @dataclass(kw_only=True)
-class UsdComponent:
+class USDComponent:
     """
     A component of a USD scene, with the physics joints inside it and its body.
     """
@@ -1189,17 +1187,17 @@ class USDComponentParser(USDStageParser):
         :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in the
         stages it rejects.
 
-        :raises UnreadUsdPhysicsJointsError: If the stage contains physics joints outside
+        :raises UnreadUSDPhysicsJointsError: If the stage contains physics joints outside
             every component.
-        :raises UsdJointChildIsComponentError: If a physics joint's ``body1`` is its own
+        :raises USDJointChildIsComponentError: If a physics joint's ``body1`` is its own
             component.
-        :raises UsdJointLinkOutsideComponentError: If a physics joint inside a
+        :raises USDJointLinkOutsideComponentError: If a physics joint inside a
             component connects a link outside it.
-        :raises ScaledArticulatedUsdComponentError: If a link a physics joint inside a
+        :raises ScaledArticulatedUSDComponentError: If a link a physics joint inside a
             component connects is scaled.
-        :raises UnsupportedUsdPhysicsJointTypeError: If a component contains a physics
+        :raises UnsupportedUSDPhysicsJointTypeError: If a component contains a physics
             joint of a type this parser does not build a Connection for.
-        :raises UsdPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
+        :raises USDPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
             relationship has no target.
         """
         world = self._create_world_with_root_body()
@@ -1222,11 +1220,11 @@ class USDComponentParser(USDStageParser):
 
     def _create_components(
         self, *, component_prims: list[Usd.Prim]
-    ) -> list[UsdComponent]:
+    ) -> list[USDComponent]:
         """
         :param component_prims: The components of the scene, none inside another.
         :return: Each component with its joints and its body.
-        :raises UnreadUsdPhysicsJointsError: If a physics joint is inside no component.
+        :raises UnreadUSDPhysicsJointsError: If a physics joint is inside no component.
         """
         joints_by_component = self._joints_by_component(component_prims=component_prims)
         components = []
@@ -1239,22 +1237,22 @@ class USDComponentParser(USDStageParser):
                 - {component_prim.GetPath()},
             )
             components.append(
-                UsdComponent(prim=component_prim, joint_prims=joint_prims, body=body)
+                USDComponent(prim=component_prim, joint_prims=joint_prims, body=body)
             )
         return components
 
     def _describe_component_joints(
-        self, *, components: list[UsdComponent]
-    ) -> UsdJointedLinks:
+        self, *, components: list[USDComponent]
+    ) -> USDJointedLinks:
         """
         :param components: The components of the scene.
         :return: The links the physics joints inside the components connect and the
             connections the joints describe. A joint attached to its component, or to
             nothing, attaches its link to the component's body.
-        :raises UsdJointChildIsComponentError: If a joint's ``body1`` is its component.
-        :raises UsdJointLinkOutsideComponentError: If a joint connects a link outside its
+        :raises USDJointChildIsComponentError: If a joint's ``body1`` is its component.
+        :raises USDJointLinkOutsideComponentError: If a joint connects a link outside its
             component.
-        :raises ScaledArticulatedUsdComponentError: If a link a joint connects is scaled.
+        :raises ScaledArticulatedUSDComponentError: If a link a joint connects is scaled.
         """
         component_paths = {str(component.prim.GetPath()) for component in components}
         # Holds the components too, so a joint's body0 resolves to its component's body.
@@ -1274,7 +1272,7 @@ class USDComponentParser(USDStageParser):
                         link_bodies=bodies_by_path,
                     )
                 )
-        return UsdJointedLinks(
+        return USDJointedLinks(
             link_bodies={
                 path_string: body
                 for path_string, body in bodies_by_path.items()
@@ -1310,7 +1308,7 @@ class USDComponentParser(USDStageParser):
         """
         :param component_prims: The components of the scene, none inside another.
         :return: The physics joint prims inside each component, by its path.
-        :raises UnreadUsdPhysicsJointsError: If a physics joint is inside no component.
+        :raises UnreadUSDPhysicsJointsError: If a physics joint is inside no component.
         """
         joints_by_component = {
             component_prim.GetPath(): [] for component_prim in component_prims
@@ -1328,29 +1326,29 @@ class USDComponentParser(USDStageParser):
                 continue
             joints_by_component[component_paths[0]].append(joint_prim)
         if unread_joint_paths:
-            raise UnreadUsdPhysicsJointsError(
+            raise UnreadUSDPhysicsJointsError(
                 file_path=self.source_description, joint_paths=unread_joint_paths
             )
         return joints_by_component
 
     def _validate_joint_inside_component(
-        self, *, component: UsdComponent, joint_prim: Usd.Prim
+        self, *, component: USDComponent, joint_prim: Usd.Prim
     ) -> None:
         """
         :param component: A component of the scene.
         :param joint_prim: A physics joint prim inside the component.
-        :raises UsdJointChildIsComponentError: If the joint's ``body1`` is the
+        :raises USDJointChildIsComponentError: If the joint's ``body1`` is the
             component.
-        :raises UsdJointLinkOutsideComponentError: If the joint connects a link outside
+        :raises USDJointLinkOutsideComponentError: If the joint connects a link outside
             the component.
-        :raises ScaledArticulatedUsdComponentError: If a link the joint connects is
+        :raises ScaledArticulatedUSDComponentError: If a link the joint connects is
             scaled; an unset ``body0`` is the component.
         """
         joint = UsdPhysics.Joint(joint_prim)
         component_path = component.prim.GetPath()
         child_paths = self._link_paths(relationship=joint.GetBody1Rel())
         if component_path in child_paths:
-            raise UsdJointChildIsComponentError(
+            raise USDJointChildIsComponentError(
                 file_path=self.source_description,
                 joint_path=str(joint_prim.GetPath()),
                 component_path=str(component_path),
@@ -1360,7 +1358,7 @@ class USDComponentParser(USDStageParser):
         ]
         for link_path in parent_paths + child_paths:
             if not link_path.HasPrefix(component_path):
-                raise UsdJointLinkOutsideComponentError(
+                raise USDJointLinkOutsideComponentError(
                     file_path=self.source_description,
                     joint_path=str(joint_prim.GetPath()),
                     component_path=str(component_path),
@@ -1370,7 +1368,7 @@ class USDComponentParser(USDStageParser):
                 prim=self.stage.GetPrimAtPath(link_path)
             )
             if not np.allclose(Gf.Transform(link_to_world).GetScale(), 1.0):
-                raise ScaledArticulatedUsdComponentError(
+                raise ScaledArticulatedUSDComponentError(
                     file_path=self.source_description,
                     joint_path=str(joint_prim.GetPath()),
                     scaled_prim_path=str(link_path),
@@ -1401,13 +1399,13 @@ class USDComponentParser(USDStageParser):
             for link_path in self._link_paths(relationship=relationship)
         )
 
-    def _scene_content(self, *, scene_root: Usd.Prim) -> UsdSceneContent:
+    def _scene_content(self, *, scene_root: Usd.Prim) -> USDSceneContent:
         """
         :param scene_root: The prim whose subtree is the scene.
         :return: The components below ``scene_root``, inside instances of instanceable
             prims too, and the shapes outside them.
         """
-        content = UsdSceneContent()
+        content = USDSceneContent()
         world_frame = Gf.Matrix4d(1.0)
         prim_range = iter(Usd.PrimRange(scene_root, Usd.TraverseInstanceProxies()))
         for prim in prim_range:

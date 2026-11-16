@@ -7,7 +7,7 @@ from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 
 
 @dataclass(eq=False)
-class UsdSemanticLabels(HasRootBody):
+class USDSemanticLabels(HasRootBody):
     """
     The semantic labels a USD prim carries under one ``UsdSemantics.LabelsAPI``
     taxonomy, attached to the Body a USD-reading parser built for that prim. A prim with

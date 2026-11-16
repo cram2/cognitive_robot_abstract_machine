@@ -17,9 +17,9 @@ import semantic_digital_twin.orm.model
 
 import semantic_digital_twin.adapters.procthor.procthor_resolver
 from semantic_digital_twin.adapters.usd.parser import (
-    UsdComponent,
-    UsdJointedLinks,
-    UsdSceneContent,
+    USDComponent,
+    USDJointedLinks,
+    USDSceneContent,
 )
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.entity_query_language.predicate import SymbolicCallable
@@ -57,9 +57,9 @@ ignore_classes = {
     SemanticDirection,
     SubclassJSONSerializer,
     # What a USD parser builds while it reads a stage, not something a world stores.
-    UsdComponent,
-    UsdJointedLinks,
-    UsdSceneContent,
+    USDComponent,
+    USDJointedLinks,
+    USDSceneContent,
     # A symbolic operation is a step of a query, not something a world stores, so none of
     # them is mapped. The modules defining them are imported above so that they are all
     # declared by the time this is read.

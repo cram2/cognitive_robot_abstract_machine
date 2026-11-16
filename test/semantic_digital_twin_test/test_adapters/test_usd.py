@@ -7,21 +7,21 @@ import pytest
 from PIL import Image
 
 from semantic_digital_twin.adapters.usd.exceptions import (
-    ScaledArticulatedUsdComponentError,
-    UnsupportedUsdGeometryTypeError,
-    UnreadUsdPhysicsJointsError,
-    UnsupportedUsdPhysicsJointTypeError,
-    UsdJointChildIsComponentError,
-    UsdJointLinkOutsideComponentError,
-    UsdPhysicsJointMissingChildBodyError,
+    ScaledArticulatedUSDComponentError,
+    UnsupportedUSDGeometryTypeError,
+    UnreadUSDPhysicsJointsError,
+    UnsupportedUSDPhysicsJointTypeError,
+    USDJointChildIsComponentError,
+    USDJointLinkOutsideComponentError,
+    USDPhysicsJointMissingChildBodyError,
 )
 from semantic_digital_twin.adapters.usd.parser import (
     USDComponentParser,
     USDParser,
-    UsdMeshShapeBuilder,
+    USDMeshShapeBuilder,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.usd_semantics import UsdSemanticLabels
+from semantic_digital_twin.semantic_annotations.usd_semantics import USDSemanticLabels
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -120,7 +120,7 @@ def test_parse_raises_on_an_unsupported_joint_type_instead_of_building_an_incomp
     # bodies but the root - not an error, just quietly missing every link.
     stage = build_single_joint_stage("SphericalJoint")
 
-    with pytest.raises(UnsupportedUsdPhysicsJointTypeError) as excinfo:
+    with pytest.raises(UnsupportedUSDPhysicsJointTypeError) as excinfo:
         parse(stage)
 
     assert excinfo.value.joint_type == "PhysicsSphericalJoint"
@@ -150,7 +150,7 @@ def test_parse_resolves_a_mesh_targeted_body0_to_its_enclosing_link():
 def test_parse_raises_on_a_joint_with_no_body1_target():
     stage = build_stage_with_joint_missing_body1()
 
-    with pytest.raises(UsdPhysicsJointMissingChildBodyError) as excinfo:
+    with pytest.raises(USDPhysicsJointMissingChildBodyError) as excinfo:
         parse(stage)
 
     assert excinfo.value.joint_path == "/object/joint"
@@ -233,7 +233,7 @@ def test_parse_raises_on_unsupported_geometry_instead_of_silently_dropping_it():
     # a stage using it builds a World quietly missing that piece of geometry.
     stage = build_jointless_stage_with_unsupported_geometry()
 
-    with pytest.raises(UnsupportedUsdGeometryTypeError) as excinfo:
+    with pytest.raises(UnsupportedUSDGeometryTypeError) as excinfo:
         parse(stage)
 
     assert excinfo.value.geometry_type == "Cone"
@@ -340,7 +340,7 @@ def test_component_parser_raises_on_physics_joints_outside_every_component():
     """
     stage = build_single_joint_stage("FixedJoint")
 
-    with pytest.raises(UnreadUsdPhysicsJointsError) as excinfo:
+    with pytest.raises(UnreadUSDPhysicsJointsError) as excinfo:
         parse_components(stage)
 
     assert excinfo.value.joint_paths == ["/object/joint"]
@@ -412,7 +412,7 @@ def test_component_parser_raises_on_a_joint_inside_a_scaled_component():
     A component with joints whose links are scaled is rejected, since the joints'
     offsets would not scale with them.
     """
-    with pytest.raises(ScaledArticulatedUsdComponentError) as excinfo:
+    with pytest.raises(ScaledArticulatedUSDComponentError) as excinfo:
         parse_components(
             build_component_scene_stage_with_a_scaled_articulated_component()
         )
@@ -426,7 +426,7 @@ def test_component_parser_raises_on_a_joint_whose_child_is_its_component():
     A joint whose ``body1`` is its own component is rejected, since the component is
     already attached to the root.
     """
-    with pytest.raises(UsdJointChildIsComponentError) as excinfo:
+    with pytest.raises(USDJointChildIsComponentError) as excinfo:
         parse_components(
             build_component_scene_stage_with_a_joint_moving_its_component()
         )
@@ -439,7 +439,7 @@ def test_component_parser_raises_on_a_joint_connecting_a_link_of_another_compone
     """
     A joint inside one component that targets a link outside it is rejected.
     """
-    with pytest.raises(UsdJointLinkOutsideComponentError) as excinfo:
+    with pytest.raises(USDJointLinkOutsideComponentError) as excinfo:
         parse_components(
             build_component_scene_stage_with_a_joint_into_another_component()
         )
@@ -480,7 +480,7 @@ def test_component_parser_attaches_a_components_semantic_labels_to_its_body():
     [annotation] = [
         annotation
         for annotation in world.semantic_annotations
-        if isinstance(annotation, UsdSemanticLabels)
+        if isinstance(annotation, USDSemanticLabels)
     ]
     assert annotation.root is component_body(world, "chairs/chair_0")
     assert annotation.labels == ["chair"]
@@ -493,7 +493,7 @@ def test_create_mesh_shape_applies_a_non_uniform_scale():
     stage = build_stage_with_scaled_mesh(scale=(2.0, 3.0, 4.0))
     mesh_prim = stage.GetPrimAtPath("/object/scaled/mesh")
 
-    shape = UsdMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
 
     vertices = shape.unscaled_mesh.vertices
     np.testing.assert_allclose(vertices.max(axis=0), [2.0, 3.0, 0.0], atol=1e-5)
@@ -628,7 +628,7 @@ def test_parse_attaches_one_usd_semantic_labels_annotation_per_taxonomy():
     annotations = [
         annotation
         for annotation in world.semantic_annotations
-        if isinstance(annotation, UsdSemanticLabels)
+        if isinstance(annotation, USDSemanticLabels)
     ]
     labels_by_taxonomy = {
         annotation.taxonomy: annotation.labels for annotation in annotations
@@ -645,7 +645,7 @@ def test_parse_attaches_no_annotation_for_an_unlabelled_body():
     world = parse(stage)
 
     assert not any(
-        isinstance(annotation, UsdSemanticLabels)
+        isinstance(annotation, USDSemanticLabels)
         for annotation in world.semantic_annotations
     )
 
@@ -664,7 +664,7 @@ def test_diffuse_texture_path_resolves_the_bound_texture(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    resolved = UsdMeshShapeBuilder._diffuse_texture_path(mesh_prim)
+    resolved = USDMeshShapeBuilder._diffuse_texture_path(mesh_prim)
 
     assert resolved == texture_file
 
@@ -673,7 +673,7 @@ def test_diffuse_texture_path_is_none_without_a_bound_material(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     unbound_mesh_prim = stage.DefinePrim("/object/unbound_mesh", "Mesh")
 
-    resolved = UsdMeshShapeBuilder._diffuse_texture_path(unbound_mesh_prim)
+    resolved = USDMeshShapeBuilder._diffuse_texture_path(unbound_mesh_prim)
 
     assert resolved is None
 
@@ -682,7 +682,7 @@ def test_uv_coordinates_reads_the_per_point_st_primvar(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    uv = UsdMeshShapeBuilder._uv_coordinates(mesh_prim)
+    uv = USDMeshShapeBuilder._uv_coordinates(mesh_prim)
 
     np.testing.assert_array_equal(uv, [[0, 0], [1, 0], [1, 1], [0, 1]])
 
@@ -691,7 +691,7 @@ def test_uv_coordinates_is_none_without_an_st_primvar(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     unbound_mesh_prim = stage.DefinePrim("/object/unbound_mesh", "Mesh")
 
-    uv = UsdMeshShapeBuilder._uv_coordinates(unbound_mesh_prim)
+    uv = USDMeshShapeBuilder._uv_coordinates(unbound_mesh_prim)
 
     assert uv is None
 
@@ -700,7 +700,7 @@ def test_create_mesh_shape_applies_the_bound_texture(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    shape = UsdMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
 
     mesh = shape.unscaled_mesh
     assert mesh.visual.kind == "texture"
@@ -714,7 +714,7 @@ def test_create_mesh_shape_has_no_texture_without_a_bound_material(texture_file)
     unbound_mesh.CreateFaceVertexCountsAttr([3])
     unbound_mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
 
-    shape = UsdMeshShapeBuilder(unbound_mesh.GetPrim(), Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(unbound_mesh.GetPrim(), Gf.Matrix4d(1)).build()
 
     assert shape.unscaled_mesh.visual.kind != "texture"
 
@@ -723,21 +723,21 @@ def test_create_mesh_shape_has_no_texture_without_a_bound_material(texture_file)
 
 
 def test_triangulate_keeps_a_triangle_as_is():
-    faces = UsdMeshShapeBuilder._triangulate([3], [0, 1, 2])
+    faces = USDMeshShapeBuilder._triangulate([3], [0, 1, 2])
     np.testing.assert_array_equal(faces, [[0, 1, 2]])
 
 
 def test_triangulate_fans_a_quad_into_two_triangles():
-    faces = UsdMeshShapeBuilder._triangulate([4], [0, 1, 2, 3])
+    faces = USDMeshShapeBuilder._triangulate([4], [0, 1, 2, 3])
     np.testing.assert_array_equal(faces, [[0, 1, 2], [0, 2, 3]])
 
 
 def test_triangulate_fans_a_pentagon_into_three_triangles():
-    faces = UsdMeshShapeBuilder._triangulate([5], [0, 1, 2, 3, 4])
+    faces = USDMeshShapeBuilder._triangulate([5], [0, 1, 2, 3, 4])
     np.testing.assert_array_equal(faces, [[0, 1, 2], [0, 2, 3], [0, 3, 4]])
 
 
 def test_triangulate_handles_multiple_faces_of_different_sizes():
     # A triangle followed by a quad, sharing no vertex indices.
-    faces = UsdMeshShapeBuilder._triangulate([3, 4], [0, 1, 2, 3, 4, 5, 6])
+    faces = USDMeshShapeBuilder._triangulate([3, 4], [0, 1, 2, 3, 4, 5, 6])
     np.testing.assert_array_equal(faces, [[0, 1, 2], [3, 4, 5], [3, 5, 6]])

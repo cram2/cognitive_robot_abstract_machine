@@ -7,7 +7,7 @@ from semantic_digital_twin.exceptions import ParsingError
 
 
 @dataclass
-class UnsupportedUsdPhysicsJointTypeError(ParsingError):
+class UnsupportedUSDPhysicsJointTypeError(ParsingError):
     """
     Raised when a stage contains a physics joint of a type this parser does not build a
     Connection for.
@@ -44,7 +44,7 @@ class UnsupportedUsdPhysicsJointTypeError(ParsingError):
 
 
 @dataclass
-class UsdPhysicsJointMissingChildBodyError(ParsingError):
+class USDPhysicsJointMissingChildBodyError(ParsingError):
     """
     Raised when a physics joint's ``body1`` relationship (its child link) has no target.
 
@@ -70,7 +70,7 @@ class UsdPhysicsJointMissingChildBodyError(ParsingError):
 
 
 @dataclass
-class UnsupportedUsdGeometryTypeError(ParsingError):
+class UnsupportedUSDGeometryTypeError(ParsingError):
     """
     Raised when a stage contains a renderable geometric primitive
     (:class:`~pxr.UsdGeom.Gprim`) of a type this parser does not build a Shape for.
@@ -107,7 +107,7 @@ class UnsupportedUsdGeometryTypeError(ParsingError):
 
 
 @dataclass(kw_only=True)
-class UnsupportedUsdComponentSceneError(ParsingError):
+class UnsupportedUSDComponentSceneError(ParsingError):
     """
     Raised when a valid USD scene holds something
     :class:`~semantic_digital_twin.adapters.usd.parser.USDComponentParser` does not read
@@ -116,7 +116,7 @@ class UnsupportedUsdComponentSceneError(ParsingError):
 
 
 @dataclass(kw_only=True)
-class UnreadUsdPhysicsJointsError(UnsupportedUsdComponentSceneError):
+class UnreadUSDPhysicsJointsError(UnsupportedUSDComponentSceneError):
     """
     Raised when a scene has physics joints outside every component, such as a door
     hinged to a wall.
@@ -142,7 +142,7 @@ class UnreadUsdPhysicsJointsError(UnsupportedUsdComponentSceneError):
 
 
 @dataclass(kw_only=True)
-class UsdJointChildIsComponentError(UnsupportedUsdComponentSceneError):
+class USDJointChildIsComponentError(UnsupportedUSDComponentSceneError):
     """
     Raised when the ``body1`` of a physics joint inside a component is the component
     itself, such as a door asset hinged to the world.
@@ -174,7 +174,7 @@ class UsdJointChildIsComponentError(UnsupportedUsdComponentSceneError):
 
 
 @dataclass(kw_only=True)
-class UsdJointLinkOutsideComponentError(UnsupportedUsdComponentSceneError):
+class USDJointLinkOutsideComponentError(UnsupportedUSDComponentSceneError):
     """
     Raised when a physics joint inside a component connects a link outside that
     component, such as a drawer whose slide belongs to another component.
@@ -211,7 +211,7 @@ class UsdJointLinkOutsideComponentError(UnsupportedUsdComponentSceneError):
 
 
 @dataclass(kw_only=True)
-class ScaledArticulatedUsdComponentError(UnsupportedUsdComponentSceneError):
+class ScaledArticulatedUSDComponentError(UnsupportedUSDComponentSceneError):
     """
     Raised when a link a physics joint inside a component connects is scaled, by its own
     transform or an ancestor's, such as in a scene exported in centimetres.
