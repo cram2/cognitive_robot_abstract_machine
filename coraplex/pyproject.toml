@@ -32,7 +32,6 @@ dependencies = [
     "probabilistic_model>=26.10.0",
     "random_events>=26.10.0",
     "numpy",
-    "objgraph",
     "pint>=0.21.1",
     "python-box",
     "rustworkx",
