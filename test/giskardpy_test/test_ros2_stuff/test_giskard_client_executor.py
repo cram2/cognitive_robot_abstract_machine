@@ -1,5 +1,10 @@
+"""
+Tests of executing statecharts on Giskard through :class:`GiskardClientExecutor`.
+"""
+
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -14,6 +19,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import (
     GiskardClientExecutor,
     GiskardClientExecutorNode,
 )
+from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.world import World
 
@@ -103,6 +109,45 @@ def test_an_extension_is_told_that_an_aborted_goal_stopped(
     assert extension.run_count == 1
 
 
+# %% debug expressions
+
+
+@pytest.mark.parametrize("publishes_debug_expressions", [True, False])
+def test_executing_says_whether_the_goal_publishes_its_debug_expressions(
+    giskard_command_server: ActionServerHandler,
+    executor_with_a_statechart: GiskardClientExecutor,
+    publishes_debug_expressions: bool,
+) -> None:
+    server = ServerAnsweringOneGoal(
+        action_server=giskard_command_server,
+        outcome_unless_canceled=GoalOutcome.ABORTED,
+    )
+
+    with pytest.raises(ExecutionAbortedException):
+        executor_with_a_statechart.execute(
+            publishes_debug_expressions=publishes_debug_expressions
+        )
+
+    sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
+    assert sent_goal.publishes_debug_expressions is publishes_debug_expressions
+
+
+def test_executing_publishes_no_debug_expressions_unless_asked(
+    giskard_command_server: ActionServerHandler,
+    executor_with_a_statechart: GiskardClientExecutor,
+) -> None:
+    server = ServerAnsweringOneGoal(
+        action_server=giskard_command_server,
+        outcome_unless_canceled=GoalOutcome.ABORTED,
+    )
+
+    with pytest.raises(ExecutionAbortedException):
+        executor_with_a_statechart.execute()
+
+    sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
+    assert sent_goal.publishes_debug_expressions is False
+
+
 # %% closing
 
 
@@ -112,7 +157,7 @@ class TestGiskardClientExecutorClose:
     a node nobody is using any more.
     """
 
-    def test_close_stops_the_heartbeat(self, giskard_command_server):
+    def test_close_stops_the_heartbeat(self, *, giskard_command_server):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
 
@@ -133,7 +178,7 @@ class TestAnnouncingPresence:
     """
 
     def test_a_client_does_not_announce_itself_unless_asked(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
@@ -145,7 +190,7 @@ class TestAnnouncingPresence:
         assert executor.heartbeat_publisher is None
 
     def test_a_client_that_never_announced_itself_can_be_closed(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
@@ -158,7 +203,7 @@ class TestAnnouncingPresence:
         assert executor.heartbeat_publisher is None
 
     def test_a_client_asked_to_on_construction_announces_itself(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
@@ -170,7 +215,9 @@ class TestAnnouncingPresence:
         assert not executor.heartbeat_publisher.timer.is_canceled()
         executor.close()
 
-    def test_a_client_can_start_announcing_itself_later(self, giskard_command_server):
+    def test_a_client_can_start_announcing_itself_later(
+        self, *, giskard_command_server
+    ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
         executor = GiskardClientExecutor(
@@ -182,7 +229,9 @@ class TestAnnouncingPresence:
         assert not executor.heartbeat_publisher.timer.is_canceled()
         executor.close()
 
-    def test_announcing_twice_keeps_the_first_heartbeat(self, giskard_command_server):
+    def test_announcing_twice_keeps_the_first_heartbeat(
+        self, *, giskard_command_server
+    ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)
         executor = GiskardClientExecutor(
@@ -204,7 +253,7 @@ class TestGiskardClientExecutorNodeClose:
     """
 
     def test_close_removes_the_node_from_the_shared_executor(
-        self, giskard_command_server
+        self, *, giskard_command_server
     ):
         world = World()
         WorldSynchronizer(node=background_node.get_node(), _world=world)

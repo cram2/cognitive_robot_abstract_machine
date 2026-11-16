@@ -1,3 +1,7 @@
+"""
+The base classes of segmind's event detectors and the context extension they share.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
@@ -5,7 +9,7 @@ from dataclasses import dataclass, field
 from typing_extensions import TypeVar, Any, Sequence
 
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues

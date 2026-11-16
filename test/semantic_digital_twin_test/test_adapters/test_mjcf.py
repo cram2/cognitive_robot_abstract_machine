@@ -7,6 +7,10 @@ import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.multi_sim import MujocoLight, MujocoTendon
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 MJCF_DIR = os.path.join(
@@ -186,6 +190,31 @@ Scene whose single body carries one geom that takes part in contact and one that
 excluded from it.
 """
 
+CONTACT_DIMENSIONALITY_SCENE = os.path.join(
+    DATASET_DIR, "contact_dimensionality_scene.xml"
+)
+"""
+Scene with two boxes declaring the same friction, one resolving its contacts in MuJoCo's
+default dimensions and one also resisting turning.
+"""
+
+
+@pytest.mark.parametrize(
+    "body_name, acting_friction",
+    [
+        ("sliding_box", ContactFriction(sliding=0.8, torsional=0.0, rolling=0.0)),
+        ("turning_box", ContactFriction(sliding=0.8, torsional=0.02, rolling=0.0)),
+    ],
+)
+def test_a_geom_offers_only_the_friction_its_contact_dimensions_let_act(
+    body_name, acting_friction
+):
+    world = MJCFParser.from_file(CONTACT_DIMENSIONALITY_SCENE).create_world()
+
+    [shape] = world.get_body_by_name(body_name).collision.shapes
+    contact = shape.get_simulator_property_of_type(ContactParameters)
+    assert contact.friction == pytest.approx(acting_friction)
+
 
 def test_visual_only_geom_is_not_a_collision_shape_by_default():
     world = MJCFParser.from_file(VISUAL_ONLY_GEOM_SCENE).create_world()
@@ -234,6 +263,26 @@ def test_visual_geometry_is_left_out_where_the_body_already_collides():
     assert [shape.scale for shape in backed_up.collision.shapes] == [
         shape.scale for shape in contact_only.collision.shapes
     ]
+
+
+# %% unnamed bodies
+
+UNNAMED_BODIES_SCENE = os.path.join(DATASET_DIR, "unnamed_bodies_scene.xml")
+"""
+Scene shaped like a RoboCasa object: an unnamed body wrapping the body named ``object``,
+which holds the geometry in an unnamed body of its own.
+"""
+
+
+def test_unnamed_bodies_each_become_a_body_of_their_own():
+    world = MJCFParser.from_file(UNNAMED_BODIES_SCENE).create_world()
+
+    [geometry] = world.bodies_with_collision
+    assert geometry.parent_connection.parent.name.name == "object"
+    assert geometry.parent_connection.origin.to_np()[:3, 3] == pytest.approx(
+        [0.0, -0.045, 0.0]
+    )
+    assert len({body.name for body in world.bodies}) == len(world.bodies)
 
 
 TEXTURED_BOX_MJCF_TEMPLATE = """

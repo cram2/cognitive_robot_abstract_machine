@@ -5,21 +5,17 @@ reaches.
 
 from __future__ import annotations
 
-import jax.numpy as jnp
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
+from random_events.variable import Continuous
 from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.circuit_representations import (
     CircuitRepresentations,
 )
 from probabilistic_model.adapters.exceptions import NoConversionPathError
-from probabilistic_model.adapters.jax_tensorized.jax_to_tensorized import (
-    DifferentiableLayeredCircuitToLayeredCircuitConverter,
-)
-from probabilistic_model.adapters.jax_tensorized.tensorized_to_jax import (
-    LayeredCircuitToDifferentiableLayeredCircuitConverter,
-)
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
@@ -27,9 +23,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.tensorized_to_rustworkx i
     LayeredCircuitToRustworkxCircuitConverter,
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    DifferentiableLayeredCircuit,
-)
+from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
     ProductUnit,
@@ -39,6 +33,14 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
+
+
+@dataclass
+class SubclassOfARepresentation(RustworkxProbabilisticCircuit):
+    """
+    A circuit type derived from a representation, as a learned circuit is.
+    """
+
 
 # %% fixtures
 
@@ -76,30 +78,22 @@ def rustworkx_mixture_of_products(x, y) -> RustworkxProbabilisticCircuit:
 # %% paths between representations
 
 
-def test_rustworkx_reaches_differentiable_through_layered(representations):
+def test_rustworkx_reaches_layered_in_one_step(representations):
     assert representations.converters_between(
-        RustworkxProbabilisticCircuit, DifferentiableLayeredCircuit
-    ) == [
-        RustworkxCircuitToLayeredCircuitConverter,
-        LayeredCircuitToDifferentiableLayeredCircuitConverter,
-    ]
+        RustworkxProbabilisticCircuit, LayeredProbabilisticCircuit
+    ) == [RustworkxCircuitToLayeredCircuitConverter]
 
 
-def test_differentiable_reaches_rustworkx_through_layered(representations):
+def test_layered_reaches_rustworkx_in_one_step(representations):
     assert representations.converters_between(
-        DifferentiableLayeredCircuit, RustworkxProbabilisticCircuit
-    ) == [
-        DifferentiableLayeredCircuitToLayeredCircuitConverter,
-        LayeredCircuitToRustworkxCircuitConverter,
-    ]
+        LayeredProbabilisticCircuit, RustworkxProbabilisticCircuit
+    ) == [LayeredCircuitToRustworkxCircuitConverter]
 
 
-def test_subclass_of_a_representation_converts_like_it(
-    representations, classification_circuit
-):
+def test_subclass_of_a_representation_converts_like_it(representations):
     assert representations.converters_between(
-        type(classification_circuit), LayeredProbabilisticCircuit
-    ) == [DifferentiableLayeredCircuitToLayeredCircuitConverter]
+        SubclassOfARepresentation, LayeredProbabilisticCircuit
+    ) == [RustworkxCircuitToLayeredCircuitConverter]
 
 
 def test_unreachable_representation_is_refused(
@@ -112,35 +106,36 @@ def test_unreachable_representation_is_refused(
 # %% conversions
 
 
-def test_rustworkx_circuit_converts_into_the_same_differentiable_distribution(
-    representations, rustworkx_mixture_of_products, single_precision_tolerance
+def test_rustworkx_circuit_converts_into_the_same_layered_distribution(
+    representations, rustworkx_mixture_of_products
 ):
-    differentiable = representations.convert(
-        rustworkx_mixture_of_products, DifferentiableLayeredCircuit
+    layered = representations.convert(
+        rustworkx_mixture_of_products, LayeredProbabilisticCircuit
     )
-    assert isinstance(differentiable, DifferentiableLayeredCircuit)
+    assert isinstance(layered, LayeredProbabilisticCircuit)
     events = np.random.normal(size=(20, 2))
     np.testing.assert_allclose(
-        np.asarray(differentiable.log_likelihood(jnp.asarray(events))),
+        layered.log_likelihood(events),
         rustworkx_mixture_of_products.log_likelihood(events),
-        rtol=single_precision_tolerance,
-        atol=single_precision_tolerance,
+        rtol=1e-12,
     )
 
 
-def test_differentiable_circuit_converts_into_the_same_rustworkx_distribution(
-    representations, continuous_region_graph_circuit, single_precision_tolerance
+def test_region_graph_circuit_converts_into_the_same_rustworkx_distribution(
+    representations,
 ):
-    rustworkx = representations.convert(
-        continuous_region_graph_circuit, RustworkxProbabilisticCircuit
+    variables = SortedSet(Continuous(name) for name in "wxyz")
+    layered = (
+        RegionGraph(variables=variables, partitions=2, depth=1, repetitions=2)
+        .create_random_region_graph()
+        .to_probabilistic_circuit()
+        .to_namespace(np)
     )
+    rustworkx = representations.convert(layered, RustworkxProbabilisticCircuit)
     assert isinstance(rustworkx, RustworkxProbabilisticCircuit)
     events = np.random.normal(size=(20, 4))
     np.testing.assert_allclose(
-        rustworkx.log_likelihood(events),
-        np.asarray(continuous_region_graph_circuit.log_likelihood(jnp.asarray(events))),
-        rtol=single_precision_tolerance,
-        atol=single_precision_tolerance,
+        rustworkx.log_likelihood(events), layered.log_likelihood(events), rtol=1e-9
     )
 
 

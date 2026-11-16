@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from krrood.development_tools.agents.prose_length import ProseLengthChecker
 from krrood.development_tools.agents.rule import Section
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% sections
 

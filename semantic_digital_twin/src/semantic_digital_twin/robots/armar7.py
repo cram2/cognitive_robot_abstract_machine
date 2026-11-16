@@ -1,10 +1,14 @@
+"""
+The ARMAR-7 robot: its joints and robot parts.
+"""
+
 from __future__ import annotations
 
 # %% Imports
 from dataclasses import dataclass
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import (
     JointName,
     GripperState,

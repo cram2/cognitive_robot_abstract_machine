@@ -30,9 +30,6 @@ if TYPE_CHECKING:
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.ontomatic.property_descriptor.attribute_introspector import (
-    DescriptorAwareIntrospector,
-)
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptorOwner
 from typing_extensions import Generic
@@ -284,6 +281,10 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def _build_class_diagram(self) -> ClassDiagram:
         """Build a class diagram from the currently known ``Symbol`` subclasses."""
+        from krrood.ontomatic.property_descriptor.attribute_introspector import (
+            DescriptorAwareIntrospector,
+        )
+
         classes = self._collect_symbol_classes()
         return ClassDiagram(classes=classes, introspector=DescriptorAwareIntrospector())
 

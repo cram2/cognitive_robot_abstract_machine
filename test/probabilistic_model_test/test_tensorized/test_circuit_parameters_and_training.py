@@ -299,6 +299,37 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
     )
 
 
+def test_training_with_weight_decay_keeps_zero_probability_weights(
+    mixture_of_products_case,
+):
+    """
+    A log weight of ``-inf`` stays ``-inf`` through gradient descent with weight decay,
+    which would otherwise turn it into nan, and every other parameter stays finite.
+    """
+    case = mixture_of_products_case
+    np.random.seed(0)
+    data = case.circuit(np).sample(200)
+    start = case.circuit(np)
+    parameters = [
+        np.where(np.arange(len(parameter)) == 0, -np.inf, parameter)
+        if isinstance(layer, SumLayer) and layer is start.root
+        else parameter
+        for layer in start.root.all_layers()
+        for parameter in layer.parameters
+    ]
+    with jax.enable_x64(True):
+        circuit = start.copy_with_parameters(parameters).to_namespace(jnp)
+        trained = GradientDescent(
+            circuit.root, AverageNegativeLogLikelihood(), optax.adamw(1e-2)
+        ).minimize(
+            20, jnp.asarray(data)
+        )
+        root_log_weights, *others = trained.circuit_parameters
+    assert float(root_log_weights[0]) == -np.inf
+    assert bool(jnp.all(jnp.isfinite(root_log_weights[1:])))
+    assert all(bool(jnp.all(jnp.isfinite(parameter))) for parameter in others)
+
+
 # %% typing
 
 

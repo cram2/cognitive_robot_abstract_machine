@@ -13,7 +13,7 @@ from types import ModuleType
 from typing_extensions import Any, Callable
 
 from krrood.development_tools.agents.checker import CodeRuleChecker
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% code named by rules
 

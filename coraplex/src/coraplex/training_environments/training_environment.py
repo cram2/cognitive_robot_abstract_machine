@@ -206,7 +206,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
                 world=world_with_urdf,
             )
             world_with_urdf.add_connection(c_root_bf)
-            c_root_bf.has_hardware_interface = True
+            world_with_urdf.set_dofs_has_hardware_interface(c_root_bf.active_dofs, True)
 
         return world_with_urdf
 

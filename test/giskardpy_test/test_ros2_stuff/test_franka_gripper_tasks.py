@@ -41,6 +41,7 @@ from ...statechart_json_round_trip import (
     NodeRoundTripTests,
     concrete_node_types,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 # %% gripper stand-in
 
@@ -55,7 +56,7 @@ class GripperActionName(StrEnum):
     HOMING = "gripper/homing"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingGripper:
     """
     Answers every goal of one gripper action with a fixed success and records the goals.
@@ -76,6 +77,7 @@ class RecordingGripper:
     The goals the gripper received, in order.
     """
 
+    @called_positionally
     def execute(self, goal: ServerGoalHandle) -> Any:
         """
         Records the goal and finishes it with :attr:`succeeds`.
@@ -84,7 +86,7 @@ class RecordingGripper:
         goal.succeed()
         return self.action.Result(success=self.succeeds)
 
-    def serve(self, node: Node, action_topic: str) -> ActionServer:
+    def serve(self, *, node: Node, action_topic: str) -> ActionServer:
         """
         :return: The action server answering goals on `action_topic` through
             :meth:`execute`.
@@ -120,7 +122,7 @@ def homing_gripper(
     request: pytest.FixtureRequest, rclpy_node: Node
 ) -> Iterator[RecordingGripper]:
     gripper = RecordingGripper(action=Homing, succeeds=request.param)
-    server = gripper.serve(rclpy_node, GripperActionName.HOMING)
+    server = gripper.serve(node=rclpy_node, action_topic=GripperActionName.HOMING)
     yield gripper
     server.destroy()
 
@@ -148,7 +150,7 @@ def test_task_observes_the_success_the_gripper_reports(
 
 def test_move_task_sends_its_width_and_speed(rclpy_node: Node) -> None:
     gripper = RecordingGripper(action=Move, succeeds=True)
-    server = gripper.serve(rclpy_node, GripperActionName.MOVE)
+    server = gripper.serve(node=rclpy_node, action_topic=GripperActionName.MOVE)
     task = GripperMoveTask(action_topic=GripperActionName.MOVE, width=0.04, speed=0.1)
 
     run_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
@@ -161,7 +163,7 @@ def test_move_task_sends_its_width_and_speed(rclpy_node: Node) -> None:
 
 def test_grasp_task_sends_its_parameters(rclpy_node: Node) -> None:
     gripper = RecordingGripper(action=Grasp, succeeds=True)
-    server = gripper.serve(rclpy_node, GripperActionName.GRASP)
+    server = gripper.serve(node=rclpy_node, action_topic=GripperActionName.GRASP)
     task = GripperGraspTask(
         action_topic=GripperActionName.GRASP,
         width=0.02,
@@ -237,13 +239,13 @@ def gripper_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
     """
     servers = [
         RecordingGripper(action=Move, succeeds=True).serve(
-            rclpy_node, GripperActionName.MOVE
+            node=rclpy_node, action_topic=GripperActionName.MOVE
         ),
         RecordingGripper(action=Grasp, succeeds=True).serve(
-            rclpy_node, GripperActionName.GRASP
+            node=rclpy_node, action_topic=GripperActionName.GRASP
         ),
         RecordingGripper(action=Homing, succeeds=True).serve(
-            rclpy_node, GripperActionName.HOMING
+            node=rclpy_node, action_topic=GripperActionName.HOMING
         ),
     ]
     yield servers
