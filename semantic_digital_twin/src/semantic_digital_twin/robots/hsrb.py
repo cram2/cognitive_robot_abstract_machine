@@ -160,9 +160,9 @@ class HSRBGripper(
     @classproperty
     def squeeze(cls) -> float:
         """
-        Half the hand's widest opening of 13.7 cm, so the fingers are sent shut: the hand
-        grips with as much force as its motor builds up from how far it is sent past
-        what it holds, and its finger springs give way on top of that.
+        Half the hand's widest opening of 13.7 cm, so the fingers are sent shut: the
+        hand grips with as much force as its motor builds up from how far it is sent
+        past what it holds, and its finger springs give way on top of that.
         """
         return 0.07
 
@@ -295,7 +295,7 @@ class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera], ServoedRobotPart):
         ]
         for joint_name in controlled_joints:
             connection = self._world.get_connection_by_name(joint_name)
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
@@ -453,7 +453,7 @@ class HSRBNeck(
         controlled_joints = [HSRBJoint.HEAD_PAN, HSRBJoint.HEAD_TILT]
         for joint_name in controlled_joints:
             connection = self._world.get_connection_by_name(joint_name)
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         return []

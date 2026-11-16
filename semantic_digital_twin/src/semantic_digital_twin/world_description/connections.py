@@ -101,11 +101,6 @@ class ActiveConnection(Connection, ABC):
         """
         return any(dof.has_hardware_interface for dof in self.active_dofs)
 
-    @has_hardware_interface.setter
-    def has_hardware_interface(self, value: bool) -> None:
-        for dof in self.active_dofs:
-            dof.has_hardware_interface = value
-
     @property
     def is_controlled(self):
         return self.has_hardware_interface
@@ -119,24 +114,26 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
 
     axis: Vector3 = field(kw_only=True)
     """
-    Connection moves along this axis, should be a unit vector.
+    Connection moves along this unit vector, given in the frame of the parent.
 
-    The axis is defined relative to the local reference frame of the parent
-    KinematicStructureEntity.
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     multiplier: float = 1.0
     """
-    Movement along the axis is multiplied by this value.
+    Movement along the axis is multiplied by this value, e.g. for shared DoFs.
 
-    Useful if Connections share DoFs.
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     offset: float = 0.0
     """
-    Movement along the axis is offset by this value.
+    Movement along the axis is offset by this value, e.g. for shared DoFs.
 
-    Useful if Connections share DoFs.
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     raw_dof: DegreeOfFreedom = field(kw_only=True)
@@ -380,6 +377,9 @@ class ScrewConnection(ActiveConnection1DOF):
     for
     the distinction between screw pitch and lead. Negative values model left-handed
     threads.
+
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     def add_to_world(self, world: World):

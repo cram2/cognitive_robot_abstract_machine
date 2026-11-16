@@ -483,7 +483,7 @@ class StretchMobileBase(
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         return []

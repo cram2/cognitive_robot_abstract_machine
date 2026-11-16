@@ -225,7 +225,7 @@ class TiagoGripper(EndEffector, HasParallelGripperCommandServer, ABC):
         connection: ActiveConnection = self._world.get_connection_by_name(
             self.finger_joint
         )
-        connection.has_hardware_interface = True
+        self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -328,7 +328,7 @@ class TiagoLeftArm(Arm[TiagoLeftGripper]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
@@ -373,7 +373,7 @@ class TiagoRightArm(Arm[TiagoRightGripper]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
@@ -450,7 +450,7 @@ class TiagoNeck(Neck[TiagoCamera]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         return []
@@ -479,7 +479,7 @@ class TiagoTorso(
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections

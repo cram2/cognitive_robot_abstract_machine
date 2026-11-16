@@ -411,7 +411,9 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
         for robot_part in self._robot_parts:
             for connection in robot_part.active_connections:
-                connection.has_hardware_interface = True
+                self._world.set_dofs_has_hardware_interface(
+                    connection.active_dofs, True
+                )
 
     @property
     def active_connections(self) -> list[ActiveConnection]:

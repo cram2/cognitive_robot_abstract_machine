@@ -334,7 +334,7 @@ def cylinder_bot_world():
             world=world, parent=body, child=robot_world.root
         )
         world.merge_world(robot_world, connection)
-        connection.has_hardware_interface = True
+        world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
         world.collision_manager.max_avoided_bodies_rules.append(
             MaxAvoidedCollisionsOverride(2, {robot})
@@ -502,7 +502,7 @@ def cylinder_bot_diff_world():
             world=world, parent=body, child=robot_world.root
         )
         world.merge_world(robot_world, connection)
-        connection.has_hardware_interface = True
+        world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     return world
 
@@ -547,7 +547,7 @@ def world_with_urdf_factory(
             world=world_with_urdf,
         )
         world_with_urdf.add_connection(c_root_bf)
-        c_root_bf.has_hardware_interface = True
+        world_with_urdf.set_dofs_has_hardware_interface(c_root_bf.active_dofs, True)
     if robot_localization_pose is not None:
         map_C_localization.origin = robot_localization_pose
 
