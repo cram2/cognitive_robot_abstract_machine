@@ -114,7 +114,8 @@ class HostMemory(PeakTrackingMemory):
 
     def free_bytes(self) -> int:
         available = self.field_bytes(
-            file=LinuxMemoryFile.MEMORY_INFORMATION, field=LinuxMemoryField.AVAILABLE
+            memory_file=LinuxMemoryFile.MEMORY_INFORMATION,
+            memory_field=LinuxMemoryField.AVAILABLE,
         )
         if not LinuxMemoryFile.CONTROL_GROUP_LIMIT.exists():
             return available
@@ -126,12 +127,14 @@ class HostMemory(PeakTrackingMemory):
 
     def in_use_bytes(self) -> int:
         return self.field_bytes(
-            file=LinuxMemoryFile.PROCESS_STATUS, field=LinuxMemoryField.RESIDENT
+            memory_file=LinuxMemoryFile.PROCESS_STATUS,
+            memory_field=LinuxMemoryField.RESIDENT,
         )
 
     def peak_bytes(self) -> int:
         return self.field_bytes(
-            file=LinuxMemoryFile.PROCESS_STATUS, field=LinuxMemoryField.PEAK_RESIDENT
+            memory_file=LinuxMemoryFile.PROCESS_STATUS,
+            memory_field=LinuxMemoryField.PEAK_RESIDENT,
         )
 
     def reset_peak(self) -> None:
@@ -139,17 +142,22 @@ class HostMemory(PeakTrackingMemory):
             LinuxMemoryValue.RESET_PEAK_RESIDENT
         )
 
-    def field_bytes(self, *, file: LinuxMemoryFile, field: LinuxMemoryField) -> int:
+    def field_bytes(
+        self, *, memory_file: LinuxMemoryFile, memory_field: LinuxMemoryField
+    ) -> int:
         """
-        :param file: The file that holds the field, one ``name: value kB`` line per field.
-        :param field: The field to read.
+        :param memory_file: The file that holds the field, one ``name: value kB`` line
+            per field.
+        :param memory_field: The field to read.
         :return: The value of the field, in bytes.
         """
-        for line in file.read_text().splitlines():
+        for line in memory_file.read_text().splitlines():
             name, value = line.split(":", 1)
-            if name == field:
+            if name == memory_field:
                 return int(value.split()[0]) * self.bytes_per_kibibyte
-        raise MissingMemoryFieldError(file=str(file), field=field)
+        raise MissingMemoryFieldError(
+            memory_file=str(memory_file), memory_field=memory_field
+        )
 
 
 # %% memory of a training step

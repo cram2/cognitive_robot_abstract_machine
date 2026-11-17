@@ -76,18 +76,18 @@ class MissingMemoryFieldError(ProbabilisticModelException, LookupError):
     Exception raised when a Linux memory file lacks a field that is read from it.
     """
 
-    file: str
+    memory_file: str
     """
-    The file that was read.
+    The memory file that was read.
     """
 
-    field: str
+    memory_field: str
     """
-    The field that was not found in it.
+    The memory field that was not found in it.
     """
 
     def error_message(self) -> str:
-        return f"{self.file} has no field {self.field}."
+        return f"{self.memory_file} has no field {self.memory_field}."
 
     def suggest_correction(self) -> str:
         return "Run on a Linux kernel that reports this field."
