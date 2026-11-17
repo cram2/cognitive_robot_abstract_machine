@@ -8,7 +8,7 @@ trees built from core EQL primitives and a stand-in for the parts of
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, make_dataclass
 from enum import Enum
 
 import pytest
@@ -51,22 +51,20 @@ class Animal:
     habitat: Optional[Species] = None
 
 
-@dataclass(unsafe_hash=True, kw_only=True)
-class Entity:
-    """
-    A case type whose lower-camel-case name is also the name of a factory the generated
-    module calls.
-    """
-
-    has_fur: bool = False
-    """
-    Whether the entity has fur.
-    """
-
-    species: Optional[Species] = None
-    """
-    What the rules conclude.
-    """
+CaseTypeNamedLikeAFactory = make_dataclass(
+    factories.entity.__name__.capitalize(),
+    [
+        ("has_fur", bool, field(default=False)),
+        ("species", Optional[Species], field(default=None)),
+    ],
+    unsafe_hash=True,
+    kw_only=True,
+)
+"""
+A case type whose lower-camel-case name is the name of a factory every generated module
+calls. It is built under the factory's own name, so no class of that name stands in this
+module.
+"""
 
 
 @dataclass
@@ -105,24 +103,28 @@ def _alternative_chain_rdr():
     return _SerializableRuleTree(query, Animal, animal, "species")
 
 
-def _entity_named_case_type_rdr():
+def _factory_named_case_type_rdr():
     """
-    A one-rule tree over :class:`Entity`, whose case variable's natural name is the
-    name of a factory.
+    A one-rule tree over :data:`CaseTypeNamedLikeAFactory`, whose case variable's natural
+    name is the name of a factory.
     """
-    entity_case = variable(Entity, domain=[])
-    query = entity(entity_case).where(entity_case.has_fur == True)
+    case = variable(CaseTypeNamedLikeAFactory, domain=[])
+    query = entity(case).where(case.has_fur == True)
     with query:
-        add(entity_case.species, Species.MAMMAL)
+        add(case.species, Species.MAMMAL)
     query.build()
-    return _SerializableRuleTree(query, Entity, entity_case, "species")
+    return _SerializableRuleTree(query, CaseTypeNamedLikeAFactory, case, "species")
 
 
-def _exec_generated_module(source: str) -> dict:
+def _exec_generated_module(source: str, local_names: dict | None = None) -> dict:
     """
     Execute generated source in a fresh namespace, as the real module loader would.
+
+    :param source: The generated module.
+    :param local_names: Names the module uses without importing, such as a case type
+        defined in the same file.
     """
-    namespace: dict = {}
+    namespace: dict = dict(local_names or {})
     exec(compile(source, "<generated>", "exec"), namespace)
     return namespace
 
@@ -233,17 +235,19 @@ def test_a_case_type_named_like_a_factory_does_not_shadow_the_factory():
     """
     The case variable never takes the name of a factory the module calls.
     """
-    original = _entity_named_case_type_rdr()
+    original = _factory_named_case_type_rdr()
+    case_type = CaseTypeNamedLikeAFactory
 
     namespace = _exec_generated_module(
-        RippleDownRulesSerializer(rdr=original).to_source()
+        RippleDownRulesSerializer(rdr=original).to_source(case_type_is_local=True),
+        {case_type.__name__: case_type},
     )
 
-    assert namespace[RippleDownRulesModuleAttribute.CASE_TYPE] is Entity
+    assert namespace[RippleDownRulesModuleAttribute.CASE_TYPE] is case_type
     assert _species_concluded_for(
         namespace[RippleDownRulesModuleAttribute.QUERY]._conditions_root_,
         namespace[RippleDownRulesModuleAttribute.CASE_VARIABLE],
-        Entity(has_fur=True),
+        case_type(has_fur=True),
     ) == {Species.MAMMAL}
 
 
