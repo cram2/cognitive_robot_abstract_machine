@@ -307,7 +307,7 @@ class WorldModelUpdateContextManager:
                 # the modifications applied before the error are not rolled back,
                 # so cached queries must be invalidated
                 clear_memoization_cache(self.world)
-                if not model_manager._active_world_model_update_context_manager_ids:
+                if not model_manager.has_open_modification:
                     # discard publications buffered before the error; they must not be sent
                     model_manager.pending_publications.clear()
                     # discard the modifications of the failed block too, so that the
@@ -337,7 +337,7 @@ class WorldModelUpdateContextManager:
                 self._id
             )
             # if there are still open context managers dont publish yet
-            if model_manager._active_world_model_update_context_manager_ids:
+            if model_manager.has_open_modification:
                 return
 
             # a block that modified nothing leaves the model as it was, but announces
@@ -401,7 +401,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
         def wrapper(current_world: World, *args, **kwargs):
             if current_world._current_active_atomic_world_modification is not None:
                 raise AtomicWorldModificationNotAtomic(func, current_world)
-            if not current_world._model_manager._active_world_model_update_context_manager_ids:
+            if not current_world._model_manager.has_open_modification:
                 raise MissingWorldModificationContextError(func)
             current_world._current_active_atomic_world_modification = func
 
@@ -2203,26 +2203,26 @@ class World(HasSimulatorProperties):
     # %% Change Notifications
     def notify_state_change(self, publish_changes: bool = True, **kwargs) -> None:
         """
-        If you have changed the state of the world, call this function to trigger
-        necessary events and increase the state version.
+        Announce a change of the state of this world to its state change callbacks.
 
-        Inside a :meth:`batch_state_changes` context the notification is collected and
-        emitted once when that context ends, with the ``publish_changes`` of that
-        context: the setters that write the state cannot know they are part of a batch,
-        so the batch is what decides whether its changes are published.
+        Within :meth:`batch_state_changes` the batch announces it once when it ends,
+        with its own ``publish_changes``; within :meth:`modify_world` the block
+        announces it.
         """
         if self._state_change_batch_depth > 0:
             self._state_change_batch_has_collected_change = True
             return
         if not self.is_empty():
             self._forward_kinematic_manager.recompute()
+        if self._model_manager.has_open_modification:
+            return
         self.state._notify_state_change(publish_changes=publish_changes, **kwargs)
 
     def _notify_model_change(self, publish_changes: bool = True, **kwargs) -> None:
         """
-        Notifies the system of a model change and updates the necessary states, caches,
-        and forward kinematics expressions while also triggering registered callbacks
-        for model changes.
+        Announce a change of the model of this world, first to its model change
+        callbacks and then to its state change callbacks, so a callback of both kinds
+        learns about the state after the model it belongs to.
         """
         self._model_manager.update_model_version_and_notify_callbacks(
             publish_changes=publish_changes, **kwargs

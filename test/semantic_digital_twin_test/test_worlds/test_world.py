@@ -451,6 +451,43 @@ def test_compute_fk_expression(world_setup):
     np.testing.assert_array_almost_equal(fk, fk2)
 
 
+# %% state changes inside a modification
+
+
+def test_a_state_change_inside_a_modification_is_announced_when_it_ends(world_setup):
+    """
+    State callbacks hear about a change made inside a modification only once, when the
+    modification ends, never while the world is still being modified.
+    """
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+    counter = StateChangeCounter(_world=world)
+
+    with world.modify_world():
+        prismatic_connection.position = 1.0
+        count_inside_the_modification = counter.count
+
+    assert count_inside_the_modification == 0
+    assert counter.count == 1
+
+
+def test_a_state_change_inside_a_modification_moves_bodies_within_it(world_setup):
+    """
+    Code inside a modification reads the transforms the state written in it produces,
+    although the state callbacks are not told yet.
+    """
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+
+    with world.modify_world():
+        prismatic_connection.position = 1.0
+        transform_inside_the_modification = l2.global_transform.to_np()
+
+    np.testing.assert_array_almost_equal(
+        transform_inside_the_modification, l2.global_transform.to_np()
+    )
+
+
 # %% forward kinematics expressions and recompilation
 
 
