@@ -65,7 +65,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Fridge,
     Drawer,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -3309,6 +3312,54 @@ def test_a_publisher_heard_from_for_the_first_time_has_lost_nothing(
     receiving.receive(MetaData(node_name="publisher", process_id=1), 7)
 
     assert receiving.logger.warnings == []
+
+
+# %% state written inside a modification
+
+
+def test_a_body_placed_inside_its_modification_reaches_another_world_at_that_place(
+    rclpy_node,
+):
+    """
+    A movable body added and placed within one modification reaches a synchronized world
+    at that place, with no position arriving before the degrees of freedom it sets.
+    """
+    (
+        publisher_world,
+        receiver_world,
+        publisher_synchronizer,
+        receiver_synchronizer,
+    ) = create_connected_worlds(rclpy_node, "placed_inside_modification")
+    try:
+        root = publisher_world.root
+        placed_body = Body(name=PrefixedName("placed_inside_modification_body"))
+        with publisher_world.modify_world():
+            publisher_world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    world=publisher_world, parent=root, child=placed_body
+                )
+            )
+            placed_body.parent_connection.origin = (
+                HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.95, z=1.04, reference_frame=root
+                )
+            )
+
+        assert wait_for_condition(
+            lambda: receiver_synchronizer.has_applied(
+                publisher_synchronizer.latest_published_position
+            )
+        ), "the receiver never applied the modification"
+        received_body = receiver_world.get_kinematic_structure_entity_by_id(
+            placed_body.id
+        )
+        np.testing.assert_array_almost_equal(
+            received_body.global_transform.to_np(),
+            placed_body.global_transform.to_np(),
+        )
+    finally:
+        publisher_synchronizer.close()
+        receiver_synchronizer.close()
 
 
 if __name__ == "__main__":

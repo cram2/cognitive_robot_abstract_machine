@@ -559,6 +559,14 @@ class WorldModelManager:
             yield
 
     @property
+    def has_open_modification(self) -> bool:
+        """
+        Whether a :meth:`World.modify_world` block is still open, so the changes made in
+        it are not announced yet.
+        """
+        return bool(self._active_world_model_update_context_manager_ids)
+
+    @property
     def revision(self) -> ModelRevision:
         """
         :return: An identifier for the current state of the kinematic structure.

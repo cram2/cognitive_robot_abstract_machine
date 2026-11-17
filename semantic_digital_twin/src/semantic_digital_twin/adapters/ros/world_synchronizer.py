@@ -557,6 +557,9 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         """
         Send the positions of the degrees of freedom to the other synchronizers.
 
+        Positions written while a :meth:`World.modify_world` block is open are sent
+        once that block has ended, after the model change they may depend on.
+
         Implements
         :meth:`~semantic_digital_twin.callbacks.callback.StateChangeCallback.on_state_change`.
 
@@ -570,6 +573,10 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         if publish_changes is None:
             raise MissingPublishChangesKWARG(kwargs)
         if not publish_changes:
+            return
+        # The end of the block announces the state, so an earlier message could only
+        # name degrees of freedom the receivers do not know yet.
+        if self._world.get_world_model_manager().has_open_modification:
             return
 
         changes = (
