@@ -10,11 +10,11 @@ from functools import cached_property
 
 import rdflib
 from rdflib.namespace import RDF, RDFS, OWL
-from typing_extensions import Any, Dict, List, Optional
+from typing_extensions import Dict, List, Optional
 
 from krrood.code_generation.naming import to_camel_case, to_snake_case
 from krrood.ontomatic.exceptions import AmbiguousDescribedClass
-from krrood.ontomatic.naming import NamingRegistry
+from krrood.ontomatic.naming import HasRDFGraph, NamingRegistry
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -26,47 +26,9 @@ from krrood.ontomatic.ontology_to_python.ontology_info import (
 
 
 @dataclass(kw_only=True)
-class RDFMetadataExtractor:
-    """
-    Helper for extracting metadata (labels, comments) from an RDF graph.
-    """
-
-    graph: rdflib.Graph
-    """
-    The graph whose labels and comments are read.
-    """
-
-    def get_label(self, *, uri: Any) -> Optional[str]:
-        """
-        Get rdfs:label for a URI.
-        """
-        for label in self.graph.objects(uri, RDFS.label):
-            return str(label)
-        return None
-
-    def get_comment(self, *, uri: Any) -> Optional[str]:
-        """
-        Get rdfs:comment for a URI.
-        """
-        for comment in self.graph.objects(uri, RDFS.comment):
-            return str(comment)
-        return None
-
-
-@dataclass(kw_only=True)
-class RDFGraphExtractor:
+class RDFGraphExtractor(HasRDFGraph):
     """
     Reads the information about the classes or properties of an RDF graph.
-    """
-
-    graph: rdflib.Graph
-    """
-    The graph the information is read from.
-    """
-
-    metadata_extractor: RDFMetadataExtractor
-    """
-    Reads the labels and comments.
     """
 
     def related_names(
@@ -114,7 +76,7 @@ class RDFClassExtractor(RDFGraphExtractor):
         superclasses = self.named_superclasses(class_uri=class_uri)
         described_class = None
         if isinstance(class_uri, rdflib.BNode):
-            name = NamingRegistry.bnode_to_name(graph=self.graph, bnode=class_uri)
+            name = self.python_name_of_node(node=class_uri)
             described_class = self.described_class(class_expression=class_uri)
             if described_class is None:
                 superclasses = self.named_conjuncts_of(class_expression=class_uri)
@@ -130,8 +92,8 @@ class RDFClassExtractor(RDFGraphExtractor):
             ),
             is_description_for=described_class,
             has_descriptions=self.description_names(class_uri=class_uri),
-            label=self.metadata_extractor.get_label(uri=class_uri),
-            comment=self.metadata_extractor.get_comment(uri=class_uri),
+            label=self.label(uri=class_uri),
+            comment=self.comment(uri=class_uri),
             add_role_taker=True,
         )
 
@@ -159,7 +121,7 @@ class RDFClassExtractor(RDFGraphExtractor):
             declared under.
         """
         return [
-            NamingRegistry.uri_to_python_name(uri=superclass, graph=self.graph)
+            self.python_name_of_node(node=superclass)
             for superclass in self.graph.objects(class_uri, RDFS.subClassOf)
             if isinstance(superclass, rdflib.BNode)
             and (
@@ -181,9 +143,7 @@ class RDFClassExtractor(RDFGraphExtractor):
         ]
         if len(candidates) > 1:
             raise AmbiguousDescribedClass(
-                class_expression_name=NamingRegistry.bnode_to_name(
-                    graph=self.graph, bnode=class_expression
-                ),
+                class_expression_name=self.python_name_of_node(node=class_expression),
                 candidates=candidates,
             )
         if candidates:
@@ -224,12 +184,11 @@ class RDFClassExtractor(RDFGraphExtractor):
         :return: The name of the named class defined by another intersection of the same members, which the expression
             therefore stands for, or None.
         """
-        name = NamingRegistry.uri_to_python_name(uri=class_expression, graph=self.graph)
+        name = self.python_name_of_node(node=class_expression)
         for definition in self.graph.subjects(OWL.intersectionOf, None):
             if (
                 definition != class_expression
-                and NamingRegistry.uri_to_python_name(uri=definition, graph=self.graph)
-                == name
+                and self.python_name_of_node(node=definition) == name
             ):
                 defined_class = self.defined_class(class_expression=definition)
                 if defined_class is not None:
@@ -244,9 +203,7 @@ class RDFClassExtractor(RDFGraphExtractor):
         return [
             NamingRegistry.uri_to_python_name(uri=member)
             for intersection in self.graph.objects(class_expression, OWL.intersectionOf)
-            for member in NamingRegistry._get_rdf_list(
-                graph=self.graph, head=intersection
-            )
+            for member in self.list_members(head=intersection)
             if isinstance(member, rdflib.URIRef)
         ]
 
@@ -304,8 +261,8 @@ class RDFPropertyExtractor(RDFGraphExtractor):
             disjoint_properties=self.mutually_related_names(
                 node=property_uri, relation=OWL.propertyDisjointWith
             ),
-            label=self.metadata_extractor.get_label(uri=property_uri),
-            comment=self.metadata_extractor.get_comment(uri=property_uri),
+            label=self.label(uri=property_uri),
+            comment=self.comment(uri=property_uri),
             field_name=to_snake_case(name),
             descriptor_name=to_camel_case(name),
             superproperties=self.related_names(
@@ -324,14 +281,9 @@ class RDFPropertyExtractor(RDFGraphExtractor):
 
 
 @dataclass(kw_only=True)
-class RDFOntologyExtractor:
+class RDFOntologyExtractor(HasRDFGraph):
     """
     Reads the information about a whole ontology out of its RDF graph.
-    """
-
-    graph: rdflib.Graph
-    """
-    The graph of the ontology.
     """
 
     predefined_data_types: Dict[str, Dict[str, str]] = field(default_factory=dict)
@@ -360,36 +312,25 @@ class RDFOntologyExtractor:
     """
 
     @cached_property
-    def metadata_extractor(self) -> RDFMetadataExtractor:
-        """
-        Reads the labels and comments of the graph.
-        """
-        return RDFMetadataExtractor(graph=self.graph)
-
-    @cached_property
     def class_extractor(self) -> RDFClassExtractor:
         """
         Reads the classes of the graph.
         """
-        return RDFClassExtractor(
-            graph=self.graph, metadata_extractor=self.metadata_extractor
-        )
+        return RDFClassExtractor(graph=self.graph)
 
     @cached_property
     def property_extractor(self) -> RDFPropertyExtractor:
         """
         Reads the properties of the graph.
         """
-        return RDFPropertyExtractor(
-            graph=self.graph, metadata_extractor=self.metadata_extractor
-        )
+        return RDFPropertyExtractor(graph=self.graph)
 
     def extract(self) -> OntologyInfo:
         """
         :return: The information about the ontology: its classes, its class descriptions and its properties.
         """
         for ontology_node in self.graph.subjects(RDF.type, OWL.Ontology):
-            self.ontology_label = self.metadata_extractor.get_label(uri=ontology_node)
+            self.ontology_label = self.label(uri=ontology_node)
             if not self.ontology_label:
                 self.ontology_label = NamingRegistry.uri_to_python_name(
                     uri=ontology_node
@@ -428,7 +369,7 @@ class RDFOntologyExtractor:
                 super_classes = class_information.superclasses[:]
 
                 # 3. Process members and make them inherit from the parent union class
-                members = NamingRegistry._get_rdf_list(graph=self.graph, head=unions[0])
+                members = self.list_members(head=unions[0])
                 for member in members:
                     member_information = self.class_extractor.extract(class_uri=member)
                     # Ensure member inherits from the union parent

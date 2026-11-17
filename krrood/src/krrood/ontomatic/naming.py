@@ -1,5 +1,6 @@
 """
-Python names for the IRIs and anonymous class expressions of an OWL ontology.
+Python names for the IRIs and anonymous class expressions of an OWL ontology, and the
+RDF graph that describes them.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 import rdflib
-from rdflib import OWL
+from rdflib import OWL, RDFS
 from rdflib.collection import Collection
 from typing_extensions import Any, Optional, Union
 
@@ -27,39 +28,15 @@ class NamingRegistry:
     """
 
     @staticmethod
-    def uri_to_python_name(*, uri: Any, graph: Optional[rdflib.Graph] = None) -> str:
+    def uri_to_python_name(*, uri: Any) -> str:
         """
-        :param uri: A named or anonymous class expression, or a property.
-        :param graph: The graph that describes an anonymous class expression.
-        :return: A valid Python identifier for it.
+        :param uri: A named class, individual or property.
+        :return: A valid Python identifier for it, or the text of anything else, such as
+            a literal or a blank node.
         """
         if isinstance(uri, rdflib.URIRef):
             return re.sub(r"[^a-zA-Z0-9_]", "_", NamingRegistry.local_name(uri=uri))
-        elif isinstance(uri, rdflib.BNode) and graph is not None:
-            return NamingRegistry.bnode_to_name(graph=graph, bnode=uri)
         return str(uri)
-
-    @staticmethod
-    def bnode_to_name(*, graph: rdflib.Graph, bnode: rdflib.BNode) -> str:
-        """
-        :param graph: The graph that describes the anonymous class expression.
-        :param bnode: The blank node of the anonymous class expression.
-        :return: A name built from the expression's kind and what it refers to.
-        :raises UnsupportedClassExpression: When the node is no known kind of
-            anonymous class expression.
-        """
-        return ClassExpression.from_node(graph=graph, node=bnode).python_name
-
-    @staticmethod
-    def _get_rdf_list(*, graph, head):
-        """
-        :return: The members of the RDF list starting at the head.
-        """
-        items = []
-        while head != rdflib.RDF.nil:
-            items.append(graph.value(head, rdflib.RDF.first))
-            head = graph.value(head, rdflib.RDF.rest)
-        return [item for item in items if item is not None]
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -74,21 +51,70 @@ class NamingRegistry:
         return text.rstrip("/").rsplit("/", 1)[-1]
 
 
+# %% what an RDF graph says about its nodes
+
+
+@dataclass(kw_only=True)
+class HasRDFGraph:
+    """
+    Reads what an RDF graph states about its nodes: their names, labels and comments,
+    and the members of its lists.
+    """
+
+    graph: rdflib.Graph
+    """
+    The graph that describes the nodes.
+    """
+
+    def python_name_of_node(self, *, node: rdflib.term.Node) -> str:
+        """
+        :param node: A class, individual, literal or anonymous class expression.
+        :return: A valid Python identifier for a named node, the name built from its kind
+            and what it refers to for an anonymous class expression, and the text of a
+            literal.
+        :raises UnsupportedClassExpression: When a blank node is no known kind of
+            anonymous class expression.
+        """
+        if isinstance(node, rdflib.BNode):
+            return ClassExpression.from_node(graph=self.graph, node=node).python_name
+        return NamingRegistry.uri_to_python_name(uri=node)
+
+    def list_members(self, *, head: rdflib.term.Node) -> list[rdflib.term.Node]:
+        """
+        :param head: The first cell of an RDF list.
+        :return: The members of the list, in order.
+        """
+        return list(Collection(self.graph, head))
+
+    def label(self, *, uri: rdflib.term.Node) -> Optional[str]:
+        """
+        :param uri: A class, property or ontology.
+        :return: Its first ``rdfs:label``, if any.
+        """
+        for label in self.graph.objects(uri, RDFS.label):
+            return str(label)
+        return None
+
+    def comment(self, *, uri: rdflib.term.Node) -> Optional[str]:
+        """
+        :param uri: A class, property or ontology.
+        :return: Its first ``rdfs:comment``, if any.
+        """
+        for comment in self.graph.objects(uri, RDFS.comment):
+            return str(comment)
+        return None
+
+
 # %% anonymous class expressions
 
 
 @dataclass(kw_only=True)
-class ClassExpression(ABC):
+class ClassExpression(HasRDFGraph, ABC):
     """
     An anonymous OWL class expression, which names itself for what it describes.
 
     Each kind of expression is a subclass without subclasses of its own, which
     recognises its own blank nodes.
-    """
-
-    graph: rdflib.Graph
-    """
-    The graph that describes the expression.
     """
 
     node: rdflib.BNode
@@ -134,13 +160,6 @@ class ClassExpression(ABC):
         The name of the expression, built from its kind and what it refers to.
         """
 
-    def node_name(self, *, node: rdflib.term.Node) -> str:
-        """
-        :param node: A class, individual, literal or expression the expression refers to.
-        :return: The name of the node.
-        """
-        return NamingRegistry.uri_to_python_name(uri=node, graph=self.graph)
-
 
 # %% expressions over a list of members
 
@@ -170,11 +189,11 @@ class ListOfMembers(ClassExpression, ABC):
         """
         The prefix and the names of the members, joined by the separator.
         """
-        members = Collection(
-            self.graph, self.graph.value(self.node, self.defining_predicate)
+        members = self.list_members(
+            head=self.graph.value(self.node, self.defining_predicate)
         )
         return self.name_prefix + self.member_separator.join(
-            self.node_name(node=member) for member in members
+            self.python_name_of_node(node=member) for member in members
         )
 
 
@@ -290,7 +309,9 @@ class ComplementOf(ClassExpression):
             NamingRegistry.uri_to_python_name(uri=disjoint)
             for disjoint in self.graph.objects(complemented, OWL.disjointWith)
         ]
-        return "OR".join(disjoint_names) or "Not" + self.node_name(node=complemented)
+        return "OR".join(disjoint_names) or "Not" + self.python_name_of_node(
+            node=complemented
+        )
 
 
 # %% restrictions on a property
@@ -332,7 +353,7 @@ class FillerRestriction(Restriction, ABC):
         The property's name, the condition word and the filler's name.
         """
         filler = self.graph.value(self.node, self.defining_predicate)
-        return f"{self.property_name}{self.condition_word}{self.node_name(node=filler)}"
+        return f"{self.property_name}{self.condition_word}{self.python_name_of_node(node=filler)}"
 
 
 @dataclass(kw_only=True)
@@ -465,7 +486,9 @@ class CardinalityRestriction(Restriction, ABC):
         qualifier = self.graph.value(self.node, OWL.onClass) or self.graph.value(
             self.node, OWL.onDataRange
         )
-        qualifier_name = "" if qualifier is None else self.node_name(node=qualifier)
+        qualifier_name = (
+            "" if qualifier is None else self.python_name_of_node(node=qualifier)
+        )
         return f"{self.property_name}{self.condition_word}{bound}{qualifier_name}"
 
 

@@ -12,7 +12,7 @@ from rdflib import Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
 from krrood.ontomatic.exceptions import UnsupportedClassExpression
-from krrood.ontomatic.naming import NamingRegistry
+from krrood.ontomatic.naming import HasRDFGraph, NamingRegistry
 
 # %% local names
 
@@ -98,7 +98,7 @@ def test_an_anonymous_class_expression_is_named_for_what_it_describes(
         class_expression_names[anchor], RDFS.subClassOf
     )
     assert (
-        NamingRegistry.bnode_to_name(graph=class_expressions_graph, bnode=expression)
+        HasRDFGraph(graph=class_expressions_graph).python_name_of_node(node=expression)
         == name
     )
 
@@ -112,4 +112,4 @@ def test_a_node_that_is_no_class_expression_is_refused(class_expressions_graph):
         predicate=RDF.type, object=OWL.AllDisjointClasses
     )
     with pytest.raises(UnsupportedClassExpression):
-        NamingRegistry.bnode_to_name(graph=class_expressions_graph, bnode=axiom)
+        HasRDFGraph(graph=class_expressions_graph).python_name_of_node(node=axiom)

@@ -12,10 +12,9 @@ from rdflib import Namespace
 from rdflib.namespace import OWL, RDFS
 
 from krrood.ontomatic.exceptions import AmbiguousDescribedClass
-from krrood.ontomatic.naming import NamingRegistry
+from krrood.ontomatic.naming import HasRDFGraph
 from krrood.ontomatic.ontology_to_python.extraction import (
     RDFClassExtractor,
-    RDFMetadataExtractor,
     RDFOntologyExtractor,
     RDFPropertyExtractor,
 )
@@ -48,9 +47,7 @@ def class_extractor(graph: rdflib.Graph) -> RDFClassExtractor:
     """
     Reads the classes of the ontology.
     """
-    return RDFClassExtractor(
-        graph=graph, metadata_extractor=RDFMetadataExtractor(graph=graph)
-    )
+    return RDFClassExtractor(graph=graph)
 
 
 @pytest.fixture(scope="module")
@@ -58,9 +55,7 @@ def property_extractor(graph: rdflib.Graph) -> RDFPropertyExtractor:
     """
     Reads the properties of the ontology.
     """
-    return RDFPropertyExtractor(
-        graph=graph, metadata_extractor=RDFMetadataExtractor(graph=graph)
-    )
+    return RDFPropertyExtractor(graph=graph)
 
 
 # %% classes
@@ -125,10 +120,7 @@ def class_expressions_extractor(
     """
     Reads the classes of the ontology of class expressions.
     """
-    return RDFClassExtractor(
-        graph=class_expressions_graph,
-        metadata_extractor=RDFMetadataExtractor(graph=class_expressions_graph),
-    )
+    return RDFClassExtractor(graph=class_expressions_graph)
 
 
 def test_a_class_records_the_named_classes_it_is_disjoint_with(
@@ -186,7 +178,7 @@ def test_an_anonymous_union_superclass_is_a_description_of_the_class(
     assert class_expressions_extractor.extract(
         class_uri=class_expressions.Tiger
     ).has_descriptions == [
-        NamingRegistry.uri_to_python_name(uri=union, graph=class_expressions_graph)
+        HasRDFGraph(graph=class_expressions_graph).python_name_of_node(node=union)
     ]
 
 
@@ -392,9 +384,7 @@ def property_relations_extractor() -> RDFPropertyExtractor:
         / "ontologies"
         / "property_relations_extraction.ttl"
     )
-    return RDFPropertyExtractor(
-        graph=graph, metadata_extractor=RDFMetadataExtractor(graph=graph)
-    )
+    return RDFPropertyExtractor(graph=graph)
 
 
 def test_an_equivalence_is_recorded_on_both_properties(
