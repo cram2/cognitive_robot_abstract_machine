@@ -5,10 +5,15 @@ Fixtures shared by the development tools tests.
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
-from typing_extensions import Callable
+from typing_extensions import Callable, Iterator
+
+from krrood.development_tools.issue_forms.issue_form_files import (
+    RepositoryIssueFormsModule,
+)
 
 
 from .dataset_files import DatasetFile, ProseSnippet
@@ -57,3 +62,31 @@ def repository(tmp_path: Path) -> Path:
     git(tmp_path, "add", "module.py")
     git(tmp_path, "commit", "--quiet", "-m", "Add")
     return tmp_path
+
+
+@pytest.fixture
+def forget_project_issue_forms() -> Iterator[None]:
+    """
+    Remove the repository's issue forms module from the imported modules after the test,
+    so that the next test imports its own.
+    """
+    yield
+    for module_name in list(sys.modules):
+        if module_name.split(".")[0] == RepositoryIssueFormsModule.ISSUE_FORMS:
+            del sys.modules[module_name]
+
+
+@pytest.fixture
+def project_issue_forms_repository(
+    repository_root: Path,
+    copy_into_temporary_directory: Callable[[DatasetFile, str], Path],
+    forget_project_issue_forms: None,
+) -> Path:
+    """
+    :return: :func:`repository_root`, holding the repository's issue forms module.
+    """
+    copy_into_temporary_directory(
+        DatasetFile.PROJECT_ISSUE_FORMS_MODULE,
+        f"{RepositoryIssueFormsModule.ISSUE_FORMS}.py",
+    )
+    return repository_root

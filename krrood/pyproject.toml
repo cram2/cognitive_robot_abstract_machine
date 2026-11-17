@@ -114,6 +114,7 @@ krrood = [
   "code_generation/templates/*.jinja",
   "entity_query_language/testing/templates/*.jinja",
   "development_tools/agents/templates/*.jinja",
+  "development_tools/issue_forms/templates/*.jinja",
 ]
 
 [tool.pytest.ini_options]

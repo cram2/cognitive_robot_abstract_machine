@@ -26,12 +26,19 @@ from giskardpy.middleware.ros2.exceptions import (
     ClientDisconnectedError,
     ExecutionCanceledException,
     MotionServerThreadStillRunningError,
+    RequiredWorldUpdateNotAppliedError,
     RequiredWorldUpdateNotReceivedError,
     UnserializableGoalError,
 )
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
-from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.middleware.ros2.plot_archive import (
+    GoalPlotKind,
+    PlotArchive,
+    RunPlotDirectory,
+)
+from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
+from giskardpy.motion_control import WorldStateTrajectoryRecording
 from giskardpy.motion_statechart.debug_expression_publisher import (
     DebugExpressionPublishing,
 )
@@ -110,6 +117,20 @@ class MotionServer:
     """
     The extension of :attr:`executor` that publishes the debug expressions of a goal
     that asks for them.
+    """
+
+    trajectory_recording: WorldStateTrajectoryRecording
+    """
+    The extension of :attr:`executor` that records the trajectory of a goal that asks
+    for its plot.
+    """
+
+    plot_directory: RunPlotDirectory = field(
+        default_factory=lambda: PlotArchive().start_run()
+    )
+    """
+    Where the debug plots of the goals this server runs are written, apart from those of
+    every other server.
     """
 
     idle_frequency: float = 20.0
@@ -214,16 +235,19 @@ class MotionServer:
         """
         Execute the accepted goal and answer the client, whatever happens.
 
-        The statechart of the previous goal is dropped first, so a goal that fails
-        before its own statechart compiled reports no states.
+        A goal that fails before its statechart compiled reports no states and has no
+        trajectory to plot.
         """
         self.executor.statechart = None
+        self.trajectory_recording.start_trajectory(executor=self.executor)
         self.outgoing_world_updates.start_goal()
         error: Exception | None = None
+        debug_output = DebugOutput()
         try:
             goal = MotionGoal.from_json(
                 data=json.loads(self.action_server.goal_msg.goal)
             )
+            debug_output = goal.debug_output
             self.client_watchdog.watch(client=goal.client)
             self.wait_for_required_world_updates(
                 required_position=goal.required_position
@@ -238,7 +262,7 @@ class MotionServer:
                 traceback.print_exc()
             error = exception
         finally:
-            self.finish_goal(error=error)
+            self.finish_goal(error=error, debug_output=debug_output)
 
     def wait_for_required_world_updates(
         self, *, required_position: StreamPosition | None
@@ -251,6 +275,8 @@ class MotionServer:
 
         :raises RequiredWorldUpdateNotReceivedError: If that change does not arrive
             within ``world_update_timeout``.
+        :raises RequiredWorldUpdateNotAppliedError: If an update of the client could not
+            be applied to the world.
         :raises ClientDisconnectedError: If the client of the goal disconnects while its
             change is awaited.
         """
@@ -261,6 +287,16 @@ class MotionServer:
             self.world_updates.apply_all()
             if self.world_updates.has_applied(position=required_position):
                 return
+            divergence = self.world_updates.divergence_from(
+                publisher=required_position.origin
+            )
+            if divergence is not None:
+                raise RequiredWorldUpdateNotAppliedError(
+                    publisher_name=required_position.origin.node_name,
+                    failed_sequence_number=divergence.sequence_number,
+                    awaited_sequence_number=required_position.sequence_number,
+                    raised_from=divergence,
+                )
             if self.client_watchdog.is_client_gone():
                 raise ClientDisconnectedError(client=self.client_watchdog.client)
             if time.monotonic() >= deadline:
@@ -286,15 +322,42 @@ class MotionServer:
             context=self.executor.context, **kwargs
         )
         self.debug_expression_publishing.publishes_markers = (
-            goal.publishes_debug_expressions
+            goal.debug_output.publishes_expression_markers
+        )
+        self.trajectory_recording.appends_every_tick = (
+            goal.debug_output.plots_trajectory
         )
         self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
         background_node.get_node().get_logger().info("Done parsing goal message.")
 
-    def finish_goal(self, *, error: Exception | None) -> None:
+    def write_trajectory_plot(self) -> None:
         """
-        Stop the robot, clean up the motion statechart and answer the client.
+        Plot the trajectory the goal recorded into :attr:`plot_directory`.
+
+        A plot that fails is only reported as a warning, because it is debug output and
+        does not change what the motion did.
+        """
+        plotter = self.trajectory_recording.plotter
+        if not plotter.has_trajectory_to_plot:
+            return
+        goal_id = self.action_server.goal_id
+        file_name = self.plot_directory.goal_plot_path(
+            plot_kind=GoalPlotKind.TRAJECTORY, goal_id=goal_id
+        )
+        try:
+            plotter.plot_trajectory(file_name=file_name)
+        except Exception as exception:
+            background_node.get_node().get_logger().warning(
+                f"Could not plot the trajectory of goal #{goal_id}: {exception}"
+            )
+
+    def finish_goal(
+        self, *, error: Exception | None, debug_output: DebugOutput
+    ) -> None:
+        """
+        Stop the robot, write the trajectory plot the goal asked for, whatever its
+        outcome, clean up the motion statechart and answer the client.
 
         The client is answered even if cleaning up fails, so that a failure here cannot
         make it wait forever.
@@ -302,6 +365,8 @@ class MotionServer:
         try:
             self.client_watchdog.stop_watching()
             self.control_loop.stop()
+            if debug_output.plots_trajectory:
+                self.write_trajectory_plot()
             if self.executor.statechart is not None:
                 self.executor.statechart.cleanup_nodes()
             self.feedback_publisher.publish()

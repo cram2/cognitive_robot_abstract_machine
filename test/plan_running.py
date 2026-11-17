@@ -56,17 +56,17 @@ def with_grounding(
 
 
 def simulated_executor(
-    extensions: list[ContextExtension], **options
+    context_extensions: list[ContextExtension], **options
 ) -> KinematicallySimulatedPlanExecutor:
     """
-    :param extensions: The context extensions of the plan, holding a
+    :param context_extensions: The context extensions of the plan, holding a
         :class:`~coraplex.plans.context_extensions.RobotAccess`.
     :param options: Further arguments of the executor.
     :return: An executor simulating plans in the world of the robot in `extensions`.
     """
     return KinematicallySimulatedPlanExecutor(
         context=StatechartContext.with_extensions(
-            world=world_of(extensions), extensions=extensions
+            world=world_of(context_extensions), extensions=context_extensions
         ),
         **options,
     )
@@ -155,17 +155,17 @@ def expand(plan: StatechartNode, extensions: list[ContextExtension]) -> Statecha
 
 
 def run_plan(
-    plan: StatechartNode, extensions: list[ContextExtension], **options
+    plan: StatechartNode, context_extensions: list[ContextExtension], **options
 ) -> KinematicallySimulatedPlanExecutor:
     """
     Run `plan` simulated until it succeeded.
 
     :param plan: The plan to run.
-    :param extensions: The context extensions of the plan.
+    :param context_extensions: The context extensions of the plan.
     :param options: Further arguments of the executor.
     :return: The executor that ran the plan.
     """
-    executor = simulated_executor(extensions, **options)
+    executor = simulated_executor(context_extensions, **options)
     executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
     return executor
