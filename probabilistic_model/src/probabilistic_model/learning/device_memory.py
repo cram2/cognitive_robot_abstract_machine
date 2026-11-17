@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from krrood.patterns.path_enumeration import PathEnumeration
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 from probabilistic_model.learning.exceptions import (
     MissingMemoryFieldError,
