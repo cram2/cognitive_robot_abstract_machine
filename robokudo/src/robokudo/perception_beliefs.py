@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass, replace
 
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from scipy.optimize import linear_sum_assignment
 from semantic_digital_twin.reasoning.queries import annotation_class_by_label
