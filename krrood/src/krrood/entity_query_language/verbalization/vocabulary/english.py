@@ -1,3 +1,7 @@
+"""
+The English words and phrases verbalization builds its clauses from.
+"""
+
 from __future__ import annotations
 
 import operator
@@ -25,6 +29,7 @@ from krrood.entity_query_language.operators.comparator import not_contains
 from krrood.entity_query_language.verbalization.exceptions import UnknownAggregatorError
 
 from krrood.entity_query_language.verbalization.fragments.base import (
+    IndefiniteArticle,
     NounPhrase,
     PhraseFragment,
     RoleFragment,
@@ -56,7 +61,7 @@ class SingularExistential(PlainWord):
     """
     Parameterised existential phrase: *"there's a/an TypeName"*.
 
-    The noun is an indefinite noun phrase, so the determiner pass chooses its article.
+    Its article is the lexeme *"a"*, which the morphology pass makes agree with the noun.
     """
 
     def build_phrase(
@@ -67,19 +72,25 @@ class SingularExistential(PlainWord):
 
         :param type_name: English noun in singular form (e.g. ``"Robot"``, ``"Apple"``).
         :param referent_id: When given, the noun is a referring noun phrase for that entity.
-        :return: Phrase fragment whose noun phrase takes its indefinite article once realised.
+        :return: Phrase fragment whose indefinite article agrees with *type_name* once realised.
 
         >>> from krrood.entity_query_language.verbalization.rendering.realization import realize_subtree
         >>> realize_subtree(SingularExistential(text="there's").build_phrase(type_name="Apple"))
         "there's an Apple"
         """
+        noun = RoleFragment(text=type_name, role=SemanticRole.VARIABLE)
+        if referent_id is not None:
+            return PhraseFragment(
+                parts=[
+                    WordFragment(text=self.text),
+                    NounPhrase(head=noun, referent_id=referent_id),
+                ],
+            )
         return PhraseFragment(
             parts=[
                 WordFragment(text=self.text),
-                NounPhrase(
-                    head=RoleFragment(text=type_name, role=SemanticRole.VARIABLE),
-                    referent_id=referent_id,
-                ),
+                IndefiniteArticle(text=Articles.A.text),
+                noun,
             ],
         )
 
@@ -725,7 +736,6 @@ class Articles(VocabEnum):
     THE_OTHER = PlainWord(text="the other")
     """The definite alternative determiner — the same referent once the pair is discourse-old
     (:class:`NounPhrase.alternative` on repeat mention)."""
-
 
 
 class ExistentialPhrase(VocabEnum):

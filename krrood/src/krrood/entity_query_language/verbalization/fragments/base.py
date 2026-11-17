@@ -1,3 +1,8 @@
+"""
+The fragment tree a verbalization is built as: its leaves, its structural nodes, and
+the folds and maps over it.
+"""
+
 from __future__ import annotations
 
 import uuid
@@ -281,6 +286,14 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
 
 
 # %% leaves whose words the morphology pass decides
+
+
+@dataclass(kw_only=True)
+class IndefiniteArticle(WordFragment):
+    """
+    The indefinite article, whose surface the morphology pass makes agree with the sound
+    of the word after it (*"a Robot"*, *"an hour"*).
+    """
 
 
 @dataclass(kw_only=True)
