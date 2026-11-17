@@ -208,7 +208,7 @@ def publish_group_message(controller: JointGroupVelocityCommandPublisher) -> Any
     """
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
-    controller.publish()
+    controller.publish(publish_time=0.0)
     return recorder.published_message
 
 
@@ -218,7 +218,7 @@ def stop_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
     """
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
-    controller.stop()
+    controller.stop(publish_time=0.0)
     return recorder.published_message
 
 
@@ -235,7 +235,7 @@ def publish_drive(publisher: DriveVelocityCommandPublisher) -> RecordingPublishe
     """
     recorder = RecordingPublisher()
     publisher.velocity_publisher = recorder
-    publisher.publish()
+    publisher.publish(publish_time=0.0)
     return recorder
 
 
@@ -444,15 +444,18 @@ def test_group_publisher_follows_its_joints_through_a_model_change(
 def test_group_publisher_publishes_the_velocities_of_the_current_cycle(
     init_background_node,
 ):
+    """
+    Every publish reads the velocities the world state holds at that moment.
+    """
     specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
     world = build_world_with_joints(specs)
     controller = group_publisher_for(world, specs)
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
 
-    controller.publish()
+    controller.publish(publish_time=0.0)
     world.get_connection_by_name("joint_a").velocity = 0.4
-    controller.publish()
+    controller.publish(publish_time=0.0)
 
     recorded = [list(message.data) for message in recorder.published_messages]
     assert recorded[0] == pytest.approx([0.1])
@@ -682,6 +685,9 @@ def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
 def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
     init_background_node,
 ):
+    """
+    A stopped drive is sent a zero twist in the message type its controller consumes.
+    """
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -689,7 +695,7 @@ def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
     recorder = RecordingPublisher()
     publisher.velocity_publisher = recorder
 
-    publisher.stop()
+    publisher.stop(publish_time=0.0)
 
     assert isinstance(recorder.published_message, TwistStamped)
     assert recorder.published_message.twist == Twist()
@@ -721,6 +727,9 @@ def test_drive_publisher_follows_its_dofs_through_a_model_change(init_background
 def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
     init_background_node,
 ):
+    """
+    Every publish reads the drive velocities the world state holds at that moment.
+    """
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -728,9 +737,9 @@ def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
     recorder = RecordingPublisher()
     publisher.velocity_publisher = recorder
 
-    publisher.publish()
+    publisher.publish(publish_time=0.0)
     world.state[drive.x_velocity.id].velocity = 0.6
-    publisher.publish()
+    publisher.publish(publish_time=0.0)
 
     assert [
         message.linear.x for message in recorder.published_messages
@@ -803,6 +812,36 @@ def test_commands_replaced_longer_ago_than_the_kept_duration_are_forgotten():
     assert history.displacement(start_time=9.5, end_time=10.5) == pytest.approx(
         [0.5 * 2.0 + 0.5 * 3.0]
     )
+
+
+def test_a_clock_jumping_back_forgets_the_commands_of_the_old_timeline():
+    """
+    A restarted simulation's clock starts over; the commands stamped before the jump
+    would otherwise never be forgotten.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=1))
+    history.record(publish_time=999.0, velocities=[1.0])
+    history.record(publish_time=1000.0, velocities=[2.0])
+
+    history.record(publish_time=0.5, velocities=[3.0])
+
+    assert [command.publish_time for command in history.held_commands] == [0.5]
+
+
+def test_a_command_is_remembered_at_the_time_it_was_published(init_background_node):
+    """
+    The publish time comes from the control loop, whose clock the measurements are
+    compared against.
+    """
+    controller = build_group_publisher(
+        [ConnectionSpec(name="joint_a", velocity=0.1)],
+        actuation_delay=timedelta(seconds=0.3),
+    )
+    controller.command_publisher = RecordingPublisher()
+
+    controller.publish(publish_time=12.5)
+
+    assert controller.command_history.held_commands[-1].publish_time == 12.5
 
 
 def test_publishing_records_the_commanded_velocities(init_background_node):

@@ -244,15 +244,6 @@ class JointVelocityCommand:
             velocity=state_velocity * self.connection.multiplier
         )
 
-    def executed_state_velocity(self, *, sent_velocity: float) -> float:
-        """
-        The raw state velocity the joint moves at while it executes a sent velocity.
-
-        :param sent_velocity: The velocity sent to the joint's hardware interface.
-        :return: The velocity of the raw degree of freedom.
-        """
-        return sent_velocity / self.connection.multiplier
-
     @classmethod
     def for_connections(
         cls,
@@ -323,10 +314,16 @@ class CommandHistory:
         Remember a command and forget the ones replaced longer than
         :attr:`kept_duration` ago.
 
+        A command published before the newest remembered one means the clock jumped
+        back, as a restarted simulation's does; the remembered commands then belong to
+        another timeline and are forgotten.
+
         :param publish_time: Seconds of the ROS clock at which the command was
             published.
         :param velocities: The velocity of every commanded degree of freedom.
         """
+        if self.held_commands and publish_time < self.held_commands[-1].publish_time:
+            self.held_commands.clear()
         self.held_commands.append(
             HeldCommand(publish_time=publish_time, velocities=np.array(velocities))
         )
@@ -485,15 +482,21 @@ class CommandPublisher(ABC):
     """
 
     @abstractmethod
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         """
         Publish the velocities currently stored in the world state.
+
+        :param publish_time: Seconds of the ROS clock at which the command is
+            published.
         """
 
     @abstractmethod
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         """
         Publish zero velocities so the robot comes to a halt.
+
+        :param publish_time: Seconds of the ROS clock at which the command is
+            published.
         """
 
     def write_predicted_positions(
@@ -620,7 +623,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
             f"{[connection.name.name for connection in self.connections]}"
         )
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         state_velocities = self.velocity_reader.velocities()
         velocities = [
             command.from_state_velocity(state_velocity=state_velocity)
@@ -629,28 +632,32 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         self.command_publisher.publish(
             self.command_format.create_message(velocities=velocities)
         )
-        self._record_command(sent_velocities=velocities)
+        self._record_command(publish_time=publish_time, sent_velocities=velocities)
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         velocities = [0.0] * len(self.commands)
         self.command_publisher.publish(
             self.command_format.create_message(velocities=velocities)
         )
-        self._record_command(sent_velocities=velocities)
+        self._record_command(publish_time=publish_time, sent_velocities=velocities)
 
-    def _record_command(self, *, sent_velocities: list[float]) -> None:
+    def _record_command(
+        self, *, publish_time: float, sent_velocities: list[float]
+    ) -> None:
         """
-        Remember the command just published, stamped with the current ROS time, as the
-        raw state velocities the joints execute; nothing without an actuation delay.
+        Remember the command just published as the raw state velocities the joints
+        execute; nothing without an actuation delay.
 
+        :param publish_time: Seconds of the ROS clock at which the command was
+            published.
         :param sent_velocities: The velocity sent to every joint.
         """
         if self.actuation_delay is None:
             return
         self.command_history.record(
-            publish_time=background_node.ros_clock_seconds(),
+            publish_time=publish_time,
             velocities=[
-                command.executed_state_velocity(sent_velocity=sent_velocity)
+                sent_velocity / command.connection.multiplier
                 for command, sent_velocity in zip(self.commands, sent_velocities)
             ],
         )
@@ -660,11 +667,16 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     ) -> bool:
         """
         Unlike :meth:`CommandPublisher.write_predicted_positions`, moves the positions
-        forward by the commands executed from one :attr:`actuation_delay` before the
-        measurement on. A measurement stamped after the expected publish time, or older
-        than :attr:`command_history_margin`, is left as it is, with a warning.
+        forward by the commands executed since one :attr:`actuation_delay` before the
+        measurement. A measurement of these joints stamped after the expected publish
+        time, or older than :attr:`command_history_margin`, is left, with a warning.
         """
         if self.actuation_delay is None or not self.command_history.held_commands:
+            return False
+        if not any(
+            connection.raw_dof.id in measurement.positions
+            for connection in self.connections
+        ):
             return False
         earliest_usable_time = (
             cycle_timing.cycle_start_time - self.command_history_margin.total_seconds()
@@ -778,7 +790,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
             return [self.connection.x_velocity, self.connection.y_velocity]
         return [self.connection.x_velocity]
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         velocities = self.velocity_reader.velocities()
         linear_velocities = self.minimum_linear_velocity.enforce_on_vector(
             velocities=velocities[:-1]
@@ -791,7 +803,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
         )
         self._publish_twist()
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         self.twist.linear.x = 0.0
         self.twist.linear.y = 0.0
         self.twist.angular.z = 0.0

@@ -91,3 +91,33 @@ def test_the_publish_time_is_expected_one_computation_time_after_the_cycle_start
     timing.start_cycle()
 
     assert timing.expected_publish_time == pytest.approx(10.1 + 0.04)
+
+
+def test_finishing_a_cycle_returns_the_publish_time(simulated_clock: SimulatedClock):
+    """
+    The commands are stamped with the time read from the same clock the cycle start was
+    read from.
+    """
+    timing = CycleTiming(clock=simulated_clock.clock)
+    simulated_clock.set_seconds(seconds=10.0)
+    timing.start_cycle()
+    simulated_clock.set_seconds(seconds=10.04)
+
+    assert timing.finish_cycle() == pytest.approx(10.04)
+
+
+def test_a_clock_jumping_back_during_a_cycle_counts_as_no_computation_time(
+    simulated_clock: SimulatedClock,
+):
+    """
+    A restarted simulation's clock starts over; a negative computation time would expect
+    the commands before the cycle even started.
+    """
+    timing = CycleTiming(clock=simulated_clock.clock)
+    simulated_clock.set_seconds(seconds=1000.0)
+    timing.start_cycle()
+    simulated_clock.set_seconds(seconds=0.5)
+
+    timing.finish_cycle()
+
+    assert timing.computation_time == 0.0

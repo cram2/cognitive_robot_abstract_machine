@@ -17,8 +17,10 @@ from semantic_digital_twin.adapters.ros.background_node import ros_time_seconds
 class CycleTiming:
     """
     The start of the running control cycle and the computation time of the previous one,
-    both on the ROS clock that the header stamps of received messages are comparable
-    with.
+    on the ROS clock that header stamps are comparable with.
+
+    The only clock the control loop reads, so the times it stamps commands with and
+    compares measurements against cannot drift apart.
     """
 
     clock: Clock
@@ -45,16 +47,27 @@ class CycleTiming:
         """
         return self.cycle_start_time + self.computation_time
 
+    def now(self) -> float:
+        """
+        :return: The current seconds of :attr:`clock`.
+        """
+        return ros_time_seconds(self.clock.now())
+
     def start_cycle(self) -> None:
         """
         Mark the start of a cycle.
         """
-        self.cycle_start_time = ros_time_seconds(self.clock.now())
+        self.cycle_start_time = self.now()
 
-    def finish_cycle(self) -> None:
+    def finish_cycle(self) -> float:
         """
-        Mark that the running cycle published its commands.
+        Mark that the running cycle publishes its commands now.
+
+        A clock that jumped back during the cycle, as a restarted simulation's does,
+        counts as no computation time.
+
+        :return: Seconds of :attr:`clock` at which the commands are published.
         """
-        self.computation_time = (
-            ros_time_seconds(self.clock.now()) - self.cycle_start_time
-        )
+        publish_time = self.now()
+        self.computation_time = max(publish_time - self.cycle_start_time, 0.0)
+        return publish_time

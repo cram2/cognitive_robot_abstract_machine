@@ -55,17 +55,6 @@ def get_node() -> Node:
     return ROSNodeRegistry().get()
 
 
-def ros_clock_seconds() -> float:
-    """
-    The current time of the node's ROS clock, the clock the header stamps of the
-    messages it receives are comparable with.
-
-    :return: Seconds since the epoch of the ROS clock.
-    :raises ROSNodeNotRegisteredError: If :func:`init_node` has not registered a node.
-    """
-    return ros_time_seconds(get_node().get_clock().now())
-
-
 def ros_time_seconds(time: Time) -> float:
     """
     :param time: A time of any ROS clock, e.g. read from it or from a header stamp.

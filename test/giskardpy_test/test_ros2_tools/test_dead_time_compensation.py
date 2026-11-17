@@ -20,6 +20,7 @@ from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.ros.input_synchronization import (
     PendingJointStateSynchronizer,
 )
+from semantic_digital_twin.input_synchronization import WorldStateInputs
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
@@ -50,6 +51,16 @@ class CompensatedJoint:
     Writes the measured position of the joint.
     """
 
+    inputs: WorldStateInputs
+    """
+    The inputs of the loop, :attr:`synchronizer` among them.
+    """
+
+    other_connection: ActiveConnection1DOF
+    """
+    A measured joint that :attr:`publisher` does not command.
+    """
+
     publisher: JointGroupVelocityCommandPublisher
     """
     Commands the velocity of the joint.
@@ -76,15 +87,31 @@ class CompensatedJoint:
         """
         Write a measured position, sampled at ``measurement_time``, into the world.
         """
-        message = JointStateMessage()
-        message.header.stamp.sec = int(measurement_time)
-        message.header.stamp.nanosec = round(
-            (measurement_time - int(measurement_time)) * 1e9
+        self.synchronizer.latest_message = stamped_joint_state(
+            positions={self.connection.name.name: position},
+            measurement_time=measurement_time,
         )
-        message.name = [self.connection.name.name]
-        message.position = [position]
-        self.synchronizer.latest_message = message
         self.synchronizer.apply()
+
+    def add_joint_state_input(
+        self, *, positions: dict[str, float], measurement_time: float
+    ) -> PendingJointStateSynchronizer:
+        """
+        Add another joint state input to the loop and let it write a measurement.
+
+        :param positions: The measured position of every joint, by joint name.
+        :param measurement_time: The time the positions were sampled at.
+        :return: The added input.
+        """
+        synchronizer = PendingJointStateSynchronizer(
+            world=self.world, node=background_node.get_node(), topic_name="joint_states"
+        )
+        self.inputs.add_input(synchronizer)
+        synchronizer.latest_message = stamped_joint_state(
+            positions=positions, measurement_time=measurement_time
+        )
+        synchronizer.apply()
+        return synchronizer
 
     def predict(self, *, cycle_start_time: float, computation_time: float) -> bool:
         """
@@ -102,12 +129,18 @@ def build_compensated_joint(*, actuation_delay: timedelta | None) -> Compensated
     """
     Build a single joint that is measured and commanded with the given actuation delay.
     """
-    spec = ConnectionSpec(name="joint_a", velocity=0.0)
-    world = build_world_with_joints([spec])
-    connection = world.get_connection_by_name(spec.name)
+    world = build_world_with_joints(
+        [
+            ConnectionSpec(name="joint_a", velocity=0.0),
+            ConnectionSpec(name="joint_b", velocity=0.0),
+        ]
+    )
+    connection = world.get_connection_by_name("joint_a")
     synchronizer = PendingJointStateSynchronizer(
         world=world, node=background_node.get_node(), topic_name="joint_states"
     )
+    inputs = WorldStateInputs(world=world)
+    inputs.add_input(synchronizer)
     publisher = JointGroupVelocityCommandPublisher(
         world=world,
         command_topic="test_cmd",
@@ -119,15 +152,30 @@ def build_compensated_joint(*, actuation_delay: timedelta | None) -> Compensated
         world=world,
         connection=connection,
         synchronizer=synchronizer,
+        inputs=inputs,
+        other_connection=world.get_connection_by_name("joint_b"),
         publisher=publisher,
         cycle_timing=cycle_timing,
         compensation=DeadTimeCompensation(
-            world=world,
-            joint_states=[synchronizer],
-            command_publishers=[publisher],
-            cycle_timing=cycle_timing,
+            inputs=inputs, command_publishers=[publisher], cycle_timing=cycle_timing
         ),
     )
+
+
+def stamped_joint_state(
+    *, positions: dict[str, float], measurement_time: float
+) -> JointStateMessage:
+    """
+    A joint state message reporting ``positions``, sampled at ``measurement_time``.
+    """
+    message = JointStateMessage()
+    message.header.stamp.sec = int(measurement_time)
+    message.header.stamp.nanosec = round(
+        (measurement_time - int(measurement_time)) * 1e9
+    )
+    message.name = list(positions)
+    message.position = list(positions.values())
+    return message
 
 
 # %% predicting positions
@@ -277,3 +325,113 @@ def test_a_measurement_older_than_the_remembered_commands_is_not_moved_forward(
         joint.predict(cycle_start_time=cycle_start_time, computation_time=0.05) is False
     )
     assert joint.position == 1.0
+
+
+def test_a_stale_measurement_of_a_commanded_joint_is_warned_about(
+    init_background_node, monkeypatch
+):
+    """
+    The warning names the publisher whose joints stay uncompensated.
+    """
+    joint = build_compensated_joint(actuation_delay=timedelta(seconds=0.3))
+    joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    joint.measure(position=1.0, measurement_time=3.0)
+    warnings = record_warnings(monkeypatch)
+
+    joint.predict(cycle_start_time=10.05, computation_time=0.05)
+
+    assert len(warnings) == 1
+    assert joint.publisher.command_topic in warnings[0]
+
+
+def test_a_stale_input_holding_none_of_the_commanded_joints_is_not_warned_about(
+    init_background_node, monkeypatch
+):
+    """
+    A gripper that publishes rarely does not report the compensation of the arm as
+    failing.
+    """
+    joint = build_compensated_joint(actuation_delay=timedelta(seconds=0.3))
+    joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    joint.measure(position=1.0, measurement_time=10.0)
+    joint.add_joint_state_input(
+        positions={joint.other_connection.name.name: 0.2}, measurement_time=3.0
+    )
+    warnings = record_warnings(monkeypatch)
+
+    assert joint.predict(cycle_start_time=10.05, computation_time=0.05) is True
+    assert warnings == []
+
+
+def record_warnings(monkeypatch) -> list[str]:
+    """
+    Record the warnings of the background node instead of logging them.
+
+    :return: The recorded warnings, filled as they are logged.
+    """
+    warnings = []
+    monkeypatch.setattr(
+        background_node.get_node().get_logger(),
+        "warning",
+        lambda message, **_: warnings.append(message),
+    )
+    return warnings
+
+
+# %% the inputs that are moved forward
+
+
+def test_a_joint_state_input_added_after_the_compensation_is_moved_forward(
+    init_background_node,
+):
+    """
+    The inputs are read every cycle, so a source added later is compensated as well.
+    """
+    actuation_delay = timedelta(seconds=0.3)
+    joint = build_compensated_joint(actuation_delay=actuation_delay)
+    joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    joint.add_joint_state_input(
+        positions={joint.connection.name.name: 1.0}, measurement_time=10.0
+    )
+
+    joint.predict(cycle_start_time=10.05, computation_time=0.05)
+
+    executed_since_measurement = joint.cycle_timing.expected_publish_time - (
+        10.0 - actuation_delay.total_seconds()
+    )
+    assert joint.position == pytest.approx(1.0 + 0.5 * executed_since_measurement)
+
+
+def test_inputs_sampled_at_the_same_time_are_moved_forward_by_one_displacement(
+    init_background_node, monkeypatch
+):
+    """
+    The parts of a robot that share a topic report the same stamp, so their joints move
+    by the same commands.
+    """
+    joint = build_compensated_joint(actuation_delay=timedelta(seconds=0.3))
+    publisher = JointGroupVelocityCommandPublisher(
+        world=joint.world,
+        command_topic="test_cmd_of_both_joints",
+        connections=[joint.connection, joint.other_connection],
+        actuation_delay=timedelta(seconds=0.3),
+    )
+    joint.compensation.command_publishers = [publisher]
+    publisher.command_history.record(publish_time=9.0, velocities=[0.5, -0.5])
+    joint.measure(position=1.0, measurement_time=10.0)
+    joint.add_joint_state_input(
+        positions={joint.other_connection.name.name: 2.0}, measurement_time=10.0
+    )
+    displacements = []
+    displacement = publisher.command_history.displacement
+    monkeypatch.setattr(
+        publisher.command_history,
+        "displacement",
+        lambda **kwargs: displacements.append(kwargs) or displacement(**kwargs),
+    )
+
+    joint.predict(cycle_start_time=10.05, computation_time=0.05)
+
+    assert len(displacements) == 1
+    assert joint.position > 1.0
+    assert joint.world.state[joint.other_connection.raw_dof.id].position < 2.0

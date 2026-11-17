@@ -151,16 +151,14 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     def connect(self) -> None:
         """
-        Release every joint the robot class declared as controlled, let :meth:`setup`
-        declare the ones that are commanded, and compensate the actuation delays it
-        configured.
+        Release every joint the robot class declared as controlled, then let
+        :meth:`setup` declare the ones that are commanded.
         """
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
                 self.world.degrees_of_freedom, False
             )
         self.setup()
-        self.control_loop.compensate_dead_time()
 
     @abstractmethod
     def setup(self) -> None:
