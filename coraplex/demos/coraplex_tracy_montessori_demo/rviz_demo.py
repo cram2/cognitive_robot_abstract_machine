@@ -50,10 +50,14 @@ class RvizRunner(DemoRunner):
         world.notify_state_change()
 
         executor = KinematicallySimulatedPlanExecutor(
-            StatechartContext.with_extensions(world, [RobotAccess(tracy)]),
+            context=StatechartContext.with_extensions(
+                world=world, extensions=[RobotAccess(robot=tracy)]
+            ),
             ros_node=node,
         )
-        executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+        executor.compile(
+            statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+        )
         executor.execute()
         executor.close()
 

@@ -57,7 +57,9 @@ def _build_executor(world):
     segmind_executor = StatechartExecutor(
         context=context, extensions=[EpisodeSegmentation()]
     )
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_context = segmind_executor.context.require_extension(
+        extension_type=SegmindContext
+    )
     return segmind_executor, segmind_context, milk, box1, box2
 
 
@@ -77,7 +79,7 @@ def test_contact_detector(_simple_apartment_setup):
     statechart = DetectorStatechartBuilder([ContactDetector()]).build(
         segmind_executor.context
     )
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, ContactEvent)) == 0
@@ -128,7 +130,7 @@ def test_support_detector(_simple_apartment_setup):
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         -1.7, 0, 0.93, reference_frame=milk.parent_connection.parent
     )
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
     assert len(events_of(segmind_context, SupportEvent)) == 1
 
@@ -174,11 +176,13 @@ def test_containment_detector(box_and_trays):
     segmind_executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_context = segmind_executor.context.require_extension(
+        extension_type=SegmindContext
+    )
     statechart = DetectorStatechartBuilder(
         [SupportDetector(), ContainmentDetector()]
     ).build(segmind_executor.context)
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, ContainmentEvent)) == 0
@@ -208,11 +212,13 @@ def test_containment_detector_ignores_an_object_held_up_inside_a_container(
     segmind_executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_context = segmind_executor.context.require_extension(
+        extension_type=SegmindContext
+    )
     statechart = DetectorStatechartBuilder(
         [SupportDetector(), ContainmentDetector()]
     ).build(segmind_executor.context)
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
 
     box.parent_connection.origin = box_and_trays.held_up_in_the_tray
     segmind_executor.tick()
@@ -232,9 +238,11 @@ def test_containment_is_not_looked_for_without_the_supports_it_is_read_from(
     segmind_executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_context = segmind_executor.context.require_extension(
+        extension_type=SegmindContext
+    )
     segmind_executor.compile(
-        DetectorStatechartBuilder([ContainmentDetector()]).build(
+        statechart=DetectorStatechartBuilder([ContainmentDetector()]).build(
             segmind_executor.context
         )
     )
@@ -273,7 +281,7 @@ def test_pickup(_simple_apartment_setup):
         -1.7, 0, 0.93, reference_frame=milk.parent_connection.parent
     )
 
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, SupportEvent)) == 1
@@ -306,7 +314,7 @@ def test_placing(_simple_apartment_setup):
             PlacingDetector(),
         ]
     ).build(segmind_executor.context)
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     for i in range(5):
@@ -356,7 +364,7 @@ def test_pickup_then_place_back_on_same_surface(_simple_apartment_setup):
         reference_frame=milk.parent_connection.parent,
     )
 
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, SupportEvent)) == 1
@@ -410,7 +418,7 @@ def test_translation(_simple_apartment_setup):
     statechart = DetectorStatechartBuilder([TranslationDetector()]).build(
         segmind_executor.context
     )
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, TranslationEvent)) == 0
@@ -431,7 +439,7 @@ def test_a_motion_event_states_its_poses_in_the_world_frame(_simple_apartment_se
     world = _simple_apartment_setup
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(world)
     segmind_executor.compile(
-        DetectorStatechartBuilder([TranslationDetector()]).build(
+        statechart=DetectorStatechartBuilder([TranslationDetector()]).build(
             segmind_executor.context
         )
     )
@@ -457,7 +465,9 @@ def test_a_contact_event_states_the_poses_of_both_objects_in_the_world_frame(
     world = _simple_apartment_setup
     segmind_executor, segmind_context, milk, box1, box2 = _build_executor(world)
     segmind_executor.compile(
-        DetectorStatechartBuilder([ContactDetector()]).build(segmind_executor.context)
+        statechart=DetectorStatechartBuilder([ContactDetector()]).build(
+            segmind_executor.context
+        )
     )
     segmind_executor.tick()
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -487,7 +497,7 @@ def test_stop_translation(_simple_apartment_setup):
             PlacingDetector(),
         ]
     ).build(segmind_executor.context)
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     for i in range(5):
@@ -513,7 +523,9 @@ def test_insertion(box_and_trays):
     segmind_executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    segmind_context = segmind_executor.context.require_extension(SegmindContext)
+    segmind_context = segmind_executor.context.require_extension(
+        extension_type=SegmindContext
+    )
     statechart = DetectorStatechartBuilder(
         [
             ContactDetector(),
@@ -522,7 +534,7 @@ def test_insertion(box_and_trays):
             ContainmentDetector(),
         ]
     ).build(segmind_executor.context)
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert len(events_of(segmind_context, InsertionEvent)) == 0
@@ -543,7 +555,7 @@ def test_rotation(_simple_apartment_setup):
     statechart = DetectorStatechartBuilder([RotationDetector()]).build(
         segmind_executor.context
     )
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert (
@@ -582,7 +594,7 @@ def test_stop_rotation(_simple_apartment_setup):
     statechart = DetectorStatechartBuilder([RotationDetector()]).build(
         segmind_executor.context
     )
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
     segmind_executor.tick()
 
     assert (
@@ -646,7 +658,7 @@ def test_slow_motion_with_all_motion_detectors(_simple_apartment_setup):
             RotationDetector(),
         ]
     ).build(segmind_executor.context)
-    segmind_executor.compile(statechart)
+    segmind_executor.compile(statechart=statechart)
 
     # Move the object to its start pose and let the pose windows settle, so that the events
     # triggered by that jump are not mistaken for the slow drift below.
@@ -744,7 +756,7 @@ def test_a_relation_relates_only_the_bodies_it_holds_between(
     """
     world, top, bottom = box_resting_on_another_beside_a_distant_one
     detector = SupportDetector()
-    Statechart(context=StatechartContext(world=world)).add_node(detector)
+    Statechart(context=StatechartContext(world=world)).add_node(node=detector)
 
     related = detector.get_relation([top], relation)
 

@@ -923,7 +923,7 @@ def _navigation_targets(action: Action) -> list[Pose]:
     """
     return [
         node.target_location
-        for node in action.statechart.get_nodes_by_type(NavigateAction)
+        for node in action.statechart.get_nodes_by_type(node_type=NavigateAction)
     ]
 
 

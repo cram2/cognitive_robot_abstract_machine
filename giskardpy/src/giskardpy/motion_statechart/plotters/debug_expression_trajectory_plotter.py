@@ -18,7 +18,7 @@ from giskardpy.motion_statechart.graph_node import DebugExpression
 from giskardpy.utils.utils import create_path
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpressionTrajectoryPlotter:
     """
     Plot how the debug expressions of a motion statechart evolved over time.
@@ -48,22 +48,24 @@ class DebugExpressionTrajectoryPlotter:
     If True, a legend is added to each subplot.
     """
 
-    def reset(self, debug_expressions: list[DebugExpression]) -> None:
+    def reset(self, *, debug_expressions: list[DebugExpression]) -> None:
         """
         Prepare to record the given debug expressions, discarding any previous data.
         """
         self.debug_expression_trajectory = (
-            DebugExpressionTrajectory.from_debug_expressions(debug_expressions)
+            DebugExpressionTrajectory.from_debug_expressions(
+                debug_expressions=debug_expressions
+            )
         )
 
-    def _seconds_to_inches(self, seconds: float) -> float:
+    def _seconds_to_inches(self, *, seconds: float) -> float:
         """
         Convert a duration in seconds to the drawable width in inches.
         """
         return max(0.0, float(seconds)) * (self.second_width_in_cm / 2.54)
 
     def _build_figure(
-        self, duration: float, number_of_subplots: int
+        self, *, duration: float, number_of_subplots: int
     ) -> tuple[plt.Figure, list[plt.Axes]]:
         """
         Create a stacked subplot figure sized so the axes width matches the duration.
@@ -72,7 +74,7 @@ class DebugExpressionTrajectoryPlotter:
         :param number_of_subplots: Number of subplots to create.
         :return: The figure and list of subplot axes.
         """
-        inner_width_in = max(1.0, self._seconds_to_inches(duration))
+        inner_width_in = max(1.0, self._seconds_to_inches(seconds=duration))
         left_margin_in = 0.8
         right_margin_in = 2.0
         top_margin_in = 0.3
@@ -99,7 +101,7 @@ class DebugExpressionTrajectoryPlotter:
             axes = [axes]
         return figure, axes
 
-    def _choose_ticks(self, duration: float) -> np.ndarray:
+    def _choose_ticks(self, *, duration: float) -> np.ndarray:
         """
         Choose tick spacing: either 0.5s or integer seconds with adaptive spacing.
 
@@ -117,6 +119,7 @@ class DebugExpressionTrajectoryPlotter:
 
     def _plot_recorded_debug_expression(
         self,
+        *,
         axis: plt.Axes,
         recorded_debug_expression: RecordedDebugExpression,
         time: np.ndarray,
@@ -149,7 +152,7 @@ class DebugExpressionTrajectoryPlotter:
         if self.legend:
             axis.legend(loc="center left", bbox_to_anchor=(1.01, 0.5))
 
-    def plot(self, file_name: str) -> None:
+    def plot(self, *, file_name: str) -> None:
         """
         Plot the recorded debug expressions and save the result to a PDF file.
 
@@ -168,11 +171,17 @@ class DebugExpressionTrajectoryPlotter:
         time = trajectory.times - float(trajectory.times[0])
         duration = float(time[-1])
 
-        figure, axes = self._build_figure(duration, len(recorded))
+        figure, axes = self._build_figure(
+            duration=duration, number_of_subplots=len(recorded)
+        )
         for axis, recorded_debug_expression in zip(axes, recorded):
-            self._plot_recorded_debug_expression(axis, recorded_debug_expression, time)
+            self._plot_recorded_debug_expression(
+                axis=axis,
+                recorded_debug_expression=recorded_debug_expression,
+                time=time,
+            )
 
-        ticks = self._choose_ticks(duration)
+        ticks = self._choose_ticks(duration=duration)
         axes[-1].set_xlim(0.0, max(duration, 1e-9))
         axes[-1].set_xticks(ticks)
         axes[-1].set_xlabel("Time [s]")

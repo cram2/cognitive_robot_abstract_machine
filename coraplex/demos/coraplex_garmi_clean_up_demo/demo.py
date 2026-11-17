@@ -58,7 +58,7 @@ from giskardpy.motion_statechart.tasks.grasped_mechanism import (
 )
 from giskardpy.motion_statechart.monitors.feature_monitors import DistanceMonitor
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
-from krrood.entity_query_language.factories import a, flat_variable, variable
+from krrood.entity_query_language.factories import a, variable_from, variable
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -348,7 +348,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
 
     def build_context_extensions(self, world: World) -> list[ContextExtension]:
         return [
-            RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0]),
+            RobotAccess(
+                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+            ),
         ]
 
     def build_statechart(self, context: StatechartContext) -> Statechart:
@@ -358,7 +360,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         the drawer while the right arm parks.
         """
         world = context.world
-        robot = context.require_extension(RobotAccess).robot
+        robot = context.require_extension(extension_type=RobotAccess).robot
         left_arm = robot.get_left_arm_if_specified()
         right_arm = robot.get_right_arm_if_specified()
         left_hand = left_arm.end_effector
@@ -392,7 +394,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
 
         statechart = Statechart(context=context)
         statechart.add_node(
-            Sequence(
+            node=Sequence(
                 nodes=[
                     # Parked before driving, since GARMI may start with its arms
                     # reaching out, and a simulated drive arrives at once.
@@ -441,7 +443,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                     end_effector=left_hand
                                 ),
                             ),
-                            UpdateTemporaryCollisionRules.for_end_effector(left_hand),
+                            UpdateTemporaryCollisionRules.for_end_effector(
+                                end_effector=left_hand
+                            ),
                         ]
                     ),
                     # Left hand closes the drawer while the right arm is parked
@@ -454,7 +458,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                 goal_joint_state=drawer_mechanism.dof.limits.lower.position,
                                 holding_end_effector=left_hand,
                             ),
-                            UpdateTemporaryCollisionRules.for_end_effector(left_hand),
+                            UpdateTemporaryCollisionRules.for_end_effector(
+                                end_effector=left_hand
+                            ),
                         ]
                     ),
                     # Back off the handle the way the hand came in.
@@ -513,7 +519,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                 lower_limit=0.0,
                 upper_limit=HandDistance.HANDLE_CONTACT.value,
             ),
-            monitored_node=UpdateTemporaryCollisionRules.for_end_effector(left_hand),
+            monitored_node=UpdateTemporaryCollisionRules.for_end_effector(
+                end_effector=left_hand
+            ),
         )
         if self.grasp_selection is GraspSelection.GIVEN:
             return [
@@ -564,7 +572,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         where_the_robot_stands = variable(
             Pose, domain=[Pose(reference_frame=arm._robot.root)]
         )
-        return flat_variable(
+        return variable_from(
             GraspsByCloseness(
                 graspable=graspable,
                 standing_position=where_the_robot_stands,

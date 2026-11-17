@@ -1,3 +1,8 @@
+"""
+Mixins that give semantic annotations a shared trait, such as having a handle or moving
+on a joint of their own.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -10,7 +15,7 @@ import trimesh
 from trimesh.util import concatenate
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.model_registries import ModelRegistry
 from krrood.patterns.mixin import Mixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -47,6 +52,7 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
     AmbiguousPart,
     CannotBeAPartOf,
+    MissingMovableJointError,
     NoGraspGeometry,
     NoSupportingSurfaceError,
     UnknownPartWholeRelationshipField,
@@ -744,6 +750,19 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
             parent_connection
             if isinstance(parent_connection, ActiveConnection1DOF)
             else None
+        )
+
+    @property
+    def opening_ratio(self) -> float:
+        """
+        How far the root stands along the travel of :attr:`movable_joint`: ``0`` at its
+        lower limit, where a door or drawer stands closed, and ``1`` at its upper limit.
+        """
+        if self.movable_joint is None:
+            raise MissingMovableJointError(self)
+        limits = self.movable_joint.dof.limits
+        return (self.movable_joint.position - limits.lower.position) / (
+            limits.upper.position - limits.lower.position
         )
 
     @abstractmethod

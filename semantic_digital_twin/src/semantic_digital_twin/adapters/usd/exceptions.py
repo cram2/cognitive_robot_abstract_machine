@@ -7,7 +7,7 @@ from semantic_digital_twin.exceptions import ParsingError
 
 
 @dataclass
-class UnsupportedUsdPhysicsJointTypeError(ParsingError):
+class UnsupportedUSDPhysicsJointTypeError(ParsingError):
     """
     Raised when a stage contains a physics joint of a type this parser does not build a
     Connection for.
@@ -44,7 +44,7 @@ class UnsupportedUsdPhysicsJointTypeError(ParsingError):
 
 
 @dataclass
-class UsdPhysicsJointMissingChildBodyError(ParsingError):
+class USDPhysicsJointMissingChildBodyError(ParsingError):
     """
     Raised when a physics joint's ``body1`` relationship (its child link) has no target.
 
@@ -70,7 +70,7 @@ class UsdPhysicsJointMissingChildBodyError(ParsingError):
 
 
 @dataclass
-class UnsupportedUsdGeometryTypeError(ParsingError):
+class UnsupportedUSDGeometryTypeError(ParsingError):
     """
     Raised when a stage contains a renderable geometric primitive
     (:class:`~pxr.UsdGeom.Gprim`) of a type this parser does not build a Shape for.
@@ -104,3 +104,138 @@ class UnsupportedUsdGeometryTypeError(ParsingError):
         if not self.supported_types:
             return ""
         return f"Use one of the supported types: {', '.join(sorted(self.supported_types))}."
+
+
+@dataclass(kw_only=True)
+class UnsupportedUSDComponentSceneError(ParsingError):
+    """
+    Raised when a valid USD scene holds something
+    :class:`~semantic_digital_twin.adapters.usd.parser.USDComponentParser` does not read
+    yet.
+    """
+
+
+@dataclass(kw_only=True)
+class UnreadUSDPhysicsJointsError(UnsupportedUSDComponentSceneError):
+    """
+    Raised when a scene has physics joints outside every component, such as a door
+    hinged to a wall.
+    """
+
+    joint_paths: list[str]
+    """
+    The stage paths of the physics joint prims, at least one.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has {len(self.joint_paths)} physics joints "
+            f"outside every component, the first at '{self.joint_paths[0]}'. "
+            f"USDComponentParser only reads the joints inside a component so far."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Extend USDComponentParser to read joints outside components, making each "
+            "link they connect a body of its own."
+        )
+
+
+@dataclass(kw_only=True)
+class USDJointChildIsComponentError(UnsupportedUSDComponentSceneError):
+    """
+    Raised when the ``body1`` of a physics joint inside a component is the component
+    itself, such as a door asset hinged to the world.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    component_path: str
+    """
+    The stage path of the component prim.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' "
+            f"whose body1 is its own component '{self.component_path}'. "
+            f"USDComponentParser attaches every component to the scene's root so far, "
+            f"never by a joint."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Extend USDComponentParser to attach a component that is a joint's body1 "
+            "by that joint instead of to the scene's root."
+        )
+
+
+@dataclass(kw_only=True)
+class USDJointLinkOutsideComponentError(UnsupportedUSDComponentSceneError):
+    """
+    Raised when a physics joint inside a component connects a link outside that
+    component, such as a drawer whose slide belongs to another component.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    component_path: str
+    """
+    The stage path of the component holding the joint.
+    """
+
+    link_path: str
+    """
+    The stage path of the root prim of the link outside the component.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' "
+            f"inside the component '{self.component_path}' that connects "
+            f"'{self.link_path}', which is outside it. USDComponentParser only reads "
+            f"joints between the links of one component so far."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Extend USDComponentParser to read joints that connect links of different "
+            "components, or links outside every component."
+        )
+
+
+@dataclass(kw_only=True)
+class ScaledArticulatedUSDComponentError(UnsupportedUSDComponentSceneError):
+    """
+    Raised when a link a physics joint inside a component connects is scaled, by its own
+    transform or an ancestor's, such as in a scene exported in centimetres.
+    """
+
+    joint_path: str
+    """
+    The stage path of the physics joint prim.
+    """
+
+    scaled_prim_path: str
+    """
+    The stage path of the root prim of the scaled link.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Stage '{self.file_path}' has a physics joint at '{self.joint_path}' that "
+            f"connects '{self.scaled_prim_path}', which is scaled. USDComponentParser "
+            f"does not scale a joint's offsets so far, so the link would be misplaced."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Extend USDComponentParser to scale a joint's offsets by the scale of the "
+            "link each is given in."
+        )

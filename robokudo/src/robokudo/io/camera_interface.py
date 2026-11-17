@@ -41,7 +41,7 @@ from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 from typing_extensions import Any, TYPE_CHECKING
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.descriptors.camera_configs.components import TfComponent

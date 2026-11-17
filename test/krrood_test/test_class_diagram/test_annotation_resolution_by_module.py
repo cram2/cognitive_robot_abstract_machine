@@ -21,7 +21,7 @@ import pytest
 
 from typing_extensions import Optional
 
-from krrood.symbol_graph.helpers import get_field_type_endpoint
+from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint
 from krrood.symbol_graph.symbol_graph import Symbol
 
 from ..dataset.role_and_ontology import university_ontology_like_classes

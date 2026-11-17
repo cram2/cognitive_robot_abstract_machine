@@ -85,6 +85,7 @@ development-tools = [
     "ruff==0.17.2",
     "docformatter==1.7.8",
     "tqdm",
+    "packaging",
 ]
 
 [project.scripts]
@@ -142,6 +143,28 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[tool.krrood.core-boundary]
+# The packages and modules a plain `pip install krrood` must be able to load; every other
+# module of krrood is not core. `krrood check` reports a core module that loads a module
+# outside core, or a distribution outside `dependencies`, at module level.
+core = [
+    "krrood._version",
+    "krrood.class_diagrams",
+    "krrood.exceptions",
+    "krrood.patterns",
+    "krrood.singleton",
+    "krrood.symbol_graph",
+    "krrood.utils",
+]
+# The distributions core may load, with everything they require.
+dependencies = [
+    "typing-extensions",
+    "rustworkx",
+    "numpy",
+    "ordered-set",
+    "sortedcontainers",
 ]
 
 [tool.setuptools.dynamic]

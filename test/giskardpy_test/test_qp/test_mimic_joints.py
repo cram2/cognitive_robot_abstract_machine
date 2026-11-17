@@ -26,8 +26,8 @@ def run_until_reached(world: World, goal: MotionStatechartNode) -> None:
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     motion_statechart = Statechart(context=executor.context)
-    motion_statechart.add_node(goal)
-    motion_statechart.add_node(EndMotion.when_true(goal))
+    motion_statechart.add_node(node=goal)
+    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=motion_statechart)
     executor.tick_until_end()
 

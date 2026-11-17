@@ -180,35 +180,37 @@ def execute(link_length: float, vel_limit: float):
     eef = fucking_huge_robot.get_kinematic_structure_entity_by_name("eef")
 
     statechart.add_node(
-        node1 := Sequence(
-            nodes=[
-                SetSeedConfiguration(
-                    seed_configuration=JointState.from_str_dict(
-                        {
-                            "map_T_link1": goal,
-                            "link1_T_link2": goal,
-                            "link2_T_link3": goal,
-                            "link3_T_link4": goal,
-                            "link4_T_link5": goal,
-                            "link5_T_eef": goal,
-                        },
-                        world=fucking_huge_robot,
-                    )
-                ),
-                CartesianPosition(
-                    root_link=fucking_huge_robot.root,
-                    tip_link=eef,
-                    goal_point=Point3(y=-link_length, reference_frame=eef),
-                    cruise_velocity=0.2 * link_length,
-                ),
-            ]
+        node=(
+            node1 := Sequence(
+                nodes=[
+                    SetSeedConfiguration(
+                        seed_configuration=JointState.from_str_dict(
+                            {
+                                "map_T_link1": goal,
+                                "link1_T_link2": goal,
+                                "link2_T_link3": goal,
+                                "link3_T_link4": goal,
+                                "link4_T_link5": goal,
+                                "link5_T_eef": goal,
+                            },
+                            world=fucking_huge_robot,
+                        )
+                    ),
+                    CartesianPosition(
+                        root_link=fucking_huge_robot.root,
+                        tip_link=eef,
+                        goal_point=Point3(y=-link_length, reference_frame=eef),
+                        cruise_velocity=0.2 * link_length,
+                    ),
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(node1))
+    statechart.add_node(node=EndMotion.when_true(node=node1))
 
     executor.compile(statechart=statechart)
 
-    executor.tick_until_end(10_000)
+    executor.tick_until_end(timeout=10_000)
 
 
 def test_cart_goal01():

@@ -26,7 +26,7 @@ from causallearn.utils.PCUtils.BackgroundKnowledgeOrientUtils import (
 from causallearn.utils.PCUtils.Meek import meek
 from typing_extensions import Any
 
-from krrood.class_diagrams.causal_relation import (
+from krrood.entity_query_language.causal_relation import (
     AttributeEndpoint,
     CausalEndpoint,
     CausalRelation,
@@ -35,7 +35,7 @@ from krrood.class_diagrams.causal_relation import (
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.feature_extraction.feature_extractor import (
     FeatureExtractor,
 )
@@ -156,8 +156,8 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         """
-        Deterministic copies and columns that never vary are left out of the learning;
-        a copy is restored as a child of its source, and a constant column stays without
+        Deterministic copies and columns that never vary are left out of the learning; a
+        copy is restored as a child of its source, and a constant column stays without
         edges.
         """
         node_of = {node.name: node for node in nodes}

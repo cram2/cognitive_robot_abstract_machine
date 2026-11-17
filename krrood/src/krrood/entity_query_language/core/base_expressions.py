@@ -112,6 +112,16 @@ class Operand(ABC):
         :return: The expression this contributes where an operand is expected.
         """
 
+    def _quantifier_operands_(
+        self, *, condition: Any
+    ) -> tuple[SymbolicExpression, Any]:
+        """
+        :param condition: The condition a quantifier over this states.
+        :return: The variable the quantifier ranges over and the condition it states of
+            each value, which are this operand's expression and *condition*.
+        """
+        return self._symbolic_expression_, condition
+
 
 class MatchAssignedValue(ABC):
     """

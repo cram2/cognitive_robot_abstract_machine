@@ -17,7 +17,7 @@ from krrood.adapters.json_serializer import (
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.path_enumeration import PathEnumeration
 
 

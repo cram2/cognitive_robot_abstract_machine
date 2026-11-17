@@ -2068,7 +2068,7 @@ def test_a_carry_runs_where_the_statechart_was_received(
         world=world,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
-    receiver.compile(received)
+    receiver.compile(statechart=received)
     receiver.tick_until_end(timeout=10_000)
 
     assert len(received.nodes) == len(sent.nodes)
@@ -2255,7 +2255,7 @@ def allowances_while_reattaching(
         collision check of the next tick reads.
     """
     executor = simulated_executor(extensions)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     [reattaching] = branch_moves_of(plan.descendants)
     allowances = []
     for _ in range(max_ticks):

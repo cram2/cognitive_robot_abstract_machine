@@ -20,7 +20,7 @@ The module is primarily used for:
 
 from __future__ import annotations
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% Imports
 import json

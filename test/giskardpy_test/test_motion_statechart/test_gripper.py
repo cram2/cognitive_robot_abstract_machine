@@ -42,7 +42,7 @@ def _expanded_nodes(goal: MoveFingers, world: World):
     """
     :return: The children the goal is made of, once it joined a statechart.
     """
-    Statechart(context=create_context_with_motion_control(world)).add_node(goal)
+    Statechart(context=create_context_with_motion_control(world)).add_node(node=goal)
     return goal.nodes
 
 
@@ -238,10 +238,10 @@ def _run(goal: MoveFingers, world: World) -> None:
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(goal)
-    statechart.add_node(EndMotion.when_true(goal))
+    statechart.add_node(node=goal)
+    statechart.add_node(node=EndMotion.when_true(node=goal))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=500)
 
 

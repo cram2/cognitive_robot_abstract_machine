@@ -579,7 +579,7 @@ def test_the_underspecified_steps_of_one_plan_are_tried_against_one_copy(
     assert second_trial.position_at_entry != first_trial.position_at_entry
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _FailsWhenThePlanEnds(StateHistoryObserver):
     """
     An observer that fails once the root of the plan it observes ends.
@@ -590,7 +590,7 @@ class _FailsWhenThePlanEnds(StateHistoryObserver):
     The root of the observed plan.
     """
 
-    def on_state_change(self, history: StateHistory) -> None:
+    def on_state_change(self, *, history: StateHistory) -> None:
         if self.plan in history.nodes_ended_in_latest_item():
             raise RuntimeError("observer failed at the end of the plan")
 
@@ -623,7 +623,7 @@ def _child_chooser_of(plan: StatechartNode) -> UnderspecifiedChildChooser:
     [chooser] = [
         chooser
         for chooser in plan.statechart.context.require_extension(
-            ChildChooserAccess
+            extension_type=ChildChooserAccess
         ).choosers
         if isinstance(chooser, UnderspecifiedChildChooser)
     ]
@@ -654,9 +654,9 @@ def test_a_plan_releases_its_trial_copy_even_when_an_observer_fails(
     plan = _plan_of_two_underspecified_steps(world)
     executor = simulated_executor(extensions)
     statechart = statechart_of(executor, plan)
-    statechart.state_history.add_observer(_FailsWhenThePlanEnds(plan=plan))
+    statechart.state_history.add_observer(observer=_FailsWhenThePlanEnds(plan=plan))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     with pytest.raises(RuntimeError):
         executor.execute()
 
@@ -706,7 +706,7 @@ def test_a_step_gives_up_after_as_many_candidates_as_the_context_allows(
     executor = simulated_executor(extensions)
 
     with pytest.raises(CandidateLimitReached) as failure:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     assert (
@@ -737,7 +737,7 @@ def test_a_step_keeps_its_own_limit_over_the_contexts(
     )
     executor = simulated_executor(extensions)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -757,7 +757,7 @@ def test_a_step_that_runs_out_of_candidates_below_its_limit_says_it_is_empty(
     executor = simulated_executor(extensions)
 
     with pytest.raises(EmptyUnderspecified) as failure:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     assert type(failure.value) is EmptyUnderspecified
@@ -788,7 +788,7 @@ def _compiled_trial_executor(
     candidate = RecordingAction(
         probe_key=register_probe(), dof_id=copied.degrees_of_freedom[0].id
     )
-    executor.compile(statechart_of(executor, Sequence(nodes=[candidate])))
+    executor.compile(statechart=statechart_of(executor, Sequence(nodes=[candidate])))
     return executor, copied
 
 
@@ -804,7 +804,7 @@ def test_a_trial_publishes_its_copy_while_debugging(debugging_executor) -> None:
 
     trial_executor, copied = _compiled_trial_executor(trial)
 
-    visualization = trial_executor.require_extension(RvizVisualization)
+    visualization = trial_executor.require_extension(extension_type=RvizVisualization)
     assert visualization.is_rendering
     assert visualization.publisher._world is copied
     trial_executor.execute()
@@ -825,7 +825,9 @@ def test_a_trial_publishes_its_copy_apart_from_the_world_it_copies(
 
     trial_executor, copied = _compiled_trial_executor(trial)
 
-    publisher = trial_executor.require_extension(RvizVisualization).publisher
+    publisher = trial_executor.require_extension(
+        extension_type=RvizVisualization
+    ).publisher
     assert (
         publisher.tf_publisher.frame_names.prefix
         == ActionTrialVisualization.FRAME_PREFIX
@@ -847,7 +849,9 @@ def test_a_trial_copy_is_drawn_see_through(debugging_executor) -> None:
 
     trial_executor, copied = _compiled_trial_executor(trial)
 
-    publisher = trial_executor.require_extension(RvizVisualization).publisher
+    publisher = trial_executor.require_extension(
+        extension_type=RvizVisualization
+    ).publisher
     assert publisher.alpha == trial.copy_marker_alpha
     trial_executor.execute()
     trial.discard()
@@ -869,7 +873,7 @@ def test_a_trial_publishes_nothing_without_debugging(
     trial_executor = trial._trial_executor(trial._copy())
 
     with pytest.raises(MissingExecutorExtensionError):
-        trial_executor.require_extension(RvizVisualization)
+        trial_executor.require_extension(extension_type=RvizVisualization)
     trial.discard()
 
 
@@ -976,7 +980,9 @@ def test_a_trial_stops_publishing_its_copy_once_the_candidate_has_run(
 
     trial_executor.execute()
 
-    assert not trial_executor.require_extension(RvizVisualization).is_rendering
+    assert not trial_executor.require_extension(
+        extension_type=RvizVisualization
+    ).is_rendering
     trial.discard()
 
 
@@ -1008,7 +1014,7 @@ def a_collision_that_could_not_be_avoided() -> MotionViolatedCollisionAvoidance:
         given.
     """
     return MotionViolatedCollisionAvoidance(
-        CollisionViolatedError(violated_collisions=[])
+        violation=CollisionViolatedError(violated_collisions=[])
     )
 
 
@@ -1230,7 +1236,7 @@ def test_a_statement_that_chose_is_grounded_alone_until_its_parallel_is_reset(
     _prepared(plan, extensions)
     for slot, statement in enumerate(side_by_side.nodes):
         statement.choose_child_with(
-            CandidateHandOver(
+            chooser=CandidateHandOver(
                 candidate=ClaimSlotAction(slot=slot, slot_dof_ids=slot_dof_ids)
             )
         )
@@ -1634,7 +1640,7 @@ def test_a_failed_statement_out_of_candidates_fails_its_parallel(
     executor = simulated_executor(extensions)
 
     with pytest.raises(EmptyUnderspecified) as failure:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     assert type(failure.value) is EmptyUnderspecified
@@ -1674,7 +1680,7 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
     executor = simulated_executor(extensions)
 
     with pytest.raises(MotionDidNotFinish):
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     [parallel] = plan.nodes

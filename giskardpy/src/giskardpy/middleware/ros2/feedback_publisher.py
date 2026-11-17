@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 import time
 from dataclasses import dataclass, field
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class MotionStatechartPayloadKey(StrEnum):
     """
     The keys of the motion statechart feedback sent to the action client on top of the
-    :class:`~cramph.data_types.StatechartPayloadKey`.
+    :class:`~cramph.reported_statechart.StatechartPayloadKey`.
     """
 
     WAITING_FOR_CHILD = "waiting_for_child"
@@ -38,7 +38,7 @@ class MotionStatechartPayloadKey(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionFeedbackPublisher:
     """
     Reports the state of the running motion statechart to the action client.
@@ -97,7 +97,7 @@ class ActionFeedbackPublisher:
         data[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         self.last_history_length = len(self.executor.statechart.state_history)
         self.sent_node_count = len(self.executor.statechart.nodes)
-        self.send(data)
+        self.send(data=data)
 
     def publish_if_changed(self) -> None:
         """
@@ -129,7 +129,7 @@ class ActionFeedbackPublisher:
         return [
             node
             for node in self.executor.statechart.get_nodes_by_type(
-                CompositeNodeChoosingItsChild
+                node_type=CompositeNodeChoosingItsChild
             )
             if node.is_waiting_for_a_child
         ]
@@ -151,7 +151,7 @@ class ActionFeedbackPublisher:
                 )
             )
             self.sent_node_count = len(statechart.nodes)
-        self.send(data)
+        self.send(data=data)
 
     def create_states(self) -> dict[str, Any]:
         """
@@ -187,11 +187,11 @@ class ActionFeedbackPublisher:
             self.last_history_length = history_length
         return has_changed
 
-    def send(self, data: dict[str, Any]) -> None:
+    def send(self, *, data: dict[str, Any]) -> None:
         """
         Publish the given data as action feedback.
         """
         message = JsonAction.Feedback()
         message.feedback = json.dumps(data)
-        self.action_server.send_feedback(message)
+        self.action_server.send_feedback(message=message)
         self._last_sent_time = time.monotonic()

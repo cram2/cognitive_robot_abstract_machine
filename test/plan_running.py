@@ -33,7 +33,7 @@ def robot_extensions(robot: AbstractRobot) -> list[ContextExtension]:
     :return: The context extensions a plan of `robot` reads, sampling with
         :data:`SAMPLING_SEED`.
     """
-    return [RobotAccess(robot), StatementGrounding(sampling_seed=SAMPLING_SEED)]
+    return [RobotAccess(robot=robot), StatementGrounding(sampling_seed=SAMPLING_SEED)]
 
 
 def with_grounding(
@@ -65,7 +65,10 @@ def simulated_executor(
     :return: An executor simulating plans in the world of the robot in `extensions`.
     """
     return KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions), **options
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        ),
+        **options,
     )
 
 
@@ -79,7 +82,10 @@ def robot_executor(
     :return: An executor sending plans to the real robot in `extensions`.
     """
     return RealRobotPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions), **options
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        ),
+        **options,
     )
 
 
@@ -115,7 +121,9 @@ def context_of(extensions: list[ContextExtension]) -> StatechartContext:
     :return: A context holding `extensions`, over the world of their robot, for building
         the parts of a plan that read the context before the plan joins a statechart.
     """
-    return StatechartContext.with_extensions(world_of(extensions), extensions)
+    return StatechartContext.with_extensions(
+        world=world_of(extensions), extensions=extensions
+    )
 
 
 # %% running plans
@@ -129,7 +137,7 @@ def statechart_of(executor: PlanExecutor, *plan_nodes: StatechartNode) -> Statec
     """
     statechart = Statechart(context=executor.context)
     for plan_node in plan_nodes:
-        statechart.add_node(plan_node)
+        statechart.add_node(node=plan_node)
     return statechart
 
 
@@ -158,7 +166,7 @@ def run_plan(
     :return: The executor that ran the plan.
     """
     executor = simulated_executor(extensions, **options)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
     return executor
 
@@ -172,8 +180,10 @@ def perform_in_physics(
     :param simulation: The running physics to perform it in.
     """
     executor = PhysicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions),
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        ),
         simulation=simulation,
     )
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
