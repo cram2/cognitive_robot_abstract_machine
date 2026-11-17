@@ -1,3 +1,7 @@
+"""
+Planar poses: a position in the plane and a rotation about the z-axis.
+"""
+
 import math
 
 import numpy as np
@@ -10,7 +14,7 @@ from krrood_spatial_math.spatial_types import RotationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from .reference_implementations import quaternion_from_rpy
-from .utils_for_tests import compare_orientations
+from ...orientation_comparison import assert_same_orientation
 
 
 class TestPose2DConstruction:
@@ -59,6 +63,10 @@ class TestPose2DConstruction:
 
 
 class TestPose2DToPose:
+    """
+    Conversion of a planar pose into a full pose.
+    """
+
     def test_to_pose_position(self):
         p2 = Pose2D.from_xy_yaw(x=3.0, y=-1.5, yaw=0)
         pose = p2.pose
@@ -130,10 +138,13 @@ class TestPose2DToPose:
         assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
+        """
+        The orientation of a planar pose is the quaternion of its yaw.
+        """
         p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0.3)
         q = p2.orientation
         assert isinstance(q, Quaternion)
-        compare_orientations(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
+        assert_same_orientation(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
 
 
 class TestPose2DFromPosition:

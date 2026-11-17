@@ -84,7 +84,6 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointVelocityLimit,
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
@@ -154,6 +153,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ...conftest import SAMPLING_SEED
+from ...orientation_comparison import assert_same_axis_angle, assert_same_orientation
 from ...plan_running import (
     context_of,
     expand,
@@ -410,6 +410,9 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
 
 
 def test_park_arms_multi(multiple_robot_apartment_context):
+    """
+    Parking every arm of each robot moves each arm joint to its park position.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     description = ParkArmsAction(arms=robot.all_arms)
     plan = description
@@ -422,7 +425,7 @@ def test_park_arms_multi(multiple_robot_apartment_context):
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):
-        compare_axis_angle(
+        assert_same_axis_angle(
             connection.position,
             np.array([1, 0, 0]),
             value,
@@ -432,6 +435,10 @@ def test_park_arms_multi(multiple_robot_apartment_context):
 
 
 def test_reach_action_multi(multiple_robot_apartment_context):
+    """
+    Reaching for the milk moves the grasp point of the left arm onto the milk and its
+    tool frame into the orientation the grasp asks for.
+    """
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
@@ -464,7 +471,7 @@ def test_reach_action_multi(multiple_robot_apartment_context):
     target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
     assert grasp_point_of(left_arm) == pytest.approx([1, -2, 0.8], abs=0.01)
-    compare_orientations(
+    assert_same_orientation(
         end_effector_orientation, target_orientation.to_np(), decimal=2
     )
 
