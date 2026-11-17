@@ -586,6 +586,14 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     ``_world_lock``: receiving a message must never wait for the world.
     """
 
+    _unpublished_model_block: ModificationBlock | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The model modification the world announced last, until it is sent together with the
+    state the world announces after it; guarded by the world lock.
+    """
+
     @classmethod
     def of_world(cls, world: World) -> WorldSynchronizer:
         """
@@ -615,8 +623,8 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         self, *, publish_changes: bool | None = None, **kwargs: Any
     ) -> None:
         """
-        Send the modification block the world just recorded to the other synchronizers,
-        together with the position of every degree of freedom.
+        Record the modification block the world just recorded; :meth:`on_state_change`
+        sends it with the state the world announces next.
 
         Implements
         :meth:`~semantic_digital_twin.callbacks.callback.ModelChangeCallback.on_model_change`.
@@ -630,30 +638,20 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         if not publish_changes:
             return
 
-        model_block = ModificationBlock(
-            meta_data=self.meta_data,
-            modifications=self._world.get_world_model_manager().model_modification_blocks[
-                -1
-            ],
-        )
-        update = WorldUpdate(
-            meta_data=self.meta_data,
-            modification_block=model_block,
-            state_update=self._create_state_update(
-                positions=self._world.state.to_uuid_position_dict()
-            ),
-        )
-        self._publish_or_defer(update)
-        self.update_previous_world_state()
+        with self._world._world_lock:
+            self._unpublished_model_block = ModificationBlock(
+                meta_data=self.meta_data,
+                modifications=self._world.get_world_model_manager().model_modification_blocks[
+                    -1
+                ],
+            )
 
     def on_state_change(
         self, *, publish_changes: bool | None = None, **kwargs: Any
     ) -> None:
         """
-        Send the positions of the degrees of freedom to the other synchronizers.
-
-        Positions written while a :meth:`World.modify_world` block is open are sent
-        once that block has ended, with the model change they may depend on.
+        Send the changed positions to the other synchronizers; after a model
+        modification, send that modification and every position together in one update.
 
         Implements
         :meth:`~semantic_digital_twin.callbacks.callback.StateChangeCallback.on_state_change`.
@@ -666,21 +664,23 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             raise MissingPublishChangesKWARG(kwargs)
         if not publish_changes:
             return
-        # The end of the block announces the state, so an earlier message could only
-        # name degrees of freedom the receivers do not know yet.
-        if self._world.get_world_model_manager().has_open_modification:
-            return
-
-        changes = self.compute_state_changes()
-        if not changes:
-            return
-
-        update = WorldUpdate(
-            meta_data=self.meta_data,
-            state_update=self._create_state_update(positions=changes),
-        )
+        with self._world._world_lock:
+            model_block = self._unpublished_model_block
+            self._unpublished_model_block = None
+            positions = (
+                self._world.state.to_uuid_position_dict()
+                if model_block is not None
+                else self.compute_state_changes()
+            )
+            if model_block is None and not positions:
+                return
+            update = WorldUpdate(
+                meta_data=self.meta_data,
+                modification_block=model_block,
+                state_update=self._create_state_update(positions=positions),
+            )
+            self.update_previous_world_state()
         self._publish_or_defer(update)
-        self.update_previous_world_state()
 
     def _create_state_update(self, *, positions: dict[UUID, float]) -> WorldStateUpdate:
         """

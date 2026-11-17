@@ -3486,19 +3486,40 @@ def test_received_positions_land_on_the_degrees_of_freedom_they_name(rclpy_node)
     received_positions = WorldStateUpdate(
         meta_data=synchronizer.meta_data, ids=[kept_connection.dof.id], states=[0.7]
     )
-    writing_thread = threading.Thread(
-        target=synchronizer._apply_state, args=(received_positions,)
-    )
-    try:
+    checked = threading.Event()
+    original_check = synchronizer._check_state_update
+
+    def check_and_wait_for_the_rearranging_thread(**kwargs) -> None:
+        """
+        Check the received positions, then hold still long enough for the state to be
+        rearranged before they are written.
+        """
+        original_check(**kwargs)
+        checked.set()
+        # give the rearranging thread the time to take the world lock
+        time.sleep(0.3)
+
+    synchronizer._check_state_update = check_and_wait_for_the_rearranging_thread
+
+    def rearrange_the_state() -> None:
+        """
+        Remove the degree of freedom in front of the received one once the positions
+        were checked, which moves the received one to another column.
+        """
+        checked.wait(timeout=5.0)
         with world._world_lock:
-            writing_thread.start()
             # give the writing thread the time to reach the world lock
-            time.sleep(0.2)
+            time.sleep(0.3)
             with world.modify_world():
                 world.remove_kinematic_structure_entity(removed_connection.child)
-        writing_thread.join(timeout=5.0)
 
-        assert not writing_thread.is_alive()
+    rearranging_thread = threading.Thread(target=rearrange_the_state)
+    try:
+        rearranging_thread.start()
+        synchronizer._apply_state(received_positions)
+        rearranging_thread.join(timeout=5.0)
+
+        assert not rearranging_thread.is_alive()
         assert world.state[kept_connection.dof.id].position == pytest.approx(0.7)
     finally:
         synchronizer.close()
