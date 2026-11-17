@@ -277,14 +277,12 @@ def test_the_time_axis_numbers_ticks_at_least_the_minimum_distance_apart(
         np.arange(
             0.0,
             recorded_duration,
-            expected_spacing.value.seconds_between_numbered_ticks,
+            expected_spacing.seconds_between_numbered_ticks,
         ),
     )
     np.testing.assert_allclose(
         np.union1d(axes[-1].get_xticks(), axes[-1].get_xticks(minor=True)),
-        np.arange(
-            0.0, recorded_duration, expected_spacing.value.seconds_between_grid_lines
-        ),
+        np.arange(0.0, recorded_duration, expected_spacing.seconds_between_grid_lines),
     )
     for axis in axes:
         minor_ticks = axis.xaxis.get_minor_ticks()

@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.world_state import (
 # %% spacing of the time axis
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class TickSpacing:
     """
     Where the time axis of a trajectory plot puts its ticks and grid lines.
@@ -45,35 +45,19 @@ class TickSpacing:
     """
 
 
-class TimeAxisTickSpacing(Enum):
+class TimeAxisTickSpacing(TickSpacing, Enum):
     """
     The spacings a trajectory plot chooses its time axis from, finest first.
     """
 
-    HALF_SECOND = TickSpacing(
-        seconds_between_numbered_ticks=0.5, seconds_between_grid_lines=0.1
-    )
-    ONE_SECOND = TickSpacing(
-        seconds_between_numbered_ticks=1.0, seconds_between_grid_lines=0.2
-    )
-    TWO_SECONDS = TickSpacing(
-        seconds_between_numbered_ticks=2.0, seconds_between_grid_lines=0.5
-    )
-    FIVE_SECONDS = TickSpacing(
-        seconds_between_numbered_ticks=5.0, seconds_between_grid_lines=1.0
-    )
-    TEN_SECONDS = TickSpacing(
-        seconds_between_numbered_ticks=10.0, seconds_between_grid_lines=2.0
-    )
-    TWENTY_SECONDS = TickSpacing(
-        seconds_between_numbered_ticks=20.0, seconds_between_grid_lines=5.0
-    )
-    THIRTY_SECONDS = TickSpacing(
-        seconds_between_numbered_ticks=30.0, seconds_between_grid_lines=10.0
-    )
-    ONE_MINUTE = TickSpacing(
-        seconds_between_numbered_ticks=60.0, seconds_between_grid_lines=10.0
-    )
+    HALF_SECOND = 0.5, 0.1
+    ONE_SECOND = 1.0, 0.2
+    TWO_SECONDS = 2.0, 0.5
+    FIVE_SECONDS = 5.0, 1.0
+    TEN_SECONDS = 10.0, 2.0
+    TWENTY_SECONDS = 20.0, 5.0
+    THIRTY_SECONDS = 30.0, 10.0
+    ONE_MINUTE = 60.0, 10.0
 
 
 # %% plotting a trajectory
@@ -206,14 +190,14 @@ class WorldStateTrajectoryPlotter:
         """
         return max(self.second_width_in_cm, self.minimum_plot_width_in_cm / duration)
 
-    def _tick_spacing(self, *, duration: float) -> TickSpacing:
+    def _tick_spacing(self, *, duration: float) -> TimeAxisTickSpacing:
         """
         :return: The finest spacing that keeps the numbered ticks of a plot of
             `duration` seconds :attr:`minimum_distance_between_numbered_ticks_in_cm`
             apart, or the coarsest one if none does.
         """
         second_width_in_cm = self._widened_second_width_in_cm(duration=duration)
-        spacings = [spacing.value for spacing in TimeAxisTickSpacing]
+        spacings = list(TimeAxisTickSpacing)
         return next(
             (
                 spacing
