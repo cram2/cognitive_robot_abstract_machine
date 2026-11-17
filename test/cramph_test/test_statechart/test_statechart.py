@@ -1,3 +1,7 @@
+"""
+Tests of building, compiling, ticking and drawing statecharts.
+"""
+
 import json
 import logging
 import time
@@ -150,6 +154,9 @@ def test_condition_to_str() -> None:
 
 
 def test_statechart_to_dot(tmp_path) -> None:
+    """
+    A statechart whose nodes read each other's observations can be drawn.
+    """
     msc = Statechart(context=StatechartContext(world=World()))
     node1 = ConstTrueNode()
     msc.add_node(node=node1)
@@ -159,7 +166,7 @@ def test_statechart_to_dot(tmp_path) -> None:
     msc.add_node(node=end)
     node1.success_condition = node2.observes_true
     end.start_condition = logic_and(node1.observes_true, node2.observes_true)
-    msc.draw(file_name=str(tmp_path / "muh.pdf"))
+    msc.draw(file_name=tmp_path / "muh.pdf")
 
 
 def test_print() -> None:
@@ -245,6 +252,10 @@ def test_print() -> None:
 
 
 def test_draw_with_invisible_node(tmp_path) -> None:
+    """
+    A statechart can be drawn while some of its nodes, a composite node among them, are
+    hidden from the drawing.
+    """
     kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin_sim.context)
     msc.add_nodes(
@@ -264,7 +275,7 @@ def test_draw_with_invisible_node(tmp_path) -> None:
     s2n2.plot_specifications.visible = False
 
     kin_sim.compile(statechart=msc)
-    msc.draw(file_name=str(tmp_path / "muh.pdf"))
+    msc.draw(file_name=tmp_path / "muh.pdf")
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -707,7 +718,15 @@ def test_thread_payload_monitor_surfaces_compute_exception() -> None:
 
 
 class TestStatechartLogic:
+    """
+    How transition conditions start, pause, resume and end nodes.
+    """
+
     def test_transition_triggers(self, *, tmp_path) -> None:
+        """
+        The start, pause, interrupt and reset conditions of a node each trigger their
+        transition and its callback.
+        """
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
@@ -742,29 +761,29 @@ class TestStatechartLogic:
         assert changer.state is None
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.RUNNING
         assert changer.state == "on_start"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.PAUSED
         assert changer.state == "on_pause"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.RUNNING
         assert changer.state == "on_unpause"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         # A node that only records callbacks never decides what it observes, so ending
         # it cannot judge it.
         assert changer.life_cycle_state == LifeCycleValues.INTERRUPTED
         assert changer.state == "on_end"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
         assert changer.state == "on_reset"
 
@@ -785,6 +804,10 @@ class TestStatechartLogic:
             _ = node.life_cycle_state
 
     def test_cancel_statechart(self, *, tmp_path) -> None:
+        """
+        :class:`CancelStatechart` raises its exception when it starts, and the cancelled
+        statechart can still be drawn.
+        """
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node1 = ConstTrueNode()
@@ -797,7 +820,7 @@ class TestStatechartLogic:
 
         with pytest.raises(CancellingFailure):
             kin_sim.tick()  # cancel starts, which triggers it
-        msc.draw(file_name=str(tmp_path / "cancelled.pdf"))
+        msc.draw(file_name=tmp_path / "cancelled.pdf")
 
     def test_history_records_the_tick_of_each_snapshot(self) -> None:
         """
@@ -904,6 +927,10 @@ class TestStatechartLogic:
         ]
 
     def test_goal(self, *, tmp_path) -> None:
+        """
+        A composite node starts its chained children one after the other and observes
+        true once the last one does.
+        """
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
@@ -1015,7 +1042,7 @@ class TestStatechartLogic:
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.TRUE,
         ]
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
 
     def test_reset(self, *, tmp_path) -> None:
         """
@@ -1046,7 +1073,7 @@ class TestStatechartLogic:
         )
 
         kin_sim.compile(statechart=msc)
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
 
         kin_sim.tick()
         assert node1.observation_state == ObservationStateValues.TRUE
@@ -1327,7 +1354,14 @@ def test_count_simulation_time_seconds_with_executor(
 
 
 class TestEndStatechart:
+    """
+    When :class:`EndStatechart` ends a statechart.
+    """
+
     def test_end_statechart_when_all_done1(self, *, tmp_path) -> None:
+        """
+        The statechart ends once all the given nodes observe true.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1345,10 +1379,13 @@ class TestEndStatechart:
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
     def test_end_statechart_when_all_done2(self, *, tmp_path) -> None:
+        """
+        The statechart does not end while one of the given nodes observes false.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1367,10 +1404,13 @@ class TestEndStatechart:
         kin_sim.compile(statechart=msc)
         with pytest.raises(TickLimitReachedError):
             kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
 
     def test_end_statechart_when_any_done1(self, *, tmp_path) -> None:
+        """
+        The statechart ends once one of the given nodes observes true.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1388,10 +1428,13 @@ class TestEndStatechart:
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
     def test_end_statechart_when_any_done2(self, *, tmp_path) -> None:
+        """
+        The statechart does not end while none of the given nodes observes true.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1410,7 +1453,7 @@ class TestEndStatechart:
         kin_sim.compile(statechart=msc)
         with pytest.raises(TickLimitReachedError):
             kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
 
     def test_end_statechart_when_all_true_accepts_a_single_node(self) -> None:

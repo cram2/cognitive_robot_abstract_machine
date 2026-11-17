@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from coraplex.robot_plans.mixins import MovesToolCenterPoint
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
@@ -20,13 +20,15 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
     ParkArmsAction,
 )
+from coraplex.robot_plans.mixins import MovesToolCenterPoint
 from cramph.composites import Parallel, Sequence
 from cramph.context import ContextExtension
+from giskardpy.motion_control import WorldStateTrajectoryRecording, MotionControl
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
+from giskardpy.qp.qp_controller_config import QPControllerConfig
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -35,14 +37,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
     Handle,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-
 from ..plan_running import robot_extensions, run_plan
 
 # %% a kitchen with a bowl and a cup in a drawer
@@ -272,13 +271,28 @@ def assert_bowl_and_cup_stand_on_the_kitchen_island(
 
 
 def test_bowl_and_cup_are_moved_from_the_drawer_onto_the_kitchen_island(
-    kitchen_with_filled_drawer: KitchenWithFilledDrawer,
+    kitchen_with_filled_drawer: KitchenWithFilledDrawer, tmp_path: Path
 ) -> None:
+    """
+    The plan sets both objects down at their goals, and the trajectory it recorded
+    plots.
+    """
     kitchen = kitchen_with_filled_drawer
 
+    recording = WorldStateTrajectoryRecording()
+
     run_plan(
-        transport_plan(kitchen), kitchen.context_extensions, collision_avoidance=True
+        transport_plan(kitchen),
+        kitchen.context_extensions,
+        collision_avoidance=True,
+        extensions=[
+            MotionControl(
+                qp_controller_config=QPControllerConfig.create_with_fast_simulation_defaults()
+            ),
+            recording,
+        ],
     )
+    recording.plotter.plot_trajectory(file_name=tmp_path / "trajectory.pdf")
 
     assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
 
