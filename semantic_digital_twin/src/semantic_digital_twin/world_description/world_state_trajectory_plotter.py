@@ -64,9 +64,30 @@ class WorldStateTrajectoryPlotter:
     If True, the degrees of freedom will be sorted by name before plotting.
     """
 
-    second_width_in_cm: float = 2.0
+    second_width_in_cm: float = 0.5
     """
     Width of a second in cm.
+    """
+
+    seconds_between_labelled_ticks: float = 5.0
+    """
+    The time between two ticks of the time axis that carry a number.
+    """
+
+    seconds_between_grid_lines: float = 1.0
+    """
+    The time between two vertical grid lines; those without a numbered tick are drawn
+    fainter.
+    """
+
+    unlabelled_grid_line_width: float = 0.4
+    """
+    The width, in points, of a vertical grid line without a numbered tick.
+    """
+
+    unlabelled_grid_line_opacity: float = 0.4
+    """
+    The opacity of a vertical grid line without a numbered tick, from 0 to 1.
     """
 
     y_label: dict[Derivatives, str] = field(
@@ -176,23 +197,11 @@ class WorldStateTrajectoryPlotter:
         # (Already applied above via fig.subplots_adjust)
         return fig, axes
 
-    def _choose_ticks(self, duration: float) -> np.ndarray:
+    def _times_up_to(self, *, duration: float, step: float) -> np.ndarray:
         """
-        Choose semi-automatic tick spacing: either 0.5s or integer seconds with adaptive
-        spacing.
-
-        :param duration: Duration of the trajectory in seconds.
-        :return: x-ticks
+        :return: The times from 0 to `duration` seconds, `step` seconds apart, including
+            `duration` itself when it falls on a step.
         """
-        if duration <= 0:
-            return np.array([0.0])
-        # Prefer 0.5 if it does not create too many ticks; otherwise use integers with adaptive step
-        max_ticks = 12
-        if duration / 0.5 <= max_ticks:
-            step = 0.5
-        else:
-            # choose integer step so that count <= max_ticks
-            step = max(1, int(np.ceil(duration / max_ticks)))
         return np.arange(0.0, duration + 1e-9, step)
 
     def _sort_degrees_of_freedom(self, traj: WorldStateTrajectory) -> list[UUID]:
@@ -338,6 +347,13 @@ class WorldStateTrajectoryPlotter:
         """
         for axis, derivative in zip(axes, self.derivatives_to_plot):
             axis.grid(True, axis="x")
+            axis.grid(
+                True,
+                axis="x",
+                which="minor",
+                linewidth=self.unlabelled_grid_line_width,
+                alpha=self.unlabelled_grid_line_opacity,
+            )
             axis.grid(True, axis="y")
             # Collect series for all DOFs
             for dof_id in dof_ids:
@@ -386,9 +402,15 @@ class WorldStateTrajectoryPlotter:
         styles = self._create_styles_for_degrees_of_freedom(degree_of_freedom_ids)
         self._plot_derivatives(axes, styles, degree_of_freedom_ids, trajectory, times)
 
-        ticks = self._choose_ticks(duration)
+        ticks = self._times_up_to(
+            duration=duration, step=self.seconds_between_labelled_ticks
+        )
         axes[-1].set_xlim(0.0, duration)
         axes[-1].set_xticks(ticks)
+        axes[-1].set_xticks(
+            self._times_up_to(duration=duration, step=self.seconds_between_grid_lines),
+            minor=True,
+        )
         axes[-1].set_xticklabels(
             [str(int(x)) if abs(x - int(x)) < 1e-9 else f"{x:.1f}" for x in ticks]
         )

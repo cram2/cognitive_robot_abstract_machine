@@ -179,6 +179,34 @@ def test_subplot_titles_labels_and_shared_xlabel(world_setup, monkeypatch):
         assert any(line.get_visible() for line in axis.get_ygridlines())
 
 
+def test_the_time_axis_numbers_some_ticks_and_draws_grid_lines_in_between(
+    world_setup, monkeypatch
+):
+    """
+    Ticks with a number mark every :attr:`seconds_between_labelled_ticks`, and every
+    subplot draws a grid line every :attr:`seconds_between_grid_lines`; those between
+    the numbered ticks carry no number.
+    """
+    trajectory = _record_trajectory(world_setup, duration=12.1, time_step=0.2)
+    plotter = WorldStateTrajectoryPlotter(legend=False)
+    duration = trajectory.times[-1] - trajectory.times[0]
+
+    axes = _render_plot(plotter, trajectory, monkeypatch).axes
+
+    np.testing.assert_allclose(
+        axes[-1].get_xticks(),
+        np.arange(0.0, duration, plotter.seconds_between_labelled_ticks),
+    )
+    np.testing.assert_allclose(
+        np.union1d(axes[-1].get_xticks(), axes[-1].get_xticks(minor=True)),
+        np.arange(0.0, duration, plotter.seconds_between_grid_lines),
+    )
+    for axis in axes:
+        minor_ticks = axis.xaxis.get_minor_ticks()
+        assert all(tick.gridline.get_visible() for tick in minor_ticks)
+        assert all(tick.label1.get_text() == "" for tick in minor_ticks)
+
+
 # %% which degrees of freedom are drawn
 
 
