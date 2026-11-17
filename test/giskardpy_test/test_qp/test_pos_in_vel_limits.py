@@ -14,6 +14,7 @@ from giskardpy.qp.pos_in_vel_limits import BrakingProfile
 
 DELTA_TIME = timedelta(seconds=0.05)
 RESIDUE = 1e-10
+NEGLIGIBLE_VELOCITY = 1e-4
 
 
 def _shifted_velocities(velocity_profile: np.ndarray) -> np.ndarray:
@@ -78,8 +79,40 @@ def test_shifted_velocity_profile_covers_exactly_the_remaining_distance():
         assert time_step * np.sum(shifted) == pytest.approx(distance)
 
 
+def test_shifted_velocity_profile_has_no_velocity_a_hair_above_rest():
+    """
+    Just past the distance a whole tail of the braking profile covers, the interpolated
+    profile must not end in velocities a hair above rest: bounds that close to the
+    other bound of their variable make an interior point solver call a solvable problem
+    infeasible.
+    """
+    braking_profile = BrakingProfile.fastest(
+        braking=JerkLimitedBraking.from_braking_time(
+            velocity_limit=1.0,
+            braking_time=timedelta(seconds=0.3),
+            time_step=DELTA_TIME,
+        ),
+        prediction_horizon=7,
+    )
+    time_step = DELTA_TIME.total_seconds()
+    velocity_profile = BrakingProfile.zero_negligible_velocities(
+        velocity_profile=braking_profile.velocity
+    )
+    tail_distances = [
+        time_step * np.sum(velocity_profile[first_step:])
+        for first_step in range(1, velocity_profile.shape[0])
+    ]
+
+    for tail_distance in tail_distances:
+        shifted = braking_profile.shifted_by(
+            distance=sm.Scalar(tail_distance + RESIDUE)
+        ).evaluate()
+
+        hair_above_rest = (shifted > 0) & (shifted < NEGLIGIBLE_VELOCITY)
+        assert not hair_above_rest.any()
+
+
 # %% zero_negligible_velocities
-NEGLIGIBLE_VELOCITY = 1e-4
 
 
 def test_zero_negligible_velocities_clears_small_positive_velocities():

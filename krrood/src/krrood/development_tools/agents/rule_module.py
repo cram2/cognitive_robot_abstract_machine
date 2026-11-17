@@ -1,5 +1,5 @@
 """
-The modules that declare sections of ``AGENTS.md`` or skills.
+The modules that declare sections of ``AGENTS.md``, skills or other generated files.
 """
 
 from __future__ import annotations
@@ -98,19 +98,26 @@ class RuleModule:
             checker for section in self.sections for checker in section.checkers
         )
 
-    @property
-    def skills(self) -> list[type[Skill]]:
+    def defined_subclasses[Declaration](
+        self, *, base: type[Declaration]
+    ) -> list[type[Declaration]]:
         """
-        The skills defined in :attr:`modules`, in alphabetical order of their names.
-
-        Skills a module only imports are not among them.
+        :param base: The class whose subclasses are looked for.
+        :return: The subclasses of the base defined in :attr:`modules`, in definition
+            order; subclasses a module only imports are not among them.
         """
-        skills = [
+        return [
             value
             for module in self.modules
             for value in vars(module).values()
             if isinstance(value, type)
-            and issubclass(value, Skill)
+            and issubclass(value, base)
             and value.__module__ == module.__name__
         ]
-        return sorted(skills, key=lambda skill: skill.name)
+
+    @property
+    def skills(self) -> list[type[Skill]]:
+        """
+        The skills defined in :attr:`modules`, in alphabetical order of their names.
+        """
+        return sorted(self.defined_subclasses(base=Skill), key=lambda skill: skill.name)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 try:
-    from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
+    from pxr import Gf, Kind, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
 
     PXR_AVAILABLE = True
 except ImportError:
@@ -351,4 +351,217 @@ def build_single_joint_stage_with_semantic_labels() -> Usd.Stage:
         ["seating"]
     )
 
+    return stage
+
+
+def _define_posed_link(
+    stage: Usd.Stage,
+    path: str,
+    *,
+    translation: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    rotation_about_z: float = 0.0,
+    scale: tuple[float, float, float] = (1.0, 1.0, 1.0),
+) -> Usd.Prim:
+    """
+    Define an ``Xform`` at ``path`` holding one quad mesh, posed the way a scene places
+    an instance of a referenced asset.
+
+    :param stage: The stage to define the link on.
+    :param path: The link prim's stage path.
+    :param translation: The link's authored translation.
+    :param rotation_about_z: The link's authored rotation about Z, in degrees.
+    :param scale: The link's authored scale.
+    :return: The link prim.
+    """
+    link = UsdGeom.Xform.Define(stage, path)
+    link.AddTranslateOp().Set(Gf.Vec3d(*translation))
+    link.AddRotateZOp().Set(rotation_about_z)
+    link.AddScaleOp().Set(Gf.Vec3f(*scale))
+    mesh = UsdGeom.Mesh.Define(stage, f"{path}/mesh")
+    mesh.CreatePointsAttr([(0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)])
+    mesh.CreateFaceVertexCountsAttr([4])
+    mesh.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
+    return link.GetPrim()
+
+
+def _define_component(
+    stage: Usd.Stage,
+    path: str,
+    *,
+    translation: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    rotation_about_z: float = 0.0,
+    scale: tuple[float, float, float] = (1.0, 1.0, 1.0),
+) -> Usd.Prim:
+    """
+    Define a posed link, as :func:`_define_posed_link` does, of kind ``component``.
+
+    :param stage: The stage to define the component on.
+    :param path: The component prim's stage path.
+    :param translation: The component's authored translation.
+    :param rotation_about_z: The component's authored rotation about Z, in degrees.
+    :param scale: The component's authored scale.
+    :return: The component prim.
+    """
+    component = _define_posed_link(
+        stage,
+        path,
+        translation=translation,
+        rotation_about_z=rotation_about_z,
+        scale=scale,
+    )
+    Usd.ModelAPI(component).SetKind(Kind.Tokens.component)
+    return component
+
+
+def build_jointless_stage_with_posed_top_level_prims() -> Usd.Stage:
+    """
+    A minimal in-memory stage with no default prim and two top-level prims, one of them
+    posed with a translation, rotation and non-uniform scale, and no physics joints.
+
+    :return: The built in-memory stage.
+    """
+    stage = Usd.Stage.CreateInMemory()
+    _define_posed_link(
+        stage,
+        "/object_a",
+        translation=(2.0, 0.0, 0.0),
+        rotation_about_z=90.0,
+        scale=(2.0, 1.0, 1.0),
+    )
+    _define_posed_link(stage, "/object_b")
+    return stage
+
+
+def build_component_scene_stage() -> Usd.Stage:
+    """
+    A minimal in-memory scene in the layout of an architectural USD export: a default
+    ``Scope`` grouping two chair components by category, one of them posed with a
+    translation, rotation and non-uniform scale, and a floor mesh outside every
+    component.
+
+    :return: The built in-memory stage.
+    """
+    stage = Usd.Stage.CreateInMemory()
+    scene = UsdGeom.Scope.Define(stage, "/scene")
+    stage.SetDefaultPrim(scene.GetPrim())
+    UsdGeom.Scope.Define(stage, "/scene/chairs")
+    _define_component(
+        stage,
+        "/scene/chairs/chair_0",
+        translation=(2.0, 0.0, 0.0),
+        rotation_about_z=90.0,
+        scale=(2.0, 1.0, 1.0),
+    )
+    _define_component(stage, "/scene/chairs/chair_1", translation=(0.0, 3.0, 0.0))
+    floor = UsdGeom.Mesh.Define(stage, "/scene/floor")
+    floor.CreatePointsAttr([(0, 0, 0), (5, 0, 0), (5, 5, 0), (0, 5, 0)])
+    floor.CreateFaceVertexCountsAttr([4])
+    floor.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
+    return stage
+
+
+def build_component_scene_stage_without_a_default_prim() -> Usd.Stage:
+    """
+    A minimal in-memory scene whose two components are top-level prims, with no default
+    prim to name the scene's root after.
+
+    :return: The built in-memory stage.
+    """
+    stage = Usd.Stage.CreateInMemory()
+    _define_component(stage, "/chair_0")
+    _define_component(stage, "/chair_1", translation=(0.0, 3.0, 0.0))
+    return stage
+
+
+def build_component_scene_stage_with_an_instanceable_component() -> Usd.Stage:
+    """
+    A minimal in-memory scene placing one chair component as an instance of an
+    instanceable prim, so the chair's mesh is only reachable through instance proxies.
+
+    :return: The built in-memory stage.
+    """
+    stage = Usd.Stage.CreateInMemory()
+    scene = UsdGeom.Scope.Define(stage, "/scene")
+    stage.SetDefaultPrim(scene.GetPrim())
+    stage.CreateClassPrim("/assets")
+    asset = UsdGeom.Xform.Define(stage, "/assets/chair")
+    Usd.ModelAPI(asset.GetPrim()).SetKind(Kind.Tokens.component)
+    mesh = UsdGeom.Mesh.Define(stage, "/assets/chair/mesh")
+    mesh.CreatePointsAttr([(0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0)])
+    mesh.CreateFaceVertexCountsAttr([4])
+    mesh.CreateFaceVertexIndicesAttr([0, 1, 2, 3])
+    chair = UsdGeom.Xform.Define(stage, "/scene/chair_0")
+    chair.GetPrim().GetReferences().AddInternalReference("/assets/chair")
+    chair.GetPrim().SetInstanceable(True)
+    chair.AddTranslateOp().Set(Gf.Vec3d(0.0, 3.0, 0.0))
+    return stage
+
+
+def build_component_scene_stage_with_an_articulated_component() -> Usd.Stage:
+    """
+    A minimal in-memory scene with a chair component and a cabinet component that holds
+    a carcass mesh of its own and a door link, which a revolute joint with an unset
+    ``body0`` connects to the cabinet.
+
+    :return: The built in-memory stage.
+    """
+    stage = Usd.Stage.CreateInMemory()
+    scene = UsdGeom.Scope.Define(stage, "/scene")
+    stage.SetDefaultPrim(scene.GetPrim())
+    _define_component(stage, "/scene/chair", translation=(0.0, 3.0, 0.0))
+    _define_component(stage, "/scene/cabinet", translation=(2.0, 0.0, 0.0))
+    _define_posed_link(stage, "/scene/cabinet/door", translation=(1.0, 0.0, 0.0))
+    joint = UsdPhysics.RevoluteJoint.Define(stage, "/scene/cabinet/door_joint")
+    joint.CreateBody1Rel().SetTargets(["/scene/cabinet/door"])
+    joint.CreateAxisAttr("Z")
+    joint.CreateLowerLimitAttr(0.0)
+    joint.CreateUpperLimitAttr(90.0)
+    joint.CreateLocalPos0Attr(Gf.Vec3f(1.0, 0.0, 0.0))
+    joint.CreateLocalRot0Attr(Gf.Quatf(1, 0, 0, 0))
+    joint.CreateLocalPos1Attr(Gf.Vec3f(0.0, 0.0, 0.0))
+    joint.CreateLocalRot1Attr(Gf.Quatf(1, 0, 0, 0))
+    return stage
+
+
+def build_component_scene_stage_with_a_scaled_articulated_component() -> Usd.Stage:
+    """
+    The scene of :func:`build_component_scene_stage_with_an_articulated_component`, with
+    the cabinet scaled, so its door joint's offsets would have to scale with it.
+
+    :return: The built in-memory stage.
+    """
+    stage = build_component_scene_stage_with_an_articulated_component()
+    cabinet = UsdGeom.Xformable(stage.GetPrimAtPath("/scene/cabinet"))
+    [scale] = [
+        operation
+        for operation in cabinet.GetOrderedXformOps()
+        if operation.GetOpType() == UsdGeom.XformOp.TypeScale
+    ]
+    scale.Set(Gf.Vec3f(2.0, 2.0, 2.0))
+    return stage
+
+
+def build_component_scene_stage_with_a_joint_moving_its_component() -> Usd.Stage:
+    """
+    The scene of :func:`build_component_scene_stage_with_an_articulated_component`, with
+    the cabinet itself as its door joint's ``body1``.
+
+    :return: The built in-memory stage.
+    """
+    stage = build_component_scene_stage_with_an_articulated_component()
+    joint = UsdPhysics.Joint(stage.GetPrimAtPath("/scene/cabinet/door_joint"))
+    joint.GetBody1Rel().SetTargets(["/scene/cabinet"])
+    return stage
+
+
+def build_component_scene_stage_with_a_joint_into_another_component() -> Usd.Stage:
+    """
+    The scene of :func:`build_component_scene_stage_with_an_articulated_component`, with
+    the chair, another component, as the cabinet's door joint's ``body0``.
+
+    :return: The built in-memory stage.
+    """
+    stage = build_component_scene_stage_with_an_articulated_component()
+    joint = UsdPhysics.Joint(stage.GetPrimAtPath("/scene/cabinet/door_joint"))
+    joint.CreateBody0Rel().SetTargets(["/scene/chair"])
     return stage

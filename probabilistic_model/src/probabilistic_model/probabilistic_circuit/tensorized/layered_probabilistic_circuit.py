@@ -35,7 +35,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    GradientDescent,
+    JaxGradientDescent,
     Loss,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
@@ -358,7 +358,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             log-likelihood if ``None``.
         :return: This circuit.
         """
-        self.root = GradientDescent(
+        self.root = JaxGradientDescent(
             self.root,
             AverageNegativeLogLikelihood() if loss is None else loss,
             optimizer,

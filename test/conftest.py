@@ -452,7 +452,7 @@ def self_collision_bot_world():
     return world
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def supported_abstract_robots():
     return [
         PR2,
