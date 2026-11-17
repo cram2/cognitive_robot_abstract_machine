@@ -17,12 +17,17 @@ from krrood.adapters.json_serializer import to_json
 from semantic_digital_twin.adapters.ros.messages import (
     MetaData,
     ModificationBlock,
+    ReceivedMessage,
     StreamPosition,
     WorldStateUpdate,
     WorldUpdate,
 )
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.world_synchronizer import (
+    ModelReloadSynchronizer,
+    WorldSynchronizer,
+)
 from semantic_digital_twin.exceptions import (
+    StateUpdateContainsNonNumericValuesError,
     StateUpdateContainsUnknownDegreesOfFreedomError,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -31,6 +36,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     AddConnectionModification,
+    AddKinematicStructureEntityModification,
     WorldModelModificationBlock,
 )
 from .test_world_synchronizer import (
@@ -215,8 +221,117 @@ def test_update_whose_state_is_no_number_is_reported(rclpy_node, stranger):
     )
 
     divergence = synchronizer.divergence_from(publisher=stranger)
-    assert isinstance(divergence.raised_from, ValueError)
+    assert isinstance(divergence.raised_from, StateUpdateContainsNonNumericValuesError)
     synchronizer.close()
+
+
+def test_programming_error_while_applying_is_not_swallowed(
+    rclpy_node, stranger, monkeypatch
+):
+    synchronizer = WorldSynchronizer(
+        node=rclpy_node,
+        _world=create_dummy_world(),
+        topic_name=unique_topic("programming_error"),
+    )
+
+    def fail_like_a_bug(message: ReceivedMessage) -> None:
+        raise KeyError(message.sequence_number)
+
+    monkeypatch.setattr(synchronizer, "_subscription_callback", fail_like_a_bug)
+
+    with pytest.raises(KeyError):
+        synchronizer.subscription_callback(
+            state_update_of_unknown_degree_of_freedom(stranger)
+        )
+    synchronizer.close()
+
+
+# %% updates applied entirely or not at all
+
+
+def test_combined_update_with_unknown_state_leaves_the_model_untouched(
+    rclpy_node, stranger
+):
+    world = create_dummy_world()
+    synchronizer = WorldSynchronizer(
+        node=rclpy_node, _world=world, topic_name=unique_topic("all_or_nothing")
+    )
+    combined = WorldUpdate(
+        meta_data=stranger,
+        modification_block=ModificationBlock(
+            meta_data=stranger,
+            modifications=WorldModelModificationBlock(
+                modifications=[
+                    AddKinematicStructureEntityModification(
+                        Body(name=PrefixedName("extra"))
+                    )
+                ]
+            ),
+        ),
+        state_update=WorldStateUpdate(meta_data=stranger, ids=[uuid4()], states=[1.0]),
+        sequence_number=1,
+    )
+
+    synchronizer.subscription_callback(
+        std_msgs.msg.String(data=json.dumps(to_json(combined)))
+    )
+
+    assert "extra" not in [
+        entity.name.name for entity in world.kinematic_structure_entities
+    ]
+    synchronizer.close()
+
+
+# %% recovering by reloading the world
+
+
+def test_reload_clears_the_divergence_from_the_reloaded_world(
+    rclpy_node, in_memory_session_maker
+):
+    world_topic = unique_topic("reload_world")
+    reload_topic = unique_topic("reload_model")
+    publishing_world = create_dummy_world()
+    receiving_world = create_dummy_world()
+    publisher = WorldSynchronizer(
+        node=rclpy_node, _world=publishing_world, topic_name=world_topic
+    )
+    receiver = WorldSynchronizer(
+        node=rclpy_node, _world=receiving_world, topic_name=world_topic
+    )
+    publishing_reloader = ModelReloadSynchronizer(
+        node=rclpy_node,
+        _world=publishing_world,
+        session=in_memory_session_maker(),
+        topic_name=reload_topic,
+    )
+    receiving_reloader = ModelReloadSynchronizer(
+        node=rclpy_node,
+        _world=receiving_world,
+        session=in_memory_session_maker(),
+        topic_name=reload_topic,
+    )
+    unknown_to_receiver = Body(name=PrefixedName("unknown"))
+    with publishing_world.modify_world(publish_changes=False):
+        publishing_world.add_connection(
+            FixedConnection(parent=publishing_world.root, child=unknown_to_receiver)
+        )
+    with publishing_world.modify_world():
+        publishing_world.add_connection(
+            FixedConnection(
+                parent=unknown_to_receiver, child=Body(name=PrefixedName("child"))
+            )
+        )
+    assert wait_for_condition(
+        lambda: receiver.divergence_from(publisher=publisher.meta_data) is not None
+    )
+
+    publishing_reloader.publish_reload_model()
+
+    assert wait_for_condition(
+        lambda: receiver.divergence_from(publisher=publisher.meta_data) is None
+    )
+    for synchronizer in (publisher, receiver, publishing_reloader, receiving_reloader):
+        synchronizer.close()
 
 
 # %% buffered updates that cannot be applied

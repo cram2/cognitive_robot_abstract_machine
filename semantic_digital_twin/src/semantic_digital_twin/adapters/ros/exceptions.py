@@ -129,8 +129,11 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
 @dataclass
 class SynchronizerDivergedError(UsageError):
     """
-    Raised on the thread that owns a world when an update of another synchronizer could
-    not be applied, so that the world may differ from the publisher's from then on.
+    Reports that an update of another synchronizer could not be applied, so that the
+    world may differ from the publisher's from then on.
+
+    .. warning:: A model modification that failed part-way stays applied as far as it
+        got, so the world may hold part of the failed update.
     """
 
     publisher: MetaData

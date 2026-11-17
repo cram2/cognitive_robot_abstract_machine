@@ -11,6 +11,8 @@ from functools import cached_property
 from typing_extensions import Callable, ClassVar
 from uuid import UUID
 
+from numbers import Real
+
 import numpy as np
 import rclpy  # type: ignore
 import std_msgs.msg
@@ -40,6 +42,7 @@ from semantic_digital_twin.callbacks.callback import (
 )
 from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
 from semantic_digital_twin.exceptions import (
+    StateUpdateContainsNonNumericValuesError,
     SynchronizerNotConnectedError,
     MissingPublishChangesKWARG,
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
@@ -48,6 +51,10 @@ from semantic_digital_twin.exceptions import (
     WorldHasNoSynchronizerError,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_modification import (
+    AddDegreeOfFreedomModification,
+    RemoveDegreeOfFreedomModification,
+)
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithClassBasedID,
 )
@@ -266,13 +273,16 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         its publisher as caught up with, instead of ending the spinning of the node or
         the batch the message is applied in.
 
+        .. warning:: A model modification that fails part-way stays applied as far as it
+            got, so the world may hold part of the failed message.
+
         :param received: The message to handle.
         :param handle: What to do with the message.
         :param error_throttle_period: The fewest seconds between two logged errors.
         """
         try:
             handle(received)
-        except (DataclassException, KeyError, ValueError) as error:
+        except DataclassException as error:
             divergence = SynchronizerDivergedError(
                 publisher=received.publisher,
                 sequence_number=received.sequence_number,
@@ -305,6 +315,26 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         """
         with self._sequence_number_lock:
             self._divergences.pop(publisher, None)
+
+    def forget_divergences_from_same_world(self, *, publisher: MetaData) -> None:
+        """
+        Count every synchronizer of the world ``publisher`` belongs to, in its process,
+        as caught up with again, once this world was replaced by that world.
+
+        The synchronizers of one world, such as its reloads and its updates, publish
+        under different nodes, so they are told apart by process and world, not node.
+
+        :param publisher: A synchronizer of the world this world now equals.
+        """
+        with self._sequence_number_lock:
+            caught_up = [
+                diverged
+                for diverged in self._divergences
+                if diverged.process_id == publisher.process_id
+                and diverged.world_id == publisher.world_id
+            ]
+            for diverged in caught_up:
+                del self._divergences[diverged]
 
     def _notice_lost_messages(
         self, message: ReceivedMessage, warning_throttle_period: float = 1.0
@@ -503,7 +533,11 @@ class ModelReloadSynchronizer(Synchronizer):
         new_world = self.session.scalars(query).one().from_dao()
         self._world._replace_with(new_world)
         self.record_applied(msg)
-        self.forget_divergence_from(publisher=msg.meta_data)
+        for synchronizer in [
+            self,
+            *WorldSynchronizer.all_callbacks_of_this_type_from_world(self._world),
+        ]:
+            synchronizer.forget_divergences_from_same_world(publisher=msg.meta_data)
 
 
 @dataclass(eq=False)
@@ -715,9 +749,16 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         Apply model first, then state — preserves the ordering invariant.
 
         Both are applied under a single hold of ``_world_lock`` so a combined update is
-        atomic: no other thread can observe the new model structure without its accompanying state.
+        atomic: no other thread can observe the new model structure without its
+        accompanying state. The state is checked before the model is applied, so a
+        state that cannot be applied leaves the model untouched too.
         """
         with self._world._world_lock:
+            if message.state_update is not None:
+                self._check_state_update(
+                    state_update=message.state_update,
+                    modification_block=message.modification_block,
+                )
             if message.modification_block is not None:
                 self._apply_model(message.modification_block)
             if message.state_update is not None:
@@ -732,32 +773,62 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         with self._world.modify_world(publish_changes=False):
             modification_block_message.modifications.apply(self._world)
 
-    def _apply_state(self, state_update_message: WorldStateUpdate):
+    def _check_state_update(
+        self,
+        *,
+        state_update: WorldStateUpdate,
+        modification_block: ModificationBlock | None = None,
+    ) -> None:
         """
-        Applies the state, and raises a StateUpdateContainsUnknownDegreesOfFreedomError
-        if we receive unknown degree of freedom.
+        :param state_update: A received state.
+        :param modification_block: The model modification received with it, whose
+            degrees of freedom the state may already refer to.
+        :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the state refers to
+            a degree of freedom the world will not hold.
+        :raises StateUpdateContainsNonNumericValuesError: If a value is not a number.
         """
-        identifier_index_state_triples = [
-            (identifier, self._world.state._index.get(identifier), state_value)
-            for identifier, state_value in zip(
-                state_update_message.ids, state_update_message.states
-            )
-        ]
+        known_identifiers = set(self._world.state.keys())
+        if modification_block is not None:
+            for modification in modification_block.modifications:
+                match modification:
+                    case AddDegreeOfFreedomModification():
+                        known_identifiers.add(modification.degree_of_freedom.id)
+                    case RemoveDegreeOfFreedomModification():
+                        known_identifiers.discard(modification.degree_of_freedom_id)
         unknown_identifiers = [
             identifier
-            for identifier, index, _ in identifier_index_state_triples
-            if index is None
+            for identifier in state_update.ids
+            if identifier not in known_identifiers
         ]
         if unknown_identifiers:
             raise StateUpdateContainsUnknownDegreesOfFreedomError(
                 unknown_identifiers=unknown_identifiers
             )
-        indices = [index for _, index, _ in identifier_index_state_triples]
-        state_values = [
-            state_value for _, _, state_value in identifier_index_state_triples
+        non_numeric_states = [
+            state for state in state_update.states if not isinstance(state, Real)
+        ]
+        if non_numeric_states:
+            raise StateUpdateContainsNonNumericValuesError(
+                non_numeric_states=non_numeric_states
+            )
+
+    def _apply_state(self, state_update_message: WorldStateUpdate):
+        """
+        Applies the state.
+
+        :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the state refers to
+            a degree of freedom the world does not hold.
+        :raises StateUpdateContainsNonNumericValuesError: If a value is not a number.
+        """
+        self._check_state_update(state_update=state_update_message)
+        indices = [
+            self._world.state._index[identifier]
+            for identifier in state_update_message.ids
         ]
         with self._world._world_lock:
-            self._world.state._data[0, indices] = np.asarray(state_values, dtype=float)
+            self._world.state._data[0, indices] = np.asarray(
+                state_update_message.states, dtype=float
+            )
             self.update_previous_world_state()
         self._world.notify_state_change(publish_changes=False)
 
