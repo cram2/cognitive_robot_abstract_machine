@@ -7,14 +7,14 @@ reason to edit a rule. Do not change the tree's structure, and do not add rules.
 {{ type_imports }}
 
 {{ variable_name }} = variable({{ case_type_name }}, domain=[])
-query = entity({{ variable_name }}).where({{ base_condition }})
-with query:
+{{ local_names.QUERY }} = entity({{ variable_name }}).where({{ base_condition }})
+with {{ local_names.QUERY }}:
 {{ body }}
-query.build()
+{{ local_names.QUERY }}.build()
 
 # Stable handles for loading.
 {{ module_attributes.CASE_TYPE }} = {{ case_type_name }}
 {{ module_attributes.CONCLUSION_ATTRIBUTE }} = {{ conclusion_attribute_name|tojson }}
 {{ module_attributes.CASE_VARIABLE }} = {{ variable_name }}
-{{ module_attributes.QUERY }} = query
+{{ module_attributes.QUERY }} = {{ local_names.QUERY }}
 {{ module_attributes.CORNER_CASES }} = {{ corner_cases_dict_src }}

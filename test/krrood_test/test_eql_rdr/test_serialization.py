@@ -51,6 +51,17 @@ class Animal:
     habitat: Optional[Species] = None
 
 
+@dataclass(unsafe_hash=True)
+class Entity:
+    """
+    A case type whose lower-camel-case name is also the name of a factory the generated
+    module calls.
+    """
+
+    has_fur: bool = False
+    species: Optional[Species] = None
+
+
 @dataclass
 class _SerializableRuleTree:
     """
@@ -85,6 +96,15 @@ def _alternative_chain_rdr():
             add(animal.species, Species.BIRD)
     query.build()
     return _SerializableRuleTree(query, Animal, animal, "species")
+
+
+def _entity_named_case_type_rdr():
+    entity_case = variable(Entity, domain=[])
+    query = entity(entity_case).where(entity_case.has_fur == True)
+    with query:
+        add(entity_case.species, Species.MAMMAL)
+    query.build()
+    return _SerializableRuleTree(query, Entity, entity_case, "species")
 
 
 def _exec_generated_module(source: str) -> dict:
@@ -154,6 +174,62 @@ def test_generated_tree_evaluates_a_bird_case_the_same_as_the_original():
     assert knowledge.sufficient_condition_sets[0].evaluate_against(
         shared_variable=rebuilt_variable, case=bat
     )
+
+
+def _species_concluded_for(root, case_variable, case) -> set[Species]:
+    """
+    The conclusions whose sufficient conditions the case satisfies in the rule tree.
+    """
+    concluded = set()
+    for value in Species:
+        knowledge = get_conclusion_sufficient_conditions_from_a_rule_tree(root, value)
+        if any(
+            condition_set.evaluate_against(shared_variable=case_variable, case=case)
+            for condition_set in knowledge.sufficient_condition_sets
+        ):
+            concluded.add(value)
+    return concluded
+
+
+@pytest.mark.parametrize("rdr_factory", [_flat_tree_rdr, _alternative_chain_rdr])
+@pytest.mark.parametrize("has_fur", [False, True])
+@pytest.mark.parametrize("can_fly", [False, True])
+def test_generated_tree_concludes_the_same_as_the_original_for_every_case(
+    rdr_factory, has_fur, can_fly
+):
+    """
+    Whatever case is given, the rebuilt tree concludes exactly what the original does.
+    """
+    original = rdr_factory()
+    namespace = _exec_generated_module(RDRSerializer(rdr=original).to_source())
+    case = Animal("subject", has_fur=has_fur, can_fly=can_fly)
+
+    original_conclusions = _species_concluded_for(
+        original.query._conditions_root_, original.case_variable, case
+    )
+    rebuilt_conclusions = _species_concluded_for(
+        namespace[RDRModuleAttribute.QUERY]._conditions_root_,
+        namespace[RDRModuleAttribute.CASE_VARIABLE],
+        case,
+    )
+
+    assert rebuilt_conclusions == original_conclusions
+
+
+def test_a_case_type_named_like_a_factory_does_not_shadow_the_factory():
+    """
+    The case variable never takes the name of a factory the module calls.
+    """
+    original = _entity_named_case_type_rdr()
+
+    namespace = _exec_generated_module(RDRSerializer(rdr=original).to_source())
+
+    assert namespace[RDRModuleAttribute.CASE_TYPE] is Entity
+    assert _species_concluded_for(
+        namespace[RDRModuleAttribute.QUERY]._conditions_root_,
+        namespace[RDRModuleAttribute.CASE_VARIABLE],
+        Entity(has_fur=True),
+    ) == {Species.MAMMAL}
 
 
 def test_raises_when_the_rdr_has_no_rules():

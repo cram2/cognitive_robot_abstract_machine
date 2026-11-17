@@ -16,7 +16,7 @@ from enum import StrEnum
 from pathlib import Path
 from textwrap import indent
 
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Any, Callable
 
 from krrood.code_generation.ast_helpers import (
     ast_attribute_access,
@@ -130,30 +130,58 @@ class RuleTreeSourceEmitter:
         raise MissingAddConclusionError(condition=condition)
 
 
+# %% names a saved module binds besides its handles
+
+
+class RDRModuleLocalName(StrEnum):
+    """The names a saved RDR module binds for itself, which no case variable may
+    take."""
+
+    QUERY = "query"
+    """The query the rules are added to."""
+
+
 # %% RDR <-> module
 
 
 @dataclass(kw_only=True)
 class RDRSerializer:
     """Writes an :class:`EQLSingleClassRDR` as a Python module that rebuilds it
-    on import, and loads such a module back."""
+    on import."""
 
     rdr: EQLSingleClassRDR
     """The RDR to write; it needs at least one rule."""
 
     @classproperty
-    def rule_authoring_import(cls) -> str:
-        """The import statement for every public function of
-        :mod:`~krrood.entity_query_language.factories`, of which a saved module
-        keeps those it calls."""
-        authoring_functions = [
+    def rule_authoring_functions(cls) -> list[Callable[..., Any]]:
+        """Every public function of :mod:`~krrood.entity_query_language.factories`,
+        which a saved module may call."""
+        return [
             member
             for member_name, member in vars(factories).items()
             if inspect.isfunction(member)
             and member.__module__ == factories.__name__
             and not member_name.startswith("_")
         ]
-        return "\n".join(get_imports_from_types(authoring_functions))
+
+    @classproperty
+    def rule_authoring_import(cls) -> str:
+        """The import statement for every rule authoring function, of which a
+        saved module keeps those it calls."""
+        return "\n".join(get_imports_from_types(cls.rule_authoring_functions))
+
+    @property
+    def case_variable_name(self) -> str:
+        """The name the saved module gives the case variable: the case type's name
+        in lower camel case, with an underscore appended while a function the module
+        calls or a name it binds already has it."""
+        taken = {function.__name__ for function in self.rule_authoring_functions} | {
+            local_name.value for local_name in RDRModuleLocalName
+        }
+        name = camel_case_to_lower_camel_case(self.rdr.case_type.__name__)
+        while name in taken:
+            name += "_"
+        return name
 
     @classproperty
     def templates_directory(cls) -> Path:
@@ -177,7 +205,7 @@ class RDRSerializer:
             raise EmptyRuleTreeError()
 
         case_type = self.rdr.case_type
-        variable_name = camel_case_to_lower_camel_case(case_type.__name__)
+        variable_name = self.case_variable_name
         context = ConditionEmissionContext(
             variable_names_by_id={self.rdr.case_variable._id_: variable_name},
             referenced_types={case_type},
@@ -221,6 +249,7 @@ class RDRSerializer:
                 conclusion_attribute_name=self.rdr.conclusion_attribute_name,
                 corner_cases_dict_src=corner_cases,
                 module_attributes=RDRModuleAttribute,
+                local_names=RDRModuleLocalName,
             )
         )
 
