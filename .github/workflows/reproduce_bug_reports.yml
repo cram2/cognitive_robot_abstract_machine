@@ -5,7 +5,7 @@ defaults:
 
 # Runs the script of a bug report on main and comments on the issue with what it did.
 # The script is its author's code, so the job running it gets a read-only token and no
-# secrets; the report job, which never runs it, is the only one that may comment.
+# secrets; the report job, which never runs it, is the only one that comments and labels.
 on:
   issues:
     types: [opened, edited, labeled]
@@ -137,3 +137,20 @@ jobs:
           } > comment.md
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --body-file comment.md --edit-last --create-if-none
+
+      # a timeout or a missing script says nothing about the bug, so the label stays as it is
+      - name: Label the issue as reproduced on main, or not
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          IS_LABELLED_REPRODUCED: ${{ contains(github.event.issue.labels.*.name, 'reproduced') }}
+        run: |
+          exit_status="$(cat reproduction/exit_status)"
+          case "$exit_status" in
+            unanswered|124) ;;
+            0)
+              if [ "$IS_LABELLED_REPRODUCED" = true ]; then
+                gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --remove-label reproduced
+              fi ;;
+            *) gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label reproduced ;;
+          esac
