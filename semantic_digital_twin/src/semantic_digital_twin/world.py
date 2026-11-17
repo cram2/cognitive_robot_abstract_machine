@@ -2227,9 +2227,7 @@ class World(HasSimulatorProperties):
         self._model_manager.update_model_version_and_notify_callbacks(
             publish_changes=publish_changes, **kwargs
         )
-        self.notify_state_change(
-            publish_changes=publish_changes, force_republish=True, **kwargs
-        )
+        self.notify_state_change(publish_changes=publish_changes, **kwargs)
 
         for callback in list(self.state.state_change_callbacks):
             callback.update_previous_world_state()

@@ -667,7 +667,7 @@ def test_callback_pausing(rclpy_node):
         w1.add_connection(c)
 
     time.sleep(0.2)
-    assert len(ws2.missed_messages) == 2
+    assert len(ws2.missed_messages) == 1
     assert len(w1.kinematic_structure_entities) == 2
     assert len(w2.kinematic_structure_entities) == 0
     assert len(w1.connections) == 1
@@ -1888,8 +1888,8 @@ def test_apply_missed_messages_interleaved_model_and_state(rclpy_node):
 
     time.sleep(0.2)
 
-    assert len(world_synchronizer_2.missed_messages) == 3, (
-        "expected at least a model message and a state message to be buffered"
+    assert len(world_synchronizer_2.missed_messages) == 2, (
+        "expected a model message and a state message to be buffered"
     )
     assert len(world_2.kinematic_structure_entities) == 0
 
@@ -2149,14 +2149,14 @@ def test_state_change_during_a_modification_is_published_after_its_model_change(
             for update in published_updates
             if update.modification_block is not None
         ]
-        state_update_positions = [
+        state_only_update_positions = [
             update.sequence_number
             for update in published_updates
-            if update.state_update is not None
+            if update.state_update is not None and update.modification_block is None
         ]
         assert len(model_update_positions) == 1
-        assert state_update_positions
-        assert max(model_update_positions) < min(state_update_positions)
+        assert state_only_update_positions
+        assert max(model_update_positions) < min(state_only_update_positions)
     finally:
         synchronizer.close()
 
@@ -2667,7 +2667,7 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
 def test_a_model_modification_republishes_the_whole_state(rclpy_node):
     """
     A receiver rebuilding itself from a model modification has no snapshot to fill the
-    gaps with, so the state that follows the modification carries every degree of
+    gaps with, so the state that comes with the modification carries every degree of
     freedom rather than only the ones that moved since the last message.
     """
     (
@@ -2681,7 +2681,7 @@ def test_a_model_modification_republishes_the_whole_state(rclpy_node):
     try:
         publish_position(publisher_world, 1.5)
         # A fixed connection carries no degree of freedom, so nothing about the state
-        # changed and only the republish can account for a state message here.
+        # changed and only the republish can account for the state of this message.
         with publisher_world.modify_world():
             late_body = Body(name=PrefixedName("model_change_republish_late_body"))
             publisher_world.add_body(late_body)
@@ -2689,8 +2689,8 @@ def test_a_model_modification_republishes_the_whole_state(rclpy_node):
                 FixedConnection(parent=publisher_world.root, child=late_body)
             )
         assert wait_for_condition(
-            lambda: len(receiver_synchronizer.missed_messages) == 3
-        ), "expected a state, a model and the model's state republish to be buffered"
+            lambda: len(receiver_synchronizer.missed_messages) == 2
+        ), "expected a state and a model with its whole state to be buffered"
 
         republished_state = receiver_synchronizer.missed_messages[-1].state_update
 
@@ -3317,6 +3317,45 @@ def test_a_publisher_heard_from_for_the_first_time_has_lost_nothing(
 # %% state written inside a modification
 
 
+def add_placed_body(world: World, body: Body) -> None:
+    """
+    Attach ``body`` to the root of ``world`` by a 6-DoF connection and move it away from
+    the root's origin, both within one modification.
+    """
+    root = world.root
+    with world.modify_world():
+        world.add_connection(
+            Connection6DoF.create_with_dofs(world=world, parent=root, child=body)
+        )
+        body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.95, z=1.04, reference_frame=root
+        )
+
+
+@dataclass(eq=False, kw_only=True)
+class BodyTransformRecorder(StateChangeCallback):
+    """
+    Records where a body is each time its world announces a state change, as any
+    observer of that world would see it.
+    """
+
+    body_id: uuid.UUID
+    """
+    The body whose global transform is recorded once it is part of the world.
+    """
+
+    recorded_transforms: list[np.ndarray] = field(default_factory=list, init=False)
+    """
+    The global transform of the body at every announced state change it was part of.
+    """
+
+    def on_state_change(self, **kwargs) -> None:
+        bodies = [body for body in self._world.bodies if body.id == self.body_id]
+        if not bodies:
+            return
+        self.recorded_transforms.append(bodies[0].global_transform.to_np())
+
+
 def test_a_body_placed_inside_its_modification_reaches_another_world_at_that_place(
     rclpy_node,
 ):
@@ -3331,19 +3370,8 @@ def test_a_body_placed_inside_its_modification_reaches_another_world_at_that_pla
         receiver_synchronizer,
     ) = create_connected_worlds(rclpy_node, "placed_inside_modification")
     try:
-        root = publisher_world.root
         placed_body = Body(name=PrefixedName("placed_inside_modification_body"))
-        with publisher_world.modify_world():
-            publisher_world.add_connection(
-                Connection6DoF.create_with_dofs(
-                    world=publisher_world, parent=root, child=placed_body
-                )
-            )
-            placed_body.parent_connection.origin = (
-                HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=0.95, z=1.04, reference_frame=root
-                )
-            )
+        add_placed_body(publisher_world, placed_body)
 
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
@@ -3358,6 +3386,74 @@ def test_a_body_placed_inside_its_modification_reaches_another_world_at_that_pla
             placed_body.global_transform.to_np(),
         )
     finally:
+        publisher_synchronizer.close()
+        receiver_synchronizer.close()
+
+
+def test_a_modification_leaves_as_one_update_with_the_state_written_in_it(rclpy_node):
+    """
+    A modification is published as a single update carrying its model change together
+    with the whole state, including the positions written inside the modification.
+    """
+    (
+        publisher_world,
+        receiver_world,
+        publisher_synchronizer,
+        receiver_synchronizer,
+    ) = create_connected_worlds(rclpy_node, "one_update_per_modification")
+    receiver_synchronizer.defer_incoming_updates = True
+    try:
+        sequence_number_before = publisher_synchronizer.published_sequence_number
+        add_placed_body(
+            publisher_world, Body(name=PrefixedName("one_update_per_modification_body"))
+        )
+
+        assert (
+            publisher_synchronizer.published_sequence_number
+            == sequence_number_before + 1
+        )
+        assert wait_for_condition(
+            lambda: len(receiver_synchronizer.missed_messages) == 1
+        ), "the update of the modification never arrived"
+        update = receiver_synchronizer.missed_messages[0]
+        assert update.modification_block is not None
+        assert (
+            dict(zip(update.state_update.ids, update.state_update.states))
+            == publisher_world.state.to_uuid_position_dict()
+        )
+    finally:
+        publisher_synchronizer.close()
+        receiver_synchronizer.close()
+
+
+def test_a_receiving_world_never_shows_a_new_body_away_from_its_place(rclpy_node):
+    """
+    Every state change a receiving world announces while taking in a body that was added
+    and placed in one modification already shows the body at its place.
+    """
+    (
+        publisher_world,
+        receiver_world,
+        publisher_synchronizer,
+        receiver_synchronizer,
+    ) = create_connected_worlds(rclpy_node, "never_away_from_its_place")
+    placed_body = Body(name=PrefixedName("never_away_from_its_place_body"))
+    recorder = BodyTransformRecorder(_world=receiver_world, body_id=placed_body.id)
+    try:
+        add_placed_body(publisher_world, placed_body)
+
+        assert wait_for_condition(
+            lambda: receiver_synchronizer.has_applied(
+                publisher_synchronizer.latest_published_position
+            )
+        ), "the receiver never applied the modification"
+        assert recorder.recorded_transforms, "the receiver never announced the body"
+        for recorded_transform in recorder.recorded_transforms:
+            np.testing.assert_array_almost_equal(
+                recorded_transform, placed_body.global_transform.to_np()
+            )
+    finally:
+        recorder.stop()
         publisher_synchronizer.close()
         receiver_synchronizer.close()
 
