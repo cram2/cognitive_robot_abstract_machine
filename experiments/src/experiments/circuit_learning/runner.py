@@ -39,8 +39,8 @@ from experiments.circuit_learning.methods import (
     TrainingContext,
 )
 from experiments.circuit_learning.records import (
-    Job,
-    JobKind,
+    BenchmarkRun,
+    RunKind,
     RunRecord,
     RunStatus,
     TrainedCircuit,
@@ -79,7 +79,7 @@ class OutputFile(StrEnum):
 
 
 @dataclass(kw_only=True)
-class JobLimits:
+class RunLimits:
     """
     The limits every run of a benchmark keeps to.
     """
@@ -117,12 +117,12 @@ class JobLimits:
 
 
 @dataclass(kw_only=True)
-class JobExecution:
+class RunExecution:
     """
     Carries out one run in the current process and stores what it measured.
     """
 
-    job: Job
+    run: BenchmarkRun
     """
     The run.
     """
@@ -137,7 +137,7 @@ class JobExecution:
     The directory of the downloaded and prepared datasets.
     """
 
-    limits: JobLimits
+    limits: RunLimits
     """
     The limits of the run.
     """
@@ -149,28 +149,28 @@ class JobExecution:
         """
         jax.config.update("jax_enable_x64", True)
         dataset = PreparedDatasets(cache_directory=self.cache_directory).load(
-            name=self.job.dataset
+            name=self.run.dataset
         )
-        method = BenchmarkMethods().find(name=self.job.method)
-        if self.job.kind is JobKind.QUERIES:
+        method = BenchmarkMethods().find(name=self.run.method)
+        if self.run.kind is RunKind.QUERIES:
             self.database.store(
                 records=QueryMeasurement(
                     dataset=dataset,
                     configuration=BenchmarkConfiguration.from_setting(
-                        learning_method=self.job.method,
-                        dataset=self.job.dataset,
-                        setting=self.job.setting,
+                        learning_method=self.run.method,
+                        dataset=self.run.dataset,
+                        setting=self.run.setting,
                         seed=method.seed,
                     ),
-                    setting=self.job.setting,
-                    circuit=self.database.trained_circuit(job=self.job.training_job()),
+                    setting=self.run.setting,
+                    circuit=self.database.trained_circuit(run=self.run.training_run()),
                 ).run()
             )
             return
         measured = TrainingMeasurement(
             dataset=dataset,
             method=method,
-            setting=self.job.setting,
+            setting=self.run.setting,
             context=TrainingContext(
                 convergence=Convergence(maximum_duration=self.limits.training_duration),
                 memory_budget_bytes=self.limits.memory_budget_bytes,
@@ -179,7 +179,9 @@ class JobExecution:
         self.database.store(
             records=[
                 measured.result,
-                TrainedCircuit(job=self.job, circuit=measured.circuit.to_namespace(np)),
+                TrainedCircuit(
+                    training_run=self.run, circuit=measured.circuit.to_namespace(np)
+                ),
             ]
         )
 
@@ -215,12 +217,12 @@ class Slot:
 
 
 @dataclass(kw_only=True)
-class RunningJob:
+class RunInProgress:
     """
     A run and the process carrying it out.
     """
 
-    job: Job
+    run: BenchmarkRun
     """
     The run.
     """
@@ -256,7 +258,7 @@ class RunningJob:
 @dataclass(kw_only=True)
 class BenchmarkRunner:
     """
-    Runs every job on the shares of the machine, the most informative first.
+    Runs every run on the shares of the machine, the most informative first.
     """
 
     datasets: list[DatasetName]
@@ -296,7 +298,7 @@ class BenchmarkRunner:
 
     poll_interval: timedelta = timedelta(seconds=5)
     """
-    How often running jobs are checked.
+    How often running runs are checked.
     """
 
     log_tail_characters: int = 3000
@@ -321,7 +323,7 @@ class BenchmarkRunner:
         """
         return BenchmarkDatabase(path=self.output / OutputFile.DATABASE)
 
-    def jobs(self) -> list[Job]:
+    def runs(self) -> list[BenchmarkRun]:
         """
         :return: Every run in the order it is started: the training in each method's
             first setting, the queries of those circuits, then every other setting.
@@ -346,16 +348,16 @@ class BenchmarkRunner:
                     continue
                 settings = method.settings()
                 first.append(
-                    Job(
-                        kind=JobKind.TRAINING,
+                    BenchmarkRun(
+                        kind=RunKind.TRAINING,
                         dataset=name,
                         method=method_name,
                         setting=settings[0],
                     )
                 )
                 queries.extend(
-                    Job(
-                        kind=JobKind.QUERIES,
+                    BenchmarkRun(
+                        kind=RunKind.QUERIES,
                         dataset=name,
                         method=method_name,
                         setting=setting,
@@ -363,8 +365,8 @@ class BenchmarkRunner:
                     for setting in query_settings
                 )
                 rest.extend(
-                    Job(
-                        kind=JobKind.TRAINING,
+                    BenchmarkRun(
+                        kind=RunKind.TRAINING,
                         dataset=name,
                         method=method_name,
                         setting=setting,
@@ -375,15 +377,15 @@ class BenchmarkRunner:
             return first + queries
         return first + queries + rest
 
-    def readiness(self, *, job: Job) -> RunStatus | None:
+    def readiness(self, *, run: BenchmarkRun) -> RunStatus | None:
         """
-        :param job: A run that has not started.
+        :param run: A run that has not started.
         :return: ``None`` if it can start, :attr:`RunStatus.SKIPPED` if it never can,
             :attr:`RunStatus.FINISHED` if it has to wait.
         """
-        if job.kind is JobKind.TRAINING:
+        if run.kind is RunKind.TRAINING:
             return None
-        trained = self.finished.get(job.training_job().key)
+        trained = self.finished.get(run.training_run().key)
         if trained is None:
             return RunStatus.FINISHED
         if trained is RunStatus.FINISHED:
@@ -416,30 +418,32 @@ class BenchmarkRunner:
             for index in range(count)
         ]
 
-    def log_file(self, *, job: Job) -> Path:
+    def log_file(self, *, run: BenchmarkRun) -> Path:
         """
-        :param job: A run.
+        :param run: A run.
         :return: The file its output is written to.
         """
-        return self.output / OutputFile.LOGS / f"{job.key}.log"
+        return self.output / OutputFile.LOGS / f"{run.key}.log"
 
-    def record(self, *, job: Job, status: RunStatus, duration: timedelta) -> None:
+    def record(
+        self, *, run: BenchmarkRun, status: RunStatus, duration: timedelta
+    ) -> None:
         """
         Store how a run ended.
         """
-        self.finished[job.key] = status
-        log = self.log_file(job=job)
+        self.finished[run.key] = status
+        log = self.log_file(run=run)
         log_tail = None
         if status is not RunStatus.FINISHED and log.exists():
             log_tail = log.read_text(errors="replace")[-self.log_tail_characters :]
         self.database.store(
             records=[
-                RunRecord(job=job, status=status, duration=duration, log_tail=log_tail)
+                RunRecord(run=run, status=status, duration=duration, log_tail=log_tail)
             ]
         )
-        print(f"{status} {job.key} {duration}", flush=True)
+        print(f"{status} {run.key} {duration}", flush=True)
 
-    def start(self, *, job: Job, slot: Slot) -> RunningJob:
+    def start(self, *, run: BenchmarkRun, slot: Slot) -> RunInProgress:
         """
         :return: The run, started in a process of its own on the share.
         """
@@ -451,11 +455,11 @@ class BenchmarkRunner:
         environment["XLA_FLAGS"] = "--xla_gpu_autotune_level=0"
         if not slot.uses_gpu:
             environment["CUDA_VISIBLE_DEVICES"] = ""
-        limits = JobLimits(
+        limits = RunLimits(
             training_duration=self.training_duration,
             memory_budget_bytes=slot.memory_budget_bytes,
         )
-        log = self.log_file(job=job)
+        log = self.log_file(run=run)
         log.parent.mkdir(parents=True, exist_ok=True)
         process = subprocess.Popen(
             [
@@ -463,8 +467,8 @@ class BenchmarkRunner:
                 "-m",
                 "experiments.circuit_learning.runner",
                 Command.EXECUTE,
-                "--job",
-                json.dumps(to_json(job)),
+                "--run",
+                json.dumps(to_json(run)),
                 "--output",
                 str(self.output),
                 "--cache-directory",
@@ -479,19 +483,19 @@ class BenchmarkRunner:
             stderr=subprocess.STDOUT,
             preexec_fn=functools.partial(os.sched_setaffinity, 0, slot.cores),
         )
-        return RunningJob(
-            job=job,
+        return RunInProgress(
+            run=run,
             process=process,
             slot=slot,
             start=time.perf_counter(),
             timeout=(
                 limits.training_timeout
-                if job.kind is JobKind.TRAINING
+                if run.kind is RunKind.TRAINING
                 else limits.query_duration
             ),
         )
 
-    def ended_status(self, *, running: RunningJob) -> RunStatus | None:
+    def ended_status(self, *, running: RunInProgress) -> RunStatus | None:
         """
         :return: How the run ended, stopping it if it ran out of time or memory,
             ``None`` while it keeps running.
@@ -514,21 +518,21 @@ class BenchmarkRunner:
 
     def run(self) -> None:
         """
-        Run every job that has not ended in an earlier start.
+        Run every run that has not ended in an earlier start.
         """
-        self.run_jobs(jobs=self.jobs())
+        self.run_pending(runs=self.runs())
 
-    def run_jobs(self, *, jobs: list[Job]) -> None:
+    def run_pending(self, *, runs: list[BenchmarkRun]) -> None:
         """
-        :param jobs: The runs, in the order they are started; those that ended in an
+        :param runs: The runs, in the order they are started; those that ended in an
             earlier start are left out.
         """
         self.finished.update(
-            {record.job.key: record.status for record in self.database.run_records()}
+            {record.run.key: record.status for record in self.database.run_records()}
         )
-        pending = [job for job in jobs if job.key not in self.finished]
+        pending = [run for run in runs if run.key not in self.finished]
         free = self.slots()
-        running: list[RunningJob] = []
+        running: list[RunInProgress] = []
         while pending or running:
             for current in list(running):
                 status = self.ended_status(running=current)
@@ -536,24 +540,24 @@ class BenchmarkRunner:
                     continue
                 running.remove(current)
                 free.append(current.slot)
-                self.record(job=current.job, status=status, duration=current.elapsed)
-            for job in list(pending):
-                readiness = self.readiness(job=job)
+                self.record(run=current.run, status=status, duration=current.elapsed)
+            for run in list(pending):
+                readiness = self.readiness(run=run)
                 if readiness is RunStatus.SKIPPED:
-                    pending.remove(job)
-                    self.record(job=job, status=RunStatus.SKIPPED, duration=timedelta())
+                    pending.remove(run)
+                    self.record(run=run, status=RunStatus.SKIPPED, duration=timedelta())
                     continue
                 if readiness is not None:
                     continue
                 slot = next(
-                    (each for each in free if each.uses_gpu == job.setting.uses_gpu),
+                    (each for each in free if each.uses_gpu == run.setting.uses_gpu),
                     None,
                 )
                 if slot is None:
                     continue
                 free.remove(slot)
-                pending.remove(job)
-                running.append(self.start(job=job, slot=slot))
+                pending.remove(run)
+                running.append(self.start(run=run, slot=slot))
             time.sleep(self.poll_interval.total_seconds())
 
 
@@ -591,16 +595,16 @@ def main() -> None:
     parser.add_argument("--gpu-slots", type=int, default=3)
     parser.add_argument("--cpu-slots", type=int, default=7)
     parser.add_argument("--first-settings-only", action="store_true")
-    parser.add_argument("--job")
+    parser.add_argument("--run")
     parser.add_argument("--memory-budget-bytes", type=int, default=0)
     arguments = parser.parse_args()
     training_duration = timedelta(seconds=arguments.training_seconds)
     if Command(arguments.command) is Command.EXECUTE:
-        JobExecution(
-            job=from_json(json.loads(arguments.job)),
+        RunExecution(
+            run=from_json(json.loads(arguments.run)),
             database=BenchmarkDatabase(path=arguments.output / OutputFile.DATABASE),
             cache_directory=arguments.cache_directory,
-            limits=JobLimits(
+            limits=RunLimits(
                 training_duration=training_duration,
                 memory_budget_bytes=arguments.memory_budget_bytes,
             ),

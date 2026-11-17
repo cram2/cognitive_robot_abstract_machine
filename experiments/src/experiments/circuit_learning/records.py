@@ -20,7 +20,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 # %% names
 
 
-class JobKind(StrEnum):
+class RunKind(StrEnum):
     """
     What a run measures.
     """
@@ -45,12 +45,12 @@ class RunStatus(StrEnum):
 
 
 @dataclass(kw_only=True, frozen=True)
-class Job:
+class BenchmarkRun:
     """
     One run of the benchmark.
     """
 
-    kind: JobKind
+    kind: RunKind
     """
     What the run measures.
     """
@@ -79,13 +79,13 @@ class Job:
             f"{self.kind}.{self.dataset}.{self.method.name.lower()}.{self.setting.key}"
         )
 
-    def training_job(self) -> Job:
+    def training_run(self) -> BenchmarkRun:
         """
         :return: The training run whose circuit a query run measures: the training of
             the same method on the same dataset in the method's first setting.
         """
-        return Job(
-            kind=JobKind.TRAINING,
+        return BenchmarkRun(
+            kind=RunKind.TRAINING,
             dataset=self.dataset,
             method=self.method,
             setting=BenchmarkMethods().find(name=self.method).settings()[0],
@@ -98,7 +98,7 @@ class RunRecord:
     How a run of the benchmark ended.
     """
 
-    job: Job
+    run: BenchmarkRun
     """
     The run.
     """
@@ -125,9 +125,9 @@ class TrainedCircuit:
     The circuit a training run learned, kept for the runs that measure its queries.
     """
 
-    job: Job
+    training_run: BenchmarkRun
     """
-    The training run.
+    The training run that learned it.
     """
 
     circuit: LayeredProbabilisticCircuit

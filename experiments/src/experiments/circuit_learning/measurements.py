@@ -60,7 +60,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 
 
 @dataclass(kw_only=True)
-class LogLikelihoods:
+class ChunkedLogLikelihoodEvaluation:
     """
     Computes the log-likelihood of many rows in chunks, in the setting of the circuit.
     """
@@ -170,7 +170,7 @@ class TrainingMeasurement:
             else host_memory.peak_bytes()
         )
         circuit = learned.circuit
-        log_likelihoods = LogLikelihoods(circuit=circuit)
+        log_likelihoods = ChunkedLogLikelihoodEvaluation(circuit=circuit)
         test = log_likelihoods.compute_log_likelihoods(
             rows=self.dataset.encoded(frame=self.dataset.test)
         )
@@ -358,7 +358,9 @@ class QueryMeasurement:
         circuit = self.setting.placed(circuit=self.circuit)
         chunk_rows = min(self.likelihood_rows, len(self.dataset.test))
         rows = self.dataset.encoded(frame=self.dataset.test)[:chunk_rows]
-        log_likelihoods = LogLikelihoods(circuit=circuit, chunk_rows=chunk_rows)
+        log_likelihoods = ChunkedLogLikelihoodEvaluation(
+            circuit=circuit, chunk_rows=chunk_rows
+        )
         timing = self.timed_calls(
             query=lambda: log_likelihoods.compute_chunk_log_likelihoods(chunk=rows)
         )
