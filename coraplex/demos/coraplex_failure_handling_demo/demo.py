@@ -246,7 +246,7 @@ class CheckGraspBeforeAttaching(SequentialInsertion[PickUpAction]):
         return [
             GraspCheck(
                 name="grasp check",
-                body=plan_node.grasp.graspable.root,
+                body=plan_node.grasp_candidate.graspable.root,
                 gripper=plan_node.arm.end_effector,
             )
         ]
@@ -281,8 +281,8 @@ class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
         ][-1]
 
     def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
-        approach = plan_node.grasp.world_T_grasp.to_np()[:3, 0]
-        body = plan_node.grasp.graspable.root
+        approach = plan_node.grasp_candidate.world_T_grasp.to_np()[:3, 0]
+        body = plan_node.grasp_candidate.graspable.root
         return [
             Nudge(
                 name="nudge",
