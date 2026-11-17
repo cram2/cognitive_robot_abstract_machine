@@ -1109,6 +1109,19 @@ def test_json_round_trip(any_circuit):
     )
 
 
+def test_a_layered_circuit_reads_its_own_json(any_circuit):
+    """
+    A layered circuit is a JSON serializer of its own, so the class rebuilds itself from
+    its JSON, as an ORM storing it as JSON does.
+    """
+    layered = RustworkxCircuitToLayeredCircuitConverter.convert(any_circuit)
+    restored = LayeredProbabilisticCircuit.from_json(data=to_json(layered))
+    samples = any_circuit.sample(200)
+    np.testing.assert_allclose(
+        restored.log_likelihood(samples), layered.log_likelihood(samples)
+    )
+
+
 def test_json_round_trip_of_a_truncated_gaussian_layer(gaussian_circuit, x, y):
     event = SimpleEvent.from_data(
         {x: closed(-2.0, 1.0), y: closed(-1.0, 3.0)}

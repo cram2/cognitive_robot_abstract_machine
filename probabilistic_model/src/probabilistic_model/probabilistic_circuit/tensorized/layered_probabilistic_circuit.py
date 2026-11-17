@@ -18,6 +18,10 @@ from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterable, Self
 
+from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
+    SubclassJSONSerializer,
+)
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.distributions import (
     IntegerDistribution,
@@ -146,7 +150,9 @@ class LayerNode:
 
 
 @dataclass(eq=False)
-class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcopyMixin):
+class LayeredProbabilisticCircuit(
+    GroundableCircuit[LayerNode], DataclassDeepcopyMixin, SubclassJSONSerializer
+):
     """
     A probabilistic circuit whose units are grouped into layers of numpy arrays.
 
@@ -168,6 +174,13 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
     """
     The root layer of the circuit.
     """
+
+    def to_json(self, **kwargs) -> dict[str, Any]:
+        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
+
+    @classmethod
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        return DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
 
     @property
     def variable_to_index_map(self) -> dict[Variable, int]:
