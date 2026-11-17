@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.mixins import (
     HasArmParameter,
-    ApproachesGrasps,
+    HasGraspApproach,
     HasMaxPlacingLinearVelocityParameter,
     HasMaxTransportLinearVelocityParameter,
     HasMaxReleaseOpeningVelocityParameter,
@@ -40,7 +40,7 @@ class PlaceAction(
     SequentialAction,
     HasArmParameter,
     HasGoalPoseParameter,
-    ApproachesGrasps,
+    HasGraspApproach,
     HasMaxPlacingLinearVelocityParameter,
     HasMaxTransportLinearVelocityParameter,
     HasMaxReleaseOpeningVelocityParameter,

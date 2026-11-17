@@ -19,7 +19,7 @@ from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction
 from coraplex.robot_plans.mixins import (
-    ApproachesGrasps,
+    HasGraspApproach,
     HasApproachClearanceParameter,
     HasArmParameter,
     HasGraspCandidateParameter,
@@ -117,12 +117,12 @@ class MovesContainerByItsHandle(
         :return: The pose the tool frame backs off to, in `grasp_pose`'s frame.
         """
         distance = (
-            ApproachesGrasps.distance_to_boundary(
+            HasGraspApproach.distance_to_boundary(
                 body=self.mechanism.child, reference_T_grasp=grasp_pose
             )
             + self.release_clearance
         )
-        return ApproachesGrasps.pre_grasp_pose(
+        return HasGraspApproach.pre_grasp_pose(
             reference_T_grasp=grasp_pose, end_effector=end_effector, distance=distance
         )
 

@@ -44,7 +44,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.robot_plans.mixins import ApproachesGrasps
+from coraplex.robot_plans.mixins import HasGraspApproach
 from cramph.composites import Parallel, Sequence, StartedWhenTrue
 from cramph.context import ContextExtension, StatechartContext
 from cramph.node import StatechartNode
@@ -467,7 +467,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     ),
                     # Back off the handle the way the hand came in.
                     MoveManipulatorAction(
-                        goal_pose=ApproachesGrasps.pre_grasp_pose(
+                        goal_pose=HasGraspApproach.pre_grasp_pose(
                             reference_T_grasp=handle_grasp.grasp_pose,
                             end_effector=left_hand,
                             distance=HandDistance.HANDLE_RELEASE_CLEARANCE.value,

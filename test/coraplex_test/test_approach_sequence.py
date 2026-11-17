@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from coraplex.robot_plans.actions.base import SequentialAction
-from coraplex.robot_plans.mixins import ApproachesGrasps
+from coraplex.robot_plans.mixins import HasGraspApproach
 from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class GraspApproachingAction(ApproachesGrasps, SequentialAction):
+class GraspApproachingAction(HasGraspApproach, SequentialAction):
     """
     An action that approaches grasps with the default clearance and retreat distance,
     and has no steps of its own.

@@ -396,7 +396,7 @@ class GraspPoseSequence:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ApproachesGrasps(
+class HasGraspApproach(
     Action, HasApproachClearanceParameter, HasRetreatDistanceParameter, ABC
 ):
     """

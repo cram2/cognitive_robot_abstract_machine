@@ -22,7 +22,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
 )
 from coraplex.robot_plans.mixins import (
-    ApproachesGrasps,
+    HasGraspApproach,
     HasApproachClearanceParameter,
     HasArmParameter,
     HasGraspCandidateParameter,
@@ -176,7 +176,7 @@ def test_action_inherits_parameter_mixins():
         HasApproachClearanceParameter,
         HasRetreatDistanceParameter,
     }
-    assert issubclass(PickUpAction, ApproachesGrasps)
+    assert issubclass(PickUpAction, HasGraspApproach)
     assert issubclass(PickUpAction, HasPositionThresholdParameter)
 
 
@@ -216,7 +216,7 @@ def test_move_to_reach_takes_no_approach_it_would_not_use():
     It moves straight to the tool frame goal of its grasp frame, which neither a
     clearance nor a retreat distance shapes.
     """
-    assert not issubclass(MoveToReach, ApproachesGrasps)
+    assert not issubclass(MoveToReach, HasGraspApproach)
 
 
 def test_set_gripper_action_takes_the_configuration_it_reaches():
