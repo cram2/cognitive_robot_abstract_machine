@@ -1,16 +1,16 @@
+"""
+Exceptions of the ROS 2 adapters of semantic digital twin.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from typing_extensions import TYPE_CHECKING
-
 from krrood.exceptions import DataclassException
+from krrood.message_stream.messages import MessageOrigin
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import UsageError
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.adapters.ros.messages import MetaData
 
 
 @dataclass
@@ -90,7 +90,7 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
     everything the missing update carried out of reach.
     """
 
-    publisher: MetaData
+    publisher: MessageOrigin
     """
     The synchronizer whose update could not be applied.
     """
@@ -123,39 +123,6 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
             "Create the synchronizer of a world before modifying that world: changes made "
             "before it exists reach nobody, and every later change that builds on them "
             "cannot be applied."
-        )
-
-
-@dataclass
-class SynchronizerDivergedError(UsageError):
-    """
-    Reports that an update of another synchronizer could not be applied, so that the
-    world may differ from the publisher's from then on.
-
-    .. warning:: A model modification that failed part-way stays applied as far as it
-        got, so the world may hold part of the failed update.
-    """
-
-    publisher: MetaData
-    """
-    The synchronizer whose update could not be applied.
-    """
-
-    sequence_number: int
-    """
-    The position of that update in the stream of its publisher.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Update #{self.sequence_number} of '{self.publisher.node_name}' could not "
-            f"be applied, so this world may differ from the one of the publisher."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "fetch the world from the publisher again, or stop relying on it being "
-            "synchronized with that publisher."
         )
 
 

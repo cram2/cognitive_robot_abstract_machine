@@ -1,3 +1,8 @@
+"""
+The world updates Giskard and its clients exchange around a goal, and what each side has
+to catch up with before it may read the world.
+"""
+
 from __future__ import annotations
 
 import time
@@ -7,11 +12,11 @@ from time import sleep
 from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json
-from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood.message_stream.exceptions import DivergedFromPublisherError
+from krrood.message_stream.messages import MessageOrigin, StreamPosition
+from krrood.message_stream.stream_participants import PublicationProgress
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
-    PublicationProgress,
     WorldSynchronizer,
 )
 
@@ -81,11 +86,11 @@ class IncomingWorldUpdates:
         Whether everything the publisher of ``position`` sent up to it was applied to
         the world.
         """
-        return self.world_synchronizer.has_applied(position)
+        return self.world_synchronizer.has_applied(position=position)
 
     def divergence_from(
-        self, *, publisher: MetaData
-    ) -> SynchronizerDivergedError | None:
+        self, *, publisher: MessageOrigin
+    ) -> DivergedFromPublisherError | None:
         """
         :param publisher: Another process.
         :return: The first failure to apply an update of ``publisher`` to the world, or
@@ -227,12 +232,12 @@ class CatchingUpWithGiskard:
         published_position = report.get(MotionStatechartPayloadKey.PUBLISHED_POSITION)
         synchronizer = self.world_updates.world_synchronizer
         if published_position is None or synchronizer.has_applied(
-            position := from_json(published_position)
+            position=(position := from_json(published_position))
         ):
             self._awaited_position = None
             return True
         if self._awaited_position is None or synchronizer.has_applied(
-            self._awaited_position
+            position=self._awaited_position
         ):
             self._awaited_position = position
             self._waiting_since = self.world_updates.clock()

@@ -49,8 +49,8 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import from_json
 from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
-from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood.message_stream.exceptions import DivergedFromPublisherError
+from krrood.message_stream.messages import MessageOrigin, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
@@ -202,7 +202,9 @@ class WorldUpdatesMimic:
     Whether a motion statechart was already compiled, per position asked about.
     """
 
-    divergences: dict[MetaData, SynchronizerDivergedError] = field(default_factory=dict)
+    divergences: dict[MessageOrigin, DivergedFromPublisherError] = field(
+        default_factory=dict
+    )
     """
     The first failure to apply an update, per publisher.
     """
@@ -224,8 +226,12 @@ class WorldUpdatesMimic:
         return self.applied_batches >= self.drains_until_caught_up
 
     def divergence_from(
-        self, *, publisher: MetaData
-    ) -> SynchronizerDivergedError | None:
+        self, *, publisher: MessageOrigin
+    ) -> DivergedFromPublisherError | None:
+        """
+        :param publisher: Another process.
+        :return: The divergence from ``publisher`` a test put into :attr:`divergences`.
+        """
         return self.divergences.get(publisher)
 
     @property
@@ -245,8 +251,8 @@ class PublicationProgressMimic:
     Sequence number of the message that was published last.
     """
 
-    origin: MetaData = field(
-        default_factory=lambda: MetaData(node_name="mimic", process_id=0)
+    origin: MessageOrigin = field(
+        default_factory=lambda: MessageOrigin(node_name="mimic", process_id=0)
     )
     """
     The publisher the sequence numbers belong to.
@@ -471,7 +477,7 @@ class CycleWatchingLateClientDisconnector(CycleWatchingClientDisconnector):
     goal was accepted.
     """
 
-    client: MetaData | None = None
+    client: MessageOrigin | None = None
     """
     The client that announces itself late.
     """
@@ -643,7 +649,7 @@ def feedback_data(message: Any) -> dict:
 def create_goal_json(
     seconds: float = 0.5,
     required_position: StreamPosition | None = None,
-    client: MetaData | None = None,
+    client: MessageOrigin | None = None,
     debug_output: DebugOutput = DebugOutput(),
 ) -> str:
     """
@@ -658,7 +664,7 @@ def create_goal_json(
     )
     motion_statechart.add_node(node=EndMotion.when_true(node=counter))
     if client is None:
-        client = MetaData(node_name="unwatched_client", process_id=0)
+        client = MessageOrigin(node_name="unwatched_client", process_id=0)
     goal = MotionGoal.from_motion_statechart(
         motion_statechart=motion_statechart,
         client=client,
@@ -680,7 +686,11 @@ class MotionServerFixture:
     publication_progress: PublicationProgressMimic
     motion_server: MotionServer
     control_loop: ControlLoop
-    client: MetaData
+    client: MessageOrigin
+    """
+    The client the heartbeats of :attr:`client_presence` come from.
+    """
+
     client_presence: HeartbeatPresence
     command_publisher: RecordingCommandPublisher
     idle_input: RecordingInputSynchronizer
@@ -719,7 +729,7 @@ def motion_server(init_background_node, tmp_path: Path) -> MotionServerFixture:
     command_publisher = RecordingCommandPublisher(world=world)
     control_input = RecordingInputSynchronizer(world=world, executor=executor)
     cycle_counter = CycleCounter()
-    client = MetaData(node_name="watched_client", process_id=1)
+    client = MessageOrigin(node_name="watched_client", process_id=1)
     client_presence = HeartbeatPresence(
         node=background_node.get_node(), clock=SteppingClock()
     )
@@ -1171,7 +1181,8 @@ class TestTrajectoryPlot:
         motion_server.motion_server.world_update_timeout = 0.2
         motion_server.action_server.goal_json = create_goal_json(
             required_position=StreamPosition(
-                origin=MetaData(node_name="client", process_id=1), sequence_number=4
+                origin=MessageOrigin(node_name="client", process_id=1),
+                sequence_number=4,
             ),
             debug_output=DebugOutput(plots_trajectory=True),
         )
@@ -1602,8 +1613,12 @@ class TestWaitingForTheWorldOfTheClient:
     def test_a_goal_waits_until_the_change_it_requires_arrived(
         self, *, motion_server: MotionServerFixture
     ):
+        """
+        A goal that requires a change of its client's world runs once that change was
+        applied.
+        """
         position = StreamPosition(
-            origin=MetaData(node_name="client", process_id=1), sequence_number=4
+            origin=MessageOrigin(node_name="client", process_id=1), sequence_number=4
         )
         motion_server.world_updates.drains_until_caught_up = 3
         motion_server.action_server.goal_json = create_goal_json(
@@ -1626,7 +1641,8 @@ class TestWaitingForTheWorldOfTheClient:
         motion_server.world_updates.drains_until_caught_up = 3
         motion_server.action_server.goal_json = create_goal_json(
             required_position=StreamPosition(
-                origin=MetaData(node_name="client", process_id=1), sequence_number=4
+                origin=MessageOrigin(node_name="client", process_id=1),
+                sequence_number=4,
             )
         )
 
@@ -1642,10 +1658,15 @@ class TestWaitingForTheWorldOfTheClient:
     def test_a_change_that_never_arrives_aborts_the_goal(
         self, *, motion_server: MotionServerFixture
     ):
+        """
+        A goal whose required change does not arrive in time is aborted with an error
+        that names the change.
+        """
         motion_server.motion_server.world_update_timeout = 0.2
         motion_server.action_server.goal_json = create_goal_json(
             required_position=StreamPosition(
-                origin=MetaData(node_name="client", process_id=1), sequence_number=4
+                origin=MessageOrigin(node_name="client", process_id=1),
+                sequence_number=4,
             )
         )
 
@@ -1661,9 +1682,13 @@ class TestWaitingForTheWorldOfTheClient:
     def test_a_change_that_cannot_be_applied_aborts_the_goal_at_once(
         self, motion_server: MotionServerFixture
     ):
-        client = MetaData(node_name="client", process_id=1)
-        motion_server.world_updates.divergences[client] = SynchronizerDivergedError(
-            publisher=client, sequence_number=2
+        """
+        A goal whose required change cannot be applied is aborted without waiting for
+        the timeout.
+        """
+        client = MessageOrigin(node_name="client", process_id=1)
+        motion_server.world_updates.divergences[client] = DivergedFromPublisherError(
+            position=StreamPosition(origin=client, sequence_number=2)
         )
         motion_server.motion_server.world_update_timeout = 5.0
         motion_server.action_server.goal_json = create_goal_json(
@@ -1717,7 +1742,7 @@ class TestClientDisconnect:
         A client's first heartbeat can arrive after its goal was accepted, and that goal
         still has to be stopped once the client is gone.
         """
-        late_client = MetaData(node_name="late_client", process_id=2)
+        late_client = MessageOrigin(node_name="late_client", process_id=2)
         motion_server.action_server.goal_json = create_goal_json(
             seconds=100.0, client=late_client
         )

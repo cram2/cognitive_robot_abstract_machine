@@ -11,7 +11,7 @@ from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from krrood.message_stream.messages import MessageOrigin
 from semantic_digital_twin.world_description.connections import WheeledDrive
 
 
@@ -182,7 +182,7 @@ class ClientDisconnectedError(InterruptedExecutionException):
     its end.
     """
 
-    client: MetaData
+    client: MessageOrigin
     """
     The client that sent the goal and is now gone.
     """

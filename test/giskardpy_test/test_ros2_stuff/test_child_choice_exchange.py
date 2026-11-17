@@ -44,7 +44,7 @@ from giskardpy.middleware.ros2.world_updates import (
     ClientWorldUpdates,
     OutgoingWorldUpdates,
 )
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood.message_stream.messages import MessageOrigin, StreamPosition
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock
@@ -357,6 +357,10 @@ class ClientAndRunningStatechart:
     """
 
     def __post_init__(self) -> None:
+        """
+        Wire the chooser that takes the client's choices into the running statechart,
+        and connect the feedback to the action server mimic.
+        """
         self.receiving_chooser = ChildSentByClient(
             world_updates=self.world_updates, action_server=self.action_server
         )
@@ -384,7 +388,8 @@ class ClientAndRunningStatechart:
             child_chooser_access=ChildChooserAccess(choosers=[self.client_chooser]),
             world_updates=self.client_world_updates,
             required_position=StreamPosition(
-                origin=MetaData(node_name="client", process_id=0), sequence_number=1
+                origin=MessageOrigin(node_name="client", process_id=0),
+                sequence_number=1,
             ),
         )
 

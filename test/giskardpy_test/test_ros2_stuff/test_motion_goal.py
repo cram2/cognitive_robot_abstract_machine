@@ -15,17 +15,17 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.context import StatechartContext
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood.message_stream.messages import MessageOrigin, StreamPosition
 from semantic_digital_twin.world import World
 
 # %% the payload a client sends
 
 
-def create_client() -> MetaData:
+def create_client() -> MessageOrigin:
     """
     The identity a client names itself with.
     """
-    return MetaData(node_name="client", process_id=3)
+    return MessageOrigin(node_name="client", process_id=3)
 
 
 def create_motion_statechart() -> Statechart:

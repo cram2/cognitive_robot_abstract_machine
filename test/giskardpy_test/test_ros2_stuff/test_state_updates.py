@@ -28,7 +28,7 @@ from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import OutgoingWorldUpdates
 from giskardpy.motion_statechart.graph_node import EndMotion
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from krrood.message_stream.messages import MessageOrigin
 from semantic_digital_twin.input_synchronization import InputSynchronizer
 from semantic_digital_twin.world import World
 
@@ -301,7 +301,7 @@ def test_the_client_sees_a_node_run_before_the_goal_ends(
     motion_server.action_server.goal_json = json.dumps(
         MotionGoal.from_motion_statechart(
             motion_statechart=statechart,
-            client=MetaData(node_name="unwatched_client", process_id=0),
+            client=MessageOrigin(node_name="unwatched_client", process_id=0),
         ).to_json()
     )
 
