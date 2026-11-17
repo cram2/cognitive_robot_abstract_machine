@@ -1,3 +1,7 @@
+"""
+Tests of building, compiling, ticking and drawing statecharts.
+"""
+
 import json
 import logging
 import time
@@ -100,7 +104,7 @@ class CancellingFailure(Exception):
 # %% a clock the test advances instead of waiting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FakeClock:
     """
     Stands in for :func:`time.monotonic` so tests can advance time without sleeping.
@@ -117,7 +121,7 @@ class FakeClock:
         """
         return self.seconds
 
-    def advance(self, seconds: float) -> None:
+    def advance(self, *, seconds: float) -> None:
         """
         :param seconds: How far to move the clock forward.
         """
@@ -127,13 +131,13 @@ class FakeClock:
 def test_condition_to_str() -> None:
     msc = Statechart(context=StatechartContext(world=World()))
     node1 = ConstTrueNode()
-    msc.add_node(node1)
+    msc.add_node(node=node1)
     node2 = ConstTrueNode()
-    msc.add_node(node2)
+    msc.add_node(node=node2)
     node3 = ConstTrueNode()
-    msc.add_node(node3)
+    msc.add_node(node=node3)
     end = EndStatechart()
-    msc.add_node(end)
+    msc.add_node(node=end)
 
     end.start_condition = sm.logic_and(
         node1.observes_true,
@@ -150,30 +154,33 @@ def test_condition_to_str() -> None:
 
 
 def test_statechart_to_dot(tmp_path) -> None:
+    """
+    A statechart whose nodes read each other's observations can be drawn.
+    """
     msc = Statechart(context=StatechartContext(world=World()))
     node1 = ConstTrueNode()
-    msc.add_node(node1)
+    msc.add_node(node=node1)
     node2 = ConstTrueNode()
-    msc.add_node(node2)
+    msc.add_node(node=node2)
     end = EndStatechart()
-    msc.add_node(end)
+    msc.add_node(node=end)
     node1.success_condition = node2.observes_true
     end.start_condition = logic_and(node1.observes_true, node2.observes_true)
-    msc.draw(str(tmp_path / "muh.pdf"))
+    msc.draw(file_name=tmp_path / "muh.pdf")
 
 
 def test_print() -> None:
-    kin_sim = StatechartExecutor(StatechartContext(world=World()))
+    kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin_sim.context)
     print_node1 = Print(name="cow", message="muh")
-    msc.add_node(print_node1)
+    msc.add_node(node=print_node1)
     print_node2 = Print(name="cow2", message="muh")
-    msc.add_node(print_node2)
+    msc.add_node(node=print_node2)
 
     node1 = ConstTrueNode()
-    msc.add_node(node1)
+    msc.add_node(node=node1)
     end = EndStatechart()
-    msc.add_node(end)
+    msc.add_node(node=end)
 
     node1.start_condition = print_node1.observes_true
     print_node2.start_condition = node1.observes_true
@@ -245,10 +252,14 @@ def test_print() -> None:
 
 
 def test_draw_with_invisible_node(tmp_path) -> None:
-    kin_sim = StatechartExecutor(StatechartContext(world=World()))
+    """
+    A statechart can be drawn while some of its nodes, a composite node among them, are
+    hidden from the drawing.
+    """
+    kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin_sim.context)
     msc.add_nodes(
-        [
+        nodes=[
             sequence := Sequence(
                 nodes=[s1n1 := ConstTrueNode(), s1n2 := ConstTrueNode()]
             ),
@@ -257,14 +268,14 @@ def test_draw_with_invisible_node(tmp_path) -> None:
             ),
         ]
     )
-    msc.add_node(EndStatechart.when_all_true([sequence, sequence2]))
+    msc.add_node(node=EndStatechart.when_all_true(nodes=[sequence, sequence2]))
 
     sequence.plot_specifications.visible = False
     s1n2.plot_specifications.visible = False
     s2n2.plot_specifications.visible = False
 
     kin_sim.compile(statechart=msc)
-    msc.draw(str(tmp_path / "muh.pdf"))
+    msc.draw(file_name=tmp_path / "muh.pdf")
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -287,13 +298,13 @@ class TestConditions:
     def test_nodes_cannot_have_themselves_as_start_condition(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         node1 = ConstTrueNode()
-        msc.add_node(node1)
+        msc.add_node(node=node1)
         with pytest.raises(SelfInStartConditionError):
             node1.start_condition = node1.observes_true
 
     def test_unsupported_variable_in_condition(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
         with pytest.raises(UnsupportedConditionVariableError):
             node.start_condition = FloatVariable(name="muh")
 
@@ -303,14 +314,14 @@ class TestConditions:
         ids=["observation_variable", "last_observation"],
     )
     def test_a_condition_may_not_read_a_trinary_observation(
-        self, read_observation
+        self, *, read_observation
     ) -> None:
         """
         A condition is two-valued, so it asks about an observation through a predicate
         rather than reading the observation, which may be Unknown.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([watched := ConstTrueNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[watched := ConstTrueNode(), node := ConstTrueNode()])
 
         with pytest.raises(UnsupportedConditionVariableError) as exception_info:
             node.start_condition = read_observation(watched)
@@ -322,7 +333,7 @@ class TestConditions:
         A condition is two-valued, so it has no Unknown to be set to.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
 
         with pytest.raises(CannotConvertToStringError):
             node.pause_condition = sm.Scalar.const_trinary_unknown()
@@ -334,7 +345,7 @@ class TestConditions:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 first := ConstTrueNode(),
                 second := ConstTrueNode(),
                 node := ConstTrueNode(),
@@ -352,7 +363,7 @@ class TestConditions:
         depend on it.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([node := ConstTrueNode(), end := EndStatechart()])
+        msc.add_nodes(nodes=[node := ConstTrueNode(), end := EndStatechart()])
         with pytest.raises(TerminalNodeInConditionError) as exception_info:
             node.start_condition = end.observes_true
 
@@ -364,7 +375,7 @@ class TestConditions:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         cancel = CancelStatechart(exception=Exception("cancelled"))
-        msc.add_nodes([node := ConstTrueNode(), cancel])
+        msc.add_nodes(nodes=[node := ConstTrueNode(), cancel])
         with pytest.raises(TerminalNodeInConditionError) as exception_info:
             node.start_condition = cancel.observes_true
 
@@ -375,7 +386,7 @@ class TestConditions:
         No transition of any kind can happen after the statechart has ended.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([node := ConstTrueNode(), end := EndStatechart()])
+        msc.add_nodes(nodes=[node := ConstTrueNode(), end := EndStatechart()])
         with pytest.raises(TerminalNodeInConditionError):
             node.pause_condition = end.observes_true
         with pytest.raises(TerminalNodeInConditionError):
@@ -390,7 +401,7 @@ class TestConditions:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [node := ConstTrueNode(), terminal := _NodeThatEndsTheStatechart()]
+            nodes=[node := ConstTrueNode(), terminal := _NodeThatEndsTheStatechart()]
         )
         with pytest.raises(TerminalNodeInConditionError) as exception_info:
             node.start_condition = terminal.observes_true
@@ -402,35 +413,35 @@ class TestConditions:
         A terminal node's own transitions are as unreachable as everyone else's.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(end := EndStatechart())
+        msc.add_node(node=(end := EndStatechart()))
         with pytest.raises(TerminalNodeInConditionError):
             end.success_condition = end.observes_true
 
     def test_add_node_to_multiple_goals(self) -> None:
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         node = ConstTrueNode()
-        msc.add_node(Sequence(nodes=[node]))
+        msc.add_node(node=Sequence(nodes=[node]))
 
         with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
-            msc.add_node(Sequence(nodes=[node]))
+            msc.add_node(node=Sequence(nodes=[node]))
 
     def test_add_node_to_multiple_goals2(self) -> None:
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         node = ConstTrueNode()
-        msc.add_node(node)
+        msc.add_node(node=node)
 
         with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
-            msc.add_node(Sequence(nodes=[node]))
+            msc.add_node(node=Sequence(nodes=[node]))
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -468,7 +479,7 @@ class _BuildCountingCompositeNode(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.child = _BuildCountingNode(name="counting_child")
-        self._add_child_to_statechart(self.child)
+        self._add_child_to_statechart(node=self.child)
 
     def build_artifacts(self) -> NodeArtifacts:
         self.build_count += 1
@@ -476,7 +487,7 @@ class _BuildCountingCompositeNode(EndedByOwner, CompositeNode):
 
 
 def _compile_msc(msc: Statechart) -> StatechartExecutor:
-    executor = StatechartExecutor(msc.context)
+    executor = StatechartExecutor(context=msc.context)
     executor.compile(statechart=msc)
     return executor
 
@@ -484,8 +495,8 @@ def _compile_msc(msc: Statechart) -> StatechartExecutor:
 def test_each_node_is_built_exactly_once() -> None:
     msc = Statechart(context=StatechartContext(world=World()))
     goal = _BuildCountingCompositeNode()
-    msc.add_node(goal)
-    msc.add_node(EndStatechart.when_true(goal))
+    msc.add_node(node=goal)
+    msc.add_node(node=EndStatechart.when_true(node=goal))
 
     _compile_msc(msc)
 
@@ -501,11 +512,11 @@ def test_adding_the_same_node_to_a_goal_twice_makes_it_its_child_once() -> None:
     A goal that already holds a node does not hold it a second time.
     """
     msc = Statechart(context=StatechartContext(world=World()))
-    msc.add_node(goal := Sequence())
+    msc.add_node(node=(goal := Sequence()))
     node = ConstTrueNode()
 
-    goal.add_node(node)
-    goal.add_node(node)
+    goal.add_node(node=node)
+    goal.add_node(node=node)
 
     assert goal.nodes == [node]
 
@@ -515,8 +526,8 @@ def test_node_added_to_a_joined_goal_joins_the_statechart_right_away() -> None:
     A node added to a goal that already joined a statechart joins it below the goal.
     """
     msc = Statechart(context=StatechartContext(world=World()))
-    msc.add_node(goal := Sequence())
-    goal.add_node(node := ConstTrueNode())
+    msc.add_node(node=(goal := Sequence()))
+    goal.add_node(node=(node := ConstTrueNode()))
 
     assert node in msc.nodes
     assert node.parent_node is goal
@@ -530,15 +541,15 @@ def test_goal_populated_before_compile_matches_one_populated_by_expand() -> None
     """
     populated_before_compile = Statechart(context=StatechartContext(world=World()))
     goal = Sequence()
-    populated_before_compile.add_node(goal)
-    goal.add_node(ConstTrueNode(name="a"))
-    goal.add_node(ConstTrueNode(name="b"))
-    populated_before_compile.add_node(EndStatechart.when_true(goal))
+    populated_before_compile.add_node(node=goal)
+    goal.add_node(node=ConstTrueNode(name="a"))
+    goal.add_node(node=ConstTrueNode(name="b"))
+    populated_before_compile.add_node(node=EndStatechart.when_true(node=goal))
 
     populated_by_expand = Statechart(context=StatechartContext(world=World()))
     expanded_goal = Sequence(nodes=[ConstTrueNode(name="a"), ConstTrueNode(name="b")])
-    populated_by_expand.add_node(expanded_goal)
-    populated_by_expand.add_node(EndStatechart.when_true(expanded_goal))
+    populated_by_expand.add_node(node=expanded_goal)
+    populated_by_expand.add_node(node=EndStatechart.when_true(node=expanded_goal))
 
     for msc in (populated_before_compile, populated_by_expand):
         executor = _compile_msc(msc)
@@ -587,8 +598,8 @@ class _SetupThenArtifactsNode(EndedByOwner, StatechartNode):
 def test_build_delegates_to_build_artifacts() -> None:
     msc = Statechart(context=StatechartContext(world=World()))
     node = _SetupThenArtifactsNode()
-    msc.add_node(node)
-    msc.add_node(EndStatechart.when_true(node))
+    msc.add_node(node=node)
+    msc.add_node(node=EndStatechart.when_true(node=node))
 
     executor = _compile_msc(msc)
 
@@ -608,18 +619,18 @@ def test_a_node_class_declaring_no_way_to_succeed_cannot_be_constructed() -> Non
 
 def test_asking_for_a_condition_of_no_transition_kind_raises() -> None:
     msc = Statechart(context=StatechartContext(world=World()))
-    msc.add_node(node := ConstTrueNode())
+    msc.add_node(node=(node := ConstTrueNode()))
 
     with pytest.raises(UnknownTransitionKindError):
-        node.get_condition("not a transition kind")
+        node.get_condition(transition_kind="not a transition kind")
 
 
 def test_state_iteration_yields_nodes() -> None:
     msc = Statechart(context=StatechartContext(world=World()))
     node1 = ConstTrueNode()
     node2 = ConstTrueNode()
-    msc.add_node(node1)
-    msc.add_node(node2)
+    msc.add_node(node=node1)
+    msc.add_node(node=node2)
 
     assert list(iter(msc.life_cycle_state)) == msc.nodes
     assert dict(msc.observation_state).keys() == {node1, node2}
@@ -661,7 +672,7 @@ def test_thread_payload_monitor_non_blocking_and_caching() -> None:
         delay=0.05,
         return_value=ObservationStateValues.TRUE,
     )
-    msc.add_node(mon)
+    msc.add_node(node=mon)
     # First call should be non-blocking and return Unknown until worker completes at least once
     start = time.perf_counter()
     val0 = mon.compute_observation()
@@ -707,29 +718,37 @@ def test_thread_payload_monitor_surfaces_compute_exception() -> None:
 
 
 class TestStatechartLogic:
-    def test_transition_triggers(self, tmp_path) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+    """
+    How transition conditions start, pause, resume and end nodes.
+    """
+
+    def test_transition_triggers(self, *, tmp_path) -> None:
+        """
+        The start, pause, interrupt and reset conditions of a node each trigger their
+        transition and its callback.
+        """
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         changer = ChangeStateOnEvents()
-        msc.add_node(changer)
+        msc.add_node(node=changer)
 
         node1 = Pulse()
-        msc.add_node(node1)
+        msc.add_node(node=node1)
 
         node2 = Pulse()
-        msc.add_node(node2)
+        msc.add_node(node=node2)
         node2.start_condition = node1.observes_true
 
         node3 = Pulse()
-        msc.add_node(node3)
+        msc.add_node(node=node3)
         node3.start_condition = logic_and(
             node1.observes_false,
             node2.observes_false,
         )
 
         node4 = Pulse()
-        msc.add_node(node4)
+        msc.add_node(node=node4)
         node4.start_condition = node3.observes_true
 
         changer.start_condition = node1.observes_true
@@ -742,29 +761,29 @@ class TestStatechartLogic:
         assert changer.state is None
 
         kin_sim.tick()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.RUNNING
         assert changer.state == "on_start"
 
         kin_sim.tick()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.PAUSED
         assert changer.state == "on_pause"
 
         kin_sim.tick()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.RUNNING
         assert changer.state == "on_unpause"
 
         kin_sim.tick()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         # A node that only records callbacks never decides what it observes, so ending
         # it cannot judge it.
         assert changer.life_cycle_state == LifeCycleValues.INTERRUPTED
         assert changer.state == "on_end"
 
         kin_sim.tick()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
         assert changer.state == "on_reset"
 
@@ -784,31 +803,35 @@ class TestStatechartLogic:
         with pytest.raises(NotInStatechartError):
             _ = node.life_cycle_state
 
-    def test_cancel_statechart(self, tmp_path) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+    def test_cancel_statechart(self, *, tmp_path) -> None:
+        """
+        :class:`CancelStatechart` raises its exception when it starts, and the cancelled
+        statechart can still be drawn.
+        """
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node1 = ConstTrueNode()
-        msc.add_node(node1)
+        msc.add_node(node=node1)
         cancel = CancelStatechart(exception=CancellingFailure())
-        msc.add_node(cancel)
+        msc.add_node(node=cancel)
         cancel.start_condition = node1.observes_true
 
         kin_sim.compile(statechart=msc)
 
         with pytest.raises(CancellingFailure):
             kin_sim.tick()  # cancel starts, which triggers it
-        msc.draw(str(tmp_path / "cancelled.pdf"))
+        msc.draw(file_name=tmp_path / "cancelled.pdf")
 
     def test_history_records_the_tick_of_each_snapshot(self) -> None:
         """
         Ticks in which nothing changes leave no snapshot, but the snapshots that are
         kept still name the tick they were taken in.
         """
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
         counter = CountTicks(name="counter", ticks=10)
-        msc.add_node(counter)
-        msc.add_node(EndStatechart.when_true(counter))
+        msc.add_node(node=counter)
+        msc.add_node(node=EndStatechart.when_true(node=counter))
         executor.compile(statechart=msc)
 
         ticks = 0
@@ -820,17 +843,17 @@ class TestStatechartLogic:
         assert msc.state_history.latest_item.tick_count == ticks
 
     def test_statechart(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         node1 = ConstTrueNode()
-        msc.add_node(node1)
+        msc.add_node(node=node1)
         node2 = ConstTrueNode()
-        msc.add_node(node2)
+        msc.add_node(node=node2)
         node3 = ConstTrueNode()
-        msc.add_node(node3)
+        msc.add_node(node=node3)
         end = EndStatechart()
-        msc.add_node(end)
+        msc.add_node(node=end)
 
         node1.start_condition = logic_or(node3.observes_true, node2.observes_true)
         end.start_condition = node1.observes_true
@@ -843,14 +866,14 @@ class TestStatechartLogic:
 
         assert len(msc.state_history) == 5
         # %% node1
-        assert msc.state_history.get_life_cycle_history_of_node(node1) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=node1) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(node1) == [
+        assert msc.state_history.get_observation_history_of_node(node=node1) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -858,14 +881,14 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
         # %% node2
-        assert msc.state_history.get_life_cycle_history_of_node(node2) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=node2) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(node2) == [
+        assert msc.state_history.get_observation_history_of_node(node=node2) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.TRUE,
@@ -873,14 +896,14 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
         # %% node3
-        assert msc.state_history.get_life_cycle_history_of_node(node3) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=node3) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(node3) == [
+        assert msc.state_history.get_observation_history_of_node(node=node3) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.TRUE,
@@ -888,14 +911,14 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
         # %% end
-        assert msc.state_history.get_life_cycle_history_of_node(end) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=end) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(end) == [
+        assert msc.state_history.get_observation_history_of_node(node=end) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -903,27 +926,31 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
 
-    def test_goal(self, tmp_path) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+    def test_goal(self, *, tmp_path) -> None:
+        """
+        A composite node starts its chained children one after the other and observes
+        true once the last one does.
+        """
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         node1 = ConstTrueNode()
-        msc.add_node(node1)
+        msc.add_node(node=node1)
 
         goal = CompositeNodeWithChainedChildren()
-        msc.add_node(goal)
+        msc.add_node(node=goal)
 
         goal.start_condition = node1.observes_true
 
         end = EndStatechart()
-        msc.add_node(end)
+        msc.add_node(node=end)
         end.start_condition = goal.observes_true
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
         assert len(msc.state_history) == 6
         # %% goal
-        assert msc.state_history.get_life_cycle_history_of_node(goal) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=goal) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
@@ -931,7 +958,7 @@ class TestStatechartLogic:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(goal) == [
+        assert msc.state_history.get_observation_history_of_node(node=goal) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -940,7 +967,7 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
         # %% node1
-        assert msc.state_history.get_life_cycle_history_of_node(node1) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=node1) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
@@ -948,7 +975,7 @@ class TestStatechartLogic:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(node1) == [
+        assert msc.state_history.get_observation_history_of_node(node=node1) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.TRUE,
@@ -957,7 +984,9 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
         # %% sub_node1
-        assert msc.state_history.get_life_cycle_history_of_node(goal.sub_node1) == [
+        assert msc.state_history.get_life_cycle_history_of_node(
+            node=goal.sub_node1
+        ) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
@@ -965,7 +994,9 @@ class TestStatechartLogic:
             LifeCycleValues.SUCCEEDED,
             LifeCycleValues.SUCCEEDED,
         ]
-        assert msc.state_history.get_observation_history_of_node(goal.sub_node1) == [
+        assert msc.state_history.get_observation_history_of_node(
+            node=goal.sub_node1
+        ) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -974,7 +1005,9 @@ class TestStatechartLogic:
             ObservationStateValues.UNKNOWN,
         ]
         # %% sub_node2
-        assert msc.state_history.get_life_cycle_history_of_node(goal.sub_node2) == [
+        assert msc.state_history.get_life_cycle_history_of_node(
+            node=goal.sub_node2
+        ) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
@@ -982,7 +1015,9 @@ class TestStatechartLogic:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(goal.sub_node2) == [
+        assert msc.state_history.get_observation_history_of_node(
+            node=goal.sub_node2
+        ) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -991,7 +1026,7 @@ class TestStatechartLogic:
             ObservationStateValues.TRUE,
         ]
         # %% sub_node2
-        assert msc.state_history.get_life_cycle_history_of_node(end) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=end) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
@@ -999,7 +1034,7 @@ class TestStatechartLogic:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(end) == [
+        assert msc.state_history.get_observation_history_of_node(node=end) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -1007,9 +1042,9 @@ class TestStatechartLogic:
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.TRUE,
         ]
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
 
-    def test_reset(self, tmp_path) -> None:
+    def test_reset(self, *, tmp_path) -> None:
         """
         A reset returns a node to NOT_STARTED, from where it starts and observes again.
 
@@ -1017,16 +1052,16 @@ class TestStatechartLogic:
         is its outcome, and both the reset trigger and the end of the statechart read
         that.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node1 = ConstTrueNode()
-        msc.add_node(node1)
+        msc.add_node(node=node1)
         node2 = ConstTrueNode()
-        msc.add_node(node2)
+        msc.add_node(node=node2)
         node3 = ConstTrueNode()
-        msc.add_node(node3)
+        msc.add_node(node=node3)
         end = EndStatechart()
-        msc.add_node(end)
+        msc.add_node(node=end)
         node1.reset_condition = node2.observes_true
         node2.start_condition = node1.observes_true
         node2.success_condition = node2.observes_true
@@ -1038,7 +1073,7 @@ class TestStatechartLogic:
         )
 
         kin_sim.compile(statechart=msc)
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
 
         kin_sim.tick()
         assert node1.observation_state == ObservationStateValues.TRUE
@@ -1098,14 +1133,14 @@ class TestStatechartLogic:
         msc = Statechart(context=StatechartContext(world=World()))
 
         node1 = ConstTrueNode(name="w")
-        msc.add_node(node1)
+        msc.add_node(node=node1)
 
         outer = CompositeNodeWithNestedCompositeChild()
-        msc.add_node(outer)
+        msc.add_node(node=outer)
         outer.start_condition = node1.observes_true
 
         end = EndStatechart()
-        msc.add_node(end)
+        msc.add_node(node=end)
         end.start_condition = outer.observes_true
 
         json_data = msc.to_json()
@@ -1116,12 +1151,14 @@ class TestStatechartLogic:
         )
 
         for node in msc.nodes:
-            assert node.index == msc_copy.get_node_by_index(node.index).index
+            assert node.index == msc_copy.get_node_by_index(index=node.index).index
 
-        kin_sim = StatechartExecutor(msc_copy.context)
-        node1 = msc_copy.get_nodes_by_type(ConstTrueNode)[0]
-        outer = msc_copy.get_nodes_by_type(CompositeNodeWithNestedCompositeChild)[0]
-        end = msc_copy.get_nodes_by_type(EndStatechart)[0]
+        kin_sim = StatechartExecutor(context=msc_copy.context)
+        node1 = msc_copy.get_nodes_by_type(node_type=ConstTrueNode)[0]
+        outer = msc_copy.get_nodes_by_type(
+            node_type=CompositeNodeWithNestedCompositeChild
+        )[0]
+        end = msc_copy.get_nodes_by_type(node_type=EndStatechart)[0]
         kin_sim.compile(statechart=msc_copy)
 
         assert node1.depth == 0
@@ -1215,20 +1252,23 @@ def test_counting() -> None:
     clock = FakeClock()
 
     kin_sim = StatechartExecutor(
-        StatechartContext(
+        context=StatechartContext(
             world=World(),
         )
     )
     msc = Statechart(context=kin_sim.context)
     seconds = 1
     msc.add_nodes(
-        [counter := CountSeconds(seconds=seconds, _now=clock.time), pulse := Pulse()]
+        nodes=[
+            counter := CountSeconds(seconds=seconds, _now=clock.time),
+            pulse := Pulse(),
+        ]
     )
 
     pulse.start_condition = counter.observes_true
     counter.reset_condition = pulse.observes_true
 
-    msc.add_node(end := EndStatechart())
+    msc.add_node(node=(end := EndStatechart()))
 
     end.start_condition = logic_and(counter.observes_true, pulse.observes_false)
 
@@ -1238,7 +1278,7 @@ def test_counting() -> None:
     step = 0.1
     while not msc.is_ended():
         kin_sim.tick()
-        clock.advance(step)
+        clock.advance(seconds=step)
         if kin_sim.tick_count > 1000:
             raise TimeoutError("test stuck")
 
@@ -1251,10 +1291,10 @@ def test_counting() -> None:
 
 
 def test_count_ticks() -> None:
-    kin_sim = StatechartExecutor(StatechartContext(world=World()))
+    kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin_sim.context)
-    msc.add_node(counter := CountTicks(ticks=3))
-    msc.add_node(EndStatechart.when_true(counter))
+    msc.add_node(node=(counter := CountTicks(ticks=3)))
+    msc.add_node(node=EndStatechart.when_true(node=counter))
     kin_sim.compile(statechart=msc)
     kin_sim.tick_until_end()
     # ending tacks 4 ticks, one to turn EndStatechart to true
@@ -1276,7 +1316,7 @@ def test_count_simulation_time_seconds_reaches_target_on_exact_tick(
     ticks_until_true = 4
     seconds = context.tick_duration * ticks_until_true
     node = CountSimulationTimeSeconds(seconds=seconds)
-    Statechart(context=context).add_node(node)
+    Statechart(context=context).add_node(node=node)
     node.on_start()
     for _ in range(ticks_until_true - 1):
         assert node.on_tick() == ObservationStateValues.FALSE
@@ -1289,7 +1329,7 @@ def test_count_simulation_time_seconds_on_start_resets_counter(
     context = statechart_context
     seconds = context.tick_duration * 2
     node = CountSimulationTimeSeconds(seconds=seconds)
-    Statechart(context=context).add_node(node)
+    Statechart(context=context).add_node(node=node)
     node.on_start()
     node.on_tick()
     node.on_tick()
@@ -1303,10 +1343,10 @@ def test_count_simulation_time_seconds_with_executor(
     context = statechart_context
     ticks_until_true = 20
     seconds = context.tick_duration * ticks_until_true
-    kin_sim = StatechartExecutor(context)
+    kin_sim = StatechartExecutor(context=context)
     msc = Statechart(context=kin_sim.context)
-    msc.add_node(counter := CountSimulationTimeSeconds(seconds=seconds))
-    msc.add_node(EndStatechart.when_true(counter))
+    msc.add_node(node=(counter := CountSimulationTimeSeconds(seconds=seconds)))
+    msc.add_node(node=EndStatechart.when_true(node=counter))
     kin_sim.compile(statechart=msc)
     kin_sim.tick_until_end()
     # +1 for EndStatechart to turn True, as in test_count_ticks
@@ -1314,90 +1354,106 @@ def test_count_simulation_time_seconds_with_executor(
 
 
 class TestEndStatechart:
-    def test_end_statechart_when_all_done1(self, tmp_path) -> None:
+    """
+    When :class:`EndStatechart` ends a statechart.
+    """
+
+    def test_end_statechart_when_all_done1(self, *, tmp_path) -> None:
+        """
+        The statechart ends once all the given nodes observe true.
+        """
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 ConstTrueNode(),
                 ConstTrueNode(),
             ]
         )
-        end = EndStatechart.when_all_true(msc.nodes)
-        msc.add_node(end)
+        end = EndStatechart.when_all_true(nodes=msc.nodes)
+        msc.add_node(node=end)
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
-    def test_end_statechart_when_all_done2(self, tmp_path) -> None:
+    def test_end_statechart_when_all_done2(self, *, tmp_path) -> None:
+        """
+        The statechart does not end while one of the given nodes observes false.
+        """
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 ConstTrueNode(),
                 ConstFalseNode(),
             ]
         )
-        end = EndStatechart.when_all_true(msc.nodes)
-        msc.add_node(end)
+        end = EndStatechart.when_all_true(nodes=msc.nodes)
+        msc.add_node(node=end)
 
         kin_sim.compile(statechart=msc)
         with pytest.raises(TickLimitReachedError):
             kin_sim.tick_until_end()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
 
-    def test_end_statechart_when_any_done1(self, tmp_path) -> None:
+    def test_end_statechart_when_any_done1(self, *, tmp_path) -> None:
+        """
+        The statechart ends once one of the given nodes observes true.
+        """
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 ConstTrueNode(),
                 ConstFalseNode(),
             ]
         )
-        end = EndStatechart.when_any_true(msc.nodes)
-        msc.add_node(end)
+        end = EndStatechart.when_any_true(nodes=msc.nodes)
+        msc.add_node(node=end)
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
-    def test_end_statechart_when_any_done2(self, tmp_path) -> None:
+    def test_end_statechart_when_any_done2(self, *, tmp_path) -> None:
+        """
+        The statechart does not end while none of the given nodes observes true.
+        """
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 ConstFalseNode(),
                 ConstFalseNode(),
             ]
         )
-        end = EndStatechart.when_any_true(msc.nodes)
-        msc.add_node(end)
+        end = EndStatechart.when_any_true(nodes=msc.nodes)
+        msc.add_node(node=end)
 
         kin_sim.compile(statechart=msc)
         with pytest.raises(TickLimitReachedError):
             kin_sim.tick_until_end()
-        msc.draw(str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
 
     def test_end_statechart_when_all_true_accepts_a_single_node(self) -> None:
@@ -1405,10 +1461,10 @@ class TestEndStatechart:
         A list of one is valid input, so combining it must not depend on there being
         something to combine it with.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
-        msc.add_node(ConstTrueNode())
-        msc.add_node(end := EndStatechart.when_all_true(msc.nodes))
+        msc.add_node(node=ConstTrueNode())
+        msc.add_node(node=(end := EndStatechart.when_all_true(nodes=msc.nodes)))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1416,10 +1472,10 @@ class TestEndStatechart:
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
     def test_end_statechart_when_any_true_accepts_a_single_node(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
-        msc.add_node(ConstTrueNode())
-        msc.add_node(end := EndStatechart.when_any_true(msc.nodes))
+        msc.add_node(node=ConstTrueNode())
+        msc.add_node(node=(end := EndStatechart.when_any_true(nodes=msc.nodes)))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1427,11 +1483,13 @@ class TestEndStatechart:
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
     def test_cancel_statechart_when_all_true_accepts_a_single_node(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
-        msc.add_node(ConstTrueNode())
+        msc.add_node(node=ConstTrueNode())
         cancelled = Exception("cancelled")
-        msc.add_node(CancelStatechart.when_all_true(msc.nodes, exception=cancelled))
+        msc.add_node(
+            node=CancelStatechart.when_all_true(nodes=msc.nodes, exception=cancelled)
+        )
 
         kin_sim.compile(statechart=msc)
         with pytest.raises(type(cancelled)) as error:
@@ -1440,11 +1498,13 @@ class TestEndStatechart:
         assert error.value is cancelled
 
     def test_cancel_statechart_when_any_true_accepts_a_single_node(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
-        msc.add_node(ConstTrueNode())
+        msc.add_node(node=ConstTrueNode())
         cancelled = Exception("cancelled")
-        msc.add_node(CancelStatechart.when_any_true(msc.nodes, exception=cancelled))
+        msc.add_node(
+            node=CancelStatechart.when_any_true(nodes=msc.nodes, exception=cancelled)
+        )
 
         kin_sim.compile(statechart=msc)
         with pytest.raises(type(cancelled)) as error:
@@ -1457,13 +1517,13 @@ class TestEndStatechart:
         Being short of its goal is not yet a failure: the node has to have been ended
         while it was.
         """
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := CountTicks(ticks=2),
                 falling_short := ConstFalseNode(),
-                end := EndStatechart.when_failed(falling_short),
+                end := EndStatechart.when_failed(node=falling_short),
             ]
         )
         falling_short.fail_condition = trigger.observes_true
@@ -1480,12 +1540,16 @@ class TestEndStatechart:
         assert end.life_cycle_state == LifeCycleValues.RUNNING
 
     def test_cancel_statechart_when_failed_raises_once_the_node_fails(self) -> None:
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
-        msc.add_nodes([trigger := ConstTrueNode(), falling_short := ConstFalseNode()])
+        msc.add_nodes(
+            nodes=[trigger := ConstTrueNode(), falling_short := ConstFalseNode()]
+        )
         falling_short.fail_condition = trigger.observes_true
         cancelled = Exception("cancelled")
-        msc.add_node(CancelStatechart.when_failed(falling_short, exception=cancelled))
+        msc.add_node(
+            node=CancelStatechart.when_failed(node=falling_short, exception=cancelled)
+        )
 
         executor.compile(statechart=msc)
         with pytest.raises(type(cancelled)) as error:
@@ -1496,10 +1560,10 @@ class TestEndStatechart:
     def test_cancel_statechart_when_true_without_exception_names_the_node(
         self,
     ) -> None:
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
-        msc.add_node(watched := ConstTrueNode())
-        msc.add_node(CancelStatechart.when_true(watched))
+        msc.add_node(node=(watched := ConstTrueNode()))
+        msc.add_node(node=CancelStatechart.when_true(node=watched))
 
         executor.compile(statechart=msc)
         with pytest.raises(CancelledByNodeReachingItsGoal) as error:
@@ -1510,11 +1574,13 @@ class TestEndStatechart:
     def test_cancel_statechart_when_failed_without_exception_names_the_node(
         self,
     ) -> None:
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
-        msc.add_nodes([trigger := ConstTrueNode(), falling_short := ConstFalseNode()])
+        msc.add_nodes(
+            nodes=[trigger := ConstTrueNode(), falling_short := ConstFalseNode()]
+        )
         falling_short.fail_condition = trigger.observes_true
-        msc.add_node(CancelStatechart.when_failed(falling_short))
+        msc.add_node(node=CancelStatechart.when_failed(node=falling_short))
 
         executor.compile(statechart=msc)
         with pytest.raises(CancelledByNodeFailing) as error:
@@ -1527,7 +1593,7 @@ class TestEndStatechart:
         [CancelStatechart.when_true, EndStatechart.when_true],
     )
     def test_when_true_reads_the_outcome_as_well_as_the_observation(
-        self, factory
+        self, *, factory
     ) -> None:
         """
         The observation behind an outcome is gone once the node ends, so a terminal node
@@ -1535,9 +1601,9 @@ class TestEndStatechart:
         waits for arrives.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(watched := ConstTrueNode())
+        msc.add_node(node=(watched := ConstTrueNode()))
 
-        terminal_node = factory(watched)
+        terminal_node = factory(node=watched)
 
         assert set(terminal_node._start_condition.expression.free_variables()) == {
             watched.observes_true,
@@ -1546,33 +1612,33 @@ class TestEndStatechart:
 
     def test_goals_cannot_have_end_statechart(self) -> None:
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         with pytest.raises(EndInCompositeNodeError):
-            msc.add_node(Sequence(nodes=[ConstTrueNode(), EndStatechart()]))
+            msc.add_node(node=Sequence(nodes=[ConstTrueNode(), EndStatechart()]))
 
 
 class TestTemplates:
-    def test_sequence_goal(self, tmp_path) -> None:
+    def test_sequence_goal(self, *, tmp_path) -> None:
         """
         Every step but the first starts on the tick its predecessor succeeds.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         steps = [ConstTrueNode(name=f"step {index}") for index in range(4)]
         node = Sequence(nodes=list(steps))
-        msc.add_node(node)
-        msc.add_node(EndStatechart.when_true(node))
+        msc.add_node(node=node)
+        msc.add_node(node=EndStatechart.when_true(node=node))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
         assert all(step.life_cycle_state == LifeCycleValues.SUCCEEDED for step in steps)
         starts = [
-            msc.state_history.get_life_cycle_history_of_node(step).index(
+            msc.state_history.get_life_cycle_history_of_node(node=step).index(
                 LifeCycleValues.RUNNING
             )
             for step in steps
@@ -1581,17 +1647,17 @@ class TestTemplates:
         assert len(set(starts)) == len(steps)
 
     def test_a_sequence_without_steps_is_rejected(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
-        msc.add_node(Sequence(nodes=[]))
+        msc.add_node(node=Sequence(nodes=[]))
 
         with pytest.raises(CompositeNodeWithoutChildrenError):
             kin_sim.compile(statechart=msc)
 
     def test_a_parallel_without_nodes_is_rejected(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
-        msc.add_node(Parallel(nodes=[]))
+        msc.add_node(node=Parallel(nodes=[]))
 
         with pytest.raises(CompositeNodeWithoutChildrenError):
             kin_sim.compile(statechart=msc)
@@ -1601,16 +1667,16 @@ class TestTemplates:
         A sequence ends each step by its own observation, but a step that ends the whole
         statechart has nothing left to transition to.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         cancel = CancelStatechart(exception=Exception("cancelled"))
-        msc.add_node(sequence := Sequence(nodes=[CountTicks(ticks=3), cancel]))
-        msc.add_node(EndStatechart.when_true(sequence))
+        msc.add_node(node=(sequence := Sequence(nodes=[CountTicks(ticks=3), cancel])))
+        msc.add_node(node=EndStatechart.when_true(node=sequence))
 
         kin_sim.compile(statechart=msc)
 
         assert [
-            cancel.get_condition(transition_kind).free_variables()
+            cancel.get_condition(transition_kind=transition_kind).free_variables()
             for transition_kind in TransitionKind.ending_kinds()
         ] == [[] for _ in TransitionKind.ending_kinds()]
 
@@ -1622,7 +1688,7 @@ class TestTemplates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         task = ConstTrueNode(name="step")
-        msc.add_node(sequence := Sequence(nodes=[task]))
+        msc.add_node(node=(sequence := Sequence(nodes=[task])))
 
         _compile_msc(msc).tick()
 
@@ -1637,7 +1703,7 @@ class TestTemplates:
         msc = Statechart(context=StatechartContext(world=World()))
         task = ConstTrueNode(name="step")
         task.fail_condition = task.observes_true
-        msc.add_node(Sequence(nodes=[task]))
+        msc.add_node(node=Sequence(nodes=[task]))
 
         _compile_msc(msc).tick()
 
@@ -1649,7 +1715,7 @@ class TestTemplates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         step = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
-        msc.add_node(sequence := Sequence(nodes=[step]))
+        msc.add_node(node=(sequence := Sequence(nodes=[step])))
 
         _compile_msc(msc).tick()
 
@@ -1667,7 +1733,7 @@ class TestTemplates:
         step.interrupt_condition = give_up_signal.is_succeeded
 
         with pytest.raises(ChildTransitionAlreadyWiredError):
-            msc.add_node(Sequence(nodes=[give_up_signal, step, ConstTrueNode()]))
+            msc.add_node(node=Sequence(nodes=[give_up_signal, step, ConstTrueNode()]))
 
     def test_a_sequence_fails_once_a_step_gives_up(self) -> None:
         """
@@ -1676,11 +1742,13 @@ class TestTemplates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            sequence := Sequence(
-                nodes=[
-                    NodeDeclaringItsOwnFailure(name="step"),
-                    ConstTrueNode(name="unreached step"),
-                ]
+            node=(
+                sequence := Sequence(
+                    nodes=[
+                        NodeDeclaringItsOwnFailure(name="step"),
+                        ConstTrueNode(name="unreached step"),
+                    ]
+                )
             )
         )
 
@@ -1693,13 +1761,13 @@ class TestTemplates:
 
     def test_parallel(self) -> None:
         kin_sim = StatechartExecutor(
-            StatechartContext(
+            context=StatechartContext(
                 world=World(),
             )
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 parallel := Parallel(
                     nodes=[
                         CountTicks(ticks=3),
@@ -1708,7 +1776,7 @@ class TestTemplates:
                 ),
             ]
         )
-        msc.add_node(EndStatechart.when_true(parallel))
+        msc.add_node(node=EndStatechart.when_true(node=parallel))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1720,11 +1788,11 @@ class TestTemplates:
         Test that Parallel completes when minimum_success nodes are True.
         """
         kin_sim = StatechartExecutor(
-            StatechartContext(world=World()),
+            context=StatechartContext(world=World()),
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 parallel := Parallel(
                     nodes=[
                         CountTicks(ticks=2),
@@ -1735,7 +1803,7 @@ class TestTemplates:
                 ),
             ]
         )
-        msc.add_node(EndStatechart.when_true(parallel))
+        msc.add_node(node=EndStatechart.when_true(node=parallel))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1747,11 +1815,11 @@ class TestTemplates:
         Test that Parallel completes when no node is True.
         """
         kin_sim = StatechartExecutor(
-            StatechartContext(world=World()),
+            context=StatechartContext(world=World()),
         )
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 parallel := Parallel(
                     nodes=[
                         CountTicks(ticks=3),
@@ -1762,7 +1830,7 @@ class TestTemplates:
                 ),
             ]
         )
-        msc.add_node(EndStatechart.when_true(parallel))
+        msc.add_node(node=EndStatechart.when_true(node=parallel))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1780,19 +1848,21 @@ class TestLifeCycleTransitions:
         """
         Test for node to run after the parent node already stopped.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         msc.add_node(
-            sequence := Sequence(
-                nodes=[
-                    ConstTrueNode(),
-                    CompositeNodeCancellingIfChildRunsAfterItsEnd(),
-                    CountTicks(name="delay EndStatechart", ticks=5),
-                ]
+            node=(
+                sequence := Sequence(
+                    nodes=[
+                        ConstTrueNode(),
+                        CompositeNodeCancellingIfChildRunsAfterItsEnd(),
+                        CountTicks(name="delay EndStatechart", ticks=5),
+                    ]
+                )
             )
         )
-        msc.add_node(EndStatechart.when_true(sequence))
+        msc.add_node(node=EndStatechart.when_true(node=sequence))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1811,19 +1881,21 @@ class TestLifeCycleTransitions:
         """
         Test for node to run from paused while the parent node already stopped.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         msc.add_node(
-            sequence := Sequence(
-                nodes=[
-                    ConstTrueNode(),
-                    CompositeNodeCancellingIfPausedChildResumesAfterItsEnd(),
-                    CountTicks(name="delay EndStatechart", ticks=5),
-                ]
+            node=(
+                sequence := Sequence(
+                    nodes=[
+                        ConstTrueNode(),
+                        CompositeNodeCancellingIfPausedChildResumesAfterItsEnd(),
+                        CountTicks(name="delay EndStatechart", ticks=5),
+                    ]
+                )
             )
         )
-        msc.add_node(EndStatechart.when_true(sequence))
+        msc.add_node(node=EndStatechart.when_true(node=sequence))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -1849,7 +1921,7 @@ class TestLifeCycleTransitions:
 
         Node3 should start and run for 1 tick before ending, instead of never starting.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         node1 = CountTicks(ticks=1)
@@ -1857,7 +1929,7 @@ class TestLifeCycleTransitions:
         node3 = ConstTrueNode()
 
         msc.add_nodes(nodes=[node1, node2, node3])
-        msc.add_node(EndStatechart.when_true(node3))
+        msc.add_node(node=EndStatechart.when_true(node=node3))
 
         node3.start_condition = node1.observes_true
         node3.success_condition = node2.observes_true
@@ -1878,11 +1950,11 @@ class TestLifeCycleTransitions:
         Test for node to start even if its success condition is met before its start
         condition, when the nodes are inside a template.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         node = CompositeNodeWithChildSucceedingBeforeItStarts()
-        msc.add_node(node)
+        msc.add_node(node=node)
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick()
@@ -1899,7 +1971,7 @@ class TestLifeCycleTransitions:
         """
         Test for intended LifeCycle transitions of nodes.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         count_node1 = CountTicks(ticks=1, name="node1")
@@ -1917,7 +1989,7 @@ class TestLifeCycleTransitions:
                 pulse_node2,
             ]
         )
-        msc.add_node(end_node := EndStatechart.when_true(end_count_node1))
+        msc.add_node(node=(end_node := EndStatechart.when_true(node=end_count_node1)))
 
         pulse_node1.start_condition = count_node1.observes_true
         pulse_node2.start_condition = count_node2.observes_true
@@ -1937,7 +2009,7 @@ class TestLifeCycleTransitions:
 
         assert len(msc.state_history) == 14
         # %% count_node1 history
-        assert msc.state_history.get_life_cycle_history_of_node(count_node1) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=count_node1) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
@@ -1953,7 +2025,7 @@ class TestLifeCycleTransitions:
             LifeCycleValues.SUCCEEDED,
             LifeCycleValues.SUCCEEDED,
         ]
-        assert msc.state_history.get_observation_history_of_node(count_node1) == [
+        assert msc.state_history.get_observation_history_of_node(node=count_node1) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.TRUE,
@@ -1971,7 +2043,7 @@ class TestLifeCycleTransitions:
         ]
 
         # %% count_node2 history
-        assert msc.state_history.get_life_cycle_history_of_node(count_node2) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=count_node2) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
@@ -1987,7 +2059,7 @@ class TestLifeCycleTransitions:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(count_node2) == [
+        assert msc.state_history.get_observation_history_of_node(node=count_node2) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -2005,7 +2077,9 @@ class TestLifeCycleTransitions:
         ]
 
         # %% end_count_node1 history
-        assert msc.state_history.get_life_cycle_history_of_node(end_count_node1) == [
+        assert msc.state_history.get_life_cycle_history_of_node(
+            node=end_count_node1
+        ) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
@@ -2021,7 +2095,9 @@ class TestLifeCycleTransitions:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(end_count_node1) == [
+        assert msc.state_history.get_observation_history_of_node(
+            node=end_count_node1
+        ) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.FALSE,
@@ -2039,7 +2115,7 @@ class TestLifeCycleTransitions:
         ]
 
         # %% end_node history
-        assert msc.state_history.get_life_cycle_history_of_node(end_node) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=end_node) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
@@ -2055,7 +2131,7 @@ class TestLifeCycleTransitions:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(end_node) == [
+        assert msc.state_history.get_observation_history_of_node(node=end_node) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -2075,7 +2151,7 @@ class TestLifeCycleTransitions:
         # %% pulse_node1 history
         # The pulse is interrupted whenever count_node2 fires.
         pulse_node1_observations = msc.state_history.get_observation_history_of_node(
-            pulse_node1
+            node=pulse_node1
         )
         assert pulse_node1_observations == [
             ObservationStateValues.UNKNOWN,
@@ -2093,7 +2169,7 @@ class TestLifeCycleTransitions:
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
         ]
-        assert msc.state_history.get_life_cycle_history_of_node(pulse_node1) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=pulse_node1) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.RUNNING,
@@ -2111,7 +2187,7 @@ class TestLifeCycleTransitions:
         ]
 
         # %% pulse_node2 history
-        assert msc.state_history.get_life_cycle_history_of_node(pulse_node2) == [
+        assert msc.state_history.get_life_cycle_history_of_node(node=pulse_node2) == [
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
             LifeCycleValues.NOT_STARTED,
@@ -2127,7 +2203,7 @@ class TestLifeCycleTransitions:
             LifeCycleValues.RUNNING,
             LifeCycleValues.RUNNING,
         ]
-        assert msc.state_history.get_observation_history_of_node(pulse_node2) == [
+        assert msc.state_history.get_observation_history_of_node(node=pulse_node2) == [
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.UNKNOWN,
@@ -2148,14 +2224,14 @@ class TestLifeCycleTransitions:
         """
         Test for child node to unpause when parent node unpauses.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
         pulse = Pulse()
         unpause = CompositeNodeResumingItsPausedChildren()
 
         msc.add_nodes(nodes=[pulse, unpause])
-        msc.add_node(EndStatechart.when_true(unpause))
+        msc.add_node(node=EndStatechart.when_true(node=unpause))
 
         unpause.pause_condition = pulse.observes_true
 
@@ -2169,16 +2245,16 @@ class TestLifeCycleTransitions:
         assert unpause.last_observation_state == ObservationStateValues.TRUE
 
     def test_long_pause(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 node1 := Parallel(nodes=[ConstTrueNode(), ConstFalseNode()]),
                 pulse := Pulse(length=5),
             ]
         )
         node1.pause_condition = pulse.observes_true
-        msc.add_node(EndStatechart.when_false(pulse))
+        msc.add_node(node=EndStatechart.when_false(node=pulse))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -2193,10 +2269,10 @@ class TestLifeCycleTransitions:
         Only a success condition that is true ends a node, so a parent whose success
         condition is still undecided is not ending and does not hold its child back.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         msc.add_nodes(
-            [
+            nodes=[
                 undecided := NodeObservingNothingYet(),
                 goal := CompositeNodeWithChildStartingLate(delay_in_ticks=2),
             ]
@@ -2213,7 +2289,7 @@ class TestLifeCycleTransitions:
 
     @pytest.mark.parametrize("transition_kind", TransitionKind.ending_kinds())
     def test_a_child_does_not_start_under_a_parent_ending_on_the_same_tick(
-        self, transition_kind: TransitionKind
+        self, *, transition_kind: TransitionKind
     ) -> None:
         """
         A child whose start condition turns true on the tick its parent ends would only
@@ -2221,12 +2297,14 @@ class TestLifeCycleTransitions:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := CountTicks(ticks=2),
                 goal := CompositeNodeWithChildStartingLate(delay_in_ticks=2),
             ]
         )
-        goal.set_condition(transition_kind, trigger.observes_true)
+        goal.set_condition(
+            transition_kind=transition_kind, expression=trigger.observes_true
+        )
 
         executor = _compile_msc(msc)
         for _ in range(3):
@@ -2241,7 +2319,7 @@ class TestLifeCycleTransitions:
         not start while it is.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstTrueNode()])
         node.start_condition = trigger.observes_true
         node.reset_condition = trigger.observes_true
 
@@ -2259,7 +2337,7 @@ class TestLifeCycleTransitions:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 reset := Pulse(),
                 node := ConstTrueNode(),
@@ -2282,7 +2360,7 @@ class TestLifeCycleTransitions:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 reset := CountTicks(ticks=2),
                 goal := CompositeNodeWithChildStartingLate(delay_in_ticks=2),
             ]
@@ -2326,15 +2404,18 @@ class TestLifeCycleForcedByParent:
     @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
     def test_a_child_reaches_its_transitions_without_its_own_ones(
         self,
+        *,
         life_cycle_state: LifeCycleValues,
         parent_life_cycle_state: LifeCycleValues,
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(parent := Sequence(nodes=[child := ConstTrueNode()]))
+        msc.add_node(node=(parent := Sequence(nodes=[child := ConstTrueNode()])))
         _compile_msc(msc)
         states = {child: life_cycle_state, parent: parent_life_cycle_state}
         transitions = dict(
-            child.create_lifecycle_transitions(Scalar.const_false()).as_cases()
+            child.create_lifecycle_transitions(
+                own_transitions_allowed=Scalar.const_false()
+            ).as_cases()
         )
 
         forced = _evaluate_in(child.create_life_cycle_forced_by_parent(), states)
@@ -2343,14 +2424,16 @@ class TestLifeCycleForcedByParent:
 
     @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
     def test_a_top_level_node_reaches_its_transitions_without_its_own_ones(
-        self, life_cycle_state: LifeCycleValues
+        self, *, life_cycle_state: LifeCycleValues
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
         _compile_msc(msc)
         states = {node: life_cycle_state}
         transitions = dict(
-            node.create_lifecycle_transitions(Scalar.const_false()).as_cases()
+            node.create_lifecycle_transitions(
+                own_transitions_allowed=Scalar.const_false()
+            ).as_cases()
         )
 
         forced = _evaluate_in(node.create_life_cycle_forced_by_parent(), states)
@@ -2367,12 +2450,12 @@ class TestLifeCycleOutcomes:
     """
 
     @staticmethod
-    def _compile(msc: Statechart) -> StatechartExecutor:
+    def _compile(*, msc: Statechart) -> StatechartExecutor:
         """
         :param msc: The statechart to compile.
         :return: An executor ready to tick `msc`.
         """
-        executor = StatechartExecutor(msc.context)
+        executor = StatechartExecutor(context=msc.context)
         executor.compile(statechart=msc)
         return executor
 
@@ -2382,10 +2465,10 @@ class TestLifeCycleOutcomes:
         observes at that moment has no say in it.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstFalseNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstFalseNode()])
         node.success_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.observation_state == ObservationStateValues.FALSE
         assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -2396,10 +2479,10 @@ class TestLifeCycleOutcomes:
         success when whatever ended it only meant to stop it.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstTrueNode()])
         node.interrupt_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.observation_state == ObservationStateValues.TRUE
         assert node.life_cycle_state == LifeCycleValues.INTERRUPTED
@@ -2410,11 +2493,11 @@ class TestLifeCycleOutcomes:
         tick.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstFalseNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstFalseNode()])
         node.success_condition = trigger.observes_true
         node.fail_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
 
@@ -2424,11 +2507,11 @@ class TestLifeCycleOutcomes:
         does.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstTrueNode()])
         node.fail_condition = trigger.observes_true
         node.interrupt_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.FAILED
 
@@ -2439,21 +2522,21 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 goal := CompositeNodeWithChildSucceedingOnItsOwn(),
             ]
         )
         goal.interrupt_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert goal.life_cycle_state == LifeCycleValues.INTERRUPTED
         assert goal.child.life_cycle_state == LifeCycleValues.SUCCEEDED
 
     @pytest.mark.parametrize("transition_kind", TransitionKind.ending_kinds())
     def test_an_ending_ancestor_interrupts_a_child_at_its_goal(
-        self, transition_kind: TransitionKind
+        self, *, transition_kind: TransitionKind
     ) -> None:
         """
         However a parent ends, its children are only cut off by it, so a child sitting
@@ -2461,14 +2544,16 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 goal := CompositeNodeCuttingOffItsChildAtItsGoal(),
             ]
         )
-        goal.set_condition(transition_kind, trigger.observes_true)
+        goal.set_condition(
+            transition_kind=transition_kind, expression=trigger.observes_true
+        )
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert goal.life_cycle_state is transition_kind.outcome
         assert goal.child.observation_state == ObservationStateValues.TRUE
@@ -2482,10 +2567,12 @@ class TestLifeCycleOutcomes:
         condition alone decides.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := NodeObservingNothingYet()])
+        msc.add_nodes(
+            nodes=[trigger := ConstTrueNode(), node := NodeObservingNothingYet()]
+        )
         node.success_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.observation_state == ObservationStateValues.UNKNOWN
         assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -2500,10 +2587,10 @@ class TestLifeCycleOutcomes:
         Only a node whose fail condition held has failed.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstFalseNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstFalseNode()])
         node.interrupt_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.observation_state == ObservationStateValues.FALSE
         assert node.life_cycle_state == LifeCycleValues.INTERRUPTED
@@ -2514,10 +2601,10 @@ class TestLifeCycleOutcomes:
         condition holds fails even while it observes its goal as reached.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstTrueNode()])
         node.fail_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.observation_state == ObservationStateValues.TRUE
         assert node.life_cycle_state == LifeCycleValues.FAILED
@@ -2531,12 +2618,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeFailingOnObservingFalse(
-                observation=ObservationStateValues.FALSE
+            node=(
+                node := NodeFailingOnObservingFalse(
+                    observation=ObservationStateValues.FALSE
+                )
             )
         )
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.FAILED
 
@@ -2549,12 +2638,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeSucceedingOnObservingTrue(
-                observation=ObservationStateValues.TRUE
+            node=(
+                node := NodeSucceedingOnObservingTrue(
+                    observation=ObservationStateValues.TRUE
+                )
             )
         )
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
 
@@ -2567,12 +2658,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeSucceedingOnObservingTrue(
-                observation=ObservationStateValues.FALSE
+            node=(
+                node := NodeSucceedingOnObservingTrue(
+                    observation=ObservationStateValues.FALSE
+                )
             )
         )
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.RUNNING
 
@@ -2585,12 +2678,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeFailingOnObservingFalse(
-                observation=ObservationStateValues.UNKNOWN
+            node=(
+                node := NodeFailingOnObservingFalse(
+                    observation=ObservationStateValues.UNKNOWN
+                )
             )
         )
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.RUNNING
 
@@ -2602,10 +2697,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeFailingOnObservingFalse(observation=ObservationStateValues.TRUE)
+            node=(
+                node := NodeFailingOnObservingFalse(
+                    observation=ObservationStateValues.TRUE
+                )
+            )
         )
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.RUNNING
 
@@ -2618,7 +2717,7 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 node := NodeFailingOnObservingFalse(
                     observation=ObservationStateValues.TRUE
@@ -2627,7 +2726,7 @@ class TestLifeCycleOutcomes:
         )
         node.fail_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert node.life_cycle_state == LifeCycleValues.FAILED
 
@@ -2638,17 +2737,19 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 goal := CompositeNodeCuttingOffItsChildAtItsGoal(),
             ]
         )
         goal.success_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert goal.child.is_succeeded.resolve() == (
-            LifeCyclePredicate.IS_SUCCEEDED.truth_value(LifeCycleValues.INTERRUPTED)
+            LifeCyclePredicate.IS_SUCCEEDED.truth_value(
+                life_cycle_value=LifeCycleValues.INTERRUPTED
+            )
         )
 
     def test_an_ending_ancestor_interrupts_a_grandchild_too(self) -> None:
@@ -2658,14 +2759,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 goal := CompositeNodeCuttingOffItsGrandchild(),
             ]
         )
         goal.success_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert goal.grandchild.life_cycle_state == LifeCycleValues.INTERRUPTED
 
@@ -2678,7 +2779,7 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 ended_by_a_sibling := CompositeNodeWithChildInterruptedBySibling(),
                 ended_by_its_parent := CompositeNodeCuttingOffItsChild(),
@@ -2686,7 +2787,7 @@ class TestLifeCycleOutcomes:
         )
         ended_by_its_parent.success_condition = trigger.observes_true
 
-        self._compile(msc).tick()
+        self._compile(msc=msc).tick()
 
         assert (
             ended_by_a_sibling.child.life_cycle_state
@@ -2704,14 +2805,14 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := CountTicks(ticks=2),
                 goal := CompositeNodeWithChildFailingOnItsOwn(),
             ]
         )
         goal.success_condition = trigger.observes_true
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         executor.tick()
         assert goal.child.life_cycle_state == LifeCycleValues.FAILED
 
@@ -2722,7 +2823,7 @@ class TestLifeCycleOutcomes:
     def test_reset_leaves_succeeded(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 reset := CountTicks(ticks=2),
                 node := ConstTrueNode(),
@@ -2731,7 +2832,7 @@ class TestLifeCycleOutcomes:
         node.success_condition = trigger.observes_true
         node.reset_condition = reset.observes_true
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         executor.tick()
         assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
 
@@ -2741,7 +2842,7 @@ class TestLifeCycleOutcomes:
     def test_reset_leaves_failed(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 reset := CountTicks(ticks=2),
                 node := ConstFalseNode(),
@@ -2750,7 +2851,7 @@ class TestLifeCycleOutcomes:
         node.fail_condition = trigger.observes_true
         node.reset_condition = reset.observes_true
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         executor.tick()
         assert node.life_cycle_state == LifeCycleValues.FAILED
 
@@ -2760,7 +2861,7 @@ class TestLifeCycleOutcomes:
     def test_reset_leaves_interrupted(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 reset := CountTicks(ticks=2),
                 goal := CompositeNodeCuttingOffItsUndecidedChild(),
@@ -2769,7 +2870,7 @@ class TestLifeCycleOutcomes:
         goal.success_condition = trigger.observes_true
         goal.reset_condition = reset.observes_true
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         executor.tick()
         assert goal.child.life_cycle_state == LifeCycleValues.INTERRUPTED
 
@@ -2782,10 +2883,10 @@ class TestLifeCycleOutcomes:
         so and only its outcome still answers for it.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstFalseNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstFalseNode()])
         node.fail_condition = trigger.observes_true
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         executor.tick()
         assert node.observation_state == ObservationStateValues.FALSE
 
@@ -2799,10 +2900,10 @@ class TestLifeCycleOutcomes:
         is kept rather than discarded.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([pause_trigger := ConstTrueNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[pause_trigger := ConstTrueNode(), node := ConstTrueNode()])
         node.pause_condition = pause_trigger.observes_true
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         executor.tick()
         assert node.observation_state == ObservationStateValues.TRUE
 
@@ -2817,7 +2918,7 @@ class TestLifeCycleOutcomes:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 finished := ConstTrueNode(),
                 later := CountTicks(ticks=3),
@@ -2833,7 +2934,7 @@ class TestLifeCycleOutcomes:
             finished.observes_true, later.observes_true
         )
 
-        executor = self._compile(msc)
+        executor = self._compile(msc=msc)
         for _ in range(5):
             executor.tick()
 
@@ -2858,9 +2959,11 @@ class TestReadingChildrenThatEnded:
 
         Reading the outcome instead makes the sequence independent of that.
         """
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
-        msc.add_node(sequence := Sequence(nodes=[ConstTrueNode(), ConstTrueNode()]))
+        msc.add_node(
+            node=(sequence := Sequence(nodes=[ConstTrueNode(), ConstTrueNode()]))
+        )
         executor.compile(statechart=msc)
         for _ in range(6):
             executor.tick()
@@ -2881,7 +2984,7 @@ class TestReadingChildrenThatEnded:
         msc = Statechart(context=StatechartContext(world=World()))
         step = NodeDeclaringItsOwnFailure(name="given up on")
         last_step = ConstTrueNode()
-        msc.add_node(sequence := Sequence(nodes=[step, last_step]))
+        msc.add_node(node=(sequence := Sequence(nodes=[step, last_step])))
 
         executor = _compile_msc(msc)
         for _ in range(5):
@@ -2901,7 +3004,7 @@ class TestReadingChildrenThatEnded:
         msc = Statechart(context=StatechartContext(world=World()))
         last_step = NodeObservingNothingYet(name="given up on")
         last_step.fail_condition = sm.Scalar.const_true()
-        msc.add_node(sequence := Sequence(nodes=[last_step]))
+        msc.add_node(node=(sequence := Sequence(nodes=[last_step])))
 
         executor = _compile_msc(msc)
         for _ in range(5):
@@ -2915,15 +3018,17 @@ class TestReadingChildrenThatEnded:
         so only a step that ended without reaching it decides anything.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(sequence := Sequence(nodes=[ConstFalseNode(), ConstTrueNode()]))
+        msc.add_node(
+            node=(sequence := Sequence(nodes=[ConstFalseNode(), ConstTrueNode()]))
+        )
 
         executor = _compile_msc(msc)
         for _ in range(5):
             executor.tick()
 
-        assert set(msc.state_history.get_observation_history_of_node(sequence)) == {
-            ObservationStateValues.UNKNOWN
-        }
+        assert set(
+            msc.state_history.get_observation_history_of_node(node=sequence)
+        ) == {ObservationStateValues.UNKNOWN}
 
     def test_a_parallel_counts_an_ended_child_and_a_running_one(self) -> None:
         """
@@ -2932,8 +3037,10 @@ class TestReadingChildrenThatEnded:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            parallel := Parallel(
-                nodes=[ended := Pulse(), still_running := ConstTrueNode()]
+            node=(
+                parallel := Parallel(
+                    nodes=[ended := Pulse(), still_running := ConstTrueNode()]
+                )
             )
         )
         ended.success_condition = ended.observes_true
@@ -2955,9 +3062,11 @@ class TestReadingChildrenThatEnded:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            parallel := Parallel(
-                nodes=[failed := Pulse(), still_trying := ConstFalseNode()],
-                minimum_success=1,
+            node=(
+                parallel := Parallel(
+                    nodes=[failed := Pulse(), still_trying := ConstFalseNode()],
+                    minimum_success=1,
+                )
             )
         )
         failed.fail_condition = failed.observes_true
@@ -2977,7 +3086,9 @@ class TestReadingChildrenThatEnded:
         its goal says so rather than holding whoever runs it open forever.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(parallel := Parallel(nodes=[failed := Pulse(), ConstTrueNode()]))
+        msc.add_node(
+            node=(parallel := Parallel(nodes=[failed := Pulse(), ConstTrueNode()]))
+        )
         failed.fail_condition = failed.observes_true
 
         executor = _compile_msc(msc)
@@ -2995,9 +3106,11 @@ class TestReadingChildrenThatEnded:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            parallel := Parallel(
-                nodes=[failed := Pulse(), at_its_goal := ConstTrueNode()],
-                minimum_success=1,
+            node=(
+                parallel := Parallel(
+                    nodes=[failed := Pulse(), at_its_goal := ConstTrueNode()],
+                    minimum_success=1,
+                )
             )
         )
         failed.fail_condition = failed.observes_true
@@ -3020,11 +3133,13 @@ class TestReadingChildrenThatEnded:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            parallel := Parallel(
-                nodes=[
-                    drifting := Pulse(),
-                    late := CountTicks(ticks=3),
-                ]
+            node=(
+                parallel := Parallel(
+                    nodes=[
+                        drifting := Pulse(),
+                        late := CountTicks(ticks=3),
+                    ]
+                )
             )
         )
 
@@ -3034,13 +3149,15 @@ class TestReadingChildrenThatEnded:
 
         assert (
             ObservationStateValues.TRUE
-            in msc.state_history.get_observation_history_of_node(drifting)
+            in msc.state_history.get_observation_history_of_node(node=drifting)
         )
         assert (
             ObservationStateValues.TRUE
-            in msc.state_history.get_observation_history_of_node(late)
+            in msc.state_history.get_observation_history_of_node(node=late)
         )
-        assert set(msc.state_history.get_observation_history_of_node(parallel)) == {
+        assert set(
+            msc.state_history.get_observation_history_of_node(node=parallel)
+        ) == {
             ObservationStateValues.UNKNOWN,
             ObservationStateValues.FALSE,
         }
@@ -3057,7 +3174,7 @@ class TestLastObservation:
 
     def test_a_node_that_has_not_started_reads_unknown(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([blocker := ConstFalseNode(), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[blocker := ConstFalseNode(), node := ConstTrueNode()])
         node.start_condition = blocker.observes_true
 
         executor = _compile_msc(msc)
@@ -3073,9 +3190,11 @@ class TestLastObservation:
             (ConstFalseNode, ObservationStateValues.FALSE),
         ],
     )
-    def test_a_running_node_reads_what_it_observes(self, node_type, expected) -> None:
+    def test_a_running_node_reads_what_it_observes(
+        self, *, node_type, expected
+    ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := node_type())
+        msc.add_node(node=(node := node_type()))
 
         executor = _compile_msc(msc)
         executor.tick()
@@ -3090,7 +3209,7 @@ class TestLastObservation:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 blocker := ConstFalseNode(),
                 not_started := ConstTrueNode(),
@@ -3149,7 +3268,7 @@ class TestLastObservation:
         most recent reading tells the two apart.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(pulse := Pulse(length=1))
+        msc.add_node(node=(pulse := Pulse(length=1)))
         pulse.interrupt_condition = pulse.observes_false
 
         executor = _compile_msc(msc)
@@ -3158,7 +3277,7 @@ class TestLastObservation:
 
         assert (
             ObservationStateValues.TRUE
-            in msc.state_history.get_observation_history_of_node(pulse)
+            in msc.state_history.get_observation_history_of_node(node=pulse)
         )
         assert pulse.life_cycle_state == LifeCycleValues.INTERRUPTED
         assert pulse.observation_state == ObservationStateValues.UNKNOWN
@@ -3166,7 +3285,7 @@ class TestLastObservation:
 
     def test_a_reset_forgets_the_previous_run(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([starter := Pulse(length=1), node := ConstTrueNode()])
+        msc.add_nodes(nodes=[starter := Pulse(length=1), node := ConstTrueNode()])
         node.start_condition = starter.observes_true
         node.success_condition = node.observes_true
         node.reset_condition = node.is_succeeded
@@ -3190,7 +3309,7 @@ class TestLastObservation:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 delay := CountTicks(ticks=3),
                 ended := ConstTrueNode(),
@@ -3212,7 +3331,7 @@ class TestLastObservation:
     def test_an_observation_reads_it_after_the_node_ended(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 ended := ConstTrueNode(),
                 observer := NodeObservingLastObservation(watched_node=ended),
@@ -3229,7 +3348,7 @@ class TestLastObservation:
 
     def test_it_renders_as_one_variable(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([finished := ConstTrueNode(), later := ConstTrueNode()])
+        msc.add_nodes(nodes=[finished := ConstTrueNode(), later := ConstTrueNode()])
         later.start_condition = finished.last_observed_true
 
         assert (
@@ -3244,7 +3363,7 @@ class TestLastObservation:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 watched := CountTicks(ticks=2),
                 observer := NodeObservingLastObservation(watched_node=watched),
             ]
@@ -3268,7 +3387,7 @@ class TestLastObservation:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 watched := CountTicks(ticks=2),
                 waiting := ConstFalseNode(),
             ]
@@ -3300,7 +3419,7 @@ class TestLifeCyclePredicates:
         ],
     )
     def test_an_outcome_predicate_is_true_only_in_its_own_state(
-        self, predicate, outcome
+        self, *, predicate, outcome
     ) -> None:
         """
         A node that has not ended, or ended some other way, did not end this way, so a
@@ -3312,7 +3431,7 @@ class TestLifeCyclePredicates:
                 if life_cycle_state is outcome
                 else ObservationStateValues.FALSE
             )
-            assert predicate.truth_value(life_cycle_state) == expected
+            assert predicate.truth_value(life_cycle_value=life_cycle_state) == expected
 
     def test_a_negated_outcome_predicate_fires_for_an_interrupted_node(self) -> None:
         """
@@ -3321,7 +3440,7 @@ class TestLifeCyclePredicates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 watched := NodeObservingNothingYet(),
                 waiting := ConstTrueNode(),
@@ -3346,7 +3465,9 @@ class TestLifeCyclePredicates:
             (LifeCyclePredicate.IS_PAUSED, LifeCycleValues.PAUSED),
         ],
     )
-    def test_phase_predicate_is_binary_in_every_state(self, predicate, phase) -> None:
+    def test_phase_predicate_is_binary_in_every_state(
+        self, *, predicate, phase
+    ) -> None:
         """
         Where a node is right now always has an answer, so a phase predicate is never
         unknown.
@@ -3357,17 +3478,22 @@ class TestLifeCyclePredicates:
                 if life_cycle_state is phase
                 else ObservationStateValues.FALSE
             )
-            assert predicate.truth_value(life_cycle_state) == expected
+            assert predicate.truth_value(life_cycle_value=life_cycle_state) == expected
 
     @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
-    def test_is_terminated_matches_the_terminal_states(self, life_cycle_state) -> None:
+    def test_is_terminated_matches_the_terminal_states(
+        self, *, life_cycle_state
+    ) -> None:
         expected = (
             ObservationStateValues.TRUE
             if life_cycle_state.is_terminal
             else ObservationStateValues.FALSE
         )
         assert (
-            LifeCyclePredicate.IS_TERMINATED.truth_value(life_cycle_state) == expected
+            LifeCyclePredicate.IS_TERMINATED.truth_value(
+                life_cycle_value=life_cycle_state
+            )
+            == expected
         )
 
     def test_a_condition_starts_a_node_on_the_tick_an_outcome_is_reached(self) -> None:
@@ -3375,10 +3501,10 @@ class TestLifeCyclePredicates:
         A predicate reads the life cycle its node reaches in the same step, so a node
         reacting to an outcome starts on the tick that outcome is reached.
         """
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
         msc.add_nodes(
-            [
+            nodes=[
                 trigger := ConstTrueNode(),
                 first := ConstTrueNode(),
                 second := ConstFalseNode(),
@@ -3395,9 +3521,9 @@ class TestLifeCyclePredicates:
         assert second.life_cycle_state == LifeCycleValues.RUNNING
 
     def test_a_predicate_follows_the_life_cycle_state_of_its_node(self) -> None:
-        executor = StatechartExecutor(StatechartContext(world=World()))
+        executor = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=executor.context)
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstFalseNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstFalseNode()])
         node.fail_condition = trigger.observes_true
 
         executor.compile(statechart=msc)
@@ -3413,7 +3539,7 @@ class TestLifeCyclePredicates:
         node takes at most one such transition per tick.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([trigger := ConstTrueNode(), node := ConstFalseNode()])
+        msc.add_nodes(nodes=[trigger := ConstTrueNode(), node := ConstFalseNode()])
         node.fail_condition = trigger.observes_true
         node.reset_condition = node.is_failed
 
@@ -3432,7 +3558,7 @@ class TestLifeCyclePredicates:
 
     def test_a_condition_renders_a_predicate_by_name(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([first := ConstTrueNode(), second := ConstFalseNode()])
+        msc.add_nodes(nodes=[first := ConstTrueNode(), second := ConstFalseNode()])
         second.start_condition = first.is_failed
 
         assert (
@@ -3442,14 +3568,14 @@ class TestLifeCyclePredicates:
 
     def test_a_predicate_makes_its_node_a_dependency_of_the_condition(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([first := ConstTrueNode(), second := ConstFalseNode()])
+        msc.add_nodes(nodes=[first := ConstTrueNode(), second := ConstFalseNode()])
         second.start_condition = first.is_failed
 
         assert second._start_condition.node_dependencies == [first]
 
     def test_variables_are_the_variables_the_condition_reads(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([first := ConstTrueNode(), second := ConstFalseNode()])
+        msc.add_nodes(nodes=[first := ConstTrueNode(), second := ConstFalseNode()])
         second.start_condition = sm.logic_and(first.is_failed, first.observes_true)
 
         assert set(second._start_condition.variables) == {
@@ -3459,7 +3585,7 @@ class TestLifeCyclePredicates:
 
     def test_an_observation_variable_resolves_to_what_its_node_observes(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
         msc.observation_state[node] = ObservationStateValues.FALSE
 
         assert node.observation_variable.resolve() == ObservationStateValues.FALSE
@@ -3468,7 +3594,7 @@ class TestLifeCyclePredicates:
         self,
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
         msc.last_observation_state[node] = ObservationStateValues.FALSE
 
         assert node.last_observation.resolve() == ObservationStateValues.FALSE
@@ -3479,13 +3605,15 @@ class TestLifeCyclePredicates:
         observation of its node already is.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
         msc.life_cycle_state[node] = LifeCycleValues.RUNNING
         msc.observation_state[node] = ObservationStateValues.TRUE
 
         assert (
             node.is_succeeded.resolve()
-            == LifeCyclePredicate.IS_SUCCEEDED.truth_value(LifeCycleValues.RUNNING)
+            == LifeCyclePredicate.IS_SUCCEEDED.truth_value(
+                life_cycle_value=LifeCycleValues.RUNNING
+            )
         )
 
     def test_a_raw_life_cycle_variable_is_rejected_in_a_condition(self) -> None:
@@ -3494,14 +3622,14 @@ class TestLifeCyclePredicates:
         only the predicates may be read.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([first := ConstTrueNode(), second := ConstFalseNode()])
+        msc.add_nodes(nodes=[first := ConstTrueNode(), second := ConstFalseNode()])
 
         with pytest.raises(UnsupportedConditionVariableError):
             second.start_condition = first.life_cycle_variable
 
     def test_a_start_condition_may_not_read_its_own_outcome(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(node := ConstTrueNode())
+        msc.add_node(node=(node := ConstTrueNode()))
 
         with pytest.raises(SelfInStartConditionError):
             node.start_condition = node.is_failed
@@ -3518,7 +3646,7 @@ class TestIsFailedOrInterrupted:
     """
 
     @staticmethod
-    def _answer(life_cycle_state: LifeCycleValues) -> ObservationStateValues:
+    def _answer(*, life_cycle_state: LifeCycleValues) -> ObservationStateValues:
         """
         :param life_cycle_state: The state to evaluate the predicate in.
         :return: What the predicate answers.
@@ -3527,8 +3655,16 @@ class TestIsFailedOrInterrupted:
         substituted = sm.Scalar(node.is_failed_or_interrupted).substitute(
             old_variables=[node.is_failed, node.is_interrupted],
             new_variables=[
-                float(LifeCyclePredicate.IS_FAILED.truth_value(life_cycle_state)),
-                float(LifeCyclePredicate.IS_INTERRUPTED.truth_value(life_cycle_state)),
+                float(
+                    LifeCyclePredicate.IS_FAILED.truth_value(
+                        life_cycle_value=life_cycle_state
+                    )
+                ),
+                float(
+                    LifeCyclePredicate.IS_INTERRUPTED.truth_value(
+                        life_cycle_value=life_cycle_state
+                    )
+                ),
             ],
         )
         return ObservationStateValues(float(substituted))
@@ -3541,22 +3677,27 @@ class TestIsFailedOrInterrupted:
             (LifeCycleValues.INTERRUPTED, ObservationStateValues.TRUE),
         ],
     )
-    def test_every_way_of_ending_is_answered(self, life_cycle_state, expected) -> None:
+    def test_every_way_of_ending_is_answered(
+        self, *, life_cycle_state, expected
+    ) -> None:
         """
         Being cut off undecided counts as ending short of the goal just as much as being
         judged to have failed.
         """
-        assert self._answer(life_cycle_state) == expected
+        assert self._answer(life_cycle_state=life_cycle_state) == expected
 
     @pytest.mark.parametrize(
         "life_cycle_state",
         sorted(set(LifeCycleValues) - LifeCycleValues.terminal_states()),
     )
-    def test_a_node_that_has_not_ended_answers_false(self, life_cycle_state) -> None:
+    def test_a_node_that_has_not_ended_answers_false(self, *, life_cycle_state) -> None:
         """
         A node that is still on its way has not ended at all.
         """
-        assert self._answer(life_cycle_state) == ObservationStateValues.FALSE
+        assert (
+            self._answer(life_cycle_state=life_cycle_state)
+            == ObservationStateValues.FALSE
+        )
 
 
 # %% observation predicates
@@ -3619,19 +3760,19 @@ class TestObservationPredicates:
         ],
     )
     def test_a_predicate_is_true_only_for_the_value_it_asks_about(
-        self, predicate, observation, expected
+        self, *, predicate, observation, expected
     ) -> None:
         """
         Unknown is neither of the values a predicate asks about, so it answers False.
         """
         variable = FloatVariable(name="observation")
 
-        answer = predicate.expression(variable).substitute(
+        answer = predicate.expression(observation=variable).substitute(
             old_variables=[variable], new_variables=[float(observation)]
         )
 
         assert ObservationStateValues(float(answer)) == expected
-        assert predicate.truth_value(observation) == expected
+        assert predicate.truth_value(observation=observation) == expected
 
     @pytest.mark.parametrize(
         "read_predicate, predicate",
@@ -3645,7 +3786,7 @@ class TestObservationPredicates:
         ],
         ids=["observes_true", "observes_false", "last_observed_true"],
     )
-    def test_the_node_reads_this_predicate(self, read_predicate, predicate) -> None:
+    def test_the_node_reads_this_predicate(self, *, read_predicate, predicate) -> None:
         """
         The attribute a caller reaches for is what the tested truth table belongs to,
         and reading it twice hands out the same variable.
@@ -3664,10 +3805,10 @@ class TestObservationPredicates:
         ],
     )
     def test_a_node_waiting_for_another_to_observe_false_ignores_unknown(
-        self, watched_type, expected
+        self, *, watched_type, expected
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_nodes([watched := watched_type(), waiting := ConstTrueNode()])
+        msc.add_nodes(nodes=[watched := watched_type(), waiting := ConstTrueNode()])
         waiting.start_condition = watched.observes_false
 
         executor = _compile_msc(msc)
@@ -3684,7 +3825,7 @@ class TestObservationPredicates:
         ids=["last_observed_true", "observes_true"],
     )
     def test_only_the_last_observation_outlasts_the_node_ending(
-        self, read_predicate, expected
+        self, *, read_predicate, expected
     ) -> None:
         """
         The watched node ends on the first tick, observing True.
@@ -3694,7 +3835,7 @@ class TestObservationPredicates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 watched := ConstTrueNode(),
                 delay := ConstTrueNode(),
                 late := ConstTrueNode(),
@@ -3720,7 +3861,7 @@ class TestObservationPredicates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 watched := ConstTrueNode(),
                 observer := NodeObservingAnObservationPredicate(watched_node=watched),
             ]
@@ -3748,7 +3889,7 @@ class TestEagerStateVariables:
     def test_nested_self_referential_success_condition_before_compile(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            Parallel(
+            node=Parallel(
                 nodes=[
                     ConstTrueNode(),
                     barrier := Parallel(
@@ -3764,17 +3905,19 @@ class TestEagerStateVariables:
     def test_nested_success_condition_survives_json_round_trip(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            outer := Parallel(
-                nodes=[
-                    ConstTrueNode(),
-                    barrier := Parallel(
-                        nodes=[ConstTrueNode(), ConstFalseNode()], minimum_success=1
-                    ),
-                ]
+            node=(
+                outer := Parallel(
+                    nodes=[
+                        ConstTrueNode(),
+                        barrier := Parallel(
+                            nodes=[ConstTrueNode(), ConstFalseNode()], minimum_success=1
+                        ),
+                    ]
+                )
             )
         )
         barrier.success_condition = barrier.observes_true
-        msc.add_node(EndStatechart.when_true(outer))
+        msc.add_node(node=EndStatechart.when_true(node=outer))
         json_data = msc.create_structure_copy().to_json()
         new_json_data = json.loads(json.dumps(json_data))
         msc_copy = Statechart.from_json(
@@ -3782,7 +3925,7 @@ class TestEagerStateVariables:
         )
         msc_copy.compiler.add_transitions()
 
-        barrier_copy = msc_copy.get_node_by_index(barrier.index)
+        barrier_copy = msc_copy.get_node_by_index(index=barrier.index)
         assert barrier_copy in barrier_copy._success_condition.node_dependencies
         assert barrier_copy.unique_name in str(barrier_copy._success_condition)
 
@@ -3807,48 +3950,50 @@ class TestConditionScoping:
     """
 
     def test_outside_node_cannot_reference_node_inside_template(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         child = ConstTrueNode()
-        msc.add_node(Sequence(nodes=[child]))
-        msc.add_node(EndStatechart.when_true(child))
+        msc.add_node(node=Sequence(nodes=[child]))
+        msc.add_node(node=EndStatechart.when_true(node=child))
 
         with pytest.raises(ConditionScopeError):
             kin_sim.compile(statechart=msc)
 
     def test_template_node_cannot_reference_node_in_sibling_template(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node_a = ConstTrueNode()
         node_b = ConstTrueNode()
-        msc.add_node(first := Parallel(nodes=[node_a]))
-        msc.add_node(Parallel(nodes=[node_b]))
+        msc.add_node(node=(first := Parallel(nodes=[node_a])))
+        msc.add_node(node=Parallel(nodes=[node_b]))
         node_b.start_condition = node_a.observes_true
-        msc.add_node(EndStatechart.when_true(first))
+        msc.add_node(node=EndStatechart.when_true(node=first))
 
         with pytest.raises(ConditionScopeError):
             kin_sim.compile(statechart=msc)
 
     def test_nested_template_node_cannot_reference_outer_node(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node_a = ConstTrueNode()
         node_b = ConstTrueNode()
-        msc.add_node(sequence := Sequence(nodes=[node_a, Parallel(nodes=[node_b])]))
+        msc.add_node(
+            node=(sequence := Sequence(nodes=[node_a, Parallel(nodes=[node_b])]))
+        )
         node_b.pause_condition = node_a.observes_true
-        msc.add_node(EndStatechart.when_true(sequence))
+        msc.add_node(node=EndStatechart.when_true(node=sequence))
 
         with pytest.raises(ConditionScopeError):
             kin_sim.compile(statechart=msc)
 
     def test_parent_can_reference_child_through_its_last_observation(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         child = ConstTrueNode()
         parallel = Parallel(nodes=[child])
-        msc.add_node(parallel)
+        msc.add_node(node=parallel)
         parallel.success_condition = child.last_observed_true
-        msc.add_node(EndStatechart.when_true(parallel))
+        msc.add_node(node=EndStatechart.when_true(node=parallel))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end(timeout=10)
@@ -3859,56 +4004,58 @@ class TestConditionScoping:
         """
         Reaching past a direct child skips the node that owns the one being read.
         """
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         grandchild = ConstTrueNode()
         outer = Parallel(nodes=[Parallel(nodes=[grandchild])])
-        msc.add_node(outer)
+        msc.add_node(node=outer)
         outer.success_condition = grandchild.last_observed_true
-        msc.add_node(EndStatechart.when_true(outer))
+        msc.add_node(node=EndStatechart.when_true(node=outer))
 
         with pytest.raises(ConditionScopeError):
             kin_sim.compile(statechart=msc)
 
     def test_child_cannot_reference_parent(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         child = ConstTrueNode()
         parallel = Parallel(nodes=[child])
         child.pause_condition = parallel.observes_true
-        msc.add_node(parallel)
-        msc.add_node(EndStatechart.when_true(parallel))
+        msc.add_node(node=parallel)
+        msc.add_node(node=EndStatechart.when_true(node=parallel))
 
         with pytest.raises(ConditionScopeError):
             kin_sim.compile(statechart=msc)
 
     def test_siblings_inside_template_can_reference_each_other(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node_a = ConstTrueNode()
         node_b = ConstTrueNode()
         node_b.start_condition = node_a.observes_true
-        msc.add_node(parallel := Parallel(nodes=[node_a, node_b]))
-        msc.add_node(EndStatechart.when_true(parallel))
+        msc.add_node(node=(parallel := Parallel(nodes=[node_a, node_b])))
+        msc.add_node(node=EndStatechart.when_true(node=parallel))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
     def test_self_referential_success_condition_inside_template_compiles(self) -> None:
-        kin_sim = StatechartExecutor(StatechartContext(world=World()))
+        kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         msc.add_node(
-            outer := Parallel(
-                nodes=[
-                    ConstTrueNode(),
-                    barrier := Parallel(
-                        nodes=[ConstTrueNode(), ConstFalseNode()], minimum_success=1
-                    ),
-                ]
+            node=(
+                outer := Parallel(
+                    nodes=[
+                        ConstTrueNode(),
+                        barrier := Parallel(
+                            nodes=[ConstTrueNode(), ConstFalseNode()], minimum_success=1
+                        ),
+                    ]
+                )
             )
         )
         barrier.success_condition = barrier.observes_true
-        msc.add_node(EndStatechart.when_true(outer))
+        msc.add_node(node=EndStatechart.when_true(node=outer))
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
@@ -3928,8 +4075,10 @@ class TestWrittenConditionsSurviveCompiling:
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeSucceedingOnObservingTrue(
-                observation=ObservationStateValues.TRUE
+            node=(
+                node := NodeSucceedingOnObservingTrue(
+                    observation=ObservationStateValues.TRUE
+                )
             )
         )
         written = str(node.success_condition)
@@ -3943,8 +4092,10 @@ class TestWrittenConditionsSurviveCompiling:
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(
-            node := NodeFailingOnObservingFalse(
-                observation=ObservationStateValues.FALSE
+            node=(
+                node := NodeFailingOnObservingFalse(
+                    observation=ObservationStateValues.FALSE
+                )
             )
         )
         written = str(node.fail_condition)
@@ -3955,7 +4106,7 @@ class TestWrittenConditionsSurviveCompiling:
 
     def test_a_parallel_keeps_its_written_fail_condition(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
-        msc.add_node(parallel := Parallel(nodes=[ConstTrueNode()]))
+        msc.add_node(node=(parallel := Parallel(nodes=[ConstTrueNode()])))
         written = str(parallel.fail_condition)
 
         _compile_msc(msc)
@@ -3967,7 +4118,7 @@ class TestWrittenConditionsSurviveCompiling:
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_nodes(
-            [
+            nodes=[
                 never_true := ConstFalseNode(),
                 parallel := Parallel(
                     nodes=[

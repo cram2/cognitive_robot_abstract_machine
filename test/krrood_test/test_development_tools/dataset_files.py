@@ -4,6 +4,7 @@ The input files of the development tools tests.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -11,6 +12,7 @@ from krrood.patterns.path_enumeration import PathEnumeration
 from .dataset.field_accessors import hand_written_accessors
 from .dataset.leading_prepositions import prepositional_names, verb_phrase_names
 from .dataset.missing_docstrings import (
+    undocumented_classproperties,
     documented_module,
     no_module_docstring,
     undocumented_definitions,
@@ -95,6 +97,48 @@ class DatasetFile(PathEnumeration):
     and the path of the module declaring it.
     """
 
+    PROJECT_ISSUE_FORMS_MODULE = (
+        Path(__file__).parent / "dataset" / "project_issue_forms_module.py"
+    )
+    """
+    A module declaring a repository's issue forms.
+    """
+
+    ISSUE_FORM_TEXT = Path(__file__).parent / "dataset" / "issue_form_text.yml"
+    """
+    The file of the crash report form of :attr:`PROJECT_ISSUE_FORMS_MODULE`, with
+    ``{generate_command}`` and ``{source_path}`` standing for the command generating it
+    and the path of the module declaring it.
+    """
+
+    ISSUE_FORM_WITHOUT_TYPE_TEXT = (
+        Path(__file__).parent / "dataset" / "issue_form_without_type_text.yml"
+    )
+    """
+    The file of the announcement form of :attr:`PROJECT_ISSUE_FORMS_MODULE`, which sets
+    no issue type, with the placeholders of :attr:`ISSUE_FORM_TEXT`.
+    """
+
+    CRASH_REPORT_ISSUE_BODY = (
+        Path(__file__).parent / "dataset" / "crash_report_issue_body.md"
+    )
+    """
+    The body GitHub gives an issue opened with the crash report form of
+    :attr:`PROJECT_ISSUE_FORMS_MODULE`, answering both of its fields.
+    """
+
+    CRASH_REPORT_UNANSWERED_ISSUE_BODY = (
+        Path(__file__).parent / "dataset" / "crash_report_unanswered_issue_body.md"
+    )
+    """
+    :attr:`CRASH_REPORT_ISSUE_BODY` with its optional script left empty.
+    """
+
+    CRASH_REPORT_SCRIPT = Path(__file__).parent / "dataset" / "crash_report_script.py"
+    """
+    The script :attr:`CRASH_REPORT_ISSUE_BODY` answers with, without its code fence.
+    """
+
     RULE_SECTIONS_TEXT = Path(__file__).parent / "dataset" / "rule_sections_text.md"
     """
     The ``AGENTS.md`` listing the design principles and verification sections of
@@ -155,6 +199,101 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+    UNDOCUMENTED_CLASSPROPERTIES = Path(undocumented_classproperties.__file__)
+    """
+    A documented module whose class implements an abstract classproperty, which needs
+    no docstring, and overrides an implemented one, both undocumented.
+    """
+
+
+class CoreBoundarySnippet(PathEnumeration):
+    """
+    The Python sources the core boundary checker reads, inside mimic distributions
+    whose ``pyproject.toml`` the checker finds above them.
+    """
+
+    DISTRIBUTION = Path(__file__).parent / "dataset" / "core_boundary_distribution"
+    """
+    The mimic distribution whose core may load only typing-extensions.
+    """
+
+    INSIDE_THE_BOUNDARY = (
+        DISTRIBUTION / "src" / "mimic_package" / "core" / "inside_the_boundary.py"
+    )
+    """
+    A core module loading only core modules, core dependencies and the standard library.
+    """
+
+    CROSSING_THE_BOUNDARY = INSIDE_THE_BOUNDARY.with_name("crossing_the_boundary.py")
+    """
+    A core module loading modules outside core, each such import marked with
+    :attr:`DatasetMarker.CROSSING_IMPORT`.
+    """
+
+    MODULE_OUTSIDE_CORE = INSIDE_THE_BOUNDARY.parents[1] / "drawing.py"
+    """
+    A module outside core loading matplotlib.
+    """
+
+    MODULE_OF_UNDECLARED_CORE = (
+        Path(__file__).parent
+        / "dataset"
+        / "undeclared_core_distribution"
+        / "src"
+        / "undeclared_package"
+        / "drawing.py"
+    )
+    """
+    A module loading matplotlib in a distribution declaring no core.
+    """
+
+    CORE_WITHOUT_DEPENDENCIES = (
+        Path(__file__).parent
+        / "dataset"
+        / "dependency_free_core_distribution"
+        / "src"
+        / "dependency_free_package"
+        / "__init__.py"
+    )
+    """
+    A core package in a distribution declaring no core dependencies, each import of a
+    distribution marked with :attr:`DatasetMarker.CROSSING_IMPORT`.
+    """
+
+
+class DatasetMarker(StrEnum):
+    """
+    Comments marking lines of the dataset files that a test expects a finding on.
+    """
+
+    CROSSING_IMPORT = "# crosses"
+    """
+    An import the core boundary checker reports.
+    """
+
+
+class MimicModule(StrEnum):
+    """
+    The dotted names of modules of the mimic distribution
+    :attr:`CoreBoundarySnippet.DISTRIBUTION`.
+    """
+
+    DRAWING = "mimic_package.drawing"
+    """
+    The module outside core that loads matplotlib.
+    """
+
+
+class MimicDistribution(StrEnum):
+    """
+    The distributions the mimic distribution's modules load.
+    """
+
+    MATPLOTLIB = "matplotlib"
+    """
+    The distribution only the mimic distribution's drawing extra requires.
     """
 
 

@@ -46,14 +46,16 @@ def capped_equality_bounds(
         qp_controller_config=controller_config(),
     )
     reachable_change = (
-        strategy.reachable_change_of_constraint(strategy.constraints[0]).to_np().item()
+        strategy.reachable_change_of_constraint(constraint=strategy.constraints[0])
+        .to_np()
+        .item()
     )
     return strategy.create_equality_bounds().to_np(), reachable_change
 
 
 def test_point_goal_writes_three_equality_constraints():
     collection = ConstraintCollection()
-    builder = GeometricConstraintBuilder(collection)
+    builder = GeometricConstraintBuilder(collection=collection)
     builder.add_point_goal_constraints(
         frame_P_current=CartesianPoint3Dimensional(0.0, 0.0, 0.0),
         frame_P_goal=CartesianPoint3Dimensional(1.0, 2.0, 3.0),
@@ -68,7 +70,7 @@ def test_point_goal_writes_three_equality_constraints():
 def test_point_goal_caps_the_length_of_its_error_and_keeps_its_direction():
     error = np.array([1.0, 0.3, 0.0])
     collection = ConstraintCollection()
-    GeometricConstraintBuilder(collection).add_point_goal_constraints(
+    GeometricConstraintBuilder(collection=collection).add_point_goal_constraints(
         frame_P_current=CartesianPoint3Dimensional(0.0, 0.0, 0.0),
         frame_P_goal=CartesianPoint3Dimensional(*error),
         cruise_velocity=0.1,
@@ -83,7 +85,7 @@ def test_point_goal_caps_the_length_of_its_error_and_keeps_its_direction():
 
 def test_rotation_goal_writes_three_equality_constraints():
     collection = ConstraintCollection()
-    builder = GeometricConstraintBuilder(collection)
+    builder = GeometricConstraintBuilder(collection=collection)
     builder.add_rotation_goal_constraints(
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(
@@ -99,7 +101,7 @@ def test_rotation_goal_writes_three_equality_constraints():
 
 def test_yaw_goal_writes_one_equality_constraint():
     collection = ConstraintCollection()
-    builder = GeometricConstraintBuilder(collection)
+    builder = GeometricConstraintBuilder(collection=collection)
     builder.add_yaw_goal_constraint(
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_rpy(roll=0.2, pitch=-0.1, yaw=0.5),
@@ -139,7 +141,7 @@ def rotation_goal_bounds(
     """
     collection = ConstraintCollection()
     add_rotation_goal(
-        GeometricConstraintBuilder(collection),
+        GeometricConstraintBuilder(collection=collection),
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(
             AxisAngle(Vector3Dimensional.Z(), angle)
@@ -233,7 +235,7 @@ def add_goal(request: pytest.FixtureRequest) -> Callable[..., None]:
     return request.param
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EnforcedGoal:
     """
     What an integral strategy makes of the constraints of a goal.
@@ -272,29 +274,31 @@ def enforced_goal(
     :return: The goal as the integral strategy enforces it.
     """
     current_and_goal = {
-        GeometricConstraintBuilder.add_point_goal_constraints: (
-            CartesianPoint3Dimensional(0.0, 0.0, 0.0),
-            CartesianPoint3Dimensional(distance, 0.0, 0.0),
+        GeometricConstraintBuilder.add_point_goal_constraints: dict(
+            frame_P_current=CartesianPoint3Dimensional(0.0, 0.0, 0.0),
+            frame_P_goal=CartesianPoint3Dimensional(distance, 0.0, 0.0),
         ),
-        GeometricConstraintBuilder.add_vector_goal_constraints: (
-            Vector3Dimensional.X(),
-            Vector3Dimensional(np.cos(distance), np.sin(distance), 0.0),
+        GeometricConstraintBuilder.add_vector_goal_constraints: dict(
+            frame_V_current=Vector3Dimensional.X(),
+            frame_V_goal=Vector3Dimensional(np.cos(distance), np.sin(distance), 0.0),
         ),
-        GeometricConstraintBuilder.add_rotation_goal_constraints: (
-            RotationMatrix(),
-            RotationMatrix.from_axis_angle(AxisAngle(Vector3Dimensional.Z(), distance)),
+        GeometricConstraintBuilder.add_rotation_goal_constraints: dict(
+            frame_R_current=RotationMatrix(),
+            frame_R_goal=RotationMatrix.from_axis_angle(
+                AxisAngle(Vector3Dimensional.Z(), distance)
+            ),
         ),
-        GeometricConstraintBuilder.add_yaw_goal_constraint: (
-            RotationMatrix(),
-            RotationMatrix.from_axis_angle(AxisAngle(Vector3Dimensional.Z(), distance)),
+        GeometricConstraintBuilder.add_yaw_goal_constraint: dict(
+            frame_R_current=RotationMatrix(),
+            frame_R_goal=RotationMatrix.from_axis_angle(
+                AxisAngle(Vector3Dimensional.Z(), distance)
+            ),
         ),
     }
-    current, goal = current_and_goal[add_goal]
     collection = ConstraintCollection()
     add_goal(
-        GeometricConstraintBuilder(collection),
-        current,
-        goal,
+        GeometricConstraintBuilder(collection=collection),
+        **current_and_goal[add_goal],
         cruise_velocity=cruise_velocity,
         quadratic_weight=1.0,
     )
@@ -328,7 +332,7 @@ def test_a_quaternion_error_is_normalized_by_how_fast_it_changes_with_the_angle(
 ):
     collection = ConstraintCollection()
     add_rotation_goal(
-        GeometricConstraintBuilder(collection),
+        GeometricConstraintBuilder(collection=collection),
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(
             AxisAngle(Vector3Dimensional.Z(), 0.5)

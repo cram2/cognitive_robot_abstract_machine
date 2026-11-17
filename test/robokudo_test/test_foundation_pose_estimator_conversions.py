@@ -63,7 +63,7 @@ class ScriptedFoundationPose:
         )
     )
     """
-    Pose3Dimensional matrix of every answer.
+    Pose matrix of every answer.
     """
 
     track_arguments: dict[str, Any] = field(default_factory=dict)
@@ -104,7 +104,7 @@ def estimator_module(monkeypatch: pytest.MonkeyPatch) -> Iterator[ModuleType]:
     sys.modules.pop(estimator_module_name, None)
 
 
-# %% Pose3Dimensional conversions
+# %% Pose conversions
 
 
 def test_estimate_returns_the_pose_of_the_engine_matrix(estimator_module: ModuleType):

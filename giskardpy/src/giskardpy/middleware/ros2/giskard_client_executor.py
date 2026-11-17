@@ -1,3 +1,7 @@
+"""
+Executors that run a statechart on a remote Giskard over ROS.
+"""
+
 from __future__ import annotations
 
 from cramph.reported_statechart import StatechartPayloadKey
@@ -26,7 +30,7 @@ from giskardpy.middleware.ros2.exceptions import (
     NoActiveGoalToCancelError,
     StatechartNotEndedByResultError,
 )
-from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
@@ -46,7 +50,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutor(Executor):
     """
     Executes a statechart by sending it to Giskard over ROS and waiting until it ended
@@ -112,14 +116,18 @@ class GiskardClientExecutor(Executor):
             WorldSynchronizer(_world=self.world, node=self.node_handle)
         if self.context is None:
             self.context = StatechartContext(world=self.world)
-            MotionControl().extend_context(self.context)
+            MotionControl().extend_context(context=self.context)
         self.world_updates = ClientWorldUpdates(
             world_synchronizer=WorldSynchronizer.of_world(self.world)
         )
         if self.announces_presence:
             self.announce_presence()
         giskard_topic = f"{self.giskard_node_name}/command"
-        self._client = GiskardActionClient(self.node_handle, JsonAction, giskard_topic)
+        self._client = GiskardActionClient(
+            node_handle=self.node_handle,
+            action_type=JsonAction,
+            action_name=giskard_topic,
+        )
         sleep(0.3)
 
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -162,25 +170,28 @@ class GiskardClientExecutor(Executor):
     def robot(self) -> AbstractRobot:
         return self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Does what :meth:`Executor.compile` does, then tells every extension that the
         statechart is compiled.
         """
-        super().compile(statechart)
+        super().compile(statechart=statechart)
         self._notify_compiled()
 
-    def execute_async(self) -> Future:
+    def execute_async(self, *, debug_output: DebugOutput = DebugOutput()) -> Future:
         """
         Sends the compiled statechart to Giskard without waiting for it to end, see
         :meth:`get_result`.
 
+        :param debug_output: what Giskard produces to debug this goal
         :return: future that completes once Giskard accepted or rejected the goal
         """
         self.statechart.sanity_check()
-        return self._client.send_goal_async(self._create_goal_message())
+        return self._client.send_goal_async(
+            goal=self._create_goal_message(debug_output=debug_output)
+        )
 
-    def execute(self) -> None:
+    def execute(self, *, debug_output: DebugOutput = DebugOutput()) -> None:
         """
         Sends the compiled statechart to Giskard, keeps its states in step with the ones
         Giskard reports while it runs, waits until it ended there, takes over its final
@@ -189,33 +200,43 @@ class GiskardClientExecutor(Executor):
         A goal that fails raises the exception that made Giskard abort it, for example
         :class:`WorldModelModifiedDuringMotionError` when another process modified the
         world model while the motion was running.
+
+        :param debug_output: what Giskard produces to debug this goal
         """
         self.statechart.sanity_check()
-        child_chooser_access = self.context.get_extension(ChildChooserAccess)
+        child_chooser_access = self.context.get_extension(
+            extension_type=ChildChooserAccess
+        )
+        goal_message = self._create_goal_message(debug_output=debug_output)
         try:
             if child_chooser_access is None:
                 result = self._client.send_goal(
-                    self._create_goal_message(),
+                    goal=goal_message,
                     feedback_callback=lambda feedback_message: self._follow_states(
-                        json.loads(feedback_message.feedback.feedback)
+                        feedback=json.loads(feedback_message.feedback.feedback)
                     ),
                 )
             else:
-                result = self._send_action_goal_choosing_children(child_chooser_access)
-            self._take_over_result(result)
+                result = self._send_action_goal_choosing_children(
+                    child_chooser_access=child_chooser_access,
+                    goal_message=goal_message,
+                )
+            self._take_over_result(result=result)
         finally:
             self.finish_run()
 
-    def _follow_states(self, feedback: dict[str, Any]) -> None:
+    def _follow_states(self, *, feedback: dict[str, Any]) -> None:
         """
         Write the states Giskard reports in `feedback` into the compiled statechart.
 
         :param feedback: The feedback of the running goal.
         """
-        StatechartStateUpdate.from_json(feedback, statechart=self.statechart).apply()
+        StatechartStateUpdate.from_json(
+            payload=feedback, statechart=self.statechart
+        ).apply()
 
     def _send_action_goal_choosing_children(
-        self, child_chooser_access: ChildChooserAccess
+        self, *, child_chooser_access: ChildChooserAccess, goal_message: JsonAction.Goal
     ) -> JsonAction_Result:
         """
         Send the goal, follow the states Giskard reports, see :meth:`_follow_states`,
@@ -225,6 +246,7 @@ class GiskardClientExecutor(Executor):
             receives the feedback.
 
         :param child_chooser_access: holds the chooser of the children
+        :param goal_message: the goal to send
         :return: result of the finished goal
         """
         client = ChildChoiceClient(
@@ -239,18 +261,16 @@ class GiskardClientExecutor(Executor):
 
         def answer(feedback_message: JsonAction_FeedbackMessage) -> None:
             feedback = json.loads(feedback_message.feedback.feedback)
-            self._follow_states(feedback)
-            for choice in client.answer(feedback):
+            self._follow_states(feedback=feedback)
+            for choice in client.answer(feedback=feedback):
                 publisher.publish(String(data=json.dumps(choice.to_json())))
 
         try:
-            return self._client.send_goal(
-                self._create_goal_message(), feedback_callback=answer
-            )
+            return self._client.send_goal(goal=goal_message, feedback_callback=answer)
         finally:
             self.node_handle.destroy_publisher(publisher)
 
-    def _take_over_result(self, result: JsonAction_Result) -> None:
+    def _take_over_result(self, *, result: JsonAction_Result) -> None:
         """
         Copy the final states of a finished goal into the compiled statechart.
 
@@ -266,29 +286,33 @@ class GiskardClientExecutor(Executor):
         if result.status == GoalStatus.STATUS_ABORTED:
             if StatechartPayloadKey.LIFE_CYCLE_STATE in result_json:
                 StatechartStateUpdate.from_json(
-                    result_json, statechart=self.statechart
+                    payload=result_json, statechart=self.statechart
                 ).apply()
             raise self._client.create_abort_exception(
-                result,
+                result=result,
                 **WorldEntityWithIDKwargsTracker.from_world(self.world).create_kwargs(),
             )
-        self.world_updates.wait_for_the_changes_of_a_goal(result_json)
-        StatechartStateUpdate.from_json(result_json, statechart=self.statechart).apply()
+        self.world_updates.wait_for_the_changes_of_a_goal(result=result_json)
+        StatechartStateUpdate.from_json(
+            payload=result_json, statechart=self.statechart
+        ).apply()
         if not self.statechart.is_ended():
             raise StatechartNotEndedByResultError()
 
-    def _create_goal_message(self) -> JsonAction.Goal:
+    def _create_goal_message(self, *, debug_output: DebugOutput) -> JsonAction.Goal:
         """
         Wrap the compiled statechart into a goal that names the change of this world it
         was built on.
 
+        :param debug_output: what Giskard produces to debug the goal
         :return: action goal message holding the serialized motion goal
         """
         goal_msg = JsonAction.Goal()
-        goal = MotionGoal.for_motion_statechart(
-            self.statechart,
+        goal = MotionGoal.from_motion_statechart(
+            motion_statechart=self.statechart,
             client=self.client,
             required_position=self.world_updates.required_position(),
+            debug_output=debug_output,
         )
         goal_msg.goal = json.dumps(goal.to_json())
         return goal_msg
@@ -316,7 +340,7 @@ class GiskardClientExecutor(Executor):
         """
         try:
             result = await self._client.get_result()
-            self._take_over_result(result)
+            self._take_over_result(result=result)
         finally:
             self.finish_run()
 
@@ -334,7 +358,7 @@ class GiskardClientExecutor(Executor):
         self.heartbeat_publisher.stop()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutorNode(GiskardClientExecutor):
     """
     A :class:`GiskardClientExecutor` that creates and owns its own ros node.

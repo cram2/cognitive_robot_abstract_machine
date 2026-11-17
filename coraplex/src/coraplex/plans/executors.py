@@ -20,6 +20,7 @@ from coraplex.plans.failures import (
     MotionExceededSimulationTimeLimit,
     MotionMadeNoProgress,
     MotionViolatedCollisionAvoidance,
+    MotionWasInfeasible,
     PlanFailure,
 )
 from coraplex.plans.plan_transformation import PlanRewriting, PlanTransformation
@@ -38,6 +39,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepTheTorsoUprightWhileUsingATool,
     MoveStretchToolCenterPointInAStraightLine,
 )
+from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -63,6 +65,7 @@ from giskardpy.motion_statechart.graph_node import ConvergingTask, EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
+from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import logic_or
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
@@ -112,7 +115,7 @@ class PlanOutcome:
         return cls(failure=failure)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanExecutor(Executor, ABC):
     """
     Executes a plan: the top-level nodes of a statechart built in :attr:`context`.
@@ -195,8 +198,10 @@ class PlanExecutor(Executor, ABC):
             executor=self, trial_executor_type=KinematicallySimulatedPlanExecutor
         )
         # Raises for a context another executor runs on before anything of it changed.
-        self.context.add_extension(ChildChooserAccess(choosers=[self.child_chooser]))
-        rewriting = self.context.get_extension(PlanRewriting)
+        self.context.add_extension(
+            extension=ChildChooserAccess(choosers=[self.child_chooser])
+        )
+        rewriting = self.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
             self.context.extensions[type(rewriting)] = (
                 rewriting.copy_with_preceding_transformations(self.adaptations)
@@ -230,19 +235,19 @@ class PlanExecutor(Executor, ABC):
             :attr:`context`.
         :raises EmptyStatechartError: If `statechart` holds no node.
         """
-        Executor.compile(self, statechart)
+        Executor.compile(self, statechart=statechart)
         plan_nodes = list(statechart.top_level_nodes)
         if not plan_nodes:
             raise EmptyStatechartError()
-        rewriting = self.context.require_extension(PlanRewriting)
+        rewriting = self.context.require_extension(extension_type=PlanRewriting)
         for plan_node in plan_nodes:
             rewriting.rewrite(plan_node)
         # a transformation may have put a plan node below a node holding it
         self.plan_nodes = list(statechart.top_level_nodes)
         if self.collision_avoidance:
-            robot = self.context.require_extension(RobotAccess).robot
-            statechart.add_node(ExternalCollisionAvoidance(robot=robot))
-            statechart.add_node(SelfCollisionAvoidance(robot=robot))
+            robot = self.context.require_extension(extension_type=RobotAccess).robot
+            statechart.add_node(node=ExternalCollisionAvoidance(robot=robot))
+            statechart.add_node(node=SelfCollisionAvoidance(robot=robot))
         self._add_end_of_plan(statechart)
         self._add_stall_detection(statechart)
 
@@ -253,12 +258,12 @@ class PlanExecutor(Executor, ABC):
 
         :param statechart: The statechart the plan was added to.
         """
-        end_of_plan = EndMotion.when_all_true(self.plan_nodes)
+        end_of_plan = EndMotion.when_all_true(nodes=self.plan_nodes)
         end_of_plan.start_condition = logic_or(
             end_of_plan.start_condition,
             *[plan_node.is_failed_or_interrupted for plan_node in self.plan_nodes],
         )
-        statechart.add_node(end_of_plan)
+        statechart.add_node(node=end_of_plan)
 
     def _add_stall_detection(self, statechart: Statechart) -> None:
         """
@@ -278,10 +283,10 @@ class PlanExecutor(Executor, ABC):
             ):
                 continue
             still_progressing = StillProgressing(monitored_node=plan_node)
-            statechart.add_node(still_progressing)
-            statechart.add_node(still_progressing.cancel_motion())
+            statechart.add_node(node=still_progressing)
+            statechart.add_node(node=still_progressing.cancel_motion())
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Prepare the plan in `statechart`, see :meth:`prepare`, and compile it, so that
         :meth:`execute` can run it.
@@ -289,7 +294,7 @@ class PlanExecutor(Executor, ABC):
         :param statechart: The statechart holding the plan, built in :attr:`context`.
         """
         self.prepare(statechart)
-        super().compile(statechart)
+        super().compile(statechart=statechart)
 
     def execute(self) -> None:
         """
@@ -308,7 +313,8 @@ class PlanExecutor(Executor, ABC):
         :return: The outcome, holding why the plan failed if it did:
             :class:`MotionMadeNoProgress` when the plan stopped approaching its goal,
             :class:`MotionViolatedCollisionAvoidance` when it brought bodies closer to
-            each other than collision avoidance allows,
+            each other than collision avoidance allows, :class:`MotionWasInfeasible`
+            when the controller found no motion satisfying every constraint at once,
             :class:`MotionExceededSimulationTimeLimit` when a simulated plan ran longer
             than :attr:`SimulatedPlanExecutor.simulation_time_limit`,
             :class:`CandidateLimitReached` or :class:`EmptyUnderspecified` when an
@@ -322,12 +328,20 @@ class PlanExecutor(Executor, ABC):
             self._run()
         except NoProgressError as stalled:
             return PlanOutcome.failed_by(
-                failure=MotionMadeNoProgress(stalled), cause=stalled
+                failure=MotionMadeNoProgress(no_progress=stalled), cause=stalled
             )
         except CollisionViolatedError as violation:
             return PlanOutcome.failed_by(
-                failure=MotionViolatedCollisionAvoidance(violation), cause=violation
+                failure=MotionViolatedCollisionAvoidance(violation=violation),
+                cause=violation,
             )
+        except InfeasibleException as infeasibility:
+            return PlanOutcome.failed_by(
+                failure=MotionWasInfeasible(infeasibility=infeasibility),
+                cause=infeasibility,
+            )
+        except PlanFailure as failure:
+            return PlanOutcome(failure=failure)
         return PlanOutcome(failure=self._failure_of_plan())
 
     @abstractmethod
@@ -366,7 +380,7 @@ class PlanExecutor(Executor, ABC):
         if candidate_shortage is not None:
             return candidate_shortage
         motion_did_not_finish = MotionDidNotFinish(
-            [
+            unfinished_motions=[
                 node
                 for node in self.statechart.nodes
                 if not isinstance(node, TerminalNode)
@@ -383,7 +397,7 @@ class PlanExecutor(Executor, ABC):
             actions as it may, an :class:`EmptyUnderspecified` if one ran out of actions
             to try, ``None`` if none did.
         """
-        for node in self.statechart.get_nodes_by_type(StatementNode):
+        for node in self.statechart.get_nodes_by_type(node_type=StatementNode):
             if not node.ran_out_of_children:
                 continue
             if node.reached_candidate_limit:
@@ -394,7 +408,7 @@ class PlanExecutor(Executor, ABC):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
     """
     Ticks the plan's statechart in a simulated world, driving the robot's motions with
@@ -424,7 +438,7 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
 
     def default_executor_extensions(self) -> list[ExecutorExtension]:
         return [
-            RosNodeAccess(self.ros_node),
+            RosNodeAccess(ros_node=self.ros_node),
             MotionControl(qp_controller_config=self.create_qp_controller_config()),
         ]
 
@@ -435,12 +449,12 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
             suited to how the world is simulated.
         """
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Differs from :meth:`PlanExecutor.compile` in also counting
         :attr:`simulation_time_limit`.
         """
-        super().compile(statechart)
+        super().compile(statechart=statechart)
         self._count_simulation_time_limit()
 
     def after_recompile(self) -> None:
@@ -455,7 +469,7 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
         """
         Set :attr:`simulation_time_limit` from the actions the statechart holds now.
         """
-        actions = len(self.statechart.get_nodes_by_type(Action))
+        actions = len(self.statechart.get_nodes_by_type(node_type=Action))
         self.simulation_time_limit = self.simulation_time_per_action * max(1, actions)
 
     def _run(self) -> None:
@@ -474,15 +488,21 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
         try:
             while not self._is_over():
                 if timedelta(seconds=self.time) >= self.simulation_time_limit:
-                    raise MotionExceededSimulationTimeLimit(self.simulation_time_limit)
+                    raise MotionExceededSimulationTimeLimit(
+                        time_limit=self.simulation_time_limit
+                    )
                 self.tick()
                 self.pacer.sleep()
             # The controller stops commanding, so a velocity-servoed base stops too.
-            MotionControl.set_velocity_acceleration_jerk_to_zero(self.context.world)
+            MotionControl.set_velocity_acceleration_jerk_to_zero(
+                world=self.context.world
+            )
             self.context.world.notify_state_change()
             self.pacer.wait_for_standstill()
         finally:
-            MotionControl.set_velocity_acceleration_jerk_to_zero(self.context.world)
+            MotionControl.set_velocity_acceleration_jerk_to_zero(
+                world=self.context.world
+            )
             self.finish_run()
 
     def _is_over(self) -> bool:
@@ -500,7 +520,7 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KinematicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     """
     Ticks the plan's statechart in a world whose state follows every command exactly,
@@ -519,7 +539,7 @@ class KinematicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         return QPControllerConfig.create_with_fast_simulation_defaults()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     """
     Ticks the plan's statechart against a physically simulated world, whose servos take
@@ -555,7 +575,7 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     """
 
     def __post_init__(self) -> None:
-        self.pacer = SteppedSimulationPacer(self.simulation)
+        self.pacer = SteppedSimulationPacer(simulation=self.simulation)
         if not any(
             isinstance(adaptation, CloseFingersToObjectWidth)
             for adaptation in self.plan_adaptations
@@ -571,7 +591,7 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         :return: The squeeze the two-finger grippers of the robot in :attr:`context`
             name, or the default one where it has none.
         """
-        robot = self.context.require_extension(RobotAccess).robot
+        robot = self.context.require_extension(extension_type=RobotAccess).robot
         [squeeze] = {
             arm.end_effector.squeeze
             for arm in robot.all_arms
@@ -583,7 +603,7 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         return QPControllerConfig.create_with_physical_simulation_defaults()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealRobotPlanExecutor(PlanExecutor):
     """
     Sends the plan's statechart to Giskard, grounding every underspecified action
@@ -599,16 +619,20 @@ class RealRobotPlanExecutor(PlanExecutor):
     """
 
     plan_adaptations: list[PlanTransformation] = field(
-        default_factory=lambda: [CloseFingersToObjectWidth(), DetectWithRoboKudo()],
+        default_factory=lambda: [
+            DriveRobotiqGrippersThroughTheirActionServers(),
+            CloseFingersToObjectWidth(),
+            DetectWithRoboKudo(),
+        ],
         kw_only=True,
     )
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         """
         Does what :meth:`PlanExecutor.compile` does, then tells every extension that the
         statechart is compiled.
         """
-        super().compile(statechart)
+        super().compile(statechart=statechart)
         self._notify_compiled()
 
     def _run(self) -> None:
@@ -617,9 +641,11 @@ class RealRobotPlanExecutor(PlanExecutor):
         extension that the run stopped.
         """
         if self._giskard is None:
-            self._giskard = GiskardClientExecutor(self.ros_node, context=self.context)
+            self._giskard = GiskardClientExecutor(
+                node_handle=self.ros_node, context=self.context
+            )
         try:
-            self._giskard.compile(self.statechart)
+            self._giskard.compile(statechart=self.statechart)
             self._giskard.execute()
         finally:
             self.finish_run()

@@ -1,3 +1,8 @@
+"""
+Tests of spawning bodies, regions and connections into a world from their
+specifications.
+"""
+
 import copy
 from dataclasses import dataclass
 import inspect
@@ -9,7 +14,7 @@ import numpy as np
 import pytest
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.connections import (

@@ -38,8 +38,8 @@ def _build_motion_statechart(
         goal_point=CartesianPoint3Dimensional(x=1, reference_frame=root),
         name="cart_pos",
     )
-    motion_statechart.add_node(goal)
-    motion_statechart.add_node(EndMotion.when_true(goal))
+    motion_statechart.add_node(node=goal)
+    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
     return motion_statechart
 
 
@@ -59,24 +59,24 @@ def _build_executor(cylinder_bot_world: World) -> StatechartExecutor:
 
 
 class TestDebugExpressionRecording:
-    def test_records_one_value_per_cycle(self, cylinder_bot_world: World):
+    def test_records_one_value_per_cycle(self, *, cylinder_bot_world: World):
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
         trajectory = executor.require_extension(
-            DebugExpressionRecording
+            extension_type=DebugExpressionRecording
         ).plotter.debug_expression_trajectory
         assert len(trajectory.recorded_debug_expressions) > 0
         assert len(trajectory.times) > 1
         for recorded in trajectory.recorded_debug_expressions:
             assert recorded.values.shape[0] == len(trajectory.times)
 
-    def test_records_expected_component_count(self, cylinder_bot_world: World):
+    def test_records_expected_component_count(self, *, cylinder_bot_world: World):
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
         trajectory = executor.require_extension(
-            DebugExpressionRecording
+            extension_type=DebugExpressionRecording
         ).plotter.debug_expression_trajectory
         current = next(
             recorded
@@ -88,30 +88,34 @@ class TestDebugExpressionRecording:
         # The recorded tip position should actually change while the bot moves.
         assert not np.allclose(current.values[0], current.values[-1])
 
-    def test_plot_creates_non_empty_pdf(self, cylinder_bot_world: World, tmp_path):
+    def test_plot_creates_non_empty_pdf(self, *, cylinder_bot_world: World, tmp_path):
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
         output = tmp_path / "debug_expressions.pdf"
-        executor.require_extension(DebugExpressionRecording).plotter.plot(str(output))
+        executor.require_extension(
+            extension_type=DebugExpressionRecording
+        ).plotter.plot(file_name=str(output))
 
         assert output.exists()
         assert output.stat().st_size > 0
 
     def test_plot_creates_missing_output_directory(
-        self, cylinder_bot_world: World, tmp_path
+        self, *, cylinder_bot_world: World, tmp_path
     ):
         executor = _build_executor(cylinder_bot_world)
         executor.tick_until_end()
 
         output = tmp_path / "debug_expressions" / "debug_expressions.pdf"
-        executor.require_extension(DebugExpressionRecording).plotter.plot(str(output))
+        executor.require_extension(
+            extension_type=DebugExpressionRecording
+        ).plotter.plot(file_name=str(output))
 
         assert output.exists()
         assert output.stat().st_size > 0
 
     def test_plot_raises_when_plotter_not_configured(
-        self, cylinder_bot_world: World, tmp_path
+        self, *, cylinder_bot_world: World, tmp_path
     ):
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
@@ -123,34 +127,42 @@ class TestDebugExpressionRecording:
 
         output = tmp_path / "debug_expressions.pdf"
         with pytest.raises(MissingExecutorExtensionError):
-            executor.require_extension(DebugExpressionRecording).plotter.plot(
-                str(output)
-            )
+            executor.require_extension(
+                extension_type=DebugExpressionRecording
+            ).plotter.plot(file_name=str(output))
 
 
 class TestDebugExpressionTrajectory:
-    def test_plot_raises_when_no_samples_were_recorded(self, tmp_path):
+    def test_plot_raises_when_no_samples_were_recorded(self, *, tmp_path):
         plotter = DebugExpressionTrajectoryPlotter()
-        plotter.reset([DebugExpression(name="constant", expression=Scalar(data=2.0))])
+        plotter.reset(
+            debug_expressions=[
+                DebugExpression(name="constant", expression=Scalar(data=2.0))
+            ]
+        )
 
         with pytest.raises(EmptyDebugExpressionTrajectoryError):
-            plotter.plot(str(tmp_path / "debug_expressions.pdf"))
+            plotter.plot(file_name=str(tmp_path / "debug_expressions.pdf"))
 
     def test_append_rejects_non_monotonic_time(self):
         trajectory = DebugExpressionTrajectory.from_debug_expressions(
-            [DebugExpression(name="constant", expression=Scalar(data=2.0))]
+            debug_expressions=[
+                DebugExpression(name="constant", expression=Scalar(data=2.0))
+            ]
         )
-        trajectory.append(0.0)
-        trajectory.append(1.0)
+        trajectory.append(time=0.0)
+        trajectory.append(time=1.0)
         with pytest.raises(NonMonotonicTimeError):
-            trajectory.append(0.5)
+            trajectory.append(time=0.5)
 
     def test_scalar_expression_has_single_component(self):
         trajectory = DebugExpressionTrajectory.from_debug_expressions(
-            [DebugExpression(name="constant", expression=Scalar(data=2.0))]
+            debug_expressions=[
+                DebugExpression(name="constant", expression=Scalar(data=2.0))
+            ]
         )
-        trajectory.append(0.0)
-        trajectory.append(1.0)
+        trajectory.append(time=0.0)
+        trajectory.append(time=1.0)
 
         values = trajectory.recorded_debug_expressions[0].values
         assert values.shape == (2, 1)

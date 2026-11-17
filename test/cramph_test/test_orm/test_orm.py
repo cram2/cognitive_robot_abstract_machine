@@ -55,9 +55,9 @@ def statechart_run_to_its_end(statechart_executor: StatechartExecutor) -> Statec
         ]
     )
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(steps)
-    statechart.add_node(EndStatechart.when_true(steps))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=steps)
+    statechart.add_node(node=EndStatechart.when_true(node=steps))
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=100)
     return statechart
 
@@ -93,16 +93,18 @@ def cancelled_statechart(statechart_executor: StatechartExecutor) -> Statechart:
     trigger = ConstTrueNode()
     statechart = Statechart(context=statechart_executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             running,
             trigger,
             CancelStatechart.when_true(
-                trigger,
-                NodeAssertionErrorNamingANode(reason="cancelled", node=running),
+                node=trigger,
+                exception=NodeAssertionErrorNamingANode(
+                    reason="cancelled", node=running
+                ),
             ),
         ]
     )
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     with pytest.raises(NodeAssertionError):
         statechart_executor.tick_until_end(timeout=100)
     return statechart
@@ -117,7 +119,7 @@ class TestStatechartNodeSurvivesRoundTrip:
     """
 
     def test_node_fields_are_read_back_unchanged(
-        self, session, tick_counting_node
+        self, *, session, tick_counting_node
     ) -> None:
         session.add(to_dao(tick_counting_node))
         session.commit()
@@ -139,7 +141,7 @@ class TestStatechartSurvivesRoundTrip:
     """
 
     def test_nodes_are_read_back_in_index_order(
-        self, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
+        self, *, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
     ) -> None:
         assert [
             (type(node), node.name, node.parent_node_index)
@@ -150,7 +152,7 @@ class TestStatechartSurvivesRoundTrip:
         ]
 
     def test_transitions_connect_the_same_nodes(
-        self, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
+        self, *, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
     ) -> None:
         def transitions(statechart: Statechart) -> list[tuple[int, int, str]]:
             graph = statechart.rx_graph
@@ -164,7 +166,7 @@ class TestStatechartSurvivesRoundTrip:
         )
 
     def test_state_history_is_read_back(
-        self, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
+        self, *, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
     ) -> None:
         def history(statechart: Statechart) -> list[tuple[int, list, list]]:
             return [
@@ -179,7 +181,7 @@ class TestStatechartSurvivesRoundTrip:
         assert history(statechart_read_back) == history(statechart_run_to_its_end)
 
     def test_current_state_is_the_last_one_recorded(
-        self, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
+        self, *, statechart_run_to_its_end: Statechart, statechart_read_back: Statechart
     ) -> None:
         assert (
             statechart_read_back.life_cycle_state
@@ -191,7 +193,7 @@ class TestStatechartSurvivesRoundTrip:
         )
 
     def test_cancelling_node_is_read_back(
-        self, session, cancelled_statechart: Statechart
+        self, *, session, cancelled_statechart: Statechart
     ) -> None:
         read_back = store_and_read_back(session, cancelled_statechart)
 
@@ -204,7 +206,7 @@ class TestStatechartSurvivesRoundTrip:
         ]
 
     def test_cancellation_error_is_read_back_with_a_copy_of_the_node_it_names(
-        self, session, cancelled_statechart: Statechart
+        self, *, session, cancelled_statechart: Statechart
     ) -> None:
         read_back = store_and_read_back(session, cancelled_statechart)
 

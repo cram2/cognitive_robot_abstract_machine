@@ -16,26 +16,6 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class NoGenericError(DataclassException, TypeError):
-    """
-    Exception raised when the original class for a DataAccessObject subclass cannot be
-    determined.
-
-    This exception is typically raised when a DataAccessObject subclass has not been
-    parameterized properly, which prevents identifying the original class associated
-    with it.
-    """
-
-    clazz: type
-
-    def error_message(self) -> str:
-        return f"Cannot determine original class for {self.clazz}."
-
-    def suggest_correction(self) -> str:
-        return "did you forget to parameterise the DataAccessObject subclass?"
-
-
-@dataclass(kw_only=True)
 class NoDAOFoundError(DataclassException, TypeError):
     """
     Represents an error raised when no DAO (Data Access Object) class is found for a

@@ -144,7 +144,7 @@ def test_the_projection_onto_a_frames_plane_is_an_orthogonal_projection():
 
 
 def test_an_orthogonal_projection_declares_only_its_plane_and_where_points_lie_on_it():
-    assert OrthogonalProjection.__abstractmethods__ == {"project", "foot_point"}
+    assert OrthogonalProjection.__abstractmethods__ == {"project", "embed_planar_point"}
 
 
 def test_every_projection_line_of_an_orthogonal_projection_runs_along_the_plane_normal():
@@ -156,5 +156,5 @@ def test_every_projection_line_of_an_orthogonal_projection_runs_along_the_plane_
     )
     np.testing.assert_array_equal(
         line.point.to_np(),
-        projection.foot_point(point=CartesianPoint2Dimensional(1.0, 2.0)).to_np(),
+        projection.embed_planar_point(point=CartesianPoint2Dimensional(1.0, 2.0)).to_np(),
     )

@@ -34,14 +34,16 @@ def main() -> None:
 
     motion_statechart = Statechart(context=giskard.context)
     motion_statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                goal_positions_in_radians, giskard.world
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    goal_positions_in_radians, giskard.world
+                )
             )
         )
     )
-    motion_statechart.add_node(EndMotion.when_true(joint_goal))
-    giskard.compile(motion_statechart)
+    motion_statechart.add_node(node=EndMotion.when_true(node=joint_goal))
+    giskard.compile(statechart=motion_statechart)
     giskard.execute()
 
     background_node.shutdown()

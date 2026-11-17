@@ -74,7 +74,9 @@ class SetGripperAction(OperatesGripper, GoalAction):
     """
 
     def create_goal(self) -> StatechartNode:
-        return self.gripper_goal_type.moving_gripper_to(self.configuration)
+        return self.gripper_goal_type.create_gripper_goal(
+            configuration=self.configuration
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -265,5 +267,5 @@ class MoveManipulatorAction(MovesToolCenterPoint, GoalAction):
             binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         for node in self.keep_base_still():
-            goal.add_node(node)
+            goal.add_node(node=node)
         return goal

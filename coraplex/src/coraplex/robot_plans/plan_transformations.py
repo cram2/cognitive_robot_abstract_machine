@@ -301,7 +301,9 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if isinstance(plan_node, StatementNode):
             # The candidates are grounded after the opening, which leaves the arms at
             # the handle, where they would stand in collision at every standing pose.
-            robot = plan_node.context.require_extension(RobotAccess).robot
+            robot = plan_node.context.require_extension(
+                extension_type=RobotAccess
+            ).robot
             nodes.append(ParkArmsAction(arms=robot.all_arms))
         return nodes
 
@@ -370,9 +372,12 @@ class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
 
     def apply(self, plan_node: PickAndPlaceAction) -> None:
         for step in list(plan_node.nodes):
-            plan_node.insert_before(step, ParkArmsAction(arms=plan_node.robot.all_arms))
+            plan_node.insert_before(
+                reference=step, node=ParkArmsAction(arms=plan_node.robot.all_arms)
+            )
         plan_node.insert_after(
-            plan_node.nodes[-1], ParkArmsAction(arms=plan_node.robot.all_arms)
+            reference=plan_node.nodes[-1],
+            node=ParkArmsAction(arms=plan_node.robot.all_arms),
         )
 
 
@@ -407,7 +412,7 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
             alongside `plan_node` starts.
         """
         step = plan_node.find_upwards(
-            lambda holder: isinstance(holder.parent_node, Sequence)
+            predicate=lambda holder: isinstance(holder.parent_node, Sequence)
         )
         if step is not None:
             return step
@@ -468,8 +473,8 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
     def apply(self, plan_node: GraspingAction) -> None:
         closing_step = self.closing_step(plan_node)
         plan_node.statechart.replace(
-            closing_step,
-            plan_node.closing_step(
+            node=closing_step,
+            replacement=plan_node.closing_step(
                 MoveFingersToWidthAction(
                     gripper=plan_node.arm.end_effector,
                     width=plan_node.grasp.width_along_closing_axis,

@@ -56,7 +56,7 @@ def _ticked_while_nothing_moves(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [
                 detector_type(tracked_object=body)
                 for body in watched
@@ -66,7 +66,7 @@ def _ticked_while_nothing_moves(
     )
     for _ in range(TICKS_WITHOUT_ANYTHING_MOVING):
         executor.tick()
-    return executor.context.require_extension(SegmindContext)
+    return executor.context.require_extension(extension_type=SegmindContext)
 
 
 def _events_of(
@@ -135,7 +135,7 @@ def test_a_containment_that_lasts_is_not_reported_lost_by_another_bodys_detector
 def test_a_detector_needs_the_segmind_context(milk_in_the_apartment) -> None:
     world, milk, box = milk_in_the_apartment
     statechart = Statechart(context=StatechartContext(world=world))
-    statechart.add_node(detector := ContactDetector(tracked_object=milk))
+    statechart.add_node(node=(detector := ContactDetector(tracked_object=milk)))
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
         statechart.compiler.compile()
@@ -148,8 +148,8 @@ def test_episode_segmentation_keeps_the_segmind_context_already_there(
 ) -> None:
     world, milk, box = milk_in_the_apartment
     context = StatechartContext(world=world)
-    context.add_extension(segmind_context := SegmindContext())
+    context.add_extension(extension=(segmind_context := SegmindContext()))
 
-    EpisodeSegmentation().extend_context(context)
+    EpisodeSegmentation().extend_context(context=context)
 
-    assert context.require_extension(SegmindContext) is segmind_context
+    assert context.require_extension(extension_type=SegmindContext) is segmind_context

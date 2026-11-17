@@ -15,7 +15,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from krrood.adapters.json_serializer import DataclassJSONSerializer
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 import numpy as np
 from typing_extensions import Any, Iterable

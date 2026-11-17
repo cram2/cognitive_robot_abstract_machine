@@ -1,9 +1,6 @@
 import gc
 from copy import deepcopy
 
-import objgraph
-
-
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
@@ -18,14 +15,14 @@ from cramph.composites import Sequence
 
 from ..conftest import SAMPLING_SEED
 from ..plan_running import context_of, robot_extensions, run_plan
+from ..reference_chain import ReferenceSearch
 
 
 def test_ref_chain_after_copy(pr2_apartment_context):
     world, view, c = pr2_apartment_context
     copy_world = deepcopy(world)
     copy_world.name = "copy_world"
-    chain = objgraph.find_ref_chain(world, lambda x: x is copy_world)
-    assert chain == [world]
+    assert ReferenceSearch(start=world).find_reference_chain(target=copy_world) == []
 
 
 def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
@@ -50,8 +47,7 @@ def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
     run_plan(plan, copy_extensions)
 
     gc.collect()
-    chain = objgraph.find_ref_chain(world, lambda x: x is copy_world)
-    assert chain == [world]
+    assert ReferenceSearch(start=world).find_reference_chain(target=copy_world) == []
 
 
 def test_ref_chain_after_copy_with_execute_complex_plan(pr2_apartment_context):
@@ -75,5 +71,4 @@ def test_ref_chain_after_copy_with_execute_complex_plan(pr2_apartment_context):
     run_plan(plan, copy_extensions)
 
     gc.collect()
-    chain = objgraph.find_ref_chain(world, lambda x: x is copy_world)
-    assert chain == [world]
+    assert ReferenceSearch(start=world).find_reference_chain(target=copy_world) == []

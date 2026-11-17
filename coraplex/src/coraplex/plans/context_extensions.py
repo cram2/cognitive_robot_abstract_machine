@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% what a plan's nodes read from the context
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotAccess(ContextExtension):
     """
     Gives the nodes of a statechart the robot that performs the plan.
@@ -44,7 +44,7 @@ class RobotAccess(ContextExtension):
         return self.robot.root
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatementGrounding(ContextExtension):
     """
     How the underspecified statements of a plan are grounded into actions.

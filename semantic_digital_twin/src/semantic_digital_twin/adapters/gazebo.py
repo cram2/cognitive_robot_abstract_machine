@@ -1,3 +1,7 @@
+"""
+A parser of Gazebo SDF files into worlds, and the errors it raises.
+"""
+
 from __future__ import annotations, absolute_import
 
 import logging
@@ -6,7 +10,7 @@ import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,

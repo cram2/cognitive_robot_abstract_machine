@@ -26,9 +26,9 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
         ),
         translation_threshold=0.01,
     )
-    motion_statechart.add_node(goal)
-    end = EndMotion.when_true(goal)
-    motion_statechart.add_node(end)
+    motion_statechart.add_node(node=goal)
+    end = EndMotion.when_true(node=goal)
+    motion_statechart.add_node(node=end)
 
     executor.compile(statechart=motion_statechart)
 

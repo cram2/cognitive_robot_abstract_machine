@@ -1,3 +1,7 @@
+"""
+The exceptions the patterns raise.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -220,3 +224,23 @@ class MissingInterfaceAttributesError(DataclassException, TypeError):
             f"Declare {', '.join(self.attributes)} on "
             f"{self.implementation.__name__} as fields or properties."
         )
+
+
+@dataclass(kw_only=True)
+class NoGenericError(DataclassException, TypeError):
+    """
+    Raised when the generic argument of a class cannot be determined.
+
+    The class inherits a generic base without binding its type parameter.
+    """
+
+    clazz: type
+    """
+    The class whose generic argument is missing.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot determine the generic argument of {self.clazz}."
+
+    def suggest_correction(self) -> str:
+        return "did you forget to parameterise the generic base class?"

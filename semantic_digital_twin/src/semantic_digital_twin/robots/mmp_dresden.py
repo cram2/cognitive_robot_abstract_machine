@@ -1,3 +1,7 @@
+"""
+The MMP Dresden robot: its joints, gripper, camera, arm, torso and mobile base.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -7,7 +11,7 @@ from typing_extensions import Self
 
 import numpy as np
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import (
     JointName,
     GripperState,

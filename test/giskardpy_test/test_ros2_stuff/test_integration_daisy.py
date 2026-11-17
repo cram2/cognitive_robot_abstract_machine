@@ -1,3 +1,7 @@
+"""
+Integration tests of Giskard controlling DAiSy.
+"""
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,7 +26,6 @@ from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
-from ...pytest_environment import runs_in_continuous_integration
 
 # %% trajectory length limit
 
@@ -41,10 +44,16 @@ def add_trajectory_length_limit(motion_statechart: Statechart) -> None:
     :data:`MAX_TRAJECTORY_LENGTH_SECONDS`.
     """
     motion_statechart.add_node(
-        max_length := CountSimulationTimeSeconds(seconds=MAX_TRAJECTORY_LENGTH_SECONDS)
+        node=(
+            max_length := CountSimulationTimeSeconds(
+                seconds=MAX_TRAJECTORY_LENGTH_SECONDS
+            )
+        )
     )
     motion_statechart.add_node(
-        CancelStatechart.when_true(max_length, MaxTrajectoryLengthException())
+        node=CancelStatechart.when_true(
+            node=max_length, exception=MaxTrajectoryLengthException()
+        )
     )
 
 
@@ -56,7 +65,7 @@ def default_joint_state(default_daisy_pose: dict[str, float]) -> dict[str, float
     return default_daisy_pose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DAiSyTester(GiskardTester):
     def setup_giskard(self) -> Giskard:
         return Giskard(
@@ -64,11 +73,7 @@ class DAiSyTester(GiskardTester):
                 robots=[RobotSpecification.specify_real_robot(DAiSy)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=not runs_in_continuous_integration(),
-                plot_gantt_chart=True,
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 
@@ -87,22 +92,27 @@ def robot():
 
 
 def test_joints1(giskard: DAiSyTester) -> None:
+    """
+    The left finger tip of DAiSy reaches the pose its joint goal implies.
+    """
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                {
-                    "left_wrist_1_joint": 1.23,
-                    "left_wrist_2_joint": 1.23,
-                    "left_wrist_3_joint": 1.23,
-                },
-                giskard.api.world,
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    {
+                        "left_wrist_1_joint": 1.23,
+                        "left_wrist_2_joint": 1.23,
+                        "left_wrist_3_joint": 1.23,
+                    },
+                    giskard.api.world,
+                )
             )
         ),
     )
-    statechart.add_node(EndMotion.when_true(joint_goal))
+    statechart.add_node(node=EndMotion.when_true(node=joint_goal))
     add_trajectory_length_limit(statechart)
-    giskard.api.compile(statechart)
+    giskard.api.compile(statechart=statechart)
     giskard.api.execute()
 
     base = giskard.world.get_kinematic_structure_entity_by_name("left_base_link")

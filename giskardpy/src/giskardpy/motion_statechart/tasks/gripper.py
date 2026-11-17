@@ -33,8 +33,9 @@ class MovesGripperToConfiguration(ABC):
 
     @classmethod
     @abstractmethod
-    def moving_gripper_to(
+    def create_gripper_goal(
         cls,
+        *,
         configuration: GripperConfiguration,
         stall_minimum_time: float | None = None,
         tolerate_stall: bool = False,
@@ -87,8 +88,9 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
     """
 
     @classmethod
-    def moving_gripper_to(
+    def create_gripper_goal(
         cls,
+        *,
         configuration: GripperConfiguration,
         stall_minimum_time: float | None = None,
         tolerate_stall: bool = False,
@@ -131,10 +133,10 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
         """
         Create the finger goal and the speed cap, after the nodes this goal was handed.
         """
-        self.add_node(self._finger_goal())
+        self.add_node(node=self._finger_goal())
         if self.finger_velocity is not None:
             self.add_node(
-                JointVelocityLimit(
+                node=JointVelocityLimit(
                     connections=self.finger_connections,
                     max_velocity=self.finger_velocity,
                 )
@@ -152,10 +154,11 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
         if not self.tolerate_stall:
             return finger_task
         return Parallel(
-            nodes=[finger_task, self._stall_monitor(finger_task)], minimum_success=1
+            nodes=[finger_task, self._stall_monitor(finger_task=finger_task)],
+            minimum_success=1,
         )
 
-    def _stall_monitor(self, finger_task: MotionStatechartNode) -> Stalled:
+    def _stall_monitor(self, *, finger_task: MotionStatechartNode) -> Stalled:
         """
         :param finger_task: The task driving the fingers to the goal.
         :return: A monitor that observes `finger_task` no longer approaching its goal for

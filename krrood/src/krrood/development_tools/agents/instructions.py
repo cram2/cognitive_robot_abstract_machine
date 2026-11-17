@@ -5,7 +5,6 @@ repository declares, and the ``SKILL.md`` of each skill the repository declares.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +17,7 @@ from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.agents.skill import Skill
+from krrood.development_tools.generated_file import GeneratedFile
 from krrood.development_tools.subcommand import Subcommand
 from krrood.patterns.path_enumeration import PathEnumeration
 
@@ -41,54 +41,11 @@ class TemplateFile(PathEnumeration):
     """
 
 
-# %% generated files
-
-
-class GeneratedInstructions(ABC):
-    """
-    An instructions file whose whole content is generated.
-    """
-
-    @property
-    @abstractmethod
-    def path(self) -> Path:
-        """
-        Where the file lies.
-        """
-
-    @property
-    @abstractmethod
-    def text(self) -> str:
-        """
-        The content the file must have.
-        """
-
-    def is_current(self) -> bool:
-        """
-        :return: Whether the file exists and equals :attr:`text`.
-        """
-        if not self.path.is_file():
-            return False
-        return self.path.read_text(encoding="utf-8") == self.text
-
-    def write(self) -> bool:
-        """
-        Write the file, and the directories it lies in, replacing whatever it held.
-
-        :return: Whether the file changed.
-        """
-        if self.is_current():
-            return False
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(self.text, encoding="utf-8")
-        return True
-
-
 # %% AGENTS.md
 
 
 @dataclass(kw_only=True)
-class AgentsInstructions(GeneratedInstructions):
+class AgentsInstructions(GeneratedFile):
     """
     The ``AGENTS.md`` of one repository, listing the rules of the given sections.
     """
@@ -146,7 +103,7 @@ class AgentsInstructions(GeneratedInstructions):
 
 
 @dataclass(kw_only=True)
-class SkillInstructions(GeneratedInstructions):
+class SkillInstructions(GeneratedFile):
     """
     The ``SKILL.md`` of one skill of a repository.
     """

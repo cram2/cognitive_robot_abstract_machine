@@ -1,3 +1,8 @@
+"""
+The symbolic casadi spatial types: values given in a frame or on its x-y plane, the
+changes between frames, and how each change acts on a value.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -288,6 +293,13 @@ class SymbolicSpatialType(ABC):
         return result
 
 
+GenericSpatialType = TypeVar("GenericSpatialType", bound=SymbolicSpatialType)
+"""
+The kind of symbolic spatial value or change a method returns unchanged in type, such as
+the value a frame expresses in its own coordinates.
+"""
+
+
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialChange(
     SymbolicSpatialType, RigidCoordinateChange[CartesianFrameT], ABC
@@ -372,6 +384,14 @@ class SpecialOrthogonalGroupAction(Interface):
         """
 
 
+SpecialOrthogonalGroupActionT = TypeVar(
+    "SpecialOrthogonalGroupActionT", bound=SpecialOrthogonalGroupAction
+)
+"""
+The kind of value or change a rotation is applied to.
+"""
+
+
 class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
     """
     A value or change the rigid motion group SE(3) acts on: a
@@ -391,6 +411,14 @@ class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
         """
 
 
+SpecialEuclideanGroupActionT = TypeVar(
+    "SpecialEuclideanGroupActionT", bound=SpecialEuclideanGroupAction
+)
+"""
+The kind of value or change a transformation is applied to.
+"""
+
+
 class PlanarSpecialEuclideanGroupAction(Interface):
     """
     A value or change on a plane the planar rigid motion group SE(2) acts on: a
@@ -407,6 +435,14 @@ class PlanarSpecialEuclideanGroupAction(Interface):
         :return: This value, on the x-y plane of the reference frame of
             ``transformation``.
         """
+
+
+PlanarSpecialEuclideanGroupActionT = TypeVar(
+    "PlanarSpecialEuclideanGroupActionT", bound=PlanarSpecialEuclideanGroupAction
+)
+"""
+The kind of value or change on a plane a planar transformation is applied to.
+"""
 
 
 class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
@@ -2462,7 +2498,7 @@ class FramePlaneProjection(
     def plane_normal(self) -> Vector3Dimensional:
         return Vector3Dimensional.Z(reference_frame=self.plane_frame)
 
-    def foot_point(
+    def embed_planar_point(
         self, *, point: CartesianPoint2Dimensional
     ) -> CartesianPoint3Dimensional:
         """
@@ -3895,32 +3931,3 @@ def rotation_matrix_to_quaternion(r: Matrix):
 
     q *= 0.5 / sm.sqrt(t * r[3, 3])
     return q
-
-
-# %% type hints
-
-GenericSpatialType = TypeVar(
-    "GenericSpatialType",
-    bound=SymbolicSpatialType,
-)
-
-SpecialEuclideanGroupActionT = TypeVar(
-    "SpecialEuclideanGroupActionT", bound=SpecialEuclideanGroupAction
-)
-"""
-The kind of value or change a transformation is applied to.
-"""
-
-PlanarSpecialEuclideanGroupActionT = TypeVar(
-    "PlanarSpecialEuclideanGroupActionT", bound=PlanarSpecialEuclideanGroupAction
-)
-"""
-The kind of value or change on a plane a planar transformation is applied to.
-"""
-
-SpecialOrthogonalGroupActionT = TypeVar(
-    "SpecialOrthogonalGroupActionT", bound=SpecialOrthogonalGroupAction
-)
-"""
-The kind of value or change a rotation is applied to.
-"""

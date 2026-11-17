@@ -173,7 +173,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             None
             if parent is None
             else parent.find_upwards(
-                lambda node: (
+                predicate=lambda node: (
                     isinstance(node, Action)
                     or not isinstance(node, ControlStructureNode)
                 )
@@ -197,7 +197,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
         )
         # the tasks of a pose goal come before the nodes accompanying it
         for task, straight_task in zip(list(plan_node.nodes), straight.create_tasks()):
-            plan_node.statechart.replace(task, straight_task)
+            plan_node.statechart.replace(node=task, replacement=straight_task)
 
 
 # %% closing a container
@@ -233,8 +233,8 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
         tool_frame = closing_goal.tip_link
         robot_root = plan_node.robot.root
         plan_node.statechart.replace(
-            closing_goal,
-            Parallel(
+            node=closing_goal,
+            replacement=Parallel(
                 nodes=[
                     CartesianPose(
                         name="Keep holding handle",

@@ -66,13 +66,13 @@ class ScriptedPoseEstimator(MeshBasedPoseEstimator):
         default_factory=lambda: object_pose_at_depth(0.5)
     )
     """
-    Pose3Dimensional every estimate returns.
+    Pose every estimate returns.
     """
     tracked_pose: Pose3Dimensional = field(
         default_factory=lambda: object_pose_at_depth(0.6)
     )
     """
-    Pose3Dimensional every track returns.
+    Pose every track returns.
     """
     loaded_mesh_files: list[Path] = field(default_factory=list)
     """
@@ -112,12 +112,12 @@ class ScriptedPoseEstimator(MeshBasedPoseEstimator):
 
 def object_pose_at_depth(depth: float) -> Pose3Dimensional:
     """
-    :return: Pose3Dimensional of an object on the optical axis, ``depth`` meters in front of the camera.
+    :return: Pose of an object on the optical axis, ``depth`` meters in front of the camera.
     """
     return Pose3Dimensional.from_xyz_quaternion(pos_z=depth)
 
 
-# %% Pose3Dimensional estimators with and without meshes
+# %% Pose estimators with and without meshes
 
 
 @dataclass
@@ -516,7 +516,7 @@ def test_match_requires_the_minimum_overlap(scene: FlatSurfaceScene):
     assert previous_frame_poses.unmatched_objects == [distant]
 
 
-# %% Pose3Dimensional update modes
+# %% Pose update modes
 
 
 @pytest.mark.parametrize(
@@ -631,7 +631,7 @@ def test_object_of_unknown_class_is_not_posed(
     assert pose_estimator.estimated_object_observations == []
 
 
-# %% Pose3Dimensional annotations
+# %% Pose annotations
 
 
 def test_pose_annotation_reaches_the_world_through_the_camera_pose_of_the_cas(
@@ -853,6 +853,27 @@ def test_smallest_bounding_box_frame_uses_the_oriented_box(
     numpy.testing.assert_allclose(
         bounding_box.extent, shape.mesh.bounding_box_oriented.primitive.extents
     )
+
+
+def test_axes_centered_on_the_bounding_box_start_at_its_center_in_the_mesh_orientation(
+    scene: FlatSurfaceScene, annotator: FoundationPoseAnnotator
+):
+    """
+    Axes centred on the bounding box start at the box's center, turned like the mesh.
+    """
+    shape = annotator.class_meshes.meshes_by_class_name[scene.class_name].shape
+    visualization = visualization_of(annotator, VisualizationFrame.MESH)
+    visualization.center_axes_on_bounding_box = True
+    pose = object_pose_at_depth(0.5)
+
+    axes = visualization.axes_pose(shape, pose).to_np()
+
+    camera_T_mesh = pose.homogeneous_matrix.to_np()
+    box_center = shape.mesh.bounding_box_oriented.primitive.transform[:3, 3]
+    numpy.testing.assert_allclose(
+        axes[:, 3], camera_T_mesh @ numpy.append(box_center, 1)
+    )
+    numpy.testing.assert_allclose(axes[:3, :3], camera_T_mesh[:3, :3])
 
 
 def test_nothing_is_drawn_for_an_object_behind_the_camera(

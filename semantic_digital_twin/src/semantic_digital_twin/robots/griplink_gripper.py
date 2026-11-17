@@ -1,3 +1,8 @@
+"""
+Grippers driven through a Griplink controller, with the commands, grip presets and
+configurations it accepts.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -6,15 +11,21 @@ from dataclasses import dataclass
 from enum import Enum, StrEnum
 from typing import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
-from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.datastructures.definitions import (
+    GripperState,
+    JointStateType,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_parts import (
+    EndEffector,
+    HasGripperActionServers,
+)
 
 # %% griplink action server endpoints
 
@@ -278,7 +289,7 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
 
 
 @dataclass(eq=False)
-class GriplinkGripper(EndEffector, ABC):
+class GriplinkGripper(EndEffector, HasGripperActionServers, ABC):
     """
     An `WEISS WPG gripper <https://weiss-robotics.com/servo-electric/wpg-series/>`_ driven by the Griplink interface.
 
@@ -333,3 +344,9 @@ class GriplinkGripper(EndEffector, ABC):
             given state, or ``None`` if this gripper serves no endpoint for it.
         """
         return self.griplink_endpoints.get(state_type)
+
+    def action_topic_serving(self, state_type: JointStateType | None) -> str | None:
+        endpoint = self.griplink_endpoint(state_type)
+        if endpoint is None:
+            return None
+        return endpoint.action_topic

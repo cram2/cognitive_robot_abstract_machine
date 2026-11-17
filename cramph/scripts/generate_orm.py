@@ -1,9 +1,5 @@
 """
 Generate the ORM interface of the cramph package.
-
-.. warning:: Do not import giskardpy or coraplex here. Alternative mappings are collected
-    through a global subclass scan, so importing a downstream package leaks its mappings
-    into this interface.
 """
 
 import logging

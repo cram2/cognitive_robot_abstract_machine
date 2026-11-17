@@ -1,8 +1,13 @@
+"""
+General motion statechart monitors, such as the one that observes when the motion has
+reached a local minimum.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from giskardpy.motion_statechart.context import MotionControlContext

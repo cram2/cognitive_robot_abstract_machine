@@ -402,8 +402,10 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
         context=context_of(extensions),
     )
     with world.modify_world():
-        box.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(*REACHABILITY_TARGET_POSITION)
+        box.parent_connection.update_parent_T_connection(
+            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+                *REACHABILITY_TARGET_POSITION
+            )
         )
 
     np.testing.assert_allclose(
@@ -470,7 +472,7 @@ def test_a_plan_without_a_seed_of_its_own_samples_the_same_candidates_every_run(
     target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    context = context_of([RobotAccess(robot), StatementGrounding()])
+    context = context_of([RobotAccess(robot=robot), StatementGrounding()])
 
     runs = [
         [

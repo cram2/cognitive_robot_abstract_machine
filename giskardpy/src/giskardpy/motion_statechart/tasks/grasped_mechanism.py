@@ -93,11 +93,11 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
         if self.holding_end_effector is not None:
             allowances.append(
                 UpdateTemporaryCollisionRules.for_end_effector(
-                    self.holding_end_effector
+                    end_effector=self.holding_end_effector
                 )
             )
         self._add_children_to_statechart(
-            [
+            nodes=[
                 *allowances,
                 JointPositionList(
                     name="hinge goal",

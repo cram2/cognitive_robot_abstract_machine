@@ -20,7 +20,7 @@ def _reach_of(pick_up: PickUpAction) -> ReachAction:
     """
     :return: The reach the expanded pick-up performs.
     """
-    [reach] = pick_up.statechart.get_nodes_by_type(ReachAction)
+    [reach] = pick_up.statechart.get_nodes_by_type(node_type=ReachAction)
     return reach
 
 

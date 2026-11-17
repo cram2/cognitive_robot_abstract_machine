@@ -43,8 +43,8 @@ def build_statechart(goal: CompositeNode) -> Statechart:
     drawn.
     """
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(goal)
-    statechart.add_node(EndStatechart.when_true(goal))
+    statechart.add_node(node=goal)
+    statechart.add_node(node=EndStatechart.when_true(node=goal))
     return expand(statechart)
 
 
@@ -52,7 +52,7 @@ def draw(statechart: Statechart) -> pydot.Graph:
     """
     :return: The dot graph of `statechart`.
     """
-    return StatechartGraphviz(statechart).to_dot_graph()
+    return StatechartGraphviz(statechart=statechart).to_dot_graph()
 
 
 def direct_node_names(graph: pydot.Graph | pydot.Cluster) -> set[str]:
@@ -164,8 +164,8 @@ def build_dependency_statechart(
     The caller wires those conditions before drawing.
     """
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(observed)
-    statechart.add_node(owner)
+    statechart.add_node(node=observed)
+    statechart.add_node(node=owner)
     return statechart
 
 
@@ -252,7 +252,7 @@ def test_structure_copy_keeps_plot_specs() -> None:
     goal.plot_specifications.collapse_children = True
     statechart = build_statechart(goal)
 
-    goal_copy = statechart.create_structure_copy().get_node_by_index(goal.index)
+    goal_copy = statechart.create_structure_copy().get_node_by_index(index=goal.index)
 
     assert goal_copy.plot_specifications.collapse_children
     assert goal_copy.plot_specifications is not goal.plot_specifications
@@ -271,7 +271,7 @@ def test_pause_dependency_may_sit_beside_the_node_reading_it() -> None:
     edge = find_edge(draw(statechart), observed, owner)
 
     assert int(edge.get("minlen")) == DrawingMetrics().minimum_rank_distance(
-        TransitionKind.PAUSE
+        transition_kind=TransitionKind.PAUSE
     )
 
 
@@ -285,7 +285,7 @@ def test_start_dependency_is_drawn_a_row_above_the_node_reading_it() -> None:
     edge = find_edge(draw(statechart), observed, owner)
 
     assert int(edge.get("minlen")) == DrawingMetrics().minimum_rank_distance(
-        TransitionKind.START
+        transition_kind=TransitionKind.START
     )
 
 
@@ -306,8 +306,8 @@ def test_merged_arrow_keeps_the_largest_distance_its_conditions_ask_for() -> Non
     edge = find_edge(draw(statechart), observed, owner)
 
     assert int(edge.get("minlen")) == max(
-        DrawingMetrics().minimum_rank_distance(TransitionKind.START),
-        DrawingMetrics().minimum_rank_distance(TransitionKind.RESET),
+        DrawingMetrics().minimum_rank_distance(transition_kind=TransitionKind.START),
+        DrawingMetrics().minimum_rank_distance(transition_kind=TransitionKind.RESET),
     )
 
 
@@ -338,7 +338,7 @@ def test_every_observation_state_has_a_drawing_style(observation_state) -> None:
     drawing an edge.
     """
     assert (
-        ObservationDrawingStyle.of_observation(observation_state).name
+        ObservationDrawingStyle.of_observation(observation=observation_state).name
         == observation_state.name
     )
 
@@ -363,8 +363,10 @@ def test_arrow_takes_the_line_width_of_the_observation_it_carries() -> None:
 
     edge = find_edge(draw(statechart), observed, owner)
 
-    expected = ObservationDrawingStyle.of_observation(ObservationStateValues.UNKNOWN)
-    assert float(edge.get("penwidth")) == expected.line_width(DrawingMetrics())
+    expected = ObservationDrawingStyle.of_observation(
+        observation=ObservationStateValues.UNKNOWN
+    )
+    assert float(edge.get("penwidth")) == expected.line_width(metrics=DrawingMetrics())
 
 
 def test_one_arrow_is_drawn_per_dependency() -> None:
@@ -403,8 +405,12 @@ def test_condition_term_is_colored_by_the_value_of_the_term() -> None:
 
     label = find_node(draw(statechart), owner).get_label()
 
-    term_value = LifeCyclePredicate.IS_SUCCEEDED.truth_value(LifeCycleValues.RUNNING)
-    term_color = ObservationDrawingStyle.of_observation(term_value).color.to_hex()
+    term_value = LifeCyclePredicate.IS_SUCCEEDED.truth_value(
+        life_cycle_value=LifeCycleValues.RUNNING
+    )
+    term_color = ObservationDrawingStyle.of_observation(
+        observation=term_value
+    ).color.to_hex()
     term = f"{observed.unique_name}.{LifeCyclePredicate.IS_SUCCEEDED.attribute_name}"
     assert f'<FONT COLOR="{term_color}">"{term}"</FONT>' in label
 
@@ -425,9 +431,11 @@ def test_condition_term_is_colored_when_its_node_name_reads_as_an_operator() -> 
     label = find_node(draw(statechart), owner).get_label()
 
     term_value = ObservationPredicate.LAST_OBSERVED_TRUE.truth_value(
-        observed.last_observation_state
+        observation=observed.last_observation_state
     )
-    term_color = ObservationDrawingStyle.of_observation(term_value).color.to_hex()
+    term_color = ObservationDrawingStyle.of_observation(
+        observation=term_value
+    ).color.to_hex()
     term = f"{observed.unique_name}.{ObservationPredicate.LAST_OBSERVED_TRUE.attribute_name}"
     assert f'<FONT COLOR="{term_color}">"{term}"</FONT>' in label
 
@@ -439,13 +447,15 @@ def test_condition_without_terms_is_spelled_out() -> None:
     """
     owner = ConstTrueNode(name="Owner")
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(owner)
+    statechart.add_node(node=owner)
     expand(statechart)
 
     true_color = ObservationDrawingStyle.of_observation(
-        ObservationStateValues.TRUE
+        observation=ObservationStateValues.TRUE
     ).color.to_hex()
-    disabled_color = StatechartGraphviz(statechart).disabled_condition_color.to_hex()
+    disabled_color = StatechartGraphviz(
+        statechart=statechart
+    ).disabled_condition_color.to_hex()
 
     label = find_node(draw(statechart), owner).get_label()
 
@@ -463,14 +473,16 @@ def test_condition_boolean_constants_coloring_in_running_state() -> None:
     """
     owner = ConstTrueNode(name="Owner")
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(owner)
+    statechart.add_node(node=owner)
     expand(statechart)
     statechart.life_cycle_state[owner] = LifeCycleValues.RUNNING
 
     false_color = ObservationDrawingStyle.of_observation(
-        ObservationStateValues.FALSE
+        observation=ObservationStateValues.FALSE
     ).color.to_hex()
-    disabled_color = StatechartGraphviz(statechart).disabled_condition_color.to_hex()
+    disabled_color = StatechartGraphviz(
+        statechart=statechart
+    ).disabled_condition_color.to_hex()
 
     label = find_node(draw(statechart), owner).get_label()
 
@@ -487,7 +499,7 @@ def test_condition_boolean_constants_coloring_in_running_state() -> None:
 def test_end_statechart_renders_with_rounded_outer_cluster() -> None:
     end = EndStatechart()
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     expand(statechart)
 
     graph = draw(statechart)
@@ -503,7 +515,7 @@ def test_end_statechart_renders_with_rounded_outer_cluster() -> None:
 def test_cancel_statechart_renders_with_dashed_outer_cluster() -> None:
     cancel = CancelStatechart(exception=Exception("fail"))
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(cancel)
+    statechart.add_node(node=cancel)
     expand(statechart)
 
     graph = draw(statechart)
@@ -521,7 +533,7 @@ def test_edge_targeting_terminal_node_clips_to_outer_cluster() -> None:
     end = EndStatechart()
     cancel = CancelStatechart(exception=Exception("fail"))
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_nodes([observed, end, cancel])
+    statechart.add_nodes(nodes=[observed, end, cancel])
     end.start_condition = observed.last_observed_true
     cancel.start_condition = observed.last_observed_true
     expand(statechart)
@@ -560,7 +572,9 @@ def test_conditions_are_grayed_out_when_not_triggerable(
     statechart.observation_state[observed] = ObservationStateValues.TRUE
 
     label = find_node(draw(statechart), node).get_label()
-    disabled_color = StatechartGraphviz(statechart).disabled_condition_color.to_hex()
+    disabled_color = StatechartGraphviz(
+        statechart=statechart
+    ).disabled_condition_color.to_hex()
 
     for condition, term in [
         (
@@ -588,8 +602,8 @@ def test_conditions_are_grayed_out_when_not_triggerable(
             f"{observed.unique_name}.{LifeCyclePredicate.IS_RUNNING.attribute_name}",
         ),
     ]:
-        prefix = StatechartGraphviz.condition_prefix(condition.kind)
-        can_trigger = condition.kind.can_trigger_from(life_cycle_state)
+        prefix = StatechartGraphviz.condition_prefix(transition_kind=condition.kind)
+        can_trigger = condition.kind.can_trigger_from(life_cycle=life_cycle_state)
         if can_trigger:
             assert f'<FONT FACE="{Font.MONOSPACE}">{prefix}:' in label
             assert (
@@ -598,7 +612,7 @@ def test_conditions_are_grayed_out_when_not_triggerable(
             )
             variable = condition.variables[0]
             resolved_color = ObservationDrawingStyle.of_observation(
-                variable.resolve()
+                observation=variable.resolve()
             ).color.to_hex()
             assert f'<FONT COLOR="{resolved_color}">"{term}"</FONT>' in label
         else:
@@ -628,14 +642,16 @@ def test_terminal_node_condition_graying(
     """
     terminal_node = node_factory()
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(terminal_node)
+    statechart.add_node(node=terminal_node)
     expand(statechart)
     statechart.life_cycle_state[terminal_node] = life_cycle_state
 
     label = find_node(draw(statechart), terminal_node).get_label()
-    disabled_color = StatechartGraphviz(statechart).disabled_condition_color.to_hex()
+    disabled_color = StatechartGraphviz(
+        statechart=statechart
+    ).disabled_condition_color.to_hex()
 
-    can_trigger = TransitionKind.START.can_trigger_from(life_cycle_state)
+    can_trigger = TransitionKind.START.can_trigger_from(life_cycle=life_cycle_state)
     if can_trigger:
         assert f'<FONT FACE="{Font.MONOSPACE}">start:' in label
         assert (

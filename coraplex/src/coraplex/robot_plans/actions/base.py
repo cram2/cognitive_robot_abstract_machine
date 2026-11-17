@@ -1,3 +1,8 @@
+"""
+The base classes of robot plan actions: actions that pursue a goal and actions composed
+of steps run in sequence, in parallel or tried in turn.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -8,7 +13,7 @@ from typing_extensions import TYPE_CHECKING, Any, Self
 
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.plan_transformation import PlanRewriting
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import SucceedsOnObservingTrue, FailsOnObservingFalse
 from cramph.composites import ControlStructureNode, Parallel, Sequence, TryAll
 from cramph.context import ContextExtension
@@ -111,7 +116,7 @@ class Action(CompositeNode, ABC):
         """
         :return: The robot performing this action.
         """
-        return self.context.require_extension(RobotAccess).robot
+        return self.context.require_extension(extension_type=RobotAccess).robot
 
     @property
     def controlled_root(self) -> KinematicStructureEntity:
@@ -119,7 +124,9 @@ class Action(CompositeNode, ABC):
         :return: The topmost entity this action's motions may move the robot relative
             to, which its Cartesian goals are expressed in.
         """
-        return self.context.require_extension(RobotAccess).controlled_root
+        return self.context.require_extension(
+            extension_type=RobotAccess
+        ).controlled_root
 
     def keep_base_still(self) -> list[MotionStatechartNode]:
         """
@@ -146,7 +153,7 @@ class Action(CompositeNode, ABC):
         :class:`~coraplex.plans.plan_transformation.PlanRewriting` of :attr:`context`,
         if any, configured this action.
         """
-        rewriting = self.context.get_extension(PlanRewriting)
+        rewriting = self.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
             rewriting.configure(self)
         self.temporary_collision_rules = self.create_temporary_collision_rules()
@@ -231,8 +238,8 @@ class GoalAction(Action, SucceedsOnObservingTrue, FailsOnObservingFalse, ABC):
         decides its own success.
         """
         self.goal = self.create_goal()
-        self._add_child_to_statechart(self.goal)
-        self._succeed_at_its_goal(self.goal)
+        self._add_child_to_statechart(node=self.goal)
+        self._succeed_at_its_goal(child=self.goal)
 
     def build_artifacts(self) -> NodeArtifacts:
         """
@@ -274,7 +281,7 @@ class ActionOfSteps(Action, ControlStructureNode, ABC):
         """
         Puts the steps below this action and lets the control structure node wire them.
         """
-        self.nodes = [self._as_node(step) for step in self.create_steps()]
+        self.nodes = [self._as_node(node=step) for step in self.create_steps()]
         self.adopt_handed_children()
 
 

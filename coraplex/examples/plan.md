@@ -40,7 +40,7 @@ ticks the plan in the world itself, a `RealRobotPlanExecutor` sends it to Giskar
 
 ```python
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
 ```
 
@@ -60,7 +60,7 @@ park = ParkArmsAction(arms=pr2.all_arms)
 
 plan = Sequence(nodes=[navigate, park])
 statechart = Statechart(context=executor.context)
-statechart.add_node(plan)
+statechart.add_node(node=plan)
 ```
 
 This creates a plan with a `Sequence` at the top level of the statechart and the two actions as its children.
@@ -76,7 +76,7 @@ statechart.visualize()
 top-level node of the plan succeeded. Underspecified actions are grounded while the plan runs.
 
 ```python
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 
@@ -88,7 +88,7 @@ statechart, keeping the robot from colliding with the rest of the world while th
 
 ```python
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)]),
     collision_avoidance=True,
 )
 ```

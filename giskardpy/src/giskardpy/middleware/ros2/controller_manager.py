@@ -58,7 +58,7 @@ class ControllerParameter(StrEnum):
 # %% controller manager
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControllerManager:
     """
     A ros2_control controller manager and the controllers it loaded.
@@ -89,7 +89,7 @@ class ControllerManager:
         return "/" + self.name.strip("/").rpartition("/")[0]
 
     def active_controllers(
-        self, whitelist: list[str] | None = None
+        self, *, whitelist: list[str] | None = None
     ) -> list[ControllerStateMessage]:
         """
         :param whitelist: The names of the controllers to consider, all if ``None``.
@@ -133,7 +133,7 @@ class ControllerManager:
             if controller.state == ControllerState.ACTIVE
         ]
 
-    def joints_of(self, controller_name: str) -> list[str]:
+    def joints_of(self, *, controller_name: str) -> list[str]:
         """
         :return: The joints the controller commands, in the order of its command layout.
         """
@@ -146,7 +146,7 @@ class ControllerManager:
             .string_array_value
         )
 
-    def command_topic_of(self, controller_name: str, message_type: type) -> str:
+    def command_topic_of(self, *, controller_name: str, message_type: type) -> str:
         """
         :param message_type: The message type the controller receives its commands in.
         :return: The topic the controller receives its commands on.
@@ -157,7 +157,7 @@ class ControllerManager:
             namespace=self.namespace,
         )
 
-    def joint_state_topic_of(self, controller_name: str) -> str:
+    def joint_state_topic_of(self, *, controller_name: str) -> str:
         """
         :return: The topic a joint state broadcaster publishes on.
         """

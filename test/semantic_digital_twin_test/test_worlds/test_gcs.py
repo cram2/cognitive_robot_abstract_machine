@@ -1,4 +1,10 @@
+"""
+Tests of graphs of convex sets built from a world's free space, and the questions they
+answer.
+"""
+
 import os.path
+from copy import deepcopy
 
 import numpy as np
 import plotly.graph_objects as go
@@ -18,6 +24,9 @@ from semantic_digital_twin.exceptions import (
     NoSupportingSurfaceError,
     PointOccupiedError,
 )
+from semantic_digital_twin.robots.exceptions import MissingMobileBaseError
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from krrood_spatial_math.spatial_types import (
     CartesianPoint2Dimensional,
@@ -42,6 +51,7 @@ from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.exceptions import (
     AmbiguousSelectedVariableError,
+    NoFreeSpaceError,
     PointOutsideSearchSpaceError,
 )
 from semantic_digital_twin.world_description.shape_collection import (
@@ -162,7 +172,7 @@ def test_from_world(table_world: World):
         table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
-        table_world, search_space=search_space
+        world=table_world, search_space=search_space
     )
     assert graph_of_convex_sets is not None
     assert len(graph_of_convex_sets.graph.nodes()) > 0
@@ -190,6 +200,45 @@ def test_from_world(table_world: World):
         graph_of_convex_sets.path_from_to(start_unsearched, target_unsearched)
 
 
+def test_a_body_left_out_of_the_obstacles_leaves_its_space_free(table_world: World):
+    """
+    What is to be reached into, such as an object to grasp, is left out of the
+    obstacles, so that the space it fills counts as free.
+    """
+    search_space = BoundingBoxCollection(
+        [
+            VolumetricBoundingBox(
+                min_x=-5,
+                max_x=-2,
+                min_y=-1,
+                max_y=2,
+                min_z=0,
+                max_z=2,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=table_world.root
+                ),
+            )
+        ],
+        table_world.root,
+    )
+    top = table_world.get_body_by_name("top")
+    inside_the_top = (
+        top.collision.as_bounding_box_collection_in_frame(table_world.root)
+        .bounding_box()
+        .center
+    )
+
+    with_the_top = VolumetricGraphOfBoundingBoxes.free_space_from_world(
+        world=table_world, search_space=search_space
+    )
+    without_the_top = VolumetricGraphOfBoundingBoxes.free_space_from_world(
+        world=table_world, search_space=search_space, excluded_bodies=[top]
+    )
+
+    assert not with_the_top.is_free(point=inside_the_top)
+    assert without_the_top.is_free(point=inside_the_top)
+
+
 def test_constrain_to_free_space_requires_floatlike_fields(table_world: World):
     """
     constrain_to_free_space must check that the given variable has a float-like field
@@ -212,7 +261,7 @@ def test_constrain_to_free_space_requires_floatlike_fields(table_world: World):
         table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
-        table_world, search_space=search_space
+        world=table_world, search_space=search_space
     )
 
     query = entity(variable(str))
@@ -244,7 +293,7 @@ def test_constrain_to_free_space_adds_a_where_condition(table_world: World):
         table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
-        table_world, search_space=search_space
+        world=table_world, search_space=search_space
     )
 
     query = a(CartesianPoint3Dimensional)(x=..., y=..., z=..., reference_frame=None)
@@ -278,7 +327,7 @@ def test_constrain_to_free_space_rejects_a_query_selecting_multiple_variables(
         table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
-        table_world, search_space=search_space
+        world=table_world, search_space=search_space
     )
 
     query = set_of(
@@ -422,7 +471,7 @@ def test_from_world_with_rotated_box():
     )
 
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
-        world, search_space=search_space
+        world=world, search_space=search_space
     )
 
     assert len(graph_of_convex_sets.graph.nodes()) > 0
@@ -556,7 +605,7 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
         world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
-        world, search_space=search_space, bloat_obstacles=0.06
+        world=world, search_space=search_space, bloat_obstacles=0.06
     )
     # Confirms this is a genuinely large graph, not an accidentally-trivial one.
     assert len(graph_of_convex_sets.graph.nodes()) > 1000
@@ -599,6 +648,48 @@ def _floor_with_an_obstacle_standing_on_it() -> Floor:
         )
         obstacle.collision.append(Box(scale=Scale(0.4, 0.4, 1.0)))
     return floor
+
+
+def test_a_robot_navigates_only_where_its_base_keeps_its_margin_from_obstacles(
+    hsr_world_copy: World,
+):
+    """
+    The space a robot navigates is the floor's free space kept clear of every obstacle
+    by the base's radius and the margin asked for.
+    """
+    floor = _floor_with_an_obstacle_standing_on_it()
+    world = floor._world
+    world.merge_world(hsr_world_copy)
+    robot = world.get_semantic_annotations_by_type(HSRB)[0]
+    margin = 0.1
+    obstacle_half_side = 0.2
+    clearance = obstacle_half_side + robot.mobile_base.base_radius + margin
+
+    navigable_space = floor.navigable_space(robot=robot, margin=margin)
+
+    assert not navigable_space.is_free(
+        point=CartesianPoint2Dimensional(
+            clearance - 0.05, 0.0, reference_frame=world.root
+        )
+    )
+    assert navigable_space.is_free(
+        point=CartesianPoint2Dimensional(
+            clearance + 0.05, 0.0, reference_frame=world.root
+        )
+    )
+
+
+def test_a_robot_without_a_mobile_base_has_no_navigable_space(tracy_world: World):
+    """
+    Only a robot that drives on a mobile base navigates a floor.
+    """
+    floor = _floor_with_an_obstacle_standing_on_it()
+    world = floor._world
+    world.merge_world(deepcopy(tracy_world))
+    robot = world.get_semantic_annotations_by_type(Tracy)[0]
+
+    with pytest.raises(MissingMobileBaseError):
+        floor.navigable_space(robot=robot, margin=0.1)
 
 
 def test_planar_free_space_uses_the_supporting_surface_as_search_space():
@@ -871,3 +962,166 @@ def test_the_unchecked_lookup_answers_with_nothing_for_an_occupied_point(
     )
 
     assert navigation_map._node_of_point(under_the_table) is None
+
+
+# %% asking whether a point is free
+
+
+def test_a_point_in_a_free_box_is_free(table_world: World):
+    """
+    A point beside the table, where a free box lies, is free.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    assert navigation_map.is_free(
+        point=CartesianPoint2Dimensional(-4.5, -0.5, reference_frame=table_world.root)
+    )
+
+
+def test_a_point_no_free_box_covers_is_not_free(table_world: World):
+    """
+    A point under the table, which no free box covers, is not free.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    assert not navigation_map.is_free(
+        point=CartesianPoint2Dimensional(-3.5, 0.5, reference_frame=table_world.root)
+    )
+
+
+def test_a_point_outside_the_search_space_is_not_free(table_world: World):
+    """
+    Nothing is known about what stands beyond the search space, so nothing there is free
+    to move to.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+
+    assert not navigation_map.is_free(
+        point=CartesianPoint2Dimensional(10, 10, reference_frame=table_world.root)
+    )
+
+
+def test_whether_a_point_is_free_does_not_depend_on_its_frame(table_world: World):
+    """
+    A free point is free whichever frame it is given in.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+    table_top = table_world.get_body_by_name("top")
+    free = CartesianPoint2Dimensional(-4.5, -0.5, reference_frame=table_world.root)
+
+    assert navigation_map.is_free(point=table_world.transform(free, table_top))
+
+
+# %% the free point nearest a point
+
+
+def test_the_nearest_free_point_of_a_free_point_is_the_point_itself(table_world: World):
+    """
+    A point that is free already is its own nearest free point.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+    free = CartesianPoint2Dimensional(-4.5, -0.5, reference_frame=table_world.root)
+
+    nearest = table_world.transform(
+        navigation_map.nearest_free_point(point=free), table_world.root
+    )
+
+    assert nearest.to_np()[:2] == pytest.approx(free.to_np()[:2])
+
+
+def test_the_nearest_free_point_of_an_occupied_point_is_free_and_nearer_than_others(
+    table_world: World,
+):
+    """
+    Of all free points, the one answered lies nearest: no free box comes closer.
+    """
+    navigation_map = _navigation_map_around_the_table(table_world)
+    under_the_table = CartesianPoint2Dimensional(
+        -3.5, 0.5, reference_frame=table_world.root
+    )
+
+    nearest = navigation_map.nearest_free_point(point=under_the_table)
+
+    assert navigation_map.is_free(point=nearest)
+    distance = np.linalg.norm(
+        table_world.transform(nearest, table_world.root).to_np()[:2]
+        - under_the_table.to_np()[:2]
+    )
+    corners = [
+        table_world.transform(corner, table_world.root).to_np()[:2]
+        for node in navigation_map.graph.nodes()
+        for corner in node.get_points()
+    ]
+    assert all(
+        np.linalg.norm(corner - under_the_table.to_np()[:2]) >= distance - 1e-9
+        for corner in corners
+    )
+
+
+def test_a_graph_without_free_space_has_no_nearest_free_point(table_world: World):
+    """
+    Where no free space was found there is no free point to answer with.
+    """
+    empty = PlanarGraphOfBoundingBoxes(
+        world=table_world,
+        search_space=_navigation_map_around_the_table(table_world).search_space,
+    )
+
+    with pytest.raises(NoFreeSpaceError):
+        empty.nearest_free_point(
+            point=CartesianPoint2Dimensional(
+                -4.5, -0.5, reference_frame=table_world.root
+            )
+        )
+
+
+# %% keeping clearance above and below obstacles
+
+
+def test_free_space_from_world_keeps_the_given_height_clearance_off_obstacles():
+    """
+    Free space starts only the given height clearance above the top of an obstacle.
+    """
+    world = World()
+    with world.modify_world():
+        root_body = Body(name=PrefixedName("map"))
+        world.add_kinematic_structure_entity(root_body)
+        box_body = Body(name=PrefixedName("box"))
+        world.add_connection(
+            FixedConnection.create_with_dofs(world, root_body, box_body)
+        )
+        box_body.collision.append(Box(scale=Scale(1, 1, 1)))
+    search_space = BoundingBoxCollection(
+        [
+            VolumetricBoundingBox(
+                min_x=-2,
+                max_x=2,
+                min_y=-2,
+                max_y=2,
+                min_z=-1,
+                max_z=2,
+                origin=HomogeneousTransformationMatrix(reference_frame=root_body),
+            )
+        ],
+        reference_frame=root_body,
+    )
+    height_clearance = 0.2
+
+    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
+        world=world,
+        search_space=search_space,
+        obstacle_height_clearance=height_clearance,
+    )
+
+    box_top = 0.5
+    within_the_clearance = CartesianPoint3Dimensional(
+        0, 0, box_top + height_clearance / 2, reference_frame=root_body
+    )
+    above_the_clearance = CartesianPoint3Dimensional(
+        0, 0, box_top + 2 * height_clearance, reference_frame=root_body
+    )
+    with pytest.raises(PointOccupiedError):
+        graph_of_convex_sets.node_of_point(within_the_clearance)
+    assert graph_of_convex_sets.node_of_point(above_the_clearance).contains(
+        above_the_clearance
+    )

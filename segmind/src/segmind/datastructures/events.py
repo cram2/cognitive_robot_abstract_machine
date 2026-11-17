@@ -1,3 +1,7 @@
+"""
+The events SegMind detects in an episode.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
@@ -317,6 +321,39 @@ class ContainmentEvent(EventWithTrackedObjects):
 class LossOfContainmentEvent(EventWithTrackedObjects):
     """
     Represents an event where an object is no longer contained in another object.
+    """
+
+    ...
+
+
+@dataclass(unsafe_hash=True)
+class OpeningEvent(EventWithTrackedObjects, ABC):
+    """
+    Represents an event where a moving part, such as a drawer or a door, came to stand
+    open or closed.
+    """
+
+    opening_ratio: float = field(kw_only=True)
+    """
+    How far the part stood open when the event was detected, as
+    :attr:`~semantic_digital_twin.semantic_annotations.mixins.HasMovableJoint.opening_ratio`
+    reads it.
+    """
+
+
+@dataclass(unsafe_hash=True)
+class OpenedEvent(OpeningEvent):
+    """
+    Represents an event where a moving part came to stand open.
+    """
+
+    ...
+
+
+@dataclass(unsafe_hash=True)
+class ClosedEvent(OpeningEvent):
+    """
+    Represents an event where a moving part came to stand closed.
     """
 
     ...

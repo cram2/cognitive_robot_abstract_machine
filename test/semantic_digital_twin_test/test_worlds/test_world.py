@@ -1,3 +1,7 @@
+"""
+Tests of the world: its kinematic structure, its state and their changes.
+"""
+
 from __future__ import annotations
 
 import gc
@@ -80,6 +84,8 @@ from semantic_digital_twin.world_description.world_modification import (
     AddConnectionModification,
     AddKinematicStructureEntityModification,
     AttributeUpdateModification,
+    RemoveConnectionModification,
+    RemoveKinematicStructureEntityModification,
 )
 from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
@@ -1460,8 +1466,8 @@ def test_rebind_copies_mutable_leaf_values(world_setup):
     A mutable value that is neither a world entity nor a recognized container is copied,
     not shared.
 
-    Mutating the rebound copy must not affect the original, the way sharing a `Pose`'s
-    underlying `casadi_sx` matrix would.
+    Mutating the rebound copy must not affect the original, the way sharing a
+    `Pose3Dimensional`'s underlying `casadi_sx` matrix would.
     """
 
     class MutableLeaf:
@@ -1918,6 +1924,9 @@ def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup
 
 
 def test_world_state_trajectory(world_setup, tmp_path):
+    """
+    A world state trajectory records every appended state, and plots them.
+    """
     world, l1, l2, bf, r1, r2 = world_setup
 
     time = 1337.0
@@ -1963,7 +1972,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
 
     plotter = WorldStateTrajectoryPlotter()
     plotter.world_state_trajectory = traj
-    plotter.plot_trajectory(str(tmp_path / "traj.pdf"))
+    plotter.plot_trajectory(file_name=tmp_path / "traj.pdf")
 
     # Verify world version consistency
     assert traj._world_version == world.get_world_model_manager().version
@@ -2985,6 +2994,27 @@ def test_world_does_not_record_removing_a_kinematic_structure_entity_it_does_not
 
     assert recorded_modifications(other_world) == []
     assert body in world.kinematic_structure_entities
+
+
+def test_world_removing_a_connection_after_its_child_records_it_once():
+    """
+    A connection that left the world with its child is not removed a second time, so the
+    order of the two removals leaves a history that still rebuilds the world.
+    """
+    world, branch_root = world_with_branch(branch_length=1)
+    leaf = branch_root.child_kinematic_structure_entities[0]
+    leaf_connection = leaf.parent_connection
+    modifications_before_removal = len(recorded_modifications(world))
+
+    with world.modify_world():
+        world.remove_kinematic_structure_entity(leaf)
+        world.remove_connection(leaf_connection)
+
+    assert [
+        type(modification)
+        for modification in recorded_modifications(world)[modifications_before_removal:]
+    ] == [RemoveConnectionModification, RemoveKinematicStructureEntityModification]
+    assert_rebuilds_to_same_structure(world, World(name="other"))
 
 
 def test_world_does_not_record_removing_a_degree_of_freedom_it_does_not_hold(

@@ -71,8 +71,8 @@ def test_height_monitor(pr2_world_state_reset: World):
         lower_limit=lower_limit,
         upper_limit=upper_limit,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -108,8 +108,8 @@ def test_distance_monitor(pr2_world_state_reset: World):
         lower_limit=lower_limit,
         upper_limit=upper_limit,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -143,8 +143,8 @@ def test_angle_monitor(pr2_world_state_reset: World):
         lower_angle=lower_angle,
         upper_angle=upper_angle,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -173,8 +173,8 @@ def test_perpendicular_monitor(pr2_world_state_reset: World):
         tip_normal=tip_normal,
         reference_normal=reference_normal,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 

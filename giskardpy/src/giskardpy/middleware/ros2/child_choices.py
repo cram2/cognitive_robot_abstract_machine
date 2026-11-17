@@ -96,7 +96,7 @@ class ChildChoicePayloadKey(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildChoiceMessage(SubclassJSONSerializer):
     """
     The child a client chose for a node of a running goal.
@@ -145,7 +145,7 @@ class ChildChoiceMessage(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         required_position = data[ChildChoicePayloadKey.REQUIRED_POSITION]
         return cls(
             goal_id=data[StatechartPayloadKey.GOAL_ID],
@@ -157,7 +157,7 @@ class ChildChoiceMessage(SubclassJSONSerializer):
             ),
         )
 
-    def apply_to(self, statechart: Statechart) -> StatechartNode | None:
+    def apply_to(self, *, statechart: Statechart) -> StatechartNode | None:
         """
         Add the sent nodes to `statechart`.
 
@@ -174,14 +174,14 @@ class ChildChoiceMessage(SubclassJSONSerializer):
             )
         world = statechart.context.world
         kwargs = WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs()
-        statechart.add_nodes_from_json(self.nodes, world=world, **kwargs)
-        return statechart.get_node_by_index(self.first_node_index)
+        statechart.add_nodes_from_json(data=self.nodes, world=world, **kwargs)
+        return statechart.get_node_by_index(index=self.first_node_index)
 
 
 # %% Giskard's side
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Lets every node of a running goal run the child the client sent for it, and wait
@@ -214,14 +214,14 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
     Guards :attr:`_received`, which the thread receiving messages writes.
     """
 
-    def receive(self, message: ChildChoiceMessage) -> None:
+    def receive(self, *, message: ChildChoiceMessage) -> None:
         """
         :param message: A choice the client sent.
         """
         with self._lock:
             self._received[message.node_index] = message
 
-    def has_choice_for(self, node: CompositeNodeChoosingItsChild) -> bool:
+    def has_choice_for(self, *, node: CompositeNodeChoosingItsChild) -> bool:
         """
         A choice for another goal is dropped.
 
@@ -236,14 +236,16 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
             if message.goal_id != self.action_server.goal_id:
                 del self._received[node.index]
                 return False
-            if self._is_made_after_a_choice_still_to_take(message, node.statechart):
+            if self._is_made_after_a_choice_still_to_take(
+                message=message, statechart=node.statechart
+            ):
                 return False
             return message.required_position is None or (
-                self.world_updates.has_applied(message.required_position)
+                self.world_updates.has_applied(position=message.required_position)
             )
 
     def _is_made_after_a_choice_still_to_take(
-        self, message: ChildChoiceMessage, statechart: Statechart
+        self, *, message: ChildChoiceMessage, statechart: Statechart
     ) -> bool:
         """
         A choice whose node ended can no longer be taken, so nothing waits for it.
@@ -256,20 +258,20 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
         return any(
             earlier.goal_id == message.goal_id
             and earlier.first_node_index < message.first_node_index
-            and statechart.get_node_by_index(earlier.node_index).life_cycle_state
+            and statechart.get_node_by_index(index=earlier.node_index).life_cycle_state
             in (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED)
             for earlier in self._received.values()
         )
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         """
         Add the nodes the client sent for `node`.
         """
         with self._lock:
             message = self._received.pop(node.index)
-        return message.apply_to(node.statechart)
+        return message.apply_to(statechart=node.statechart)
 
     def cleanup(self) -> None:
         with self._lock:
@@ -279,7 +281,7 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
 # %% the client's side
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ChildRequest:
     """
     A node of a running goal reporting that it waits for its next child.
@@ -301,7 +303,7 @@ class ChildRequest:
     """
 
     @classmethod
-    def from_feedback(cls, feedback: dict[str, Any]) -> list[Self]:
+    def from_feedback(cls, *, feedback: dict[str, Any]) -> list[Self]:
         """
         :param feedback: The feedback of a running goal.
         :return: The request of every node the feedback reports as waiting for a child.
@@ -318,7 +320,7 @@ class ChildRequest:
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildChoiceClient:
     """
     Answers the nodes a running goal reports as waiting for a child, by choosing on the
@@ -360,7 +362,7 @@ class ChildChoiceClient:
     def __post_init__(self) -> None:
         self._catching_up = CatchingUpWithGiskard(world_updates=self.world_updates)
 
-    def answer(self, feedback: dict[str, Any]) -> list[ChildChoiceMessage]:
+    def answer(self, *, feedback: dict[str, Any]) -> list[ChildChoiceMessage]:
         """
         :param feedback: The feedback of the running goal.
         :return: A choice for every node waiting for a child that was not answered
@@ -374,24 +376,25 @@ class ChildChoiceClient:
         """
         requests = [
             request
-            for request in ChildRequest.from_feedback(feedback)
+            for request in ChildRequest.from_feedback(feedback=feedback)
             if request not in self._answered
         ]
         if not requests:
             return []
-        if not self._catching_up.has_applied_the_changes_reported_in(feedback):
+        if not self._catching_up.has_applied_the_changes_reported_in(report=feedback):
             return []
         messages = []
         for request in requests:
             if request in self._answered:
                 continue
             messages += self._choose(
-                request.goal_id, self.statechart.get_node_by_index(request.node_index)
+                goal_id=request.goal_id,
+                node=self.statechart.get_node_by_index(index=request.node_index),
             )
         return messages
 
     def _choose(
-        self, goal_id: int, node: CompositeNodeChoosingItsChild
+        self, *, goal_id: int, node: CompositeNodeChoosingItsChild
     ) -> list[ChildChoiceMessage]:
         """
         Choose the next child of `node` on the client's copy, and note the request of
@@ -406,7 +409,7 @@ class ChildChoiceClient:
             every node it left without a child; empty if the choice is pending.
         """
         choosing_nodes = self.statechart.get_nodes_by_type(
-            CompositeNodeChoosingItsChild
+            node_type=CompositeNodeChoosingItsChild
         )
         children_before = {
             choosing_node: len(choosing_node.children)
@@ -417,7 +420,9 @@ class ChildChoiceClient:
             for choosing_node in choosing_nodes
             if choosing_node.ran_out_of_children
         }
-        if not node.choose_child_with(self.child_chooser_access.chooser_for(node)):
+        if not node.choose_child_with(
+            chooser=self.child_chooser_access.chooser_for(node=node)
+        ):
             return []
         given_a_child = sorted(
             (
@@ -435,7 +440,9 @@ class ChildChoiceClient:
             and choosing_node not in out_of_children_before
         ]
         messages = self._messages_answering(
-            goal_id, given_a_child, left_without_a_child
+            goal_id=goal_id,
+            given_a_child=given_a_child,
+            left_without_a_child=left_without_a_child,
         )
         self._answered |= {
             ChildRequest(
@@ -449,6 +456,7 @@ class ChildChoiceClient:
 
     def _messages_answering(
         self,
+        *,
         goal_id: int,
         given_a_child: list[CompositeNodeChoosingItsChild],
         left_without_a_child: list[CompositeNodeChoosingItsChild],
@@ -472,7 +480,7 @@ class ChildChoiceClient:
                 node_index=answered.index,
                 first_node_index=chosen_child_index,
                 nodes=self.statechart.nodes_from_to_json(
-                    chosen_child_index, stop_node_index
+                    first_node_index=chosen_child_index, stop_node_index=stop_node_index
                 ),
                 required_position=self.required_position,
             )

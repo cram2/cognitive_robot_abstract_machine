@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase

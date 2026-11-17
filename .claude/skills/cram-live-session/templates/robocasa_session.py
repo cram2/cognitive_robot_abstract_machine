@@ -50,12 +50,14 @@ def run(*actions: StatechartNode) -> PlanOutcome:
     :return: How the plan ended.
     """
     executor = PhysicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot)]),
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=robot)]
+        ),
         simulation=simulation,
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(Sequence(nodes=list(actions)))
-    executor.compile(statechart)
+    statechart.add_node(node=Sequence(nodes=list(actions)))
+    executor.compile(statechart=statechart)
     outcome = executor.attempt()
     executor.close()
     return outcome

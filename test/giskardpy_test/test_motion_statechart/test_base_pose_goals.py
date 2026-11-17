@@ -51,7 +51,9 @@ def test_a_holonomic_base_goal_moves_the_root_of_the_robot(
     robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
     target = _target(pr2_world_copy)
 
-    goal = HolonomicBaseGoal.moving_base_of(robot, target, threshold=0.05)
+    goal = HolonomicBaseGoal.moving_base_of(
+        robot=robot, goal_pose=target, threshold=0.05
+    )
 
     assert goal.mobile_base is robot.mobile_base
     assert goal.goal_pose is target
@@ -64,7 +66,9 @@ def test_a_differential_drive_goal_drives_the_drive_of_the_robot(
     robot = stretch_world_copy.get_semantic_annotations_by_type(Stretch)[0]
     target = _target(stretch_world_copy)
 
-    goal = DifferentialDriveBaseGoal.moving_base_of(robot, target, threshold=0.05)
+    goal = DifferentialDriveBaseGoal.moving_base_of(
+        robot=robot, goal_pose=target, threshold=0.05
+    )
 
     assert goal.mobile_base is robot.mobile_base
     assert goal.goal_pose is target
@@ -78,7 +82,9 @@ def test_a_drive_goal_cannot_move_a_robot_without_a_mobile_base(
     robot = self_collision_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
 
     with pytest.raises(RobotWithoutMobileBaseError) as raised:
-        goal_type.moving_base_of(robot, _target(self_collision_bot_world), 0.05)
+        goal_type.moving_base_of(
+            robot=robot, goal_pose=_target(self_collision_bot_world), threshold=0.05
+        )
 
     assert raised.value.robot is robot
 
@@ -89,7 +95,7 @@ def test_setting_the_odometry_writes_the_connection_above_the_robot(
     robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
     target = _target(pr2_world_copy)
 
-    goal = SetOdometry.moving_base_of(robot, target, threshold=0.05)
+    goal = SetOdometry.moving_base_of(robot=robot, goal_pose=target, threshold=0.05)
 
     assert goal.odom_connection is robot.root.parent_connection
     np.testing.assert_allclose(goal.base_pose.to_np(), target.to_np())
@@ -107,8 +113,8 @@ def _compiled(world: World, goal: StatechartNode) -> StatechartExecutor:
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(goal)
-    statechart.add_node(EndMotion.when_true(goal))
+    statechart.add_node(node=goal)
+    statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=statechart)
     return executor
 
@@ -128,7 +134,9 @@ def test_a_holonomic_base_goal_constrains_only_x_y_and_yaw(
     cylinder_bot_world: World,
 ) -> None:
     robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
-    goal = HolonomicBaseGoal.moving_base_of(robot, _target(cylinder_bot_world), 0.01)
+    goal = HolonomicBaseGoal.moving_base_of(
+        robot=robot, goal_pose=_target(cylinder_bot_world), threshold=0.01
+    )
 
     _compiled(cylinder_bot_world, goal)
 
@@ -167,7 +175,9 @@ def test_a_holonomic_base_goal_reaches_the_pose_on_the_floor_below_its_target(
         yaw=2.0,
         reference_frame=cylinder_bot_world.root,
     )
-    goal = HolonomicBaseGoal.moving_base_of(robot, target, 0.01)
+    goal = HolonomicBaseGoal.moving_base_of(
+        robot=robot, goal_pose=target, threshold=0.01
+    )
     executor = _compiled(cylinder_bot_world, goal)
 
     executor.tick_until_end()

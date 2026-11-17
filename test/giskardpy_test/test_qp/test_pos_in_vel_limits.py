@@ -14,6 +14,7 @@ from giskardpy.qp.pos_in_vel_limits import BrakingProfile
 
 DELTA_TIME = timedelta(seconds=0.05)
 RESIDUE = 1e-10
+NEGLIGIBLE_VELOCITY = 1e-4
 
 
 def _shifted_velocities(velocity_profile: np.ndarray) -> np.ndarray:
@@ -78,26 +79,62 @@ def test_shifted_velocity_profile_covers_exactly_the_remaining_distance():
         assert time_step * np.sum(shifted) == pytest.approx(distance)
 
 
+def test_shifted_velocity_profile_has_no_velocity_a_hair_above_rest():
+    """
+    Just past the distance a whole tail of the braking profile covers, the interpolated
+    profile must not end in velocities a hair above rest: bounds that close to the
+    other bound of their variable make an interior point solver call a solvable problem
+    infeasible.
+    """
+    braking_profile = BrakingProfile.fastest(
+        braking=JerkLimitedBraking.from_braking_time(
+            velocity_limit=1.0,
+            braking_time=timedelta(seconds=0.3),
+            time_step=DELTA_TIME,
+        ),
+        prediction_horizon=7,
+    )
+    time_step = DELTA_TIME.total_seconds()
+    velocity_profile = BrakingProfile.zero_negligible_velocities(
+        velocity_profile=braking_profile.velocity
+    )
+    tail_distances = [
+        time_step * np.sum(velocity_profile[first_step:])
+        for first_step in range(1, velocity_profile.shape[0])
+    ]
+
+    for tail_distance in tail_distances:
+        shifted = braking_profile.shifted_by(
+            distance=sm.Scalar(tail_distance + RESIDUE)
+        ).evaluate()
+
+        hair_above_rest = (shifted > 0) & (shifted < NEGLIGIBLE_VELOCITY)
+        assert not hair_above_rest.any()
+
+
 # %% zero_negligible_velocities
-NEGLIGIBLE_VELOCITY = 1e-4
 
 
 def test_zero_negligible_velocities_clears_small_positive_velocities():
     cleared = BrakingProfile.zero_negligible_velocities(
-        np.array([NEGLIGIBLE_VELOCITY / 2])
+        velocity_profile=np.array([NEGLIGIBLE_VELOCITY / 2])
     )
 
     np.testing.assert_array_equal(cleared, np.array([0.0]))
 
 
 def test_zero_negligible_velocities_keeps_velocities_at_the_threshold():
-    kept = BrakingProfile.zero_negligible_velocities(np.array([NEGLIGIBLE_VELOCITY]))
+    kept = BrakingProfile.zero_negligible_velocities(
+        velocity_profile=np.array([NEGLIGIBLE_VELOCITY])
+    )
 
     np.testing.assert_array_equal(kept, np.array([NEGLIGIBLE_VELOCITY]))
 
 
 def test_zero_negligible_velocities_clears_negative_velocities():
-    cleared = BrakingProfile.zero_negligible_velocities(np.array([-0.5]))
+    cleared = BrakingProfile.zero_negligible_velocities(
+        velocity_profile=np.array([-0.5])
+    )
 
     np.testing.assert_array_equal(cleared, np.array([0.0]))
 
@@ -109,7 +146,7 @@ def test_zero_negligible_velocities_leaves_the_input_unchanged():
     """
     velocity_profile = np.array([1.0, NEGLIGIBLE_VELOCITY / 2])
 
-    BrakingProfile.zero_negligible_velocities(velocity_profile)
+    BrakingProfile.zero_negligible_velocities(velocity_profile=velocity_profile)
 
     np.testing.assert_array_equal(
         velocity_profile, np.array([1.0, NEGLIGIBLE_VELOCITY / 2])
@@ -135,7 +172,7 @@ def test_fastest_braking_stays_within_the_acceleration_limit_of_its_braking(
     """
     braking = JerkLimitedBraking.from_braking_time(
         velocity_limit=velocity_limit, braking_time=braking_time, time_step=DELTA_TIME
-    ).limited_to_acceleration(acceleration_limit)
+    ).limited_to_acceleration(acceleration_limit=acceleration_limit)
 
     profile = BrakingProfile.fastest(
         braking=braking, prediction_horizon=braking.number_of_steps + 2

@@ -69,7 +69,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
 
     @classmethod
     def moving_base_of(
-        cls, robot: AbstractRobot, goal_pose: Pose3Dimensional, threshold: float
+        cls, *, robot: AbstractRobot, goal_pose: Pose3Dimensional, threshold: float
     ) -> Self:
         """
         Differs from :meth:`MobileBasePoseGoal.moving_base_of` in setting the odometry

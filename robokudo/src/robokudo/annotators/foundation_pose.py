@@ -135,7 +135,7 @@ class PosedObject:
 
     pose: Pose3Dimensional
     """
-    Pose3Dimensional of the mesh in the camera frame.
+    Pose of the mesh in the camera frame.
     """
 
     mask_region: Rect
@@ -322,7 +322,7 @@ class PoseVisualization:
         Draw a posed mesh into the color image and add it to the 3D view.
 
         :param shape: The mesh.
-        :param pose: Pose3Dimensional of the mesh in the camera frame.
+        :param pose: Pose of the mesh in the camera frame.
         :param label: Unique text identifying the object.
         """
         bounding_box = self.bounding_box(shape, pose)
@@ -346,7 +346,7 @@ class PoseVisualization:
     ) -> open3d.geometry.OrientedBoundingBox:
         """
         :param shape: The mesh.
-        :param pose: Pose3Dimensional of the mesh in the camera frame.
+        :param pose: Pose of the mesh in the camera frame.
         :return: The bounding box of the posed mesh in :attr:`frame`.
         """
         if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
@@ -369,8 +369,8 @@ class PoseVisualization:
     ) -> HomogeneousTransformationMatrix:
         """
         :param shape: The mesh.
-        :param pose: Pose3Dimensional of the mesh in the camera frame.
-        :return: Pose3Dimensional of the drawn axes in the camera frame.
+        :param pose: Pose of the mesh in the camera frame.
+        :return: Pose of the drawn axes in the camera frame.
         """
         smallest_box_pose = HomogeneousTransformationMatrix(
             data=shape.mesh.bounding_box_oriented.primitive.transform
@@ -379,7 +379,12 @@ class PoseVisualization:
             return pose.homogeneous_matrix @ smallest_box_pose
         if not self.center_axes_on_bounding_box:
             return pose.homogeneous_matrix
-        return pose.homogeneous_matrix @ smallest_box_pose.translation_matrix
+        return (
+            pose.homogeneous_matrix
+            @ HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=smallest_box_pose.position
+            )
+        )
 
     def draw_bounding_box(
         self, bounding_box: open3d.geometry.OrientedBoundingBox, label: str
@@ -416,7 +421,7 @@ class PoseVisualization:
         Draw the x, y and z axes of a pose in red, green and blue into the color image,
         unless the end of an axis is not in front of the camera.
 
-        :param axes_pose: Pose3Dimensional of the axes in the camera frame.
+        :param axes_pose: Pose of the axes in the camera frame.
         """
         pose_matrix = axes_pose.to_np()
         rotation, translation = pose_matrix[:3, :3], pose_matrix[:3, 3]
@@ -471,7 +476,7 @@ class PoseVisualization:
     ) -> open3d.geometry.TriangleMesh:
         """
         :param shape: The mesh.
-        :param pose: Pose3Dimensional of the mesh in the camera frame.
+        :param pose: Pose of the mesh in the camera frame.
         :return: The mesh in the camera frame, painted in :attr:`object_mesh_color`.
         """
         posed_mesh = trimesh_to_o3d_mesh(shape.mesh)
@@ -490,7 +495,7 @@ class PoseVisualization:
         return round(blue * maximum), round(green * maximum), round(red * maximum)
 
 
-# %% Pose3Dimensional requests
+# %% Pose requests
 
 
 @dataclass(eq=False)
@@ -540,7 +545,7 @@ class EstimatedPose:
 
     pose: Pose3Dimensional
     """
-    Pose3Dimensional of the mesh in the camera frame.
+    Pose of the mesh in the camera frame.
     """
 
     @property
@@ -590,7 +595,7 @@ class PoseCandidate:
         pose_annotation: PoseAnnotation | None = None,
     ) -> PoseRequest:
         """
-        :param previous_pose: Pose3Dimensional to track from, or ``None`` to estimate the pose.
+        :param previous_pose: Pose to track from, or ``None`` to estimate the pose.
         :param pose_annotation: Annotation receiving the new pose, or ``None`` to add one.
         :return: The request to pose the object hypothesis.
         """
@@ -603,7 +608,7 @@ class PoseCandidate:
         )
 
 
-# %% Pose3Dimensional update modes
+# %% Pose update modes
 
 
 @dataclass
@@ -786,7 +791,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
 
         parameters = Parameters()
         """
-        Pose3Dimensional estimation and visualization defaults.
+        Pose estimation and visualization defaults.
         """
 
     pose_estimator: MeshBasedPoseEstimator = field(kw_only=True)
@@ -801,7 +806,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
 
     descriptor: Descriptor = field(default_factory=Descriptor)
     """
-    Pose3Dimensional estimation and visualization configuration.
+    Pose estimation and visualization configuration.
     """
 
     class_meshes: ObjectClassMeshes = field(init=False, repr=False)
@@ -832,7 +837,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
     @record_time
     def compute(self) -> Status:
         """
-        Pose3Dimensional the classified object hypotheses of the CAS and visualize the poses.
+        Pose the classified object hypotheses of the CAS and visualize the poses.
 
         :return: ``Status.SUCCESS`` after processing the frame.
         """
@@ -976,7 +981,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         plausible, and estimate it otherwise.
 
         :param request: The object hypothesis to pose.
-        :return: Pose3Dimensional of the mesh in the camera frame, or ``None`` if none was found.
+        :return: Pose of the mesh in the camera frame, or ``None`` if none was found.
         """
         self.pose_estimator.select_mesh(request.class_mesh.estimator_mesh_file)
         if request.previous_pose is not None:

@@ -99,16 +99,16 @@ class OrthogonalProjection(
     """
 
     @abstractmethod
-    def foot_point(self, *, point: TargetPointT) -> SourcePointT:
+    def embed_planar_point(self, *, point: TargetPointT) -> SourcePointT:
         """
         :param point: A point of the plane.
-        :return: The same point, given as a point of the source space.
+        :return: The same point, given as a point of the space the plane lies in.
         """
 
     def projection_line(self, point: TargetPointT) -> ProjectionLineT:
         line_type = self.get_type_of_generic_parameter(parameter=ProjectionLineT)
         return line_type(
-            point=self.foot_point(point=point), direction=self.plane_normal
+            point=self.embed_planar_point(point=point), direction=self.plane_normal
         )
 
     def unproject(
@@ -118,4 +118,4 @@ class OrthogonalProjection(
         Differs from :meth:`SpaceMap.unproject` in defaulting ``position_along_line`` to
         zero, the point on the plane itself.
         """
-        return self.foot_point(point=point) + self.plane_normal * position_along_line
+        return self.embed_planar_point(point=point) + self.plane_normal * position_along_line

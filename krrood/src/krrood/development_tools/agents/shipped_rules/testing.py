@@ -9,7 +9,7 @@ import unittest
 import pytest
 
 from krrood.development_tools.agents.rule import CodeReference, Section
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 
 class TestingRules(Section):

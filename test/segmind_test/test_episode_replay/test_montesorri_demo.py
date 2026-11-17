@@ -42,7 +42,7 @@ def test_context():
     )
     return {
         "world": world,
-        "logger": context.require_extension(SegmindContext).logger,
+        "logger": context.require_extension(extension_type=SegmindContext).logger,
         "context": context,
         "file_player": file_player,
         "episode_executor": episode_executor,
@@ -54,11 +54,15 @@ def test_replay_episode(test_context):
     context = test_context["context"]
     logger = test_context["logger"]
     executor = test_context["episode_executor"]
-    executor.compile(DetectorStatechartBuilder().build(executor.context))
-    assert executor.require_extension(EpisodeSegmentation).player.is_alive()
+    executor.compile(statechart=DetectorStatechartBuilder().build(executor.context))
+    assert executor.require_extension(
+        extension_type=EpisodeSegmentation
+    ).player.is_alive()
     executor.tick_until_end()
     try:
-        while executor.require_extension(EpisodeSegmentation).player.is_alive():
+        while executor.require_extension(
+            extension_type=EpisodeSegmentation
+        ).player.is_alive():
             pass
     finally:
         assert len(logger.get_events()) > 0

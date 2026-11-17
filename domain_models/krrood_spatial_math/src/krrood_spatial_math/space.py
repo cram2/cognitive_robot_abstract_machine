@@ -1,8 +1,12 @@
+"""
+Spaces: the sets of points that coordinate systems chart, with their dimension.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.interface import Interface
 
 # %% sets of points and their geometry
