@@ -680,14 +680,13 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         Neither another thread nor a callback of this world sees the new model without
         the positions that came with it.
         """
-        with self._world._world_lock:
-            if message.modification_block is not None:
-                with self._world.modify_world(publish_changes=False):
-                    self._apply_model(message.modification_block)
-                    if message.state_update is not None:
-                        self._write_state(state_update_message=message.state_update)
-            elif message.state_update is not None:
-                self._apply_state(message.state_update)
+        if message.modification_block is not None:
+            with self._world.modify_world(publish_changes=False):
+                self._apply_model(message.modification_block)
+                if message.state_update is not None:
+                    self._write_state(state_update_message=message.state_update)
+        elif message.state_update is not None:
+            self._apply_state(message.state_update)
         self.record_applied(message)
 
     def _apply_model(self, modification_block_message: ModificationBlock):
@@ -715,26 +714,26 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the message names a
             degree of freedom this world does not have.
         """
-        identifier_index_state_triples = [
-            (identifier, self._world.state._index.get(identifier), state_value)
-            for identifier, state_value in zip(
-                state_update_message.ids, state_update_message.states
-            )
-        ]
-        unknown_identifiers = [
-            identifier
-            for identifier, index, _ in identifier_index_state_triples
-            if index is None
-        ]
-        if unknown_identifiers:
-            raise StateUpdateContainsUnknownDegreesOfFreedomError(
-                unknown_identifiers=unknown_identifiers
-            )
-        indices = [index for _, index, _ in identifier_index_state_triples]
-        state_values = [
-            state_value for _, _, state_value in identifier_index_state_triples
-        ]
         with self._world._world_lock:
+            identifier_index_state_triples = [
+                (identifier, self._world.state._index.get(identifier), state_value)
+                for identifier, state_value in zip(
+                    state_update_message.ids, state_update_message.states
+                )
+            ]
+            unknown_identifiers = [
+                identifier
+                for identifier, index, _ in identifier_index_state_triples
+                if index is None
+            ]
+            if unknown_identifiers:
+                raise StateUpdateContainsUnknownDegreesOfFreedomError(
+                    unknown_identifiers=unknown_identifiers
+                )
+            indices = [index for _, index, _ in identifier_index_state_triples]
+            state_values = [
+                state_value for _, _, state_value in identifier_index_state_triples
+            ]
             self._world.state._data[0, indices] = np.asarray(state_values, dtype=float)
             self.update_previous_world_state()
 

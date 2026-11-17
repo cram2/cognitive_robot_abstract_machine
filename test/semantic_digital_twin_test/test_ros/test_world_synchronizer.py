@@ -3458,5 +3458,42 @@ def test_a_receiving_world_never_shows_a_new_body_away_from_its_place(rclpy_node
         receiver_synchronizer.close()
 
 
+# %% writing received positions
+
+
+def test_received_positions_land_on_the_degrees_of_freedom_they_name(rclpy_node):
+    """
+    Positions received while another thread rearranges the state of the world are
+    written to the degrees of freedom they name, wherever those sit once it is done.
+    """
+    world = World(name="rearranged_state")
+    with world.modify_world():
+        world.add_body(Body(name=PrefixedName("rearranged_state_root")))
+    removed_connection = add_prismatic_connection(world, "rearranged_state_removed")
+    kept_connection = add_prismatic_connection(world, "rearranged_state_kept")
+    synchronizer = WorldSynchronizer(
+        node=rclpy_node, _world=world, topic_name=unique_topic("rearranged_state")
+    )
+    received_positions = WorldStateUpdate(
+        meta_data=synchronizer.meta_data, ids=[kept_connection.dof.id], states=[0.7]
+    )
+    writing_thread = threading.Thread(
+        target=synchronizer._apply_state, args=(received_positions,)
+    )
+    try:
+        with world._world_lock:
+            writing_thread.start()
+            # give the writing thread the time to reach the world lock
+            time.sleep(0.2)
+            with world.modify_world():
+                world.remove_kinematic_structure_entity(removed_connection.child)
+        writing_thread.join(timeout=5.0)
+
+        assert not writing_thread.is_alive()
+        assert world.state[kept_connection.dof.id].position == pytest.approx(0.7)
+    finally:
+        synchronizer.close()
+
+
 if __name__ == "__main__":
     unittest.main()
