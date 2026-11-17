@@ -195,7 +195,7 @@ class Slot:
     A share of the machine one run uses at a time.
     """
 
-    uses_gpu: bool
+    uses_graphics_processor: bool
     """
     Whether the share holds part of the GPU.
     """
@@ -286,12 +286,12 @@ class BenchmarkRunner:
     The time after which iterative training starts no further epoch.
     """
 
-    gpu_slots: int = 3
+    graphics_processor_slots: int = 3
     """
     The number of runs that share the GPU.
     """
 
-    cpu_slots: int = 7
+    processor_core_slots: int = 7
     """
     The number of runs that use processor cores only.
     """
@@ -397,20 +397,26 @@ class BenchmarkRunner:
         :return: The shares of the machine.
         """
         cores = sorted(os.sched_getaffinity(0))
-        count = self.gpu_slots + self.cpu_slots
+        count = self.graphics_processor_slots + self.processor_core_slots
         per_slot = len(cores) // count
         available = psutil.virtual_memory().available
         host_share = int(0.8 * available / count)
-        gpu_total = (
-            torch.cuda.get_device_properties(0).total_memory if self.gpu_slots else 0
+        graphics_processor_memory = (
+            torch.cuda.get_device_properties(0).total_memory
+            if self.graphics_processor_slots
+            else 0
         )
         return [
             Slot(
-                uses_gpu=index < self.gpu_slots,
+                uses_graphics_processor=index < self.graphics_processor_slots,
                 cores=set(cores[index * per_slot : (index + 1) * per_slot]),
                 memory_budget_bytes=(
-                    int(0.9 * gpu_total / max(self.gpu_slots, 1))
-                    if index < self.gpu_slots
+                    int(
+                        0.9
+                        * graphics_processor_memory
+                        / max(self.graphics_processor_slots, 1)
+                    )
+                    if index < self.graphics_processor_slots
                     else host_share
                 ),
                 host_memory_limit_bytes=2 * host_share,
@@ -453,7 +459,7 @@ class BenchmarkRunner:
         environment["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
         # autotuning makes compiling a step take minutes on large batches
         environment["XLA_FLAGS"] = "--xla_gpu_autotune_level=0"
-        if not slot.uses_gpu:
+        if not slot.uses_graphics_processor:
             environment["CUDA_VISIBLE_DEVICES"] = ""
         limits = RunLimits(
             training_duration=self.training_duration,
@@ -550,7 +556,12 @@ class BenchmarkRunner:
                 if readiness is not None:
                     continue
                 slot = next(
-                    (each for each in free if each.uses_gpu == run.setting.uses_gpu),
+                    (
+                        each
+                        for each in free
+                        if each.uses_graphics_processor
+                        == run.setting.uses_graphics_processor
+                    ),
                     None,
                 )
                 if slot is None:
@@ -592,8 +603,8 @@ def main() -> None:
     parser.add_argument(
         "--methods", nargs="+", default=[name.name for name in LearningMethod]
     )
-    parser.add_argument("--gpu-slots", type=int, default=3)
-    parser.add_argument("--cpu-slots", type=int, default=7)
+    parser.add_argument("--graphics-processor-slots", type=int, default=3)
+    parser.add_argument("--processor-core-slots", type=int, default=7)
     parser.add_argument("--first-settings-only", action="store_true")
     parser.add_argument("--run")
     parser.add_argument("--memory-budget-bytes", type=int, default=0)
@@ -616,8 +627,8 @@ def main() -> None:
         output=arguments.output,
         cache_directory=arguments.cache_directory,
         training_duration=training_duration,
-        gpu_slots=arguments.gpu_slots,
-        cpu_slots=arguments.cpu_slots,
+        graphics_processor_slots=arguments.graphics_processor_slots,
+        processor_core_slots=arguments.processor_core_slots,
         first_settings_only=arguments.first_settings_only,
     ).run()
 

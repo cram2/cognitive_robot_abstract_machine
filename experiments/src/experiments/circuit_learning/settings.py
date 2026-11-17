@@ -164,7 +164,7 @@ class ComputationSetting:
         )
 
     @property
-    def uses_gpu(self) -> bool:
+    def uses_graphics_processor(self) -> bool:
         """
         :return: Whether the setting computes on the GPU.
         """

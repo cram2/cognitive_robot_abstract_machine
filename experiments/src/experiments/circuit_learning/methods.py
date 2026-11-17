@@ -109,7 +109,7 @@ class TrainingContext:
         """
         memory = (
             JaxDeviceMemory(device=jax.devices("gpu")[0])
-            if setting.uses_gpu
+            if setting.uses_graphics_processor
             else HostMemory()
         )
         return BudgetedMemory(memory=memory, budget_bytes=self.memory_budget_bytes)

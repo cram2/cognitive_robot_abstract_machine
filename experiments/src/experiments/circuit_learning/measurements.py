@@ -166,7 +166,7 @@ class TrainingMeasurement:
         training_duration = timedelta(seconds=time.perf_counter() - start)
         peak_memory_bytes = (
             self.peak_device_memory_bytes()
-            if self.setting.uses_gpu
+            if self.setting.uses_graphics_processor
             else host_memory.peak_bytes()
         )
         circuit = learned.circuit
