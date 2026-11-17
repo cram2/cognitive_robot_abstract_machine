@@ -46,6 +46,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% driving the base
 
@@ -95,8 +96,9 @@ class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
     def create_steps(self) -> list[StatechartNode]:
         camera = self.pointed_camera(robot=self.robot)
         pointing = Pointing(
-            root_link=self.robot.get_torso().root,
-            tip_link=camera.root,
+            kinematic_chain=KinematicChain(
+                root=self.robot.get_torso().root, tip=camera.root
+            ),
             goal_point=self._world_P_target(),
             pointing_axis=camera.viewing_direction,
         )
@@ -129,8 +131,9 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
     def create_steps(self) -> list[StatechartNode]:
         return [
             Pointing(
-                root_link=self.world.root,
-                tip_link=self.robot.root,
+                kinematic_chain=KinematicChain(
+                    root=self.world.root, tip=self.robot.root
+                ),
                 goal_point=self._target_at_base_height(),
                 pointing_axis=Vector3(
                     *self.robot.mobile_base.forward_axis.to_np()[:3],
@@ -138,8 +141,9 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
                 ),
             ),
             CartesianPosition(
-                root_link=self.world.root,
-                tip_link=self.robot.root,
+                kinematic_chain=KinematicChain(
+                    root=self.world.root, tip=self.robot.root
+                ),
                 goal_point=Point3(reference_frame=self.robot.root),
             ),
         ]

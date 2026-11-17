@@ -86,6 +86,7 @@ from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from krrood.utils import recursive_subclasses
 from ..motion_control_context import create_context_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def angle_between_vector(v1: np.ndarray, v2: np.ndarray) -> float:
@@ -141,8 +142,7 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         height_goal = HeightGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=lower_limit,
@@ -192,8 +192,7 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         height_goal = HeightGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=lower_limit,
@@ -247,8 +246,7 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         reach_point = ReachPoint(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
         )
@@ -292,8 +290,7 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         distance_goal = DistanceGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=lower_limit,
@@ -347,8 +344,7 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         distance_goal = DistanceGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=lower_limit,
@@ -402,8 +398,7 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         distance_goal = DistanceGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=lower_limit,
@@ -461,16 +456,14 @@ class TestFeatureFunctions:
         combined_goal = Parallel(
             nodes=[
                 HeightGoal(
-                    root_link=root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(root=root, tip=tip),
                     tip_point=tip_point,
                     reference_point=reference_point,
                     lower_limit=height_lower,
                     upper_limit=height_upper,
                 ),
                 DistanceGoal(
-                    root_link=root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(root=root, tip=tip),
                     tip_point=tip_point,
                     reference_point=reference_point,
                     lower_limit=distance_lower,
@@ -540,24 +533,21 @@ class TestFeatureFunctions:
         )
         statechart = Statechart(context=executor.context)
         height_goal = HeightGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=height_lower,
             upper_limit=height_upper,
         )
         distance_goal = DistanceGoal(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_point=tip_point,
             reference_point=reference_point,
             lower_limit=distance_lower,
             upper_limit=distance_upper,
         )
         align_perpendicular = AlignPerpendicular(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             tip_normal=tip_normal,
             reference_normal=reference_normal,
             threshold=perpendicular_threshold,
@@ -636,8 +626,7 @@ def test_pointing(pr2_world_state_reset: World):
     pointing_axis = Vector3.X(reference_frame=tip)
 
     pointing = Pointing(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=goal_point,
         pointing_axis=pointing_axis,
     )
@@ -684,8 +673,7 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     )
     statechart = Statechart(context=executor.context)
     pointing = Pointing(
-        root_link=base,
-        tip_link=head,
+        kinematic_chain=KinematicChain(root=base, tip=head),
         goal_point=goal_point,
         pointing_axis=Vector3.X(reference_frame=head),
     )
@@ -739,8 +727,7 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     world_T_region = world.compose_forward_kinematics_expression(world.root, region)
     world_T_region.reference_frame = world.root
     pointing = Pointing(
-        root_link=base,
-        tip_link=head,
+        kinematic_chain=KinematicChain(root=base, tip=head),
         goal_point=world_T_region.position,
         pointing_axis=Vector3.X(reference_frame=head),
     )
@@ -780,8 +767,7 @@ def test_pointing_cone(pr2_world_state_reset: World):
     pointing_axis = Vector3.X(tip)
     cone_theta = radians(20)
     pointing_cone = PointingCone(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=goal_point,
         pointing_axis=pointing_axis,
         cone_theta=cone_theta,
@@ -838,8 +824,7 @@ def test_align_planes(pr2_world_state_reset: World):
     tip_normal = Vector3.Y(reference_frame=tip)
 
     align_planes = AlignPlanes(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
@@ -969,8 +954,7 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     tip_normal = Vector3.X(reference_frame=tip)
 
     align_perp = AlignPerpendicular(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
@@ -1032,8 +1016,7 @@ def test_angle_goal(pr2_world_state_reset: World):
     upper_angle = radians(32)
 
     angle_goal = AngleGoal(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         tip_vector=tip_vector,
         reference_vector=reference_vector,
         lower_angle=lower_angle,
@@ -1151,8 +1134,9 @@ class TestArticulateGraspedMechanism:
                 Sequence(
                     nodes=[
                         CartesianPose(
-                            root_link=pr2_world_copy.root,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(
+                                root=pr2_world_copy.root, tip=r_tip
+                            ),
                             goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
                             ),
@@ -1238,8 +1222,7 @@ class TestArticulateGraspedMechanism:
             node=Sequence(
                 nodes=[
                     CartesianPose(
-                        root_link=world.root,
-                        tip_link=tip,
+                        kinematic_chain=KinematicChain(root=world.root, tip=tip),
                         goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                             yaw=np.pi, reference_frame=handle.root
                         ),
@@ -1328,8 +1311,9 @@ class TestArticulateGraspedMechanism:
                         # Grasp with the roll axis of the gripper collinear with the
                         # screw axis, so the wrist can follow the cap's rotation.
                         CartesianPose(
-                            root_link=pr2_world_copy.root,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(
+                                root=pr2_world_copy.root, tip=r_tip
+                            ),
                             goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 reference_frame=cap_body
                             ),

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         EndEffector,
-        KinematicChain,
+        RobotKinematicChain,
     )
     from semantic_digital_twin.world_description.world_entity import (
         Body,
@@ -677,7 +677,7 @@ class AllowCollisionBetweenFingers(AllowCollisionRule):
         }
 
     @staticmethod
-    def _finger_bodies(finger: KinematicChain) -> list[Body]:
+    def _finger_bodies(finger: RobotKinematicChain) -> list[Body]:
         """
         :param finger: A finger of a gripper.
         :return: Its bodies with collision geometry, without the one it is mounted on,

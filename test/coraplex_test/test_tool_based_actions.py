@@ -134,7 +134,7 @@ def test_mixing_action_expands_to_aligned_motion(tool_action_world):
     trajectory = _trajectory_of(goals[0])
     assert len(trajectory.goal_points) > 0
     assert len(_alignments_of(goals[0])) == 1
-    assert trajectory.tip_link == whisk.get_tool_frame()
+    assert trajectory.kinematic_chain.tip == whisk.get_tool_frame()
 
 
 def test_cutting_action_pointer_stride_reduces_waypoints(tool_action_world):
@@ -348,7 +348,7 @@ def test_a_tool_motion_moves_the_tool_relative_to_the_world(tool_action_world) -
 
     goal = _tool_path_goals(action, extensions)[0]
 
-    assert _trajectory_of(goal).root_link is world.root
+    assert _trajectory_of(goal).kinematic_chain.root is world.root
     assert robot.mobile_base.full_body_controlled == full_body_controlled
 
 
@@ -393,7 +393,7 @@ def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
         for node in [action, *action.descendants]
         if isinstance(node, PositionReached)
     ]
-    assert final_waypoint_reached.tip_link is tool_body
+    assert final_waypoint_reached.kinematic_chain.tip is tool_body
     assert final_waypoint_reached.goal_point is action._waypoints[-1]
     assert final_waypoint_reached.threshold == action.final_waypoint_threshold
 
@@ -551,7 +551,7 @@ def test_justin_keeps_its_torso_upright_while_it_uses_a_tool(justin_world) -> No
     torso_alignments = [
         alignment
         for alignment in _alignments_of(action)
-        if alignment.tip_link is torso_tip
+        if alignment.kinematic_chain.tip is torso_tip
     ]
     assert len(torso_alignments) == 1
 

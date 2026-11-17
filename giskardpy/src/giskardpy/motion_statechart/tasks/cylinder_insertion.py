@@ -16,12 +16,13 @@ from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
     HasTipLinkParameter,
     HasWeightParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 )
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood_spatial_math.spatial_types import Point3, Vector3
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% staying on a line
 
@@ -29,7 +30,7 @@ from krrood_spatial_math.spatial_types import Point3, Vector3
 @dataclass(eq=False, repr=False, kw_only=True)
 class StayOnLineTask(
     ConvergingTask,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasCruiseVelocityParameter,
 ):
     """
@@ -60,17 +61,17 @@ class StayOnLineTask(
             controlled point and the line segment.
         """
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_P_tool = root_T_tip @ self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_P_tool
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_P_tool
         )
         distance_to_line, root_P_on_line = root_P_tool.distance_to_line_segment(
             self.context.world.transform(
-                target_frame=self.root_link, spatial_object=self.root_P_start
+                target_frame=self.kinematic_chain.root, spatial_object=self.root_P_start
             ),
             self.context.world.transform(
-                target_frame=self.root_link, spatial_object=self.root_P_end
+                target_frame=self.kinematic_chain.root, spatial_object=self.root_P_end
             ),
         )
 
@@ -195,8 +196,7 @@ class InsertCylinder(
 
         self.reach_top = ReachPoint(
             name=f"{self.name}/reach top",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_point=self.tip_P_tool,
             reference_point=root_P_top,
             cruise_velocity=self.approach_cruise_velocity,
@@ -204,8 +204,7 @@ class InsertCylinder(
         )
         self.tilt_task = AngleGoal(
             name=f"{self.name}/slightly tilted",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_vector=self.tip_V_axis,
             reference_vector=root_V_up,
             lower_angle=self.tilt,
@@ -215,8 +214,7 @@ class InsertCylinder(
         )
         self.stay_on_line = StayOnLineTask(
             name=f"{self.name}/stay on straight line",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_P_tool=self.tip_P_tool,
             root_P_start=root_P_hole,
             root_P_end=root_P_top,
@@ -224,8 +222,7 @@ class InsertCylinder(
         )
         self.insert_task = ReachPoint(
             name=f"{self.name}/insert",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_point=self.tip_P_tool,
             reference_point=root_P_hole,
             cruise_velocity=self.insertion_cruise_velocity,
@@ -233,8 +230,7 @@ class InsertCylinder(
         )
         self.tilt_straight_task = AlignPlanes(
             name=f"{self.name}/tilt straight",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_normal=self.tip_V_axis,
             reference_normal=root_V_up,
             cruise_velocity=self.straightening_cruise_velocity,

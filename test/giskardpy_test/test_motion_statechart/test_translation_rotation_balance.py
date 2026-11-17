@@ -34,6 +34,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% scenarios
 
@@ -231,7 +232,8 @@ def run_pose_goal(
     at most `maximum_cycles`.
     """
     goal = CartesianPose(
-        root_link=root, tip_link=tip, goal_pose=offset.goal_pose(tip=tip)
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal_pose=offset.goal_pose(tip=tip),
     )
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]

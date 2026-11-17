@@ -47,6 +47,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..plan_running import robot_extensions, run_plan
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% a kitchen with a bowl and a cup in a drawer
 
@@ -225,7 +226,9 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
             Parallel(
                 nodes=[
                     HoldPose(
-                        root_link=kitchen.world.root, tip_link=robot.mobile_base.root
+                        kinematic_chain=KinematicChain(
+                            root=kitchen.world.root, tip=robot.mobile_base.root
+                        )
                     ),
                     PickUpAction.from_above(kitchen.bowl, robot.left_arm),
                     PickUpAction.from_above(kitchen.cup, robot.right_arm),
@@ -237,7 +240,9 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
             Parallel(
                 nodes=[
                     HoldPose(
-                        root_link=kitchen.world.root, tip_link=robot.mobile_base.root
+                        kinematic_chain=KinematicChain(
+                            root=kitchen.world.root, tip=robot.mobile_base.root
+                        )
                     ),
                     PlaceAction(
                         arm=robot.left_arm,

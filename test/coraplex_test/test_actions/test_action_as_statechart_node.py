@@ -749,8 +749,8 @@ def test_fixating_an_object_keeps_the_gripper_where_it_is(simple_pr2_context) ->
 
     [holding] = action.nodes
     assert type(holding) is CartesianPose
-    assert holding.root_link is world.root
-    assert holding.tip_link is tool_frame
+    assert holding.kinematic_chain.root is world.root
+    assert holding.kinematic_chain.tip is tool_frame
     assert holding.goal_pose.reference_frame is tool_frame
     [rule] = action.temporary_collision_rules
     assert rule.end_effector is end_effector

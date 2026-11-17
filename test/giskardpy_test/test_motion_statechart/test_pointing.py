@@ -7,6 +7,7 @@ from test.giskardpy_test.test_motion_statechart.debug_expression_helpers import 
     debug_expression_by_name,
 )
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 class TestPointingDebugExpressions:
@@ -19,8 +20,7 @@ class TestPointingDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = Pointing(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
             pointing_axis=Vector3(x=1, reference_frame=tip),
             name="point",
@@ -40,8 +40,7 @@ class TestPointingDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = PointingCone(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
             pointing_axis=Vector3(x=1, reference_frame=tip),
             cone_theta=0.1,

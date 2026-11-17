@@ -14,26 +14,25 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
+    HasRootLinkParameter,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% aligning a plane of a link
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class AlignPlanes(
-    ConvergingTask, HasKinematicChainParameters, HasCruiseVelocityParameter
+    ConvergingTask, HasKinematicChainParameter, HasCruiseVelocityParameter
 ):
     """
-    Will orient the plane fixed on :attr:`tip_link` to align with the plane fixed on
-    :attr:`root_link`, with an error in radians.
+    Will orient the plane fixed on the tip of :attr:`kinematic_chain` to align with the
+    plane fixed on its root, with an error in radians.
 
     The planes are represented by their normal vectors, :attr:`tip_normal` and
     :attr:`reference_normal`.
@@ -41,13 +40,13 @@ class AlignPlanes(
 
     tip_normal: Vector3
     """
-    Normal vector of the plane fixed on :attr:`tip_link`.
+    Normal vector of the plane fixed on the tip of :attr:`kinematic_chain`.
     """
 
     reference_normal: Vector3
     """
-    Normal vector of the plane fixed on :attr:`root_link`, which the other plane is
-    aligned to.
+    Normal vector of the plane fixed on the root of :attr:`kinematic_chain`, which the
+    other plane is aligned to.
     """
 
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
@@ -69,21 +68,21 @@ class AlignPlanes(
         """
         artifacts = MotionNodeArtifacts()
         tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_normal
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
         )
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_normal
+            target_frame=self.kinematic_chain.root, spatial_object=self.reference_normal
         )
         root_V_root_normal.scale(1)
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_V_tip_normal = root_R_tip @ tip_V_tip_normal
         root_V_tip_normal.scale(1)
 
-        root_V_tip_normal.visualisation_frame = self.tip_link
+        root_V_tip_normal.visualisation_frame = self.kinematic_chain.tip
         current_normal_debug_expression = DebugExpression(
             name=f"{self.name}/current_normal",
             expression=root_V_tip_normal,
@@ -91,7 +90,7 @@ class AlignPlanes(
         )
         # a copy, as transforming returns the reference normal itself when it is in the root
         root_V_reference_normal_at_tip = Vector3.from_iterable(root_V_root_normal)
-        root_V_reference_normal_at_tip.visualisation_frame = self.tip_link
+        root_V_reference_normal_at_tip.visualisation_frame = self.kinematic_chain.tip
         reference_normal_debug_expression = DebugExpression(
             name=f"{self.name}/reference_normal",
             expression=root_V_reference_normal_at_tip,
@@ -114,7 +113,7 @@ class AlignPlanes(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class KeepHeldBodyUpright(AlignPlanes):
+class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
     """
     Turns the body an end effector holds when this task starts until its z-axis points
     along the z-axis of :attr:`root_link`.
@@ -128,9 +127,9 @@ class KeepHeldBodyUpright(AlignPlanes):
     The end effector holding the body.
     """
 
-    tip_link: KinematicStructureEntity = field(init=False)
+    kinematic_chain: KinematicChain = field(init=False)
     """
-    The tool frame of :attr:`end_effector`.
+    The chain from :attr:`root_link` to the tool frame of :attr:`end_effector`.
     """
 
     reference_normal: Vector3 = field(init=False)
@@ -153,17 +152,17 @@ class KeepHeldBodyUpright(AlignPlanes):
         Expresses the plane to align over the pose this task binds when it starts.
         """
         super().set_up()
-        self.tip_link = self.end_effector.tool_frame
+        tool_frame = self.end_effector.tool_frame
+        self.kinematic_chain = KinematicChain(root=self.root_link, tip=tool_frame)
         self.reference_normal = Vector3.Z(reference_frame=self.root_link)
         self._tool_T_held_body = ForwardKinematicsBinding(
             name=PrefixedName("tool_T_held_body", str(self.name)),
-            root=self.tip_link,
-            tip=self.tip_link,
+            kinematic_chain=KinematicChain(root=tool_frame, tip=tool_frame),
             float_variable_data=self.context.float_variable_data,
         )
         self._tool_T_held_body.bind(world=self.context.world)
         self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3.Z(
-            reference_frame=self.tip_link
+            reference_frame=tool_frame
         )
 
     def on_start(self) -> None:

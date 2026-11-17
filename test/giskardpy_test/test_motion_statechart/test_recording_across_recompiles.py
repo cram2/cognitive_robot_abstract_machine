@@ -24,6 +24,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% helpers
 
@@ -69,8 +70,7 @@ def _position_goal(world: World, tip: Body, name: str) -> CartesianPosition:
     :return: A goal moving `tip` to a point too far away to reach during a test.
     """
     return CartesianPosition(
-        root_link=world.root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=world.root, tip=tip),
         goal_point=Point3(x=5, reference_frame=world.root),
         name=name,
     )

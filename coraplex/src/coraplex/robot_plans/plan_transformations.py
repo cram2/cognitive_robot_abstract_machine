@@ -122,7 +122,7 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
         """
         return any(
             isinstance(node, CartesianTask)
-            and node.tip_link is arm.end_effector.tool_frame
+            and node.kinematic_chain.tip is arm.end_effector.tool_frame
             for node in [step, *step.descendants]
         )
 

@@ -6,7 +6,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.mixins import (
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 )
 from cramph.node import NodeArtifacts
 from krrood_spatial_math.spatial_types import Point3, Vector3
@@ -14,11 +14,12 @@ from krrood_spatial_math.spatial_types import Point3, Vector3
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class FeatureFunctionMonitor(
-    EndedByOwner, MotionStatechartNode, HasKinematicChainParameters
+    EndedByOwner, MotionStatechartNode, HasKinematicChainParameter
 ):
     """
-    Base for monitors that compare a controlled feature (attached to ``tip_link``) with a
-    reference feature (attached to ``root_link``) expressed in the root link frame.
+    Base for monitors that compare a controlled feature, attached to the tip of
+    :attr:`kinematic_chain`, with a reference feature attached to its root, expressed in
+    the frame of the root.
     """
 
     reference_feature: Point3 | Vector3 = field(init=False)
@@ -32,14 +33,16 @@ class FeatureFunctionMonitor(
         the node for use by subclasses.
         """
         root_reference_feature = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_feature
+            target_frame=self.kinematic_chain.root,
+            spatial_object=self.reference_feature,
         )
         tip_controlled_feature = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.controlled_feature
+            target_frame=self.kinematic_chain.tip,
+            spatial_object=self.controlled_feature,
         )
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         if isinstance(self.controlled_feature, Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature

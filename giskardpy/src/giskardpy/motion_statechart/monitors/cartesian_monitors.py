@@ -17,7 +17,7 @@ from giskardpy.motion_statechart.mixins import (
     HasGoalOrientationParameter,
     HasGoalPointParameter,
     HasGoalPoseParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasPositionThresholdParameter,
     HasOrientationThresholdParameter,
     HasThresholdParameter,
@@ -35,17 +35,17 @@ class RootRelativeGoalMonitor(
     EndedByOwner,
     MotionStatechartNode,
     BindsGoalReferenceFrame,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     ABC,
 ):
     """
-    A monitor observing :attr:`tip_link` against a goal whose frame is read relative to
-    :attr:`root_link`.
+    A monitor observing the tip of :attr:`kinematic_chain` against a goal whose frame is
+    read relative to its root.
     """
 
     @property
     def goal_binding_root(self) -> KinematicStructureEntity:
-        return self.root_link
+        return self.kinematic_chain.root
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -67,7 +67,7 @@ class PoseReached(
     def build_artifacts(self) -> NodeArtifacts:
         root_T_goal = self.root_T_goal_reference_frame @ self.goal_pose
         root_T_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         distance_to_goal = root_T_goal.position.euclidean_distance(
             root_T_current.position
@@ -100,7 +100,7 @@ class PositionReached(
     def build_artifacts(self) -> NodeArtifacts:
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
         return NodeArtifacts(observation=distance_to_goal < self.threshold)
@@ -122,7 +122,7 @@ class OrientationReached(
     def build_artifacts(self) -> NodeArtifacts:
         root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
         root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         rotation_error = root_R_current.rotational_distance(root_R_goal)
         return NodeArtifacts(observation=sm.abs(rotation_error) < self.threshold)
@@ -135,7 +135,7 @@ class OrientationReached(
 class PointingAt(
     EndedByOwner,
     MotionStatechartNode,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasGoalPointParameter,
     HasThresholdParameter,
 ):
@@ -151,15 +151,15 @@ class PointingAt(
 
     def build_artifacts(self) -> NodeArtifacts:
         root_P_goal_point = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_point
+            target_frame=self.kinematic_chain.root, spatial_object=self.goal_point
         )
 
         tip_V_pointing_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.pointing_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_P_tip = root_T_tip.position
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
@@ -174,7 +174,7 @@ class PointingAt(
 class VectorsAligned(
     EndedByOwner,
     MotionStatechartNode,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasThresholdParameter,
 ):
     """
@@ -194,17 +194,17 @@ class VectorsAligned(
 
     def build_artifacts(self) -> NodeArtifacts:
         tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_normal
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
         )
         tip_V_tip_normal.scale(1)
 
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_normal
+            target_frame=self.kinematic_chain.root, spatial_object=self.reference_normal
         )
         root_V_root_normal.scale(1)
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
         error = root_V_tip_normal.angle_between(root_V_root_normal)
@@ -215,7 +215,7 @@ class VectorsAligned(
 class DistanceToLine(
     EndedByOwner,
     MotionStatechartNode,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasThresholdParameter,
 ):
     """
@@ -240,14 +240,14 @@ class DistanceToLine(
 
     def build_artifacts(self) -> NodeArtifacts:
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         root_V_line_axis = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.line_axis
+            target_frame=self.kinematic_chain.root, spatial_object=self.line_axis
         )
         root_V_line_axis.scale(1)
         root_P_center = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.center_point
+            target_frame=self.kinematic_chain.root, spatial_object=self.center_point
         )
         root_P_line_start = root_P_center + root_V_line_axis * (self.line_length / 2)
         root_P_line_end = root_P_center - root_V_line_axis * (self.line_length / 2)

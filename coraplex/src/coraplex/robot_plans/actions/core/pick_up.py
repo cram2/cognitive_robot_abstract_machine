@@ -39,6 +39,7 @@ from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from krrood_spatial_math.spatial_types import RotationMatrix
 from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 logger = logging.getLogger(__name__)
 
@@ -315,8 +316,7 @@ class FixateObjectAction(ParallelAction):
         return [
             CartesianPose(
                 name="Keep the gripper in place",
-                root_link=self.world.root,
-                tip_link=tool_frame,
+                kinematic_chain=KinematicChain(root=self.world.root, tip=tool_frame),
                 goal_pose=Pose(reference_frame=tool_frame),
                 # Holding on has to matter more than keeping clear of what is held.
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,

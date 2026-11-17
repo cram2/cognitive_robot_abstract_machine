@@ -48,6 +48,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% motion nodes in JSON
 
@@ -85,8 +86,7 @@ def test_to_json_joint_position_list(mini_world):
 def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
     root, tip = mini_world.bodies
     node = CartesianPositionStraight(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(1, 0, 0, reference_frame=root),
     )
     new_json_data = json.loads(json.dumps(to_json(node)))
@@ -169,8 +169,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
 
     statechart = Statechart(context=_create_executor(pr2_world_state_reset).context)
     cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_pose=tip_goal,
     )
     statechart.add_node(node=cart_goal)

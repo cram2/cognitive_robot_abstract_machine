@@ -22,7 +22,7 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
@@ -35,7 +35,7 @@ from krrood_spatial_math.spatial_types import (
 @dataclass(eq=False, repr=False, kw_only=True)
 class WiggleInsert(
     ConvergingTask,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasCruiseVelocityParameter,
 ):
     """
@@ -173,7 +173,7 @@ class WiggleInsert(
         self._random_translation = Vector3.create_with_variables(
             f"{self.name}_rand_translation"
         )
-        self._random_translation.reference_frame = self.root_link
+        self._random_translation.reference_frame = self.kinematic_chain.root
         self.context.float_variable_data.register_expression(
             expression=self._random_translation
         )
@@ -194,11 +194,11 @@ class WiggleInsert(
         # The previous default was a zero vector, which has no well-defined perpendicular plane;
         # the root z-axis is used instead so the default is usable.
         hole_normal = self.context.world.transform(
-            target_frame=self.root_link,
+            target_frame=self.kinematic_chain.root,
             spatial_object=(
                 self.hole_normal
                 if self.hole_normal is not None
-                else Vector3.Z(reference_frame=self.root_link)
+                else Vector3.Z(reference_frame=self.kinematic_chain.root)
             ),
         )
 
@@ -207,10 +207,10 @@ class WiggleInsert(
         )
 
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         root_P_hole = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.hole_point
+            target_frame=self.kinematic_chain.root, spatial_object=self.hole_point
         )
 
         root_P_hole_wiggled = root_P_hole + self._random_translation
@@ -223,13 +223,13 @@ class WiggleInsert(
         )
 
         tip_V_hole_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=hole_normal
+            target_frame=self.kinematic_chain.tip, spatial_object=hole_normal
         )
         tip_R_hole_normal = RotationMatrix.from_axis_angle(
             AxisAngle(angle=self._random_angle, axis=tip_V_hole_normal)
         )
         root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_R_goal = root_R_current.dot(tip_R_hole_normal)
 

@@ -49,6 +49,7 @@ from .test_client_presence import wait_until
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(kw_only=True)
@@ -180,8 +181,9 @@ class TestCartGoals:
         statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=giskard.base_footprint,
-                    tip_link=giskard.right_tip,
+                    kinematic_chain=KinematicChain(
+                        root=giskard.base_footprint, tip=giskard.right_tip
+                    ),
                     goal_pose=tip_goal,
                 )
             )
@@ -283,8 +285,9 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=100, reference_frame=giskard.base_footprint
                 ),
@@ -301,8 +304,9 @@ class TestActionServerEvents:
         statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=giskard.map,
-                    tip_link=giskard.base_footprint,
+                    kinematic_chain=KinematicChain(
+                        root=giskard.map, tip=giskard.base_footprint
+                    ),
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         y=1, reference_frame=giskard.base_footprint
                     ),
@@ -322,8 +326,9 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
@@ -354,8 +359,9 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
@@ -395,8 +401,9 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),

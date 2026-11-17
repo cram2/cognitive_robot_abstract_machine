@@ -42,16 +42,14 @@ from giskardpy.motion_statechart.mixins import (
     HasGoalPoseParameter,
     HasGoalStateParameter,
     HasMaxJointVelocityParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasMaxLinearVelocityParameter,
     HasCruiseLinearVelocityParameter,
     HasCruiseAngularVelocityParameter,
     HasPositionThresholdParameter,
     HasOrientationThresholdParameter,
     HasCruiseVelocityParameter,
-    HasRootLinkParameter,
     HasThresholdParameter,
-    HasTipLinkParameter,
     HasTwoFingerGripperParameter,
     HasWidthParameter,
     HasWeightParameter,
@@ -105,6 +103,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% collecting the node classes
 
@@ -179,7 +178,7 @@ def _feature_parameters(cls: type) -> dict[str, object]:
 # %% one mixin per concept
 
 
-def test_only_the_kinematic_chain_combines_parameter_mixins():
+def test_no_parameter_mixin_combines_another():
     combined_mixins = {
         mixin: {
             other
@@ -188,9 +187,7 @@ def test_only_the_kinematic_chain_combines_parameter_mixins():
         }
         for mixin in _parameter_mixins()
     }
-    assert {mixin: others for mixin, others in combined_mixins.items() if others} == {
-        HasKinematicChainParameters: {HasRootLinkParameter, HasTipLinkParameter}
-    }
+    assert {mixin: others for mixin, others in combined_mixins.items() if others} == {}
 
 
 @pytest.mark.parametrize(
@@ -288,17 +285,25 @@ def test_every_root_and_tip_link_is_a_kinematic_structure_entity():
     assert {
         key: link_type
         for key, link_type in link_types.items()
-        if link_type not in (KinematicStructureEntity, KinematicStructureEntity | None)
+        if link_type is not KinematicStructureEntity
     } == {}
 
 
-def test_every_node_taking_a_root_and_a_tip_link_takes_them_as_a_kinematic_chain():
+def test_no_node_takes_a_root_and_a_tip_link_apart():
     assert [
         cls
         for cls in _node_classes()
-        if issubclass(cls, HasRootLinkParameter)
-        and issubclass(cls, HasTipLinkParameter)
-        and not issubclass(cls, HasKinematicChainParameters)
+        if {"root_link", "tip_link"}
+        <= {field.name for field in dataclasses.fields(cls) if field.init}
+    ] == []
+
+
+def test_every_kinematic_chain_comes_from_its_mixin():
+    assert [
+        cls
+        for cls in _node_classes()
+        if "kinematic_chain" in {field.name for field in dataclasses.fields(cls)}
+        and not issubclass(cls, HasKinematicChainParameter)
     ] == []
 
 
@@ -399,8 +404,9 @@ def test_a_grasped_mechanism_names_the_position_it_drives_to():
 def test_the_goal_reference_frame_is_the_frame_of_the_goal():
     goal_frame = Body(name=PrefixedName("goal_frame"))
     task = CartesianPosition(
-        root_link=Body(name=PrefixedName("root")),
-        tip_link=Body(name=PrefixedName("tip")),
+        kinematic_chain=KinematicChain(
+            root=Body(name=PrefixedName("root")), tip=Body(name=PrefixedName("tip"))
+        ),
         goal_point=Point3(reference_frame=goal_frame),
     )
     assert task.goal_reference_frame is goal_frame
@@ -409,8 +415,12 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
 def test_nodes_with_equal_parameters_are_told_apart_by_identity():
     root, tip = Body(name=PrefixedName("root")), Body(name=PrefixedName("tip"))
     goal = Point3(reference_frame=root)
-    first = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal)
-    second = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal)
+    first = CartesianPosition(
+        kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=goal
+    )
+    second = CartesianPosition(
+        kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=goal
+    )
     assert first != second
     assert len({first, second}) == 2
 

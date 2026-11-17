@@ -72,6 +72,7 @@ from ...plan_running import (
     statechart_of,
     world_of,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% recording a run
 
@@ -411,13 +412,13 @@ def test_a_simulated_stretch_stays_in_front_of_the_container_it_closes(
     assert type(closing_step) is Parallel
     holding, facing, close = closing_step.nodes
     assert type(holding) is CartesianPose
-    assert holding.root_link is action.grasp_candidate.graspable.root
-    assert holding.tip_link is tool_frame
+    assert holding.kinematic_chain.root is action.grasp_candidate.graspable.root
+    assert holding.kinematic_chain.tip is tool_frame
     np.testing.assert_allclose(holding.goal_pose.to_np(), Pose().to_np())
     assert holding.goal_pose.reference_frame is tool_frame
     assert type(facing) is AlignPlanes
-    assert facing.root_link is world.root
-    assert facing.tip_link is robot.root
+    assert facing.kinematic_chain.root is world.root
+    assert facing.kinematic_chain.tip is robot.root
     np.testing.assert_allclose(facing.reference_normal.to_np()[:3], [1, 0, 0])
     assert (
         facing.reference_normal.reference_frame is action.grasp_candidate.graspable.root
@@ -517,8 +518,8 @@ def test_stretch_reaches_in_a_straight_line(
         reaching_goals_of(action), reaching_goals_of(unchanged), strict=True
     ):
         assert type(goal.nodes[0]) is CartesianPositionStraight
-        assert goal.root_link is default_goal.root_link
-        assert goal.tip_link is default_goal.tip_link
+        assert goal.kinematic_chain.root is default_goal.kinematic_chain.root
+        assert goal.kinematic_chain.tip is default_goal.kinematic_chain.tip
         np.testing.assert_allclose(
             goal.goal_pose.to_np(), default_goal.goal_pose.to_np()
         )
@@ -547,8 +548,8 @@ def test_stretch_lifts_in_a_straight_line(
     )
 
     assert type(goal.nodes[0]) is CartesianPositionStraight
-    assert goal.root_link is unchanged.root_link
-    assert goal.tip_link is unchanged.tip_link
+    assert goal.kinematic_chain.root is unchanged.kinematic_chain.root
+    assert goal.kinematic_chain.tip is unchanged.kinematic_chain.tip
     np.testing.assert_allclose(goal.goal_pose.to_np(), unchanged.goal_pose.to_np())
     assert goal.position_threshold == unchanged.position_threshold
     assert goal.orientation_threshold == unchanged.orientation_threshold
@@ -578,8 +579,8 @@ def test_stretch_holds_the_orientation_of_its_base_while_it_reaches(
 
     [hold] = held_orientations_of(action)
     assert hold.parent_node is action.parent_node
-    assert hold.root_link is world.root
-    assert hold.tip_link is robot.root
+    assert hold.kinematic_chain.root is world.root
+    assert hold.kinematic_chain.tip is robot.root
 
 
 def test_stretch_holds_the_orientation_of_its_base_once_for_nested_tool_motions(
@@ -627,12 +628,19 @@ def test_stretch_holds_the_orientation_of_its_base_beside_a_hold_of_something_el
     tool_frame = robot.all_arms[0].end_effector.tool_frame
 
     prepared(
-        Parallel(nodes=[HoldPose(root_link=world.root, tip_link=tool_frame), reach]),
+        Parallel(
+            nodes=[
+                HoldPose(
+                    kinematic_chain=KinematicChain(root=world.root, tip=tool_frame)
+                ),
+                reach,
+            ]
+        ),
         simulated_executor(extensions),
     )
 
     [hold] = held_orientations_of(reach)
-    assert hold.tip_link is robot.root
+    assert hold.kinematic_chain.tip is robot.root
 
 
 def test_stretch_holds_the_orientation_of_its_base_only_once_it_drove_there(

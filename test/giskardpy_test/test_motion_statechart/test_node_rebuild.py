@@ -9,6 +9,7 @@ from giskardpy.motion_statechart.monitors.progress_monitors import (
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 
 from ...cramph_test.test_statechart.node_rebuild import RebuildLeavingNodesOut
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% helpers
 
@@ -19,8 +20,9 @@ def _task_moving_the_bot(world: World, name: str) -> CartesianPosition:
     """
     return CartesianPosition(
         name=name,
-        root_link=world.root,
-        tip_link=world.get_kinematic_structure_entity_by_name("bot"),
+        kinematic_chain=KinematicChain(
+            root=world.root, tip=world.get_kinematic_structure_entity_by_name("bot")
+        ),
         goal_point=Point3(0, 0, 0, reference_frame=world.root),
     )
 

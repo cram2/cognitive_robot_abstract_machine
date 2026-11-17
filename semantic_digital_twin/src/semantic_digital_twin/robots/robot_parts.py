@@ -539,13 +539,13 @@ class HasGripperActionServers(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC):
+class RobotKinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC):
     """
-    A kinematic chain is a robot part that consists of a chain of bodies and connections
-    between them.
+    A robot part that consists of the chain of bodies and connections from its root body
+    to its tip body.
 
-    It has a root body and a tip body, and the connections between them can be computed
-    using the world description.
+    .. note:: A chain between any two entities of a world that is not a robot part is a
+        :class:`~semantic_digital_twin.world_description.kinematic_chain.KinematicChain`.
     """
 
     tip: Body = field(kw_only=True)
@@ -783,7 +783,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
 
 
 @dataclass(eq=False)
-class Finger(KinematicChain, ABC):
+class Finger(RobotKinematicChain, ABC):
     """
     A finger is a kinematic chain attached to a gripper to manipulate objects.
     """
@@ -959,7 +959,7 @@ class EndEffector(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class Torso(KinematicChain, ABC):
+class Torso(RobotKinematicChain, ABC):
     """
     The torso of a robot, which is a kinematic chain providing additional shared degrees
     of freedom to its attachments, such as arms or the neck.
@@ -967,7 +967,7 @@ class Torso(KinematicChain, ABC):
 
 
 @dataclass(eq=False)
-class Arm(KinematicChain, HasEndEffector[TGenericEndEffector], ABC):
+class Arm(RobotKinematicChain, HasEndEffector[TGenericEndEffector], ABC):
     """
     An arm is a kinematic chain that has an end effector attached to it.
     """
@@ -975,7 +975,7 @@ class Arm(KinematicChain, HasEndEffector[TGenericEndEffector], ABC):
 
 @dataclass(eq=False)
 class Neck(
-    KinematicChain,
+    RobotKinematicChain,
     HasSensors[Unpack[TGenericSensors]],
     ABC,
 ):

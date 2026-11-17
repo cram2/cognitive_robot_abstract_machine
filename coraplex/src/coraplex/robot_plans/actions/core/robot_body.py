@@ -47,6 +47,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from semantic_digital_twin.datastructures.definitions import StaticJointState
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -196,8 +197,9 @@ class FollowToolCenterPointPathAction(
         :return: The task reaching that waypoint.
         """
         return CartesianPose(
-            root_link=self.controlled_root,
-            tip_link=self.arm.end_effector.tool_frame,
+            kinematic_chain=KinematicChain(
+                root=self.controlled_root, tip=self.arm.end_effector.tool_frame
+            ),
             goal_pose=target,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
@@ -234,8 +236,9 @@ class MoveManipulatorAction(
 
     def create_goal(self) -> StatechartNode:
         goal = CartesianPose(
-            root_link=self.controlled_root,
-            tip_link=self.arm.end_effector.tool_frame,
+            kinematic_chain=KinematicChain(
+                root=self.controlled_root, tip=self.arm.end_effector.tool_frame
+            ),
             goal_pose=self.goal_pose,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,

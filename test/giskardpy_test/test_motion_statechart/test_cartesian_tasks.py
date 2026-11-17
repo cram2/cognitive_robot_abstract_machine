@@ -91,6 +91,7 @@ from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_control import WorldStateTrajectoryRecording
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% holding a pose
 
@@ -123,14 +124,16 @@ class TestHoldPose:
         motion_statechart.add_nodes(
             nodes=[
                 CartesianPosition(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=bot,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=bot
+                    ),
                     goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
                     weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                 ),
                 HoldPose(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=bot,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=bot
+                    ),
                     weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                 ),
             ]
@@ -156,11 +159,12 @@ class TestHoldPose:
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         goal = CartesianPosition(
-            root_link=cylinder_bot_world.root,
-            tip_link=bot,
+            kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
             goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
         )
-        hold = HoldPose(root_link=cylinder_bot_world.root, tip_link=bot)
+        hold = HoldPose(
+            kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot)
+        )
         together = Parallel(nodes=[goal, hold])
         progressing = StillProgressing(monitored_node=together)
         executor = self.executor_for(world=cylinder_bot_world)
@@ -180,7 +184,9 @@ class TestHoldPose:
         that ends once everything under it reached its goal would otherwise never end.
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-        hold = HoldPose(root_link=cylinder_bot_world.root, tip_link=bot)
+        hold = HoldPose(
+            kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot)
+        )
         executor = self.executor_for(world=cylinder_bot_world)
         motion_statechart = Statechart(context=executor.context)
         motion_statechart.add_node(node=hold)
@@ -200,8 +206,7 @@ class TestHoldPose:
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         hold = HoldPose(
-            root_link=cylinder_bot_world.root,
-            tip_link=bot,
+            kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
             weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
         executor = self.executor_for(world=cylinder_bot_world)
@@ -209,8 +214,9 @@ class TestHoldPose:
         motion_statechart.add_nodes(
             nodes=[
                 CartesianPosition(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=bot,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=bot
+                    ),
                     goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
                     weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                 ),
@@ -241,22 +247,19 @@ class TestHoldPose:
         motion_statechart.add_nodes(
             nodes=[
                 moving := CartesianPosition(
-                    root_link=world.root,
-                    tip_link=bot,
+                    kinematic_chain=KinematicChain(root=world.root, tip=bot),
                     goal_point=goal_point,
                     weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                 ),
                 CartesianOrientation(
-                    root_link=world.root,
-                    tip_link=bot,
+                    kinematic_chain=KinematicChain(root=world.root, tip=bot),
                     goal_orientation=RotationMatrix.from_rpy(
                         yaw=np.pi / 2, reference_frame=world.root
                     ),
                     weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                 ),
                 HoldOrientation(
-                    root_link=world.root,
-                    tip_link=bot,
+                    kinematic_chain=KinematicChain(root=world.root, tip=bot),
                     weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                 ),
             ]
@@ -341,8 +344,7 @@ def peak_angle_per_tick_towards_roll_goal(world: World, angle: float) -> float:
     )
     motion_statechart = Statechart(context=executor.context)
     orientation_goal = CartesianOrientation(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_orientation=RotationMatrix.from_axis_angle(
             AxisAngle(Vector3.X(), angle, reference_frame=tip)
         ),
@@ -498,8 +500,10 @@ class TestCartesianPositionTrajectory:
         )
         motion_statechart = Statechart(context=executor.context)
         cartesian_trajectory = CartesianPositionTrajectory(
-            root_link=cylinder_bot_world.root,
-            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            kinematic_chain=KinematicChain(
+                root=cylinder_bot_world.root,
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            ),
             goal_points=points,
         )
         motion_statechart.add_node(node=cartesian_trajectory)
@@ -512,8 +516,8 @@ class TestCartesianPositionTrajectory:
             world_state_trajectory=executor.require_extension(
                 extension_type=WorldStateTrajectoryRecording
             ).plotter.world_state_trajectory,
-            root_link=cartesian_trajectory.root_link,
-            tip_link=cartesian_trajectory.tip_link,
+            root_link=cartesian_trajectory.kinematic_chain.root,
+            tip_link=cartesian_trajectory.kinematic_chain.tip,
         )
 
     def test_cartesian_position_trajectory_circle(self, *, cylinder_bot_world: World):
@@ -539,8 +543,10 @@ class TestCartesianPositionTrajectory:
         )
         motion_statechart = Statechart(context=executor.context)
         cartesian_trajectory = CartesianPositionTrajectory(
-            root_link=cylinder_bot_world.root,
-            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            kinematic_chain=KinematicChain(
+                root=cylinder_bot_world.root,
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            ),
             goal_points=points,
             maximum_skip_ahead=20,
         )
@@ -554,8 +560,8 @@ class TestCartesianPositionTrajectory:
             world_state_trajectory=executor.require_extension(
                 extension_type=WorldStateTrajectoryRecording
             ).plotter.world_state_trajectory,
-            root_link=cartesian_trajectory.root_link,
-            tip_link=cartesian_trajectory.tip_link,
+            root_link=cartesian_trajectory.kinematic_chain.root,
+            tip_link=cartesian_trajectory.kinematic_chain.tip,
         )
 
     def test_trajectory_follows_a_goal_frame_that_moved_before_it_started(
@@ -576,12 +582,11 @@ class TestCartesianPositionTrajectory:
         )
         motion_statechart = Statechart(context=executor.context)
         cartesian_trajectory = CartesianPositionTrajectory(
-            root_link=root, tip_link=tip, goal_points=points
+            kinematic_chain=KinematicChain(root=root, tip=tip), goal_points=points
         )
         motion_statechart.add_node(node=cartesian_trajectory)
         move_away = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(-0.5, 0, 0, reference_frame=root),
         )
         motion_statechart.add_node(node=move_away)
@@ -614,7 +619,8 @@ class TestCartesianPositionTrajectory:
         )
         motion_statechart = Statechart(context=executor.context)
         cartesian_trajectory = CartesianPositionTrajectory(
-            root_link=cylinder_bot_world.root, tip_link=tip, goal_points=points
+            kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
+            goal_points=points,
         )
         motion_statechart.add_node(node=cartesian_trajectory)
         motion_statechart.add_node(node=EndMotion.when_true(node=cartesian_trajectory))
@@ -670,8 +676,7 @@ class TestCartesianPositionTrajectory:
         motion_statechart.add_node(
             node=(
                 cartesian_trajectory := CartesianPositionTrajectory(
-                    root_link=root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(root=root, tip=tip),
                     goal_points=points,
                 )
             )
@@ -685,8 +690,8 @@ class TestCartesianPositionTrajectory:
             world_state_trajectory=executor.require_extension(
                 extension_type=WorldStateTrajectoryRecording
             ).plotter.world_state_trajectory,
-            root_link=cartesian_trajectory.root_link,
-            tip_link=cartesian_trajectory.tip_link,
+            root_link=cartesian_trajectory.kinematic_chain.root,
+            tip_link=cartesian_trajectory.kinematic_chain.tip,
         )
 
 
@@ -706,8 +711,9 @@ class TestCartesianTasks:
         motion_statechart.add_nodes(
             nodes=[
                 goal := CartesianPose(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=tip
+                    ),
                     goal_pose=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_world.root
                     ),
@@ -753,15 +759,17 @@ class TestCartesianTasks:
         motion_statechart.add_nodes(
             nodes=[
                 strict := CartesianPose(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=tip
+                    ),
                     goal_pose=goal_pose,
                     position_threshold=0.01,
                     name="strict",
                 ),
                 loose := CartesianPose(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=tip
+                    ),
                     goal_pose=goal_pose,
                     position_threshold=0.01,
                     orientation_threshold=0.1,
@@ -802,8 +810,9 @@ class TestCartesianTasks:
         motion_statechart.add_nodes(
             nodes=[
                 goal := CartesianPose(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=tip
+                    ),
                     goal_pose=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_world.root
                     ),
@@ -852,9 +861,11 @@ class TestCartesianTasks:
         motion_statechart.add_nodes(
             nodes=[
                 cart_goal := CartesianPose(
-                    root_link=pr2_world_state_reset.root,
-                    tip_link=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-                        "base_footprint"
+                    kinematic_chain=KinematicChain(
+                        root=pr2_world_state_reset.root,
+                        tip=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+                            "base_footprint"
+                        ),
                     ),
                     goal_pose=Pose.from_xyz_rpy(
                         x=50, reference_frame=pr2_world_state_reset.root
@@ -912,8 +923,7 @@ class TestCartesianTasks:
         motion_statechart.add_nodes(
             nodes=[
                 cart_goal := CartesianPose(
-                    root_link=root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(root=root, tip=tip),
                     goal_pose=tip_goal,
                 ),
                 EndMotion.when_true(node=cart_goal),
@@ -947,8 +957,9 @@ class TestCartesianTasks:
         motion_statechart.add_nodes(
             nodes=[
                 cart_goal := CartesianPose(
-                    root_link=pr2_world_state_reset.root,
-                    tip_link=base_footprint,
+                    kinematic_chain=KinematicChain(
+                        root=pr2_world_state_reset.root, tip=base_footprint
+                    ),
                     goal_pose=Pose.from_xyz_rpy(
                         z=-1, reference_frame=pr2_world_state_reset.root
                     ),
@@ -993,15 +1004,17 @@ class TestCartesianTasks:
                 both_grippers := Parallel(
                     nodes=[
                         CartesianPose(
-                            root_link=base_link,
-                            tip_link=right_tip,
+                            kinematic_chain=KinematicChain(
+                                root=base_link, tip=right_tip
+                            ),
                             goal_pose=Pose.from_xyz_quaternion(
                                 pos_x=-0.1, reference_frame=right_tip
                             ),
                         ),
                         CartesianPose(
-                            root_link=base_link,
-                            tip_link=left_tip,
+                            kinematic_chain=KinematicChain(
+                                root=base_link, tip=left_tip
+                            ),
                             goal_pose=Pose.from_xyz_quaternion(
                                 pos_x=-0.05, reference_frame=left_tip
                             ),
@@ -1048,7 +1061,8 @@ class TestCartesianTasks:
         motion_statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=left_tip, tip_link=right_tip, goal_pose=goal_pose
+                    kinematic_chain=KinematicChain(root=left_tip, tip=right_tip),
+                    goal_pose=goal_pose,
                 )
             )
         )
@@ -1091,7 +1105,8 @@ class TestCartesianTasks:
         motion_statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=torso_lift_link, tip_link=right_tip, goal_pose=goal_pose
+                    kinematic_chain=KinematicChain(root=torso_lift_link, tip=right_tip),
+                    goal_pose=goal_pose,
                 )
             )
         )
@@ -1139,8 +1154,9 @@ class TestCartesianTasks:
         motion_statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=hsr_world_copy.root,
-                    tip_link=base_footprint,
+                    kinematic_chain=KinematicChain(
+                        root=hsr_world_copy.root, tip=base_footprint
+                    ),
                     goal_pose=goal_pose,
                 )
             )
@@ -1178,7 +1194,8 @@ class TestCartesianTasks:
         motion_statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=base, tip_link=finger_tip, goal_pose=goal_pose
+                    kinematic_chain=KinematicChain(root=base, tip=finger_tip),
+                    goal_pose=goal_pose,
                 )
             )
         )
@@ -1227,13 +1244,15 @@ class TestCartesianTasks:
                 goal := Parallel(
                     nodes=[
                         CartesianOrientation(
-                            root_link=_hsr_world_setup.root,
-                            tip_link=hand.tool_frame,
+                            kinematic_chain=KinematicChain(
+                                root=_hsr_world_setup.root, tip=hand.tool_frame
+                            ),
                             goal_orientation=orientation_goal,
                         ),
                         CartesianPosition(
-                            root_link=_hsr_world_setup.root,
-                            tip_link=hand.tool_frame,
+                            kinematic_chain=KinematicChain(
+                                root=_hsr_world_setup.root, tip=hand.tool_frame
+                            ),
                             goal_point=_hsr_world_setup.bodies[
                                 -1
                             ].global_transform.position,
@@ -1269,15 +1288,13 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianPose(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=tip_goal1,
         )
         motion_statechart.add_node(node=cart_goal1)
 
         cart_goal2 = CartesianPose(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=tip_goal2,
             goal_binding_policy=GoalBindingPolicy.Bind_at_build,
         )
@@ -1320,15 +1337,13 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianPose(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=tip_goal1,
         )
         motion_statechart.add_node(node=cart_goal1)
 
         cart_goal2 = CartesianPose(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=tip_goal2,
         )
         motion_statechart.add_node(node=cart_goal2)
@@ -1372,8 +1387,7 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal = CartesianOrientation(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=tip_goal,
         )
         motion_statechart.add_node(node=cart_goal)
@@ -1413,16 +1427,14 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=tip_goal1,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(node=cart_goal1)
 
         cart_goal2 = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=tip_goal2,
             goal_binding_policy=GoalBindingPolicy.Bind_at_build,
         )
@@ -1471,16 +1483,14 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=tip_goal1,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(node=cart_goal1)
 
         cart_goal2 = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=tip_goal2,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
@@ -1524,15 +1534,13 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=tip_goal1,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
 
         cart_goal2 = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=tip_goal2,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
@@ -1583,16 +1591,14 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianOrientation(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=tip_rot1,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(node=cart_goal1)
 
         cart_goal2 = CartesianOrientation(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=tip_rot2,
             goal_binding_policy=GoalBindingPolicy.Bind_at_build,
         )
@@ -1642,16 +1648,14 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_goal1 = CartesianOrientation(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=tip_rot1,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         motion_statechart.add_node(node=cart_goal1)
 
         cart_goal2 = CartesianOrientation(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=tip_rot2,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
@@ -1695,8 +1699,7 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_straight = CartesianPositionStraight(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=goal_point,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
             threshold=0.015,
@@ -1731,8 +1734,7 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         cart_straight = CartesianPoseStraight(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=goal_pose,
             goal_binding_policy=GoalBindingPolicy.Bind_on_start,
         )
@@ -1768,8 +1770,7 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         goal = CartesianPoseStraight(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=Pose.from_xyz_rpy(0.1, 0, 0, reference_frame=tip),
             position_threshold=0.03,
             orientation_threshold=0.2,
@@ -1812,8 +1813,7 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         goal = CartesianPoseStraight(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=goal_pose,
         )
         motion_statechart.add_node(node=goal)
@@ -1871,8 +1871,10 @@ class TestCartesianTasks:
         weight times the lateral weight factor.
         """
         task = CartesianPositionStraight(
-            root_link=cylinder_bot_world.root,
-            tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            kinematic_chain=KinematicChain(
+                root=cylinder_bot_world.root,
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            ),
             goal_point=Point3(x=1, reference_frame=cylinder_bot_world.root),
             weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             name="straight",
@@ -1919,7 +1921,7 @@ class TestCartesianTasks:
         )
         motion_statechart = Statechart(context=executor.context)
         position_goal = CartesianPosition(
-            root_link=root, tip_link=tip, goal_point=goal_point
+            kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=goal_point
         )
         motion_statechart.add_node(node=position_goal)
         motion_statechart.add_node(node=EndMotion.when_true(node=position_goal))
@@ -1960,8 +1962,7 @@ class TestCartesianTasks:
             )
         )
         straight = CartesianPositionStraight(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=goal_point,
         )
         motion_statechart.add_nodes(nodes=[wrist_goal, straight])
@@ -1998,8 +1999,7 @@ class TestCartesianTasks:
         )
         statechart = Statechart(context=executor.context)
         goal = CartesianPosition(
-            root_link=world.root,
-            tip_link=trunk.arms[0].tip,
+            kinematic_chain=KinematicChain(root=world.root, tip=trunk.arms[0].tip),
             goal_point=goal_point,
         )
         statechart.add_node(node=goal)
@@ -2359,8 +2359,7 @@ class TestDiffDriveBaseGoal:
         motion_statechart.add_node(
             node=(
                 halfway := PositionReached(
-                    root_link=world.root,
-                    tip_link=base,
+                    kinematic_chain=KinematicChain(root=world.root, tip=base),
                     goal_point=Point3(x=0.5, reference_frame=world.root),
                     threshold=0.1,
                 )
@@ -2479,15 +2478,13 @@ class TestVelocityTasks:
 
         if goal_type == "position":
             goal = CartesianPosition(
-                root_link=root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=root, tip=tip),
                 goal_point=Point3(1, 0, 0, reference_frame=tip),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             )
         else:
             goal = CartesianOrientation(
-                root_link=root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=root, tip=tip),
                 goal_orientation=RotationMatrix.from_rpy(
                     yaw=np.pi / 2, reference_frame=tip
                 ),
@@ -2495,8 +2492,7 @@ class TestVelocityTasks:
             )
 
         low_weight_limit = limit_cls(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
         executor = StatechartExecutor(
@@ -2535,13 +2531,14 @@ class TestVelocityTasks:
 
         point = Point3(1, 0, 0, reference_frame=tip)
         position_goal = CartesianPosition(
-            root_link=root, tip_link=tip, goal_point=point
+            kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=point
         )
 
-        usual_limit = limit_cls(root_link=root, tip_link=tip, max_linear_velocity=0.1)
+        usual_limit = limit_cls(
+            kinematic_chain=KinematicChain(root=root, tip=tip), max_linear_velocity=0.1
+        )
         half_velocity_limit = limit_cls(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             max_linear_velocity=(usual_limit.max_linear_velocity / 2.1),
         )
 
@@ -2578,13 +2575,15 @@ class TestVelocityTasks:
 
         rotation = RotationMatrix.from_rpy(yaw=np.pi / 2, reference_frame=tip)
         orientation = CartesianOrientation(
-            root_link=root, tip_link=tip, goal_orientation=rotation
+            kinematic_chain=KinematicChain(root=root, tip=tip),
+            goal_orientation=rotation,
         )
 
-        usual_limit = limit_cls(root_link=root, tip_link=tip, max_angular_velocity=0.3)
+        usual_limit = limit_cls(
+            kinematic_chain=KinematicChain(root=root, tip=tip), max_angular_velocity=0.3
+        )
         half_velocity_limit = limit_cls(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             max_angular_velocity=(usual_limit.max_angular_velocity / 2.1),
         )
 
@@ -2612,12 +2611,14 @@ class TestVelocityTasks:
         root = world.get_kinematic_structure_entity_by_name("odom_combined")
         if limit_type == "position":
             limit = CartesianPositionVelocityLimit(
-                root_link=root, tip_link=tip, max_linear_velocity=0.05
+                kinematic_chain=KinematicChain(root=root, tip=tip),
+                max_linear_velocity=0.05,
             )
             velocity_scale = VelocityScale.TRANSLATION
         else:
             limit = CartesianRotationVelocityLimit(
-                root_link=root, tip_link=tip, max_angular_velocity=0.1
+                kinematic_chain=KinematicChain(root=root, tip=tip),
+                max_angular_velocity=0.1,
             )
             velocity_scale = VelocityScale.ROTATION
         executor = StatechartExecutor(
@@ -2643,8 +2644,7 @@ class TestDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPosition(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
             name="cart_pos",
         )
@@ -2665,8 +2665,7 @@ class TestDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPositionStraight(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
             name="straight",
         )
@@ -2687,8 +2686,7 @@ class TestDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianOrientation(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=RotationMatrix.from_rpy(
                 yaw=np.pi / 2, reference_frame=root
             ),
@@ -2711,8 +2709,7 @@ class TestDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPositionTrajectory(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_points=[
                 Point3(x=0, reference_frame=root),
                 Point3(x=1, reference_frame=root),
@@ -2739,8 +2736,7 @@ class TestDebugExpressions:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPose(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=root),
             name="pose",
         )

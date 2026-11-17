@@ -39,7 +39,6 @@ from giskardpy.motion_statechart.mixins import (
     HasFingerStallMinimumTimeParameter,
     HasGoalPoseParameter,
     HasMaxJointVelocityParameter,
-    HasKinematicChainParameters,
     HasOrientationThresholdParameter,
     HasPositionThresholdParameter,
     HasThresholdParameter,
@@ -152,13 +151,11 @@ def test_a_parameter_mixin_declares_the_one_field_it_is_named_for(mixin: type):
     assert combined_mixins(mixin) == set()
 
 
-def test_the_kinematic_chain_is_the_only_bundle_of_parameters():
+def test_no_parameter_mixin_bundles_several_parameters():
     """
-    The bundle declares no field of its own; its fields are those of the single
-    parameter mixins it combines.
+    Parameters that always come together are one parameter of a type holding them.
     """
-    assert parameter_mixins_named("Parameters") == [HasKinematicChainParameters]
-    assert own_fields(HasKinematicChainParameters) == set()
+    assert parameter_mixins_named("Parameters") == []
 
 
 @pytest.mark.parametrize(

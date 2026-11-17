@@ -44,6 +44,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 from cramph.node import NodeArtifacts, StatechartNode, EndStatechart
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 if TYPE_CHECKING:
     from cramph.statechart import Statechart
@@ -431,8 +432,9 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
         super().set_up()
         self._goal_reference_frame_binding = ForwardKinematicsBinding(
             name=self._goal_reference_frame_name,
-            root=self.goal_binding_root,
-            tip=self.goal_reference_frame,
+            kinematic_chain=KinematicChain(
+                root=self.goal_binding_root, tip=self.goal_reference_frame
+            ),
             float_variable_data=self.context.float_variable_data,
             root_T_tip=self._root_T_goal_reference_frame_to_bind(),
         )

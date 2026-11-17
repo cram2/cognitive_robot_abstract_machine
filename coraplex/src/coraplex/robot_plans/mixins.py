@@ -53,6 +53,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 # %% what an action acts on
@@ -595,8 +596,7 @@ class MovesToolCenterPoint(
         :return: The task that brings `tip` to `target`.
         """
         return CartesianPose(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=target,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
@@ -616,16 +616,14 @@ class MovesToolCenterPoint(
         if max_linear_velocity is not None:
             limits.append(
                 CartesianPositionVelocityLimit(
-                    root_link=root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(root=root, tip=tip),
                     max_linear_velocity=max_linear_velocity,
                 )
             )
         if max_angular_velocity is not None:
             limits.append(
                 CartesianRotationVelocityLimit(
-                    root_link=root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(root=root, tip=tip),
                     max_angular_velocity=max_angular_velocity,
                 )
             )

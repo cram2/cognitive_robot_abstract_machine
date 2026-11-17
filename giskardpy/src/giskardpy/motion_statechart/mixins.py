@@ -14,6 +14,7 @@ from krrood.patterns.mixin import ParameterMixin
 from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -46,9 +47,14 @@ class HasTipLinkParameter(ParameterMixin):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasKinematicChainParameters(HasRootLinkParameter, HasTipLinkParameter):
+class HasKinematicChainParameter(ParameterMixin):
     """
-    A node moving :attr:`tip_link` relative to :attr:`root_link`.
+    A node moving the tip of a kinematic chain relative to its root.
+    """
+
+    kinematic_chain: KinematicChain
+    """
+    The chain whose tip is moved, relative to its root.
     """
 
 

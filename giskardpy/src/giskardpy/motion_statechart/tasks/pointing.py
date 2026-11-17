@@ -24,7 +24,7 @@ class Pointing(CartesianTask, HasGoalPointParameter):
 
     pointing_axis: Vector3
     """
-    The axis of tip_link that will be used for pointing.
+    The axis of the tip of :attr:`kinematic_chain` that will be used for pointing.
     """
 
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
@@ -46,12 +46,12 @@ class Pointing(CartesianTask, HasGoalPointParameter):
         artifacts = MotionNodeArtifacts()
 
         tip_V_pointing_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.pointing_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
@@ -59,8 +59,8 @@ class Pointing(CartesianTask, HasGoalPointParameter):
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip @ tip_V_pointing_axis
-        root_V_pointing_axis.visualisation_frame = self.tip_link
-        root_V_goal_axis.visualisation_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.kinematic_chain.tip
+        root_V_goal_axis.visualisation_frame = self.kinematic_chain.tip
 
         tip_V_goal_axis = root_T_tip.inverse() @ root_V_goal_axis
         tip_V_goal_axis.scale(1)
@@ -87,7 +87,7 @@ class PointingCone(CartesianTask, HasGoalPointParameter):
 
     pointing_axis: Vector3
     """
-    The axis of tip_link that will be used for pointing.
+    The axis of the tip of :attr:`kinematic_chain` that will be used for pointing.
     """
 
     cone_theta: float = 0.0
@@ -113,12 +113,12 @@ class PointingCone(CartesianTask, HasGoalPointParameter):
         """
         artifacts = MotionNodeArtifacts()
         tip_V_pointing_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.pointing_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
@@ -126,14 +126,14 @@ class PointingCone(CartesianTask, HasGoalPointParameter):
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
-        root_V_pointing_axis.visualisation_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.kinematic_chain.tip
 
-        root_V_goal_axis.visualisation_frame = self.tip_link
+        root_V_goal_axis.visualisation_frame = self.kinematic_chain.tip
 
         root_V_goal_axis_proj = root_V_pointing_axis.project_to_cone(
             root_V_goal_axis, self.cone_theta
         )
-        root_V_goal_axis_proj.visualisation_frame = self.tip_link
+        root_V_goal_axis_proj.visualisation_frame = self.kinematic_chain.tip
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,

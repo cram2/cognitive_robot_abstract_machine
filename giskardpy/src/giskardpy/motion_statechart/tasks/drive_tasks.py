@@ -50,6 +50,7 @@ from semantic_digital_twin.world_description.connections import DifferentialDriv
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% moving a driven base
 
@@ -241,8 +242,9 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         super().set_up()
         self._parent_T_start_binding = ForwardKinematicsBinding(
             name=PrefixedName("parent_T_start", str(self.name)),
-            root=self.drive_parent,
-            tip=self.driven_body,
+            kinematic_chain=KinematicChain(
+                root=self.drive_parent, tip=self.driven_body
+            ),
             float_variable_data=self.context.float_variable_data,
         )
         self._parent_T_start_binding.bind(world=self.context.world)
@@ -256,7 +258,7 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         bound start pose relative to the drive's new parent, if the drive was moved
         under another parent.
         """
-        if self._parent_T_start_binding.root is not self.drive_parent:
+        if self._parent_T_start_binding.kinematic_chain.root is not self.drive_parent:
             self._parent_T_start_binding.change_root(
                 root=self.drive_parent, world=self.context.world
             )
@@ -420,7 +422,10 @@ class DrivenBaseGoal(
 
         Where the goal's reference frame was bound is kept.
         """
-        if self._goal_reference_frame_binding.root is not self._drive_parent:
+        if (
+            self._goal_reference_frame_binding.kinematic_chain.root
+            is not self._drive_parent
+        ):
             self._goal_reference_frame_binding.change_root(
                 root=self._drive_parent, world=self.context.world
             )

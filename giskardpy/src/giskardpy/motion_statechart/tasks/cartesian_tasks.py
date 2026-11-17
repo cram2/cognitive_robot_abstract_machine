@@ -43,11 +43,10 @@ from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
     HasRootLinkParameter,
     HasThresholdParameter,
-    HasTipLinkParameter,
     HasMaxAngularVelocityParameter,
     HasMaxLinearVelocityParameter,
     HasWeightParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 )
 from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math.float_variable_data import FloatVariableData
@@ -78,13 +77,13 @@ from semantic_digital_twin.world_description.world_entity import (
 class CartesianTask(
     ConvergingTask,
     BindsGoalReferenceFrame,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasCruiseVelocityParameter,
     ABC,
 ):
     """
-    Base class for all cartesian tasks, which drive :attr:`tip_link` towards a goal
-    expressed relative to :attr:`root_link`.
+    Base class for all cartesian tasks, which drive the tip of :attr:`kinematic_chain`
+    towards a goal expressed relative to its root.
 
     .. note:: subclasses describe their goal by implementing `build_artifacts`.
     """
@@ -105,7 +104,7 @@ class CartesianTask(
 
     @property
     def goal_binding_root(self) -> KinematicStructureEntity:
-        return self.root_link
+        return self.kinematic_chain.root
 
     def add_goal_and_current_debug_expressions(
         self,
@@ -164,7 +163,7 @@ class CartesianPosition(CartesianTask, HasGoalPointParameter):
 
         # Get current tip position in root frame
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
 
         # Add constraints to move tip towards goal
@@ -337,7 +336,7 @@ class CartesianPositionTrajectory(CartesianTask, HasGoalPointsParameter):
 
         # Get current tip position in root frame
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
 
         # Add constraints to move tip towards goal
@@ -407,7 +406,7 @@ class CartesianPositionTrajectory(CartesianTask, HasGoalPointsParameter):
             after a change of the world structure therefore keeps one stale compiled function per rebuild.
         """
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         goal_reference_frame_T_tip = (
             self.root_T_goal_reference_frame.inverse() @ root_T_tip
@@ -573,8 +572,7 @@ class CartesianPositionStraight(CartesianTask, HasGoalPointParameter):
         super().set_up()
         self._line_start_binding = ForwardKinematicsBinding(
             name=PrefixedName("root_T_line_start", str(self.name)),
-            root=self.root_link,
-            tip=self.tip_link,
+            kinematic_chain=self.kinematic_chain,
             float_variable_data=self.context.float_variable_data,
         )
         self._line_start_binding.bind(world=self.context.world)
@@ -604,7 +602,7 @@ class CartesianPositionStraight(CartesianTask, HasGoalPointParameter):
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_line_start = self._line_start_binding.root_T_tip.position
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
 
         root_V_line = root_P_goal - root_P_line_start
@@ -680,7 +678,7 @@ class CartesianOrientation(CartesianTask, HasGoalOrientationParameter):
 
         # Get current tip orientation in root frame
         root_T_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_R_current = root_T_current.rotation_matrix
 
@@ -708,7 +706,7 @@ class CartesianOrientation(CartesianTask, HasGoalOrientationParameter):
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianPose(
     Parallel,
-    HasTipLinkParameter,
+    HasKinematicChainParameter,
     HasGoalPoseParameter,
     HasGoalBindingPolicyParameter,
     HasPositionThresholdParameter,
@@ -718,20 +716,13 @@ class CartesianPose(
     HasWeightParameter,
 ):
     """
-    This goal will use the kinematic chain between root and tip link to move tip_link
-    into the 6D :attr:`goal_pose`.
+    This goal will use :attr:`kinematic_chain` to move its tip into the 6D
+    :attr:`goal_pose`.
 
     Position and orientation are separate tasks, because an error in meters and an error
     in radians cannot be compared against one threshold. This goal is the parallel
     holding both, together with any node it is handed, such as a speed cap or a
     collision allowance accompanying the motion.
-    """
-
-    root_link: KinematicStructureEntity | None = None
-    """
-    Base link of the kinematic chain.
-
-    Defaults to the root of the world.
     """
 
     nodes: list[StatechartNode] = field(default_factory=list, init=False)
@@ -744,8 +735,6 @@ class CartesianPose(
         Create the position and the orientation task, before the nodes this goal was
         handed.
         """
-        if self.root_link is None:
-            self.root_link = self.context.world.root
         for position, task in enumerate(self.create_tasks()):
             self._insert_at(position=position, node=task)
 
@@ -756,8 +745,7 @@ class CartesianPose(
         return [
             CartesianPosition(
                 name=f"{self.name}/position",
-                root_link=self.root_link,
-                tip_link=self.tip_link,
+                kinematic_chain=self.kinematic_chain,
                 goal_point=self.goal_pose.position,
                 cruise_velocity=self.cruise_linear_velocity,
                 threshold=self.position_threshold,
@@ -766,8 +754,7 @@ class CartesianPose(
             ),
             CartesianOrientation(
                 name=f"{self.name}/orientation",
-                root_link=self.root_link,
-                tip_link=self.tip_link,
+                kinematic_chain=self.kinematic_chain,
                 goal_orientation=self.goal_pose.rotation_matrix,
                 cruise_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
@@ -778,16 +765,16 @@ class CartesianPose(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HoldLink(Task, HasKinematicChainParameters, ABC):
+class HoldLink(Task, HasKinematicChainParameter, ABC):
     """
-    Keeps :attr:`tip_link` as it was relative to :attr:`root_link` when this task
-    started.
+    Keeps the tip of :attr:`kinematic_chain` as it was relative to its root when this
+    task started.
 
     An invariant rather than a goal, so it does not report progress. It observes
     whether the link is still held.
 
     .. note:: Unlike :class:`CartesianPose`, this constrains the chain between
-        :attr:`root_link` and :attr:`tip_link` without naming a pose, because the pose
+        :attr:`kinematic_chain` without naming a pose, because the pose
         to keep is the one the link is already at.
     """
 
@@ -809,8 +796,7 @@ class HoldLink(Task, HasKinematicChainParameters, ABC):
         super().set_up()
         self._pose_to_keep = ForwardKinematicsBinding(
             name=PrefixedName("pose_to_keep", str(self.name)),
-            root=self.root_link,
-            tip=self.tip_link,
+            kinematic_chain=self.kinematic_chain,
             float_variable_data=self.context.float_variable_data,
         )
         self._pose_to_keep.bind(world=self.context.world)
@@ -833,7 +819,7 @@ class HoldLink(Task, HasKinematicChainParameters, ABC):
         :return: Whether the link is within `threshold` of that orientation.
         """
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_R_tip_when_started = self._pose_to_keep.root_T_tip.rotation_matrix
         artifacts.geometry.add_rotation_goal_constraints(
@@ -862,7 +848,7 @@ class HoldLink(Task, HasKinematicChainParameters, ABC):
         :return: Whether the link is within `threshold` of that position.
         """
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         root_P_tip_when_started = self._pose_to_keep.root_T_tip.position
         artifacts.geometry.add_point_goal_constraints(
@@ -934,11 +920,11 @@ class HoldPose(
 @dataclass(eq=False, repr=False, kw_only=True)
 class RigidCoupling(
     Task,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 ):
     """
-    Keeps :attr:`tip_link` at rest relative to :attr:`root_link` at every step of the
-    predicted trajectory, so that neither moves without the other.
+    Keeps the tip of :attr:`kinematic_chain` at rest relative to its root at every step
+    of the predicted trajectory, so that neither moves without the other.
 
     An invariant rather than a goal: it observes nothing and is always true.
 
@@ -953,12 +939,12 @@ class RigidCoupling(
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
-        Constrain the velocity of the position and of two axes of :attr:`tip_link`,
-        relative to :attr:`root_link`, to zero.
+        Constrain the velocity of the position and of two axes of the tip of
+        :attr:`kinematic_chain`, relative to its root, to zero.
         """
         artifacts = MotionNodeArtifacts()
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_R_tip = root_T_tip.rotation_matrix
         self._keep_at_rest(
@@ -1006,14 +992,14 @@ class RigidCoupling(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianPositionVelocityLimit(
-    Task, HasKinematicChainParameters, HasMaxLinearVelocityParameter
+    Task, HasKinematicChainParameter, HasMaxLinearVelocityParameter
 ):
     """
     Limit the Cartesian (translational) velocity of a tip link relative to a root link,
     in m/s.
 
     This goal enforces a strict cap on the linear speed of the frame defined by
-    the kinematic transform from `root_link` to `tip_link`. Enforcement is performed
+    the kinematic transform along :attr:`kinematic_chain`. Enforcement is performed
     by adding constraints to the optimizer and by providing an observation expression
     that evaluates whether the current translational speed is within the limit.
 
@@ -1033,7 +1019,7 @@ class CartesianPositionVelocityLimit(
     def build_artifacts(self) -> MotionNodeArtifacts:
         artifacts = MotionNodeArtifacts()
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         artifacts.geometry.add_translational_velocity_limit(
             frame_P_current=root_P_tip,
@@ -1055,7 +1041,7 @@ class CartesianPositionVelocityLimit(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianRotationVelocityLimit(
-    Task, HasKinematicChainParameters, HasMaxAngularVelocityParameter
+    Task, HasKinematicChainParameter, HasMaxAngularVelocityParameter
 ):
     """
     Limit the angular velocity of a tip link relative to a root link, in rad/s.
@@ -1084,7 +1070,7 @@ class CartesianRotationVelocityLimit(
         artifacts = MotionNodeArtifacts()
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
 
         artifacts.geometry.add_rotational_velocity_limit(
@@ -1104,7 +1090,7 @@ class CartesianRotationVelocityLimit(
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianVelocityLimit(
     Parallel,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasMaxLinearVelocityParameter,
     HasMaxAngularVelocityParameter,
     HasWeightParameter,
@@ -1141,14 +1127,12 @@ class CartesianVelocityLimit(
         """
         limits = [
             CartesianPositionVelocityLimit(
-                root_link=self.root_link,
-                tip_link=self.tip_link,
+                kinematic_chain=self.kinematic_chain,
                 max_linear_velocity=self.max_linear_velocity,
                 weight=self.weight,
             ),
             CartesianRotationVelocityLimit(
-                root_link=self.root_link,
-                tip_link=self.tip_link,
+                kinematic_chain=self.kinematic_chain,
                 max_angular_velocity=self.max_angular_velocity,
                 weight=self.weight,
             ),
@@ -1181,8 +1165,7 @@ class CartesianPoseStraight(CartesianPose):
         return [
             CartesianPositionStraight(
                 name=f"{self.name}/position",
-                root_link=self.root_link,
-                tip_link=self.tip_link,
+                kinematic_chain=self.kinematic_chain,
                 goal_point=self.goal_pose.position,
                 cruise_velocity=self.cruise_linear_velocity,
                 threshold=self.position_threshold,
@@ -1191,8 +1174,7 @@ class CartesianPoseStraight(CartesianPose):
             ),
             CartesianOrientation(
                 name=f"{self.name}/orientation",
-                root_link=self.root_link,
-                tip_link=self.tip_link,
+                kinematic_chain=self.kinematic_chain,
                 goal_orientation=self.goal_pose.rotation_matrix,
                 cruise_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,

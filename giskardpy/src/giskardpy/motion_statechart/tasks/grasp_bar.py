@@ -7,7 +7,7 @@ from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, Convergi
 from giskardpy.motion_statechart.mixins import (
     HasCruiseLinearVelocityParameter,
     HasCruiseAngularVelocityParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 )
 from krrood_spatial_math.spatial_types import Point3, Vector3
 
@@ -15,7 +15,7 @@ from krrood_spatial_math.spatial_types import Point3, Vector3
 @dataclass(eq=False, repr=False, kw_only=True)
 class GraspBar(
     ConvergingTask,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
     HasCruiseLinearVelocityParameter,
     HasCruiseAngularVelocityParameter,
 ):
@@ -61,21 +61,21 @@ class GraspBar(
         """
         artifacts = MotionNodeArtifacts()
         root_P_bar_center = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.bar_center
+            target_frame=self.kinematic_chain.root, spatial_object=self.bar_center
         )
 
         tip_V_tip_grasp_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_grasp_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_grasp_axis
         )
         tip_V_tip_grasp_axis.scale(1)
 
         root_V_bar_axis = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.bar_axis
+            target_frame=self.kinematic_chain.root, spatial_object=self.bar_axis
         )
         root_V_bar_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_V_tip_normal = root_T_tip @ tip_V_tip_grasp_axis
 

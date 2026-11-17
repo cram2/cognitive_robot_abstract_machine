@@ -63,6 +63,7 @@ from cramph.context import StatechartContext
 from cramph.exceptions import TickLimitReachedError
 from cramph.executor import StatechartExecutor
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% motion nodes in a statechart
 
@@ -316,9 +317,11 @@ def test_long_goal(pr2_world_state_reset: World):
     statechart.add_nodes(
         nodes=[
             cart_goal := CartesianPose(
-                root_link=pr2_world_state_reset.root,
-                tip_link=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-                    "base_footprint"
+                kinematic_chain=KinematicChain(
+                    root=pr2_world_state_reset.root,
+                    tip=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+                        "base_footprint"
+                    ),
                 ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=50, reference_frame=pr2_world_state_reset.root
@@ -431,16 +434,14 @@ class TestTemplates:
         statechart = Statechart(context=executor.context)
         position_knife = CartesianPose(
             name="Position Knife",
-            root_link=map_link,
-            tip_link=knife,
+            kinematic_chain=KinematicChain(root=map_link, tip=knife),
             goal_pose=pre_cut_pose,
         )
         cut = Sequence(
             nodes=[
                 CartesianPose(
                     name="Down",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose(
                         position=Point3(x=-depth, reference_frame=knife),
                         reference_frame=knife,
@@ -448,8 +449,7 @@ class TestTemplates:
                 ),
                 CartesianPose(
                     name="Up",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose(
                         position=Point3(x=depth, reference_frame=knife),
                         reference_frame=knife,
@@ -457,8 +457,7 @@ class TestTemplates:
                 ),
                 CartesianPose(
                     name="Move Right",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose(
                         position=Point3(y=right_shift, reference_frame=knife),
                         reference_frame=knife,
@@ -521,14 +520,12 @@ class TestTemplates:
                 parallel := Parallel(
                     nodes=[
                         AlignPlanes(
-                            root_link=map,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(root=map, tip=r_tip),
                             tip_normal=Vector3.X(reference_frame=r_tip),
                             reference_normal=Vector3.X(reference_frame=map),
                         ),
                         AlignPlanes(
-                            root_link=map,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(root=map, tip=r_tip),
                             tip_normal=Vector3.Y(reference_frame=r_tip),
                             reference_normal=Vector3.Z(reference_frame=map),
                         ),
@@ -656,14 +653,15 @@ class TestMaxManipulability:
         )
         statechart = Statechart(context=executor.context)
         cart_goal = CartesianPose(
-            root_link=pr2_world_state_reset.root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=pr2_world_state_reset.root, tip=tip),
             goal_pose=goal_pose,
         )
         statechart.add_nodes(
             nodes=[
                 cart_goal,
-                manipulability := MaxManipulability(root_link=root, tip_link=tip),
+                manipulability := MaxManipulability(
+                    kinematic_chain=KinematicChain(root=root, tip=tip)
+                ),
             ]
         )
         manipulability.interrupt_condition = cart_goal.observes_true

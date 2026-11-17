@@ -12,6 +12,7 @@ from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
@@ -31,8 +32,7 @@ def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
     )
     statechart = Statechart(context=executor.context)
     grasp = GraspBar(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         tip_grasp_axis=tip_grasp_axis,
         bar_center=bar_center,
         bar_axis=bar_axis,

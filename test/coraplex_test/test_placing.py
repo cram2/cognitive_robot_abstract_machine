@@ -328,7 +328,7 @@ def _arms_moved_by(place: PlaceAction, robot) -> set[Arm]:
     """
     :return: The arms of `robot` whose tool frames the expanded `place` moves.
     """
-    moved_tips = {goal.tip_link for goal in _tool_goals_of(place)}
+    moved_tips = {goal.kinematic_chain.tip for goal in _tool_goals_of(place)}
     return {arm for arm in robot.all_arms if arm.end_effector.tool_frame in moved_tips}
 
 

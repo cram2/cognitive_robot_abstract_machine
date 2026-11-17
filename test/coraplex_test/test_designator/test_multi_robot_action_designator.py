@@ -1346,7 +1346,7 @@ def test_look_at_points_the_default_camera(multiple_robot_apartment_context):
     expand(action, extensions)
 
     [pointing] = nodes_of_type(action, Pointing)
-    assert pointing.tip_link == robot.get_default_camera().root
+    assert pointing.kinematic_chain.tip == robot.get_default_camera().root
 
 
 def test_look_at_points_along_the_optical_viewing_direction(
@@ -1558,8 +1558,8 @@ def test_moving_an_arm_or_looking_holds_the_base_of_a_robot_that_stands_still(
         expand(action, extensions)
 
         [hold_base] = nodes_of_type(action, HoldPose)
-        assert hold_base.root_link == world.root
-        assert hold_base.tip_link == robot.root
+        assert hold_base.kinematic_chain.root == world.root
+        assert hold_base.kinematic_chain.tip == robot.root
         assert hold_base.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
 
 

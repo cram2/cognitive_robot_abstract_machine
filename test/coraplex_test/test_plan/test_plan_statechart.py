@@ -268,7 +268,7 @@ def test_a_place_after_several_pick_ups_moves_only_the_arm_it_is_given(
     )
 
     moved_tool_frames = {
-        node.tip_link
+        node.kinematic_chain.tip
         for node in place_milk.descendants
         if isinstance(node, CartesianPose)
     }
@@ -312,7 +312,7 @@ def test_a_place_after_an_earlier_place_moves_only_the_arm_it_is_given(
     )
 
     moved_tool_frames = {
-        node.tip_link
+        node.kinematic_chain.tip
         for node in place_spoon.descendants
         if isinstance(node, CartesianPose)
     }

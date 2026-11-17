@@ -20,6 +20,7 @@ from giskardpy.motion_control import DebugExpressionRecording
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def _build_motion_statechart(
@@ -33,8 +34,7 @@ def _build_motion_statechart(
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     motion_statechart = Statechart(context=executor.context)
     goal = CartesianPosition(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(x=1, reference_frame=root),
         name="cart_pos",
     )

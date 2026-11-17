@@ -147,6 +147,7 @@ from ...statechart_json_round_trip import (
     WorldFixture,
     concrete_node_types,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% what the nodes of the cases refer to
 
@@ -249,8 +250,8 @@ def _self_collision_avoidance(world: World) -> list[StatechartNode]:
     return [SelfCollisionAvoidance(robot=_robot(world))]
 
 
-def _feature_fields(world: World) -> dict[str, Body]:
-    return {"root_link": _root(world), "tip_link": _tip(world)}
+def _feature_fields(world: World) -> dict[str, KinematicChain]:
+    return {"kinematic_chain": KinematicChain(root=_root(world), tip=_tip(world))}
 
 
 def _cartesian_cases() -> list[NodeRoundTripCase]:
@@ -262,7 +263,8 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPose,
             lambda world: [
                 CartesianPose(
-                    root_link=_root(world), tip_link=_tip(world), goal_pose=_pose(world)
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
+                    goal_pose=_pose(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -281,7 +283,8 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPoseStraight,
             lambda world: [
                 CartesianPoseStraight(
-                    root_link=_root(world), tip_link=_tip(world), goal_pose=_pose(world)
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
+                    goal_pose=_pose(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -290,7 +293,11 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             NodeRoundTripCase(
                 node_type,
                 lambda world, node_type=node_type: [
-                    node_type(root_link=_root(world), tip_link=_tip(world))
+                    node_type(
+                        kinematic_chain=KinematicChain(
+                            root=_root(world), tip=_tip(world)
+                        )
+                    )
                 ],
                 WorldFixture.PR2_WORLD,
             )
@@ -300,8 +307,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPosition,
             lambda world: [
                 CartesianPosition(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_point=_point(world),
                 )
             ],
@@ -324,8 +330,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPositionStraight,
             lambda world: [
                 CartesianPositionStraight(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_point=_point(world),
                 )
             ],
@@ -335,8 +340,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPositionTrajectory,
             lambda world: [
                 CartesianPositionTrajectory(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_points=[_point(world), _point(world)],
                 )
             ],
@@ -346,8 +350,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianOrientation,
             lambda world: [
                 CartesianOrientation(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_orientation=_orientation(world),
                 )
             ],
@@ -357,7 +360,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPositionVelocityLimit,
             lambda world: [
                 CartesianPositionVelocityLimit(
-                    root_link=_root(world), tip_link=_tip(world)
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world))
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -366,7 +369,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianRotationVelocityLimit,
             lambda world: [
                 CartesianRotationVelocityLimit(
-                    root_link=_root(world), tip_link=_tip(world)
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world))
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -374,7 +377,9 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
         NodeRoundTripCase(
             CartesianVelocityLimit,
             lambda world: [
-                CartesianVelocityLimit(root_link=_root(world), tip_link=_tip(world))
+                CartesianVelocityLimit(
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world))
+                )
             ],
             WorldFixture.PR2_WORLD,
         ),
@@ -407,8 +412,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             AlignPlanes,
             lambda world: [
                 AlignPlanes(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     reference_normal=_root_axis(world),
                     tip_normal=_tip_axis(world),
                 )
@@ -429,8 +433,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             Pointing,
             lambda world: [
                 Pointing(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_point=_point(world),
                     pointing_axis=_tip_axis(world),
                 )
@@ -441,8 +444,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             PointingCone,
             lambda world: [
                 PointingCone(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_point=_point(world),
                     pointing_axis=_tip_axis(world),
                 )
@@ -453,8 +455,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             GraspBar,
             lambda world: [
                 GraspBar(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     tip_grasp_axis=_tip_axis(world),
                     bar_center=_point(world),
                     bar_axis=_root_axis(world),
@@ -467,8 +468,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             WiggleInsert,
             lambda world: [
                 WiggleInsert(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     hole_point=_point(world),
                 )
             ],
@@ -491,8 +491,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             StayOnLineTask,
             lambda world: [
                 StayOnLineTask(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     tip_P_tool=_tip_point(world),
                     root_P_start=_point(world),
                     root_P_end=Point3(0.1, 0.2, 0.5, reference_frame=_root(world)),
@@ -503,7 +502,9 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
         NodeRoundTripCase(
             MaxManipulability,
             lambda world: [
-                MaxManipulability(root_link=_root(world), tip_link=_tip(world))
+                MaxManipulability(
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world))
+                )
             ],
             WorldFixture.PR2_WORLD,
         ),
@@ -648,8 +649,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             PoseReached,
             lambda world: [
                 PoseReached(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_pose=_transformation(world),
                 )
             ],
@@ -659,8 +659,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             PositionReached,
             lambda world: [
                 PositionReached(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_point=_point(world),
                 )
             ],
@@ -670,8 +669,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             OrientationReached,
             lambda world: [
                 OrientationReached(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_orientation=_orientation(world),
                 )
             ],
@@ -681,8 +679,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             PointingAt,
             lambda world: [
                 PointingAt(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     goal_point=_point(world),
                     pointing_axis=_tip_axis(world),
                 )
@@ -693,8 +690,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             VectorsAligned,
             lambda world: [
                 VectorsAligned(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     reference_normal=_root_axis(world),
                     tip_normal=_tip_axis(world),
                 )
@@ -705,8 +701,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             DistanceToLine,
             lambda world: [
                 DistanceToLine(
-                    root_link=_root(world),
-                    tip_link=_tip(world),
+                    kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     center_point=_point(world),
                     line_axis=_root_axis(world),
                     line_length=0.4,

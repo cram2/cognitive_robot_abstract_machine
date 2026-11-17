@@ -22,6 +22,7 @@ The following three cells initilaize the CoraPlex world with a kitchen environme
 from geometry_msgs.msg import PoseStamped
 from coraplex.graph_of_convex_sets import BoundingBox, VolumetricGraphOfBoundingBoxes
 from coraplex.datastructures.enums import WorldMode
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from pycrap.ontologies import Robot, Kitchen
 from coraplex.worlds.bullet_world import BulletWorld
 
@@ -118,8 +119,7 @@ def follow_path(waypoints):
     return Sequence(
         nodes=[
             CartesianPose(
-                root_link=RobotAccess(robot=robot).controlled_root,
-                tip_link=tool_frame,
+                kinematic_chain=KinematicChain(root=RobotAccess(robot=robot).controlled_root, tip=tool_frame),
                 goal_pose=pose,
             )
             for pose in waypoints

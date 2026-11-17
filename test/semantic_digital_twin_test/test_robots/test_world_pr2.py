@@ -29,7 +29,7 @@ from semantic_digital_twin.robots.pr2 import (
     PR2RightGripperRightFinger,
     PR2KinectV1,
 )
-from semantic_digital_twin.robots.robot_parts import KinematicChain
+from semantic_digital_twin.robots.robot_parts import RobotKinematicChain
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.spatial_computations.ik_solver import (
@@ -478,8 +478,8 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
 
 
 def test_kinematic_chains(pr2_world_state_reset):
-    semantic_kinematic_chain_annotation: list[KinematicChain] = (
-        pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)
+    semantic_kinematic_chain_annotation: list[RobotKinematicChain] = (
+        pr2_world_state_reset.get_semantic_annotations_by_type(RobotKinematicChain)
     )
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root

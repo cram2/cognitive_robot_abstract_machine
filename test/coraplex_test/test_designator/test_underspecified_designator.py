@@ -953,7 +953,7 @@ def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
         type(node)
         for node in reach.descendants
         if isinstance(node, (CartesianPosition, CartesianPositionStraight))
-        and node.tip_link is tool_frame
+        and node.kinematic_chain.tip is tool_frame
     ] == [CartesianPositionStraight] * 2
     trial.discard()
 

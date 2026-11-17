@@ -85,6 +85,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% what the scene is built from
 
@@ -514,8 +515,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         handle_contact = StartedWhenTrue(
             monitor=DistanceMonitor(
                 name="Left hand near the handle",
-                root_link=handle_grasp.graspable.root,
-                tip_link=left_hand.tool_frame,
+                kinematic_chain=KinematicChain(
+                    root=handle_grasp.graspable.root, tip=left_hand.tool_frame
+                ),
                 reference_point=Point3(reference_frame=handle_grasp.graspable.root),
                 tip_point=Point3(reference_frame=left_hand.tool_frame),
                 lower_limit=0.0,

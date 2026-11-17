@@ -25,6 +25,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from ..motion_control_context import create_context_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% goals that are a parallel of their tasks
 
@@ -47,8 +48,7 @@ def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
     statechart.add_node(
         node=(
             pose := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -76,12 +76,11 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     pose = CartesianPose(
-        root_link=cylinder_bot_world.root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
         goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
     )
     speed_cap = CartesianPositionVelocityLimit(
-        root_link=cylinder_bot_world.root, tip_link=tip
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip)
     )
     pose.add_node(node=speed_cap)
     statechart.add_node(node=pose)
@@ -107,8 +106,7 @@ def test_cartesian_pose_observes_its_goal_reached(
     statechart.add_node(
         node=(
             pose := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -135,8 +133,7 @@ def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     statechart.add_node(
         node=(
             pose := CartesianPoseStraight(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -161,7 +158,9 @@ def test_velocity_limit_has_its_two_limits_after_a_json_round_trip(
         context=create_context_with_motion_control(cylinder_bot_world)
     )
     statechart.add_node(
-        node=CartesianVelocityLimit(root_link=cylinder_bot_world.root, tip_link=tip)
+        node=CartesianVelocityLimit(
+            kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip)
+        )
     )
     json_data = json.loads(json.dumps(statechart.to_json()))
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)

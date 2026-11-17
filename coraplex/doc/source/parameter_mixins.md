@@ -17,7 +17,7 @@ Action parameter mixins
 
 Node parameter mixins
 : {mod}`giskardpy.motion_statechart.mixins` declares the parameters that unrelated tasks, goals and monitors share,
-  such as the links of the kinematic chain they control, their goal, their threshold and their reference velocity.
+  such as the kinematic chain they control, their goal, their threshold and their reference velocity.
   Each kind of goal has a mixin of its own, such as a goal pose, a goal point or a goal joint state.
 
 One parameter per mixin
@@ -26,10 +26,11 @@ One parameter per mixin
   parameter mixin: {class}`~coraplex.robot_plans.mixins.HasPlanarGoalPoseParameter` declares `planar_goal_pose`.
   So the name of a parameter tells which mixin to inherit, and the name of a mixin tells which parameter it adds.
 
-The kinematic chain
-: {class}`~giskardpy.motion_statechart.mixins.HasKinematicChainParameters` is the one bundle. It declares nothing of
-  its own and combines {class}`~giskardpy.motion_statechart.mixins.HasRootLinkParameter` and
-  {class}`~giskardpy.motion_statechart.mixins.HasTipLinkParameter`, which a node always takes together.
+Values that come together
+: Parameters a class always takes together are one parameter whose type holds them. A node moving the tip of a chain
+  relative to its root takes a
+  {class}`~semantic_digital_twin.world_description.kinematic_chain.KinematicChain` through
+  {class}`~giskardpy.motion_statechart.mixins.HasKinematicChainParameter`, rather than a root link and a tip link.
 
 Mixins shared by both
 : An action that passes a parameter on unchanged to the node it builds takes that node's mixin, rather than

@@ -31,6 +31,7 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% helpers
 
@@ -72,15 +73,13 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
             carry := Sequence(
                 nodes=[
                     CartesianPose(
-                        root_link=world.root,
-                        tip_link=robot,
+                        kinematic_chain=KinematicChain(root=world.root, tip=robot),
                         goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
                         name="approach",
                     ),
                     MoveBranch(branch_root=box, new_parent=robot),
                     CartesianPose(
-                        root_link=world.root,
-                        tip_link=box,
+                        kinematic_chain=KinematicChain(root=world.root, tip=box),
                         goal_pose=goal_pose,
                         name="carry",
                     ),
@@ -111,8 +110,7 @@ def test_building_the_nodes_again_registers_no_further_variables(
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
@@ -186,8 +184,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=5, reference_frame=world.root),
         )
     )
@@ -240,8 +237,7 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
@@ -263,8 +259,7 @@ def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_a
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )

@@ -24,7 +24,7 @@ A robot is a semantic annotation with a `root` body typically representing its b
 composed of structured semantic annotations of its parts (all defined in
 `semantic_digital_twin.robots.robot_parts`):
 
-* A `KinematicChain` is a contiguous sequence of kinematic structure entities from a `root` body to a `tip` body.
+* A `RobotKinematicChain` is a contiguous sequence of kinematic structure entities from a `root` body to a `tip` body.
 * An `EndEffector` is the abstract base for end effectors and always defines a `tool_frame`. Each concrete end
   effector states, in its tool frame, the `approach_axis` it travels toward an object along and the `closing_axis`
   its fingers close along; together they are the grasp frame's x- and y-axis. Concrete
@@ -86,7 +86,7 @@ world model.
 ## Key takeaways
 
 - `AbstractRobot` is a semantic, world-backed description of a robot's structure and capabilities.
-- Parts are composed from `KinematicChain`, `EndEffector`, `Sensor` and `Torso` using specialized structures
+- Parts are composed from `RobotKinematicChain`, `EndEffector`, `Sensor` and `Torso` using specialized structures
   (mixins and generics), and reached as nested attributes.
 - Accessor methods such as `all_arms` and `get_default_camera()` query parts in a robot-agnostic way.
 - The robot is reconstructed from a `World` via `from_world`; new robots are added by subclassing and implementing

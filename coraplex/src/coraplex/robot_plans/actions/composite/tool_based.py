@@ -65,6 +65,7 @@ from coraplex.robot_plans.actions.composite.tool_paths import (
     planar_spiral_xy,
     planar_sweep_x,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
@@ -180,8 +181,7 @@ class ToolMotionAction(
         tip = self.tool.get_tool_frame()
         alignments = [
             AlignPlanes(
-                tip_link=tip,
-                root_link=root,
+                kinematic_chain=KinematicChain(root=root, tip=tip),
                 tip_normal=pair.tip_normal,
                 reference_normal=pair.reference_normal,
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE.value,
@@ -189,8 +189,7 @@ class ToolMotionAction(
             for pair in self._alignment_pairs
         ]
         trajectory = CartesianPositionTrajectory(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_points=self._waypoints,
             maximum_skip_ahead=self.maximum_skip_ahead,
             weight=float(DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE),
@@ -401,8 +400,9 @@ class WipingAction(ToolMotionAction, TryAllAction):
                 monitor=Stalled(monitored_node=tool_path, timeout=self.stall_timeout),
                 monitored_node=PositionReached(
                     name=f"{self.name}/final waypoint reached",
-                    root_link=self.world.root,
-                    tip_link=self.tool.root,
+                    kinematic_chain=KinematicChain(
+                        root=self.world.root, tip=self.tool.root
+                    ),
                     goal_point=self._waypoints[-1],
                     threshold=self.final_waypoint_threshold,
                 ),

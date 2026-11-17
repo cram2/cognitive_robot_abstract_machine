@@ -4,14 +4,13 @@ from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
-from giskardpy.motion_statechart.mixins import HasKinematicChainParameters
+from giskardpy.motion_statechart.mixins import HasKinematicChainParameter
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MaxManipulability(ConvergingTask, HasKinematicChainParameters):
+class MaxManipulability(ConvergingTask, HasKinematicChainParameter):
     """
-    This goal maximizes the manipulability of the kinematic chain between root_link and
-    tip_link.
+    This goal maximizes the manipulability of :attr:`kinematic_chain`.
 
     This chain should only include rotational joint and no linear joints i.e. torso lift
     joints or odometry joints.
@@ -31,7 +30,7 @@ class MaxManipulability(ConvergingTask, HasKinematicChainParameters):
         """
         artifacts = MotionNodeArtifacts()
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position[:3]
 
         joint_symbols = root_P_tip.free_variables()

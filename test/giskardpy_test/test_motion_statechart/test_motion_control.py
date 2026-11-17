@@ -25,6 +25,7 @@ from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% context
 
@@ -101,8 +102,7 @@ def test_motion_nodes_and_nodes_of_other_modules_run_in_one_statechart(
     root = cylinder_bot_world.root
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     goal = CartesianPosition(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(x=0.1, reference_frame=root),
     )
     other_node = ConstTrueNode()

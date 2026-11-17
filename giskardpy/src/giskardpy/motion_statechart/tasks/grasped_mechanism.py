@@ -23,6 +23,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -106,15 +107,17 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParamete
                 ),
                 CartesianPose(
                     name="hold handle",
-                    root_link=self.environment_link,
-                    tip_link=self.tip_link,
+                    kinematic_chain=KinematicChain(
+                        root=self.environment_link, tip=self.tip_link
+                    ),
                     goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.grasp_weight,
                 ),
                 RigidCoupling(
                     name="move with handle",
-                    root_link=self.environment_link,
-                    tip_link=self.tip_link,
+                    kinematic_chain=KinematicChain(
+                        root=self.environment_link, tip=self.tip_link
+                    ),
                     weight=self.grasp_weight,
                 ),
             ]

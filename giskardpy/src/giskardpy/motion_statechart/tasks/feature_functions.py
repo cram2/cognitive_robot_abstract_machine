@@ -15,19 +15,19 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
-    HasKinematicChainParameters,
+    HasKinematicChainParameter,
 )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class FeatureFunctionGoal(
-    ConvergingTask, HasKinematicChainParameters, HasCruiseVelocityParameter, ABC
+    ConvergingTask, HasKinematicChainParameter, HasCruiseVelocityParameter, ABC
 ):
     """
     Base for feature tasks operating on geometric features.
 
-    :attr:`controlled_feature` is fixed on :attr:`tip_link` and :attr:`reference_feature`
-    on :attr:`root_link`. Both are transformed into a common frame, and debug
+    :attr:`controlled_feature` is fixed on the tip of :attr:`kinematic_chain` and
+    :attr:`reference_feature` on its root. Both are transformed into a common frame, and debug
     visualizations are registered for them.
     """
 
@@ -57,14 +57,16 @@ class FeatureFunctionGoal(
         )
         feature_debug_expressions: list[DebugExpression] = []
         root_reference_feature = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_feature
+            target_frame=self.kinematic_chain.root,
+            spatial_object=self.reference_feature,
         )
         tip_controlled_feature = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.controlled_feature
+            target_frame=self.kinematic_chain.tip,
+            spatial_object=self.controlled_feature,
         )
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         if isinstance(self.controlled_feature, Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
@@ -116,16 +118,16 @@ class FeatureFunctionGoal(
 
     def _vector_to_draw(self, *, root_V_feature: Vector3, feature: Vector3) -> Vector3:
         """
-        :param root_V_feature: `feature` expressed in :attr:`root_link`.
+        :param root_V_feature: `feature` expressed in the root of :attr:`kinematic_chain`.
         :param feature: The vector feature as the task was given it.
         :return: A copy of `root_V_feature` drawn from the visualisation frame of
-            `feature`, or from :attr:`tip_link` if it has none.
+            `feature`, or from the tip of :attr:`kinematic_chain` if it has none.
         """
         vector_to_draw = Vector3.from_iterable(root_V_feature)
         vector_to_draw.visualisation_frame = (
             feature.visualisation_frame
             if feature.visualisation_frame is not None
-            else self.tip_link
+            else self.kinematic_chain.tip
         )
         return vector_to_draw
 
