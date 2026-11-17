@@ -988,16 +988,7 @@ def test_copy_big_world():
     ).create_world()
     PR2.from_world(pr2_world)
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "..",
-            "coraplex",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
 
     apartment_world.merge_world(pr2_world)

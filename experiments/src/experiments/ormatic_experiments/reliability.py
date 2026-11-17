@@ -7,7 +7,6 @@ It includes tools for running experiments to evaluate the reliability and perfor
 robotic action plans and data operations.
 """
 
-import pathlib
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -49,8 +48,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from cramph.composites import Sequence, StatementNode
 from cramph.orm.ormatic_interface import SequenceDAO  # type: ignore
 
-_REPO_ROOT = pathlib.Path(__file__).parents[4]
-_APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.urdf"
+_APARTMENT_URDF = "package://iai_apartment/urdf/apartment.urdf"
 
 
 def _build_hsrb_world() -> World:
@@ -77,7 +75,7 @@ def build_cram_world():
     extensions being what its plans read from their context.
     """
     hsrb_world = _build_hsrb_world()
-    apartment = URDFParser.from_file(str(_APARTMENT_URDF)).create_world()
+    apartment = URDFParser.from_file(_APARTMENT_URDF).create_world()
     hsrb_world.merge_world(apartment)
     hsrb_world.get_body_by_name(
         "base_footprint"

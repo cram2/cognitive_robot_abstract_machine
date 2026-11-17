@@ -16,7 +16,6 @@ Lower :attr:`FailureHandlingDemonstration.maximum_attempts` below
 from dataclasses import dataclass, field
 from enum import StrEnum
 from itertools import groupby
-from pathlib import Path
 
 from coraplex.datastructures.enums import InsertionPosition
 from coraplex.demonstrations import RobotDemonstration
@@ -41,13 +40,11 @@ from cramph.failure_handling import HandledOnFailure, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.gripper import MoveFingers
-from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood.patterns.path_enumeration import PathEnumeration
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose2D,
@@ -72,19 +69,17 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% what the scene is built from
 
 
-class SceneFile(PathEnumeration):
+class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from, under the coraplex resources.
+    The files the demonstration builds its scene from, as ``package://`` URIs.
     """
 
-    APARTMENT = (
-        Path(__file__).resolve().parents[2] / "resources" / "worlds" / "apartment.urdf"
-    )
+    APARTMENT = "package://iai_apartment/urdf/apartment.urdf"
     """
     The apartment the PR2 works in.
     """
 
-    MILK = Path(PackageUriResolver().resolve("package://iai_objects/objects/milk.stl"))
+    MILK = "package://iai_objects/objects/milk.stl"
     """
     The mesh of the milk carton.
     """
@@ -398,7 +393,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         """
         :return: The apartment.
         """
-        return WorldSpecification.from_urdf(str(SceneFile.APARTMENT))
+        return WorldSpecification.from_urdf(SceneFile.APARTMENT)
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -421,7 +416,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
             semantic_annotation_type=Milk,
             root_specification=BodySpecification.mesh(
                 name,
-                str(SceneFile.MILK),
+                SceneFile.MILK,
                 connection_specification=Connection6DoFSpecification(),
             ),
         ).spawn(world, parent=None, parent_T_self=self.milk_start)

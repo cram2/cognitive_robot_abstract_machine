@@ -78,7 +78,7 @@ class SceneFile(StrEnum):
     in a ROS package.
     """
 
-    APARTMENT = os.path.join("worlds", "apartment.urdf")
+    APARTMENT = "package://iai_apartment/urdf/apartment.urdf"
     MILK = "package://iai_objects/objects/milk.stl"
     BOWL = "package://iai_objects/objects/bowl.stl"
     SPOON = "package://iai_objects/objects/spoon.stl"

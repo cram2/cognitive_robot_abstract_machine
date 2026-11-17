@@ -185,7 +185,7 @@ def urdf_paths():
     )
     return URDFPaths(
         table=os.path.join(urdf_directory, "table.urdf"),
-        kitchen=os.path.join(urdf_directory, "kitchen-small.urdf"),
+        kitchen="package://iai_kitchen/urdf_obj/kitchen-small.urdf",
         apartment=os.path.join(urdf_directory, "apartment.urdf"),
         pr2=PR2.get_ros_file_path(),
     )

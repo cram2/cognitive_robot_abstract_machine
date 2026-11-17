@@ -636,14 +636,7 @@ def _tiago_world_setup():
 @pytest.fixture(scope="session")
 def _apartment_world_setup():
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
     milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     cereal_world = STLParser(
@@ -879,14 +872,7 @@ def _simple_apartment_setup():
 
 @pytest.fixture(scope="session")
 def kitchen_world():
-    path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-        "kitchen-small.urdf",
-    )
+    path = "package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     parser = URDFParser.from_file(file_path=path)
     world = parser.create_world()
     world.validate()

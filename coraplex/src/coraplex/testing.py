@@ -95,14 +95,7 @@ def setup_world() -> World:
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).create_world()
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
     milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     cereal_world = STLParser(
