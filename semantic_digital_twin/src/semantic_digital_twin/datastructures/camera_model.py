@@ -1,3 +1,8 @@
+"""
+Models of how a camera projects the world into an image, and of the distortion of its
+lens.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -9,7 +14,7 @@ from enum import StrEnum
 import numpy as np
 from typing_extensions import Self, Sequence
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.specificity_ranking import concrete_subclasses
 from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution

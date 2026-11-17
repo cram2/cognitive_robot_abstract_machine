@@ -37,23 +37,46 @@ from semantic_digital_twin.world_description.geometry import (
 
 
 @dataclass
+class TransformToSemDTConverter(
+    Ros2ToSemDTConverter[geometry_msgs.Transform, HomogeneousTransformationMatrix]
+):
+    """
+    Converts a transform that names no frames into a transformation matrix without
+    reference and child frame.
+    """
+
+    @classmethod
+    def convert(
+        cls, data: geometry_msgs.Transform, world: World
+    ) -> HomogeneousTransformationMatrix:
+        return HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=data.translation.x,
+            pos_y=data.translation.y,
+            pos_z=data.translation.z,
+            quat_x=data.rotation.x,
+            quat_y=data.rotation.y,
+            quat_z=data.rotation.z,
+            quat_w=data.rotation.w,
+        )
+
+
+@dataclass
 class TransformStampedToSemDTConverter(
     Ros2ToSemDTConverter[
         geometry_msgs.TransformStamped, HomogeneousTransformationMatrix
     ]
 ):
+    """
+    Converts a transform into a transformation matrix between the bodies of the world
+    that its header and child frame name; a frame left empty stays unset.
+    """
+
     @classmethod
-    def convert(cls, data: InputType, world: World) -> OutputType:
-        result = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=data.transform.translation.x,
-            pos_y=data.transform.translation.y,
-            pos_z=data.transform.translation.z,
-            quat_x=data.transform.rotation.x,
-            quat_y=data.transform.rotation.y,
-            quat_z=data.transform.rotation.z,
-            quat_w=data.transform.rotation.w,
-        )
-        if data.child_frame_id != "":
+    def convert(
+        cls, data: geometry_msgs.TransformStamped, world: World
+    ) -> HomogeneousTransformationMatrix:
+        result = TransformToSemDTConverter.convert(data.transform, world)
+        if data.header.frame_id != "":
             result.reference_frame = world.get_kinematic_structure_entity_by_name(
                 data.header.frame_id
             )

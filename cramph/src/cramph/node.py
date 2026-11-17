@@ -58,7 +58,7 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
 )
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import (
     FloatVariable,

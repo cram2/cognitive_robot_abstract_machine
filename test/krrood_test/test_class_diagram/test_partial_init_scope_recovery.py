@@ -198,9 +198,9 @@ def test_fallback_recompute_is_shared_across_lookups_within_the_same_import_gene
             counting_get_scope_from_imports,
         )
         monkeypatch.setattr(
-            class_diagram_utils,
-            "_count_of_modules_that_finished_initializing",
-            lambda: 100,
+            class_diagram_utils.ModulesThatFinishedInitializing,
+            "count_finished_modules",
+            lambda self: 100,
         )
 
         # The provider module stays poisoned for every one of these lookups: each must fail, but
@@ -210,9 +210,9 @@ def test_fallback_recompute_is_shared_across_lookups_within_the_same_import_gene
                 class_diagram_utils.get_object_by_name_from_another_object_in_same_module(
                     "LateBoundAnnotationType", OwnerWithLateBoundAnnotation
                 )
-                assert (
-                    False
-                ), "resolution should still fail while the provider stays poisoned"
+                assert False, (
+                    "resolution should still fail while the provider stays poisoned"
+                )
             except CouldNotResolveType:
                 pass
 
@@ -221,17 +221,17 @@ def test_fallback_recompute_is_shared_across_lookups_within_the_same_import_gene
         # Advancing the generation (something elsewhere finished initializing) makes it worth
         # trying again, even though this particular lookup still fails.
         monkeypatch.setattr(
-            class_diagram_utils,
-            "_count_of_modules_that_finished_initializing",
-            lambda: 101,
+            class_diagram_utils.ModulesThatFinishedInitializing,
+            "count_finished_modules",
+            lambda self: 101,
         )
         try:
             class_diagram_utils.get_object_by_name_from_another_object_in_same_module(
                 "LateBoundAnnotationType", OwnerWithLateBoundAnnotation
             )
-            assert (
-                False
-            ), "resolution should still fail while the provider stays poisoned"
+            assert False, (
+                "resolution should still fail while the provider stays poisoned"
+            )
         except CouldNotResolveType:
             pass
 
@@ -241,3 +241,62 @@ def test_fallback_recompute_is_shared_across_lookups_within_the_same_import_gene
             sys.modules[provider_module] = saved_module
         else:
             sys.modules.pop(provider_module, None)
+
+
+# %% counting the modules that finished initializing
+
+
+class ModuleCountingReadsOfItsSpecification(types.ModuleType):
+    """
+    A module that counts how often its import specification is read.
+    """
+
+    def __init__(self, name: str, *, initializing: bool):
+        super().__init__(name)
+        self.specification = types.SimpleNamespace(_initializing=initializing)
+        """
+        Stands in for the specification the import system gives a module.
+        """
+        self.specification_reads = 0
+        """
+        How often the specification was read.
+        """
+
+    @property
+    def __spec__(self) -> types.SimpleNamespace:
+        self.specification_reads += 1
+        return self.specification
+
+
+def test_a_module_counts_once_it_has_finished_initializing(monkeypatch):
+    class_diagram_utils.ModulesThatFinishedInitializing.clear_instance()
+    finished_modules = class_diagram_utils.ModulesThatFinishedInitializing()
+    module = ModuleCountingReadsOfItsSpecification(
+        "module_still_initializing", initializing=True
+    )
+    count_before = finished_modules.count_finished_modules()
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+
+    assert finished_modules.count_finished_modules() == count_before
+
+    module.specification._initializing = False
+
+    assert finished_modules.count_finished_modules() == count_before + 1
+
+
+def test_a_module_seen_finished_is_not_inspected_again(monkeypatch):
+    """
+    Counting costs what changed since the last count, not everything that is loaded.
+    """
+    class_diagram_utils.ModulesThatFinishedInitializing.clear_instance()
+    finished_modules = class_diagram_utils.ModulesThatFinishedInitializing()
+    module = ModuleCountingReadsOfItsSpecification(
+        "module_that_finished_initializing", initializing=False
+    )
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+
+    finished_modules.count_finished_modules()
+    reads_after_the_first_count = module.specification_reads
+    finished_modules.count_finished_modules()
+
+    assert module.specification_reads == reads_after_the_first_count

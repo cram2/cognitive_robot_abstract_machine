@@ -11,7 +11,7 @@ from enum import StrEnum
 from functools import cached_property
 from pathlib import Path
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% file names
 

@@ -1,3 +1,7 @@
+"""
+Lookups of a class's wrapped fields and their types in the symbol graph's class diagram.
+"""
+
 import inspect
 from dataclasses import is_dataclass, fields
 from types import NoneType

@@ -1,3 +1,7 @@
+"""
+Integration tests of Giskard controlling the HSR.
+"""
+
 from dataclasses import dataclass, field
 
 import pytest
@@ -22,7 +26,6 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
-from ...pytest_environment import runs_in_continuous_integration
 
 
 @pytest.fixture()
@@ -48,11 +51,7 @@ class HSRTester(GiskardTester):
                 robots=[RobotSpecification.specify_real_robot(HSRB)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=not runs_in_continuous_integration(),
-                plot_gantt_chart=True,
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 
@@ -71,6 +70,9 @@ def robot():
 
 
 def test_move_base(giskard: HSRTester) -> None:
+    """
+    The base of the HSR reaches goal poses after its odometry was set.
+    """
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
         node=(

@@ -21,7 +21,7 @@ from krrood.symbolic_math.symbolic_math import (
     Vector,
 )
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues, ObservationStateValues

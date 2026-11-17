@@ -1,7 +1,11 @@
+"""
+Tests of rendering dataclasses created in memory into a Python module.
+"""
+
 from dataclasses import make_dataclass
 from pathlib import Path
 
-from krrood.class_diagrams.module_generation import (
+from krrood.code_generation.module_generation import (
     DataclassRenderer,
     ModuleRenderer,
 )
@@ -10,7 +14,10 @@ from krrood.utils import module_and_class_name
 
 
 def test_module_generation():
-
+    """
+    A dataclass created in memory and its child are rendered into a module that keeps
+    the child a subclass of its parent.
+    """
     in_memory_class = make_dataclass(
         cls_name="InMemoryClass", bases=(Symbol,), fields=[]
     )

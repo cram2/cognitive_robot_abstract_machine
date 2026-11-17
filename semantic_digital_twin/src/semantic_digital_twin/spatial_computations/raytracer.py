@@ -1,3 +1,7 @@
+"""
+Ray tracing through a world's geometry, and rendering camera images from it.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -7,7 +11,7 @@ from typing_extensions import TYPE_CHECKING
 import numpy as np
 import trimesh
 from trimesh import Scene
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.spatial_computations.exceptions import (
     RayPointShapeMismatch,
     UnsupportedCameraProjection,

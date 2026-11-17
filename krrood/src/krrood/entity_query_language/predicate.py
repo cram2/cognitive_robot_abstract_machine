@@ -54,7 +54,7 @@ from krrood.entity_query_language.exceptions import ResultTypeCannotBeDetermined
 from krrood.source_analysis.property_return_statement import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
 

@@ -20,6 +20,7 @@ from coraplex.plans.failures import (
     MotionExceededSimulationTimeLimit,
     MotionMadeNoProgress,
     MotionViolatedCollisionAvoidance,
+    MotionWasInfeasible,
     PlanFailure,
 )
 from coraplex.plans.plan_transformation import PlanRewriting, PlanTransformation
@@ -38,6 +39,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepTheTorsoUprightWhileUsingATool,
     MoveStretchToolCenterPointInAStraightLine,
 )
+from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -63,6 +65,7 @@ from giskardpy.motion_statechart.graph_node import ConvergingTask, EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
+from giskardpy.qp.exceptions import InfeasibleException
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import logic_or
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
@@ -310,7 +313,8 @@ class PlanExecutor(Executor, ABC):
         :return: The outcome, holding why the plan failed if it did:
             :class:`MotionMadeNoProgress` when the plan stopped approaching its goal,
             :class:`MotionViolatedCollisionAvoidance` when it brought bodies closer to
-            each other than collision avoidance allows,
+            each other than collision avoidance allows, :class:`MotionWasInfeasible`
+            when the controller found no motion satisfying every constraint at once,
             :class:`MotionExceededSimulationTimeLimit` when a simulated plan ran longer
             than :attr:`SimulatedPlanExecutor.simulation_time_limit`,
             :class:`CandidateLimitReached` or :class:`EmptyUnderspecified` when an
@@ -331,6 +335,13 @@ class PlanExecutor(Executor, ABC):
                 failure=MotionViolatedCollisionAvoidance(violation=violation),
                 cause=violation,
             )
+        except InfeasibleException as infeasibility:
+            return PlanOutcome.failed_by(
+                failure=MotionWasInfeasible(infeasibility=infeasibility),
+                cause=infeasibility,
+            )
+        except PlanFailure as failure:
+            return PlanOutcome(failure=failure)
         return PlanOutcome(failure=self._failure_of_plan())
 
     @abstractmethod
@@ -608,7 +619,11 @@ class RealRobotPlanExecutor(PlanExecutor):
     """
 
     plan_adaptations: list[PlanTransformation] = field(
-        default_factory=lambda: [CloseFingersToObjectWidth(), DetectWithRoboKudo()],
+        default_factory=lambda: [
+            DriveRobotiqGrippersThroughTheirActionServers(),
+            CloseFingersToObjectWidth(),
+            DetectWithRoboKudo(),
+        ],
         kw_only=True,
     )
 
