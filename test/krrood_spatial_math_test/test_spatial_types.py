@@ -10,7 +10,6 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
     WrongDimensionsError,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.exceptions import SpatialTypesError
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
@@ -22,7 +21,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types import Pose, Point2, Pose2D
 from krrood_spatial_math.spatial_types import Pose, SpatialType
-from semantic_digital_twin.world_description.world_entity import Body
+from .dataset.frames import NamedFrame
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
     axis_angle_from_rotation_matrix,
@@ -173,8 +172,8 @@ class TestRotationMatrix:
         ).all()
 
     def test_reference_frames(self):
-        reference_frame = Body(name=PrefixedName("muh"))
-        reference_frame2 = Body(name=PrefixedName("muh2"))
+        reference_frame = NamedFrame("muh")
+        reference_frame2 = NamedFrame("muh2")
         m1 = RotationMatrix(reference_frame=reference_frame)
         m2 = RotationMatrix(reference_frame=reference_frame2)
         q = Quaternion(reference_frame=reference_frame)
@@ -698,7 +697,7 @@ class TestPoint3:
         np.testing.assert_allclose(point.midpoint(point).to_np(), point.to_np())
 
     def test_the_midpoint_stays_in_the_frame_the_points_were_given_in(self):
-        reference_frame = Body(name=PrefixedName("muh"))
+        reference_frame = NamedFrame("muh")
         near = Point3(x=0, y=0, z=0, reference_frame=reference_frame)
         far = Point3(x=2, y=0, z=0, reference_frame=reference_frame)
 
@@ -1451,10 +1450,10 @@ class TestTransformationMatrix:
         assert np.allclose(t.to_np(), t_copy.to_np())
 
     def test_reference_frames(self):
-        reference_frame = Body(name=PrefixedName("muh"))
-        child_frame = Body(name=PrefixedName("kikariki"))
-        reference_frame2 = Body(name=PrefixedName("muh2"))
-        child_frame2 = Body(name=PrefixedName("kikariki2"))
+        reference_frame = NamedFrame("muh")
+        child_frame = NamedFrame("kikariki")
+        reference_frame2 = NamedFrame("muh2")
+        child_frame2 = NamedFrame("kikariki2")
         t1 = HomogeneousTransformationMatrix(
             reference_frame=reference_frame, child_frame=child_frame
         )
