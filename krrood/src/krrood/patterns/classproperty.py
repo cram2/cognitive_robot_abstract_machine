@@ -25,6 +25,14 @@ class classproperty(Generic[T]):
         value.
         """
 
+    @property
+    def __isabstractmethod__(self) -> bool:
+        """
+        Whether the accessor is abstract, so that an abstract base class records the
+        classproperty among its abstract methods, as it does a :class:`property`.
+        """
+        return vars(self.fget).get("__isabstractmethod__", False)
+
     def __get__(self, instance: Any, owner: type[Any] | None = None) -> T:
         """
         Returns the property value by invoking the accessor with the owning class.

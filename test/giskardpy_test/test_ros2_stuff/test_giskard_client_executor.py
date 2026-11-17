@@ -19,7 +19,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import (
     GiskardClientExecutor,
     GiskardClientExecutorNode,
 )
-from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.world import World
 
@@ -109,33 +109,44 @@ def test_an_extension_is_told_that_an_aborted_goal_stopped(
     assert extension.run_count == 1
 
 
-# %% debug expressions
+# %% debug output
 
 
-@pytest.mark.parametrize("publishes_debug_expressions", [True, False])
-def test_executing_says_whether_the_goal_publishes_its_debug_expressions(
+@pytest.mark.parametrize(
+    "debug_output",
+    [
+        DebugOutput(publishes_expression_markers=True),
+        DebugOutput(plots_trajectory=True),
+    ],
+)
+def test_executing_sends_what_giskard_produces_to_debug_the_goal(
     giskard_command_server: ActionServerHandler,
     executor_with_a_statechart: GiskardClientExecutor,
-    publishes_debug_expressions: bool,
+    debug_output: DebugOutput,
 ) -> None:
+    """
+    The goal sent to Giskard carries the debug output passed to
+    :meth:`GiskardClientExecutor.execute`.
+    """
     server = ServerAnsweringOneGoal(
         action_server=giskard_command_server,
         outcome_unless_canceled=GoalOutcome.ABORTED,
     )
 
     with pytest.raises(ExecutionAbortedException):
-        executor_with_a_statechart.execute(
-            publishes_debug_expressions=publishes_debug_expressions
-        )
+        executor_with_a_statechart.execute(debug_output=debug_output)
 
     sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
-    assert sent_goal.publishes_debug_expressions is publishes_debug_expressions
+    assert sent_goal.debug_output == debug_output
 
 
-def test_executing_publishes_no_debug_expressions_unless_asked(
+def test_executing_asks_for_no_debug_output_unless_told_to(
     giskard_command_server: ActionServerHandler,
     executor_with_a_statechart: GiskardClientExecutor,
 ) -> None:
+    """
+    A goal executed without a debug output asks for the default :class:`DebugOutput`.
+    """
     server = ServerAnsweringOneGoal(
         action_server=giskard_command_server,
         outcome_unless_canceled=GoalOutcome.ABORTED,
@@ -145,7 +156,7 @@ def test_executing_publishes_no_debug_expressions_unless_asked(
         executor_with_a_statechart.execute()
 
     sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
-    assert sent_goal.publishes_debug_expressions is False
+    assert sent_goal.debug_output == DebugOutput()
 
 
 # %% closing
