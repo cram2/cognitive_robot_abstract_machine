@@ -15,7 +15,7 @@ from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOut
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HandlerWithoutRosAdvertisement(ActionServerHandler):
     """
     Exercises the handler's goal bookkeeping without advertising a ROS action.
@@ -29,11 +29,11 @@ class HandlerWithoutRosAdvertisement(ActionServerHandler):
     def __post_init__(self):
         pass
 
-    def loginfo(self, message: str, goal_id: int | None = None) -> None:
+    def loginfo(self, *, message: str, goal_id: int | None = None) -> None:
         self.messages.append(message)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GoalStateRecorder:
     """
     Stands in for a goal handle and records which state transition was requested.
@@ -70,7 +70,7 @@ class GoalStateRecorder:
 def test_succeeded_is_reported_as_success():
     goal_handle = GoalStateRecorder()
 
-    GoalOutcome.SUCCEEDED.report_to(goal_handle)
+    GoalOutcome.SUCCEEDED.report_to(goal_handle=goal_handle)
 
     assert goal_handle.transitions == ["succeed"]
 
@@ -78,7 +78,7 @@ def test_succeeded_is_reported_as_success():
 def test_aborted_is_reported_as_abort():
     goal_handle = GoalStateRecorder()
 
-    GoalOutcome.ABORTED.report_to(goal_handle)
+    GoalOutcome.ABORTED.report_to(goal_handle=goal_handle)
 
     assert goal_handle.transitions == ["abort"]
 
@@ -86,7 +86,7 @@ def test_aborted_is_reported_as_abort():
 def test_a_goal_its_client_asked_to_cancel_is_reported_as_canceled():
     goal_handle = GoalStateRecorder(is_cancel_requested=True)
 
-    GoalOutcome.CANCELED.report_to(goal_handle)
+    GoalOutcome.CANCELED.report_to(goal_handle=goal_handle)
 
     assert goal_handle.transitions == ["canceled"]
 
@@ -94,7 +94,7 @@ def test_a_goal_its_client_asked_to_cancel_is_reported_as_canceled():
 def test_a_goal_superseded_by_a_newer_one_is_reported_as_aborted():
     goal_handle = GoalStateRecorder(is_cancel_requested=False)
 
-    GoalOutcome.CANCELED.report_to(goal_handle)
+    GoalOutcome.CANCELED.report_to(goal_handle=goal_handle)
 
     assert goal_handle.transitions == ["abort"]
 
@@ -103,7 +103,7 @@ def test_every_outcome_reports_exactly_one_transition():
     for outcome in GoalOutcome:
         goal_handle = GoalStateRecorder()
 
-        outcome.report_to(goal_handle)
+        outcome.report_to(goal_handle=goal_handle)
 
         assert len(goal_handle.transitions) == 1
 
@@ -208,7 +208,7 @@ def test_the_callback_returns_the_result_and_reports_the_outcome_of_its_goal():
     returned: list[Any] = []
     callback = Thread(
         target=lambda: returned.append(
-            asyncio.run(handler.execute_callback(goal_handle))
+            asyncio.run(handler.execute_callback(goal_handle=goal_handle))
         ),
         daemon=True,
     )
@@ -231,7 +231,8 @@ def test_a_goal_accepted_while_the_previous_one_is_being_answered_is_kept():
     )
     previous = GoalStateRecorder(request="previous")
     callback = Thread(
-        target=lambda: asyncio.run(handler.execute_callback(previous)), daemon=True
+        target=lambda: asyncio.run(handler.execute_callback(goal_handle=previous)),
+        daemon=True,
     )
     callback.start()
     answer_the_next_goal(handler, GoalOutcome.CANCELED, "result")

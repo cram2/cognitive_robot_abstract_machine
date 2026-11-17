@@ -1,3 +1,7 @@
+"""
+Tensorized input layers whose leaves are Gaussian and truncated Gaussian distributions.
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -8,7 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 from random_events.interval import SimpleInterval, reals
 from random_events.variable import Variable
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
 from typing_extensions import Self
@@ -356,7 +360,7 @@ class TruncatedGaussianLayer(
     ) -> SampleNodeValues:
         column = self.float_column(values=values)
         left_included = self.namespace.where(
-            self.namespace.asarray(self.left_closed),
+            self.namespace.asarray(self.left_closed, device=self.device),
             self.lower <= column,
             self.lower < column,
         )

@@ -1038,3 +1038,55 @@ def test_a_graph_without_free_space_has_no_nearest_free_point(table_world: World
         empty.nearest_free_point(
             point=Point2(-4.5, -0.5, reference_frame=table_world.root)
         )
+
+
+# %% keeping clearance above and below obstacles
+
+
+def test_free_space_from_world_keeps_the_given_height_clearance_off_obstacles():
+    """
+    Free space starts only the given height clearance above the top of an obstacle.
+    """
+    world = World()
+    with world.modify_world():
+        root_body = Body(name=PrefixedName("map"))
+        world.add_kinematic_structure_entity(root_body)
+        box_body = Body(name=PrefixedName("box"))
+        world.add_connection(
+            FixedConnection.create_with_dofs(world, root_body, box_body)
+        )
+        box_body.collision.append(Box(scale=Scale(1, 1, 1)))
+    search_space = BoundingBoxCollection(
+        [
+            VolumetricBoundingBox(
+                min_x=-2,
+                max_x=2,
+                min_y=-2,
+                max_y=2,
+                min_z=-1,
+                max_z=2,
+                origin=HomogeneousTransformationMatrix(reference_frame=root_body),
+            )
+        ],
+        reference_frame=root_body,
+    )
+    height_clearance = 0.2
+
+    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
+        world=world,
+        search_space=search_space,
+        obstacle_height_clearance=height_clearance,
+    )
+
+    box_top = 0.5
+    within_the_clearance = Point3(
+        0, 0, box_top + height_clearance / 2, reference_frame=root_body
+    )
+    above_the_clearance = Point3(
+        0, 0, box_top + 2 * height_clearance, reference_frame=root_body
+    )
+    with pytest.raises(PointOccupiedError):
+        graph_of_convex_sets.node_of_point(within_the_clearance)
+    assert graph_of_convex_sets.node_of_point(above_the_clearance).contains(
+        above_the_clearance
+    )

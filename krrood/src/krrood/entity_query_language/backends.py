@@ -1,3 +1,8 @@
+"""
+The backends that answer entity queries: by selecting existing objects, from a database
+or in memory, or by generating them, symbolically or from a probabilistic model.
+"""
+
 import copy
 import enum
 import uuid
@@ -50,7 +55,7 @@ from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.ormatic.eql_interface import eql_to_sql
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 try:
     from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (

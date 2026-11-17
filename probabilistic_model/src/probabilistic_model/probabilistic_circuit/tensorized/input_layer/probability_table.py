@@ -21,6 +21,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     StateValues,
     TableEntryValues,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    RowReduction,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )
@@ -292,17 +295,22 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     ) -> list[BackendArray]:
         """
         :param parameters: Log-probabilities in the shape of :attr:`log_probabilities`.
-        :return: The log-probabilities normalized per node.
+        :return: The log-probabilities normalized per node. A node whose
+            log-probabilities are all ``-inf`` has nothing to normalize and keeps them.
         """
         (log_probabilities,) = parameters
         namespace = self.namespace
-        largest = namespace.max(log_probabilities, axis=1, keepdims=True)
-        normalization = namespace.log(
-            namespace.sum(
-                namespace.exp(log_probabilities - largest), axis=1, keepdims=True
-            )
+        normalization = namespace.expand_dims(
+            RowReduction.LOG_SUM_EXP.reduce_last_axis(namespace, log_probabilities),
+            axis=1,
         )
-        return [log_probabilities - largest - normalization]
+        return [
+            namespace.where(
+                namespace.isfinite(normalization),
+                log_probabilities - normalization,
+                log_probabilities,
+            )
+        ]
 
     @classmethod
     def from_entries(
@@ -342,6 +350,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
                     (self.number_of_nodes, 1),
                     -np.inf,
                     dtype=self.log_probabilities.dtype,
+                    device=self.device,
                 ),
             ],
             axis=1,
@@ -350,7 +359,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return self.namespace.take(padded, columns, axis=1).T
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
-        columns = self.namespace.asarray(np.flatnonzero(selected))
+        columns = self.namespace.asarray(np.flatnonzero(selected), device=self.device)
         return self.namespace.sum(
             self.namespace.exp(
                 self.namespace.take(self.log_probabilities, columns, axis=1)
@@ -360,7 +369,8 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
 
     def dot(self, values: StateValues) -> NodeValues:
         return self.namespace.matmul(
-            self.namespace.exp(self.log_probabilities), self.namespace.asarray(values)
+            self.namespace.exp(self.log_probabilities),
+            self.namespace.asarray(values, device=self.device),
         )
 
     def probabilities_of_node(self, node: int) -> tuple[StateIndices, TableEntryValues]:

@@ -11,7 +11,7 @@ from typing_extensions import Any, Callable
 
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.exceptions import ArgumentsPassableOnlyByPosition
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.caching import memoize
 from krrood.utils import is_hashable
 

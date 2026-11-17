@@ -1,3 +1,8 @@
+"""
+The base classes of robot plan actions: actions that pursue a goal and actions composed
+of steps run in sequence, in parallel or tried in turn.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -8,7 +13,7 @@ from typing_extensions import TYPE_CHECKING, Any, Self
 
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.plan_transformation import PlanRewriting
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import SucceedsOnObservingTrue, FailsOnObservingFalse
 from cramph.composites import ControlStructureNode, Parallel, Sequence, TryAll
 from cramph.context import ContextExtension

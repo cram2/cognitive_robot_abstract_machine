@@ -73,7 +73,7 @@ from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
-from krrood.symbol_graph.helpers import get_field_type_endpoint
+from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType

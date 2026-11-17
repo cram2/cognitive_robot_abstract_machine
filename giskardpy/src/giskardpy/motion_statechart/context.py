@@ -46,7 +46,7 @@ class MotionControlContext(ContextExtension):
     """
 
     def get_or_create_self_collision_manager(
-        self, context: StatechartContext
+        self, *, context: StatechartContext
     ) -> SelfCollisionVariableManager:
         """
         :param context: The context this extension belongs to.
@@ -62,7 +62,7 @@ class MotionControlContext(ContextExtension):
         return self.self_collision_manager
 
     def get_or_create_external_collision_manager(
-        self, context: StatechartContext
+        self, *, context: StatechartContext
     ) -> ExternalCollisionVariableManager:
         """
         :param context: The context this extension belongs to.

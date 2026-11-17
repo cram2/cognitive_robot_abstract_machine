@@ -221,7 +221,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
             left = self.lower < column
         else:
             left = self.namespace.where(
-                self.namespace.asarray(left_closed),
+                self.namespace.asarray(left_closed, device=self.device),
                 self.lower <= column,
                 self.lower < column,
             )
@@ -233,7 +233,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
             right = column < self.upper
         else:
             right = self.namespace.where(
-                self.namespace.asarray(right_closed),
+                self.namespace.asarray(right_closed, device=self.device),
                 column <= self.upper,
                 column < self.upper,
             )

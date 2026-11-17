@@ -636,7 +636,8 @@ class VolumetricGraphOfBoundingBoxes(
             connectivity.
         :param bloat_obstacles: The amount to bloat the obstacles in x and y.
         :param bloat_walls: The amount to bloat the walls.
-        :param obstacle_height_clearance: The amount to bloat the obstacles in z.
+        :param obstacle_height_clearance: The amount to bloat every obstacle and wall
+            upwards and downwards.
         :param excluded_bodies: Bodies that are no obstacles, such as an object to be
             reached into.
         :return: The connectivity graph. If no obstacles are found, an empty graph is
@@ -702,8 +703,9 @@ class VolumetricGraphOfBoundingBoxes(
         :param search_space: The search space for the connectivity graph.
         :param tolerance: The tolerance for the intersection when calculating the
             connectivity.
-        :param bloat_obstacles: The amount to bloat the obstacles in x and y.
-        :param obstacle_height_clearance: The amount to bloat the obstacles in z.
+        :param bloat_obstacles: The amount to bloat the obstacles.
+        :param obstacle_height_clearance: The amount to bloat every obstacle upwards and
+            downwards.
         :param excluded_bodies: Bodies that are no obstacles, such as an object to be
             reached into.
         :return: The connectivity graph.

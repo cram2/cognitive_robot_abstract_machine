@@ -101,11 +101,6 @@ class ActiveConnection(Connection, ABC):
         """
         return any(dof.has_hardware_interface for dof in self.active_dofs)
 
-    @has_hardware_interface.setter
-    def has_hardware_interface(self, value: bool) -> None:
-        for dof in self.active_dofs:
-            dof.has_hardware_interface = value
-
     @property
     def is_controlled(self):
         return self.has_hardware_interface
@@ -119,24 +114,26 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
 
     axis: Vector3 = field(kw_only=True)
     """
-    Connection moves along this axis, should be a unit vector.
+    Connection moves along this unit vector, given in the frame of the parent.
 
-    The axis is defined relative to the local reference frame of the parent
-    KinematicStructureEntity.
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     multiplier: float = 1.0
     """
-    Movement along the axis is multiplied by this value.
+    Movement along the axis is multiplied by this value, e.g. for shared DoFs.
 
-    Useful if Connections share DoFs.
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     offset: float = 0.0
     """
-    Movement along the axis is offset by this value.
+    Movement along the axis is offset by this value, e.g. for shared DoFs.
 
-    Useful if Connections share DoFs.
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     raw_dof: DegreeOfFreedom = field(kw_only=True)
@@ -281,46 +278,6 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         self._world.state[self.raw_dof.id].jerk = value / self.multiplier
         self._world.notify_state_change()
 
-    def copy_for_world(self, world: World):
-        (
-            other_parent,
-            other_child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-
-        return self.__class__(
-            name=PrefixedName(self.name.name, self.name.prefix),
-            parent=other_parent,
-            child=other_child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            raw_dof=world.get_degree_of_freedom_by_id(self.raw_dof.id),
-            dynamics=self.dynamics,
-        )
-
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        # Reuse the same degree of freedom so the joint state is kept.
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            raw_dof=self.raw_dof,
-            dynamics=self.dynamics,
-        )
-
 
 @dataclass(eq=False)
 class PrismaticConnection(ActiveConnection1DOF):
@@ -380,6 +337,9 @@ class ScrewConnection(ActiveConnection1DOF):
     for
     the distinction between screw pitch and lead. Negative values model left-handed
     threads.
+
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
     """
 
     def add_to_world(self, world: World):
@@ -452,48 +412,6 @@ class ScrewConnection(ActiveConnection1DOF):
             dynamics=dynamics or JointDynamics(),
         )
         return connection
-
-    def copy_for_world(self, world: World):
-        (
-            other_parent,
-            other_child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-
-        return self.__class__(
-            name=PrefixedName(self.name.name, self.name.prefix),
-            parent=other_parent,
-            child=other_child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            raw_dof=world.get_degree_of_freedom_by_id(self.raw_dof.id),
-            screw_pitch=self.screw_pitch,
-            dynamics=self.dynamics,
-        )
-
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        # Reuse the same degree of freedom so the joint state is kept.
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            axis=self.axis,
-            multiplier=self.multiplier,
-            offset=self.offset,
-            raw_dof=self.raw_dof,
-            dynamics=self.dynamics,
-            screw_pitch=self.screw_pitch,
-        )
 
 
 @dataclass(eq=False)
@@ -666,57 +584,6 @@ class Connection6DoF(Connection):
             self._world.state[self.qz.id].position = orientation[2]
             self._world.state[self.qw.id].position = orientation[3]
             self._world.notify_state_change()
-
-    def copy_for_world(self, world: World) -> Connection6DoF:
-        """
-        Copies this 6DoF connection for another world.
-
-        Returns a new connection with references to the given world.
-        :param world: The world to copy this connection for.
-        :return: A copy of this connection for the given world.
-        """
-        (
-            other_parent,
-            other_child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-
-        return Connection6DoF(
-            name=deepcopy(self.name),
-            parent=other_parent,
-            child=other_child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            x=world.get_degree_of_freedom_by_id(self.x.id),
-            y=world.get_degree_of_freedom_by_id(self.y.id),
-            z=world.get_degree_of_freedom_by_id(self.z.id),
-            qx=world.get_degree_of_freedom_by_id(self.qx.id),
-            qy=world.get_degree_of_freedom_by_id(self.qy.id),
-            qz=world.get_degree_of_freedom_by_id(self.qz.id),
-            qw=world.get_degree_of_freedom_by_id(self.qw.id),
-        )
-
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        # Reuse the same degrees of freedom so the world state layout is kept.
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            x=self.x,
-            y=self.y,
-            z=self.z,
-            qx=self.qx,
-            qy=self.qy,
-            qz=self.qz,
-            qw=self.qw,
-        )
 
 
 @dataclass(eq=False)
@@ -931,27 +798,6 @@ class OmniDrive(WheeledDrive):
             y_velocity=y_vel,
         )
 
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        # Reuse the same degrees of freedom so the odometry and the world state layout are kept.
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            x=self.x,
-            y=self.y,
-            roll=self.roll,
-            pitch=self.pitch,
-            yaw=self.yaw,
-            x_velocity=self.x_velocity,
-            y_velocity=self.y_velocity,
-        )
-
     @property
     def active_dofs(self) -> list[DegreeOfFreedom]:
         return [self.x_velocity, self.y_velocity, self.yaw]
@@ -975,37 +821,6 @@ class OmniDrive(WheeledDrive):
 
     def get_free_variable_names(self) -> list[UUID]:
         return [self.x.id, self.y.id, self.yaw.id]
-
-    def copy_for_world(self, world: World) -> OmniDrive:
-        """
-        Copies this OmniDriveConnection for the provided world.
-
-        This finds the references for the parent and child in the new world and returns
-        a new connection with references to the new parent and child.
-        :param world: The world where the connection is copied.
-        :return: The connection with references to the new parent and child.
-        """
-        (
-            other_parent,
-            other_child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-
-        return OmniDrive(
-            name=deepcopy(self.name),
-            parent=other_parent,
-            child=other_child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            x=world.get_degree_of_freedom_by_id(self.x.id),
-            y=world.get_degree_of_freedom_by_id(self.y.id),
-            roll=world.get_degree_of_freedom_by_id(self.roll.id),
-            pitch=world.get_degree_of_freedom_by_id(self.pitch.id),
-            yaw=world.get_degree_of_freedom_by_id(self.yaw.id),
-            x_velocity=world.get_degree_of_freedom_by_id(self.x_velocity.id),
-            y_velocity=world.get_degree_of_freedom_by_id(self.y_velocity.id),
-        )
 
 
 @dataclass(eq=False)
@@ -1121,26 +936,6 @@ class DifferentialDrive(WheeledDrive):
             x_velocity=x_vel,
         )
 
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        # Reuse the same degrees of freedom so the odometry and the world state layout are kept.
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            x=self.x,
-            y=self.y,
-            roll=self.roll,
-            pitch=self.pitch,
-            yaw=self.yaw,
-            x_velocity=self.x_velocity,
-        )
-
     @property
     def active_dofs(self) -> list[DegreeOfFreedom]:
         return [self.x_velocity, self.yaw]
@@ -1162,33 +957,3 @@ class DifferentialDrive(WheeledDrive):
 
     def get_free_variable_names(self) -> list[UUID]:
         return [self.x.id, self.y.id, self.yaw.id]
-
-    def copy_for_world(self, world: World) -> DifferentialDrive:
-        """
-        Copies this DiffDriveConnection for the provided world.
-
-        This finds the references for the parent and child in the new world and returns
-        a new connection with references to the new parent and child.
-        :param world: The world where the connection is copied.
-        :return: The connection with references to the new parent and child.
-        """
-        (
-            other_parent,
-            other_child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-
-        return DifferentialDrive(
-            name=deepcopy(self.name),
-            parent=other_parent,
-            child=other_child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            x=world.get_degree_of_freedom_by_id(self.x.id),
-            y=world.get_degree_of_freedom_by_id(self.y.id),
-            roll=world.get_degree_of_freedom_by_id(self.roll.id),
-            pitch=world.get_degree_of_freedom_by_id(self.pitch.id),
-            yaw=world.get_degree_of_freedom_by_id(self.yaw.id),
-            x_velocity=world.get_degree_of_freedom_by_id(self.x_velocity.id),
-        )

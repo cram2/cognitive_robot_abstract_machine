@@ -1,6 +1,6 @@
 """
-The semantic annotations of an environment: furniture, rooms, containers and their
-parts.
+Semantic annotations of the furniture, appliances, doors, handles and other things a
+world contains.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing_extensions import Iterable, Iterator, Self, TYPE_CHECKING
 
 import numpy as np
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
@@ -562,18 +562,6 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
         :return: The identity: the rails' frame is the drawer's frame.
         """
         return HomogeneousTransformationMatrix()
-
-    @property
-    def opening_ratio(self) -> float:
-        """
-        :return: How far this drawer stands pulled out, as a fraction of its travel.
-        """
-        if self.movable_joint is None:
-            raise MissingMovableJointError(self)
-        limits = self.movable_joint.dof.limits
-        return (self.movable_joint.position - limits.lower.position) / (
-            limits.upper.position - limits.lower.position
-        )
 
 
 @dataclass(eq=False)
