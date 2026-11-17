@@ -18,6 +18,9 @@ can use the same conventions:
 - `krrood issue-forms [--check]` generates the `.github/ISSUE_TEMPLATE/<name>.yml` of
   every GitHub issue form krrood ships and the repository declares, replacing whatever those files held.
   `--check` works as for `agents-md`.
+- `krrood issue-answer --form NAME --field IDENTIFIER` reads the body of an issue opened
+  with an issue form from standard input and prints its answer to one field, code
+  without its fence; it exits with 1 when the issue leaves the field empty.
 - `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
   enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
   the staged change (`git diff --cached`) adds or changes are checked, because existing
@@ -189,6 +192,10 @@ other classproperties give the `description`, the organisation's `issue_type` se
 every issue opened with it, and its `text_areas`. The bug report krrood ships,
 `BugReportIssueForm` in `krrood/development_tools/issue_forms/shipped_forms.py`, shows
 each of them.
+
+`krrood issue-answer` finds a form by its `name`, the file name without `.yml`, and a
+field by its `identifier`, so a workflow can act on an answer, for example run the
+script of a bug report.
 
 Never edit a generated issue form; the comment at its top names the class and module it
 comes from. Issue forms written by hand in `.github/ISSUE_TEMPLATE` are left alone.

@@ -119,6 +119,26 @@ class DatasetFile(PathEnumeration):
     no issue type, with the placeholders of :attr:`ISSUE_FORM_TEXT`.
     """
 
+    CRASH_REPORT_ISSUE_BODY = (
+        Path(__file__).parent / "dataset" / "crash_report_issue_body.md"
+    )
+    """
+    The body GitHub gives an issue opened with the crash report form of
+    :attr:`PROJECT_ISSUE_FORMS_MODULE`, answering both of its fields.
+    """
+
+    CRASH_REPORT_UNANSWERED_ISSUE_BODY = (
+        Path(__file__).parent / "dataset" / "crash_report_unanswered_issue_body.md"
+    )
+    """
+    :attr:`CRASH_REPORT_ISSUE_BODY` with its optional script left empty.
+    """
+
+    CRASH_REPORT_SCRIPT = Path(__file__).parent / "dataset" / "crash_report_script.py"
+    """
+    The script :attr:`CRASH_REPORT_ISSUE_BODY` answers with, without its code fence.
+    """
+
     RULE_SECTIONS_TEXT = Path(__file__).parent / "dataset" / "rule_sections_text.md"
     """
     The ``AGENTS.md`` listing the design principles and verification sections of

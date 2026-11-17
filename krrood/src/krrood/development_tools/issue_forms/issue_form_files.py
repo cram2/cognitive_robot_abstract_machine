@@ -12,6 +12,7 @@ from krrood.code_generation.generator import CodeGenerator
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.generated_file import GeneratedFile
 from krrood.development_tools.issue_forms import shipped_forms
+from krrood.development_tools.issue_forms.exceptions import UnknownIssueForm
 from krrood.development_tools.issue_forms.issue_form import IssueForm
 from krrood.development_tools.subcommand import Subcommand
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -90,10 +91,9 @@ class RepositoryIssueForms:
     """
 
     @property
-    def files(self) -> list[IssueFormFile]:
+    def forms(self) -> list[type[IssueForm]]:
         """
-        The file of every shipped and declared form, in alphabetical order of their
-        titles.
+        Every shipped and declared form, in alphabetical order of their titles.
         """
         forms = RuleModule(module=shipped_forms).defined_subclasses(base=IssueForm)
         project_forms = RuleModule.import_from(
@@ -102,7 +102,27 @@ class RepositoryIssueForms:
         )
         if project_forms is not None:
             forms += project_forms.defined_subclasses(base=IssueForm)
+        return sorted(forms, key=lambda form: form.title)
+
+    @property
+    def files(self) -> list[IssueFormFile]:
+        """
+        The file of every form of :attr:`forms`, in the same order.
+        """
         return [
             IssueFormFile(repository_root=self.repository_root, form=form)
-            for form in sorted(forms, key=lambda form: form.title)
+            for form in self.forms
         ]
+
+    def find_form(self, *, name: str) -> type[IssueForm]:
+        """
+        :param name: The :attr:`IssueForm.name` of a shipped or declared form.
+        :return: The form with that name.
+        :raises UnknownIssueForm: If no form has it.
+        """
+        for form in self.forms:
+            if form.name == name:
+                return form
+        raise UnknownIssueForm(
+            name=name, known_names=[form.name for form in self.forms]
+        )

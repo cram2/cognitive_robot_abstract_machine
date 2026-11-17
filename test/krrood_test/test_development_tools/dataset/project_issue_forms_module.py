@@ -31,20 +31,31 @@ class CrashReportIssueForm(IssueForm):
         return "Bug"
 
     @classproperty
+    def what_crashed(cls) -> TextArea:
+        """
+        A required prose field.
+        """
+        return TextArea(
+            identifier="what-crashed",
+            label="What crashed",
+            description="The program and what it was doing: say it plainly.",
+            required=True,
+        )
+
+    @classproperty
+    def script(cls) -> TextArea:
+        """
+        An optional field holding Python code.
+        """
+        return TextArea(
+            identifier="script",
+            label="Script",
+            code_language=CodeLanguage.PYTHON,
+        )
+
+    @classproperty
     def text_areas(cls) -> list[TextArea]:
-        return [
-            TextArea(
-                identifier="what-crashed",
-                label="What crashed",
-                description="The program and what it was doing: say it plainly.",
-                required=True,
-            ),
-            TextArea(
-                identifier="script",
-                label="Script",
-                code_language=CodeLanguage.PYTHON,
-            ),
-        ]
+        return [cls.what_crashed, cls.script]
 
 
 class AnnouncementIssueForm(IssueForm):

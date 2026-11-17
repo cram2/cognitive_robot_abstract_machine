@@ -7,8 +7,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-from typing_extensions import Callable, Iterator
 
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.command_line import CommandLine, ExitStatus, Option
@@ -17,7 +15,6 @@ from krrood.development_tools.issue_forms.issue_form import IssueForm
 from krrood.development_tools.issue_forms.issue_form_files import (
     IssueFormFile,
     RepositoryIssueForms,
-    RepositoryIssueFormsModule,
 )
 from krrood.development_tools.subcommand import Subcommand
 
@@ -100,34 +97,6 @@ def test_the_file_of_a_form_without_an_issue_type_sets_no_type(
 
 
 # %% project issue forms
-
-
-@pytest.fixture
-def forget_project_issue_forms() -> Iterator[None]:
-    """
-    Remove the repository's issue forms module from the imported modules after the test,
-    so that the next test imports its own.
-    """
-    yield
-    for module_name in list(sys.modules):
-        if module_name.split(".")[0] == RepositoryIssueFormsModule.ISSUE_FORMS:
-            del sys.modules[module_name]
-
-
-@pytest.fixture
-def project_issue_forms_repository(
-    repository_root: Path,
-    copy_into_temporary_directory: Callable[[DatasetFile, str], Path],
-    forget_project_issue_forms: None,
-) -> Path:
-    """
-    :return: :func:`repository_root`, holding the repository's issue forms module.
-    """
-    copy_into_temporary_directory(
-        DatasetFile.PROJECT_ISSUE_FORMS_MODULE,
-        f"{RepositoryIssueFormsModule.ISSUE_FORMS}.py",
-    )
-    return repository_root
 
 
 def test_a_repository_without_an_issue_forms_module_has_the_shipped_forms(

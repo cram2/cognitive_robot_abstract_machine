@@ -32,34 +32,50 @@ class BugReportIssueForm(IssueForm):
         return "Bug"
 
     @classproperty
+    def issue_description(cls) -> TextArea:
+        """
+        What goes wrong.
+        """
+        return TextArea(
+            identifier="describe-the-issue",
+            label="Describe the issue",
+            description=(
+                "What happens, in which situation, and what should happen instead."
+            ),
+            required=True,
+        )
+
+    @classproperty
+    def code_example(cls) -> TextArea:
+        """
+        The script that makes the bug happen.
+        """
+        return TextArea(
+            identifier="reproduce-the-code-example",
+            label="Reproduce the code example",
+            description=(
+                "A short, self contained script that reproduces the problem and runs as "
+                "it is with `python reproduce.py`. Name the commit or version it ran on."
+            ),
+            code_language=CodeLanguage.PYTHON,
+            required=True,
+        )
+
+    @classproperty
+    def error_message(cls) -> TextArea:
+        """
+        What the script prints when the bug happens.
+        """
+        return TextArea(
+            identifier="error-message",
+            label="Error message",
+            description=(
+                "The full error message, if there is one, starting from "
+                "`Traceback (most recent call last):`."
+            ),
+            code_language=CodeLanguage.SHELL,
+        )
+
+    @classproperty
     def text_areas(cls) -> list[TextArea]:
-        return [
-            TextArea(
-                identifier="describe-the-issue",
-                label="Describe the issue",
-                description=(
-                    "What happens, in which situation, and what should happen instead."
-                ),
-                required=True,
-            ),
-            TextArea(
-                identifier="reproduce-the-code-example",
-                label="Reproduce the code example",
-                description=(
-                    "A short, self contained script that reproduces the problem and "
-                    "runs as it is with `python reproduce.py`. Name the commit or "
-                    "version it ran on."
-                ),
-                code_language=CodeLanguage.PYTHON,
-                required=True,
-            ),
-            TextArea(
-                identifier="error-message",
-                label="Error message",
-                description=(
-                    "The full error message, if there is one, starting from "
-                    "`Traceback (most recent call last):`."
-                ),
-                code_language=CodeLanguage.SHELL,
-            ),
-        ]
+        return [cls.issue_description, cls.code_example, cls.error_message]

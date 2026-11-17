@@ -48,6 +48,16 @@ class Option(StrEnum):
     Check every line of a file, not only those the staged change touches.
     """
 
+    FORM = "--form"
+    """
+    The name of the issue form an issue was opened with.
+    """
+
+    FIELD = "--field"
+    """
+    The identifier of the field of an issue form whose answer to print.
+    """
+
 
 class ExitStatus(IntEnum):
     """
@@ -142,6 +152,14 @@ class CommandLine:
         )
         issue_forms_parser.set_defaults(run=self.generate_issue_forms)
 
+        issue_answer_parser = subparsers.add_parser(
+            Subcommand.ISSUE_ANSWER,
+            help="Print the answer of the issue body on standard input to one field of a form.",
+        )
+        issue_answer_parser.add_argument(Option.FORM, required=True)
+        issue_answer_parser.add_argument(Option.FIELD, required=True)
+        issue_answer_parser.set_defaults(run=self.print_issue_answer)
+
         check_parser = subparsers.add_parser(
             Subcommand.CHECK,
             help="Report the code that breaks a rule a checker enforces.",
@@ -213,6 +231,25 @@ class CommandLine:
             subcommand=Subcommand.ISSUE_FORMS,
             only_check=arguments.check,
         )
+
+    def print_issue_answer(self, *, arguments: argparse.Namespace) -> ExitStatus:
+        """
+        Print the answer the issue body on standard input gives to the field the command
+        line names, of a form krrood ships or the current directory declares.
+
+        :param arguments: The parsed command line.
+        :return: :attr:`ExitStatus.FAILURE` if the issue leaves the field unanswered.
+        """
+        form = RepositoryIssueForms(repository_root=Path.cwd()).find_form(
+            name=arguments.form
+        )
+        text_area = form.find_text_area(identifier=arguments.field)
+        answer = form.find_answer(issue_body=sys.stdin.read(), text_area=text_area)
+        if answer is None:
+            logger.error("The issue leaves `%s` unanswered.", text_area.label)
+            return ExitStatus.FAILURE
+        sys.stdout.write(f"{answer}\n")
+        return ExitStatus.SUCCESS
 
     def generate_files(
         self,
