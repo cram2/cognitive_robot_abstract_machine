@@ -155,8 +155,7 @@ class ProbabilisticBackend(GenerativeBackend):
         if aggregator._leaf_attribute_ is None:
             return None
         if aggregator._distinct_:
-            # native evaluation deduplicates values before averaging; the closed-form
-            # expectation has no notion of that, so it must not silently stand in
+            # The closed-form expectation cannot deduplicate values.
             return None
         if any(
             builder is not None
@@ -186,8 +185,7 @@ class ProbabilisticBackend(GenerativeBackend):
         return model.expectation((random_event_variable,))[random_event_variable]
 
     def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
-        # create new objects with the values from the samples, and reject those
-        # contradicting a value the model does not cover, such as a property's
+        # Reject instances contradicting a value the model does not cover.
         instances = (
             expression._construct_instance_from_bindings_(bindings=row.bindings)
             for row in self.sample_bindings(expression=expression)
@@ -278,9 +276,7 @@ class ProbabilisticBackend(GenerativeBackend):
             )
             if not isinstance(model, CausalCircuit):
                 raise DoRequiresCausalCircuitModel(resolved_model=model)
-            # search every candidate cause independently and keep the primary one's
-            # already effect-truncated, already region-narrowed circuit -- see
-            # _resolve_primary_intervention for why this needs no joint intervention
+            # Keep the primary cause's effect-truncated, region-narrowed circuit.
             primary = self._resolve_primary_intervention(
                 model=model,
                 cause_variables=cause_effect.cause_variables,
@@ -293,8 +289,7 @@ class ProbabilisticBackend(GenerativeBackend):
                 model=primary.narrowed_circuit
             )
         else:
-            # The same conditioning and truncation a distribution_of(...) query
-            # resolves to, without sampling.
+            # Same conditioning and truncation as distribution_of, without sampling.
             truncated = parameters.resolve_conditioned_and_truncated_model(model=model)
 
         if truncated is None:
@@ -308,11 +303,6 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         Resolve the cause candidates and the single effect variable a ``cause`` search
         optimizes for.
-
-        Any number of cause candidates is fine -- each is searched independently (see
-        :meth:`_resolve_primary_intervention`). Exactly one effect variable is required:
-        :meth:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit.backdoor_adjustment`
-        has no multi-effect form to route several through.
 
         :param parameters: The parameters extracted from *expression*.
         :param expression: The match being evaluated.
@@ -425,10 +415,8 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         Ask the learned structure what intervening on one cause adjusts for, among the
         variables the query names and the aggregation statistics a relational grounding
-        keeps; the variables marked ``confounder`` are settled by
-        :attr:`declared_adjustment_policy`. A chosen statistic the query does not name
-        is added to its parameters' variables. A part attribute's node stands for the
-        copy on the part the cause, or else the effect, sits on.
+        keeps. Variables marked ``confounder`` are settled by
+        :attr:`declared_adjustment_policy`; a chosen statistic the query lacks is added.
 
         :param parameters: The query's parameters.
         :param structure: The structure learned for the queried class.
@@ -678,14 +666,7 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         Search every candidate cause variable independently for the region whose
         intervention best explains the effect, and return the highest-scoring candidate
-        as the primary cause.
-
-        This is the same per-candidate approach
-        :meth:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit.diagnose_failure`
-        already uses to identify a ``primary_cause_variable`` -- trying one candidate at
-        a time needs no joint, multi-variable intervention, which
-        ``backdoor_adjustment`` does not support. See :meth:`rank_causes` for every
-        candidate's score, not just this one.
+        as the primary cause. :meth:`rank_causes` gives every candidate's score.
 
         :param model: The causal circuit to search.
         :param cause_variables: The candidate cause variables, one or more.
@@ -832,8 +813,7 @@ class ProbabilisticBackend(GenerativeBackend):
             cause_variable, effect_variable, list(adjustment_variables)
         )
 
-        # `.truncated()` fills in missing variables in place on the event it is given,
-        # so each call gets a fresh copy rather than the previous call's variables.
+        # `.truncated()` mutates the event it is given, so each call needs a fresh copy.
         if effect_truncation_event:
             effect_truncated = interventional.truncated(
                 copy.deepcopy(effect_truncation_event)

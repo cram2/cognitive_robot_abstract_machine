@@ -30,7 +30,7 @@ import krrood.entity_query_language.factories as eql
 import krrood.entity_query_language.testing as testing_package
 import krrood.entity_query_language.verbalization as verbalization_package
 import krrood.parametrization as parametrization_package
-import krrood.parametrization.probabilistic_query_rules
+import krrood.parametrization.probabilistic_queries
 from krrood.entity_query_language.operators.causal import CausesEffect
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
@@ -167,4 +167,4 @@ def test_doctest_discovery_covers_the_rules_of_the_probabilistic_queries():
     The probabilistic part defines the rules of its own queries outside the
     verbalization package, so its doctests must be scanned too.
     """
-    assert krrood.parametrization.probabilistic_query_rules.__name__ in _MODULE_NAMES
+    assert krrood.parametrization.probabilistic_queries.__name__ in _MODULE_NAMES
