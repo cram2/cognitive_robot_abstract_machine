@@ -59,7 +59,14 @@ class Entity:
     """
 
     has_fur: bool = False
+    """
+    Whether the entity has fur.
+    """
+
     species: Optional[Species] = None
+    """
+    What the rules conclude.
+    """
 
 
 @dataclass
@@ -99,6 +106,10 @@ def _alternative_chain_rdr():
 
 
 def _entity_named_case_type_rdr():
+    """
+    A one-rule tree over :class:`Entity`, whose case variable's natural name is the
+    name of a factory.
+    """
     entity_case = variable(Entity, domain=[])
     query = entity(entity_case).where(entity_case.has_fur == True)
     with query:
