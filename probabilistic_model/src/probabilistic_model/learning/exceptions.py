@@ -168,3 +168,23 @@ class UnmeasurableHostStepMemoryError(ProbabilisticModelException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Choose the batch size on the CPU by hand, or train on a CUDA device."
+
+
+@dataclass(kw_only=True)
+class UnscheduledOptimizerError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when a learning rate schedule is given for an optax optimizer whose
+    learning rate cannot be changed during training.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "The learning rate of the optimizer cannot be changed between steps, so a "
+            "learning rate schedule cannot reduce it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Build the optimizer with optax.inject_hyperparams, for example "
+            "optax.inject_hyperparams(optax.adam)(learning_rate=1e-2)."
+        )

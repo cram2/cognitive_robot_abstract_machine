@@ -15,14 +15,17 @@ import optax
 import pytest
 from array_api_compat import array_namespace
 
+from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
     JaxGradientDescent,
 )
 from probabilistic_model.learning.training_schedule import (
     Convergence,
+    LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
+    PlateauScheduledTraining,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
@@ -119,6 +122,160 @@ def test_a_loss_that_keeps_improving_ends_training_at_the_epoch_limit(convergenc
 
     assert not history.converged
     assert history.epochs == convergence.maximum_epochs
+
+
+def test_an_elapsed_time_limit_starts_no_further_epoch(convergence):
+    """
+    Once the time limit has passed, no epoch starts and training ends without having
+    converged.
+    """
+    convergence.maximum_seconds = 0.0
+    history = convergence.history_until_converged(
+        training=scripted_training([1.0] * convergence.maximum_epochs)
+    )
+
+    assert not history.converged
+    assert history.epochs == 0
+
+
+# %% learning rate plateau
+
+
+def test_a_plateau_reduces_the_learning_rate_after_the_patience():
+    """
+    The learning rate is reduced once more epochs than the patience brought no relative
+    improvement, and not before.
+    """
+    plateau = LearningRatePlateau(factor=0.5, patience=2, relative_tolerance=0.01)
+    for loss in [10.0, 9.0, 8.95, 8.95]:
+        plateau.record(average_loss=loss)
+    assert plateau.scale == 1.0
+    plateau.record(average_loss=8.95)
+    assert plateau.scale == plateau.factor
+
+
+def test_a_plateau_settles_after_its_reductions():
+    """
+    A constant loss reduces the learning rate every patience plus one epochs until the
+    plateau has settled.
+    """
+    plateau = LearningRatePlateau(patience=1, reductions_until_settled=2)
+    for _ in range(1 + 2 * (plateau.patience + 1)):
+        plateau.record(average_loss=1.0)
+    assert plateau.is_settled
+    assert plateau.reductions == plateau.reductions_until_settled
+
+
+@dataclass(kw_only=True)
+class ScriptedPlateauTraining(PlateauScheduledTraining, ScriptedLossTraining):
+    """
+    Scripted training under a learning rate schedule that records every scale it is
+    given.
+    """
+
+    scales: list[float]
+    """
+    The scale of the learning rate after every epoch, in order.
+    """
+
+    def scale_learning_rate(self, *, scale: float) -> None:
+        self.scales.append(scale)
+
+
+def test_training_under_a_plateau_converges_only_once_the_plateau_settled(
+    convergence,
+):
+    """
+    A constant loss converges by the criterion after the patience, but training goes on
+    until the plateau has reduced the learning rate often enough.
+    """
+    plateau = LearningRatePlateau(patience=1, reductions_until_settled=2)
+    training = ScriptedPlateauTraining(
+        arguments=(np.zeros(1),),
+        mini_batches=MiniBatches(),
+        losses=[1.0] * convergence.maximum_epochs,
+        scales=[],
+        learning_rate_plateau=plateau,
+    )
+    history = convergence.history_until_converged(training=training)
+
+    assert history.converged
+    assert history.epochs == 1 + plateau.reductions_until_settled * (
+        plateau.patience + 1
+    )
+    assert training.scales[-1] == plateau.factor**plateau.reductions_until_settled
+
+
+@pytest.fixture
+def jax_circuit(mixture_of_products_case):
+    """
+    The mixture of products of :func:`mixture_of_products_case` with jax parameters.
+    """
+    return mixture_of_products_case.circuit(np).to_namespace(jnp)
+
+
+def test_a_plateau_needs_an_optimizer_whose_learning_rate_can_change(jax_circuit):
+    """
+    A schedule for an optax optimizer with a fixed learning rate is rejected.
+    """
+    trainer = JaxGradientDescent(
+        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+    )
+    with pytest.raises(UnscheduledOptimizerError):
+        trainer.start_training(
+            arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
+            mini_batches=MiniBatches(),
+            learning_rate_plateau=LearningRatePlateau(),
+        )
+
+
+def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
+    """
+    Scaling the learning rate multiplies the initial learning rate of the optimizer.
+    """
+    learning_rate = 0.1
+    training = JaxGradientDescent(
+        jax_circuit.root,
+        AverageNegativeLogLikelihood(),
+        optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+    ).start_training(
+        arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
+        mini_batches=MiniBatches(),
+        learning_rate_plateau=LearningRatePlateau(),
+    )
+    training.scale_learning_rate(scale=0.5)
+
+    assert float(
+        training.state.optimizer_state.hyperparams["learning_rate"]
+    ) == pytest.approx(0.5 * learning_rate)
+
+
+def test_torch_training_scales_the_learning_rate_of_its_optimizer(
+    mixture_of_products_case,
+):
+    """
+    Scaling the learning rate multiplies the learning rate of every parameter group.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+    circuit = mixture_of_products_case.circuit(np).to_namespace(
+        array_namespace(torch.zeros(0))
+    )
+    trainer = torch_gradient_descent.TorchGradientDescent(
+        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+    )
+    training = trainer.start_training(
+        arguments=(torch.zeros((1, len(circuit.variables))),),
+        mini_batches=MiniBatches(),
+        learning_rate_plateau=LearningRatePlateau(),
+    )
+    training.scale_learning_rate(scale=0.5)
+
+    assert [group["lr"] for group in training.optimizer.param_groups] == [
+        pytest.approx(0.5 * trainer.learning_rate)
+    ] * len(training.optimizer.param_groups)
 
 
 # %% mini-batches

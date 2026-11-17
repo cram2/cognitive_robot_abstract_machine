@@ -20,7 +20,10 @@ from probabilistic_model.learning.device_memory import (
     HostMemory,
     PeakTrackingMemory,
 )
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.training_schedule import (
+    LearningRatePlateau,
+    MiniBatches,
+)
 
 
 # %% gradient descent
@@ -60,13 +63,18 @@ class TorchGradientDescent(GradientDescent[LayerType]):
         ]
 
     def start_training(
-        self, *, arguments: tuple[torch.Tensor, ...], mini_batches: MiniBatches
+        self,
+        *,
+        arguments: tuple[torch.Tensor, ...],
+        mini_batches: MiniBatches,
+        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TorchGradientDescentTraining[LayerType]:
         return TorchGradientDescentTraining(
             arguments=arguments,
             mini_batches=mini_batches,
             gradient_descent=self,
             optimizer=self.optimizer_type(self.parameters, lr=self.learning_rate),
+            learning_rate_plateau=learning_rate_plateau,
         )
 
     def device_memory(self) -> PeakTrackingMemory:
@@ -144,6 +152,10 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
 
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> float:
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
+
+    def scale_learning_rate(self, *, scale: float) -> None:
+        for group in self.optimizer.param_groups:
+            group["lr"] = self.gradient_descent.learning_rate * scale
 
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
