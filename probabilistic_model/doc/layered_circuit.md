@@ -165,7 +165,7 @@ sum layers of a RAT-SPN, and much slower for sparsely connected ones;
 `store_edges_as` converts every inner layer of a circuit.
 
 A circuit with JAX parameters is trained by gradient descent with `fit`, or with
-`GradientDescent` and a `Loss` from `probabilistic_model.learning.gradient_descent`; a
+`JaxGradientDescent` and a `Loss` from `probabilistic_model.learning.gradient_descent`; a
 circuit with PyTorch parameters with `TorchGradientDescent` from
 `probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
 builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with NumPy
