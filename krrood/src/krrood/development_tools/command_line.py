@@ -17,10 +17,11 @@ from typing_extensions import Sequence
 from krrood.development_tools.agents.checker import CodeRulesCheck, StagedLines
 from krrood.development_tools.agents.instructions import (
     AgentsInstructions,
-    GeneratedInstructions,
     RepositorySkills,
 )
 from krrood.development_tools.formatting import DocstringFormatter
+from krrood.development_tools.generated_file import GeneratedFile
+from krrood.development_tools.issue_forms.issue_form_files import RepositoryIssueForms
 from krrood.development_tools.agents.repository_files import (
     RepositoryInstructionsFile,
 )
@@ -45,6 +46,16 @@ class Option(StrEnum):
     ALL_LINES = "--all-lines"
     """
     Check every line of a file, not only those the staged change touches.
+    """
+
+    FORM = "--form"
+    """
+    The name of the issue form an issue was opened with.
+    """
+
+    FIELD = "--field"
+    """
+    The identifier of the field of an issue form whose answer to print.
     """
 
 
@@ -130,6 +141,25 @@ class CommandLine:
         )
         skills_parser.set_defaults(run=self.generate_skill_instructions)
 
+        issue_forms_parser = subparsers.add_parser(
+            Subcommand.ISSUE_FORMS,
+            help="Generate the file of every issue form krrood ships and the repository declares.",
+        )
+        issue_forms_parser.add_argument(
+            Option.CHECK,
+            action="store_true",
+            help="Only verify that every issue form file is up to date; exit non-zero if one is not.",
+        )
+        issue_forms_parser.set_defaults(run=self.generate_issue_forms)
+
+        issue_answer_parser = subparsers.add_parser(
+            Subcommand.ISSUE_ANSWER,
+            help="Print the answer of the issue body on standard input to one field of a form.",
+        )
+        issue_answer_parser.add_argument(Option.FORM, required=True)
+        issue_answer_parser.add_argument(Option.FIELD, required=True)
+        issue_answer_parser.set_defaults(run=self.print_issue_answer)
+
         check_parser = subparsers.add_parser(
             Subcommand.CHECK,
             help="Report the code that breaks a rule a checker enforces.",
@@ -166,8 +196,8 @@ class CommandLine:
         :return: :attr:`ExitStatus.FAILURE` if the file was rewritten or is stale.
         """
         instructions = AgentsInstructions.from_repository(repository_root=Path.cwd())
-        return self.generate_instructions(
-            instructions=[instructions],
+        return self.generate_files(
+            files=[instructions],
             subcommand=Subcommand.AGENTS_MD,
             only_check=arguments.check,
         )
@@ -182,29 +212,62 @@ class CommandLine:
         :param arguments: The parsed command line.
         :return: :attr:`ExitStatus.FAILURE` if a file was rewritten or is stale.
         """
-        return self.generate_instructions(
-            instructions=RepositorySkills(repository_root=Path.cwd()).instructions,
+        return self.generate_files(
+            files=RepositorySkills(repository_root=Path.cwd()).instructions,
             subcommand=Subcommand.SKILLS,
             only_check=arguments.check,
         )
 
-    def generate_instructions(
+    def generate_issue_forms(self, *, arguments: argparse.Namespace) -> ExitStatus:
+        """
+        Generate, or with :attr:`Option.CHECK` verify, the file of every issue form krrood
+        ships and the current directory declares.
+
+        :param arguments: The parsed command line.
+        :return: :attr:`ExitStatus.FAILURE` if a file was rewritten or is stale.
+        """
+        return self.generate_files(
+            files=RepositoryIssueForms(repository_root=Path.cwd()).files,
+            subcommand=Subcommand.ISSUE_FORMS,
+            only_check=arguments.check,
+        )
+
+    def print_issue_answer(self, *, arguments: argparse.Namespace) -> ExitStatus:
+        """
+        Print the answer the issue body on standard input gives to the field the command
+        line names, of a form krrood ships or the current directory declares.
+
+        :param arguments: The parsed command line.
+        :return: :attr:`ExitStatus.FAILURE` if the issue leaves the field unanswered.
+        """
+        form = RepositoryIssueForms(repository_root=Path.cwd()).find_form(
+            name=arguments.form
+        )
+        text_area = form.find_text_area(identifier=arguments.field)
+        answer = form.find_answer(issue_body=sys.stdin.read(), text_area=text_area)
+        if answer is None:
+            logger.error("The issue leaves `%s` unanswered.", text_area.label)
+            return ExitStatus.FAILURE
+        sys.stdout.write(f"{answer}\n")
+        return ExitStatus.SUCCESS
+
+    def generate_files(
         self,
         *,
-        instructions: list[GeneratedInstructions],
+        files: list[GeneratedFile],
         subcommand: Subcommand,
         only_check: bool,
     ) -> ExitStatus:
         """
-        Write generated instruction files, or only verify that they are current.
+        Write generated files, or only verify that they are current.
 
-        :param instructions: The files.
+        :param files: The files.
         :param subcommand: The subcommand that regenerates them, named when one is stale.
         :param only_check: Whether to verify the files instead of writing them.
         :return: :attr:`ExitStatus.FAILURE` if a file was rewritten or is stale.
         """
         if only_check:
-            stale = [file for file in instructions if not file.is_current()]
+            stale = [file for file in files if not file.is_current()]
             for file in stale:
                 logger.error(
                     "%s is missing, out of date or edited by hand. Change the module "
@@ -214,7 +277,7 @@ class CommandLine:
                     subcommand,
                 )
             return ExitStatus.FAILURE if stale else ExitStatus.SUCCESS
-        written = [file for file in instructions if file.write()]
+        written = [file for file in files if file.write()]
         for file in written:
             logger.info("Wrote %s", file.path)
         return ExitStatus.FAILURE if written else ExitStatus.SUCCESS
