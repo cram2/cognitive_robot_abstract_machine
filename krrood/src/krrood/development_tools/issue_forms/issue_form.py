@@ -10,9 +10,34 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.development_tools.agents.rule import ClassNamedDeclaration
 from krrood.development_tools.issue_forms.exceptions import UnknownTextArea
 from krrood.patterns.classproperty import classproperty
+
+# %% issue types
+
+
+class IssueType(StrEnum):
+    """
+    The issue types an issue form can set, by the names GitHub organisations give them.
+    """
+
+    BUG = "Bug"
+    """
+    Code that behaves differently from its documentation or intent.
+    """
+
+    FEATURE = "Feature"
+    """
+    Something the code cannot do yet.
+    """
+
+    TASK = "Task"
+    """
+    Work that changes no behaviour.
+    """
+
 
 # %% text areas
 
@@ -107,7 +132,7 @@ class TextArea:
 class IssueForm(ClassNamedDeclaration, ABC):
     """
     An issue form, declared as a class named after it followed by ``IssueForm``, whose
-    text areas are written in the order :attr:`text_areas` lists them.
+    fields are its classproperties returning a :class:`TextArea`.
     """
 
     @classproperty
@@ -142,19 +167,28 @@ class IssueForm(ClassNamedDeclaration, ABC):
         """
 
     @classproperty
-    def issue_type(cls) -> str | None:
+    def issue_type(cls) -> IssueType | None:
         """
-        The issue type, one the repository's organisation defines, that GitHub sets on
-        every issue opened with the form; none to set no type.
+        The issue type GitHub sets on every issue opened with the form, which the
+        repository's organisation has to define; none to set no type.
         """
         return None
 
     @classproperty
-    @abstractmethod
     def text_areas(cls) -> list[TextArea]:
         """
-        The fields of the form.
+        The fields of the form: every classproperty of it returning a
+        :class:`TextArea`, in the order the form and its base forms define them.
         """
+        text_area_properties = {
+            name: value
+            for form in reversed(cls.__mro__)
+            if issubclass(form, IssueForm)
+            for name, value in vars(form).items()
+            if isinstance(value, classproperty)
+            and get_type_hints_of_object(value.fget).get("return") is TextArea
+        }
+        return [value.fget(cls) for value in text_area_properties.values()]
 
     @classmethod
     def find_text_area(cls, *, identifier: str) -> TextArea:

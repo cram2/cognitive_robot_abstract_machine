@@ -10,7 +10,7 @@ from pathlib import Path
 
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.command_line import CommandLine, ExitStatus, Option
-from krrood.development_tools.issue_forms import shipped_forms
+from krrood.development_tools.issue_forms import bug_report
 from krrood.development_tools.issue_forms.issue_form import IssueForm
 from krrood.development_tools.issue_forms.issue_form_files import (
     IssueFormFile,
@@ -42,6 +42,16 @@ def test_an_issue_form_lies_in_the_issue_template_directory_in_kebab_case() -> N
     GitHub finds the form only in ``.github/ISSUE_TEMPLATE``.
     """
     assert CrashReportIssueForm.path == Path(".github/ISSUE_TEMPLATE/crash-report.yml")
+
+
+def test_an_issue_form_has_every_text_area_classproperty_in_definition_order() -> None:
+    """
+    A classproperty returning a :class:`TextArea` is a field of the form.
+    """
+    assert CrashReportIssueForm.text_areas == [
+        CrashReportIssueForm.what_crashed,
+        CrashReportIssueForm.script,
+    ]
 
 
 def test_a_module_lists_the_issue_forms_it_defines_in_definition_order() -> None:
@@ -108,7 +118,7 @@ def test_a_repository_without_an_issue_forms_module_has_the_shipped_forms(
     files = RepositoryIssueForms(repository_root=repository_root).files
 
     assert [file.form for file in files] == RuleModule(
-        module=shipped_forms
+        module=bug_report
     ).defined_subclasses(base=IssueForm)
 
 
@@ -120,7 +130,7 @@ def test_a_repository_has_a_file_for_every_shipped_and_declared_form_alphabetica
     """
     files = RepositoryIssueForms(repository_root=project_issue_forms_repository).files
     forms = [
-        *RuleModule(module=shipped_forms).defined_subclasses(base=IssueForm),
+        *RuleModule(module=bug_report).defined_subclasses(base=IssueForm),
         AnnouncementIssueForm,
         CrashReportIssueForm,
     ]

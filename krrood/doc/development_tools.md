@@ -188,9 +188,11 @@ A GitHub issue form is a class subclassing `IssueForm`, named for the form follo
 in an `issue_forms.py` module at the repository root or in the modules of an
 `issue_forms` package there, to `.github/ISSUE_TEMPLATE/<name>.yml`, the name being the
 class name's words in kebab case. The form's title is those words in sentence case; its
-other classproperties give the `description`, the organisation's `issue_type` set on
-every issue opened with it, and its `text_areas`. The bug report krrood ships,
-`BugReportIssueForm` in `krrood/development_tools/issue_forms/shipped_forms.py`, shows
+classproperties give the `description` and the `IssueType` set on every issue opened
+with it, which the organisation has to define, and each classproperty returning a
+`TextArea` is a field of the form, in the order they are defined. The bug report krrood
+ships,
+`BugReportIssueForm` in `krrood/development_tools/issue_forms/bug_report.py`, shows
 each of them.
 
 `krrood issue-answer` finds a form by its `name`, the file name without `.yml`, and a

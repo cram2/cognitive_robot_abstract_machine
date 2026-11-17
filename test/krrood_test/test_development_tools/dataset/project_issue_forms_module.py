@@ -7,6 +7,7 @@ from __future__ import annotations
 from krrood.development_tools.issue_forms.issue_form import (
     CodeLanguage,
     IssueForm,
+    IssueType,
     TextArea,
 )
 from krrood.patterns.classproperty import classproperty
@@ -24,11 +25,11 @@ class CrashReportIssueForm(IssueForm):
         return "Report a crash."
 
     @classproperty
-    def issue_type(cls) -> str:
+    def issue_type(cls) -> IssueType:
         """
         A crash report is a ``Bug``, overriding :meth:`IssueForm.issue_type`.
         """
-        return "Bug"
+        return IssueType.BUG
 
     @classproperty
     def what_crashed(cls) -> TextArea:
@@ -53,10 +54,6 @@ class CrashReportIssueForm(IssueForm):
             code_language=CodeLanguage.PYTHON,
         )
 
-    @classproperty
-    def text_areas(cls) -> list[TextArea]:
-        return [cls.what_crashed, cls.script]
-
 
 class AnnouncementIssueForm(IssueForm):
     """
@@ -68,5 +65,8 @@ class AnnouncementIssueForm(IssueForm):
         return "Announce something."
 
     @classproperty
-    def text_areas(cls) -> list[TextArea]:
-        return [TextArea(identifier="news", label="News")]
+    def news(cls) -> TextArea:
+        """
+        The only field.
+        """
+        return TextArea(identifier="news", label="News")

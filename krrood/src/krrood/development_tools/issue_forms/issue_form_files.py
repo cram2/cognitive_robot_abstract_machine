@@ -11,7 +11,7 @@ from pathlib import Path
 from krrood.code_generation.generator import CodeGenerator
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.generated_file import GeneratedFile
-from krrood.development_tools.issue_forms import shipped_forms
+from krrood.development_tools.issue_forms import bug_report
 from krrood.development_tools.issue_forms.exceptions import UnknownIssueForm
 from krrood.development_tools.issue_forms.issue_form import IssueForm
 from krrood.development_tools.subcommand import Subcommand
@@ -95,7 +95,7 @@ class RepositoryIssueForms:
         """
         Every shipped and declared form, in alphabetical order of their titles.
         """
-        forms = RuleModule(module=shipped_forms).defined_subclasses(base=IssueForm)
+        forms = RuleModule(module=bug_report).defined_subclasses(base=IssueForm)
         project_forms = RuleModule.import_from(
             directory=self.repository_root,
             module_name=RepositoryIssueFormsModule.ISSUE_FORMS,

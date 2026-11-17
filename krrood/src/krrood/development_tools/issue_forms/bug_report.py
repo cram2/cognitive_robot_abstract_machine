@@ -1,6 +1,6 @@
 """
-The issue forms krrood ships, which ``krrood issue-forms`` writes into every
-repository's ``.github/ISSUE_TEMPLATE`` alongside the repository's own.
+The bug report form, which ``krrood issue-forms`` writes into every repository's
+``.github/ISSUE_TEMPLATE`` alongside the repository's own forms.
 """
 
 from __future__ import annotations
@@ -8,6 +8,7 @@ from __future__ import annotations
 from krrood.development_tools.issue_forms.issue_form import (
     CodeLanguage,
     IssueForm,
+    IssueType,
     TextArea,
 )
 from krrood.patterns.classproperty import classproperty
@@ -25,11 +26,11 @@ class BugReportIssueForm(IssueForm):
         return "Report code that behaves differently from its documentation or intent."
 
     @classproperty
-    def issue_type(cls) -> str:
+    def issue_type(cls) -> IssueType:
         """
-        Every bug report is a ``Bug``, as :meth:`IssueForm.issue_type` allows.
+        Every bug report is a :attr:`IssueType.BUG`.
         """
-        return "Bug"
+        return IssueType.BUG
 
     @classproperty
     def issue_description(cls) -> TextArea:
@@ -75,7 +76,3 @@ class BugReportIssueForm(IssueForm):
             ),
             code_language=CodeLanguage.SHELL,
         )
-
-    @classproperty
-    def text_areas(cls) -> list[TextArea]:
-        return [cls.issue_description, cls.code_example, cls.error_message]
