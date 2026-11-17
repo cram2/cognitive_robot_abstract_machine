@@ -37,7 +37,21 @@ class RoleTakerInfo:
 
 
 @dataclass(kw_only=True, eq=False)
-class ClassInfo(DataclassDeepcopyMixin, HashedByIdentity):
+class HasOntologyInfo(DataclassDeepcopyMixin):
+    """
+    Part of an ontology, which a deep copy keeps pointing at.
+    """
+
+    ontology: OntologyInfo | None = field(
+        default=None, repr=False, metadata={DeepCopyOfField: DeepCopyOfField.SHARED}
+    )
+    """
+    The ontology this belongs to.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class ClassInfo(HasOntologyInfo, HashedByIdentity):
     """
     Maintains all metadata, inheritance, and property associations for an OWL class.
     Used during the code generation process to represent a Python class.
@@ -126,16 +140,10 @@ class ClassInfo(DataclassDeepcopyMixin, HashedByIdentity):
     class). They hold for every member of the class but do not make an individual a member, so they are not used for
     classification.
     """
-    ontology: OntologyInfo | None = field(
-        default=None, repr=False, metadata={DeepCopyOfField: DeepCopyOfField.SHARED}
-    )
-    """
-    The ontology the class belongs to, which a copy of the class keeps.
-    """
 
 
 @dataclass(kw_only=True, eq=False)
-class PropertyInfo(DataclassDeepcopyMixin, HashedByIdentity):
+class PropertyInfo(HasOntologyInfo, HashedByIdentity):
     """
     Maintains metadata, domains, ranges, and inheritance for an OWL property.
     Used during the code generation process to represent a Python property or descriptor.
@@ -280,12 +288,6 @@ class PropertyInfo(DataclassDeepcopyMixin, HashedByIdentity):
     chain_axioms: List[List[str]] = field(default_factory=list)
     """
     The names of the descriptor classes of every property chain implying the property.
-    """
-    ontology: OntologyInfo | None = field(
-        default=None, repr=False, metadata={DeepCopyOfField: DeepCopyOfField.SHARED}
-    )
-    """
-    The ontology the property belongs to, which a copy of the property keeps.
     """
 
 
