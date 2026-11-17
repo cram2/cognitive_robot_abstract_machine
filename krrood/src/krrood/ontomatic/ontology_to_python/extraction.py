@@ -26,7 +26,7 @@ from krrood.ontomatic.ontology_to_python.ontology_info import (
 
 
 @dataclass(kw_only=True)
-class MetadataExtractor:
+class RDFMetadataExtractor:
     """
     Helper for extracting metadata (labels, comments) from an RDF graph.
     """
@@ -54,7 +54,7 @@ class MetadataExtractor:
 
 
 @dataclass(kw_only=True)
-class GraphExtractor:
+class RDFGraphExtractor:
     """
     Reads the information about the classes or properties of an RDF graph.
     """
@@ -64,7 +64,7 @@ class GraphExtractor:
     The graph the information is read from.
     """
 
-    metadata_extractor: MetadataExtractor
+    metadata_extractor: RDFMetadataExtractor
     """
     Reads the labels and comments.
     """
@@ -100,7 +100,7 @@ class GraphExtractor:
 
 
 @dataclass(kw_only=True)
-class ClassExtractor(GraphExtractor):
+class RDFClassExtractor(RDFGraphExtractor):
     """
     Extractor for OWL Class information from an RDF graph.
     """
@@ -264,7 +264,7 @@ class ClassExtractor(GraphExtractor):
 
 
 @dataclass(kw_only=True)
-class PropertyExtractor(GraphExtractor):
+class RDFPropertyExtractor(RDFGraphExtractor):
     """
     Extractor for OWL Property information from an RDF graph.
     """
@@ -324,7 +324,7 @@ class PropertyExtractor(GraphExtractor):
 
 
 @dataclass(kw_only=True)
-class OntologyExtractor:
+class RDFOntologyExtractor:
     """
     Reads the information about a whole ontology out of its RDF graph.
     """
@@ -360,27 +360,27 @@ class OntologyExtractor:
     """
 
     @cached_property
-    def metadata_extractor(self) -> MetadataExtractor:
+    def metadata_extractor(self) -> RDFMetadataExtractor:
         """
         Reads the labels and comments of the graph.
         """
-        return MetadataExtractor(graph=self.graph)
+        return RDFMetadataExtractor(graph=self.graph)
 
     @cached_property
-    def class_extractor(self) -> ClassExtractor:
+    def class_extractor(self) -> RDFClassExtractor:
         """
         Reads the classes of the graph.
         """
-        return ClassExtractor(
+        return RDFClassExtractor(
             graph=self.graph, metadata_extractor=self.metadata_extractor
         )
 
     @cached_property
-    def property_extractor(self) -> PropertyExtractor:
+    def property_extractor(self) -> RDFPropertyExtractor:
         """
         Reads the properties of the graph.
         """
-        return PropertyExtractor(
+        return RDFPropertyExtractor(
             graph=self.graph, metadata_extractor=self.metadata_extractor
         )
 

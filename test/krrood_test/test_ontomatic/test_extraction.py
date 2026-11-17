@@ -14,10 +14,10 @@ from rdflib.namespace import OWL, RDFS
 from krrood.ontomatic.failures import AmbiguousDescribedClass
 from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.extraction import (
-    ClassExtractor,
-    MetadataExtractor,
-    OntologyExtractor,
-    PropertyExtractor,
+    RDFClassExtractor,
+    RDFMetadataExtractor,
+    RDFOntologyExtractor,
+    RDFPropertyExtractor,
 )
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
 from krrood.symbol_graph.symbol_graph import Symbol
@@ -44,22 +44,22 @@ def graph() -> rdflib.Graph:
 
 
 @pytest.fixture(scope="module")
-def class_extractor(graph: rdflib.Graph) -> ClassExtractor:
+def class_extractor(graph: rdflib.Graph) -> RDFClassExtractor:
     """
     Reads the classes of the ontology.
     """
-    return ClassExtractor(
-        graph=graph, metadata_extractor=MetadataExtractor(graph=graph)
+    return RDFClassExtractor(
+        graph=graph, metadata_extractor=RDFMetadataExtractor(graph=graph)
     )
 
 
 @pytest.fixture(scope="module")
-def property_extractor(graph: rdflib.Graph) -> PropertyExtractor:
+def property_extractor(graph: rdflib.Graph) -> RDFPropertyExtractor:
     """
     Reads the properties of the ontology.
     """
-    return PropertyExtractor(
-        graph=graph, metadata_extractor=MetadataExtractor(graph=graph)
+    return RDFPropertyExtractor(
+        graph=graph, metadata_extractor=RDFMetadataExtractor(graph=graph)
     )
 
 
@@ -121,13 +121,13 @@ def class_expressions_graph() -> rdflib.Graph:
 @pytest.fixture(scope="module")
 def class_expressions_extractor(
     class_expressions_graph: rdflib.Graph,
-) -> ClassExtractor:
+) -> RDFClassExtractor:
     """
     Reads the classes of the ontology of class expressions.
     """
-    return ClassExtractor(
+    return RDFClassExtractor(
         graph=class_expressions_graph,
-        metadata_extractor=MetadataExtractor(graph=class_expressions_graph),
+        metadata_extractor=RDFMetadataExtractor(graph=class_expressions_graph),
     )
 
 
@@ -381,7 +381,7 @@ def property_relations() -> Namespace:
 
 
 @pytest.fixture(scope="module")
-def property_relations_extractor() -> PropertyExtractor:
+def property_relations_extractor() -> RDFPropertyExtractor:
     """
     Reads the properties of the ontology of related properties.
     """
@@ -392,8 +392,8 @@ def property_relations_extractor() -> PropertyExtractor:
         / "ontologies"
         / "property_relations_extraction.ttl"
     )
-    return PropertyExtractor(
-        graph=graph, metadata_extractor=MetadataExtractor(graph=graph)
+    return RDFPropertyExtractor(
+        graph=graph, metadata_extractor=RDFMetadataExtractor(graph=graph)
     )
 
 
@@ -523,7 +523,7 @@ def test_the_ontology_holds_its_named_classes_and_its_properties(graph):
     """
     Extracting the ontology collects its named classes and its properties by name.
     """
-    ontology = OntologyExtractor(graph=graph).extract()
+    ontology = RDFOntologyExtractor(graph=graph).extract()
     assert (sorted(ontology.classes), sorted(ontology.properties)) == (
         ["Person", "Professor", "Student"],
         ["advises", "age", "hasAdvisor", "hasMentor", "hasSupervisor", "knows"],
