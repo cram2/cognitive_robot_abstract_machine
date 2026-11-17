@@ -29,6 +29,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
     PerceivedObject,
 )
+from krrood.exceptions import DataclassException
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -589,6 +590,44 @@ class TestDiscoveringASharedWorld:
             )
 
         assert wait_until(lambda: set(threading.enumerate()) <= threads_before)
+
+    def test_stops_serving_its_node_when_the_shared_world_cannot_be_synchronized(
+        self,
+        node: Node,
+        engine: EngineRunningABehaviour,
+        shared_world: SharedWorld,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """
+        A synchronizer that cannot be created fails RoboKudo's start, and leaves no
+        thread serving its node.
+        """
+        threads_before = set(threading.enumerate())
+
+        def unavailable_synchronizer(**kwargs: object) -> WorldSynchronizer:
+            raise SynchronizerUnavailableError()
+
+        monkeypatch.setattr(
+            "robokudo.process.WorldSynchronizer", unavailable_synchronizer
+        )
+
+        with pytest.raises(SynchronizerUnavailableError):
+            robokudo_joining_a_shared_world(node, engine)
+
+        assert wait_until(lambda: set(threading.enumerate()) <= threads_before)
+
+
+@dataclass
+class SynchronizerUnavailableError(DataclassException):
+    """
+    Raised in place of creating a synchronizer, as when the network refuses one.
+    """
+
+    def error_message(self) -> str:
+        return "The world synchronizer could not be created."
+
+    def suggest_correction(self) -> str:
+        return ""
 
 
 # %% one RoboKudo per process

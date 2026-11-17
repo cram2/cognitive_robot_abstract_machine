@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import time
 import traceback
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Thread
@@ -140,33 +141,34 @@ class RoboKudo:
 
         .. note:: No other executor may serve :attr:`node`.
 
+        If joining fails, :attr:`node` is no longer served.
+
         :raises TimeoutError: If the process serving a shared world does not send it
-            within :attr:`world_fetch_timeout`; :attr:`node` is no longer served then.
+            within :attr:`world_fetch_timeout`.
         """
         self.executor = SingleThreadedExecutor(context=self.node.context)
         self.executor.add_node(self.node)
         self.executor_thread = Thread(target=self.executor.spin, daemon=True)
         self.executor_thread.start()
 
-        service = find_world_fetcher_service(
-            self.node, timeout_seconds=self.world_discovery_timeout.total_seconds()
-        )
-        if service is None:
-            logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE).warning(
-                "No process serves a shared world; perceiving into a world of its own."
+        with ExitStack() as closing_on_failure:
+            # A failed start returns no RoboKudo whose close() a caller could call.
+            closing_on_failure.callback(self.close)
+            service = find_world_fetcher_service(
+                self.node, timeout_seconds=self.world_discovery_timeout.total_seconds()
             )
-            self.world = World()
-        else:
-            try:
+            if service is None:
+                logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE).warning(
+                    "No process serves a shared world; perceiving into a world of its own."
+                )
+                self.world = World()
+            else:
                 self.world = fetch_world_from_service(
                     self.node,
                     timeout_seconds=self.world_fetch_timeout.total_seconds(),
                 )
-            except BaseException:
-                # Nothing could close the executor started above once this start fails.
-                self.close()
-                raise
-            self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
+                self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
+            closing_on_failure.pop_all()
 
     @classmethod
     def from_blackboard(cls) -> RoboKudo:
