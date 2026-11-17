@@ -873,11 +873,20 @@ class Mesh(Shape):
         return MeshFileSources().resolve(self.filename)
 
     @property
+    def stored_mesh(self) -> trimesh.Trimesh:
+        """
+        The mesh with exactly the vertices and faces its file stores, before this
+        shape's scale is applied.
+        """
+        return self._load_in_meters(str(self.local_file), process=False)
+
+    @property
     def unscaled_mesh(self) -> trimesh.Trimesh:
         """
-        The mesh exactly as the file describes it, before this shape's scale is applied.
+        The mesh :attr:`stored_mesh` describes, with its duplicate vertices welded
+        unless it is coloured per vertex, before this shape's scale is applied.
         """
-        mesh = self._load_in_meters(str(self.local_file), process=False)
+        mesh = self.stored_mesh
         if mesh.visual.kind != "vertex":
             # Welding duplicate vertices is what makes a mesh watertight, which volume
             # and boolean operations require; formats like STL give every face its own
