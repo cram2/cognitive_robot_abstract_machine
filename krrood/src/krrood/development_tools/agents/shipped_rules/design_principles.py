@@ -23,7 +23,7 @@ from krrood.development_tools.agents.ruff_rules import (
     RuffSetting,
 )
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.path_enumeration import PathEnumeration
 
 

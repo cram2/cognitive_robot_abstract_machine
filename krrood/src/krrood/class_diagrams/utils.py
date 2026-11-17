@@ -6,7 +6,7 @@ import os
 import sys
 import types
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from uuid import UUID
@@ -16,6 +16,7 @@ from typing_extensions import Any, Callable, TypeVar, TypeVarTuple, get_origin
 
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
+from krrood.singleton import SingletonMeta
 from krrood.utils import (
     ensure_hashable,
     get_scope_from_imports,
@@ -376,21 +377,33 @@ def _cached_scope_from_imports(source_path: str) -> dict[str, Any]:
     return _scope_from_imports_by_mtime(source_path, mtime)
 
 
-def _count_of_modules_that_finished_initializing() -> int:
+@dataclass(kw_only=True)
+class ModulesThatFinishedInitializing(metaclass=SingletonMeta):
     """
-    Count the modules in ``sys.modules`` that have finished executing.
+    The modules of ``sys.modules`` that have finished executing.
 
-    This only grows as modules complete loading, so two calls returning the same value
-    guarantee that nothing relevant to an in-progress circular import could have changed
-    in between.
-
-    :return: The current count of fully initialized modules in ``sys.modules``.
+    A module is looked at until it is seen finished and never again, so counting costs
+    what was loaded since the last count rather than everything that is loaded.
     """
-    return sum(
-        1
-        for module in tuple(sys.modules.values())
-        if not getattr(getattr(module, "__spec__", None), "_initializing", False)
-    )
+
+    finished_module_names: set[str] = field(default_factory=set, init=False)
+    """
+    Names of the modules seen finished so far.
+    """
+
+    def count_finished_modules(self) -> int:
+        """
+        Count the modules that have finished executing.
+
+        The count only grows as modules complete loading, so two calls returning the
+        same value guarantee that nothing relevant to an in-progress circular import
+        could have changed in between.
+        """
+        for name in set(sys.modules).difference(self.finished_module_names):
+            specification = getattr(sys.modules.get(name), "__spec__", None)
+            if not getattr(specification, "_initializing", False):
+                self.finished_module_names.add(name)
+        return len(self.finished_module_names)
 
 
 @lru_cache(maxsize=None)
@@ -403,7 +416,7 @@ def _fallback_scope_for_import_generation(
 
     A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every retry
     until that module finishes loading. Keying this on *generation*
-    (:func:`_count_of_modules_that_finished_initializing`) means the expensive, uncached
+    (:meth:`ModulesThatFinishedInitializing.count_finished_modules`) means the expensive, uncached
     :func:`~krrood.utils.get_scope_from_imports` recompute only actually runs again once something
     has genuinely changed, instead of once per failed lookup: many dataclasses across a codebase can
     independently need the same still-unavailable name while a dependency is mid-import, and without
@@ -454,7 +467,7 @@ def get_object_by_name_from_another_object_in_same_module(
     # instead of each re-parsing and re-importing the file from scratch. Merge the recovered names
     # into the memoized scope so later lookups reuse them instead of repeating this forever.
     fresh_scope = _fallback_scope_for_import_generation(
-        source_path, _count_of_modules_that_finished_initializing()
+        source_path, ModulesThatFinishedInitializing().count_finished_modules()
     )
     if name in fresh_scope:
         scope.update(fresh_scope)

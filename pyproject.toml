@@ -40,7 +40,6 @@ dev = [
     "pytest-cov",
     "setuptools>=68",
     "wheel",
-    "objgraph",
     "treon",
     "bokeh",
     "mypy>=1.8",

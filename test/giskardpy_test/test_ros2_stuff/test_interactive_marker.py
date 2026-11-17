@@ -17,7 +17,7 @@ Tip links belonging to :data:`ROOT_LINKS`, in the same order.
 
 
 def test_endpoints_are_paired_by_index():
-    chains = RootTipPair.pair_up(ROOT_LINKS, TIP_LINKS)
+    chains = RootTipPair.pair_up(root_links=ROOT_LINKS, tip_links=TIP_LINKS)
 
     assert chains == [
         RootTipPair(root_link=ROOT_LINKS[0], tip_link=TIP_LINKS[0]),
@@ -27,9 +27,9 @@ def test_endpoints_are_paired_by_index():
 
 def test_more_root_links_than_tip_links_raises():
     with pytest.raises(UnpairedKinematicChainParametersError):
-        RootTipPair.pair_up(ROOT_LINKS, TIP_LINKS[:1])
+        RootTipPair.pair_up(root_links=ROOT_LINKS, tip_links=TIP_LINKS[:1])
 
 
 def test_more_tip_links_than_root_links_raises():
     with pytest.raises(UnpairedKinematicChainParametersError):
-        RootTipPair.pair_up(ROOT_LINKS[:1], TIP_LINKS)
+        RootTipPair.pair_up(root_links=ROOT_LINKS[:1], tip_links=TIP_LINKS)

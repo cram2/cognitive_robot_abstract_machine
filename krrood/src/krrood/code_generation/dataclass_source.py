@@ -17,7 +17,7 @@ from typing_extensions import Any
 
 from krrood.code_generation.exceptions import ObjectNotSerializableError
 from krrood.code_generation.type_hints import value_to_source
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% ObjectSource
 

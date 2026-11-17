@@ -361,7 +361,7 @@ def test_long_goal(pr2_world_state_reset: World):
 
 
 class TestTemplates:
-    def test_hsr_cutting(self, hsr_world_state_reset: World, rclpy_node):
+    def test_hsr_cutting(self, *, hsr_world_state_reset: World, rclpy_node):
         """
         The HSR cuts a loaf with a knife: down, up, then a sideways shift, repeated
         until five seconds have passed and paused while a human is close.
@@ -506,7 +506,7 @@ class TestTemplates:
         )
         assert restarts >= 1
 
-    def test_parallel_with_tasks(self, pr2_world_state_reset: World):
+    def test_parallel_with_tasks(self, *, pr2_world_state_reset: World):
         map = pr2_world_state_reset.root
         r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -559,7 +559,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
     expr = Vector3.X(tip).angle_between(Vector3.Y(root))
 
-    GeometricConstraintBuilder(col).add_point_goal_constraints(
+    GeometricConstraintBuilder(collection=col).add_point_goal_constraints(
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         cruise_velocity=0.1,
@@ -606,11 +606,11 @@ def test_constraint_collection(pr2_world_state_reset: World):
         task_expression=expr,
     )
 
-    col.merge("prefix", col2)
+    col.merge(name_prefix="prefix", other=col2)
     assert any(c.name.startswith("prefix/") for c in col._constraints)
 
     with pytest.raises(DuplicateNameException):
-        col.merge("", col2)
+        col.merge(name_prefix="", other=col2)
 
     col3 = ConstraintCollection()
     col3.add_equality_constraint(
@@ -639,11 +639,11 @@ def test_constraint_collection(pr2_world_state_reset: World):
         col3._are_names_unique()
 
     with pytest.raises(DuplicateNameException):
-        col2.merge("", col3)
+        col2.merge(name_prefix="", other=col3)
 
 
 class TestMaxManipulability:
-    def test_MaxManipulability(self, pr2_world_state_reset: World) -> None:
+    def test_MaxManipulability(self, *, pr2_world_state_reset: World) -> None:
         root = pr2_world_state_reset.get_body_by_name("base_footprint")
         tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
 

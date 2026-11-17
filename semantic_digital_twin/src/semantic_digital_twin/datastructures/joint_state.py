@@ -15,6 +15,9 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.definitions import JointStateType
+from semantic_digital_twin.datastructures.exceptions import (
+    ConnectionNotInJointStateError,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
@@ -80,6 +83,18 @@ class JointState(SubclassJSONSerializer):
 
     def items(self):
         return zip(self.connections, self.target_values)
+
+    def target_value(self, connection: ActiveConnection1DOF) -> float:
+        """
+        :param connection: One of :attr:`connections`.
+        :raises ConnectionNotInJointStateError: If this state sets no target value for
+            `connection`.
+        :return: The position this state brings `connection` to, in its own units.
+        """
+        for state_connection, target_value in self.items():
+            if state_connection == connection:
+                return target_value
+        raise ConnectionNotInJointStateError(joint_state=self, connection=connection)
 
     def is_achieved(self) -> bool:
         """

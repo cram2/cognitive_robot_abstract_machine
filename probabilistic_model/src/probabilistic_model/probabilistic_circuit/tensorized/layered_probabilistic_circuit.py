@@ -1,3 +1,8 @@
+"""
+Probabilistic circuits whose nodes are grouped into layers that store their parameters
+as arrays of any Array API backend, and the queries they answer.
+"""
+
 from __future__ import annotations
 
 from types import ModuleType
@@ -6,6 +11,7 @@ import copy
 from dataclasses import dataclass
 
 import numpy as np
+import optax
 from array_api_compat import array_namespace, is_numpy_array
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
@@ -26,6 +32,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
     SampleArray,
     SampleValues,
+)
+from probabilistic_model.learning.gradient_descent import (
+    AverageNegativeLogLikelihood,
+    JaxGradientDescent,
+    Loss,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
@@ -327,6 +338,32 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
                 for parameter in self.parameters
             ]
         )
+
+    def fit(
+        self,
+        *,
+        data: SampleArray,
+        epochs: int = 100,
+        optimizer: optax.GradientTransformation | None = None,
+        loss: Loss | None = None,
+    ) -> Self:
+        """
+        Minimize a loss of the circuit on the data by gradient descent with jax, in
+        place.
+
+        :param data: The data, whose symbolic values are hashes of domain elements.
+        :param epochs: The number of full batch steps.
+        :param optimizer: The optimizer, Adam with a learning rate of 1e-3 if ``None``.
+        :param loss: The loss of the circuit on the encoded data, the average negative
+            log-likelihood if ``None``.
+        :return: This circuit.
+        """
+        self.root = JaxGradientDescent(
+            self.root,
+            AverageNegativeLogLikelihood() if loss is None else loss,
+            optimizer,
+        ).minimize(epochs, self.encoded(data))
+        return self
 
     def raise_if_parameters_are_not_on_host(self):
         """

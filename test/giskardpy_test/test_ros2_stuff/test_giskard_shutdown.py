@@ -20,7 +20,7 @@ from semantic_digital_twin.world_source import WorldSource
 # %% being interrupted while waiting for goals
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InterruptingInput(InputSynchronizer):
     """
     Asks the process to shut down as soon as it is read.
@@ -31,7 +31,7 @@ class InterruptingInput(InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InterruptedWhileIdleInterface(StandAloneRobotInterfaceConfig):
     """
     Lets the first idle cycle of Giskard be interrupted.
@@ -41,7 +41,7 @@ class InterruptedWhileIdleInterface(StandAloneRobotInterfaceConfig):
         self.motion_server.inputs.add_input(InterruptingInput(world=self.world))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldWithMinimalRobot(WorldSource):
     """
     Hands out an existing world, treating everything in it as the robot.
@@ -75,7 +75,7 @@ def test_an_interrupt_while_waiting_for_goals_shuts_ros_down(
 # %% failing while starting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotUnreachableError(DataclassException):
     """
     Raised by an interface that cannot connect to its robot.
@@ -88,7 +88,7 @@ class RobotUnreachableError(DataclassException):
         return "Start the robot before Giskard."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUnbuildableError(DataclassException):
     """
     Raised by a world source that cannot create its world.
@@ -101,7 +101,7 @@ class WorldUnbuildableError(DataclassException):
         return "Check the robot description the world source loads."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnreachableRobotInterface(StandAloneRobotInterfaceConfig):
     """
     Fails as soon as Giskard connects to the robot.
@@ -111,7 +111,7 @@ class UnreachableRobotInterface(StandAloneRobotInterfaceConfig):
         raise RobotUnreachableError()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnbuildableWorld(WorldSource):
     """
     Fails as soon as Giskard creates the world.

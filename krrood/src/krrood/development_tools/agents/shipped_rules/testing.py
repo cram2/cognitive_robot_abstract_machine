@@ -15,7 +15,7 @@ from krrood.development_tools.agents.ruff_rules import (
     RuffRuleChecker,
     RuffSetting,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 
 class TestingRules(Section):

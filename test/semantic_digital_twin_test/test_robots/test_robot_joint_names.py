@@ -66,6 +66,7 @@ def robot_world(request: pytest.FixtureRequest) -> World:
     ROBOTS_WITH_JOINT_ENUM,
     ids=ROBOT_IDENTIFIERS,
     indirect=["robot_world"],
+    scope="module",
 )
 def test_joint_enum_members_name_connections_of_the_robot(
     robot_world: World, joint_enum: type[JointName]
@@ -83,6 +84,7 @@ def test_joint_enum_members_name_connections_of_the_robot(
     ROBOTS_WITH_JOINT_ENUM,
     ids=ROBOT_IDENTIFIERS,
     indirect=["robot_world"],
+    scope="module",
 )
 def test_joint_enum_members_name_actuated_connections(
     robot_world: World, joint_enum: type[JointName]
