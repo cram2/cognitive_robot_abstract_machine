@@ -11,8 +11,8 @@ from enum import StrEnum
 import torch
 
 from probabilistic_model.learning.gradient_descent import (
-    CircuitGradientDescent,
-    CircuitTraining,
+    GradientDescent,
+    GradientDescentTraining,
     LayerType,
 )
 from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
@@ -27,7 +27,7 @@ from probabilistic_model.learning.training_schedule import MiniBatches
 
 
 @dataclass
-class TorchGradientDescent(CircuitGradientDescent[LayerType]):
+class TorchGradientDescent(GradientDescent[LayerType]):
     """
     Gradient descent with torch, one optimizer step per batch, after which the
     parameters are projected onto valid parameters with
@@ -127,7 +127,7 @@ class TorchGradientDescent(CircuitGradientDescent[LayerType]):
 
 
 @dataclass(kw_only=True)
-class TorchGradientDescentTraining(CircuitTraining[LayerType]):
+class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
     """
     Mini-batch training by :class:`TorchGradientDescent`, one optimizer step per batch.
     """

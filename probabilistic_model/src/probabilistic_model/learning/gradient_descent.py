@@ -172,10 +172,11 @@ class TrainingRun(Generic[LayerType], SubClassSafeGeneric):
 
 
 @dataclass(kw_only=True)
-class CircuitTraining(MiniBatchTraining, Generic[LayerType], SubClassSafeGeneric, ABC):
+class GradientDescentTraining(
+    MiniBatchTraining, Generic[LayerType], SubClassSafeGeneric, ABC
+):
     """
-    Mini-batch training of the parameters of a circuit by a
-    :class:`CircuitGradientDescent`.
+    Mini-batch training of the parameters of a circuit by a :class:`GradientDescent`.
     """
 
     @abstractmethod
@@ -188,7 +189,7 @@ class CircuitTraining(MiniBatchTraining, Generic[LayerType], SubClassSafeGeneric
 
 
 @dataclass
-class CircuitGradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
+class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
     """
     Minimizes a loss of the circuit rooted at a layer by gradient descent, with the
     array library of its subclass.
@@ -227,7 +228,7 @@ class CircuitGradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
     @abstractmethod
     def start_training(
         self, *, arguments: tuple[BackendArray, ...], mini_batches: MiniBatches
-    ) -> CircuitTraining[LayerType]:
+    ) -> GradientDescentTraining[LayerType]:
         """
         :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
             per training example each.
@@ -318,7 +319,7 @@ class CircuitGradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
 
 
 @dataclass
-class GradientDescent(CircuitGradientDescent[LayerType]):
+class JaxGradientDescent(GradientDescent[LayerType]):
     """
     Gradient descent with jax, one compiled step per batch.
 
@@ -383,8 +384,8 @@ class GradientDescent(CircuitGradientDescent[LayerType]):
 
     def start_training(
         self, *, arguments: tuple[jax.Array, ...], mini_batches: MiniBatches
-    ) -> GradientDescentTraining[LayerType]:
-        return GradientDescentTraining(
+    ) -> JaxGradientDescentTraining[LayerType]:
+        return JaxGradientDescentTraining(
             arguments=arguments, mini_batches=mini_batches, gradient_descent=self
         )
 
@@ -425,19 +426,19 @@ class GradientDescent(CircuitGradientDescent[LayerType]):
 
 
 @dataclass(kw_only=True)
-class GradientDescentTraining(CircuitTraining[LayerType]):
+class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
     """
-    Mini-batch training by :class:`GradientDescent`, one compiled step per batch.
+    Mini-batch training by :class:`JaxGradientDescent`, one compiled step per batch.
     """
 
-    gradient_descent: GradientDescent[LayerType]
+    gradient_descent: JaxGradientDescent[LayerType]
     """
     The gradient descent whose steps are taken.
     """
 
     compiled_step: Callable[..., TrainingState] = field(init=False)
     """
-    :meth:`GradientDescent.step`, compiled once for every shape of batch.
+    :meth:`JaxGradientDescent.step`, compiled once for every shape of batch.
     """
 
     state: TrainingState = field(init=False)

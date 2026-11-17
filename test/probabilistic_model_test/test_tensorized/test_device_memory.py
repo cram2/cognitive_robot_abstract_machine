@@ -27,7 +27,7 @@ from probabilistic_model.learning.exceptions import (
 )
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    GradientDescent,
+    JaxGradientDescent,
 )
 from probabilistic_model.learning.training_schedule import MiniBatches
 
@@ -139,7 +139,7 @@ def test_a_jax_circuit_on_the_cpu_is_trained_in_host_memory(mixture_of_products_
         circuit = mixture_of_products_case.circuit(np).to_namespace(
             jnp, device=jax.devices("cpu")[0]
         )
-        trainer = GradientDescent(circuit.root, AverageNegativeLogLikelihood())
+        trainer = JaxGradientDescent(circuit.root, AverageNegativeLogLikelihood())
 
     assert isinstance(trainer.device_memory(), HostMemory)
 
@@ -153,7 +153,7 @@ def test_a_compiled_jax_step_needs_memory_for_every_row(mixture_of_products_case
     data = case.circuit(np).sample(500)
     with jax.enable_x64(True):
         circuit = case.circuit(np).to_namespace(jnp)
-        step_memory = GradientDescent(
+        step_memory = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood()
         ).step_memory(jnp.asarray(data))
 

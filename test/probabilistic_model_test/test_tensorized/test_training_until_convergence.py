@@ -17,7 +17,7 @@ from array_api_compat import array_namespace
 
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    GradientDescent,
+    JaxGradientDescent,
 )
 from probabilistic_model.learning.training_schedule import (
     Convergence,
@@ -195,7 +195,7 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
         ).to_namespace(jnp)
         events = jnp.asarray(data)
         before = float(jnp.mean(circuit.log_likelihood(events)))
-        run = GradientDescent(
+        run = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize_until_converged(
             events,
