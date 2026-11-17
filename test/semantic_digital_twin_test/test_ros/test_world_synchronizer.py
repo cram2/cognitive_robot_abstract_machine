@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import JSONAttributeDiff, to_json, from_json
-from krrood.message_stream.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, StreamPosition
 from semantic_digital_twin.adapters.ros.messages import (
     WorldStateUpdate,
     LoadModel,

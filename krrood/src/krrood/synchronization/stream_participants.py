@@ -9,8 +9,8 @@ import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from krrood.message_stream.exceptions import DivergedFromPublisherError
-from krrood.message_stream.messages import Message, MessageOrigin, StreamPosition
+from krrood.synchronization.exceptions import DivergedFromPublisherError
+from krrood.synchronization.messages import Message, MessageOrigin, StreamPosition
 
 # %% publishing
 

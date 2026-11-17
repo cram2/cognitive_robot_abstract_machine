@@ -10,7 +10,7 @@ from typing_extensions import Self, Any
 
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from krrood.message_stream.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, StreamPosition
 
 from cramph.statechart import Statechart
 

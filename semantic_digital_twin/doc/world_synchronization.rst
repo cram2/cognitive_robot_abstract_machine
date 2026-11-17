@@ -14,8 +14,8 @@ Modules:
 - :mod:`semantic_digital_twin.adapters.ros.messages`
 - :mod:`semantic_digital_twin.adapters.ros.world_synchronizer`
 - :mod:`semantic_digital_twin.world_description.world_modification`
-- :mod:`krrood.message_stream.messages`
-- :mod:`krrood.message_stream.stream_participants`
+- :mod:`krrood.synchronization.messages`
+- :mod:`krrood.synchronization.stream_participants`
 
 Classes:
 
@@ -44,14 +44,14 @@ to force all worlds subscribed to it to do so.
 
 Message streams
 ---------------
-What does not depend on worlds lives in :mod:`krrood.message_stream`, so that other models can be synchronized the same way.
-Every message carries its :class:`~krrood.message_stream.messages.MessageOrigin` and its position in the stream of that
-publisher. A synchronizer is a :class:`~krrood.message_stream.stream_participants.StreamPublisher`, which numbers the
-messages it sends, and a :class:`~krrood.message_stream.stream_participants.StreamReceiver`, which remembers per publisher
+What does not depend on worlds lives in :mod:`krrood.synchronization`, so that other models can be synchronized the same way.
+Every message carries its :class:`~krrood.synchronization.messages.MessageOrigin` and its position in the stream of that
+publisher. A synchronizer is a :class:`~krrood.synchronization.stream_participants.StreamPublisher`, which numbers the
+messages it sends, and a :class:`~krrood.synchronization.stream_participants.StreamReceiver`, which remembers per publisher
 how far it received and applied that stream. With that, two processes can tell each other what to catch up with
-(:meth:`~krrood.message_stream.stream_participants.StreamReceiver.has_applied`), a gap in a stream reveals lost messages,
+(:meth:`~krrood.synchronization.stream_participants.StreamReceiver.has_applied`), a gap in a stream reveals lost messages,
 and a message that could not be applied stops its publisher from counting as caught up with until
-:meth:`~krrood.message_stream.stream_participants.StreamReceiver.forget_divergence_from` is called.
+:meth:`~krrood.synchronization.stream_participants.StreamReceiver.forget_divergence_from` is called.
 
 Expanding Modifications
 -----------------------

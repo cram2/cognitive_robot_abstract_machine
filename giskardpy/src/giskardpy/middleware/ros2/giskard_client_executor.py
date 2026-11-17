@@ -39,7 +39,7 @@ from rclpy import Context, Parameter, Future
 from action_msgs.msg import GoalStatus
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
-from krrood.message_stream.messages import MessageOrigin
+from krrood.synchronization.messages import MessageOrigin
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (

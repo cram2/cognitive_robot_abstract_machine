@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.exceptions import DataclassException
-from krrood.message_stream.messages import StreamPosition
+from krrood.synchronization.messages import StreamPosition
 
 
 @dataclass(kw_only=True)

@@ -14,7 +14,7 @@ from krrood.adapters.json_serializer import (
     to_json,
     from_json,
 )
-from krrood.message_stream.messages import Message, MessageField, StreamPosition
+from krrood.synchronization.messages import Message, MessageField, StreamPosition
 from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.ros.exceptions import (
     WorldUpdateReferencesUnknownEntityError,

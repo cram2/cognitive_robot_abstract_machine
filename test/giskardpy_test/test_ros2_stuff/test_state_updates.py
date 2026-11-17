@@ -28,7 +28,7 @@ from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import OutgoingWorldUpdates
 from giskardpy.motion_statechart.graph_node import EndMotion
-from krrood.message_stream.messages import MessageOrigin
+from krrood.synchronization.messages import MessageOrigin
 from semantic_digital_twin.input_synchronization import InputSynchronizer
 from semantic_digital_twin.world import World
 

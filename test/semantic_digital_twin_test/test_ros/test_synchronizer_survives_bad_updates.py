@@ -14,7 +14,7 @@ import std_msgs.msg
 from typing_extensions import Any
 
 from krrood.adapters.json_serializer import to_json
-from krrood.message_stream.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, StreamPosition
 from semantic_digital_twin.adapters.ros.messages import (
     ModificationBlock,
     ReceivedMessage,

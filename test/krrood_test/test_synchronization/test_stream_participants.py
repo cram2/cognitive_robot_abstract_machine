@@ -10,11 +10,11 @@ from uuid import uuid4
 import pytest
 
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood.message_stream.exceptions import DivergedFromPublisherError
-from krrood.message_stream.messages import MessageOrigin, StreamPosition
-from krrood.message_stream.stream_participants import LostMessages
+from krrood.synchronization.exceptions import DivergedFromPublisherError
+from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.stream_participants import LostMessages
 
-from ..dataset.message_stream import CounterPeer, CounterReading
+from ..dataset.synchronization import CounterPeer, CounterReading
 
 # %% fixtures
 

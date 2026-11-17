@@ -12,9 +12,9 @@ from time import sleep
 from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json
-from krrood.message_stream.exceptions import DivergedFromPublisherError
-from krrood.message_stream.messages import MessageOrigin, StreamPosition
-from krrood.message_stream.stream_participants import PublicationProgress
+from krrood.synchronization.exceptions import DivergedFromPublisherError
+from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.stream_participants import PublicationProgress
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
     WorldSynchronizer,

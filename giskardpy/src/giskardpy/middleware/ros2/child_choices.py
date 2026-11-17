@@ -39,7 +39,7 @@ from giskardpy.middleware.ros2.world_updates import (
     IncomingWorldUpdates,
 )
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from krrood.message_stream.messages import StreamPosition
+from krrood.synchronization.messages import StreamPosition
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )

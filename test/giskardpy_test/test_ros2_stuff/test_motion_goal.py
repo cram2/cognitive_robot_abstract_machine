@@ -15,7 +15,7 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.context import StatechartContext
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
-from krrood.message_stream.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, StreamPosition
 from semantic_digital_twin.world import World
 
 # %% the payload a client sends
