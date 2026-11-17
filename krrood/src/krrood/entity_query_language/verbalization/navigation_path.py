@@ -1,3 +1,7 @@
+"""
+The hops of an attribute navigation chain, as the data a possessive is read out from.
+"""
+
 from __future__ import annotations
 
 import uuid

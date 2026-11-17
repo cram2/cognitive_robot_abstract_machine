@@ -304,6 +304,9 @@ class VerbFormFragment(RoleFragment):
     """
 
     role: SemanticRole = SemanticRole.VERB
+    """
+    Always the verb role.
+    """
 
 
 @dataclass(kw_only=True)

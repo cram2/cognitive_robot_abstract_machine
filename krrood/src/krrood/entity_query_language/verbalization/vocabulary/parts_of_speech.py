@@ -1,3 +1,8 @@
+"""
+The typed parts of speech a predicate clause is built from, before any word is
+inflected.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -599,9 +604,7 @@ def predicate_clause(
             operands,
         )
     predicate = (
-        [Copula(), *complement]
-        if is_copular
-        else [VerbForm(form=head), *complement]
+        [Copula(), *complement] if is_copular else [VerbForm(form=head), *complement]
     )
     return clause(
         Noun(content=subject), *predicate, *(Noun(content=obj) for obj in objects)
