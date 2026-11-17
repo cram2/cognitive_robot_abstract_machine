@@ -126,11 +126,8 @@ The hooks run the `krrood` command already installed in your development environ
 rather than krrood. `krrood-check` needs that environment anyway: the core boundary check
 reads the installed packages.
 
-The same check runs outside pre-commit too. In CI, `krrood check --since` with the base
-of a pull request checks the lines it changes. For Claude Code, a Stop hook that runs
-`krrood check --since HEAD` and exits with 2 when it fails hands the violations back to
-Claude before it ends its turn; cognitive_robot_abstract_machine's
-`.claude/hooks/check_rules.sh` is one.
+The same check runs in CI too: `krrood check --since` with the base of a pull request
+checks the lines it changes.
 
 To use rules that are not released yet, install krrood from a commit of
 cognitive_robot_abstract_machine:

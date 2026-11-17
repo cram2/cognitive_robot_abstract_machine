@@ -142,7 +142,7 @@ jobs:
           krrood skills --check
 
       - name: Check the changed code against the rules that have a checker
-        # The check pre-commit and the Claude Code Stop hook run, over the lines the pull
+        # The check pre-commit runs, over the lines the pull
         # request changes, so it holds even for commits made without the hooks. A pull
         # request is checked out as its merge commit, whose first parent is the base.
         if: ${{ inputs.lib == 'krrood' && github.event_name == 'pull_request' }}
