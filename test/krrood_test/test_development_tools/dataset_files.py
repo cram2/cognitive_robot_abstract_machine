@@ -12,6 +12,7 @@ from krrood.patterns.path_enumeration import PathEnumeration
 from .dataset.field_accessors import hand_written_accessors
 from .dataset.leading_prepositions import prepositional_names, verb_phrase_names
 from .dataset.missing_docstrings import (
+    undocumented_classproperties,
     documented_module,
     no_module_docstring,
     undocumented_definitions,
@@ -96,6 +97,28 @@ class DatasetFile(PathEnumeration):
     and the path of the module declaring it.
     """
 
+    PROJECT_ISSUE_FORMS_MODULE = (
+        Path(__file__).parent / "dataset" / "project_issue_forms_module.py"
+    )
+    """
+    A module declaring a repository's issue forms.
+    """
+
+    ISSUE_FORM_TEXT = Path(__file__).parent / "dataset" / "issue_form_text.yml"
+    """
+    The file of the crash report form of :attr:`PROJECT_ISSUE_FORMS_MODULE`, with
+    ``{generate_command}`` and ``{source_path}`` standing for the command generating it
+    and the path of the module declaring it.
+    """
+
+    ISSUE_FORM_WITHOUT_TYPE_TEXT = (
+        Path(__file__).parent / "dataset" / "issue_form_without_type_text.yml"
+    )
+    """
+    The file of the announcement form of :attr:`PROJECT_ISSUE_FORMS_MODULE`, which sets
+    no issue type, with the placeholders of :attr:`ISSUE_FORM_TEXT`.
+    """
+
     RULE_SECTIONS_TEXT = Path(__file__).parent / "dataset" / "rule_sections_text.md"
     """
     The ``AGENTS.md`` listing the design principles and verification sections of
@@ -156,6 +179,12 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+    UNDOCUMENTED_CLASSPROPERTIES = Path(undocumented_classproperties.__file__)
+    """
+    A documented module whose class implements an abstract classproperty, which needs
+    no docstring, and overrides an implemented one, both undocumented.
     """
 
 

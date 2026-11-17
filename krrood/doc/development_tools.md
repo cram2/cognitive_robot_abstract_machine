@@ -15,12 +15,15 @@ can use the same conventions:
 - `krrood skills [--check]` generates the `.claude/skills/<name>/SKILL.md` of every
   skill the repository declares, replacing whatever those files held. `--check` works
   as for `agents-md`.
+- `krrood issue-forms [--check]` generates the `.github/ISSUE_TEMPLATE/<name>.yml` of
+  every GitHub issue form the repository declares, replacing whatever those files held.
+  `--check` works as for `agents-md`.
 - `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
   enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
   the staged change (`git diff --cached`) adds or changes are checked, because existing
   code has many violations; `--all-lines` checks every line.
 
-`format`, `agents-md` and `skills` exit with 1 when they modified a file, and `check` when it
+`format`, `agents-md`, `skills` and `issue-forms` exit with 1 when they modified a file, and `check` when it
 found a violation, following pre-commit's convention for hooks.
 
 ## Rules
@@ -99,7 +102,7 @@ pip install "krrood[development-tools]"
 The hooks are published in
 [`.pre-commit-hooks.yaml`](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/.pre-commit-hooks.yaml)
 at the root of cognitive_robot_abstract_machine: `krrood-format`, `krrood-agents-md`,
-`krrood-skills` and `krrood-check`. Add that repository to your
+`krrood-skills`, `krrood-issue-forms` and `krrood-check`. Add that repository to your
 `.pre-commit-config.yaml` and list the hook ids you want.
 
 The hooks run the `krrood` command already installed in your development environment
@@ -174,6 +177,49 @@ class LiveSessionSkill(Skill):
 
 Never edit a generated `SKILL.md`; the comment below its front matter names the class
 and module it comes from. Skills written by hand in `.claude/skills` are left alone.
+
+## Issue forms
+
+A GitHub issue form is a class subclassing `IssueForm`, named for the form followed by
+`IssueForm`, in an `issue_forms.py` module at the repository root or in the modules of
+an `issue_forms` package there. `krrood issue-forms` writes each form defined in it to
+`.github/ISSUE_TEMPLATE/<name>.yml`, the name being the class name's words in kebab case
+(`BugReportIssueForm` becomes `bug-report.yml`). The form's title is those words in
+sentence case; its other classproperties give the `description`, the organisation's
+`issue_type` set on every issue opened with it, and its `text_areas`:
+
+```python
+from krrood.development_tools.issue_forms.issue_form import (
+    CodeLanguage,
+    IssueForm,
+    TextArea,
+)
+
+
+class BugReportIssueForm(IssueForm):
+    @classproperty
+    def description(cls) -> str:
+        return "Report code that behaves differently from its documentation."
+
+    @classproperty
+    def issue_type(cls) -> str:
+        return "Bug"
+
+    @classproperty
+    def text_areas(cls) -> list[TextArea]:
+        return [
+            TextArea(identifier="describe-the-issue", label="Describe the issue", required=True),
+            TextArea(
+                identifier="reproduce-the-code-example",
+                label="Reproduce the code example",
+                code_language=CodeLanguage.PYTHON,
+                required=True,
+            ),
+        ]
+```
+
+Never edit a generated issue form; the comment at its top names the class and module it
+comes from. Issue forms written by hand in `.github/ISSUE_TEMPLATE` are left alone.
 
 ## Changing a rule
 

@@ -29,6 +29,11 @@ class Subcommand(StrEnum):
     Generate the ``SKILL.md`` of every skill the repository declares.
     """
 
+    ISSUE_FORMS = "issue-forms"
+    """
+    Generate the file of every issue form the repository declares.
+    """
+
     CHECK = "check"
     """
     Report the code that breaks a rule a checker enforces.
