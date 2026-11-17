@@ -81,7 +81,7 @@ Now, we define a search space for the GCS algorithm around the open drawer and t
 ```python
 search_space = BoundingBox(min_x=-0.0, max_x=1.5, min_y=0.1, max_y=2, min_z=0, max_z=1.45)
 print('Calculating graph of convex sets...')
-cg = VolumetricGraphOfBoundingBoxes.free_space_from_world(world, search_space=search_space)
+cg = VolumetricGraphOfBoundingBoxes.free_space_from_world(world=world, search_space=search_space)
 ```
 
 Given the connectivity graph a start pose and a goal pose for the path search is needed.

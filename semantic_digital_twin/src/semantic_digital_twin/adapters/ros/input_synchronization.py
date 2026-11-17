@@ -68,6 +68,10 @@ class TopicInputSynchronizer(
 class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     """
     Writes the positions of a joint state message into the world state.
+
+    A message reports the position of each joint, with the joint's multiplier and offset
+    applied, so a mimic joint reported next to the joint it mimics leaves both where the
+    message put them.
     """
 
     def apply_message(self, message: JointState) -> None:
@@ -77,7 +81,9 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
             )
             if not self.writes(connection):
                 continue
-            self.world.state[connection.raw_dof.id].position = position
+            self.world.state[connection.raw_dof.id].position = (
+                position - connection.offset
+            ) / connection.multiplier
 
     def writes(self, connection: ActiveConnection1DOF) -> bool:
         """

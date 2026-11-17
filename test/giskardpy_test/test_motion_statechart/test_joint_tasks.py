@@ -1,3 +1,7 @@
+"""
+Tests of the tasks that move joints to goal positions or limit their velocity.
+"""
+
 import numpy as np
 import pytest
 
@@ -123,6 +127,10 @@ def test_set_seed_odometry(pr2_world_state_reset):
 
 
 def test_joint_goal(tmp_path):
+    """
+    A joint position task moves a revolute joint to its goal, after which the motion
+    ends.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -178,9 +186,9 @@ def test_joint_goal(tmp_path):
     assert end.observation_state == ObservationStateValues.UNKNOWN
     assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     executor.tick_until_end()
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     # +1 compared to the tick count without a moving dof: EndMotion now waits for the
     # dof's velocity to settle below its convergence threshold before observing True.
     assert len(statechart.state_history) == 7

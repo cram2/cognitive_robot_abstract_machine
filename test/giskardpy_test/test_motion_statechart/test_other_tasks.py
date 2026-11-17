@@ -1053,6 +1053,10 @@ def test_angle_goal(pr2_world_state_reset: World):
 
 
 class TestArticulateGraspedMechanism:
+    """
+    Articulating a mechanism the robot holds.
+    """
+
     def test_the_mechanism_is_articulated_once_its_parts_reached_their_goals(
         self, *, prismatic_bot2: World
     ):
@@ -1081,7 +1085,9 @@ class TestArticulateGraspedMechanism:
         }
 
     def test_open(self, *, pr2_world_copy, tmp_path):
-
+        """
+        The PR2 opens a door by its handle and then closes it again.
+        """
         world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
         )
@@ -1177,7 +1183,7 @@ class TestArticulateGraspedMechanism:
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
-        statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+        statechart.draw(file_name=tmp_path / "muh.pdf")
 
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED

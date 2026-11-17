@@ -29,6 +29,17 @@ class Subcommand(StrEnum):
     Generate the ``SKILL.md`` of every skill the repository declares.
     """
 
+    ISSUE_FORMS = "issue-forms"
+    """
+    Generate the file of every issue form krrood ships and the repository declares.
+    """
+
+    ISSUE_ANSWER = "issue-answer"
+    """
+    Print the answer an issue's body, read from standard input, gives to one field of an
+    issue form.
+    """
+
     CHECK = "check"
     """
     Report the code that breaks a rule a checker enforces.
