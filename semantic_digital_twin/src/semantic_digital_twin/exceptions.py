@@ -1437,6 +1437,28 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
 
 
 @dataclass
+class StateUpdateContainsNonNumericValuesError(UsageError):
+    """
+    Raised when a received WorldStateUpdate gives a degree of freedom a value that is
+    not a number.
+    """
+
+    non_numeric_states: list[Any]
+    """
+    The values that are not numbers.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Received a WorldStateUpdate whose states {self.non_numeric_states} are "
+            f"not numbers."
+        )
+
+    def suggest_correction(self) -> str:
+        return "publish the positions of degrees of freedom as numbers."
+
+
+@dataclass
 class WorldHasNoSynchronizerError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but the world publishes its

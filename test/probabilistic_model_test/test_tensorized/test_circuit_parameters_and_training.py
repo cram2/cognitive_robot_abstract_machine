@@ -18,7 +18,7 @@ from typing_extensions import Any
 
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    GradientDescent,
+    JaxGradientDescent,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
@@ -255,7 +255,7 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(moved).to_namespace(jnp)
         before = float(jnp.mean(circuit.log_likelihood(jnp.asarray(data))))
-        trained_root = GradientDescent(
+        trained_root = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize(200, jnp.asarray(data))
         after = float(
@@ -319,11 +319,9 @@ def test_training_with_weight_decay_keeps_zero_probability_weights(
     ]
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(parameters).to_namespace(jnp)
-        trained = GradientDescent(
+        trained = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adamw(1e-2)
-        ).minimize(
-            20, jnp.asarray(data)
-        )
+        ).minimize(20, jnp.asarray(data))
         root_log_weights, *others = trained.circuit_parameters
     assert float(root_log_weights[0]) == -np.inf
     assert bool(jnp.all(jnp.isfinite(root_log_weights[1:])))
@@ -343,4 +341,4 @@ def test_parameter_arrays_and_gradient_descent_name_their_types():
         np.ndarray,
         np.dtype,
     )
-    assert typing_extensions.get_args(GradientDescent[Layer]) == (Layer,)
+    assert typing_extensions.get_args(JaxGradientDescent[Layer]) == (Layer,)

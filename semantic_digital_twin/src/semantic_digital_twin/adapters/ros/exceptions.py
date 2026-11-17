@@ -126,6 +126,39 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
         )
 
 
+@dataclass
+class SynchronizerDivergedError(UsageError):
+    """
+    Reports that an update of another synchronizer could not be applied, so that the
+    world may differ from the publisher's from then on.
+
+    .. warning:: A model modification that failed part-way stays applied as far as it
+        got, so the world may hold part of the failed update.
+    """
+
+    publisher: MetaData
+    """
+    The synchronizer whose update could not be applied.
+    """
+
+    sequence_number: int
+    """
+    The position of that update in the stream of its publisher.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Update #{self.sequence_number} of '{self.publisher.node_name}' could not "
+            f"be applied, so this world may differ from the one of the publisher."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "fetch the world from the publisher again, or stop relying on it being "
+            "synchronized with that publisher."
+        )
+
+
 # %% services
 
 
