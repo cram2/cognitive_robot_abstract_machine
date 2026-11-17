@@ -338,6 +338,7 @@ def test_double_tf_publisher(rclpy_node, pr2_world_state_reset):
     tf_publisher = TFPublisher.create_with_ignore_existing_tf(
         node=rclpy_node,
         world=pr2_world_state_reset,
+        wait_for_existing_tf=0,
     )
     all_frames = [
         str(kse.name) for kse in pr2_world_state_reset.kinematic_structure_entities
@@ -348,6 +349,7 @@ def test_double_tf_publisher(rclpy_node, pr2_world_state_reset):
         tf_publisher2 = TFPublisher.create_with_ignore_existing_tf(
             node=rclpy_node,
             world=pr2_world_state_reset,
+            wait_for_existing_tf=0,
         )
     tf_publisher2.tf_pub.publish = MagicMock()
     with pr2_world_state_reset.modify_world():
@@ -568,7 +570,9 @@ def publisher_ignoring_existing_frames(
     Build a publisher for a world whose tf tree already carries the given frames.
     """
     with patch.object(TFWrapper, "get_tf_frames", return_value=existing_frames):
-        return TFPublisher.create_with_ignore_existing_tf(node=node, world=world)
+        return TFPublisher.create_with_ignore_existing_tf(
+            node=node, world=world, wait_for_existing_tf=0
+        )
 
 
 def test_a_body_another_publisher_broadcasts_keeps_that_frame_name(rclpy_node):
