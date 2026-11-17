@@ -11,7 +11,7 @@ import rdflib
 from rdflib import Namespace
 from rdflib.namespace import OWL, RDFS
 
-from krrood.ontomatic.failures import AmbiguousDescribedClass
+from krrood.ontomatic.exceptions import AmbiguousDescribedClass
 from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.extraction import (
     RDFClassExtractor,

@@ -30,10 +30,24 @@ class UnMonitoredContainerTypeForDescriptor(Exception):
     """
 
     clazz: type
+    """
+    The class whose field uses the container type.
+    """
+
     field_name: str
+    """
+    The name of the field.
+    """
+
     container_type: type
+    """
+    The container type that is not monitored.
+    """
 
     def __post_init__(self):
+        """
+        Set the message from the class, field and container type.
+        """
         super().__init__(
             f"Unmonitored container type '{self.container_type.__name__}' used for field '{self.field_name}' "
             f"in class '{self.clazz.__name__}'."

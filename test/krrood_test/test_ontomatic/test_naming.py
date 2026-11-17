@@ -11,7 +11,7 @@ import rdflib
 from rdflib import Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
-from krrood.ontomatic.failures import UnsupportedClassExpression
+from krrood.ontomatic.exceptions import UnsupportedClassExpression
 from krrood.ontomatic.naming import NamingRegistry
 
 # %% local names

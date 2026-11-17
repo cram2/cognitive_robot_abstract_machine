@@ -13,7 +13,7 @@ from rdflib.namespace import RDF, RDFS, OWL
 from typing_extensions import Any, Dict, List, Optional
 
 from krrood.code_generation.naming import to_camel_case, to_snake_case
-from krrood.ontomatic.failures import AmbiguousDescribedClass
+from krrood.ontomatic.exceptions import AmbiguousDescribedClass
 from krrood.ontomatic.naming import NamingRegistry
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
 from krrood.symbol_graph.symbol_graph import Symbol

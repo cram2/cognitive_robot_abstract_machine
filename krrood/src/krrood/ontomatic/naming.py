@@ -14,7 +14,7 @@ from rdflib import OWL
 from rdflib.collection import Collection
 from typing_extensions import Any, Optional, Union
 
-from krrood.ontomatic.failures import UnsupportedClassExpression
+from krrood.ontomatic.exceptions import UnsupportedClassExpression
 from krrood.ormatic.utils import classproperty
 from krrood.utils import recursive_subclasses
 
