@@ -43,6 +43,8 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      # the runner pulls the CI image from the repository's packages with this token
+      packages: read
     container:
       image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
       options: --volume /:/host
