@@ -184,6 +184,14 @@ class ListOfMembers(ClassExpression, ABC):
         The text between the names of the members.
         """
 
+    @classmethod
+    def join_member_names(cls, *, member_names: list[str]) -> str:
+        """
+        :param member_names: The names of the members.
+        :return: The prefix and the member names, joined by the separator.
+        """
+        return cls.name_prefix + cls.member_separator.join(member_names)
+
     @property
     def python_name(self) -> str:
         """
@@ -192,8 +200,8 @@ class ListOfMembers(ClassExpression, ABC):
         members = self.list_members(
             head=self.graph.value(self.node, self.defining_predicate)
         )
-        return self.name_prefix + self.member_separator.join(
-            self.python_name_of_node(node=member) for member in members
+        return self.join_member_names(
+            member_names=[self.python_name_of_node(node=member) for member in members]
         )
 
 
@@ -301,17 +309,17 @@ class ComplementOf(ClassExpression):
     @property
     def python_name(self) -> str:
         """
-        The names of the classes the complemented class is disjoint with, joined by
-        ``OR``, or else ``Not`` and its name.
+        The names of the classes the complemented class is disjoint with, joined as
+        their :class:`UnionOf`, or else ``Not`` and its name.
         """
         complemented = self.graph.value(self.node, OWL.complementOf)
         disjoint_names = [
             NamingRegistry.uri_to_python_name(uri=disjoint)
             for disjoint in self.graph.objects(complemented, OWL.disjointWith)
         ]
-        return "OR".join(disjoint_names) or "Not" + self.python_name_of_node(
-            node=complemented
-        )
+        return UnionOf.join_member_names(
+            member_names=disjoint_names
+        ) or "Not" + self.python_name_of_node(node=complemented)
 
 
 # %% restrictions on a property
