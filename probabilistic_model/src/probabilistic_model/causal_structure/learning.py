@@ -26,7 +26,7 @@ from causallearn.utils.PCUtils.BackgroundKnowledgeOrientUtils import (
 from causallearn.utils.PCUtils.Meek import meek
 from typing_extensions import Any
 
-from krrood.entity_query_language.causal_relation import (
+from krrood.parametrization.causal_relation import (
     AttributeEndpoint,
     CausalEndpoint,
     CausalRelation,
