@@ -70,12 +70,12 @@ class CorrelatedNormalTreeFactory:
     Number of samples drawn to fit the tree.
     """
 
-    min_samples_per_leaf: float = 0.02
+    minimum_samples_per_leaf: float = 0.02
     """
     Minimum fraction of samples a leaf of the tree must hold.
     """
 
-    min_samples_per_quantile: int = 50
+    minimum_samples_per_quantile: int = 50
     """
     Minimum number of samples per quantile when inferring the variables' domains.
     """
@@ -96,11 +96,11 @@ class CorrelatedNormalTreeFactory:
             data, columns=[f"x_{index}" for index in range(self.number_of_variables)]
         )
         variables = infer_variables_from_dataframe(
-            frame, min_samples_per_quantile=self.min_samples_per_quantile
+            frame, minimum_samples_per_quantile=self.minimum_samples_per_quantile
         )
         return JointProbabilityTree(
             annotated_variables=variables,
-            min_samples_per_leaf=self.min_samples_per_leaf,
+            minimum_samples_per_leaf=self.minimum_samples_per_leaf,
         ).fit(frame)
 
 

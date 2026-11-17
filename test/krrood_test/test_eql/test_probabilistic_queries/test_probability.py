@@ -29,7 +29,7 @@ def test_probability_matches_direct_computation():
     circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
     x = variable(Coin)
 
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Coin: circuit}))
     result = probability_of(x.a < 0.5).first(backend=backend)
 
     expected = circuit.probability(
@@ -44,7 +44,7 @@ def test_probability_of_conjunction():
     circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
     x = variable(Coin)
 
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Coin: circuit}))
     result = probability_of(and_(x.a < 0.5, x.b < 1)).first(backend=backend)
 
     # independent uniforms: P(a < 0.5) * P(b < 1) == 0.5 * 0.5
@@ -57,7 +57,7 @@ def test_probability_rejects_cross_class():
 
     with pytest.raises(JointQueryAcrossClassesNotSupported):
         probability_of(and_(x.a < 0.5, y.d < 0.5)).first(
-            backend=ProbabilisticBackend(model_registry=DictRegistry({}))
+            backend=ProbabilisticBackend(model_registry=DictRegistry(models={}))
         )
 
 
@@ -100,7 +100,7 @@ def test_probability_given_evidence_matches_direct_computation():
     circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
     x = variable(Coin)
 
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Coin: circuit}))
     result = probability_of(x.a < 0.5, evidence=x.a < 0.8).first(backend=backend)
 
     query_and_evidence = SimpleEvent.from_data({var_a: closed(0, 0.5)})
@@ -123,7 +123,7 @@ def test_probability_given_impossible_evidence_raises():
     circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
     x = variable(Coin)
 
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Coin: circuit}))
     with pytest.raises(EvidenceHasZeroProbability):
         probability_of(x.a < 0.5, evidence=x.a > 2).first(backend=backend)
 
@@ -141,7 +141,7 @@ def test_probability_given_evidence_on_other_class_rejected():
 
     with pytest.raises(JointQueryAcrossClassesNotSupported):
         probability_of(x.a < 0.5, evidence=y.d < 0.5).first(
-            backend=ProbabilisticBackend(model_registry=DictRegistry({}))
+            backend=ProbabilisticBackend(model_registry=DictRegistry(models={}))
         )
 
 

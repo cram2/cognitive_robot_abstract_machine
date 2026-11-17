@@ -1,14 +1,19 @@
+"""
+The Unitree G1 robot: its joints, hands and other robot parts.
+"""
+
 from __future__ import annotations
 
+# %% Imports
 import os
 from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
-from typing_extensions import Self, Union
+from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
@@ -38,18 +43,21 @@ from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     Arm,
-    Camera,
+    RobotCamera,
     Finger,
     Neck,
     Torso,
     MobileBase,
     EndEffector,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
 
 
 class UnitreeG1Joint(JointName):
@@ -109,7 +117,6 @@ class UnitreeG1Joint(JointName):
 
 @dataclass(eq=False)
 class UnitreeG1LeftThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -132,7 +139,6 @@ class UnitreeG1LeftThumb(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1LeftIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -155,7 +161,6 @@ class UnitreeG1LeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1LeftMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -178,7 +183,6 @@ class UnitreeG1LeftMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1RightThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -201,7 +205,6 @@ class UnitreeG1RightThumb(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1RightIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -224,7 +227,6 @@ class UnitreeG1RightIndexFinger(Finger):
 
 @dataclass(eq=False)
 class UnitreeG1RightMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -254,7 +256,6 @@ class UnitreeG1LeftHand(
         UnitreeG1LeftMiddleFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -306,7 +307,6 @@ class UnitreeG1RightHand(
         UnitreeG1RightMiddleFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -351,7 +351,6 @@ class UnitreeG1RightHand(
 
 @dataclass(eq=False)
 class UnitreeG1LeftArm(Arm[UnitreeG1LeftHand]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -381,7 +380,6 @@ class UnitreeG1LeftArm(Arm[UnitreeG1LeftHand]):
 
 @dataclass(eq=False)
 class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -410,19 +408,21 @@ class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
 
 
 @dataclass(eq=False)
-class D435(Camera):
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
-
+class D435(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "d435_link"),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            root=cls.create_optical_body(
+                robot_root._world.get_body_in_branch_by_name(robot_root, "d435_link"),
+                HomogeneousTransformationMatrix(),
+            ),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(
+                    horizontal_angle=0.99483, vertical_angle=0.75049
+                )
+            ),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,
@@ -437,7 +437,6 @@ class D435(Camera):
 
 @dataclass(eq=False)
 class UnitreeG1Neck(Neck[D435]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -458,7 +457,6 @@ class UnitreeG1Neck(Neck[D435]):
 class UnitreeG1Torso(
     Torso, HasLeftRightArm[UnitreeG1LeftArm, UnitreeG1RightArm], HasNeck[UnitreeG1Neck]
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -477,7 +475,6 @@ class UnitreeG1Torso(
 
 @dataclass(eq=False)
 class UnitreeG1MobileBase(MobileBase[OmniDrive]):
-
     @classproperty
     def forward_axis(cls) -> Vector3:
         return Vector3.X()

@@ -1,3 +1,7 @@
+"""
+Graphs of convex sets whose nodes are convex polytopes grown by IRIS around seed points.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -11,10 +15,7 @@ from semantic_digital_twin.exceptions import PointOccupiedError
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     Shape,
@@ -376,7 +377,9 @@ class GraphOfConvexPolygons(
         semantic_annotation = SemanticEnvironmentAnnotation(
             root=world.root, _world=world
         )
-        obstacle_entities = semantic_annotation.obstacle_entities(result.search_space)
+        obstacle_entities = semantic_annotation.obstacle_entities(
+            search_space=result.search_space
+        )
         result.obstacles = [
             _shape_to_convex_set(shape, world.root, bloat_obstacles, bloat_obstacles)
             for entity in obstacle_entities

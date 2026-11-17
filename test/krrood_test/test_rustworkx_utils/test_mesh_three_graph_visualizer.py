@@ -17,7 +17,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def body_graph(*bodies: Body) -> rx.PyDiGraph:
-    """Build a chain graph out of the given bodies (or other payloads)."""
+    """
+    Build a chain graph out of the given bodies (or other payloads).
+    """
     graph = rx.PyDiGraph(multigraph=False)
     indices = [graph.add_node(body) for body in bodies]
     for parent, child in zip(indices, indices[1:]):
@@ -26,14 +28,18 @@ def body_graph(*bodies: Body) -> rx.PyDiGraph:
 
 
 def body_visual_mesh(payload):
-    """The combined visual mesh of a ``Body`` payload, or ``None`` otherwise."""
+    """
+    The combined visual mesh of a ``Body`` payload, or ``None`` otherwise.
+    """
     if not isinstance(payload, Body) or not payload.visual:
         return None
     return payload.visual.combined_mesh
 
 
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> MeshThreeGraphVisualizer:
-    """A visualizer that labels bodies by their name."""
+    """
+    A visualizer that labels bodies by their name.
+    """
     overrides.setdefault("mesh_getter", body_visual_mesh)
     return MeshThreeGraphVisualizer(
         graph=graph,
@@ -100,22 +106,22 @@ class TestMeshGlbCaching:
     def test_mesh_is_only_exported_once(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
-        first = visualizer._mesh_glb(0)
-        second = visualizer._mesh_glb(0)
+        first = visualizer._mesh_glb(node_index=0)
+        second = visualizer._mesh_glb(node_index=0)
 
         assert first is second
 
     def test_exported_bytes_are_a_valid_glb_header(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
-        glb_bytes = visualizer._mesh_glb(0)
+        glb_bytes = visualizer._mesh_glb(node_index=0)
 
         assert glb_bytes[:4] == b"glTF"
 
     def test_missing_mesh_is_cached_as_none(self):
         visualizer = named_visualizer(body_graph(body_without_visual("a")))
 
-        assert visualizer._mesh_glb(0) is None
+        assert visualizer._mesh_glb(node_index=0) is None
         assert 0 in visualizer._mesh_glb_cache
 
     def test_concurrent_requests_export_the_same_mesh_only_once(self):
@@ -133,7 +139,8 @@ class TestMeshGlbCaching:
         mesh.export = counting_export
 
         threads = [
-            threading.Thread(target=visualizer._mesh_glb, args=(0,)) for _ in range(5)
+            threading.Thread(target=visualizer._mesh_glb, kwargs={"node_index": 0})
+            for _ in range(5)
         ]
         for started_thread in threads:
             started_thread.start()
@@ -242,7 +249,7 @@ class TestExtraScript:
 class TestCheckDependencies:
     @pytest.mark.parametrize("missing_module", ["flask", "trimesh"])
     def test_raises_when_a_required_module_is_missing(
-        self, monkeypatch, missing_module
+        self, *, monkeypatch, missing_module
     ):
         original_find_spec = importlib.util.find_spec
 

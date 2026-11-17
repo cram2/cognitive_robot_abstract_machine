@@ -43,4 +43,4 @@ def test_a_role_read_back_from_the_database_is_registered_for_its_taker(
 
     restored = session.scalars(select(RoleOverAValueStoredAsJsonDAO)).one().from_dao()
 
-    assert Role.roles_for(restored.role_taker) == [restored]
+    assert Role.roles_for(role_taker=restored.role_taker) == [restored]

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 270" role="img" aria-label="A parallel of two sequences and a collision allowance. The open and the milk pick-up start with the parallel and are grounded together; the cup pick-up and the place come later in their sequences and ground when their sequence reaches them; the allowance has no statement.">
+<style>
+.background { fill: #ffffff; }
+.box { fill: #ffffff; stroke: #98a5ac; stroke-width: 1.2; }
+.choose { fill: #ffffff; stroke: #17212a; stroke-width: 1.6; }
+.start { fill: #d7eeef; stroke: #0e7882; stroke-width: 1.6; }
+.later { fill: #ffffff; stroke: #0e7882; stroke-width: 1.3; stroke-dasharray: 5 3; }
+.ok { fill: #dcf0e2; stroke: #2c8448; stroke-width: 1.4; }
+.fail { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; }
+.run { fill: #dde8f7; stroke: #2d69b8; stroke-width: 1.4; }
+.wait { fill: #f6ead3; stroke: #a86d12; stroke-width: 1.6; }
+.ghost { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.gap { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; stroke-dasharray: 5 3; }
+.trialbox { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1.4; }
+.zone { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1; stroke-dasharray: 6 4; opacity: 0.9; }
+.template { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 6 4; }
+.rootmark { fill: none; stroke: #0e7882; stroke-width: 1.4; stroke-dasharray: 6 4; }
+.root { fill: #d7eeef; stroke: #0e7882; stroke-width: 2.2; }
+.edge { stroke: #98a5ac; stroke-width: 1.2; fill: none; }
+.flow { stroke: #17212a; stroke-width: 1.4; fill: none; }
+.flow-bad { stroke: #bf3f2b; stroke-width: 1.4; fill: none; }
+.flow-accent { stroke: #0e7882; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+.marker-line { stroke: #5b6971; stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.head { fill: #17212a; }
+.head-bad { fill: #bf3f2b; }
+text { fill: #17212a; }
+.h { font: 600 14px "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif; }
+.t { font: 500 12px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.tn { font: 500 11px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.s { font: 11px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #5b6971; }
+.lab { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #17212a; }
+.lab-bad { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #bf3f2b; }
+.lab-accent { font: 500 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #0e7882; }
+.lab-trial { font: 600 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #6b4fc0; }
+.num { font: 600 13px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.gridcell { fill: #ffffff; stroke: #98a5ac; stroke-width: 1; }
+</style>
+<rect class="background" x="0" y="0" width="520" height="270"/>
+        <defs>
+          <marker id="f1-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <text class="h" x="10" y="22">Plan as written</text>
+        <line class="edge" x1="250" y1="76" x2="112" y2="110"/>
+        <line class="edge" x1="250" y1="76" x2="332" y2="110"/>
+        <line class="edge" x1="250" y1="76" x2="455" y2="110"/>
+        <line class="edge" x1="112" y1="144" x2="60" y2="186"/>
+        <line class="edge" x1="112" y1="144" x2="165" y2="186"/>
+        <line class="edge" x1="332" y1="144" x2="280" y2="186"/>
+        <line class="edge" x1="332" y1="144" x2="385" y2="186"/>
+        <rect class="box" x="195" y="40" width="110" height="36" rx="6"/>
+        <text class="t" x="250" y="63" text-anchor="middle">Parallel</text>
+        <rect class="box" x="67" y="110" width="90" height="34" rx="6"/>
+        <text class="t" x="112" y="132" text-anchor="middle">Sequence</text>
+        <rect class="box" x="287" y="110" width="90" height="34" rx="6"/>
+        <text class="t" x="332" y="132" text-anchor="middle">Sequence</text>
+        <rect class="run" x="405" y="110" width="100" height="46" rx="6"/>
+        <text class="t" x="455" y="129" text-anchor="middle">Allowance</text>
+        <text class="s" x="455" y="146" text-anchor="middle">left hand may touch</text>
+        <text class="s" x="455" y="174" text-anchor="middle">no statement</text>
+
+        <rect class="start" x="10" y="186" width="100" height="46" rx="6"/>
+        <text class="tn" x="60" y="205" text-anchor="middle">a(OpenAction)</text>
+        <text class="s" x="60" y="221" text-anchor="middle">drawer, left arm</text>
+        <rect class="later" x="115" y="186" width="100" height="46" rx="6"/>
+        <text class="tn" x="165" y="205" text-anchor="middle">a(PickUp…)</text>
+        <text class="s" x="165" y="221" text-anchor="middle">cup, left arm</text>
+        <rect class="start" x="230" y="186" width="100" height="46" rx="6"/>
+        <text class="tn" x="280" y="205" text-anchor="middle">a(PickUp…)</text>
+        <text class="s" x="280" y="221" text-anchor="middle">milk, right arm</text>
+        <rect class="later" x="335" y="186" width="100" height="46" rx="6"/>
+        <text class="tn" x="385" y="205" text-anchor="middle">a(PlaceAction)</text>
+        <text class="s" x="385" y="221" text-anchor="middle">milk, right arm</text>
+        <text class="lab-accent" x="60" y="252" text-anchor="middle">together</text>
+        <text class="s" x="165" y="252" text-anchor="middle">later</text>
+        <text class="lab-accent" x="280" y="252" text-anchor="middle">together</text>
+        <text class="s" x="385" y="252" text-anchor="middle">later</text>
+
+      </svg>

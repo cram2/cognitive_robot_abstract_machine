@@ -64,7 +64,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.region_extraction import (
     PlacementSamplerRegionReader,
 )
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 ALL_LAYOUTS_AND_STYLES = -3
 """

@@ -24,7 +24,7 @@ def test_structural_cache_never_strongly_references_expressions():
     captured_contexts = []
 
     @symbolic_function
-    def capture_context(value):
+    def capture_context(value: int) -> bool:
         captured_contexts.append(get_evaluation_context())
         return True
 
@@ -81,7 +81,7 @@ def test_resumed_evaluation_sees_its_own_context_on_every_result():
     captured_contexts = []
 
     @symbolic_function
-    def capture_context(value):
+    def capture_context(value: int) -> bool:
         captured_contexts.append(get_evaluation_context())
         return True
 
@@ -105,7 +105,7 @@ def test_interleaved_evaluations_of_one_query_each_keep_their_own_context():
     captured_contexts = []
 
     @symbolic_function
-    def capture_context(value):
+    def capture_context(value: int) -> bool:
         captured_contexts.append(get_evaluation_context())
         return True
 
@@ -135,7 +135,7 @@ def test_evaluation_started_while_another_is_suspended_gets_its_own_context():
     captured_contexts = []
 
     @symbolic_function
-    def capture_context(value):
+    def capture_context(value: int) -> bool:
         captured_contexts.append(get_evaluation_context())
         return True
 
@@ -161,7 +161,7 @@ def test_evaluation_runs_in_the_context_set_before_it_starts():
     captured_contexts = []
 
     @symbolic_function
-    def capture_context(value):
+    def capture_context(value: int) -> bool:
         captured_contexts.append(get_evaluation_context())
         return True
 
@@ -187,7 +187,7 @@ def test_closing_suspended_results_keeps_their_context_current_for_the_cleanup()
         finally:
             contexts_seen_by_cleanup.append(get_evaluation_context())
 
-    results = evaluation_context.iterate_as_current(results_with_cleanup())
+    results = evaluation_context.iterate_as_current(results=results_with_cleanup())
     next(results)
     results.close()
 

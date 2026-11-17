@@ -11,14 +11,9 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.exceptions import (
-    MissingConnectionAxisError,
-    MissingReferenceFrameError,
-)
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from semantic_digital_twin.exceptions import MissingConnectionAxisError
+from krrood_spatial_math.exceptions import MissingReferenceFrameError
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -189,15 +184,18 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
 
 @pytest.mark.parametrize("drive_type", [OmniDrive, DifferentialDrive])
 def test_has_hardware_interface_round_trip(world_with_two_bodies, drive_type):
+    world, _, _ = world_with_two_bodies
     connection = _add_drive(world_with_two_bodies, drive_type)
     assert not connection.has_hardware_interface
     assert connection.controlled_dofs == []
 
-    connection.has_hardware_interface = True
+    with world.modify_world():
+        world.set_dofs_has_hardware_interface(connection.active_dofs, True)
     assert connection.has_hardware_interface
     assert set(connection.controlled_dofs) == set(connection.active_dofs)
 
-    connection.has_hardware_interface = False
+    with world.modify_world():
+        world.set_dofs_has_hardware_interface(connection.active_dofs, False)
     assert not connection.has_hardware_interface
     assert connection.controlled_dofs == []
 
@@ -394,6 +392,42 @@ def test_screw_connection_copy_with_new_parent_preserves_screw_pitch(
     assert copied_connection.raw_dof is connection.raw_dof
     assert copied_connection.axis == connection.axis
     assert copied_connection.parent is new_parent
+
+
+# %% re-parenting keeps the connection name
+
+
+@pytest.mark.parametrize(
+    "connection_type, additional_arguments",
+    [
+        (FixedConnection, {}),
+        (Connection6DoF, {}),
+        (OmniDrive, {}),
+        (DifferentialDrive, {}),
+        (RevoluteConnection, {"axis": Vector3.Z()}),
+        (PrismaticConnection, {"axis": Vector3.X()}),
+        (ScrewConnection, {"axis": Vector3.Z(), "screw_pitch": 0.01}),
+    ],
+)
+def test_copy_with_new_parent_keeps_name(
+    world_with_two_bodies, connection_type, additional_arguments
+):
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = connection_type.create_with_dofs(
+            world,
+            parent,
+            child,
+            name=PrefixedName("named_connection"),
+            **additional_arguments,
+        )
+        world.add_connection(connection)
+
+    copied_connection = connection.copy_with_new_parent(
+        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+    )
+
+    assert copied_connection.name == connection.name
 
 
 # %% create_with_dofs parameter forwarding

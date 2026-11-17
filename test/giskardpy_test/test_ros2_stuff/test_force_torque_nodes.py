@@ -1,24 +1,35 @@
+"""
+Tests of the statechart nodes that watch a force-torque sensor.
+"""
+
 import json
+from pathlib import Path
 
 from geometry_msgs.msg import WrenchStamped
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
-from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
+from cramph.data_types import ObservationStateValues
+from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.ros2_nodes.force_torque_monitor import (
     ForceImpactMonitor,
 )
-from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
+from giskardpy.motion_statechart.ros2_nodes.topics import (
     PublishOnStart,
     WaitForMessage,
 )
-from giskardpy.ros_executor import Ros2Executor
 from semantic_digital_twin.world import World
+from giskardpy.motion_control import MotionControl
+from giskardpy.motion_statechart.ros_context import RosNodeAccess
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 
 def test_force_impact_node(rclpy_node):
+    """
+    A force impact monitor observes false while the measured force stays below its
+    threshold, and true once a larger force arrives.
+    """
     topic_name = "force_torque_topic"
 
     msg_below = WrenchStamped()
@@ -26,46 +37,50 @@ def test_force_impact_node(rclpy_node):
     msg_above = WrenchStamped()
     msg_above.wrench.force.x = 20.0
 
-    msc = MotionStatechart()
-    msc.add_node(
-        parallel := Parallel(
-            [
-                ForceImpactMonitor(topic_name=topic_name, threshold=10),
-                Sequence(
-                    nodes=[
-                        PublishOnStart(topic_name=topic_name, msg=msg_below),
-                        WaitForMessage(topic_name=topic_name, msg_type=WrenchStamped),
-                        PublishOnStart(topic_name=topic_name, msg=msg_above),
-                    ]
-                ),
-            ]
+    statechart = Statechart(context=StatechartContext(world=World()))
+    statechart.add_node(
+        node=(
+            parallel := Parallel(
+                nodes=[
+                    ForceImpactMonitor(topic_name=topic_name, threshold=10),
+                    Sequence(
+                        nodes=[
+                            PublishOnStart(topic_name=topic_name, msg=msg_below),
+                            WaitForMessage(
+                                topic_name=topic_name, msg_type=WrenchStamped
+                            ),
+                            PublishOnStart(topic_name=topic_name, msg=msg_above),
+                        ]
+                    ),
+                ]
+            )
         )
     )
-    msc.add_node(EndMotion.when_true(parallel))
+    statechart.add_node(node=EndMotion.when_true(node=parallel))
 
-    json_data = msc.to_json()
+    json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    msc_copy = MotionStatechart.from_json(new_json_data)
-
-    kin_sim = Ros2Executor(
-        context=MotionStatechartContext(world=World()), ros_node=rclpy_node
+    executor = StatechartExecutor(
+        context=StatechartContext(world=World()),
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl()],
     )
-    kin_sim.compile(motion_statechart=msc_copy)
+    statechart_copy = Statechart.from_json(data=new_json_data, context=executor.context)
+    executor.compile(statechart=statechart_copy)
 
-    ft_node = msc_copy.nodes[0].nodes[0]
+    ft_node = statechart_copy.nodes[0].nodes[0]
 
-    kin_sim.tick_until_end(timeout=5_000)
-    msc_copy.draw("muh.pdf")
+    executor.tick_until_end(timeout=5_000)
+    statechart_copy.draw(file_name=Path("muh.pdf"))
     assert (
-        msc_copy.history.get_observation_history_of_node(ft_node)[0]
+        statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[0]
         == ObservationStateValues.UNKNOWN
     )
     assert (
         ObservationStateValues.FALSE
-        in msc_copy.history.get_observation_history_of_node(ft_node)
+        in statechart_copy.state_history.get_observation_history_of_node(node=ft_node)
     )
     assert (
-        msc_copy.history.get_observation_history_of_node(ft_node)[-1]
+        statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[-1]
         == ObservationStateValues.TRUE
     )

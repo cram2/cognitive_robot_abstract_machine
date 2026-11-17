@@ -43,6 +43,7 @@ _SCANNED_PACKAGES = [verbalization_package, testing_package]
 # It also includes the example-domain classes, so the rendered examples also hyperlink to real API pages.
 factories = [
     eql.variable,  # variables
+    eql.variable_from,
     eql.a,
     eql.an,
     eql.the,  # quantifiers

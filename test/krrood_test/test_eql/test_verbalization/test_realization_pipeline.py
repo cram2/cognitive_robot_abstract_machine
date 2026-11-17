@@ -81,8 +81,10 @@ def test_realize_tree_is_the_ordered_pass_pipeline():
     """
     tree = _sample_tree()
     manual = OrthographyProcessor().process(
-        MorphologyProcessor().process(
-            DeterminerProcessor().process(CoreferenceProcessor().process(tree))
+        fragment=MorphologyProcessor().process(
+            fragment=DeterminerProcessor().process(
+                fragment=CoreferenceProcessor().process(fragment=tree)
+            )
         )
     )
     assert flatten_fragment_to_plain_text(

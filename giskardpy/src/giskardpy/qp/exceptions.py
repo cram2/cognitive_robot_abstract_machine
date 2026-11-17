@@ -17,17 +17,17 @@ from giskardpy.data_types.exceptions import (
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
     from giskardpy.qp.qp_data import QPData
-    from semantic_digital_twin.spatial_types.derivatives import Derivatives
+    from semantic_digital_twin.world_description.derivatives import Derivatives
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPSolverException(GiskardException):
     """
     Base class for errors raised by the QP solvers.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SolverReturnedFailureError(QPSolverException):
     """
     Raised when a QP solver returns a non-optimal status.
@@ -45,7 +45,7 @@ class SolverReturnedFailureError(QPSolverException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InfeasibleException(QPSolverException):
     """
     Raised when the QP has no feasible solution.
@@ -63,7 +63,7 @@ class InfeasibleException(QPSolverException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuadraticObjectiveUnsupportedError(QPSolverException):
     """
     Raised when a linear program solver is given a problem with a quadratic objective.
@@ -81,7 +81,7 @@ class QuadraticObjectiveUnsupportedError(QPSolverException):
         return "Use a quadratic program solver for this problem."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PredictionHorizonTooShortError(SetupException):
     """
     Raised when the prediction horizon of the QP controller is shorter than the
@@ -99,7 +99,7 @@ class PredictionHorizonTooShortError(SetupException):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PredictionHorizonTooShortForDerivativeError(PredictionHorizonTooShortError):
     """
     Raised when the explicitly set prediction horizon has too few steps to integrate the
@@ -125,7 +125,7 @@ class PredictionHorizonTooShortForDerivativeError(PredictionHorizonTooShortError
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BrakingExceedsHorizonError(PredictionHorizonTooShortError):
     """
     Raised when a braking from the velocity limit to rest does not fit into the
@@ -139,7 +139,7 @@ class BrakingExceedsHorizonError(PredictionHorizonTooShortError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BrakingTimeExceedsHorizonError(BrakingExceedsHorizonError):
     """
     Raised when the configured braking time needs more steps than the explicitly set
@@ -165,7 +165,7 @@ class BrakingTimeExceedsHorizonError(BrakingExceedsHorizonError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DegreeOfFreedomBrakingExceedsHorizonError(BrakingExceedsHorizonError):
     """
     Raised when the jerk limit of a degree of freedom is too low to brake from its
@@ -202,7 +202,7 @@ class DegreeOfFreedomBrakingExceedsHorizonError(BrakingExceedsHorizonError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyProblemException(InfeasibleException):
     """
     Raised when the QP problem has no free variables.
@@ -214,7 +214,7 @@ class EmptyProblemException(InfeasibleException):
         return "Empty QP problem."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchedLimitLengthsError(GiskardException):
     """
     Raised when the bounds, weights, and names of a DirectLimits do not all share the
@@ -233,7 +233,29 @@ class MismatchedLimitLengthsError(GiskardException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
+class MissingCruiseVelocityError(QPSolverException):
+    """
+    Raised when a constraint on the position of its expression has no cruise velocity to
+    derive the change it may demand within the control horizon from.
+    """
+
+    constraint_name: str
+    """
+    The name of the constraint without a cruise velocity.
+    """
+
+    def error_message(self) -> str:
+        return f"Constraint {self.constraint_name!r} has no cruise velocity."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Set the cruise velocity of every constraint on the position of its "
+            "expression."
+        )
+
+
+@dataclass(kw_only=True)
 class ConstraintTypeMismatchError(QPSolverException):
     """
     Raised when an enforcement strategy receives a constraint of the wrong type for the
@@ -270,7 +292,7 @@ class ConstraintTypeMismatchError(QPSolverException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoFactoryForQPDataTypeError(QPSolverException):
     """
     Raised when no registered factory handles the requested QPData type.

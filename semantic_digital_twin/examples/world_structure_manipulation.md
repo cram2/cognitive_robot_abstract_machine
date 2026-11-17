@@ -39,7 +39,7 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 world = World()

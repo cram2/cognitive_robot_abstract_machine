@@ -28,7 +28,7 @@ def identifiers(expressions):
 def test_detaching_a_child_keeps_its_siblings():
     position = variable(KRROODPosition, [])
     x, y = position.x, position.y
-    predicate = IsGreaterThan(x, y)
+    predicate = IsGreaterThan(value=x, bound=y)
 
     y._parent_ = None
 
@@ -40,7 +40,7 @@ def test_detaching_a_parent_keeps_the_other_parents():
     other_position = variable(KRROODPosition, [])
     x, y = position.x, position.y
 
-    y._replace_child_(position, other_position)
+    y._replace_child_(old_child=position, new_child=other_position)
 
     assert identifiers(position._parents_) == identifiers([x])
 
@@ -51,9 +51,9 @@ def test_detaching_a_parent_keeps_the_other_parents():
 def test_replacing_a_child_with_its_sibling_leaves_the_sibling_once():
     position = variable(KRROODPosition, [])
     x, y = position.x, position.y
-    predicate = IsGreaterThan(x, y)
+    predicate = IsGreaterThan(value=x, bound=y)
 
-    predicate._replace_child_(x, y)
+    predicate._replace_child_(old_child=x, new_child=y)
 
     assert identifiers(predicate._children_) == identifiers([y])
 
@@ -63,6 +63,6 @@ def test_replacing_a_child_replaces_every_branch_of_a_case_holding_it():
     y, z = position.y, position.z
     case = case_when(position.x > 0, y, y)
 
-    case._replace_child_(y, z)
+    case._replace_child_(old_child=y, new_child=z)
 
     assert identifiers([case.then_value, case.else_value]) == identifiers([z, z])

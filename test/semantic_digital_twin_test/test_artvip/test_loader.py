@@ -26,9 +26,14 @@ except ImportError:
 DOOR_OBJECT_NAME = "EKET_Cabinet_with_door_brown_walnut_effect_35x35x35cm"
 DRAWERS_OBJECT_NAME = "EKET_Cabinet_with_2_drawers_white_70x35x35cm"
 
-pytestmark = pytest.mark.skipif(
-    not PXR_AVAILABLE, reason="usd-core (pxr) not installed"
-)
+pytestmark = [
+    pytest.mark.skipif(not PXR_AVAILABLE, reason="usd-core (pxr) not installed"),
+    pytest.mark.skipif(
+        os.getenv("CI") == "true",
+        reason="downloads ArtVIP objects from Hugging Face; test_build_world.py "
+        "covers loading an object without the download",
+    ),
+]
 
 
 def get_artvip_object(name: str) -> ArtVipObject | None:
@@ -94,7 +99,7 @@ def test_every_body_has_mesh_geometry(door_object):
 
 
 def test_hinged_door_is_reachable_as_an_active_connection_from_its_body(door_object):
-    # giskardpy's Open/Close goals (motion_statechart/goals/open_close.py) drive any
+    # giskardpy's ArticulateGraspedMechanism goal (motion_statechart/goals/grasped_mechanism.py) drives any
     # mechanism whose grasped part "hangs below an ActiveConnection1DOF" by calling
     # exactly this lookup on the grasped Body - this is the actual shape a manipulation
     # plan would query, not just that the World happens to contain a RevoluteConnection

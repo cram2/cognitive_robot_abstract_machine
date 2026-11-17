@@ -15,8 +15,8 @@ from giskardpy.qp.exceptions import (
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 if TYPE_CHECKING:
     from giskardpy.qp.solvers.qp_solver import QPSolver
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QPControllerConfig:
     """
     Configuration for the QPController.
@@ -197,6 +197,31 @@ class QPControllerConfig:
         """
         return self.prediction_horizon - self.number_of_resting_steps
 
+    def horizon_weight_scale(self, *, step: int) -> float:
+        """
+        :param step: Index of a prediction horizon step.
+        :return: The fraction of a dof weight applied at that step, growing linearly
+            from :attr:`horizon_weight_gain_scalar` at the first step to 1 at the last
+            step of the control horizon.
+        """
+        gain = self.horizon_weight_gain_scalar
+        return gain + (1 - gain) * step / (self.control_horizon - 1)
+
+    @property
+    def executed_to_mean_velocity_ratio(self) -> float:
+        """
+        How much faster the executed first step of a plan moves than the plan's mean
+        velocity over the control horizon, while no jerk limit binds.
+
+        The cheaper early steps take a share of the motion inversely proportional to
+        their :meth:`horizon_weight_scale`.
+        """
+        inverse_scales = [
+            1 / self.horizon_weight_scale(step=step)
+            for step in range(self.control_horizon)
+        ]
+        return inverse_scales[0] / (sum(inverse_scales) / self.control_horizon)
+
     @classmethod
     def create_with_simulation_defaults(cls):
         """
@@ -230,21 +255,23 @@ class QPControllerConfig:
         )
 
     def set_dof_weight(
-        self, dof_name: PrefixedName, derivative: Derivatives, weight: float
+        self, *, dof_name: PrefixedName, derivative: Derivatives, weight: float
     ):
         """
         Sets the objective weight of a single degree-of-freedom derivative.
         """
         self.dof_weights[dof_name][derivative] = weight
 
-    def set_dof_weights(self, dof_name: PrefixedName, weight_map: DerivativeMap[float]):
+    def set_dof_weights(
+        self, *, dof_name: PrefixedName, weight_map: DerivativeMap[float]
+    ):
         """
         Sets the objective weights of all derivatives of a degree of freedom.
         """
         self.dof_weights[dof_name] = weight_map
 
     def get_degree_of_freedom_weight(
-        self, dof_name: PrefixedName, derivative: Derivatives
+        self, *, dof_name: PrefixedName, derivative: Derivatives
     ) -> float:
         """
         Returns the objective weight of a single degree-of-freedom derivative.

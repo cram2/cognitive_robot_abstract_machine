@@ -1,3 +1,7 @@
+"""
+Helpers shared by the ripple down rules classifiers.
+"""
+
 from __future__ import annotations
 
 import builtins
@@ -38,17 +42,6 @@ from krrood.utils import (
 )
 
 try:
-    import matplotlib
-    from matplotlib import pyplot as plt
-
-    Figure = plt.Figure
-except ImportError as e:
-    matplotlib = None
-    plt = None
-    Figure = None
-    logger.debug(f"{e}: matplotlib is not installed")
-
-try:
     import networkx as nx
 except ImportError as e:
     nx = None
@@ -85,8 +78,10 @@ from typing_extensions import (
 if TYPE_CHECKING:
     from .datastructures.case import Case
     from .datastructures.dataclasses import CaseQuery
+    from matplotlib.figure import Figure
 
 import ast
+from krrood.patterns.called_positionally import called_positionally
 
 
 class IDGenerator:
@@ -1320,7 +1315,6 @@ _RE_ESC = re.compile(r'["\\]')
 
 
 class FilteredDotExporter(object):
-
     def __init__(
         self,
         node,
@@ -1498,32 +1492,47 @@ class FilteredDotExporter(object):
         edgeattrfunc = self.edgeattrfunc or self._default_edgeattrfunc
         edgetypefunc = self.edgetypefunc or self._default_edgetypefunc
         return self.__iter(
-            indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc
+            indent=indent,
+            nodenamefunc=nodenamefunc,
+            nodeattrfunc=nodeattrfunc,
+            edgeattrfunc=edgeattrfunc,
+            edgetypefunc=edgetypefunc,
         )
 
     @staticmethod
+    @called_positionally
     def _default_nodenamefunc(node):
         return node.name
 
     @staticmethod
+    @called_positionally
     def _default_nodeattrfunc(node):
         return None
 
     @staticmethod
+    @called_positionally
     def _default_edgeattrfunc(node, child):
         return None
 
     @staticmethod
+    @called_positionally
     def _default_edgetypefunc(node, child):
         return "->"
 
-    def __iter(self, indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc):
+    def __iter(self, *, indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc):
         yield "{self.graph} {self.name} {{".format(self=self)
-        for option in self.__iter_options(indent):
+        for option in self.__iter_options(indent=indent):
             yield option
-        for node in self.__iter_nodes(indent, nodenamefunc, nodeattrfunc):
+        for node in self.__iter_nodes(
+            indent=indent, nodenamefunc=nodenamefunc, nodeattrfunc=nodeattrfunc
+        ):
             yield node
-        for edge in self.__iter_edges(indent, nodenamefunc, edgeattrfunc, edgetypefunc):
+        for edge in self.__iter_edges(
+            indent=indent,
+            nodenamefunc=nodenamefunc,
+            edgeattrfunc=edgeattrfunc,
+            edgetypefunc=edgetypefunc,
+        ):
             yield edge
         if self.use_legend:
             legend_dot_graph = """
@@ -1546,13 +1555,13 @@ subgraph cluster_legend {
                 yield "%s" % (line.strip())
         yield "}"
 
-    def __iter_options(self, indent):
+    def __iter_options(self, *, indent):
         options = self.options
         if options:
             for option in options:
                 yield "%s%s" % (indent, option)
 
-    def __iter_nodes(self, indent, nodenamefunc, nodeattrfunc):
+    def __iter_nodes(self, *, indent, nodenamefunc, nodeattrfunc):
         for node in PreOrderIter(self.node, maxlevel=self.maxlevel):
             nodename = nodenamefunc(node)
             if (
@@ -1562,9 +1571,13 @@ subgraph cluster_legend {
                 continue
             nodeattr = nodeattrfunc(node)
             nodeattr = " [%s]" % nodeattr if nodeattr is not None else ""
-            yield '%s"%s"%s;' % (indent, FilteredDotExporter.esc(nodename), nodeattr)
+            yield '%s"%s"%s;' % (
+                indent,
+                FilteredDotExporter.esc(value=nodename),
+                nodeattr,
+            )
 
-    def __iter_edges(self, indent, nodenamefunc, edgeattrfunc, edgetypefunc):
+    def __iter_edges(self, *, indent, nodenamefunc, edgeattrfunc, edgetypefunc):
         maxlevel = self.maxlevel - 1 if self.maxlevel else None
         for node in PreOrderIter(self.node, maxlevel=maxlevel):
             nodename = nodenamefunc(node)
@@ -1585,13 +1598,13 @@ subgraph cluster_legend {
                 edgeattr = " [%s]" % edgeattr if edgeattr is not None else ""
                 yield '%s"%s" %s "%s"%s;' % (
                     indent,
-                    FilteredDotExporter.esc(nodename),
+                    FilteredDotExporter.esc(value=nodename),
                     edgetype,
-                    FilteredDotExporter.esc(childname),
+                    FilteredDotExporter.esc(value=childname),
                     edgeattr,
                 )
 
-    def to_dotfile(self, filename):
+    def to_dotfile(self, *, filename):
         """
         Write graph to `filename`.
 
@@ -1607,7 +1620,7 @@ subgraph cluster_legend {
         >>> s1ca = Node("sub1Ca", parent=s1c)
 
         >>> from anytree.exporter import DotExporter
-        >>> DotExporter(root).to_dotfile("tree.dot")
+        >>> DotExporter(root).to_dotfile(filename="tree.dot")
 
         The generated file should be handed over to the `dot` tool from the
         http://www.graphviz.org/ package::
@@ -1618,7 +1631,7 @@ subgraph cluster_legend {
             for line in self:
                 file.write("%s\n" % line)
 
-    def to_picture(self, filename):
+    def to_picture(self, *, filename):
         """
         Write graph to a temporary file and invoke `dot`.
 
@@ -1647,7 +1660,7 @@ subgraph cluster_legend {
         return Source("\n".join(self), filename=self.name)
 
     @staticmethod
-    def esc(value):
+    def esc(*, value):
         """
         Escape Strings.
         """
@@ -1694,27 +1707,32 @@ def render_tree(
             include_nodes=only_nodes,
             nodenamefunc=unique_node_names,
             edgeattrfunc=edge_attr_setter,
-            nodeattrfunc=lambda node: f"style=filled,"
-            f' fillcolor={color_map(node) if color_map else getattr(node, "color", "white")}',
+            nodeattrfunc=lambda node: (
+                f"style=filled,"
+                f" fillcolor={color_map(node) if color_map else getattr(node, 'color', 'white')}"
+            ),
             use_legend=use_legend,
         )
         if view:
             de.to_source().view()
         else:
             filename = filename or "rule_tree"
-            de.to_dotfile(f"{filename}{'.dot'}")
+            de.to_dotfile(filename=f"{filename}{'.dot'}")
             try:
-                de.to_picture(f"{filename}{'.svg'}")
+                de.to_picture(filename=f"{filename}{'.svg'}")
             except FileNotFoundError as e:
                 logger.warning(f"{e}")
 
 
-def draw_tree(root: Node, fig: Figure):
+def draw_tree(root: Node | None, fig: Figure) -> None:
     """
-    Draw the tree using matplotlib and networkx.
+    Draw the rule tree on the figure, replacing what the figure showed before.
+
+    :param root: The root rule of the tree; nothing is drawn if it is ``None``.
+    :param fig: The figure to draw on.
+    :raises ModuleNotFoundError: If matplotlib is not installed.
     """
-    # if matplotlib.get_backend().lower() not in ['qt5agg', 'qt4agg', 'qt6agg']:
-    #     matplotlib.use("Qt6Agg")  # or "Qt6Agg", depending on availability
+    from matplotlib import pyplot as plt
 
     if root is None:
         return

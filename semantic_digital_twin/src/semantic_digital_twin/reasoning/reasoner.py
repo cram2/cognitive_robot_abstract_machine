@@ -62,5 +62,5 @@ class CaseReasoner:
         :return: The inferred concepts as a dictionary mapping concept name to all
             inferred values of that concept.
         """
-        self.result = self.rdr.classify(self.case, modify_case=True)
+        self.result = self.rdr.classify(case=self.case, modify_case=True)
         return self.result

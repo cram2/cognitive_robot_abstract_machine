@@ -27,14 +27,14 @@ class GrammaticalNumber(StrEnum):
     """More than one entity."""
 
     @classmethod
-    def of(cls, is_plural: bool) -> GrammaticalNumber:
+    def of(cls, *, is_plural: bool) -> GrammaticalNumber:
         """
         :param is_plural: Whether the number is plural.
         :return: ``PLURAL`` when *is_plural* else ``SINGULAR``.
 
-        >>> GrammaticalNumber.of(True)
+        >>> GrammaticalNumber.of(is_plural=True)
         <GrammaticalNumber.PLURAL: 'plural'>
-        >>> GrammaticalNumber.of(False)
+        >>> GrammaticalNumber.of(is_plural=False)
         <GrammaticalNumber.SINGULAR: 'singular'>
         """
         return cls.PLURAL if is_plural else cls.SINGULAR

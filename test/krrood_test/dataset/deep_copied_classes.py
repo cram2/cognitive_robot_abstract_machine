@@ -9,7 +9,7 @@ from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 # %% immutable values a deep copy shares
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnitOfMeasurement:
     """
     An immutable value that every deep copy shares.
@@ -27,7 +27,7 @@ class UnitOfMeasurement:
 # %% dataclasses copied through their constructor
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Measurements(DataclassDeepcopyMixin):
     """
     Measured values whose total the constructor derives.
@@ -57,7 +57,7 @@ class Measurements(DataclassDeepcopyMixin):
         self.total = sum(self.values)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnnotatedMeasurements(Measurements):
     """
     Measurements that carry notes about how they were taken.
@@ -69,7 +69,7 @@ class AnnotatedMeasurements(Measurements):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PairOfMeasurements(DataclassDeepcopyMixin):
     """
     Two measurements that may be the same object.
@@ -89,7 +89,7 @@ class PairOfMeasurements(DataclassDeepcopyMixin):
 # %% identity-compared dataclasses
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SensorReading(DataclassDeepcopyMixin):
     """
     A reading that is equal only to itself.

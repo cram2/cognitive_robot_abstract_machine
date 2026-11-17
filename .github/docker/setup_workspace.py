@@ -2,7 +2,6 @@ import subprocess
 import os
 import shutil
 from dataclasses import dataclass, field
-from typing_extensions import Optional
 
 
 class bcolors:
@@ -241,6 +240,11 @@ def main():
         "ros-jazzy-control-msgs",
         "ros-jazzy-ur-robot-driver",
         "ros-jazzy-ur-client-library",
+        # robokudo_foundation_pose_tensorrt; its CUDA extension is skipped without CUDA.
+        "python3-dev",
+        "libeigen3-dev",
+        "libassimp-dev",
+        "libopencv-dev",
     ]
     manager.dep_manager.install_packages(packages)
 

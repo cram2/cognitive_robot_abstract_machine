@@ -1,9 +1,33 @@
-from dataclasses import dataclass
+"""
+The camera configuration that plays back recorded data from MongoDB.
+"""
 
-from typing_extensions import ClassVar
+from __future__ import annotations
+
+# %% Imports
+from krrood.patterns.classproperty import classproperty
+from dataclasses import dataclass
+from enum import StrEnum
+
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import WorldDescriptorComponent
+
+
+class MongoReplayMode(StrEnum):
+    """
+    Choose which part of a recorded world playback restores.
+    """
+
+    SENSOR_CONTEXT = "sensor_context"
+    """
+    Restore only the camera and its required reference frames.
+    """
+
+    FULL_WORLD = "full_world"
+    """
+    Restore the complete recorded world for each frame.
+    """
 
 
 @dataclass(slots=True)
@@ -20,7 +44,12 @@ class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
         MongoDB database, allowing for replay and analysis of recorded scenes.
     """
 
-    registry_name: ClassVar[str] = "mongo"
+    @classproperty
+    def registry_name(cls) -> str:
+        """
+        Identifier selecting this camera configuration.
+        """
+        return "mongo"
 
     interface_type: str = "StorageReader"
 
@@ -37,4 +66,9 @@ class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
     restore_annotations: bool = False
     """
     Whether to restore stored CAS annotations during playback.
+    """
+
+    replay_mode: MongoReplayMode = MongoReplayMode.SENSOR_CONTEXT
+    """
+    World content restored before decoding each recorded frame.
     """

@@ -1,5 +1,8 @@
-
-from krrood.inheritance_path_length import nearest_common_ancestor, inheritance_path_length, inheritance_distance
+from krrood.inheritance_path_length import (
+    nearest_common_ancestor,
+    inheritance_path_length,
+    inheritance_distance,
+)
 
 from krrood.entity_query_language.factories import not_, set_of, type_
 import math
@@ -34,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 def semantic_annotations_on_surfaces(
-        supporting_surfaces: list[HasSupportingSurface], world: World
+    supporting_surfaces: list[HasSupportingSurface], world: World
 ) -> list[HasRootBody]:
     """
     Queries a list of Semantic annotations that are on top of a given list of other
@@ -54,9 +57,9 @@ def semantic_annotations_on_surfaces(
 
 
 def get_next_object_using_planar_distance(
-        main_body: Body,
-        supporting_surface,
-        ignore_dimension,
+    main_body: Body,
+    supporting_surface,
+    ignore_dimension,
 ) -> Entity[SemanticAnnotation]:
     """
     Queries the next object based on Euclidean distance in x and y coordinates relative
@@ -74,7 +77,7 @@ def get_next_object_using_planar_distance(
         semantic_annotations_on_surfaces([supporting_surface], main_body._world)
     )
     return entity(supported_semantic_annotations).ordered_by(
-        compute_euclidean_planar_distance(
+        variable=compute_euclidean_planar_distance(
             body1=supported_semantic_annotations.bodies[0],
             body2=main_body,
             ignore_dimension=ignore_dimension,
@@ -83,9 +86,9 @@ def get_next_object_using_planar_distance(
 
 
 def goal_surface_of_object(
-        object_of_interest: SemanticAnnotation,
-        supporting_surfaces: list[HasSupportingSurface],
-        threshold: int = 1,
+    object_of_interest: SemanticAnnotation,
+    supporting_surfaces: list[HasSupportingSurface],
+    threshold: int = 1,
 ) -> HasSupportingSurface | None:
     """
     Finds the most similar object to a given semantic annotation among a list of tables
@@ -107,19 +110,30 @@ def goal_surface_of_object(
     supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
     supporting_body = supporting_surface.bodies[0]
     non_supporting_table = entity(supporting_surface).where(
-        not_(Supports(supporting_body)))
+        not_(Supports(supporting_body=supporting_body))
+    )
 
     # Query annotations on the surfaces of the tables
-    obj = variable(SemanticAnnotation, semantic_annotations_on_surfaces(
-        supporting_surfaces, object_of_interest._world
-    ))
+    obj = variable(
+        SemanticAnnotation,
+        semantic_annotations_on_surfaces(
+            supporting_surfaces, object_of_interest._world
+        ),
+    )
 
-    query = set_of(obj, supporting_surface).where(
-        (distance := inheritance_distance(object_of_interest, type_(obj))) <= threshold,
-        SupportedBy(obj.bodies[0], supporting_body)
-    ).ordered_by(distance)
-    return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))
-
+    query = (
+        set_of(obj, supporting_surface)
+        .where(
+            (distance := inheritance_distance(object_of_interest, type_(obj)))
+            <= threshold,
+            SupportedBy(supported=obj.bodies[0], supporting=supporting_body),
+        )
+        .ordered_by(variable=distance)
+    )
+    return next(
+        query[supporting_surface].evaluate(),
+        next(non_supporting_table.evaluate(), None),
+    )
 
 
 def filter_annotations_by_color(
@@ -142,7 +156,7 @@ def filter_annotations_by_color(
 
     matching_body = entity(body).where(
         body.visual != None,
-        length(body.visual.shapes) > 0,
+        length(iterable=body.visual.shapes) > 0,
         body.visual.shapes[0].color == color,
     )
     semantic_annotation = variable(HasRootBody, world.semantic_annotations)
@@ -206,5 +220,5 @@ def sort_annotations_by_volume(
             return 0.0
 
     return entity(annotaion_var).ordered_by(
-        get_volume(annotaion_var), descending=not order
+        variable=get_volume(annotaion_var), descending=not order
     )

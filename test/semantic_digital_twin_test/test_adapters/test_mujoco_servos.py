@@ -19,10 +19,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
     ServoGains,
@@ -215,8 +212,8 @@ def test_a_servoed_joint_is_driven_towards_the_world_state_not_teleported():
     """
     Writing a servoed joint's position into the world hands the servo a set point:
 
-    the joint then moves there through the physics, and the world keeps the set point
-    rather than being overwritten with the position reached so far.
+    the joint then moves there through the physics, and the world shows the position the
+    physics has reached.
     """
     pendulum = _servoed_pendulum_world()
     world = pendulum.world
@@ -237,7 +234,7 @@ def test_a_servoed_joint_is_driven_towards_the_world_state_not_teleported():
 
     assert 0.0 < after_one_step < set_point
     assert settled == pytest.approx(set_point, abs=0.02)
-    assert world.state[pendulum.hinge.raw_dof.id].position == set_point
+    assert world.state[pendulum.hinge.raw_dof.id].position == settled
 
 
 @pytest.mark.skipif(
@@ -263,3 +260,127 @@ def test_starting_the_simulation_holds_a_servoed_joint_where_the_world_has_it():
         simulation.stop_simulation()
 
     assert held == pytest.approx(0.7, abs=0.02)
+
+
+# %% a servoed joint commanded like a controller does
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_servoed_joint_stops_where_its_commands_stop():
+    """
+    A controller moves a joint by a velocity in every control period, from where the
+    world shows it, and stops commanding once the world shows the joint at its target:
+
+    the joint then stays there, rather than running on by the distance it trailed behind
+    its set point.
+    """
+    pendulum = _servoed_pendulum_world()
+    world = pendulum.world
+    degree_of_freedom = pendulum.hinge.raw_dof
+    control_period = timedelta(milliseconds=10)
+    velocity = 0.5
+    target = 0.5
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        while world.state[degree_of_freedom.id].position < target:
+            world.state[degree_of_freedom.id].velocity = velocity
+            world.state[degree_of_freedom.id].position += (
+                velocity * control_period.total_seconds()
+            )
+            world.notify_state_change()
+            simulation.step_simulation(control_period)
+        world.state[degree_of_freedom.id].velocity = 0.0
+        world.notify_state_change()
+        simulation.step_simulation(timedelta(seconds=1))
+    finally:
+        simulation.stop_simulation()
+
+    assert world.state[degree_of_freedom.id].position == pytest.approx(target, abs=0.01)
+
+
+# %% a servoed joint blocked by an obstacle
+
+
+def _blocked_servoed_pendulum_world() -> PendulumWorld:
+    """
+    :return: A servoed pendulum with a post fixed in the way of its arm, which stops the
+        arm at about 0.26 rad when it turns towards positive angles.
+    """
+    pendulum = _servoed_pendulum_world()
+    world = pendulum.world
+    base = pendulum.hinge.parent
+    with world.modify_world():
+        post = Body(name=PrefixedName("post"))
+        post.collision = ShapeCollection(
+            [Box(scale=Scale(0.02, 0.02, 0.04))], reference_frame=post
+        )
+        world.add_connection(
+            FixedConnection(
+                parent=base,
+                child=post,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.15, y=0.06, reference_frame=base
+                ),
+            )
+        )
+    return pendulum
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_blocked_servoed_joint_shows_where_the_physics_stopped_it():
+    """
+    An obstacle in the way stops the joint short of its set point, and the world shows
+    the joint where it is stuck, not where it was commanded to.
+    """
+    pendulum = _blocked_servoed_pendulum_world()
+    world = pendulum.world
+    set_point = 0.5
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        world.state[pendulum.hinge.raw_dof.id].position = set_point
+        world.notify_state_change()
+        simulation.step_simulation(timedelta(seconds=2))
+        stuck = simulation.simulator.get_joint_value("hinge").result
+    finally:
+        simulation.stop_simulation()
+
+    assert stuck < set_point - 0.1
+    assert world.state[pendulum.hinge.raw_dof.id].position == stuck
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_a_blocked_servoed_joint_keeps_being_pushed_towards_its_set_point():
+    """
+    While the joint is stuck, a command moving it further from where the world shows it
+    moves the servo's set point by the same amount, so the servo keeps pushing.
+    """
+    pendulum = _blocked_servoed_pendulum_world()
+    world = pendulum.world
+    degree_of_freedom = pendulum.hinge.raw_dof
+    set_point = 0.5
+    further = 0.1
+
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    try:
+        world.state[degree_of_freedom.id].position = set_point
+        world.notify_state_change()
+        simulation.step_simulation(timedelta(seconds=1))
+        world.state[degree_of_freedom.id].position += further
+        world.notify_state_change()
+        simulation.step_simulation(timedelta(seconds=1))
+        control = simulation.simulator.get_actuator("hinge_servo").result.ctrl[0]
+    finally:
+        simulation.stop_simulation()
+
+    assert control == pytest.approx(set_point + further)

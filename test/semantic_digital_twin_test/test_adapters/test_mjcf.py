@@ -8,6 +8,10 @@ import pytest
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.multi_sim import MujocoLight, MujocoTendon
+from semantic_digital_twin.world_description.contact import (
+    ContactFriction,
+    ContactParameters,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 MJCF_DIR = os.path.join(
@@ -62,8 +66,8 @@ def test_from_file_defaults_the_prefix_to_the_file_name():
 
 
 def test_parsing_twice_yields_independent_worlds(table_xml_parser):
-    first = table_xml_parser.parse()
-    second = table_xml_parser.parse()
+    first = table_xml_parser.create_world()
+    second = table_xml_parser.create_world()
 
     assert first is not second
     first_ids = {body.id for body in first.bodies}
@@ -74,7 +78,7 @@ def test_parsing_twice_yields_independent_worlds(table_xml_parser):
 
 def test_table_parsing(table_xml_parser):
     body_num = 7
-    world = table_xml_parser.parse()
+    world = table_xml_parser.create_world()
     world.validate()
 
     assert len(world.kinematic_structure_entities) == body_num
@@ -86,7 +90,7 @@ def test_table_parsing(table_xml_parser):
 
 
 def test_kitchen_parsing(kitchen_xml_parser):
-    world = kitchen_xml_parser.parse()
+    world = kitchen_xml_parser.create_world()
     world.validate()
 
     assert len(world.kinematic_structure_entities) > 0
@@ -94,7 +98,7 @@ def test_kitchen_parsing(kitchen_xml_parser):
 
 
 def test_apartment_parsing(apartment_xml_parser):
-    world = apartment_xml_parser.parse()
+    world = apartment_xml_parser.create_world()
     world.validate()
 
     assert len(world.kinematic_structure_entities) > 0
@@ -102,7 +106,7 @@ def test_apartment_parsing(apartment_xml_parser):
 
 
 def test_pr2_parsing(pr2_xml_parser):
-    world = pr2_xml_parser.parse()
+    world = pr2_xml_parser.create_world()
     world.validate()
 
     assert len(world.kinematic_structure_entities) > 0
@@ -132,7 +136,7 @@ def test_joint_position_limits_are_python_floats():
     MuJoCo reports them as numpy scalars, which do not interoperate with the symbolic-math layer (``numpy_scalar - symbol`` makes numpy
     try to arrayify the symbol) and break motion planning on the joint.
     """
-    world = MJCFParser.from_xml_string(HINGED_BODY_MJCF).parse()
+    world = MJCFParser.from_xml_string(HINGED_BODY_MJCF).create_world()
     limits = world.get_degree_of_freedom_by_name("hinge").limits
     assert type(limits.lower.position) is float
     assert type(limits.upper.position) is float
@@ -158,7 +162,7 @@ def test_light_is_parsed_and_attached_to_its_parent_body():
     lost all lighting information, falling back to MuJoCo's minimal default camera
     headlight instead of the scene's own intended lights.
     """
-    world = MJCFParser.from_xml_string(LIT_WORLD_MJCF).parse()
+    world = MJCFParser.from_xml_string(LIT_WORLD_MJCF).create_world()
 
     lights = [
         light_property
@@ -187,9 +191,34 @@ Scene whose single body carries one geom that takes part in contact and one that
 excluded from it.
 """
 
+CONTACT_DIMENSIONALITY_SCENE = os.path.join(
+    DATASET_DIR, "contact_dimensionality_scene.xml"
+)
+"""
+Scene with two boxes declaring the same friction, one resolving its contacts in MuJoCo's
+default dimensions and one also resisting turning.
+"""
+
+
+@pytest.mark.parametrize(
+    "body_name, acting_friction",
+    [
+        ("sliding_box", ContactFriction(sliding=0.8, torsional=0.0, rolling=0.0)),
+        ("turning_box", ContactFriction(sliding=0.8, torsional=0.02, rolling=0.0)),
+    ],
+)
+def test_a_geom_offers_only_the_friction_its_contact_dimensions_let_act(
+    body_name, acting_friction
+):
+    world = MJCFParser.from_file(CONTACT_DIMENSIONALITY_SCENE).create_world()
+
+    [shape] = world.get_body_by_name(body_name).collision.shapes
+    contact = shape.get_simulator_property_of_type(ContactParameters)
+    assert contact.friction == pytest.approx(acting_friction)
+
 
 def test_visual_only_geom_is_not_a_collision_shape_by_default():
-    world = MJCFParser.from_file(VISUAL_ONLY_GEOM_SCENE).parse()
+    world = MJCFParser.from_file(VISUAL_ONLY_GEOM_SCENE).create_world()
 
     [shelf] = [
         body for body in world.kinematic_structure_entities if body.name.name == "shelf"
@@ -201,7 +230,7 @@ def test_visual_only_geom_is_not_a_collision_shape_by_default():
 def test_visual_geometry_stands_in_when_a_body_has_no_collision_geometry():
     world = MJCFParser.from_file(
         VISUAL_ONLY_GEOM_SCENE, use_visual_as_collision_backup=True
-    ).parse()
+    ).create_world()
 
     [shelf] = [
         body for body in world.kinematic_structure_entities if body.name.name == "shelf"
@@ -215,10 +244,10 @@ def test_visual_geometry_is_left_out_where_the_body_already_collides():
     contact keeps exactly the geometry the scene gave it to collide with, so the geoms
     the scene deliberately excluded from contact stay out of it.
     """
-    without_backup = MJCFParser.from_file(MIXED_GEOM_SCENE).parse()
+    without_backup = MJCFParser.from_file(MIXED_GEOM_SCENE).create_world()
     with_backup = MJCFParser.from_file(
         MIXED_GEOM_SCENE, use_visual_as_collision_backup=True
-    ).parse()
+    ).create_world()
 
     [contact_only] = [
         body
@@ -235,6 +264,26 @@ def test_visual_geometry_is_left_out_where_the_body_already_collides():
     assert [shape.scale for shape in backed_up.collision.shapes] == [
         shape.scale for shape in contact_only.collision.shapes
     ]
+
+
+# %% unnamed bodies
+
+UNNAMED_BODIES_SCENE = os.path.join(DATASET_DIR, "unnamed_bodies_scene.xml")
+"""
+Scene shaped like a RoboCasa object: an unnamed body wrapping the body named ``object``,
+which holds the geometry in an unnamed body of its own.
+"""
+
+
+def test_unnamed_bodies_each_become_a_body_of_their_own():
+    world = MJCFParser.from_file(UNNAMED_BODIES_SCENE).create_world()
+
+    [geometry] = world.bodies_with_collision
+    assert geometry.parent_connection.parent.name.name == "object"
+    assert geometry.parent_connection.origin.to_np()[:3, 3] == pytest.approx(
+        [0.0, -0.045, 0.0]
+    )
+    assert len({body.name for body in world.bodies}) == len(world.bodies)
 
 
 TEXTURED_BOX_MJCF_TEMPLATE = """
@@ -280,7 +329,7 @@ def frame_wrapped_world(frame_wrapped_parser):
     """
     World parsed from the frame wrapped scene.
     """
-    return frame_wrapped_parser.parse()
+    return frame_wrapped_parser.create_world()
 
 
 def test_frame_transform_is_applied_to_the_geoms_it_wraps(frame_wrapped_world):
@@ -317,7 +366,7 @@ def test_joint_velocity_limit_is_symmetric_about_zero(frame_wrapped_parser):
     A one-sided velocity limit would stop the hinge moving towards its own range, which
     runs from a negative angle to zero.
     """
-    world = frame_wrapped_parser.parse()
+    world = frame_wrapped_parser.create_world()
 
     hinge = world.get_degree_of_freedom_by_name("door_hinge")
 
@@ -363,7 +412,7 @@ def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
         TEXTURED_BOX_MJCF_TEMPLATE.format(texture_file_path=texture_file_path)
     )
 
-    world = MJCFParser(str(mjcf_file_path)).parse()
+    world = MJCFParser(str(mjcf_file_path)).create_world()
 
     [counter] = [
         body
@@ -389,16 +438,18 @@ def test_a_scene_named_by_a_package_uri_is_read_from_that_package(
     shutil.copy(os.path.join(DATASET_DIR, scene_file_name), package_directory)
     monkeypatch.setenv("ROS_PACKAGE_PATH", str(package_directory))
 
-    from_package = MJCFParser(f"package://scene_package/{scene_file_name}").parse()
+    from_package = MJCFParser(
+        f"package://scene_package/{scene_file_name}"
+    ).create_world()
 
-    from_file = MJCFParser(os.path.join(DATASET_DIR, scene_file_name)).parse()
+    from_file = MJCFParser(os.path.join(DATASET_DIR, scene_file_name)).create_world()
     assert [body.name for body in from_package.kinematic_structure_entities] == [
         body.name for body in from_file.kinematic_structure_entities
     ]
 
 
 def test_a_mesh_file_named_by_a_package_uri_is_read_from_that_package():
-    world = MJCFParser(os.path.join(MJCF_DIR, "jeroen_cups.xml")).parse()
+    world = MJCFParser(os.path.join(MJCF_DIR, "jeroen_cups.xml")).create_world()
 
     [cup] = [
         body
@@ -424,7 +475,7 @@ def test_a_fixed_tendon_couples_the_joints_with_the_coefficients_mujoco_reads():
         for wrap in wraps
     }
 
-    world = MJCFParser(file_path).parse()
+    world = MJCFParser(file_path).create_world()
 
     (parsed,) = [
         simulator_property
@@ -458,6 +509,6 @@ def test_parsing_a_scene_without_tendons_does_not_compile_it(monkeypatch):
     monkeypatch.setattr(mujoco.MjSpec, "to_xml", refuse_to_compile)
     monkeypatch.setattr(mujoco.MjSpec, "compile", refuse_to_compile)
 
-    world = MJCFParser(file_path).parse()
+    world = MJCFParser(file_path).create_world()
 
     assert world.root.name.name == root_name

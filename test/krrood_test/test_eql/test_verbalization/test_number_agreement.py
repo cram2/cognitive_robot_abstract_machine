@@ -33,17 +33,19 @@ def _realised(fragment) -> str:
     """
     Apply the morphology pass (as ``build`` does), then flatten to plain text.
     """
-    return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
+    return flatten_fragment_to_plain_text(
+        MorphologyProcessor().process(fragment=fragment)
+    )
 
 
 def test_number_of_bridges_boolean_plan_features():
-    assert GrammaticalNumber.of(True) is GrammaticalNumber.PLURAL
-    assert GrammaticalNumber.of(False) is GrammaticalNumber.SINGULAR
+    assert GrammaticalNumber.of(is_plural=True) is GrammaticalNumber.PLURAL
+    assert GrammaticalNumber.of(is_plural=False) is GrammaticalNumber.SINGULAR
 
 
 def test_copula_agreement_is_applied_by_the_pass():
-    assert _realised(Copulas.for_number(GrammaticalNumber.SINGULAR)) == "is"
-    assert _realised(Copulas.for_number(GrammaticalNumber.PLURAL)) == "are"
+    assert _realised(Copulas.for_number(number=GrammaticalNumber.SINGULAR)) == "is"
+    assert _realised(Copulas.for_number(number=GrammaticalNumber.PLURAL)) == "are"
 
 
 def test_predicative_operator_factors_copula_for_agreement():
@@ -76,15 +78,17 @@ def test_predicative_operator_factors_copula_for_agreement():
 def test_existential_noun_pluralised_by_the_pass():
     assert (
         _realised(
-            ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).build_phrase(
-                "Robot"
-            )
+            ExistentialPhrase.for_number(
+                number=GrammaticalNumber.SINGULAR
+            ).build_phrase(type_name="Robot")
         )
         == "there's a Robot"
     )
     assert (
         _realised(
-            ExistentialPhrase.for_number(GrammaticalNumber.PLURAL).build_phrase("Robot")
+            ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).build_phrase(
+                type_name="Robot"
+            )
         )
         == "there are Robots"
     )
@@ -95,7 +99,9 @@ def test_existential_noun_pluralised_by_the_pass():
 
 def test_ordered_report_agrees_attribute_operator_and_possessive():
     e = variable(Employee, [])
-    text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(e.salary)))
+    text = verbalize_expression(
+        an(entity(e).where(e.salary > 5).ordered_by(variable=e.salary))
+    )
     assert text == (
         "Report Employees whose salaries are greater than 5, "
         "ordered by their salaries from lowest to highest"
@@ -107,8 +113,8 @@ def test_ranking_subject_agrees_the_whose_restriction():
     query = (
         entity(e)
         .where(e.salary > 1000)
-        .ordered_by(e.starting_salary, descending=True)
-        .limit(3)
+        .ordered_by(variable=e.starting_salary, descending=True)
+        .limit(n=3)
     )
     text = verbalize_expression(query)
     assert text == (
@@ -120,7 +126,9 @@ def test_ranking_subject_agrees_the_whose_restriction():
 def test_plural_subject_agrees_a_range_restriction():
     e = variable(Employee, [])
     query = an(
-        entity(e).where(and_(e.salary > 100, e.salary < 200)).ordered_by(e.salary)
+        entity(e)
+        .where(and_(e.salary > 100, e.salary < 200))
+        .ordered_by(variable=e.salary)
     )
     text = verbalize_expression(query)
     assert text == (
@@ -140,8 +148,8 @@ def test_intermediate_owner_in_a_longer_possessive_stays_singular():
     query = (
         entity(e)
         .where(e.department.name == "Sales")
-        .ordered_by(e.salary, descending=True)
-        .limit(3)
+        .ordered_by(variable=e.salary, descending=True)
+        .limit(n=3)
     )
     text = verbalize_expression(query)
     # each Employee has one department, so the intermediate owner is not pluralised

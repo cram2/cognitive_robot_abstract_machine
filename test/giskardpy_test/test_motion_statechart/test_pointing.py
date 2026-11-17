@@ -1,12 +1,12 @@
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
 from test.giskardpy_test.test_motion_statechart.debug_expression_helpers import (
     CURRENT_COLOR,
     GOAL_COLOR,
     debug_expression_by_name,
 )
+from ..motion_control_context import add_to_statechart_with_motion_control
 
 
 class TestPointingDebugExpressions:
@@ -15,7 +15,7 @@ class TestPointingDebugExpressions:
     green/red debug expressions, named with the task name.
     """
 
-    def test_pointing(self, cylinder_bot_world: World):
+    def test_pointing(self, *, cylinder_bot_world: World):
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = Pointing(
@@ -26,7 +26,8 @@ class TestPointingDebugExpressions:
             name="point",
         )
 
-        artifacts = task.build(MotionStatechartContext(world=cylinder_bot_world))
+        add_to_statechart_with_motion_control(task, cylinder_bot_world)
+        artifacts = task.build()
 
         goal = debug_expression_by_name(artifacts.debug_expressions, "point/goal")
         current = debug_expression_by_name(artifacts.debug_expressions, "point/current")
@@ -35,7 +36,7 @@ class TestPointingDebugExpressions:
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 
-    def test_pointing_cone(self, cylinder_bot_world: World):
+    def test_pointing_cone(self, *, cylinder_bot_world: World):
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = PointingCone(
@@ -47,7 +48,8 @@ class TestPointingDebugExpressions:
             name="cone",
         )
 
-        artifacts = task.build(MotionStatechartContext(world=cylinder_bot_world))
+        add_to_statechart_with_motion_control(task, cylinder_bot_world)
+        artifacts = task.build()
 
         goal = debug_expression_by_name(artifacts.debug_expressions, "cone/goal")
         current = debug_expression_by_name(artifacts.debug_expressions, "cone/current")

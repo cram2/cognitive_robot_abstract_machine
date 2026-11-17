@@ -12,12 +12,13 @@ This module provides an annotator for:
    Cropping can be done in either sensor coordinates (default) or world coordinates.
 """
 
+# %% Imports
 from __future__ import annotations
 
 from timeit import default_timer
 
 import cv2
-import open3d as o3d
+import open3d
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
@@ -34,8 +35,10 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
+# %% Point cloud cropping
 class PointcloudCropAnnotator(BaseAnnotator):
-    """Point cloud cropping using axis-aligned bounding boxes.
+    """
+    Point cloud cropping using axis-aligned bounding boxes.
 
     Crop a subset of points from a pointcloud data based on min/max X,Y,Z values.
     The crop is either done in sensor coordinates (default) or relative to the world frame.
@@ -108,54 +111,29 @@ class PointcloudCropAnnotator(BaseAnnotator):
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.color: npt.NDArray | None = None
-        """A copy of the color image currently being worked with."""
+        """
+        A copy of the color image currently being worked with.
+        """
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
-        """Process and crop point cloud data.
+        """
+        Crop the cloud in the selected frame and publish its visualization.
 
-        The method:
-
-        * Loads point cloud and camera data from CAS
-        * Optionally transforms to world coordinates
-        * Crops using axis-aligned bounding box
-        * Generates visualization mask
-        * Updates CAS with cropped cloud
-        * Creates combined visualization
-
-        :return: SUCCESS after processing
-        :raises Exception: If world transform not found when needed
+        :return: Processing status, with failures recorded on the blackboard.
         """
         start_timer = default_timer()
         self.rk_logger.warning(f"{self.__class__.__name__} called for update()")
 
         cloud = self.get_cas().get(CASViews.CLOUD)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        pointcloud_camera_intrinsics = self.get_cas().get(
-            CASViews.POINTCLOUD_CAMERA_INTRINSIC
-        )
-        color_to_depth_ratio = self.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
-
-        #
-        # Lookup camera information if the crop should be done relative to the world frame
-        #
+        pointcloud_camera_model = self.get_cas().pointcloud_camera_model
+        color_to_depth_ratio = self.get_cas().color_to_depth_ratio
 
         if self.descriptor.parameters.relative_to_world:
-            try:
-                cloud = transform_cloud_from_camera_to_world(self.get_cas(), cloud)
-            except Exception as e:
-                self.rk_logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS and relative_to_world is true. "
-                    f"Fail. Error: {e}"
-                )
-                return Status.FAILURE
+            cloud = transform_cloud_from_camera_to_world(self.get_cas(), cloud)
 
-        #
-        # Crop the point cloud
-        #
-        assert isinstance(cloud, o3d.geometry.PointCloud)
-
-        abb = o3d.geometry.AxisAlignedBoundingBox(
+        bounding_box = open3d.geometry.AxisAlignedBoundingBox(
             [
                 self.descriptor.parameters.min_x,
                 self.descriptor.parameters.min_y,
@@ -168,16 +146,12 @@ class PointcloudCropAnnotator(BaseAnnotator):
             ],
         )
 
-        cropped_cloud = cloud.crop(abb)
+        cropped_cloud = cloud.crop(bounding_box)
 
-        # Transform cloud back to camera coordinates if it has been transformed to world before
         if self.descriptor.parameters.relative_to_world:
-            cropped_cloud_transformed = transform_cloud_from_world_to_camera(
+            cropped_cloud = transform_cloud_from_world_to_camera(
                 self.get_cas(), cropped_cloud
             )
-            cropped_cloud = cropped_cloud_transformed
-
-        assert isinstance(cropped_cloud, o3d.geometry.PointCloud)
 
         self.get_cas().set_ref(CASViews.CLOUD, cropped_cloud)
         self.get_annotator_output_struct().set_geometries(cropped_cloud)
@@ -186,7 +160,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
         mask = get_mask_from_pointcloud(
             cropped_cloud,
             self.color,
-            pointcloud_camera_intrinsics,
+            pointcloud_camera_model,
             mask_scale_factor=mask_scale,
             crop_to_ref=True,
         )

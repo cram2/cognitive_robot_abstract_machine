@@ -9,9 +9,11 @@ from __future__ import annotations
 # Built before any test module imports a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.SEGMIND)
 
 
 from dataclasses import dataclass, field
@@ -21,7 +23,7 @@ import pytest
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,

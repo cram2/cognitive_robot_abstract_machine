@@ -1,4 +1,6 @@
-"""Serialisation of type hints and values to Python source-code strings."""
+"""
+Serialisation of type hints and values to Python source-code strings.
+"""
 
 from __future__ import annotations
 
@@ -20,8 +22,16 @@ from krrood.utils import is_builtin_type, is_typing_type
 # %%
 # Type-hint serialisation
 
-def _extract_types(type_hint: Any, seen: set[type] | None = None) -> set[type]:
-    """Recursively extract all base types from a type hint."""
+
+def extract_types(type_hint: Any, seen: set[type] | None = None) -> set[type]:
+    """
+    Collect every class a type hint names: the hint itself if it is a class, otherwise
+    its origin and the classes its arguments name.
+
+    :param type_hint: The type hint to collect the classes of.
+    :param seen: The classes collected so far, extended in place.
+    :return: The collected classes.
+    """
     if seen is None:
         seen = set()
 
@@ -37,7 +47,7 @@ def _extract_types(type_hint: Any, seen: set[type] | None = None) -> set[type]:
     if origin:
         seen.add(origin)
         for arg in args:
-            _extract_types(arg, seen)
+            extract_types(arg, seen)
     elif isinstance(type_hint, type):
         seen.add(type_hint)
 
@@ -45,12 +55,13 @@ def _extract_types(type_hint: Any, seen: set[type] | None = None) -> set[type]:
 
 
 def stringify_type_hint(type_hint: Any) -> str:
-    """Recursively convert a type hint to its string representation.
+    """
+    Recursively convert a type hint to its string representation.
 
-    Handles :class:`~typing.ForwardRef`, generic aliases (e.g. ``List[int]``),
-    builtins, and qualified names.  This is the **single canonical** function
-    for converting type hints to source-code strings — use it everywhere
-    instead of manual ``t.__name__`` concatenation.
+    Handles :class:`~typing.ForwardRef`, generic aliases (e.g. ``List[int]``), builtins,
+    and qualified names.  This is the **single canonical** function for converting type
+    hints to source-code strings — use it everywhere instead of manual ``t.__name__``
+    concatenation.
 
     :param type_hint: The type hint to convert.
     :returns: A Python source-code string for the type.
@@ -78,7 +89,8 @@ def stringify_type_hint(type_hint: Any) -> str:
 
 
 def value_to_source(value: object) -> str:
-    """Convert a Python value to its source-code representation.
+    """
+    Convert a Python value to its source-code representation.
 
     Handles: ``None``, booleans, integers, floats, strings, enum members,
     and type objects.  Falls back to ``repr(value)`` for unrecognized types.
@@ -96,14 +108,15 @@ def value_to_source(value: object) -> str:
 
 
 def get_types_to_import_from_type_hints(hints: list[type]) -> list[type]:
-    """Extract importable types from a list of type hints.
+    """
+    Extract importable types from a list of type hints.
 
     :param hints: A list of type hints to extract types from.
     :return: A set of types that need to be imported.
     """
-    seen_types = _extract_types(None, set())
+    seen_types = extract_types(None, set())
     for hint in hints:
-        _extract_types(hint, seen_types)
+        extract_types(hint, seen_types)
 
     to_import: list[type] = []
     for type_ in seen_types:
@@ -116,7 +129,8 @@ def get_types_to_import_from_type_hints(hints: list[type]) -> list[type]:
 
 
 def get_types_to_import_from_function_type_hints(function: Callable) -> list[type]:
-    """Extract importable types from a function's annotations.
+    """
+    Extract importable types from a function's annotations.
 
     :param function: The function to extract type hints from.
     :returns: A list of types that need to be imported.

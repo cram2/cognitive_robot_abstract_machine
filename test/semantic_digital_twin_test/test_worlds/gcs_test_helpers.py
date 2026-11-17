@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import rustworkx as rx
 from typing_extensions import Generic
 
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world_description.graph_of_convex_sets.base import PointT
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
     BoxT,

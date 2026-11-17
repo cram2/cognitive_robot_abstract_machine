@@ -21,7 +21,7 @@ mlflow.set_tracking_uri(uri=" http://127.0.0.1:8080")
 number_of_samples_per_component = 1000
 number_of_samples_for_evaluation = 5000
 number_of_components = 5
-min_samples_per_quantile = 60
+minimum_samples_per_quantile = 60
 
 data = []
 for component in tqdm.trange(number_of_components, desc="Generating data"):
@@ -32,14 +32,14 @@ data = np.concatenate(data, axis=0)
 variable = Continuous("x")
 
 rustworkx_model = NygaInduction(
-    variable, min_samples_per_quantile=min_samples_per_quantile
+    variable, minimum_samples_per_quantile=minimum_samples_per_quantile
 )
 
 run = mlflow.start_run(run_name="Integration example with mlflow")
 
 # Log the hyperparameters
 mlflow.log_params(
-    {"min_samples_per_quantile": rustworkx_model.min_samples_per_quantile}
+    {"minimum_samples_per_quantile": rustworkx_model.minimum_samples_per_quantile}
 )
 rustworkx_model = rustworkx_model.fit(data)
 mlflow.set_tag("Training Info", "Basic LR model for iris data")

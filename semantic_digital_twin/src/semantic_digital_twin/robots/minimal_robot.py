@@ -48,6 +48,7 @@ class MinimalRobot(AbstractRobot):
             self.bodies_of_branch = world.get_kinematic_structure_entities_of_branch(
                 self.root
             )
+            self.setup_robot_part_semantic_annotations()
             world.add_semantic_annotation_recursively(self)
             self._setup_hardware_interfaces()
             self._setup_joint_states()
@@ -64,7 +65,9 @@ class MinimalRobot(AbstractRobot):
     def _setup_hardware_interfaces(self):
         for connection in self.connections:
             if isinstance(connection, ActiveConnection):
-                connection.has_hardware_interface = True
+                self._world.set_dofs_has_hardware_interface(
+                    connection.active_dofs, True
+                )
 
     def _setup_joint_states(self):
         pass

@@ -17,7 +17,10 @@ from semantic_digital_twin.exceptions import (
     InvalidConnectionLimits,
     MimicDofLimitOverwriteError,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.world_description.derivatives import (
+    Derivatives,
+    DerivativeMap,
+)
 
 
 class DegreeOfFreedomVariableJSONKey(StrEnum):
@@ -59,16 +62,16 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
 
     def _value_to_json(self, **kwargs) -> dict[str, Any]:
         result = {}
-        WorldEntityReference(DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM).write(
-            result, self.dof
-        )
+        WorldEntityReference(
+            subject=DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
+        ).write(data=result, identified_object=self.dof)
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         dof = WorldEntityReference(
-            DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
-        ).resolve(data, **kwargs)
+            subject=DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
+        ).resolve(data=data, **kwargs)
         return dof.variables[cls.derivative]
 
 
@@ -195,9 +198,12 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled.
     Instead a the omni drive connection is directly controlled and a low level
-    controller translates these commands to commands for the caster wheels.
+    controller translates these commands to commands for the caster wheels. A door
+    hinge also has a dof that cannot be controlled.
 
-    A door hinge also has a dof that cannot be controlled.
+    .. warning:: In a world, change it only through
+        :meth:`World.set_dofs_has_hardware_interface`: a direct assignment is not
+        recorded, published or rolled back, and a block holding only it changes nothing.
     """
 
     def __post_init__(self):

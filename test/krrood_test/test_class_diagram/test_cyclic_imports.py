@@ -6,8 +6,8 @@ from ..dataset.example_classes import KRROODPose
 
 def test_unfinished_type_field_info():
 
-    diagram = ClassDiagram([KRROODPose, PoseAnnotation])
+    diagram = ClassDiagram(classes=[KRROODPose, PoseAnnotation])
 
-    wrapped_cls = diagram.get_wrapped_class(PoseAnnotation)
+    wrapped_cls = diagram.get_wrapped_class(clazz=PoseAnnotation)
     f = [f for f in wrapped_cls.fields if f.field.name == "pose"][0]
     assert f.contained_type is KRROODPose

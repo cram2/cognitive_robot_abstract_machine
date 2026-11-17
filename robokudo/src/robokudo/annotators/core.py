@@ -18,6 +18,7 @@ This module provides base classes for implementing annotators in RoboKudo.
 
 from __future__ import annotations
 
+# %% Imports
 import logging
 import threading
 import time
@@ -27,16 +28,18 @@ from concurrent.futures import Future
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
+from rclpy.time import Time
 from sensor_msgs.msg import JointState
 from typing_extensions import Any, Callable
 
 import robokudo.pipeline  # Work around circular import
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.outputs import (
     AnnotatorOutputPerPipelineMap,
     AnnotatorOutputs,
     AnnotatorOutputStruct,
 )
+from robokudo.annotator_parameters import AnnotatorPredefinedParameters
+from robokudo.annotators.exceptions import InvalidAnalysisData, EmptyAnalysisScope
 from robokudo.cas import CAS, CASViews
 from robokudo.defs import PACKAGE_NAME
 from robokudo.types.core import Annotation
@@ -244,20 +247,16 @@ class BaseAnnotator(Behaviour):
         Get the outputs container for all annotators in the current pipeline.
 
         :return: Container for all annotator outputs in the pipeline
-        :raises AssertionError: If output container types are invalid
+        :raises InvalidAnalysisData: If output container types are invalid
         """
         blackboard = Blackboard()
         annotator_output_pipeline_map_buffer = blackboard.get(
             "annotator_output_pipeline_map_buffer"
         )
-        assert isinstance(
-            annotator_output_pipeline_map_buffer,
-            AnnotatorOutputPerPipelineMap,
-        )
 
         pipeline = self.get_parent_pipeline()
         annotator_outputs = annotator_output_pipeline_map_buffer.map[pipeline.name]
-        assert isinstance(annotator_outputs, AnnotatorOutputs)
+
         return annotator_outputs
 
     def get_annotator_output_struct(
@@ -353,9 +352,7 @@ class BaseAnnotator(Behaviour):
                 )
 
         if len(result) == 0:
-            raise ValueError(
-                f"Result list after scope look up is empty. Can't continue processing.Input was: {analysis_scope}"
-            )
+            raise EmptyAnalysisScope(analysis_scope=analysis_scope)
 
         return result
 
@@ -373,16 +370,10 @@ class BaseAnnotator(Behaviour):
         :param value: The timing value to record
         :param func: The function name to associate with the timing
         """
-        timing_dict = getattr(self, "_times")
+        timing_dict = self._times
         timing_dict[func] = value
 
-    #########################################################
-    # Data publishing handling                               #
-    #                                                        #
-    # Collect float variables in your Annotators             #
-    # that you want to analyze with external tools.          #
-    # The following methods handle to publish these via ROS. #
-    ##########################################################
+    # %% Variable publishing
 
     def shall_publish_variables(self) -> bool:
         """
@@ -418,10 +409,8 @@ class BaseAnnotator(Behaviour):
         :param name: Identifier of the variable
         :param value: The actual value (must be a float)
         """
-        try:
+        if self.setup_done_for_published_variables():
             self.published_variables[name] = value
-        except Exception as e:
-            pass
 
     def setup_done_for_published_variables(self) -> bool:
         """
@@ -434,7 +423,8 @@ class BaseAnnotator(Behaviour):
         )
 
     def publish_variables(self) -> None:
-        """Publish all collected variable updates at once.
+        """
+        Publish all collected variable updates at once.
 
         Use this function as a decorator (i.e. @robokudo.utils.decorators.publish_variables) on your update or
         compute method to automatically publish variables whenever the method is returning.
@@ -447,19 +437,17 @@ class BaseAnnotator(Behaviour):
 
             # Create a joint state message to have a common data structure for all values
             msg = JointState()
-            msg.header.stamp = (
-                self.get_cas().get(CASViews.CAMERA_INFO).header.stamp
-            )  # This is always the time of recording the data.
+            timestamp_nanoseconds = (
+                self.get_cas().require_camera_observation().timestamp_nanoseconds
+            )
+            msg.header.stamp = Time(nanoseconds=timestamp_nanoseconds).to_msg()
 
             # msg.header.stamp = rospy.Time(self.get_cas().timestamp) # This might be the current time!
             for key, value in self.published_variables.items():
                 msg.name.append(key)
                 msg.position.append(value)
 
-            try:
-                self.variable_publisher.publish(msg)
-            except Exception as e:
-                self.rk_logger.warning(f"Caught exception {e} while publish_variables")
+            self.variable_publisher.publish(msg)
 
 
 # This class is based on https://stackoverflow.com/a/32913813

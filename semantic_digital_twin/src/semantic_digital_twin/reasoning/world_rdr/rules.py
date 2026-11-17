@@ -266,13 +266,15 @@ class IsNamedAfter(Predicate):
         return kind is not None and kind.value is self.annotation_type
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after <annotation type>"*.
         """
         return predicate_clause(
-            cls, Noun(fields["body"]), Noun(fields["annotation_type"])
+            cls, Noun(content=fields["body"]), Noun(content=fields["annotation_type"])
         )
 
 
@@ -293,12 +295,14 @@ class NamesARecognisedKind(Predicate):
         return asserted_kind(_name_words(self.body), NamedKind) is not None
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> names a recognised kind"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 @dataclass(eq=False)
@@ -321,12 +325,14 @@ class IsNamedAfterFurniture(Predicate):
         return kind is not None and kind.is_furniture
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after furniture"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 @dataclass(eq=False)
@@ -351,12 +357,16 @@ class NamedContainerKind(SymbolicFunction):
         return None
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the named container kind of <body>"*.
         """
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 # %% what the rules leave alone
@@ -393,12 +403,14 @@ class IsPartOfARobot(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is part of a robot"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 # %% the geometry a body carries
@@ -422,12 +434,14 @@ class HasCollisionGeometry(Predicate):
         return self.body.has_collision()
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has collision geometry"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 # %% identities the world already holds
@@ -467,18 +481,20 @@ class HasAnotherAnnotation(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has an annotation besides <annotation type>"*, which
             names the annotations it was looked up in no more than the rule does.
         """
         return clause(
-            Noun(fields["body"]),
-            Verb("have"),
-            Noun("annotation"),
+            Noun(content=fields["body"]),
+            Verb(lemma="have"),
+            Noun(content="annotation"),
             Prepositions.BESIDES,
-            Noun(fields["annotation_type"]),
+            Noun(content=fields["annotation_type"]),
         )
 
 
@@ -569,13 +585,19 @@ class HoldsOpenableParts(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> holds openable parts"*, which names the annotations
             it looked them up in no more than the rule does.
         """
-        return clause(Noun(fields["body"]), Verb("hold"), Noun.bare("openable parts"))
+        return clause(
+            Noun(content=fields["body"]),
+            Verb(lemma="hold"),
+            Noun.bare(head="openable parts"),
+        )
 
 
 # %% graspable parts
@@ -599,10 +621,16 @@ def handles(world: World) -> list[Handle]:
         entity(inference(Handle)(root=grip))
         .where(
             joint.child == mount.parent,
-            HasCollisionGeometry(grip),
-            not_(IsPartOfARobot(grip)),
-            not_(IsNamedAfterFurniture(grip)),
-            not_(HasAnotherAnnotation(grip, Handle, world.semantic_annotations)),
+            HasCollisionGeometry(body=grip),
+            not_(IsPartOfARobot(body=grip)),
+            not_(IsNamedAfterFurniture(body=grip)),
+            not_(
+                HasAnotherAnnotation(
+                    body=grip,
+                    annotation_type=Handle,
+                    annotations=world.semantic_annotations,
+                )
+            ),
         )
         .tolist()
     )
@@ -622,8 +650,8 @@ def drawers_with_a_handle(world: World) -> list[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child, handle=handle))
         .where(
-            HasCollisionGeometry(slider.child),
-            not_(IsPartOfARobot(slider.child)),
+            HasCollisionGeometry(body=slider.child),
+            not_(IsPartOfARobot(body=slider.child)),
             mount.parent == slider.child,
             mount.child == handle.root,
         )
@@ -643,8 +671,8 @@ def drawers_without_a_handle(world: World) -> list[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child))
         .where(
-            HasCollisionGeometry(slider.child),
-            not_(IsPartOfARobot(slider.child)),
+            HasCollisionGeometry(body=slider.child),
+            not_(IsPartOfARobot(body=slider.child)),
             not_(
                 exists(
                     mount,
@@ -667,8 +695,8 @@ def doors_with_a_handle(world: World) -> list[Door]:
     return (
         entity(inference(Door)(root=hinge.child, handle=handle))
         .where(
-            HasCollisionGeometry(hinge.child),
-            not_(IsPartOfARobot(hinge.child)),
+            HasCollisionGeometry(body=hinge.child),
+            not_(IsPartOfARobot(body=hinge.child)),
             mount.parent == hinge.child,
             mount.child == handle.root,
         )
@@ -703,8 +731,8 @@ def doors_without_a_handle(
     return (
         entity(inference(Door)(root=hinge.child))
         .where(
-            HasCollisionGeometry(hinge.child),
-            not_(IsPartOfARobot(hinge.child)),
+            HasCollisionGeometry(body=hinge.child),
+            not_(IsPartOfARobot(body=hinge.child)),
             follower.parent == hinge.child,
             follower.multiplier != independent_joint_multiplier,
             mount.parent == follower.child,
@@ -747,10 +775,10 @@ def _containers_of_kind(world: World, kind: ContainerKind | None) -> list[Cabine
             )
         )
         .where(
-            not_(IsPartOfARobot(container)),
-            HoldsOpenableParts(container, annotations),
-            NamedContainerKind(container) == kind,
-            not_(NamesARecognisedKind(container)),
+            not_(IsPartOfARobot(body=container)),
+            HoldsOpenableParts(body=container, annotations=annotations),
+            NamedContainerKind(body=container) == kind,
+            not_(NamesARecognisedKind(body=container)),
         )
         .tolist()
     )
@@ -805,9 +833,9 @@ def _furniture_named_after(
     return (
         entity(inference(annotation_type)(root=body))
         .where(
-            HasCollisionGeometry(body),
-            not_(IsPartOfARobot(body)),
-            IsNamedAfter(body, annotation_type),
+            HasCollisionGeometry(body=body),
+            not_(IsPartOfARobot(body=body)),
+            IsNamedAfter(body=body, annotation_type=annotation_type),
         )
         .tolist()
     )

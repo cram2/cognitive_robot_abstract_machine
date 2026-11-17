@@ -17,9 +17,7 @@ from robokudo.utils.transform import (
     get_quaternion_from_transform_matrix,
     get_translation_from_transform_matrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 import trimesh.creation
 from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 import sys
@@ -33,6 +31,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World, Body
 from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 # Module-level singleton-like variables
 this = sys.modules[__name__]
@@ -263,10 +262,11 @@ def _get_world_body_from_cas(cas: CAS, rk_world: World) -> Body | None:
     """
     Return the world-frame body referenced by the CAS, if available.
     """
-    world_frame = cas.world_frame
-    if world_frame is None:
+    observation = cas.camera_observation
+    if observation is None or observation.world_T_camera is None:
         return None
-    return rk_world.get_body_by_name(PrefixedName(name=world_frame))
+    reference_frame = observation.world_T_camera.reference_frame
+    return rk_world.get_body_by_name(reference_frame.name)
 
 
 def _create_world_origin_and_scale_from_latest_bbox(
@@ -328,10 +328,12 @@ def _update_belief_body_from_latest_bbox(
     origin, scale = origin_and_scale
     object_belief_body = object_belief.body
 
+    kept_shapes = [] if replace_existing_visuals else object_belief_body.visual.shapes
     with rk_world.modify_world():
-        if replace_existing_visuals:
-            object_belief_body.visual.shapes.clear()
-        object_belief_body.visual.append(Box(scale=scale))
+        object_belief_body.update_shapes(
+            visual=ShapeCollection([*kept_shapes, Box(scale=scale)]),
+            collision=object_belief_body.collision,
+        )
         world_T_object_belief.origin = origin
 
 

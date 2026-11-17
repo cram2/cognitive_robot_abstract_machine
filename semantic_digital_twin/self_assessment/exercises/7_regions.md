@@ -33,7 +33,7 @@ from pathlib import Path
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection, Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body, Region
@@ -68,7 +68,7 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-world = URDFParser.from_file(table_urdf).parse()
+world = URDFParser.from_file(table_urdf).create_world()
 # Find the table surface body named "top"
 top = [b for b in world.bodies if b.name.name == "top"][0]
 # Create a thin region at the table surface and attach it to the body "top"

@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1044 352" role="img" aria-label="Left, the live plan when the open's child failed: a parallel holding the two sequences and the running allowance; right, the trial built from it in the world copy: the new open candidate beside the running place and a rebuilt allowance, the succeeded milk pick-up left out and the later cup pick-up cut.">
+<style>
+.background { fill: #ffffff; }
+.box { fill: #ffffff; stroke: #98a5ac; stroke-width: 1.2; }
+.choose { fill: #ffffff; stroke: #17212a; stroke-width: 1.6; }
+.start { fill: #d7eeef; stroke: #0e7882; stroke-width: 1.6; }
+.later { fill: #ffffff; stroke: #0e7882; stroke-width: 1.3; stroke-dasharray: 5 3; }
+.ok { fill: #dcf0e2; stroke: #2c8448; stroke-width: 1.4; }
+.fail { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; }
+.run { fill: #dde8f7; stroke: #2d69b8; stroke-width: 1.4; }
+.wait { fill: #f6ead3; stroke: #a86d12; stroke-width: 1.6; }
+.ghost { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.gap { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; stroke-dasharray: 5 3; }
+.trialbox { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1.4; }
+.zone { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1; stroke-dasharray: 6 4; opacity: 0.9; }
+.template { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 6 4; }
+.rootmark { fill: none; stroke: #0e7882; stroke-width: 1.4; stroke-dasharray: 6 4; }
+.root { fill: #d7eeef; stroke: #0e7882; stroke-width: 2.2; }
+.edge { stroke: #98a5ac; stroke-width: 1.2; fill: none; }
+.flow { stroke: #17212a; stroke-width: 1.4; fill: none; }
+.flow-bad { stroke: #bf3f2b; stroke-width: 1.4; fill: none; }
+.flow-accent { stroke: #0e7882; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+.marker-line { stroke: #5b6971; stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.head { fill: #17212a; }
+.head-bad { fill: #bf3f2b; }
+text { fill: #17212a; }
+.h { font: 600 14px "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif; }
+.t { font: 500 12px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.tn { font: 500 11px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.s { font: 11px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #5b6971; }
+.lab { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #17212a; }
+.lab-bad { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #bf3f2b; }
+.lab-accent { font: 500 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #0e7882; }
+.lab-trial { font: 600 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #6b4fc0; }
+.num { font: 600 13px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.gridcell { fill: #ffffff; stroke: #98a5ac; stroke-width: 1; }
+</style>
+<rect class="background" x="0" y="0" width="1044" height="352"/>
+        <defs>
+          <marker id="f4-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <text class="h" x="8" y="16">Live plan: the open's child just failed</text>
+        <rect class="rootmark" x="4" y="26" width="502" height="318" rx="8"/>
+        <text class="lab-accent" x="14" y="44">remainder root</text>
+        <line class="edge" x1="325" y1="64" x2="440" y2="88"/>
+        <line class="edge" x1="325" y1="64" x2="109" y2="240"/>
+        <line class="edge" x1="325" y1="64" x2="309" y2="240"/>
+        <line class="edge" x1="109" y1="264" x2="58" y2="288"/>
+        <line class="edge" x1="109" y1="264" x2="160" y2="288"/>
+        <line class="edge" x1="309" y1="264" x2="258" y2="288"/>
+        <line class="edge" x1="309" y1="264" x2="360" y2="288"/>
+        <rect class="box" x="270" y="36" width="110" height="28" rx="6"/>
+        <text class="t" x="325" y="54" text-anchor="middle">Parallel</text>
+        <rect class="run" x="385" y="88" width="110" height="42" rx="6"/>
+        <text class="t" x="440" y="105" text-anchor="middle">Allowance</text>
+        <text class="s" x="440" y="121" text-anchor="middle">running</text>
+        <rect class="box" x="67" y="240" width="84" height="24" rx="6"/>
+        <text class="t" x="109" y="256" text-anchor="middle">Sequence</text>
+        <rect class="box" x="267" y="240" width="84" height="24" rx="6"/>
+        <text class="t" x="309" y="256" text-anchor="middle">Sequence</text>
+        <rect class="wait" x="10" y="288" width="96" height="44" rx="6"/>
+        <text class="tn" x="58" y="306" text-anchor="middle">a(OpenAction)</text>
+        <text class="s" x="58" y="322" text-anchor="middle">child failed</text>
+        <rect class="later" x="112" y="288" width="96" height="44" rx="6"/>
+        <text class="tn" x="160" y="306" text-anchor="middle">a(PickUp…)</text>
+        <text class="s" x="160" y="322" text-anchor="middle">cup, not started</text>
+        <rect class="ok" x="210" y="288" width="96" height="44" rx="6"/>
+        <text class="tn" x="258" y="306" text-anchor="middle">a(PickUp…)</text>
+        <text class="s" x="258" y="322" text-anchor="middle">milk, succeeded</text>
+        <rect class="run" x="312" y="288" width="96" height="44" rx="6"/>
+        <text class="tn" x="360" y="306" text-anchor="middle">a(PlaceAction)</text>
+        <text class="s" x="360" y="322" text-anchor="middle">running #12</text>
+
+        <line class="flow" x1="514" y1="200" x2="590" y2="200" marker-end="url(#f4-arrow)"/>
+        <text class="tn" x="552" y="190" text-anchor="middle" style="font-size: 9px">unfinished_nodes</text>
+        <text class="s" x="552" y="218" text-anchor="middle">for trial</text>
+
+        <rect class="zone" x="596" y="26" width="444" height="318" rx="10"/>
+        <text class="lab-trial" x="608" y="46">Trial in the world copy</text>
+        <line class="edge" x1="860" y1="84" x2="860" y2="104"/>
+        <line class="edge" x1="860" y1="130" x2="980" y2="150"/>
+        <line class="edge" x1="860" y1="130" x2="690" y2="240"/>
+        <line class="edge" x1="860" y1="130" x2="872" y2="240"/>
+        <line class="edge" x1="690" y1="264" x2="644" y2="288"/>
+        <line class="edge" x1="690" y1="264" x2="736" y2="288"/>
+        <line class="edge" x1="872" y1="264" x2="826" y2="288"/>
+        <line class="edge" x1="872" y1="264" x2="918" y2="288"/>
+        <rect class="box" x="805" y="58" width="110" height="26" rx="6"/>
+        <text class="t" x="860" y="75" text-anchor="middle">Sequence</text>
+        <text class="s" x="922" y="75">ends the parallel</text>
+        <rect class="box" x="805" y="104" width="110" height="26" rx="6"/>
+        <text class="t" x="860" y="121" text-anchor="middle">Parallel</text>
+        <rect class="run" x="930" y="150" width="100" height="42" rx="6"/>
+        <text class="t" x="980" y="167" text-anchor="middle">Allowance</text>
+        <text class="s" x="980" y="183" text-anchor="middle">rebuilt, runs</text>
+        <rect class="box" x="648" y="240" width="84" height="24" rx="6"/>
+        <text class="t" x="690" y="256" text-anchor="middle">Sequence</text>
+        <rect class="box" x="830" y="240" width="84" height="24" rx="6"/>
+        <text class="t" x="872" y="256" text-anchor="middle">Sequence</text>
+        <rect class="start" x="600" y="288" width="88" height="44" rx="6"/>
+        <text class="tn" x="644" y="306" text-anchor="middle">OpenAction</text>
+        <text class="s" x="644" y="322" text-anchor="middle">the proposal</text>
+        <rect class="ghost" x="692" y="288" width="88" height="44" rx="6"/>
+        <text class="tn" x="736" y="306" text-anchor="middle" opacity="0.6">PickUp, cup</text>
+        <text class="s" x="736" y="322" text-anchor="middle">✂ cut</text>
+        <rect class="ghost" x="782" y="288" width="88" height="44" rx="6"/>
+        <text class="tn" x="826" y="306" text-anchor="middle" opacity="0.6">PickUp, milk</text>
+        <text class="s" x="826" y="322" text-anchor="middle">left out: ended</text>
+        <rect class="run" x="874" y="288" width="88" height="44" rx="6"/>
+        <text class="tn" x="918" y="306" text-anchor="middle">PlaceAction</text>
+        <text class="s" x="918" y="322" text-anchor="middle">#12 kept</text>
+      </svg>

@@ -40,9 +40,11 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 @pytest.fixture
 def two_clusters() -> pd.DataFrame:
     """
-    Three hundred rows in two correlated clusters. The columns are named so that the
-    circuit, which sorts its variables by name, lays them out in the reverse order of
-    the dataframe; a conversion that confused the two orders would swap the columns.
+    Three hundred rows in two correlated clusters.
+
+    The columns are named so that the circuit, which sorts its variables by name, lays
+    them out in the reverse order of the dataframe; a conversion that confused the two
+    orders would swap the columns.
     """
     generator = np.random.default_rng(0)
     first = generator.multivariate_normal(

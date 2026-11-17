@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RelationStep:
     """The data a *relational* hop renders from — the related type (the relative clause's head
     noun), the verb split into participle + preposition (so the preposition pied-pipes before
@@ -56,7 +56,7 @@ class RelationStep:
     unused for a non-agentive relation."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PathStep:
     """
     One hop of a navigation chain — a display name and the source reference it links to.
@@ -147,11 +147,11 @@ def build_path_parts(
             verb = relation_verb(name) if relation_verb is not None else None
             relation = (
                 RelationStep(
-                    node._type_,
-                    owner,
-                    verb.participle,
-                    verb.preposition,
-                    node._id_,
+                    value_type=node._type_,
+                    owner_class=owner,
+                    participle=verb.participle,
+                    preposition=verb.preposition,
+                    referent_id=node._id_,
                     is_agentive=verb.is_agentive,
                     active_verb=verb.active_verb,
                 )
@@ -160,8 +160,10 @@ def build_path_parts(
             )
             parts.append(
                 PathStep(
-                    name,
-                    SourceReference.for_attribute(owner, name),
+                    name=name,
+                    source_reference=SourceReference.for_attribute(
+                        owner=owner, attribute_name=name
+                    ),
                     relation=relation,
                     is_scalar_value=_is_scalar_value(node._type_),
                 )
@@ -198,7 +200,7 @@ def _append_index(parts: list[PathStep], node: Index) -> None:
     """
     key = node._key_
     if not isinstance(key, int) or isinstance(key, bool):
-        parts.append(PathStep(f"[{repr(key)}]", None))
+        parts.append(PathStep(name=f"[{repr(key)}]", source_reference=None))
         return
     ordinal_phrase = morphology.index_ordinal(key)
     if parts and parts[-1].is_plain_attribute and parts[-1].ordinal is None:
@@ -208,4 +210,4 @@ def _append_index(parts: list[PathStep], node: Index) -> None:
             is_scalar_value=_is_scalar_value(node._type_),
         )
         return
-    parts.append(PathStep(ordinal_phrase, None))
+    parts.append(PathStep(name=ordinal_phrase, source_reference=None))

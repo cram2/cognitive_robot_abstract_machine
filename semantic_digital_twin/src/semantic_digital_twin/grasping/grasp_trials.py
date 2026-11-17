@@ -1,10 +1,5 @@
 """
 Trying grasps on an object to collect the data a model of grasps is learned from.
-
-The grasps are drawn from the statement of where the object's annotation may be grasped,
-through a model registry: uniformly from what it allows at first, from a learned model
-later. Each tried grasp is recorded together with what happened, so the records hold the
-grasp's parameters and its result as plain numbers and truth values.
 """
 
 from __future__ import annotations
@@ -12,17 +7,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Iterator
+from typing_extensions import Callable, Iterator
 
+from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.grasping.surface_grasp import (
+from semantic_digital_twin.grasping.grasp_strategies import GraspStrategy
+from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
-    SurfaceGrasp,
-    draw_surface_grasps,
+    ObjectRelativeGrasp,
+    draw_grasps,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
@@ -57,7 +54,7 @@ class GraspTrialRecord:
     The part the grasp was placed on.
     """
 
-    grasp: SurfaceGrasp
+    grasp: ObjectRelativeGrasp
     """
     The grasp, with its result.
     """
@@ -66,10 +63,8 @@ class GraspTrialRecord:
 @dataclass
 class GraspTrials:
     """
-    Grasps drawn from the statement of where an object may be grasped, each tried and
-    given its result.
-
-    The grasps are placed on the object's grasped part: its handle when it has one.
+    Grasps drawn from the statement of where an object's grasped part may be grasped,
+    each tried and given its result.
     """
 
     graspable: HasGraspCandidates
@@ -92,10 +87,16 @@ class GraspTrials:
     Answers the statement.
     """
 
-    require_lifting: bool = False
+    result_pattern: Callable[[], Match[GraspResult]] | None = None
     """
-    Whether to ask the model only for grasps it expects to lift the object, which needs
-    a model learned over tried grasps and their results.
+    Builds the pattern of the result the grasps asked for are to have had, such as
+    :meth:`GraspResult.lifting_pattern`; any result when ``None``.
+    """
+
+    grasp_strategy: GraspStrategy | None = None
+    """
+    Where the grasps are drawn from; the :attr:`grasped_part`'s own strategy when
+    ``None``.
     """
 
     @property
@@ -105,13 +106,15 @@ class GraspTrials:
         """
         return self.graspable.grasped_part()
 
-    def drawn_grasps(self) -> list[SurfaceGrasp]:
+    def drawn_grasps(self) -> list[ObjectRelativeGrasp]:
         """
         :return: :attr:`number_of_trials` grasps answering the statement of where
-            :attr:`grasped_part` may be grasped.
+            :attr:`grasp_strategy` allows :attr:`grasped_part` to be grasped.
         """
-        return draw_surface_grasps(
-            self.grasped_part.surface_grasp_statement(self.require_lifting),
+        part = self.grasped_part
+        strategy = self.grasp_strategy or part.grasp_strategy
+        return draw_grasps(
+            strategy.statement(part, self.result_pattern),
             self.number_of_trials,
             self.model_registry,
         )
@@ -121,13 +124,11 @@ class GraspTrials:
         Try every drawn grasp.
 
         :return: A record of each grasp tried, with its result, as they are tried. A
-            grasp naming a point the grasped part's surface does not reach is skipped.
+            grasp that does not reach the surface of the grasped part is skipped.
         """
         part = self.grasped_part
-        for surface_grasp in self.drawn_grasps():
-            if not surface_grasp.reaches_surface_of(part):
+        for grasp in self.drawn_grasps():
+            if not grasp.reaches_surface_of(part):
                 continue
-            surface_grasp.result = self.performer.perform(
-                surface_grasp.grasp_candidate(part)
-            )
-            yield GraspTrialRecord(grasped_part=part, grasp=surface_grasp)
+            grasp.result = self.performer.perform(grasp.grasp_candidate(part))
+            yield GraspTrialRecord(grasped_part=part, grasp=grasp)

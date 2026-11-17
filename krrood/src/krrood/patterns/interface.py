@@ -21,12 +21,12 @@ class Interface(ABC):
     """
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
-        if Interface.is_interface(cls):
-            raise InterfaceInstantiationError(cls)
+        if Interface.is_interface(class_=cls):
+            raise InterfaceInstantiationError(interface=cls)
         return super().__new__(cls)
 
     @staticmethod
-    def is_interface(class_: type) -> bool:
+    def is_interface(*, class_: type) -> bool:
         """
         :param class_: The class to check.
         :return: Whether the class names :class:`Interface` among its own bases.

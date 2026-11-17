@@ -61,7 +61,7 @@ COINDEXED_OPERATORS: tuple[Callable, ...] = (
 # %% fold artifacts (the vocabulary the pass produces)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RangeFold:
     """
     A folded lower/upper bound pair on one attribute chain.
@@ -83,7 +83,7 @@ class RangeFold:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CoindexedFold:
     """
     A group of comparators that compare the *same* leaf attributes across two shared
@@ -120,7 +120,7 @@ class CoindexedFold:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SharedSubjectComparisons:
     """
     Two or more value comparators on the *same* subject chain, factored so the subject
@@ -146,7 +146,7 @@ class SharedSubjectComparisons:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SharedSubjectConjunction:
     """
     The conjunctive analogue of :class:`SharedSubjectComparisons`: two or more value
@@ -172,7 +172,7 @@ class SharedSubjectConjunction:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CoindexedNaturalParts:
     """
     The pieces of the natural *"the <a> and <b> of <shared> have the same …"* rendering.
@@ -218,7 +218,7 @@ class ConjunctFold(ABC):
     """
 
     @abstractmethod
-    def apply(self, conjuncts: ConjunctList) -> ConjunctList:
+    def apply(self, *, conjuncts: ConjunctList) -> ConjunctList:
         """:param conjuncts: The (possibly already partly-folded) conjunct list.
         :return: The list with every group this fold recognises collapsed to its artifact.
         """
@@ -230,11 +230,11 @@ class RangeBoundFold(ConjunctFold):
     (*"x is between low and high"*).
     """
 
-    def apply(self, conjuncts: ConjunctList) -> ConjunctList:
+    def apply(self, *, conjuncts: ConjunctList) -> ConjunctList:
         """:return: *conjuncts* with each complementary bound pair folded to a :class:`RangeFold`.
 
         >>> robot = variable(Robot, [])
-        >>> isinstance(RangeBoundFold().apply([robot.battery >= 20, robot.battery <= 80])[0], RangeFold)
+        >>> isinstance(RangeBoundFold().apply(conjuncts=[robot.battery >= 20, robot.battery <= 80])[0], RangeFold)
         True
         """
         return fold_range_pairs(conjuncts)
@@ -246,7 +246,7 @@ class CoindexedComparisonFold(ConjunctFold):
     :class:`CoindexedFold` (*"the begin and end … have the same month and year"*).
     """
 
-    def apply(self, conjuncts: ConjunctList) -> ConjunctList:
+    def apply(self, *, conjuncts: ConjunctList) -> ConjunctList:
         """:return: *conjuncts* with each co-indexed comparison group folded to a
         :class:`CoindexedFold`.
 
@@ -254,14 +254,14 @@ class CoindexedComparisonFold(ConjunctFold):
         >>> Span = dataclasses.make_dataclass("Span", [("low", int), ("high", int)])
         >>> Pair = dataclasses.make_dataclass("Pair", [("left", Span), ("right", Span)])
         >>> pair = variable(Pair, [])
-        >>> folded = CoindexedComparisonFold().apply([pair.left.low == pair.right.low, pair.left.high == pair.right.high])
+        >>> folded = CoindexedComparisonFold().apply(conjuncts=[pair.left.low == pair.right.low, pair.left.high == pair.right.high])
         >>> isinstance(folded[0], CoindexedFold)
         True
         """
         return fold_coindexed_groups(conjuncts)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConjunctReducer:
     """
     The single home of WHERE-conjunct simplification: applies its ordered
@@ -279,17 +279,17 @@ class ConjunctReducer:
     extend).
     """
 
-    def reduce(self, conjuncts: list[SymbolicExpression]) -> ConjunctList:
+    def reduce(self, *, conjuncts: list[SymbolicExpression]) -> ConjunctList:
         """:param conjuncts: A flat conjunct list (e.g. an ``AND``'s operands).
         :return: The list with each fold's recognised groups reduced to artifacts.
 
         >>> robot = variable(Robot, [])
-        >>> len(ConjunctReducer().reduce([robot.battery >= 20, robot.battery <= 80]))
+        >>> len(ConjunctReducer().reduce(conjuncts=[robot.battery >= 20, robot.battery <= 80]))
         1
         """
         items: ConjunctList = list(conjuncts)
         for fold in self.folds:
-            items = fold.apply(items)
+            items = fold.apply(conjuncts=items)
         return items
 
 
@@ -305,7 +305,7 @@ def reduce_conjuncts(conjuncts: list[SymbolicExpression]) -> ConjunctList:
     >>> [type(item).__name__ for item in reduce_conjuncts([robot.battery >= 20, robot.battery <= 80])]
     ['RangeFold']
     """
-    return ConjunctReducer().reduce(conjuncts)
+    return ConjunctReducer().reduce(conjuncts=conjuncts)
 
 
 # %% range-bound fold
@@ -589,7 +589,7 @@ OwnerClassifier: TypeAlias = Callable[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class OwnerGroup:
     """
     A group of sibling items that share one owner — the unit of owner-based aggregation,
@@ -767,7 +767,7 @@ def build_between(
     :return: The range phrase fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(build_between(WordFragment("x"), WordFragment("1"), WordFragment("10"), compact=False))
+    >>> flatten_fragment_to_plain_text(build_between(WordFragment(text="x"), WordFragment(text="1"), WordFragment(text="10"), compact=False))
     'x is between 1 and 10'
     """
     # Spread the range phrase's parts so the clause stays flat ([left, operator, bounds]); the
@@ -803,7 +803,7 @@ def between_phrase(
     :return: The range-predicate fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment("1"), WordFragment("10"), compact=False))
+    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment(text="1"), WordFragment(text="10"), compact=False))
     'is between 1 and 10'
     """
     return PhraseFragment(
@@ -856,7 +856,7 @@ def disjunctive_phrase(
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, RoleFragment,
     ... )
-    >>> members = [RoleFragment.for_literal(value) for value in ("a", "b", "c")]
+    >>> members = [RoleFragment.for_literal(value=value) for value in ("a", "b", "c")]
     >>> flatten_fragment_to_plain_text(disjunctive_phrase(members))
     "'a', 'b', or 'c'"
     """
@@ -883,7 +883,7 @@ def one_of(candidates: list[VerbalizationFragment]) -> VerbalizationFragment | N
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, RoleFragment,
     ... )
-    >>> options = [RoleFragment.for_literal(value) for value in ("a", "b", "c")]
+    >>> options = [RoleFragment.for_literal(value=value) for value in ("a", "b", "c")]
     >>> flatten_fragment_to_plain_text(one_of(options))
     "one of 'a', 'b', or 'c'"
     >>> one_of([]) is None

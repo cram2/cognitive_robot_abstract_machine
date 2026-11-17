@@ -11,8 +11,9 @@ stop being feasible.
 """
 
 import numpy as np
+import pytest
 
-from coraplex.datastructures.enums import ExecutionType
+from coraplex.plans.executors import RealRobotPlanExecutor
 from experiments.real_stretch_apartment_demo.demo import (
     CEREAL_NAME,
     CEREAL_SHELF_LAYER_NAME,
@@ -20,7 +21,6 @@ from experiments.real_stretch_apartment_demo.demo import (
     StretchApartmentDemonstration,
 )
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.world import World
 
 RESULT_FETCH_TIMEOUT_SECONDS = 60
 """
@@ -53,7 +53,7 @@ def test_demonstration_runs_against_a_controller_in_another_process(
     gripper.
     """
     StretchApartmentDemonstration(
-        execution_type=ExecutionType.REAL, used_robot=Stretch
+        executor_type=RealRobotPlanExecutor, used_robot=Stretch
     ).run()
 
     controller_world = stretch_controller_process.session.fetch_world(
@@ -82,7 +82,7 @@ def test_the_scene_counts_as_populated_once_the_cereal_is_spawned(apartment_mesh
     The demonstration decides whether to spawn its scene by the presence of the cereal.
     """
     demonstration = StretchApartmentDemonstration(used_robot=Stretch)
-    world = World.create_with_root_body()
+    world = demonstration.scene_specification().create_world()
     assert not demonstration.is_scene_populated(world)
 
     demonstration.populate_scene(world)

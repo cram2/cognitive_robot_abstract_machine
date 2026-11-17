@@ -17,6 +17,7 @@ from segmind.detectors import (  # noqa: F401
     agent_event_detector_nodes,
     atomic_event_detectors_nodes,
     coarse_event_detector_nodes,
+    mechanism_detector_nodes,
     spatial_relation_detector_nodes,
 )
 from segmind.detectors.base import AbstractDetector
@@ -47,6 +48,7 @@ class DetectorSelection:
             agent_event_detector_nodes.__name__,
             atomic_event_detectors_nodes.__name__,
             coarse_event_detector_nodes.__name__,
+            mechanism_detector_nodes.__name__,
             spatial_relation_detector_nodes.__name__,
         }
         return cls.of(

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 from .example_classes import Position
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MixinWithForwardRef(ABC):
     """
     A mixin class that has a field with a forward reference type.
@@ -46,7 +46,7 @@ class MixinWithForwardRef(ABC):
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnotherMixinWithForwardRef(ABC):
     """
     Another mixin with a different forward reference.
@@ -55,7 +55,7 @@ class AnotherMixinWithForwardRef(ABC):
     type_b_ref: Optional[ForwardRefTypeB] = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassWithMultipleForwardRefMixins(
     MixinWithForwardRef, AnotherMixinWithForwardRef, Symbol
 ):

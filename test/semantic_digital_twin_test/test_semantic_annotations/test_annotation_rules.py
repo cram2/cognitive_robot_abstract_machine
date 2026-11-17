@@ -26,10 +26,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SideTable,
     Spoon,
 )
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -437,7 +435,9 @@ def test_a_container_takes_its_kind_from_the_part_that_names_it():
         .apply(handles, drawers_without_a_handle)
     )
 
-    assert NamedContainerKind(furniture.bodies["unit"])() is ContainerKind.DISHWASHER
+    assert (
+        NamedContainerKind(body=furniture.bodies["unit"])() is ContainerKind.DISHWASHER
+    )
     assert furniture.root_names(dishwashers) == {furniture.name_of("unit")}
     assert furniture.root_names(cabinets) == set()
 
@@ -453,5 +453,5 @@ def test_a_container_naming_no_kind_is_a_plain_cabinet():
         .apply(handles, drawers_without_a_handle)
     )
 
-    assert NamedContainerKind(furniture.bodies["unit"])() is None
+    assert NamedContainerKind(body=furniture.bodies["unit"])() is None
     assert furniture.root_names(cabinets) == {furniture.name_of("unit")}

@@ -1,3 +1,7 @@
+"""
+The parts a robot is made of: kinematic chains, sensors, cameras, fingers and the like.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -13,24 +17,29 @@ from typing_extensions import (
     Any,
     Generic,
     Self,
+    TypeVar,
     Union,
     Unpack,
-    cast,
     get_args,
     get_origin,
 )
 from uuid import UUID
 
 import numpy as np
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.entity_query_language.factories import a, contains, entity, variable
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
-from typing_extensions import TypeVar
-
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModel,
+    CameraModality,
+    CameraRange,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.definitions import (
@@ -57,7 +66,10 @@ from semantic_digital_twin.exceptions import (
     UselessConceptError,
 )
 from semantic_digital_twin.input_synchronization import InputSynchronizer
-from semantic_digital_twin.robots.exceptions import MissingDriveConnectionError
+from semantic_digital_twin.robots.exceptions import (
+    MissingDriveConnectionError,
+    RobotDescriptionMissingError,
+)
 from semantic_digital_twin.robots.input_source import (
     BasePoseSource,
     JointPositionSource,
@@ -69,7 +81,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
     HasInputSource,
     HasLeftRightArm,
-    HasMobileBase,
     HasSensors,
     RobotPartMixin,
     TGenericEndEffector,
@@ -83,13 +94,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Agent,
     Table,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -107,6 +118,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
+    DriveVelocityLimits,
     JointDrive,
     JointServo,
 )
@@ -173,10 +185,10 @@ class HasRobotParts(ABC):
             seen.add(self.id)
             robot_parts.append(self)
 
-        for field_ in introspector.discover(self.__class__):
+        for field_ in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for robot_part in value:
                     if not isinstance(robot_part, HasRobotParts):
                         continue
@@ -193,14 +205,14 @@ class HasRobotParts(ABC):
         """
         introspector = DataclassOnlyIntrospector()
 
-        for attr in introspector.discover(self.__class__):
+        for attr in introspector.discover(owner_cls=self.__class__):
             field_name = attr.public_name
             field_type = attr.field.type
 
             origin = get_origin(field_type)
             args = get_args(field_type)
 
-            if origin in list_like_classes and args:
+            if origin in CollectionKind.ELEMENT_SEQUENCE.value and args:
                 self._initialize_list_field(field_name, args)
 
             elif (
@@ -403,7 +415,9 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
         for robot_part in self._robot_parts:
             for connection in robot_part.active_connections:
-                connection.has_hardware_interface = True
+                self._world.set_dofs_has_hardware_interface(
+                    connection.active_dofs, True
+                )
 
     @property
     def active_connections(self) -> list[ActiveConnection]:
@@ -509,6 +523,22 @@ class ServoedRobotPart(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
+class HasGripperActionServers(AbstractRobotPart, ABC):
+    """
+    A gripper whose real hardware moves through ROS actions its driver serves, rather
+    than through commands for its joints.
+    """
+
+    @abstractmethod
+    def action_topic_serving(self, state_type: JointStateType | None) -> str | None:
+        """
+        :param state_type: The state to bring the gripper into.
+        :return: The name the driver serves the action bringing the gripper into
+            `state_type` under, None if it serves none for that state.
+        """
+
+
+@dataclass(eq=False)
 class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC):
     """
     A kinematic chain is a robot part that consists of a chain of bodies and connections
@@ -611,71 +641,145 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
 
 
 @dataclass(eq=False)
-class Sensor(AbstractRobotPart, ABC):
+class Sensor(HasRootBody, ABC):
     """
-    Abstract base class for all sensors.
+    A sensor rooted at the body from which it perceives the environment.
+    """
 
-    A sensor is a robot part that can perceive the environment.
-    """
+
+# %% Camera projection types
+TCameraModel = TypeVar("TCameraModel", bound=CameraModel)
+"""
+Projection model accepted by a camera.
+"""
 
 
 @dataclass(eq=False)
-class Camera(Sensor, ABC):
+class Camera(Sensor, Generic[TCameraModel], SubClassSafeGeneric):
     """
-    A camera is a sensor that captures images of the environment.
+    An image sensor rooted at its optical frame.
+
+    The root axes are positive x right, positive y down, and positive z into the scene.
+    Its mounting pose belongs to the world connection of the root body.
     """
 
-    field_of_view: FieldOfView = field(kw_only=True)
+    camera_model: TCameraModel = field(kw_only=True)
     """
-    The field of view of the camera, defined by the vertical and horizontal angles of
-    the camera's view.
-    """
-
-    default_camera: bool = False
-    """
-    Whether this camera is the default camera of the robot.
-
-    Used for quick access.
+    Native projection model of the camera.
     """
 
-    minimal_height: float = 0.0
+    camera_range: CameraRange = field(default_factory=CameraRange, kw_only=True)
     """
-    The minimal height of the camera above the ground, in meters.
+    Usable distance interval of the camera.
     """
 
-    maximal_height: float = 1.0
+    modalities: tuple[CameraModality, ...] = field(default_factory=tuple, kw_only=True)
     """
-    The maximal height of the camera above the ground, in meters.
+    Kinds of image data the camera can produce.
     """
 
     @property
-    @abstractmethod
-    def forward_facing_axis(self) -> Vector3:
+    def field_of_view(self) -> FieldOfView:
         """
-        The direction the camera looks, expressed in :attr:`root`'s frame.
+        Return the angular extent of the native camera model.
         """
+        return self.camera_model.field_of_view
 
     @property
-    def root_T_forward_view(self) -> HomogeneousTransformationMatrix:
+    def resolution(self) -> CameraResolution:
         """
-        The camera's pose in the world root frame, with its x axis along the direction
-        the camera looks.
+        Return the native image resolution.
+        """
+        return self.camera_model.resolution
 
-        The y and z axes only complete the frame and carry no meaning.
+    @property
+    def viewing_direction(self) -> Vector3:
         """
-        root_T_camera = self.root.global_transform
-        root_V_forward = root_T_camera.rotation_matrix @ self.forward_facing_axis
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=root_T_camera.position,
-            rotation_matrix=RotationMatrix.from_x_axis(root_V_forward),
-            reference_frame=root_T_camera.reference_frame,
-        )
+        Return optical positive z expressed in the camera root.
+
+        :return: Forward direction with the optical root as its reference frame.
+        """
+        return Vector3.Z(reference_frame=self.root)
+
+    @classproperty
+    def optical_R_forward_view(cls: type[Camera]) -> HomogeneousTransformationMatrix:
+        """
+        Express the x-forward viewing frame in right-down-forward optical axes.
+
+        :return: Rotation from the forward-view frame into optical axes.
+        """
+        return HomogeneousTransformationMatrix.from_xyz_rpy(pitch=-np.pi / 2)
+
+    @property
+    def world_T_forward_view(self) -> HomogeneousTransformationMatrix:
+        """
+        Return the world-space x-forward pose with the optical image orientation.
+
+        :return: Forward-view pose preserving the optical root orientation.
+        """
+        return self.root.global_transform @ self.optical_R_forward_view
 
 
 TCamera = TypeVar("TCamera", bound=Camera)
 """
 A kind of camera.
 """
+
+
+@dataclass(eq=False)
+class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel], ABC):
+    """
+    An optical-frame-rooted camera that participates in robot-part lifecycle handling.
+    """
+
+    default_camera: bool = False
+    """
+    Whether this camera is the robot's default camera.
+    """
+
+    minimal_height: float = 0.0
+    """
+    Minimal camera height above the ground in meters.
+    """
+
+    maximal_height: float = 1.0
+    """
+    Maximal camera height above the ground in meters.
+    """
+
+    @staticmethod
+    def create_optical_body(
+        mounting_body: Body, parent_T_optical: HomogeneousTransformationMatrix
+    ) -> Body:
+        """
+        Add a geometry-free optical body when the robot description lacks an optical frame.
+
+        Use the returned body as the camera root. If the description already provides
+        an optical frame, use that body directly as the camera root instead.
+
+        :param mounting_body: Mounting body in the robot world.
+        :param parent_T_optical: Optical pose relative to the mounting body.
+        :return: Optical body attached by a fixed connection.
+        """
+        optical_root = Body(
+            name=PrefixedName(
+                name=f"{mounting_body.name.name}_camera_optical_frame",
+                prefix=mounting_body.name.prefix,
+            )
+        )
+        with mounting_body._world.modify_world():
+            mounting_body._world.add_connection(
+                FixedConnection(
+                    parent=mounting_body,
+                    child=optical_root,
+                    parent_T_connection_expression=HomogeneousTransformationMatrix(
+                        data=parent_T_optical,
+                        reference_frame=mounting_body,
+                        child_frame=optical_root,
+                    ),
+                )
+            )
+        return optical_root
 
 
 @dataclass(eq=False)
@@ -942,13 +1046,25 @@ class MobileBase(
             SubscribedBasePoseSource,
         )
 
-        robot = self._robot
-        drive = robot.drive if robot is not None else None
-        if drive is None:
-            raise MissingDriveConnectionError(robot_part=self)
         return SubscribedBasePoseSource(
-            world=self._world, node=node, topic_name=self.topic_name, connection=drive
+            world=self._world,
+            node=node,
+            topic_name=self.topic_name,
+            connection=self.drive,
         )
+
+    @property
+    def drive(self) -> WheeledDrive:
+        """
+        The drive attaching the root of this base's robot to its parent.
+
+        :raises MissingDriveConnectionError: If this base belongs to no robot, or its
+            robot is not attached by a drive.
+        """
+        robot = self._robot
+        if robot is None or robot.drive is None:
+            raise MissingDriveConnectionError(robot_part=self)
+        return robot.drive
 
     @classproperty
     @abstractmethod
@@ -964,6 +1080,45 @@ class MobileBase(
         ``None`` if the base is moved kinematically there.
         """
         return None
+
+    @classproperty
+    def odometry_body_name(cls) -> str:
+        """
+        The name of the frame the real robot reports the odometry of this base relative
+        to.
+        """
+        return "odom"
+
+    @classproperty
+    def drive_velocity_limits(cls) -> DriveVelocityLimits:
+        """
+        How fast the drive of the real robot may move this base.
+        """
+        return DriveVelocityLimits(translation=0.2, rotation=0.2)
+
+    @classmethod
+    def create_drive(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+    ) -> TGenericDrive:
+        """
+        Create the drive this base declares, limited to :attr:`drive_velocity_limits`.
+
+        :param world: The world the drive's degrees of freedom are added to.
+        :param parent: The body the base drives relative to.
+        :param child: The root of the base's robot.
+        :return: The created drive.
+        """
+        limits = cls.drive_velocity_limits
+        return cls.get_drive_connection_type().create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            translation_velocity_limits=limits.translation,
+            rotation_velocity_limits=limits.rotation,
+        )
 
     def _setup_servos(self) -> None:
         drive = self._robot.drive
@@ -1168,12 +1323,17 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         :return: This robot, in a world holding nothing but it, read from its own
             description: the URDF :meth:`get_ros_file_path` points to, unless the robot
             is described in another format.
+        :raises RobotDescriptionMissingError: If this robot declares no description
+            file.
         """
+        description_file_path = cls.get_ros_file_path()
+        if not description_file_path:
+            raise RobotDescriptionMissingError(robot_class=cls)
         return cls.from_world(
             URDFParser.from_file(
-                cls.get_ros_file_path(),
+                description_file_path,
                 use_visual_as_collision_backup=cls.uses_visual_as_collision_backup,
-            ).parse()
+            ).create_world()
         )
 
     @classmethod
@@ -1183,21 +1343,6 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         Returns the name of the root body of the robot in the world, which serves as the
         entry point for traversing the robot's kinematic structure.
         """
-
-    @classmethod
-    def get_drive_connection_type(cls) -> type[Connection]:
-        """
-        The connection type attaching this robot to its ``odom`` frame.
-
-        :return: The mobile base's drive connection type, or :class:`FixedConnection`
-            when the robot has no mobile base and is therefore rigidly attached.
-        """
-        if not issubclass(cls, HasMobileBase):
-            return FixedConnection
-        mobile_base_type = cast(
-            MobileBase, get_generic_type_parameters(cls, HasMobileBase)[0]
-        )
-        return mobile_base_type.get_drive_connection_type()
 
     def setup_robot_part_semantic_annotations(self) -> None:
         """
@@ -1266,14 +1411,11 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
     def validate(self) -> bool:
         """
-        Validates the robot semantic annotation.
-            The validation process includes:
-            1. Deepcopy the resulting world to ensure that all parts of the robot are initialized in the correct order
-            2. Check that the copied world is the same as the original world
-            3. Check that a robot that declares cameras marks one as its default camera.
-            4. Check the assumptions of every mixin each robot part combines
+        Validate world identity, camera defaults, part ownership, and mixin constraints.
 
-        :return: True if the robot semantic annotation is valid, False otherwise.
+        Robots without declared cameras need no default camera.
+
+        :return: Whether every robot annotation constraint holds.
         :raises CopiedWorldDiffersFromOriginalError: If deepcopying the world does not
             reproduce the original world's entities.
         :raises MissingDefaultCameraError: If the robot declares cameras but marks none
@@ -1321,12 +1463,10 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         """
         The connection which the robot uses for driving.
         """
-        try:
-            parent_connection = self.root.parent_connection
-            if isinstance(parent_connection, WheeledDrive):
-                return parent_connection
-        except AttributeError:
-            pass
+        parent_connection = self.root.parent_connection
+        if isinstance(parent_connection, WheeledDrive):
+            return parent_connection
+        return None
 
     def set_root_pose(self, pose: Pose) -> None:
         """
@@ -1525,12 +1665,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 return part.right_arm
         return None
 
-    def get_default_camera(self) -> Camera:
+    def get_default_camera(self) -> RobotCamera:
         """
         Returns the default camera of the robot.
         """
         for robot_part in self._robot_parts:
-            if isinstance(robot_part, Camera) and robot_part.default_camera:
+            if isinstance(robot_part, RobotCamera) and robot_part.default_camera:
                 return robot_part
         raise MissingDefaultCameraError(type(self))
 

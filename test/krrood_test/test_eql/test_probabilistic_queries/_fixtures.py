@@ -10,14 +10,14 @@ from random_events.interval import closed
 from random_events.variable import Continuous
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Coin:
     a: float
     b: float
     c: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OtherClass:
     d: float
 
@@ -40,7 +40,22 @@ def build_three_independent_variables_circuit() -> tuple:
 
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
-    root.add_subcircuit(leaf(UniformDistribution(variable=var_a, interval=closed(0, 1).simple_sets[0]), circuit))
-    root.add_subcircuit(leaf(UniformDistribution(variable=var_b, interval=closed(0, 2).simple_sets[0]), circuit))
-    root.add_subcircuit(leaf(UniformDistribution(variable=var_c, interval=closed(0, 3).simple_sets[0]), circuit))
+    root.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=var_a, interval=closed(0, 1).simple_sets[0]),
+            circuit,
+        )
+    )
+    root.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=var_b, interval=closed(0, 2).simple_sets[0]),
+            circuit,
+        )
+    )
+    root.add_subcircuit(
+        leaf(
+            UniformDistribution(variable=var_c, interval=closed(0, 3).simple_sets[0]),
+            circuit,
+        )
+    )
     return circuit, var_a, var_b, var_c

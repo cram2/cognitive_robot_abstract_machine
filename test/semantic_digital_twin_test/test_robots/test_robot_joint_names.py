@@ -7,7 +7,7 @@ from semantic_digital_twin.datastructures.definitions import JointName
 from semantic_digital_twin.robots.armar7 import Armar7, Armar7Joint
 from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
 from semantic_digital_twin.robots.garmi import GarmiJoint
-from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint, HSRBSpringJoint
+from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.robots.icub3 import ICub3, ICub3Joint
 from semantic_digital_twin.robots.justin import Justin, JustinJoint
 from semantic_digital_twin.robots.mmp_dresden import MMPDresden, MMPDresdenJoint
@@ -55,7 +55,7 @@ def robot_world(request: pytest.FixtureRequest) -> World:
     module's tests of that robot and released once they have run.
     """
     robot_type: type[AbstractRobot] = request.param
-    return URDFParser.from_file(robot_type.get_ros_file_path()).parse()
+    return URDFParser.from_file(robot_type.get_ros_file_path()).create_world()
 
 
 # %% joint-name enums against the parsed description
@@ -66,6 +66,7 @@ def robot_world(request: pytest.FixtureRequest) -> World:
     ROBOTS_WITH_JOINT_ENUM,
     ids=ROBOT_IDENTIFIERS,
     indirect=["robot_world"],
+    scope="module",
 )
 def test_joint_enum_members_name_connections_of_the_robot(
     robot_world: World, joint_enum: type[JointName]
@@ -83,6 +84,7 @@ def test_joint_enum_members_name_connections_of_the_robot(
     ROBOTS_WITH_JOINT_ENUM,
     ids=ROBOT_IDENTIFIERS,
     indirect=["robot_world"],
+    scope="module",
 )
 def test_joint_enum_members_name_actuated_connections(
     robot_world: World, joint_enum: type[JointName]
@@ -107,7 +109,6 @@ def test_joint_enum_members_name_actuated_connections(
     [
         *(joint_enum for _, joint_enum in ROBOTS_WITH_JOINT_ENUM),
         GarmiJoint,
-        HSRBSpringJoint,
         TiagoMujocoFingerJoint,
     ],
     ids=lambda joint_enum: joint_enum.__name__,

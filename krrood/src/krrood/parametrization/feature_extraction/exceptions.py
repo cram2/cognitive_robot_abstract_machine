@@ -8,7 +8,7 @@ from krrood.exceptions import InputError
 from probabilistic_model.exceptions import ProbabilisticModelException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoInstancesProvidedError(InputError):
     """
     Raised when a :class:`~krrood.parametrization.feature_extraction.feature_extractor.F
@@ -22,7 +22,7 @@ class NoInstancesProvidedError(InputError):
         return "Pass a non-empty list of instances to FeatureExtractor.from_instances."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingFieldNameError(InputError):
     """
     Raised when :attr:`~krrood.parametrization.feature_extraction.aggregations.Aggregati
@@ -38,7 +38,7 @@ class MissingFieldNameError(InputError):
         return "Construct the AggregationStatistic with the field_name of the exchangeable-part field."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidAggregatedFieldError(InputError):
     """
     Raised when :func:`~krrood.parametrization.feature_extraction.aggregations.aggregati
@@ -57,7 +57,7 @@ class InvalidAggregatedFieldError(InputError):
         return "Pass an attribute of a variable, e.g. @aggregation_statistic(variable(Shelf).layers)."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OutOfDomainValueError(ProbabilisticModelException):
     """
     Raised when a computed aggregation statistic falls outside the training domain of
@@ -84,7 +84,7 @@ class OutOfDomainValueError(ProbabilisticModelException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedFeatureTypeError(ProbabilisticModelException):
     """
     Raised when a feature column has a type that cannot be preprocessed for a

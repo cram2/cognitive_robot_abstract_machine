@@ -9,12 +9,12 @@ from random_events.interval import Interval
 
 def allowed_intervals(statement: Match) -> dict[str, Interval]:
     """
-    :param statement: A statement over a surface grasp.
+    :param statement: A statement over a grasp.
     :return: For each of the grasp's parameters, by name, the smallest interval holding
         every value the statement allows it.
     """
     allowed = UnderspecifiedParameters(
-        statement
+        statement=statement
     ).truncation_assignments_from_where_conditions.bounding_box()
     return {
         variable.name.rsplit(".", 1)[-1]: allowed[variable]

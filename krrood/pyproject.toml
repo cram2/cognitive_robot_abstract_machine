@@ -39,8 +39,8 @@ dependencies = [
     "ucimlrepo>=0.0.7",
     "pdbpp",
     "pytest",
-    "probabilistic_model",
-    "random_events",
+    "probabilistic_model>=26.10.0",
+    "random_events>=26.10.0",
 ]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
 readme = "README.md"
@@ -85,6 +85,7 @@ development-tools = [
     "ruff==0.17.2",
     "docformatter==1.7.8",
     "tqdm",
+    "packaging",
 ]
 
 [project.scripts]
@@ -94,6 +95,7 @@ krrood = "krrood.development_tools.command_line:CommandLine.main"
 Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
 "Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
 "Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -112,6 +114,7 @@ krrood = [
   "code_generation/templates/*.jinja",
   "entity_query_language/testing/templates/*.jinja",
   "development_tools/agents/templates/*.jinja",
+  "development_tools/issue_forms/templates/*.jinja",
 ]
 
 [tool.pytest.ini_options]
@@ -141,6 +144,28 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[tool.krrood.core-boundary]
+# The packages and modules a plain `pip install krrood` must be able to load; every other
+# module of krrood is not core. `krrood check` reports a core module that loads a module
+# outside core, or a distribution outside `dependencies`, at module level.
+core = [
+    "krrood._version",
+    "krrood.class_diagrams",
+    "krrood.exceptions",
+    "krrood.patterns",
+    "krrood.singleton",
+    "krrood.symbol_graph",
+    "krrood.utils",
+]
+# The distributions core may load, with everything they require.
+dependencies = [
+    "typing-extensions",
+    "rustworkx",
+    "numpy",
+    "ordered-set",
+    "sortedcontainers",
 ]
 
 [tool.setuptools.dynamic]

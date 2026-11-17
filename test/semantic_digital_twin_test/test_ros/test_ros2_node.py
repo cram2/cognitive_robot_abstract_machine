@@ -1,3 +1,7 @@
+"""
+Tests that everything communicating over a ROS2 node shares one node field.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -19,6 +23,7 @@ from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker impor
     CollisionVisualizationMarkerPublisher,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
+    EvaluatedSpatialTypePublisher,
     SpatialTypePublisher,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -36,6 +41,7 @@ node_users = [
     VizMarkerPublisher,
     CollisionVisualizationMarkerPublisher,
     SpatialTypePublisher,
+    EvaluatedSpatialTypePublisher,
     FetchWorldServer,
     TFWrapper,
 ]
@@ -49,7 +55,8 @@ def test_classes_communicating_over_a_node_are_ros2_nodes(node_user):
 @pytest.mark.parametrize("node_user", node_users)
 def test_node_field_is_declared_only_on_ros2_node(node_user):
     assert (
-            node_user.__dataclass_fields__["node"] is HasROS2Node.__dataclass_fields__["node"]
+        node_user.__dataclass_fields__["node"]
+        is HasROS2Node.__dataclass_fields__["node"]
     )
 
 

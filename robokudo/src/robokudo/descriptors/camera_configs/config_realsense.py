@@ -45,4 +45,4 @@ class RealsenseCameraConfig(
 
     tf_to: str = "map"
 
-    filterBlurredImages: bool = False
+    filter_blurred_images: bool = False

@@ -40,7 +40,7 @@ class ConclusionSupportPresenter(ConclusionHelper):
     """
 
     @abstractmethod
-    def present(self, context: CaseContext) -> str | None:
+    def present(self, *, context: CaseContext) -> str | None:
         """
         Render supporting material for the case.
 
@@ -57,7 +57,7 @@ class ConclusionSuggester(ConclusionHelper):
     """
 
     @abstractmethod
-    def suggest(self, context: CaseContext) -> Any | None:
+    def suggest(self, *, context: CaseContext) -> Any | None:
         """
         Propose a candidate conclusion for the case.
 

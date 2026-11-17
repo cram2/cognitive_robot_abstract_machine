@@ -1,3 +1,7 @@
+"""
+The fields of the classes in a class diagram, with what their annotations declare.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -13,6 +17,7 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
 from typing_extensions import (
+    Annotated,
     get_origin,
     get_args,
     ClassVar,
@@ -31,7 +36,9 @@ from krrood.class_diagrams.utils import (
     behaves_like_a_built_in_type,
     common_base_class,
     get_type_hints_of_object,
+    is_union_annotation,
 )
+from krrood.class_diagrams.collection_kind import CollectionKind, DeclaredValueKind
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -41,7 +48,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeResolutionError(TypeError):
     """
     Error raised when a type cannot be resolved, even if searched for manually.
@@ -53,7 +60,7 @@ class TypeResolutionError(TypeError):
         super().__init__(f"Could not resolve type for {self.name}")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedField:
     """
     A class that wraps a field of dataclass and provides some utility functions.
@@ -107,43 +114,65 @@ class WrappedField:
         return f"{module_and_class_name(self.clazz.clazz)}.{self.field.name}"
 
     @cached_property
-    def resolved_type(self):
+    def resolved_type(self) -> Any:
         """
         Resolve the type hint for this field.
+
+        A field typed ``Annotated[T, ...]`` resolves to ``T``.
 
         :return: The resolved type hint.
         :raises CouldNotResolveType: If the type cannot be resolved.
         """
-        # Fast path: already-resolved type (e.g., provided by specialized generic introspector)
-        if not isinstance(self.field.type, str):
-            return self.field.type
+        type_hint = self.field.type
+        # A string is a postponed annotation; anything else is already resolved, e.g. by
+        # the specialized generic introspector.
+        if isinstance(type_hint, str):
+            type_hint = get_type_hints_of_object(
+                self.clazz.class_to_introspect,
+                namespace=tuple(self._build_initial_namespace().items()),
+            )[self.field.name]
 
-        local_namespace = self._build_initial_namespace()
-
-        # If it's a specialized generic, use its origin for get_type_hints
-        clazz = self.clazz.class_to_introspect
-
-        return get_type_hints_of_object(
-            clazz, namespace=tuple(local_namespace.items())
-        )[self.field.name]
+        if get_origin(type_hint) is not Annotated:
+            return type_hint
+        return type_hint.__origin__
 
     def _build_initial_namespace(self) -> dict:
         """
-        Build the initial namespace for type resolution from the class diagram.
+        Build the fallback namespace for resolving the class's annotations.
+
+        It holds the class diagram's classes whose names the declaring modules do not
+        bind, such as names imported only for type checking, so that a module's own
+        binding wins over a same-named class from another module.
         """
         class_diagram = self.clazz._class_diagram
         if class_diagram is None:
             return {}
+        names_bound_by_declaring_modules = self._names_bound_by_declaring_modules_()
         namespace = {}
         for cls in class_diagram.wrapped_classes:
             # Only add to namespace if it's a real type.
             # Specialized generics (which have _GenericAlias as clazz) are skipped
             # to avoid shadowing the origin classes.
-            if isinstance(cls.clazz, type):
+            if (
+                isinstance(cls.clazz, type)
+                and cls.name not in names_bound_by_declaring_modules
+            ):
                 namespace[cls.name] = cls.clazz
         return namespace
 
-    def _find_class_by_name(self, class_name: str) -> type:
+    def _names_bound_by_declaring_modules_(self) -> set[str]:
+        """
+        :return: The global names of the modules of the introspected class and its base
+            classes, whose annotations the type resolution evaluates.
+        """
+        names = set()
+        for base in getattr(self.clazz.class_to_introspect, "__mro__", ()):
+            module = sys.modules.get(base.__module__)
+            if module is not None:
+                names.update(vars(module))
+        return names
+
+    def _find_class_by_name(self, *, class_name: str) -> type:
         """
         Find a class by name in the class diagram or sys.modules.
         """
@@ -165,6 +194,47 @@ class WrappedField:
         return get_origin(self.resolved_type) in self.container_types
 
     @cached_property
+    def holds_collection(self) -> bool:
+        """
+        Whether the field's value is a collection of any
+        :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union
+        such as ``Optional``, whether any member of the union is.
+        """
+        return any(
+            get_origin(annotation) in CollectionKind.all_classes()
+            for annotation in self._union_members_
+        )
+
+    @cached_property
+    def declared_value_kind(self) -> DeclaredValueKind:
+        """
+        Whether the field's annotation declares a collection, one value, or neither.
+
+        Of a union's members other than ``None``, one that declares nothing makes the
+        union declare nothing, and otherwise one collection makes it a collection.
+        """
+        kinds = {
+            DeclaredValueKind.from_annotation(annotation=annotation)
+            for annotation in self._union_members_
+            if annotation is not NoneType
+        }
+        if not kinds or DeclaredValueKind.UNDECLARED in kinds:
+            return DeclaredValueKind.UNDECLARED
+        if DeclaredValueKind.COLLECTION in kinds:
+            return DeclaredValueKind.COLLECTION
+        return DeclaredValueKind.SINGLE_VALUE
+
+    @cached_property
+    def _union_members_(self) -> tuple[Any, ...]:
+        """
+        The members of the field's annotation when it is a union, else the annotation
+        alone.
+        """
+        if is_union_annotation(self.resolved_type):
+            return get_args(self.resolved_type)
+        return (self.resolved_type,)
+
+    @cached_property
     def container_type(self) -> type | None:
         if not self.is_container:
             return None
@@ -174,6 +244,17 @@ class WrappedField:
     def is_collection_of_builtins(self):
         return self.is_container and all(
             behaves_like_a_built_in_type(field_type)
+            for field_type in get_args(self.resolved_type)
+        )
+
+    @cached_property
+    def is_collection_of_types(self) -> bool:
+        """
+        :return: Whether the field holds a collection of classes, such as
+            ``list[type[X]]``.
+        """
+        return self.is_container and all(
+            field_type in (type, Type) or get_origin(field_type) is type
             for field_type in get_args(self.resolved_type)
         )
 
@@ -220,7 +301,9 @@ class WrappedField:
                     return self.resolved_type
                 else:
                     raise MissingContainedTypeOfContainer(
-                        self.clazz.clazz, self.name, self.container_type
+                        class_=self.clazz.clazz,
+                        field_name=self.name,
+                        container_type=self.container_type,
                     )
 
     @cached_property
@@ -405,7 +488,7 @@ def manually_search_for_class_name(target_class_name: str) -> type:
     found_classes += search_class_in_sys_modules(target_class_name)
 
     if len(found_classes) == 0:
-        raise TypeResolutionError(target_class_name)
+        raise TypeResolutionError(name=target_class_name)
     elif len(found_classes) == 1:
         resolved_class = found_classes[0]
     else:

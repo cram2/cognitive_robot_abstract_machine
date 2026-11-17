@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import itertools
+from dataclasses import replace
+
 import numpy as np
 import plotly.graph_objects as go
 import pytest
 from random_events.interval import SimpleInterval, closed, closed_open, reals
 from random_events.variable import Continuous
-from scipy.special import logsumexp
+from scipy.special import logsumexp, rel_entr
 
 from krrood.adapters.json_serializer import from_json, to_json
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
@@ -27,21 +30,8 @@ def induction_step_over(
     :param support: The allowed span of the support of the induced distribution.
     :return: The first induction step over the equally weighted data 1, 2, 3, 4, 7, 9.
     """
-    sorted_data = np.array([1, 2, 3, 4, 7, 9])
-    weights = np.ones(len(sorted_data))
-    return InductionStep(
-        sorted_data,
-        np.append(0, np.cumsum(weights)),
-        np.append(0, np.cumsum(np.log(weights))),
-        0,
-        len(sorted_data),
-        NygaInduction(
-            variable,
-            min_samples_per_quantile=1,
-            min_likelihood_improvement=0.01,
-            support=support,
-        ),
-    )
+    induction = NygaInduction(variable, minimum_samples_per_quantile=1, support=support)
+    return induction.initial_induction_step(np.array([1, 2, 3, 4, 7, 9]))
 
 
 @pytest.fixture
@@ -50,6 +40,24 @@ def induction_step(x) -> InductionStep:
     The first induction step over six data points without a constrained support.
     """
     return induction_step_over(x)
+
+
+@pytest.fixture
+def spiked_data() -> np.ndarray:
+    """
+    Fifty copies of 0 followed by the values 1 to 10, so the unique values carry very
+    different weights.
+    """
+    return np.array([0.0] * 50 + list(np.arange(1.0, 11.0)))
+
+
+@pytest.fixture
+def spiked_induction_step(x, spiked_data) -> InductionStep:
+    """
+    The first induction step over :func:`spiked_data`.
+    """
+    induction = NygaInduction(x, minimum_samples_per_quantile=1)
+    return induction.initial_induction_step(spiked_data)
 
 
 # %% connecting points and pieces
@@ -92,7 +100,7 @@ def test_an_internal_piece_spans_its_connecting_points(x, support):
 
 
 def test_sum_of_weights(induction_step):
-    assert induction_step.sum_weights() == pytest.approx(6)
+    assert induction_step.total_weights == pytest.approx(6)
     assert induction_step.sum_weights_from_indices(3, 5) == pytest.approx(2)
 
 
@@ -100,21 +108,21 @@ def test_sum_of_weights(induction_step):
 
 
 def split_side_log_likelihood(
-    induction_step: InductionStep,
-    split_index: int,
-    connecting_point: float,
-    is_left: bool,
+    induction_step: InductionStep, split_index: int, is_left: bool
 ) -> float:
     """
     :return: The log-likelihood of one side of the split at the index.
     """
-    split_indices = np.array([split_index])
-    split_values = (
-        induction_step.data[split_indices - 1] + induction_step.data[split_indices]
-    ) / 2
-    return induction_step._vectorized_log_likelihood_of_split_side(
-        split_indices, split_values, connecting_point, is_left
-    )[0]
+    begin_index, end_index = (
+        (induction_step.begin_index, split_index)
+        if is_left
+        else (split_index, induction_step.end_index)
+    )
+    return float(
+        induction_step.log_likelihood_of_segments(
+            np.array([begin_index]), np.array([end_index])
+        )[0]
+    )
 
 
 def test_log_likelihood_without_split(induction_step):
@@ -137,10 +145,10 @@ def test_log_likelihood_of_the_sides_of_a_split(
     induction_step, split_index, expected_left, expected_right
 ):
     assert split_side_log_likelihood(
-        induction_step, split_index, 1, is_left=True
+        induction_step, split_index, is_left=True
     ) == pytest.approx(expected_left, abs=0.01)
     assert split_side_log_likelihood(
-        induction_step, split_index, 9, is_left=False
+        induction_step, split_index, is_left=False
     ) == pytest.approx(expected_right, abs=0.01)
 
 
@@ -150,7 +158,7 @@ def test_best_split(induction_step):
 
 
 def test_best_split_of_too_few_samples_is_none(induction_step):
-    induction_step.nyga_induction.min_samples_per_quantile = 4
+    induction_step.nyga_induction.minimum_samples_per_quantile = 4
     maximum, index = induction_step.compute_best_split()
     assert index is None
     assert maximum == -float("inf")
@@ -177,9 +185,8 @@ def test_induction_steps_of_the_sides_share_the_data(
     assert side.begin_index == begin_index
     assert side.end_index == end_index
     np.testing.assert_equal(side.data, induction_step.data)
-    np.testing.assert_equal(
-        side.cumulative_log_weights, induction_step.cumulative_log_weights
-    )
+    np.testing.assert_equal(side.cumulative_weights, induction_step.cumulative_weights)
+    assert side.minimum_split_gain == induction_step.minimum_split_gain
 
 
 # %% fitting
@@ -187,8 +194,8 @@ def test_induction_steps_of_the_sides_share_the_data(
 
 def test_fit_has_at_most_one_piece_per_quantile(induction_step):
     induction = induction_step.nyga_induction
-    induction.min_samples_per_quantile = 20
-    induction.min_likelihood_improvement = 0
+    induction.minimum_samples_per_quantile = 20
+    induction.split_penalty_factor = 0
     data = np.random.normal(0, 1, 500).tolist()
     circuit = induction.fit(data)
     assert len(circuit.root.subcircuits) <= len(data) // 20
@@ -211,7 +218,7 @@ def test_fit_of_singular_data_is_a_dirac_delta(induction_step):
 
 
 def test_serialization_round_trip(x):
-    induction = NygaInduction(x, min_likelihood_improvement=0.01)
+    induction = NygaInduction(x)
     induction.fit(np.random.normal(0, 1, 100).tolist())
     deserialized = from_json(to_json(induction))
     assert isinstance(deserialized, NygaInduction)
@@ -250,9 +257,7 @@ def fitted_induction(x, standard_normal_data) -> NygaInduction:
     """
     An induction fitted to :func:`standard_normal_data`.
     """
-    induction = NygaInduction(
-        x, min_likelihood_improvement=0.001, min_samples_per_quantile=300
-    )
+    induction = NygaInduction(x, minimum_samples_per_quantile=300)
     induction.fit(standard_normal_data)
     return induction
 
@@ -277,9 +282,7 @@ def test_plot_of_a_fitted_distribution_has_traces(fitted_induction):
 
 
 def test_fit_narrows_the_default_support_to_data_range_widened_by_tolerance(x):
-    induction = NygaInduction(
-        x, min_samples_per_quantile=1, min_likelihood_improvement=0
-    )
+    induction = NygaInduction(x, minimum_samples_per_quantile=1, split_penalty_factor=0)
     induction.fit([1.0, 2.0, 3.0])
     # a simple interval stores its bounds in single precision, so the bounds pick up
     # rounding noise around the scale of the tolerance itself
@@ -296,8 +299,8 @@ def test_fit_narrows_a_given_support_no_further_than_the_tolerance_window(x):
     induction = NygaInduction(
         x,
         support=closed(0.0, 10.0).simple_sets[0],
-        min_samples_per_quantile=1,
-        min_likelihood_improvement=0,
+        minimum_samples_per_quantile=1,
+        split_penalty_factor=0,
     )
     induction.fit([1.0, 2.0, 3.0])
     assert induction.support.lower == pytest.approx(
@@ -313,8 +316,8 @@ def test_fit_narrows_a_given_support_to_stay_inside_it(x):
     induction = NygaInduction(
         x,
         support=closed(0.0, 3.0000005).simple_sets[0],
-        min_samples_per_quantile=1,
-        min_likelihood_improvement=0,
+        minimum_samples_per_quantile=1,
+        split_penalty_factor=0,
     )
     induction.fit([1.0, 2.0, 3.0])
     widest_leaf = max(
@@ -322,3 +325,221 @@ def test_fit_narrows_a_given_support_to_stay_inside_it(x):
         key=lambda leaf: leaf.distribution.interval.upper,
     )
     assert widest_leaf.distribution.interval.upper == pytest.approx(3.0000005, abs=1e-5)
+
+
+# %% duplicate values weigh in with their count
+
+
+def test_best_split_isolates_a_heavily_weighted_value(spiked_induction_step):
+    _, index = spiked_induction_step.compute_best_split()
+    assert index == 1
+
+
+def test_gain_of_a_split_is_the_weighted_divergence_of_its_two_sides(
+    spiked_induction_step,
+):
+    step = spiked_induction_step
+    split_indices = np.arange(step.begin_index + 1, step.end_index)
+    begin_indices = np.full_like(split_indices, step.begin_index)
+    end_indices = np.full_like(split_indices, step.end_index)
+    gains = (
+        step.log_likelihood_of_segments(begin_indices, split_indices)
+        + step.log_likelihood_of_segments(split_indices, end_indices)
+        - step.log_likelihood_without_split()
+    )
+
+    left_end = step.right_connecting_point_from_index(split_indices)
+    share_of_weight = step.sum_weights_from_indices(begin_indices, split_indices) / (
+        step.total_weights
+    )
+    share_of_width = (left_end - step.left_connecting_point()) / (
+        step.right_connecting_point() - step.left_connecting_point()
+    )
+    bernoulli_divergence = rel_entr(share_of_weight, share_of_width) + rel_entr(
+        1 - share_of_weight, 1 - share_of_width
+    )
+    np.testing.assert_allclose(gains, step.total_weights * bernoulli_divergence)
+
+
+def test_weights_of_duplicate_values_add_up(x):
+    induction = NygaInduction(x, minimum_samples_per_quantile=1, split_penalty_factor=0)
+    weighted = induction.initial_induction_step(
+        np.array([2.0, 0.0, 0.0, 1.0]), np.array([1.0, 3.0, 1.0, 2.0])
+    )
+    expanded = induction.initial_induction_step(
+        np.array([2.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0])
+    )
+    np.testing.assert_equal(weighted.data, expanded.data)
+    np.testing.assert_allclose(weighted.cumulative_weights, expanded.cumulative_weights)
+
+
+# %% stopping criterion
+
+
+def test_minimum_split_gain_of_unit_weights_is_the_bayesian_information_criterion(
+    x,
+):
+    induction = NygaInduction(x, split_penalty_factor=1.5)
+    assert induction.minimum_split_gain(np.ones(10)) == pytest.approx(
+        induction.split_penalty_factor * np.log(10)
+    )
+
+
+def test_minimum_split_gain_scales_with_the_weights(x):
+    induction = NygaInduction(x)
+    weights = np.random.uniform(0.1, 1.0, 50)
+    assert induction.minimum_split_gain(7 * weights) == pytest.approx(
+        7 * induction.minimum_split_gain(weights)
+    )
+
+
+@pytest.mark.parametrize("split_penalty_factor, expected", [(1.0, False), (0.0, True)])
+def test_split_has_to_outweigh_the_penalty(x, split_penalty_factor, expected):
+    induction = NygaInduction(
+        x, minimum_samples_per_quantile=1, split_penalty_factor=split_penalty_factor
+    )
+    step = induction.initial_induction_step(np.array([1, 2, 3, 4, 7, 9]))
+    maximum_log_likelihood, _ = step.compute_best_split()
+    assert step.improvement_is_good_enough(maximum_log_likelihood) == expected
+
+
+def test_fit_of_evenly_spaced_data_is_one_piece(x):
+    induction = NygaInduction(x, minimum_samples_per_quantile=1)
+    circuit = induction.fit(np.linspace(0.0, 1.0, 1000))
+    assert len(circuit.root.subcircuits) == 1
+
+
+# %% copies
+
+
+def test_empty_copy_keeps_every_parameter(x):
+    induction = NygaInduction(
+        x,
+        split_penalty_factor=2.0,
+        minimum_samples_per_quantile=3,
+        tolerance_at_extremes=1e-3,
+        support=closed(0.0, 5.0).simple_sets[0],
+        maximum_unique_values_for_optimal_partition=10,
+    )
+    induction.fit(np.random.uniform(1.0, 4.0, 50))
+    copy = induction.empty_copy()
+    assert copy == induction
+    assert copy.probabilistic_circuit.nodes() == []
+
+
+# %% globally optimal partition
+
+
+def penalized_log_likelihood(step: InductionStep, boundaries: list[int]) -> float:
+    """
+    :return: The log likelihood of the partition of the step's data at the boundaries,
+        minus the step's minimum split gain for every split.
+    """
+    log_likelihood = step.log_likelihood_of_segments(
+        np.array(boundaries[:-1]), np.array(boundaries[1:])
+    ).sum()
+    return float(log_likelihood - step.minimum_split_gain * (len(boundaries) - 2))
+
+
+def best_penalized_log_likelihood_by_enumeration(step: InductionStep) -> float:
+    """
+    :return: The highest :func:`penalized_log_likelihood` of every partition of the
+        step's data whose segments each hold at least the minimal number of samples.
+    """
+    inner_indices = range(step.begin_index + 1, step.end_index)
+    partitions = [
+        [step.begin_index, *cuts, step.end_index]
+        for number_of_cuts in range(len(inner_indices) + 1)
+        for cuts in itertools.combinations(inner_indices, number_of_cuts)
+    ]
+    admissible = [
+        boundaries
+        for boundaries in partitions
+        if len(boundaries) == 2
+        or min(np.diff(boundaries)) >= step.minimum_samples_per_quantile
+    ]
+    return max(penalized_log_likelihood(step, boundaries) for boundaries in admissible)
+
+
+@pytest.mark.parametrize("minimum_samples_per_quantile", [1, 2])
+@pytest.mark.parametrize("split_penalty_factor", [0.0, 0.3, 1.0])
+def test_optimal_segment_boundaries_maximize_the_penalized_likelihood(
+    x, minimum_samples_per_quantile, split_penalty_factor
+):
+    induction = NygaInduction(
+        x,
+        minimum_samples_per_quantile=minimum_samples_per_quantile,
+        split_penalty_factor=split_penalty_factor,
+    )
+    step = induction.initial_induction_step(np.random.randint(0, 13, 40).astype(float))
+    boundaries = step.optimal_segment_boundaries()
+    assert penalized_log_likelihood(step, boundaries) == pytest.approx(
+        best_penalized_log_likelihood_by_enumeration(step)
+    )
+
+
+@pytest.fixture
+def unevenly_spaced_data() -> np.ndarray:
+    """
+    Data on which splitting greedily misses the partition with the highest penalized
+    likelihood at a split penalty factor of 0.1.
+    """
+    return np.array([2.0, 6.0, 10.0, 20.0, 30.0, 36.0, 37.0, 40.0, 50.0])
+
+
+def fitted_pieces(induction: NygaInduction, data: np.ndarray) -> set:
+    """
+    :return: The uniform distributions of the circuit the induction fits to the data.
+    """
+    return {leaf.distribution for leaf in induction.fit(data).leaves}
+
+
+def optimal_pieces(induction: NygaInduction, data: np.ndarray) -> set:
+    """
+    :return: The uniform distributions over the parts of the optimal partition of the
+        data, within the support the induction narrowed while fitting.
+    """
+    step = induction.initial_induction_step(data)
+    return {
+        step.create_uniform_distribution_from_indices(begin_index, end_index)
+        for begin_index, end_index in itertools.pairwise(
+            step.optimal_segment_boundaries()
+        )
+    }
+
+
+def test_fit_partitions_optimally_up_to_the_limit(x, unevenly_spaced_data):
+    induction = NygaInduction(
+        x,
+        minimum_samples_per_quantile=1,
+        split_penalty_factor=0.1,
+        maximum_unique_values_for_optimal_partition=len(unevenly_spaced_data),
+    )
+    pieces = fitted_pieces(induction, unevenly_spaced_data)
+    assert pieces == optimal_pieces(induction, unevenly_spaced_data)
+
+
+def test_fit_splits_greedily_above_the_limit(x, unevenly_spaced_data):
+    above_the_limit = NygaInduction(
+        x,
+        minimum_samples_per_quantile=1,
+        split_penalty_factor=0.1,
+        maximum_unique_values_for_optimal_partition=len(unevenly_spaced_data) - 1,
+    )
+    pieces = fitted_pieces(above_the_limit, unevenly_spaced_data)
+    always_greedy = replace(
+        above_the_limit, maximum_unique_values_for_optimal_partition=0
+    )
+    assert pieces == fitted_pieces(always_greedy, unevenly_spaced_data)
+    assert pieces != optimal_pieces(above_the_limit, unevenly_spaced_data)
+
+
+def test_optimally_partitioned_fit_is_a_deterministic_distribution(x):
+    induction = NygaInduction(x, minimum_samples_per_quantile=5)
+    data = np.concatenate(
+        [np.random.normal(0.0, 1.0, 300), np.random.normal(6.0, 0.3, 300)]
+    )
+    circuit = induction.fit(data)
+    assert len(data) <= induction.maximum_unique_values_for_optimal_partition
+    assert circuit.is_deterministic()
+    assert logsumexp(circuit.root.log_weights) == pytest.approx(0.0)

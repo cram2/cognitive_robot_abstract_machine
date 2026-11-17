@@ -6,10 +6,6 @@ import pytest
 from huggingface_hub.errors import HfHubHTTPError
 from requests import HTTPError
 
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-    ShapeSource,
-)
 from semantic_digital_twin.adapters.sage_10k_dataset.loader import (
     Sage10kDatasetLoader,
 )
@@ -80,13 +76,9 @@ def sage10k_scene():
     return scene
 
 
-def test_loader(rclpy_node, sage10k_scene):
+def test_loader(sage10k_scene):
     scene = sage10k_scene
     world = scene.create_world()
-    pub = VizMarkerPublisher(
-        _world=world,
-        node=rclpy_node,
-    )
     verify_scene(world, scene)
     assert (
         len(world.get_semantic_annotations_by_type(NaturalLanguageWithTypeDescription))
@@ -111,10 +103,13 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
     pipeline = Pipeline([decomposer])
     pipeline.apply(world)
 
-    pub = VizMarkerPublisher(
+    viz_marker = pytest.importorskip(
+        "semantic_digital_twin.adapters.ros.visualization.viz_marker"
+    )
+    viz_marker.VizMarkerPublisher(
         _world=world,
         node=rclpy_node,
-        shape_source=ShapeSource.COLLISION_ONLY,
+        shape_source=viz_marker.ShapeSource.COLLISION_ONLY,
     )
 
 

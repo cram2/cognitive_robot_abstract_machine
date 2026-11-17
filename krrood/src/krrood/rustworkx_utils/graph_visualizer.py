@@ -1,29 +1,15 @@
+"""
+Drawing a rustworkx graph as a layered diagram with matplotlib.
+"""
+
 from __future__ import annotations
 
-from collections import defaultdict
+import sys
+from collections import OrderedDict, defaultdict
 from textwrap import fill
 
+import numpy as np
 from typing_extensions import TYPE_CHECKING, Any
-
-try:
-    import matplotlib as mpl
-
-    # Ensure a non-interactive backend for headless environments
-    # Needs to be done before importing pyplot
-    try:
-        mpl.use("Agg")
-    except Exception:
-        pass
-    from matplotlib import pyplot as plt
-    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
-    from matplotlib.path import Path
-except ModuleNotFoundError:
-    mpl = None
-
-try:
-    import numpy as np
-except ModuleNotFoundError:
-    np = None
 
 from krrood.rustworkx_utils.utils import ColorLegend
 
@@ -77,7 +63,18 @@ class GraphVisualizer:
         self.ctx: dict[str, Any] = {}
 
     def render(self):
-        self._check_dependencies()
+        """
+        Draw the graph rooted at :attr:`node` and save it to the configured file.
+
+        :return: The figure and axes the graph is drawn on.
+        :raises ModuleNotFoundError: If matplotlib is not installed.
+        """
+        import matplotlib
+
+        if "matplotlib.pyplot" not in sys.modules:
+            # A non-interactive backend for headless environments; it can only be chosen
+            # without closing open figures before pyplot is loaded.
+            matplotlib.use("Agg")
         self._build_rooted_subgraph()
         self._layer_nodes()
         self._order_layers_barycentric()
@@ -88,27 +85,14 @@ class GraphVisualizer:
         self._auto_figsize()
         fig, ax = self._setup_figure()
         self._wrap_labels_and_sizes()
-        self._compute_pixel_and_obstacles(fig, ax)
-        self._adjust_limits_and_center(ax)
-        self._draw_wrap_boxes(ax)
-        self._draw_edges(ax)
-        self._draw_nodes_and_labels(ax)
-        self._draw_legend(fig, ax)
-        self._style_and_save(fig, ax)
+        self._compute_pixel_and_obstacles(fig=fig, ax=ax)
+        self._adjust_limits_and_center(ax=ax)
+        self._draw_wrap_boxes(ax=ax)
+        self._draw_edges(ax=ax)
+        self._draw_nodes_and_labels(ax=ax)
+        self._draw_legend(fig=fig, ax=ax)
+        self._style_and_save(fig=fig, ax=ax)
         return fig, ax
-
-    @classmethod
-    def _check_dependencies(cls):
-        if mpl is None:
-            raise ModuleNotFoundError(
-                "matplotlib must be installed to visualize the graph. (pip install matplotlib)",
-                name="matplotlib",
-            )
-        elif np is None:
-            raise ModuleNotFoundError(
-                "numpy must be installed to visualize the graph. (pip install numpy)",
-                name="numpy",
-            )
 
     def _build_rooted_subgraph(self):
         root = self.node.root
@@ -274,6 +258,8 @@ class GraphVisualizer:
                     ordered_nodes.append(id_to_node[nid])
                     coords.append((x, y))
         if not ordered_nodes:
+            from matplotlib import pyplot as plt
+
             fig, ax = plt.subplots(figsize=(self.params["figsize"] or (6, 4)))
             self.ctx.update(dict(empty=True, fig=fig, ax=ax))
             return
@@ -359,6 +345,8 @@ class GraphVisualizer:
         self.ctx["figsize"] = (base_w * w_scale, base_h * h_scale)
 
     def _setup_figure(self):
+        from matplotlib import pyplot as plt
+
         figsize = self.ctx.get("figsize", self.params["figsize"])
         fig, ax = plt.subplots(figsize=figsize)
         xlim = self.ctx.get("xlim", (0.0, self.ctx["x_extent"]))
@@ -401,7 +389,7 @@ class GraphVisualizer:
             )
         )
 
-    def _compute_pixel_and_obstacles(self, fig, ax):
+    def _compute_pixel_and_obstacles(self, *, fig, ax):
         norm_pos = self.ctx["norm_pos"]
         size_per_node = self.ctx["size_per_node"]
         radii_pt = np.sqrt(size_per_node / np.pi)
@@ -454,7 +442,7 @@ class GraphVisualizer:
             )
         )
 
-    def _adjust_limits_and_center(self, ax):
+    def _adjust_limits_and_center(self, *, ax):
         # Compute padded content bounds from obstacles and center horizontally around the root when possible.
         norm_pos = self.ctx["norm_pos"]
         obstacles_rects = self.ctx["obstacles_rects"]
@@ -506,7 +494,9 @@ class GraphVisualizer:
         ax.set_xlim(self.ctx["xlim"])
         ax.set_ylim(self.ctx["ylim"])
 
-    def _draw_wrap_boxes(self, ax):
+    def _draw_wrap_boxes(self, *, ax):
+        from matplotlib.patches import FancyBboxPatch
+
         ordered_nodes = self.ctx["ordered_nodes"]
         id_map = self.ctx["id_map"]
         obstacles_rects = self.ctx["obstacles_rects"]
@@ -570,7 +560,7 @@ class GraphVisualizer:
             ax.add_patch(box)
 
     @staticmethod
-    def _dist_pt_seg(px, py, ax_, ay_, bx_, by_):
+    def _dist_pt_seg(*, px, py, ax_, ay_, bx_, by_):
         vx, vy = bx_ - ax_, by_ - ay_
         wx, wy = px - ax_, py - ay_
         vv = vx * vx + vy * vy
@@ -582,6 +572,7 @@ class GraphVisualizer:
 
     def _seg_blocked(
         self,
+        *,
         p_start: tuple[float, float],
         p_end: tuple[float, float],
         ignore: tuple[int, int],
@@ -645,7 +636,10 @@ class GraphVisualizer:
                     code1 = outcode(x1, y1, xmin, xmax, ymin, ymax)
         return False
 
-    def _draw_edges(self, ax):
+    def _draw_edges(self, *, ax):
+        from matplotlib.patches import FancyArrowPatch
+        from matplotlib.path import Path
+
         edge_style = self.params["edge_style"]
         curve_scale = float(self.params["curve_scale"])
         edges = self.ctx["edges"]
@@ -689,7 +683,10 @@ class GraphVisualizer:
                 if (min(x0, x1) <= cx <= max(x0, x1)) and (
                     min(y0, y1) <= cy <= max(y0, y1)
                 ):
-                    if self._dist_pt_seg(cx, cy, x0, y0, x1, y1) < 0.06:
+                    if (
+                        self._dist_pt_seg(px=cx, py=cy, ax_=x0, ay_=y0, bx_=x1, by_=y1)
+                        < 0.06
+                    ):
                         near_count += 1
 
             if edge_style == "straight":
@@ -747,11 +744,9 @@ class GraphVisualizer:
                     ax.add_patch(arrow)
                 else:
                     # Short straight segment: draw straight with cropped endpoints
-                    from matplotlib.path import Path as MPath
-
                     verts = [tuple(start), tuple(end)]
-                    codes = [MPath.MOVETO, MPath.LINETO]
-                    path = MPath(verts, codes)
+                    codes = [Path.MOVETO, Path.LINETO]
+                    path = Path(verts, codes)
                     arrow = FancyArrowPatch(
                         path=path,
                         arrowstyle="-|>",
@@ -774,8 +769,8 @@ class GraphVisualizer:
                     p3 = (xm, y1)
                     if (
                         within_x(xm)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -787,8 +782,8 @@ class GraphVisualizer:
                     p3 = (x1, ym)
                     if (
                         within_y(ym)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -801,9 +796,9 @@ class GraphVisualizer:
                     p4 = (x1, y1)
                     if (
                         within_y(ym)
-                        and (not self._seg_blocked(p1, p2, ignore=(u, v)))
-                        and (not self._seg_blocked(p2, p3, ignore=(u, v)))
-                        and (not self._seg_blocked(p3, p4, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p3, p_end=p4, ignore=(u, v)))
                     ):
                         return [p1, p2, p3, p4]
                     return None
@@ -942,8 +937,6 @@ class GraphVisualizer:
                             )
                             ax.add_patch(arrow)
                             continue
-                from matplotlib.path import Path as MPath
-
                 # Crop endpoints of the orthogonal path so it meets node borders
                 pts = list(best)
                 # Pre-cropping deduplication to ensure non-zero first/last segments
@@ -1010,11 +1003,11 @@ class GraphVisualizer:
 
                 def add_moveto(pt):
                     verts.append(pt)
-                    codes.append(MPath.MOVETO)
+                    codes.append(Path.MOVETO)
 
                 def add_lineto(pt):
                     verts.append(pt)
-                    codes.append(MPath.LINETO)
+                    codes.append(Path.LINETO)
 
                 add_moveto(pts[0])
                 for i in range(1, len(pts)):
@@ -1024,7 +1017,7 @@ class GraphVisualizer:
                     b = pts[i]
                     ori = "v" if abs(a[0] - b[0]) < 1e-12 else "h"
                     prev_ortho_segments.append((ori, a[0], a[1], b[0], b[1], u, v))
-                path = MPath(verts, codes)
+                path = Path(verts, codes)
                 arrow = FancyArrowPatch(
                     path=path,
                     arrowstyle="-|>",
@@ -1086,7 +1079,7 @@ class GraphVisualizer:
             )
             ax.add_patch(arrow)
 
-    def _draw_nodes_and_labels(self, ax):
+    def _draw_nodes_and_labels(self, *, ax):
         ordered_nodes = self.ctx["ordered_nodes"]
         norm_pos = self.ctx["norm_pos"]
         size_per_node = self.ctx["size_per_node"]
@@ -1152,9 +1145,9 @@ class GraphVisualizer:
         self.ctx["colors"] = colors
         self.ctx["any_enclosed"] = any_enclosed
 
-    def _draw_legend(self, fig, ax):
-        from collections import OrderedDict
+    def _draw_legend(self, *, fig, ax):
         from matplotlib.lines import Line2D
+        from matplotlib.patches import Patch
 
         ordered_nodes = self.ctx["ordered_nodes"]
         colors = self.ctx["colors"]
@@ -1167,7 +1160,7 @@ class GraphVisualizer:
             return
         handles = []
         for lbl, col in fam_to_color.items():
-            patch = mpl.patches.Patch(facecolor=col, edgecolor="black", label=lbl)
+            patch = Patch(facecolor=col, edgecolor="black", label=lbl)
             handles.append(patch)
         # Add enclosed marker legend if applicable
         if self.ctx.get("any_enclosed", False):
@@ -1215,7 +1208,9 @@ class GraphVisualizer:
         )
         legend.get_title().set_color("black")
 
-    def _style_and_save(self, fig, ax):
+    def _style_and_save(self, *, fig, ax):
+        from matplotlib import pyplot as plt
+
         # White backgrounds
         fig.patch.set_facecolor("white")
         ax.set_facecolor("white")

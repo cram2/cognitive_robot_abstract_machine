@@ -10,12 +10,12 @@ from typing_extensions import List
 from .example_classes import KRROODPosition, Entity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CustomPosition(KRROODPosition):
     custom_value: str
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AggregatorOfExternalInstances:
     a: List[KRROODPosition]
     entity: Entity

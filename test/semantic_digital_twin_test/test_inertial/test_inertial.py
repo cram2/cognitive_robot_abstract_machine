@@ -3,7 +3,7 @@ from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation as R
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import RotationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,

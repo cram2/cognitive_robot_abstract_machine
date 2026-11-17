@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .latebound_annotation_secondary_type import LateBoundAnnotationSecondaryType
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OwnerWithLateBoundAnnotation:
     """
     A dataclass annotated with ``TYPE_CHECKING``-only types from other modules.

@@ -106,8 +106,8 @@ poetry install
 [CRAMERA](https://github.com/AICOR-Solutions/cramera) provides live 3D visualization,
 recorded playback, EQL questions and plan/statechart inspection in the browser. It
 lives in its own repository, whose `scripts/install_stack.py` installs it together with
-this workspace; with it installed, `CORAPLEX_VISUALIZATION=cramera` selects it as the
-renderer.
+this workspace; with it installed, start `cramera` from the activated environment, then
+add a `LiveVisualization` to the executor of the demo you want to follow.
 
 ## To run tests
 

@@ -26,7 +26,7 @@ from ..dataset.ormatic_interface import *
 
 
 def test_position(session, database):
-    p1 = KRROODPosition(1, 2, 3)
+    p1 = KRROODPosition(x=1, y=2, z=3)
 
     p1dao: KRROODPositionDAO = to_dao(p1)
     assert p1.x == p1dao.x
@@ -48,7 +48,7 @@ def test_position(session, database):
 
 
 def test_position4d(session, database):
-    p4d = KRROODPosition4D(1.0, 2.0, 3.0, 4.0)
+    p4d = KRROODPosition4D(x=1.0, y=2.0, z=3.0, w=4.0)
 
     p4d_dao = to_dao(p4d)
     assert p4d.x == p4d_dao.x
@@ -73,7 +73,7 @@ def test_position4d(session, database):
 
 
 def test_orientation(session, database):
-    o1 = KRROODOrientation(1.0, 2.0, 3.0, None)
+    o1 = KRROODOrientation(x=1.0, y=2.0, z=3.0, w=None)
 
     o1dao = to_dao(o1)
     assert o1.x == o1dao.x
@@ -97,9 +97,9 @@ def test_orientation(session, database):
 
 
 def test_pose(session, database):
-    p1 = KRROODPosition(1, 2, 3)
-    o1 = KRROODOrientation(1.0, 2.0, 3.0, None)
-    pose = KRROODPose(p1, o1)
+    p1 = KRROODPosition(x=1, y=2, z=3)
+    o1 = KRROODOrientation(x=1.0, y=2.0, z=3.0, w=None)
+    pose = KRROODPose(position=p1, orientation=o1)
 
     posedao = to_dao(pose)
     assert isinstance(posedao.position, KRROODPositionDAO)
@@ -117,7 +117,7 @@ def test_pose(session, database):
 
 
 def test_atom(session, database):
-    atom = Atom(Element.C, 1, 2.0)
+    atom = Atom(element=Element.C, type=1, charge=2.0)
     atomdao = to_dao(atom)
     assert atomdao.element == Element.C
 
@@ -132,8 +132,8 @@ def test_atom(session, database):
 
 
 def test_entity_and_derived(session, database):
-    entity = Entity("TestEntity")
-    derived = DerivedEntity("DerivedEntity")
+    entity = Entity(name="TestEntity")
+    derived = DerivedEntity(name="DerivedEntity")
 
     entity_dao = to_dao(entity)
     derived_dao = to_dao(derived)
@@ -162,9 +162,9 @@ def test_entity_and_derived(session, database):
 
 
 def test_parent_and_child(session, database):
-    parent = Parent("TestParent")
-    child_mapped = ChildMapped("ChildMapped", 42)
-    child_not_mapped = ChildNotMapped("a", 2, {})
+    parent = Parent(name="TestParent")
+    child_mapped = ChildMapped(name="ChildMapped", attribute1=42)
+    child_not_mapped = ChildNotMapped(name="a", attribute2=2, unparseable={})
 
     parent_dao = to_dao(parent)
     child_dao = to_dao(child_mapped)
@@ -211,7 +211,7 @@ def test_node(session, database):
 
 
 def test_position_type_wrapper(session, database):
-    wrapper = KRROODPositionTypeWrapper(KRROODPosition)
+    wrapper = KRROODPositionTypeWrapper(position_type=KRROODPosition)
     dao = to_dao(wrapper)
     assert dao.position_type == wrapper.position_type
     session.add(dao)
@@ -221,10 +221,23 @@ def test_position_type_wrapper(session, database):
     assert result == dao
 
 
+def test_a_collection_of_classes_survives_a_round_trip(session, database):
+    wrapper = KRROODPositionTypesWrapper(
+        position_types=[KRROODPosition, KRROODPosition4D]
+    )
+    session.add(to_dao(wrapper))
+    session.commit()
+    session.expunge_all()
+
+    result = session.scalars(select(KRROODPositionTypesWrapperDAO)).one()
+
+    assert result.from_dao().position_types == wrapper.position_types
+
+
 def test_positions(session, database):
-    p1 = KRROODPosition(1, 2, 3)
-    p2 = KRROODPosition(2, 3, 4)
-    positions = KRROODPositions([p1, p2], ["a", "b", "c"])
+    p1 = KRROODPosition(x=1, y=2, z=3)
+    p2 = KRROODPosition(x=2, y=3, z=4)
+    positions = KRROODPositions(positions=[p1, p2], some_strings=["a", "b", "c"])
     dao = to_dao(positions)
     assert len(dao.positions) == 2
 
@@ -241,8 +254,8 @@ def test_positions(session, database):
 
 
 def test_positions_with_duplicated_entry_in_list(session, database):
-    p1 = KRROODPosition(1, 2, 3)
-    positions = KRROODPositions([p1, p1], ["a", "b", "c"])
+    p1 = KRROODPosition(x=1, y=2, z=3)
+    positions = KRROODPositions(positions=[p1, p1], some_strings=["a", "b", "c"])
     dao: KRROODPositionsDAO = to_dao(positions)
     assert len(dao.positions) == 2
     session.add(dao)
@@ -259,11 +272,11 @@ def test_positions_with_duplicated_entry_in_list(session, database):
 
 def test_double_position_aggregator(session, database):
     p1, p2, p3 = (
-        KRROODPosition(1, 2, 3),
-        KRROODPosition(2, 3, 4),
-        KRROODPosition(3, 4, 5),
+        KRROODPosition(x=1, y=2, z=3),
+        KRROODPosition(x=2, y=3, z=4),
+        KRROODPosition(x=3, y=4, z=5),
     )
-    dpa = DoubleKRROODPositionAggregator([p1, p2], [p1, p3])
+    dpa = DoubleKRROODPositionAggregator(positions1=[p1, p2], positions2=[p1, p3])
     dpa_dao = to_dao(dpa)
     session.add(dpa_dao)
     session.commit()
@@ -277,9 +290,9 @@ def test_double_position_aggregator(session, database):
 
 
 def test_kinematic_chain_and_torso(session, database):
-    k1 = KRROODKinematicChain("a")
-    k2 = KRROODKinematicChain("b")
-    torso = KRROODTorso("t", [k1, k2])
+    k1 = KRROODKinematicChain(name="a")
+    k2 = KRROODKinematicChain(name="b")
+    torso = KRROODTorso(name="t", kinematic_chains=[k1, k2])
     torso_dao = to_dao(torso)
 
     session.add(torso_dao)
@@ -290,7 +303,7 @@ def test_kinematic_chain_and_torso(session, database):
 
 
 def test_custom_types(session, database):
-    ogs = OriginalSimulatedObject(KRROODBowl(), 1)
+    ogs = OriginalSimulatedObject(concept=KRROODBowl(), placeholder=1)
     ogs_dao = to_dao(ogs)
     assert ogs.concept == ogs_dao.concept
 
@@ -321,7 +334,7 @@ def test_inheriting_from_explicit_mapping(session, database):
 
 
 def test_entity_association(session, database):
-    entity = Entity("TestEntity")
+    entity = Entity(name="TestEntity")
     association = EntityAssociation(entity=entity, a=["a"])
 
     association_dao = to_dao(association)
@@ -345,9 +358,9 @@ def test_assertion(session, database):
 
 
 def test_KRROODPositionsSubclassWithAnotherKRROODPosition(session, database):
-    position = KRROODPosition(1, 2, 3)
+    position = KRROODPosition(x=1, y=2, z=3)
     obj = KRROODPositionsSubclassWithAnotherKRROODPosition(
-        [position], ["a", "b", "c"], position
+        positions=[position], some_strings=["a", "b", "c"], positions2=position
     )
     dao: KRROODPositionsSubclassWithAnotherKRROODPositionDAO = to_dao(obj)
 
@@ -356,8 +369,8 @@ def test_KRROODPositionsSubclassWithAnotherKRROODPosition(session, database):
 
 
 def test_inheriting_from_inherited_class(session, database):
-    position_5d = KRROODPosition5D(1, 2, 3, 4, 5)
-    position_4d = KRROODPosition4D(1, 2, 3, 4)
+    position_5d = KRROODPosition5D(x=1, y=2, z=3, w=4, v=5)
+    position_4d = KRROODPosition4D(x=1, y=2, z=3, w=4)
 
     position_4d_dao = to_dao(position_4d)
     position_5d_dao = to_dao(position_5d)
@@ -383,8 +396,8 @@ def test_inheriting_from_inherited_class(session, database):
 
 
 def test_backreference_with_mapping(session, database):
-    back_ref = Backreference({1: 1})
-    ref = Reference(0, back_ref)
+    back_ref = Backreference(unmappable={1: 1})
+    ref = Reference(value=0, backreference=back_ref)
     back_ref.reference = ref
 
     dao = to_dao(ref)
@@ -403,11 +416,11 @@ def test_backreference_with_mapping(session, database):
 
 
 def test_alternative_mapping_aggregator(session, database):
-    e1 = Entity("E1")
-    e2 = Entity("E2")
-    e3 = Entity("E3")
+    e1 = Entity(name="E1")
+    e2 = Entity(name="E2")
+    e3 = Entity(name="E3")
 
-    ama = AlternativeMappingAggregator([e1, e2], [e2, e3])
+    ama = AlternativeMappingAggregator(entities1=[e1, e2], entities2=[e2, e3])
     dao = to_dao(ama)
 
     assert dao.entities1[1].target is dao.entities2[0].target
@@ -421,9 +434,9 @@ def test_alternative_mapping_aggregator(session, database):
 
 
 def test_container_item(session, database):
-    i1 = ItemWithBackreference(0)
-    i2 = ItemWithBackreference(1)
-    container = ContainerGeneration([i1, i2])
+    i1 = ItemWithBackreference(value=0)
+    i2 = ItemWithBackreference(value=1)
+    container = ContainerGeneration(items=[i1, i2])
 
     dao = to_dao(container)
     session.add(dao)
@@ -440,19 +453,34 @@ def test_container_item(session, database):
 
 
 def test_nested_mappings(session, database):
-    shape_1 = Shape("rectangle", KRROODTransformation(KRROODVector(1), Rotation(1)))
-    shape_2 = Shape("circle", KRROODTransformation(KRROODVector(2), Rotation(2)))
-    shape_3 = Shape("rectangle", KRROODTransformation(KRROODVector(3), Rotation(3)))
-    shapes = Shapes([shape_1, shape_2, shape_3])
-    more_shapes = MoreShapes([shapes, shapes])
+    shape_1 = Shape(
+        name="rectangle",
+        origin=KRROODTransformation(
+            vector=KRROODVector(x=1), rotation=Rotation(angle=1)
+        ),
+    )
+    shape_2 = Shape(
+        name="circle",
+        origin=KRROODTransformation(
+            vector=KRROODVector(x=2), rotation=Rotation(angle=2)
+        ),
+    )
+    shape_3 = Shape(
+        name="rectangle",
+        origin=KRROODTransformation(
+            vector=KRROODVector(x=3), rotation=Rotation(angle=3)
+        ),
+    )
+    shapes = Shapes(shapes=[shape_1, shape_2, shape_3])
+    more_shapes = MoreShapes(shapes=[shapes, shapes])
     dao = to_dao(more_shapes)
     session.add(dao)
     session.commit()
 
 
 def test_vector_mapped(session, database):
-    vector = KRROODVector(1.0)
-    vector_mapped = KRROODVectorsWithProperty([vector])
+    vector = KRROODVector(x=1.0)
+    vector_mapped = KRROODVectorsWithProperty(_vectors=[vector])
     dao = to_dao(vector_mapped)
 
     session.add(dao)
@@ -465,10 +493,10 @@ def test_vector_mapped(session, database):
 
 
 def test_test_classes(session, database):
-    parent = ParentBase("x", 0)
-    child = ChildBase("y", 0)
-    parent_mapping = ParentBaseMapping("x")
-    child_mapping = ChildBaseMapping("y")
+    parent = ParentBase(name="x", value=0)
+    child = ChildBase(name="y", value=0)
+    parent_mapping = ParentBaseMapping(name="x")
+    child_mapping = ChildBaseMapping(name="y")
 
     parent_dao = to_dao(parent_mapping)
     child_dao = to_dao(child_mapping)
@@ -496,14 +524,14 @@ def test_private_factories(session, database):
 
 
 def test_relationship_overloading(session, database):
-    obj = RelationshipChild(KRROODPosition(1, 2, 3))
+    obj = RelationshipChild(positions=KRROODPosition(x=1, y=2, z=3))
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
 
     queried = session.scalars(select(RelationshipParentDAO)).one()
     reconstructed = queried.from_dao()
-    assert reconstructed.positions == KRROODPosition(1, 2, 3)
+    assert reconstructed.positions == KRROODPosition(x=1, y=2, z=3)
 
 
 def test_alternative_mapping_inheritance(session, database):
@@ -515,7 +543,12 @@ def test_inheritance_mapper_args(session, database):
 
 
 def test_to_dao_alternatively_mapped_parent(session, database):
-    ch2 = ChildLevel2NormallyMapped(1, [Entity("a")], 2, 3)
+    ch2 = ChildLevel2NormallyMapped(
+        base_attribute=1,
+        entities=[Entity(name="a")],
+        level_one_attribute=2,
+        level_two_attribute=3,
+    )
     ch2_dao: ChildLevel2NormallyMappedDAO = to_dao(ch2)
 
     result_by_hand = ChildLevel2NormallyMappedDAO(
@@ -540,14 +573,14 @@ def test_to_dao_alternatively_mapped_parent(session, database):
 
 
 def test_callable_alternative_mapping():
-    callable_mapping = FunctionMapping.from_domain_object(module_level_function)
+    callable_mapping = FunctionMapping.from_domain_object(obj=module_level_function)
     reconstructed = callable_mapping.to_domain_object()
     assert reconstructed() == 1
 
 
 def test_callable_alternative_mapping_instance_method():
     callable_mapping = FunctionMapping.from_domain_object(
-        CallableWrapper.custom_instance_method
+        obj=CallableWrapper.custom_instance_method
     )
     reconstructed = callable_mapping.to_domain_object()
     assert reconstructed is CallableWrapper.custom_instance_method
@@ -555,7 +588,7 @@ def test_callable_alternative_mapping_instance_method():
 
 def test_callable_alternative_mapping_class_method():
     callable_mapping = FunctionMapping.from_domain_object(
-        CallableWrapper.custom_class_method
+        obj=CallableWrapper.custom_class_method
     )
     reconstructed = callable_mapping.to_domain_object()
     assert reconstructed == CallableWrapper.custom_class_method
@@ -563,7 +596,7 @@ def test_callable_alternative_mapping_class_method():
 
 def test_callable_alternative_mapping_static_method():
     callable_mapping = FunctionMapping.from_domain_object(
-        CallableWrapper.custom_static_method
+        obj=CallableWrapper.custom_static_method
     )
     reconstructed = callable_mapping.to_domain_object()
     assert reconstructed is CallableWrapper.custom_static_method
@@ -572,7 +605,7 @@ def test_callable_alternative_mapping_static_method():
 
 def test_anonymous_function_mapping():
     func = lambda: 0
-    callable_mapping = FunctionMapping.from_domain_object(func)
+    callable_mapping = FunctionMapping.from_domain_object(obj=func)
     reconstructed = callable_mapping.to_domain_object()
     with pytest.raises(UncallableFunction):
         reconstructed()
@@ -580,7 +613,7 @@ def test_anonymous_function_mapping():
 
 def test_callable_mapping(session, database):
 
-    obj = CallableWrapper(module_level_function)
+    obj = CallableWrapper(func=module_level_function)
     assert obj.func() == 1
 
     dao = to_dao(obj)
@@ -590,7 +623,7 @@ def test_callable_mapping(session, database):
 
 
 def test_uuid(session, database):
-    obj = UUIDWrapper(uuid.uuid4())
+    obj = UUIDWrapper(identification=uuid.uuid4())
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
@@ -600,7 +633,9 @@ def test_uuid(session, database):
 
 
 def test_list_of_custom_type(session, database):
-    obj = UUIDWrapper(uuid.uuid4(), [uuid.uuid4(), uuid.uuid4()])
+    obj = UUIDWrapper(
+        identification=uuid.uuid4(), other_identifications=[uuid.uuid4(), uuid.uuid4()]
+    )
     dao = to_dao(obj)
 
     session.add(dao)
@@ -612,7 +647,10 @@ def test_list_of_custom_type(session, database):
 
 
 def test_json_integration(session, database):
-    obj = JSONWrapper(JSONSerializableClass(1, 2), [JSONSerializableClass(3, 4)])
+    obj = JSONWrapper(
+        json_serializable_object=JSONSerializableClass(a=1, b=2),
+        more_objects=[JSONSerializableClass(a=3, b=4)],
+    )
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
@@ -642,9 +680,9 @@ def test_custom_type_from_foreign_package(session, database):
 def test_many_to_many_with_same_type(session, database):
 
     state = ToDataAccessObjectState()
-    position = KRROODPosition(1, 2, 3)
-    ps1 = KRROODPositions([position], ["a"])
-    ps2 = KRROODPositions([position], ["a"])
+    position = KRROODPosition(x=1, y=2, z=3)
+    ps1 = KRROODPositions(positions=[position], some_strings=["a"])
+    ps2 = KRROODPositions(positions=[position], some_strings=["a"])
 
     ps1_dao = to_dao(ps1, state)
     ps2_dao = to_dao(ps2, state)
@@ -681,7 +719,9 @@ def test_multiple_inheritance(session, database):
 
 
 def test_list_of_enum(session, database):
-    obj = ListOfEnum([TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C])
+    obj = ListOfEnum(
+        list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C]
+    )
     dao = to_dao(obj)
 
     session.add(dao)
@@ -721,8 +761,8 @@ def test_underspecified_types():
 
 
 def test_position_set(session, database):
-    p1, p2 = KRROODPosition(1, 2, 3), KRROODPosition(2, 3, 4)
-    obj = TestKRROODPositionSet({p1, p2})
+    p1, p2 = KRROODPosition(x=1, y=2, z=3), KRROODPosition(x=2, y=3, z=4)
+    obj = TestKRROODPositionSet(positions={p1, p2})
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
@@ -769,10 +809,10 @@ def test_post_init_and_circular_reference(session, database):
 
 
 def test_polymorphic_enum(session, database):
-    v1 = PolymorphicEnumAssociation(ChildEnum1.A)
-    v2 = PolymorphicEnumAssociation(ChildEnum1.B)
-    v3 = PolymorphicEnumAssociation(ChildEnum2.B)
-    v4 = PolymorphicEnumAssociation(ChildEnum2.C)
+    v1 = PolymorphicEnumAssociation(value=ChildEnum1.A)
+    v2 = PolymorphicEnumAssociation(value=ChildEnum1.B)
+    v3 = PolymorphicEnumAssociation(value=ChildEnum2.B)
+    v4 = PolymorphicEnumAssociation(value=ChildEnum2.C)
 
     dao_1, dao_2, dao_3, dao_4 = to_dao(v1), to_dao(v2), to_dao(v3), to_dao(v4)
 
@@ -803,15 +843,17 @@ def test_generic_class(session, database):
     assert hasattr(GenericClass_KRROODPositionDAO, "container")
 
     assert hasattr(GenericClassAssociationDAO, "associated_value")
-    generic_position = GenericClass[KRROODPosition](KRROODPosition(1.0, 2.0, 3.0))
+    generic_position = GenericClass[KRROODPosition](
+        value=KRROODPosition(x=1.0, y=2.0, z=3.0)
+    )
     obj = GenericClassAssociation(
-        associated_value=GenericClass[float](1.0),
+        associated_value=GenericClass[float](value=1.0),
         associated_value_list=[
             generic_position,
             generic_position,
         ],
         associated_value_not_parametrized=generic_position,
-        associated_value_not_parametrized_list=[GenericClass(2.0)],
+        associated_value_not_parametrized_list=[GenericClass(value=2.0)],
     )
     dao: GenericClassAssociationDAO = to_dao(obj)
     assert isinstance(dao.associated_value, GenericClass_floatDAO)
@@ -850,14 +892,14 @@ def test_shared_parametrization_resolves_the_same_whichever_field_reaches_it_fir
     which field got there first would pin a shared object to the ambiguous base DAO and
     drop everything the concrete table holds.
     """
-    shared = GenericClass[KRROODPosition](KRROODPosition(1.0, 2.0, 3.0))
+    shared = GenericClass[KRROODPosition](value=KRROODPosition(x=1.0, y=2.0, z=3.0))
     reached_through_bare_field = GenericClassAssociation(
-        associated_value=GenericClass[float](1.0),
+        associated_value=GenericClass[float](value=1.0),
         associated_value_list=[],
         associated_value_not_parametrized=shared,
     )
     reached_through_parametrized_field = GenericClassAssociation(
-        associated_value=GenericClass[float](9.0),
+        associated_value=GenericClass[float](value=9.0),
         associated_value_list=[shared],
     )
 
@@ -880,11 +922,11 @@ def test_consistent_hashes_of_association_object_table_names():
 
 def test_class_dependencies(session, database):
 
-    b1 = BuildFirst("a")
-    b2 = BuildFirst("b")
-    a1 = BuildFirstAssociation(b1)
+    b1 = BuildFirst(value="a")
+    b2 = BuildFirst(value="b")
+    a1 = BuildFirstAssociation(build_first=b1)
 
-    instance = Entrypoint(b2, a1)
+    instance = Entrypoint(build_first=b2, build_first_association=a1)
     dao = to_dao(instance)
     session.add(dao)
     session.commit()
@@ -908,7 +950,7 @@ def test_class_dependencies(session, database):
 
 
 def test_path_custom_type(session, database):
-    path = PathAssociation(Path.home())
+    path = PathAssociation(path=Path.home())
 
     dao = to_dao(path)
     session.add(dao)
@@ -921,7 +963,7 @@ def test_path_custom_type(session, database):
 
 
 def test_duration_keeps_sub_second_resolution(session, database):
-    duration = DurationAssociation(timedelta(seconds=3, microseconds=12500))
+    duration = DurationAssociation(duration=timedelta(seconds=3, microseconds=12500))
 
     dao = to_dao(duration)
     session.add(dao)
@@ -937,9 +979,9 @@ def test_selectin_loading_preloads_relationships(session, database):
     lazy='selectin') and remain accessible after the instance is detached from the
     session, with or without the selectin_loading() context manager.
     """
-    p1 = KRROODPosition(1, 2, 3)
-    p2 = KRROODPosition(2, 3, 4)
-    positions = KRROODPositions([p1, p2], ["a"])
+    p1 = KRROODPosition(x=1, y=2, z=3)
+    p2 = KRROODPosition(x=2, y=3, z=4)
+    positions = KRROODPositions(positions=[p1, p2], some_strings=["a"])
     session.add(to_dao(positions))
     session.commit()
     session.expunge_all()
@@ -967,8 +1009,10 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
     """
     N = 30
     positions = KRROODPositions(
-        [KRROODPosition(float(i), float(i), float(i)) for i in range(N)],
-        ["s"],
+        positions=[
+            KRROODPosition(x=float(i), y=float(i), z=float(i)) for i in range(N)
+        ],
+        some_strings=["s"],
     )
     session.add(to_dao(positions))
     session.commit()
@@ -1002,9 +1046,9 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
         sa_event.remove(engine, "after_cursor_execute", _count)
 
     # from_dao() must issue no queries at all in either case.
-    assert (
-        queries_without == 0
-    ), f"Expected 0 queries without selectin_loading but got {queries_without}"
-    assert (
-        queries_with == 0
-    ), f"Expected 0 queries with selectin_loading but got {queries_with}"
+    assert queries_without == 0, (
+        f"Expected 0 queries without selectin_loading but got {queries_without}"
+    )
+    assert queries_with == 0, (
+        f"Expected 0 queries with selectin_loading but got {queries_with}"
+    )

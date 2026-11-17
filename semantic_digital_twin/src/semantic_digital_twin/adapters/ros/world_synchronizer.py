@@ -8,8 +8,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing_extensions import ClassVar
+from typing_extensions import Callable, ClassVar
 from uuid import UUID
+
+from numbers import Real
 
 import numpy as np
 import rclpy  # type: ignore
@@ -20,7 +22,8 @@ from rclpy.subscription import Subscription
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from krrood.adapters.json_serializer import from_json, to_json
+from krrood.adapters.json_serializer import to_json
+from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.adapters.ros.messages import (
     MessageField,
@@ -29,20 +32,18 @@ from semantic_digital_twin.adapters.ros.messages import (
     Message,
     ModificationBlock,
     LoadModel,
+    ReceivedMessage,
     StreamPosition,
     WorldUpdate,
-)
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
+from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
 from semantic_digital_twin.exceptions import (
+    StateUpdateContainsNonNumericValuesError,
     SynchronizerNotConnectedError,
-    WorldEntityWithIDNotInKwargs,
-    WorldUpdateReferencesUnknownEntityError,
     MissingPublishChangesKWARG,
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
     StateUpdateContainsUnknownDegreesOfFreedomError,
@@ -50,6 +51,10 @@ from semantic_digital_twin.exceptions import (
     WorldHasNoSynchronizerError,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_modification import (
+    AddDegreeOfFreedomModification,
+    RemoveDegreeOfFreedomModification,
+)
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithClassBasedID,
 )
@@ -92,6 +97,10 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     Every published message carries its position in this synchronizer's stream, and
     every applied message is remembered per publisher, so that two processes can tell
     each other what to catch up with without comparing world models they cannot compare.
+    A message that does not follow the one received from its publisher before reveals
+    that messages in between were lost, which is logged. A message this world cannot
+    apply is logged too, and its publisher no longer counts as caught up with until
+    :meth:`forget_divergence_from` is called for it.
     """
 
     node: RosNode = field(kw_only=True)
@@ -117,6 +126,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     discovery_poll_interval: timedelta = timedelta(seconds=0.02)
     """
     How long to wait between two looks at the subscribers of the topic while connecting.
+    """
+
+    message_queue_depth: int = 1000
+    """
+    How many messages the publisher and the subscriber keep for a receiver that has not
+    taken them yet; once more are waiting, the oldest are lost.
     """
 
     publisher: Publisher | None = field(init=False, default=None)
@@ -146,6 +161,21 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     The highest position applied so far, per publisher.
     """
 
+    _received_sequence_numbers: dict[MetaData, int] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The position of the message received last, per publisher.
+    """
+
+    _divergences: dict[MetaData, SynchronizerDivergedError] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The first failure to apply a message of a publisher, per publisher this world may
+    differ from since.
+    """
+
     _sequence_number_lock: threading.Lock = field(
         default_factory=threading.Lock, init=False, repr=False
     )
@@ -161,10 +191,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             std_msgs.msg.String,
             topic=self.topic_name,
             callback=self.subscription_callback,
-            qos_profile=10,
+            qos_profile=self.message_queue_depth,
         )
         self.publisher = self.node.create_publisher(
-            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
+            std_msgs.msg.String,
+            topic=self.topic_name,
+            qos_profile=self.message_queue_depth,
         )
         self.wait_until_connected()
 
@@ -213,32 +245,122 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             process_id=os.getpid(),
         )
 
-    def subscription_callback(self, message: std_msgs.msg.String):
+    def subscription_callback(self, message: std_msgs.msg.String) -> None:
         """
-        Wrap the origin subscription callback by self-skipping and disabling the next
-        world callback. Holds the world lock while deserializing to ensure no changes
-        happen while building the tracker and running from_json.
+        Hand a message of another synchronizer to :meth:`_subscription_callback`; the
+        echo of this synchronizer's own messages is dropped unread.
 
         :param message: The incoming ROS string message containing a serialized
             synchronization message.
         """
-        content = json.loads(message.data)
-        with self._world._world_lock:
-            tracker = WorldEntityWithIDKwargsTracker.from_world(self._world)
-            try:
-                deserialized_message = from_json(content, **tracker.create_kwargs())
-            except WorldEntityWithIDNotInKwargs as unknown_entity:
-                # More concrete exception for synchronizer
-                raise WorldUpdateReferencesUnknownEntityError(
-                    publisher=from_json(content[MessageField.META_DATA]),
-                    entity_id=unknown_entity.key,
-                    entity_name=unknown_entity.world_entity_name,
-                ) from unknown_entity
+        received = ReceivedMessage.from_json(json.loads(message.data))
+        if received.publisher == self.meta_data:
+            return
+        self._notice_lost_messages(received)
+        self._handle_reporting_divergence(
+            received=received, handle=self._subscription_callback
+        )
 
-            if deserialized_message.meta_data == self.meta_data:
-                return
+    def _handle_reporting_divergence(
+        self,
+        *,
+        received: ReceivedMessage,
+        handle: Callable[[ReceivedMessage], None],
+        error_throttle_period: float = 1.0,
+    ) -> None:
+        """
+        Handle a received message; if it cannot be applied, log that, and stop counting
+        its publisher as caught up with, instead of ending the spinning of the node or
+        the batch the message is applied in.
 
-            self._subscription_callback(deserialized_message)
+        .. warning:: A model modification that fails part-way stays applied as far as it
+            got, so the world may hold part of the failed message.
+
+        :param received: The message to handle.
+        :param handle: What to do with the message.
+        :param error_throttle_period: The fewest seconds between two logged errors.
+        """
+        try:
+            handle(received)
+        except DataclassException as error:
+            divergence = SynchronizerDivergedError(
+                publisher=received.publisher,
+                sequence_number=received.sequence_number,
+                raised_from=error,
+            )
+            with self._sequence_number_lock:
+                self._divergences.setdefault(received.publisher, divergence)
+            self.node.get_logger().error(
+                f"{divergence.error_message()} Cause: {error}",
+                throttle_duration_sec=error_throttle_period,
+            )
+
+    def divergence_from(
+        self, *, publisher: MetaData
+    ) -> SynchronizerDivergedError | None:
+        """
+        :param publisher: Another synchronizer.
+        :return: The first failure to apply a message of ``publisher`` since this world
+            last caught up with it in full, or ``None`` if every message was applied.
+        """
+        with self._sequence_number_lock:
+            return self._divergences.get(publisher)
+
+    def forget_divergence_from(self, *, publisher: MetaData) -> None:
+        """
+        Count ``publisher`` as caught up with again, once this world was made equal to
+        its world, for example by fetching or reloading it.
+
+        :param publisher: The synchronizer whose world this world now equals.
+        """
+        with self._sequence_number_lock:
+            self._divergences.pop(publisher, None)
+
+    def forget_divergences_from_same_world(self, *, publisher: MetaData) -> None:
+        """
+        Count every synchronizer of the world ``publisher`` belongs to, in its process,
+        as caught up with again, once this world was replaced by that world.
+
+        The synchronizers of one world, such as its reloads and its updates, publish
+        under different nodes, so they are told apart by process and world, not node.
+
+        :param publisher: A synchronizer of the world this world now equals.
+        """
+        with self._sequence_number_lock:
+            caught_up = [
+                diverged
+                for diverged in self._divergences
+                if diverged.process_id == publisher.process_id
+                and diverged.world_id == publisher.world_id
+            ]
+            for diverged in caught_up:
+                del self._divergences[diverged]
+
+    def _notice_lost_messages(
+        self, message: ReceivedMessage, warning_throttle_period: float = 1.0
+    ) -> None:
+        """
+        Warn that messages of the publisher of `message` were lost if `message` does not
+        follow the one received from it before.
+
+        Only what changed is published, so the world may differ from the publisher's in
+        what the lost messages carried.
+
+        :param message: A message just received from another synchronizer.
+        :param warning_throttle_period: The fewest seconds between two warnings.
+        """
+        publisher = message.publisher
+        with self._sequence_number_lock:
+            last_received = self._received_sequence_numbers.get(publisher)
+            self._received_sequence_numbers[publisher] = message.sequence_number
+        if last_received is None or message.sequence_number == last_received + 1:
+            return
+        self.node.get_logger().warning(
+            f"Updates #{last_received + 1} to #{message.sequence_number - 1} of "
+            f"'{publisher.node_name}' were lost, so this world may differ from the one "
+            f"of the publisher.",
+            throttle_duration_sec=warning_throttle_period,
+        )
 
     @property
     def published_sequence_number(self) -> int:
@@ -256,9 +378,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         Whether everything up to ``position`` was applied to this world.
 
         A publisher this world never heard from is treated as being at the start of its
-        stream, so its first message is still awaited.
+        stream, so its first message is still awaited. A publisher a message of which
+        could not be applied is not caught up with, see :meth:`divergence_from`.
         """
         with self._sequence_number_lock:
+            if position.origin in self._divergences:
+                return False
             applied = self._applied_sequence_numbers.get(position.origin, 0)
         return applied >= position.sequence_number
 
@@ -277,9 +402,11 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             )
 
     @abstractmethod
-    def _subscription_callback(self, msg: message_type):
+    def _subscription_callback(self, message: ReceivedMessage) -> None:
         """
         Callback function called when receiving new messages from other publishers.
+
+        :param message: The message, not yet built against the world.
         """
         raise NotImplementedError
 
@@ -375,11 +502,12 @@ class ModelReloadSynchronizer(Synchronizer):
         message = LoadModel(primary_key=dao.database_id, meta_data=self.meta_data)
         self.publish(message)
 
-    def _subscription_callback(self, msg: LoadModel):
+    def _subscription_callback(self, message: ReceivedMessage) -> None:
+        reload = message.to_message(world=self._world)
         if self.defer_incoming_reloads:
-            self.pending_reload = msg
+            self.pending_reload = reload
             return
-        self.apply_reload(msg)
+        self.apply_reload(reload)
 
     def apply_pending_reload(self):
         """
@@ -405,6 +533,11 @@ class ModelReloadSynchronizer(Synchronizer):
         new_world = self.session.scalars(query).one().from_dao()
         self._world._replace_with(new_world)
         self.record_applied(msg)
+        for synchronizer in [
+            self,
+            *WorldSynchronizer.all_callbacks_of_this_type_from_world(self._world),
+        ]:
+            synchronizer.forget_divergences_from_same_world(publisher=msg.meta_data)
 
 
 @dataclass(eq=False)
@@ -432,11 +565,12 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     example a controller that must not have the world changed under a running motion.
     """
 
-    missed_messages: list[WorldUpdate] = field(
+    missed_messages: list[ReceivedMessage] = field(
         default_factory=list, init=False, repr=False
     )
     """
-    Buffer for messages that were received but not applied yet.
+    Buffer for messages that were received but not applied yet, each built against the
+    world only when it is applied, so it may refer to what an earlier one introduces.
 
     These messages can be applied later by calling ``apply_missed_messages()`` or, up to
     the next model modification, ``apply_missed_state_updates()``.
@@ -589,12 +723,12 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             for index in changed_indices
         }
 
-    def _subscription_callback(self, message: WorldUpdate):
+    def _subscription_callback(self, message: ReceivedMessage) -> None:
         if self._is_paused or self.defer_incoming_updates:
             with self._missed_message_lock:
                 self.missed_messages.append(message)
             return
-        self.apply_message(message)
+        self.apply_message(message.to_message(world=self._world))
 
     @property
     def has_buffered_model_modification(self) -> bool:
@@ -607,8 +741,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         """
         with self._missed_message_lock:
             return any(
-                message.modification_block is not None
-                for message in self.missed_messages
+                message.carries_model_modification for message in self.missed_messages
             )
 
     def apply_message(self, message: WorldUpdate):
@@ -616,9 +749,16 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         Apply model first, then state — preserves the ordering invariant.
 
         Both are applied under a single hold of ``_world_lock`` so a combined update is
-        atomic: no other thread can observe the new model structure without its accompanying state.
+        atomic: no other thread can observe the new model structure without its
+        accompanying state. The state is checked before the model is applied, so a
+        state that cannot be applied leaves the model untouched too.
         """
         with self._world._world_lock:
+            if message.state_update is not None:
+                self._check_state_update(
+                    state_update=message.state_update,
+                    modification_block=message.modification_block,
+                )
             if message.modification_block is not None:
                 self._apply_model(message.modification_block)
             if message.state_update is not None:
@@ -633,32 +773,62 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         with self._world.modify_world(publish_changes=False):
             modification_block_message.modifications.apply(self._world)
 
-    def _apply_state(self, state_update_message: WorldStateUpdate):
+    def _check_state_update(
+        self,
+        *,
+        state_update: WorldStateUpdate,
+        modification_block: ModificationBlock | None = None,
+    ) -> None:
         """
-        Applies the state, and raises a StateUpdateContainsUnknownDegreesOfFreedomError
-        if we receive unknown degree of freedom.
+        :param state_update: A received state.
+        :param modification_block: The model modification received with it, whose
+            degrees of freedom the state may already refer to.
+        :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the state refers to
+            a degree of freedom the world will not hold.
+        :raises StateUpdateContainsNonNumericValuesError: If a value is not a number.
         """
-        identifier_index_state_triples = [
-            (identifier, self._world.state._index.get(identifier), state_value)
-            for identifier, state_value in zip(
-                state_update_message.ids, state_update_message.states
-            )
-        ]
+        known_identifiers = set(self._world.state.keys())
+        if modification_block is not None:
+            for modification in modification_block.modifications:
+                match modification:
+                    case AddDegreeOfFreedomModification():
+                        known_identifiers.add(modification.degree_of_freedom.id)
+                    case RemoveDegreeOfFreedomModification():
+                        known_identifiers.discard(modification.degree_of_freedom_id)
         unknown_identifiers = [
             identifier
-            for identifier, index, _ in identifier_index_state_triples
-            if index is None
+            for identifier in state_update.ids
+            if identifier not in known_identifiers
         ]
         if unknown_identifiers:
             raise StateUpdateContainsUnknownDegreesOfFreedomError(
                 unknown_identifiers=unknown_identifiers
             )
-        indices = [index for _, index, _ in identifier_index_state_triples]
-        state_values = [
-            state_value for _, _, state_value in identifier_index_state_triples
+        non_numeric_states = [
+            state for state in state_update.states if not isinstance(state, Real)
+        ]
+        if non_numeric_states:
+            raise StateUpdateContainsNonNumericValuesError(
+                non_numeric_states=non_numeric_states
+            )
+
+    def _apply_state(self, state_update_message: WorldStateUpdate):
+        """
+        Applies the state.
+
+        :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the state refers to
+            a degree of freedom the world does not hold.
+        :raises StateUpdateContainsNonNumericValuesError: If a value is not a number.
+        """
+        self._check_state_update(state_update=state_update_message)
+        indices = [
+            self._world.state._index[identifier]
+            for identifier in state_update_message.ids
         ]
         with self._world._world_lock:
-            self._world.state._data[0, indices] = np.asarray(state_values, dtype=float)
+            self._world.state._data[0, indices] = np.asarray(
+                state_update_message.states, dtype=float
+            )
             self.update_previous_world_state()
         self._world.notify_state_change(publish_changes=False)
 
@@ -690,7 +860,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         """
         with self._missed_message_lock:
             for position, message in enumerate(self.missed_messages):
-                if message.modification_block is not None:
+                if message.carries_model_modification:
                     return position
             return len(self.missed_messages)
 
@@ -702,6 +872,9 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         between messages, which is required for state messages that follow model
         messages (``compiled_all_fks`` must exist before ``notify_state_change`` is
         called).
+
+        A message that cannot be applied is reported as in :meth:`subscription_callback`
+        and does not keep the messages after it from being applied.
 
         :raises ApplyMissedMessagesWhileWorldIsBeingModifiedError: If called while a
             ``modify_world`` context is active on this synchronizer's world.
@@ -719,7 +892,12 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         # concurrent modify_world on another thread serializes behind it instead of interleaving.
         with self._world._world_lock:
             for message in pending_messages:
-                self.apply_message(message)
+                self._handle_reporting_divergence(
+                    received=message,
+                    handle=lambda received: self.apply_message(
+                        received.to_message(world=self._world)
+                    ),
+                )
 
     def resume(self):
         """

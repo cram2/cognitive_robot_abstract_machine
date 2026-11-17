@@ -5,6 +5,10 @@ The rules on documentation.
 from __future__ import annotations
 
 
+from krrood.development_tools.agents.docstring_presence import (
+    MissingDocstringChecker,
+)
+from krrood.development_tools.agents.prose_length import ProseLengthChecker
 from krrood.development_tools.agents.rule import Section
 
 
@@ -13,16 +17,24 @@ class DocumentationRules(Section):
     The rules on docstrings and comments.
     """
 
-    DOCUMENT_EVERYTHING = (
-        "Every class and method has meaningful, non-trivial documentation in "
-        "reStructuredText. Every field has its own docstring directly below it, "
-        "not a description in the class docstring"
+    DOCUMENT_EVERY_CONSTRUCT = (
+        "Every module, class, function and field has a docstring. A field's "
+        "docstring goes directly below the field, not in the class docstring. A "
+        "method implementing an abstract method is exempt: the abstract method's "
+        "docstring is enough",
+        (),
+        MissingDocstringChecker(),
+    )
+
+    MEANINGFUL_DOCUMENTATION = (
+        "Documentation is written in reStructuredText and is meaningful and "
+        "non-trivial: it says something the name and the type hints do not"
     )
 
     OVERRIDES_INHERIT_DOCSTRINGS = (
-        "An override that keeps its base contract has no docstring and inherits "
-        "the base one. One that changes the contract documents only the difference "
-        "and references the overridden method with `:meth:`"
+        "An implementation of an abstract method has no docstring and inherits "
+        "the base one. An override of an implemented method documents only what "
+        "differs from the base and references the overridden method with `:meth:`"
     )
 
     DOCSTRINGS_STATE_THE_CONTRACT = (
@@ -46,8 +58,15 @@ class DocumentationRules(Section):
         ),
     )
 
-    SHORT_COMMENTS = (
-        "Keep docstrings and comments short and never write walls of text. "
+    SHORT_PROSE = (
+        f"A docstring holds at most {ProseLengthChecker.docstring_lines} lines of "
+        "prose, field lists and literal blocks aside, and a comment block at most "
+        f"{ProseLengthChecker.comment_lines} lines",
+        (),
+        ProseLengthChecker(),
+    )
+
+    MEANINGFUL_COMMENTS = (
         "Comments are meaningful and DRY; remove comments that restate the code"
     )
 

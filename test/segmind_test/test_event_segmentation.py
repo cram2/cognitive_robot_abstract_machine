@@ -12,7 +12,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 import pytest
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.executor import StatechartExecutor
 from krrood.exceptions import DataclassException
 
 from segmind.datastructures.events import (
@@ -31,7 +31,7 @@ from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.event_segmentation import Segmind
 from segmind.exceptions import NoSemanticAnnotationToWatch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Food, Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 from .conftest import RESTING_ON_THE_TABLE
@@ -170,7 +170,7 @@ def test_what_happens_while_a_run_is_watched_is_detected(milk_in_the_apartment):
 # %% detectors that detect nothing, to watch the watching itself
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class DetectorCountingItsTicks(AbstractDetector):
     """
     Detects nothing, and records how often and on which thread it was ticked.
@@ -193,7 +193,6 @@ class DetectorCountingItsTicks(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
         tracked_objects: list[Body],
     ) -> list[DetectionEvent]:
@@ -203,7 +202,7 @@ class DetectorCountingItsTicks(AbstractDetector):
         return []
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class DetectorTakingItsTime(AbstractDetector):
     """
     Detects nothing, and spends a fixed time on every tick.
@@ -216,7 +215,6 @@ class DetectorTakingItsTime(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
         tracked_objects: list[Body],
     ) -> list[DetectionEvent]:

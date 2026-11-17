@@ -1,19 +1,18 @@
 #!/usr/bin/env python
 import argparse
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.other_robots.garmi.configs import (
     GarmiInteractiveMarkerChain,
-    GarmiStandaloneInterface,
-    WorldWithGarmiConfig,
 )
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     InteractiveMarkerNode,
 )
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.robots.garmi import Garmi
+from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
 def main() -> None:
@@ -26,14 +25,11 @@ def main() -> None:
     # parse_known_args ignores ROS 2 arguments (--ros-args ...) that argparse does not know about.
     args, _ = parser.parse_known_args()
 
-    rospy.init_node("giskard")
-    robot_description = load_xacro("package://garmi_description/urdf/garmi.urdf")
+    background_node.init_node("giskard")
 
-    giskard = Giskard(
-        world_config=WorldWithGarmiConfig(urdf=robot_description),
-        robot_interface_config=GarmiStandaloneInterface(),
-        server_config=GiskardServerConfig(
-            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
+    giskard = Giskard.standalone(
+        world_source=WorldSpecification(
+            robots=[RobotSpecification.specify_real_robot(Garmi)]
         ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )

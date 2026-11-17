@@ -1,28 +1,35 @@
+"""
+The exceptions raised across the semantic digital twin.
+"""
+
 from __future__ import annotations, absolute_import
 
+# %% Imports
 from dataclasses import dataclass, field, Field
 from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
-from typing_extensions import TYPE_CHECKING, Callable, Any
 from uuid import UUID
 
 import mujoco
+from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.adapters.ros.messages import MetaData
     from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
         HasSupportingSurface,
     )
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-    from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
+    from semantic_digital_twin.grasping.object_relative_grasp import (
+        ObjectRelativeGrasp,
+    )
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -38,18 +45,19 @@ if TYPE_CHECKING:
         WorldEntityWithID,
         KinematicStructureEntity,
     )
-    from semantic_digital_twin.spatial_types.spatial_types import (
-        SpatialType,
-    )
-    from semantic_digital_twin.spatial_types import Vector3, Point
+    from krrood_spatial_math.spatial_types import Vector3, Point
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
         DegreeOfFreedom,
     )
     from semantic_digital_twin.world_description.world_modification import (
+        WorldModelModificationBlock,
         WorldModification,
     )
-    from semantic_digital_twin.collision_checking.collision_matrix import CollisionCheck
+    from semantic_digital_twin.collision_checking.collision_matrix import (
+        CollisionCheck,
+        CollisionRule,
+    )
 
 
 @dataclass
@@ -299,6 +307,99 @@ class InvalidCameraResolutionError(UsageError):
 
 
 @dataclass
+class InvalidCameraFieldOfViewError(UsageError):
+    """
+    Raised when camera viewing angles cannot describe a projection.
+    """
+
+    horizontal_angle: float
+    """
+    Invalid horizontal viewing angle in radians.
+    """
+
+    vertical_angle: float
+    """
+    Invalid vertical viewing angle in radians.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "Camera field-of-view angles must be between zero and pi radians, "
+            f"got horizontal={self.horizontal_angle} and vertical={self.vertical_angle}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide positive viewing angles smaller than pi radians."
+
+
+@dataclass
+class InvalidCameraDistortionError(UsageError):
+    """
+    Raised when distortion coefficients do not match their model.
+    """
+
+    model: str
+    """
+    Distortion model whose coefficients are invalid.
+    """
+
+    reason: str
+    """
+    Reason the distortion value is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid camera distortion model '{self.model}': {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "provide finite coefficients defined by the distortion model."
+
+
+@dataclass
+class InvalidPinholeCameraModelError(UsageError):
+    """
+    Raised when pinhole calibration parameters cannot describe an image.
+    """
+
+    reason: str
+    """
+    Reason the calibration is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid pinhole camera model: {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "provide positive focal lengths and a principal point within the image."
+
+
+@dataclass
+class InvalidCameraRangeError(UsageError):
+    """
+    Raised when a camera distance interval is empty or negative.
+    """
+
+    minimum_distance: float
+    """
+    Invalid minimum distance in meters.
+    """
+
+    maximum_distance: float
+    """
+    Invalid maximum distance in meters.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "Camera range requires a non-negative minimum below its maximum, "
+            f"got minimum={self.minimum_distance} and maximum={self.maximum_distance}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide an ordered, non-negative distance interval."
+
+
+@dataclass
 class ROSNodeNotRegisteredError(UsageError, RuntimeError):
     """
     Raised when shared ROS node access is requested before registration.
@@ -344,26 +445,54 @@ class WorldIsNotATreeError(WorldValidationError):
 
 
 @dataclass
-class BrokenWorldModificationHistoryError(WorldValidationError):
+class PartiallyAppliedWorldModificationError(WorldValidationError):
     """
-    Raised when the world's modification history was detected to be broken.
+    Raised when an exception escapes a modification block after the block already
+    changed the world.
+
+    The changes stay in the world, but they are neither in its modification history nor
+    published, so copies and synchronized worlds no longer match it.
+
+    .. warning::
+        This always signals a bug, never a condition to handle.
     """
 
-    potential_cause: DataclassException | None = None
+    cause: Exception
     """
-    The exception that was thrown and caused the world's modification history to be
-    broken.
+    The exception that escaped the modification block.
     """
+
+    applied_modifications: WorldModelModificationBlock
+    """
+    The modifications the block applied to the world before the exception.
+    """
+
+    @classproperty
+    def issue_tracker_url(cls) -> str:
+        """
+        :return: Where to report a failed modification block.
+        """
+        return "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
     def error_message(self) -> str:
+        applied_modification_types = ", ".join(
+            type(modification).__name__ for modification in self.applied_modifications
+        )
         return (
-            f"The world's modification history was detected to be broken. "
-            f"The world is {self.world}"
-            f" Potential cause: {self.potential_cause}"
+            f"A modification block raised {type(self.cause).__name__}: {self.cause}\n"
+            f"It had already applied {len(self.applied_modifications)} "
+            f"modification(s): {applied_modification_types}. They stay in the world but "
+            f"are not in its modification history and were not published, so copies and "
+            f"synchronized worlds no longer match {self.world}"
         )
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            f"this is a bug, not a condition to handle: a modification block must not "
+            f"raise. Find where the cause above was raised and fix it there; if the "
+            f"mistake is not in your code, or you cannot tell, report it at "
+            f"{self.issue_tracker_url} with this traceback."
+        )
 
 
 @dataclass
@@ -417,6 +546,52 @@ class InvalidRollbackVersionError(WorldValidationError):
 
     def suggest_correction(self) -> str:
         return "pass a version between 0 and the world's current version."
+
+
+@dataclass(kw_only=True)
+class RollbackBeforeClearError(WorldValidationError):
+    """
+    Raised when attempting to roll back to a version from before the world's history was
+    last cleared, which the history no longer holds the modifications to restore.
+    """
+
+    target_version: int
+    """
+    The version that was requested.
+    """
+
+    version_at_last_clear: int
+    """
+    The version the world was at when its history was last cleared.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot roll back to version {self.target_version}: the world's history "
+            f"was cleared at version {self.version_at_last_clear}, so no version up to "
+            f"it can be restored."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"pass a version after {self.version_at_last_clear}."
+
+
+@dataclass(kw_only=True)
+class WorldMergedWithItselfError(UsageError):
+    """
+    Raised when a world is asked to merge itself into itself.
+    """
+
+    world: World
+    """
+    The world that was to be merged with itself.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot merge the world {self.world} with itself."
+
+    def suggest_correction(self) -> str:
+        return "merge another world, or a copy of this one."
 
 
 @dataclass
@@ -1262,6 +1437,28 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
 
 
 @dataclass
+class StateUpdateContainsNonNumericValuesError(UsageError):
+    """
+    Raised when a received WorldStateUpdate gives a degree of freedom a value that is
+    not a number.
+    """
+
+    non_numeric_states: list[Any]
+    """
+    The values that are not numbers.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Received a WorldStateUpdate whose states {self.non_numeric_states} are "
+            f"not numbers."
+        )
+
+    def suggest_correction(self) -> str:
+        return "publish the positions of degrees of freedom as numbers."
+
+
+@dataclass
 class WorldHasNoSynchronizerError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but the world publishes its
@@ -1305,49 +1502,6 @@ class SynchronizerNotConnectedError(UsageError):
 
     def suggest_correction(self) -> str:
         return "Check that the ros node of the synchronizer is alive and its middleware is running."
-
-
-@dataclass
-class WorldUpdateReferencesUnknownEntityError(UsageError):
-    """
-    Raised when an update refers to an entity this world never received, which leaves
-    everything the missing update carried out of reach.
-    """
-
-    publisher: MetaData
-    """
-    The synchronizer whose update could not be applied.
-    """
-
-    entity_id: UUID
-    """
-    The entity the update refers to.
-
-    Only its id is known, because the update that created it never arrived.
-    """
-
-    entity_name: PrefixedName | None
-    """
-    The name the update calls that entity, or ``None`` where it carries none.
-    """
-
-    def error_message(self) -> str:
-        named_entity = (
-            f"'{self.entity_name}' ({self.entity_id})"
-            if self.entity_name is not None
-            else f"'{self.entity_id}'"
-        )
-        return (
-            f"The update of '{self.publisher.node_name}' refers to the entity "
-            f"{named_entity}, which this world never received."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Create the synchronizer of a world before modifying that world: changes made "
-            "before it exists reach nobody, and every later change that builds on them "
-            "cannot be applied."
-        )
 
 
 @dataclass
@@ -1459,95 +1613,6 @@ class DuplicateRobotAssignmentsError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
-
-
-@dataclass
-class SpatialTypesError(UsageError):
-    pass
-
-
-@dataclass
-class InsufficientVectorsError(SpatialTypesError):
-    """
-    Raised when a rotation matrix is constructed from fewer than two vectors.
-    """
-
-    x: Vector3 | None
-    y: Vector3 | None
-    z: Vector3 | None
-
-    def error_message(self) -> str:
-        return (
-            f"from_vectors requires at least two of the vectors x, y, z to be provided; "
-            f"the third is computed via the cross product."
-            f"X Vector was: {self.x}"
-            f"Y Vector was: {self.y}"
-            f"Z Vector was: {self.z}"
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class ReferenceFrameMismatchError(SpatialTypesError):
-    expected_frame: KinematicStructureEntity | None
-    """
-    The frame the operation requires, or ``None`` if it requires no frame.
-    """
-
-    actual_frame: KinematicStructureEntity | None
-    """
-    The frame that was found instead, or ``None`` if the value has no frame.
-    """
-
-    context: str | None = None
-    """
-    Description of the value whose frame was checked, e.g. the argument name.
-    """
-
-    def error_message(self) -> str:
-        checked_value = self.context or "the given value"
-        return (
-            f"Expected {checked_value} to be expressed in "
-            f"{self._describe(self.expected_frame)}, "
-            f"but it is expressed in {self._describe(self.actual_frame)}."
-        )
-
-    @staticmethod
-    def _describe(frame: KinematicStructureEntity | None) -> str:
-        """
-        :param frame: The frame to describe.
-        :return: The frame as it reads in the error message.
-        """
-        if frame is None:
-            return "no frame"
-        return f"frame '{frame.name}'"
-
-    def suggest_correction(self) -> str:
-        return (
-            "transform it into the expected frame first, e.g. via "
-            "world.transform(value, target_frame), or construct it with the expected frame."
-        )
-
-
-@dataclass
-class MissingReferenceFrameError(SpatialTypesError):
-    """
-    Represents an error that occurs when a spatial type lacks a reference frame, even
-    though its required for the current operation.
-    """
-
-    spatial_type: SpatialType
-    """
-    Spatial type that lacks a reference frame.
-    """
-
-    def error_message(self) -> str:
-        return f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one."
-
-    def suggest_correction(self) -> str:
-        return "construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
 
 
 @dataclass
@@ -1924,9 +1989,9 @@ class WorldEntityWithIDNotInKwargs(UntrackedObjectError):
     """
     The name the reference to that entity went by when it was written.
 
-    Says which entity is meant where the id alone says nothing. ``None`` where the
-    reference carries no name, and never used to look an entity up: the id is its
-    identity.
+    Says which entity is meant where the id alone says nothing. ``None``
+    where the reference carries no name, and never used to look an
+    entity up: the id is its identity.
     """
 
     def error_message(self) -> str:
@@ -2017,6 +2082,37 @@ class BodyHasNoGeometryError(InvalidCollisionCheckError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class TemporaryCollisionRulesDependOnOrder(CollisionCheckingError):
+    """
+    Raised when temporary collision rules are put in force next to others, and which
+    body pairs are checked at which distance would depend on which of them came first.
+    """
+
+    rules_in_force: list[CollisionRule]
+    """
+    The temporary rules that were in force already.
+    """
+
+    added_rules: list[CollisionRule]
+    """
+    The temporary rules that were to be put in force next to them.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The temporary collision rules {self.added_rules} and the ones already "
+            f"in force, {self.rules_in_force}, decide differently about the same "
+            f"body pairs, so the outcome would depend on which were added first."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Put rules that overrule each other in force together, in the order "
+            "they are meant to apply, or do not let them be in force at once."
+        )
 
 
 @dataclass
@@ -2326,36 +2422,6 @@ class ExerciseVerificationFailed(UsageError):
 
 
 @dataclass
-class DriveVelocityLimitsOnUndrivenRobot(UsageError):
-    """
-    Raised when drive velocity limits are given for a robot that is attached to its
-    localization frame rigidly rather than by a drive.
-    """
-
-    robot_type_name: str
-    """
-    The name of the robot type the limits were given for.
-    """
-
-    connection_type_name: str
-    """
-    The name of the connection type that robot attaches to its localization frame with.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.robot_type_name}' attaches to its localization frame with a "
-            f"'{self.connection_type_name}', which carries no velocity limits."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "leave the drive velocity limits unset, or give the robot a mobile base "
-            "whose drive can carry them."
-        )
-
-
-@dataclass
 class NothingHeld(UsageError):
     """
     Raised when the grasp of a gripper that holds nothing is asked for.
@@ -2402,12 +2468,12 @@ class NoGraspGeometry(UsageError):
 
 
 @dataclass
-class SurfaceGraspNotOnSurfaceError(UsageError):
+class GraspNotOnObjectError(UsageError):
     """
-    Raised when a surface grasp names a point the object's grasp surface does not reach.
+    Raised when a grasp names a place that does not reach the surface of the object.
     """
 
-    surface_grasp: SurfaceGrasp
+    grasp: ObjectRelativeGrasp
     """
     The grasp that missed.
     """
@@ -2418,16 +2484,12 @@ class SurfaceGraspNotOnSurfaceError(UsageError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"No surface of '{self.graspable.name}' lies at azimuth "
-            f"{self.surface_grasp.azimuth:.3f} rad and height "
-            f"{self.surface_grasp.height:.3f} of its bounding box."
-        )
+        return f"{self.grasp} does not reach the surface of '{self.graspable.name}'."
 
     def suggest_correction(self) -> str:
         return (
-            "keep the height of a surface grasp between 0 and 1, and check with "
-            "SurfaceGrasp.reaches_surface_of before asking for its grasp candidate."
+            "keep the parameters of the grasp within the bounds its strategy states, and "
+            "check with reaches_surface_of before asking for its grasp candidate."
         )
 
 
@@ -2578,6 +2640,31 @@ class SimulationAlreadyRunningError(UsageError):
 
     def suggest_correction(self) -> str:
         return "Stop the simulation before starting it again."
+
+
+@dataclass(kw_only=True)
+class SnapshotDoesNotFitSimulationError(UsageError):
+    """
+    Raised when a simulation is restored from a snapshot of a simulation that was built
+    from a different world.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation the snapshot was restored into.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The snapshot was not taken of the simulation of the world rooted at "
+            f"{self.world_name}: its physics or world state has a different size."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Restore only snapshots taken of this simulation, after the last change to "
+            "its world's model."
+        )
 
 
 @dataclass

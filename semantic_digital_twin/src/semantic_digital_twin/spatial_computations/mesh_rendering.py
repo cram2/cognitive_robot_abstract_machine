@@ -11,7 +11,7 @@ import trimesh
 from numpy.typing import NDArray
 
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
@@ -122,8 +122,10 @@ class CameraRing:
     """
 
     directions: list[ViewDirection] = field(
-        default_factory=lambda: ViewDirection.around(8, np.radians(25.0))
-        + ViewDirection.around(3, np.radians(65.0))
+        default_factory=lambda: (
+            ViewDirection.around(8, np.radians(25.0))
+            + ViewDirection.around(3, np.radians(65.0))
+        )
     )
     """
     The directions the mesh is looked at from.

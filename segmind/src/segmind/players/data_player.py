@@ -11,10 +11,8 @@ from typing_extensions import Callable, Generator
 
 from segmind.datastructures.enums import PlayerStatus
 from segmind.episode_player import EpisodePlayer
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Pose,
-)
+from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -96,7 +94,6 @@ class DataPlayer(EpisodePlayer, ABC):
         is_first_frame = True
         start_time: float = 0.0
         for frame_data in self.frame_data_generator:
-
             if self.kill_event.is_set():
                 break
 

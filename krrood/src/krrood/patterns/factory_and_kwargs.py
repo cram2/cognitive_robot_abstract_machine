@@ -1,17 +1,26 @@
-import inspect
 from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import lru_cache
+from inspect import isclass, ismethod
 
-from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
+from typing_extensions import (
+    Callable,
+    Any,
+    Generic,
+    Iterator,
+    Self,
+    TypeVar,
+    get_origin,
+)
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.call_signature import CallSignature
+from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasFactoryAndKwargs(Generic[T]):
     """
     Mixin containing a hierarchy of factories and their keyword arguments.
@@ -42,14 +51,14 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         constructed_kwargs = {}
         for key, value in self._factory_keyword_arguments_.items():
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 constructed_kwargs[key] = type(value)(
-                    self._recurse_construct_instance_and_get_value(element)
+                    self._recurse_construct_instance_and_get_value(value=element)
                     for element in value
                 )
             else:
                 constructed_kwargs[key] = (
-                    self._recurse_construct_instance_and_get_value(value)
+                    self._recurse_construct_instance_and_get_value(value=value)
                 )
         return self._factory_(**constructed_kwargs)
 
@@ -68,16 +77,40 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         factory_keyword_arguments = {}
         for key, value in self._kwargs_.items():
-            if self._is_kept_out_of_construction_(key, type(value)):
+            if self._is_kept_out_of_construction_(keyword=key, value_type=type(value)):
                 continue
-            if not self._is_factory_parameter_(key):
+            if not self._is_factory_parameter_(keyword=key):
                 raise KeywordNamesNoFactoryParameter(
                     factory=self._factory_, keyword=key
                 )
             factory_keyword_arguments[key] = value
         return factory_keyword_arguments
 
-    def _stated_values_(self, keyword: str) -> Iterator[Any]:
+    @staticmethod
+    def _type_built_by_(*, factory: Callable[..., Any]) -> type | None:
+        """
+        :param factory: A class, function or method.
+        :return: The class itself; otherwise the class its return annotation names, the
+            class a method annotated with :data:`~typing.Self` is bound to, the origin
+            of a parameterized generic it names (``list`` for ``list[int]``), or
+            :class:`object` for :data:`~typing.Any`. ``None`` when it has no return
+            annotation or the annotation names no class.
+        """
+        if isclass(factory):
+            return factory
+        return_annotation = get_type_hints_of_object(factory).get("return")
+        if return_annotation is Self and ismethod(factory):
+            owner = factory.__self__
+            return owner if isclass(owner) else type(owner)
+        if return_annotation is Any:
+            return object
+        if isclass(return_annotation):
+            return return_annotation
+        if isclass(get_origin(return_annotation)):
+            return get_origin(return_annotation)
+        return None
+
+    def _stated_values_(self, *, keyword: str) -> Iterator[Any]:
         """
         :param keyword: A keyword argument.
         :return: The value given for that keyword, or nothing when none was given.
@@ -85,39 +118,17 @@ class HasFactoryAndKwargs(Generic[T]):
         if keyword in self._kwargs_:
             yield self._kwargs_[keyword]
 
-    def _is_factory_parameter_(self, keyword: str) -> bool:
+    def _is_factory_parameter_(self, *, keyword: str) -> bool:
         """
         :param keyword: A keyword argument.
         :return: Whether :attr:`_factory_` takes that keyword, as a parameter of that
             name or through arbitrary keywords (a ``**kwargs`` parameter).
         """
-        return self._factory_takes_keyword_(self._factory_, keyword)
-
-    @staticmethod
-    def _factory_takes_keyword_(factory: Callable[..., Any], keyword: str) -> bool:
-        """
-        :param factory: A factory.
-        :param keyword: A keyword argument.
-        :return: Whether the factory takes that keyword, as a parameter of that name or
-            through arbitrary keywords (a ``**kwargs`` parameter).
-        """
-        return any(
-            parameter.kind is inspect.Parameter.VAR_KEYWORD or parameter.name == keyword
-            for parameter in HasFactoryAndKwargs._factory_signature_(
-                factory
-            ).parameters.values()
+        return CallSignature.from_callable(callee=self._factory_).accepts_keyword(
+            keyword=keyword
         )
 
-    @staticmethod
-    @lru_cache(maxsize=None)
-    def _factory_signature_(factory: Callable[..., Any]) -> inspect.Signature:
-        """
-        :param factory: A factory.
-        :return: Its signature, read once per factory.
-        """
-        return inspect.signature(factory)
-
-    def _is_kept_out_of_construction_(self, keyword: str, value_type: type) -> bool:
+    def _is_kept_out_of_construction_(self, *, keyword: str, value_type: type) -> bool:
         """
         :param keyword: A keyword argument.
         :param value_type: The type of the value given for that keyword.
@@ -127,7 +138,7 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         return False
 
-    def _recurse_construct_instance_and_get_value(self, value: Any):
+    def _recurse_construct_instance_and_get_value(self, *, value: Any):
         """
         Recursively construct an instance and return it.
 
@@ -140,6 +151,6 @@ class HasFactoryAndKwargs(Generic[T]):
 
     def __deepcopy__(self, memo):
         return self.__class__(
-            self._factory_,
+            _factory_=self._factory_,
             _kwargs_={name: deepcopy(value) for name, value in self._kwargs_.items()},
         )

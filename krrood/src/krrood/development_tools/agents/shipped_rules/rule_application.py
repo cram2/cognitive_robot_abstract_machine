@@ -28,3 +28,15 @@ class RuleApplicationRules(Section):
         "has to live at module level - ask the user before departing from it; "
         "never decide the exception on your own"
     )
+
+
+class RuleModellingRules(Section):
+    """
+    The rules on writing the rules in this file.
+    """
+
+    SPLIT_OFF_THE_CHECKABLE_PART = (
+        "When a script can check part of a rule, split the rule: the checkable "
+        "part becomes a rule of its own that carries its checker, and the part "
+        "only a person can judge stays a rule without one"
+    )

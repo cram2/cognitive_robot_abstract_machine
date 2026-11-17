@@ -16,44 +16,44 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class WorldEntity(Symbol):
     world: Optional[World] = field(default=None, kw_only=True, repr=False, hash=False)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Body(WorldEntity):
     name: str
     size: int = field(default=1)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Handle(Body): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Container(Body): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Connection(WorldEntity):
     parent: Body
     child: Body
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class FixedConnection(Connection): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class PrismaticConnection(Connection): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class RevoluteConnection(Connection): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class World(Symbol):
     id: int = field(default=0)
     bodies: List[Body] = field(default_factory=list)
@@ -69,11 +69,11 @@ class World(Symbol):
         return self.id == other.id
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class View(WorldEntity): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Drawer(View):
     handle: Handle
     container: Container
@@ -92,7 +92,7 @@ class Drawer(View):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cabinet(View):
     container: Container
     drawers: List[Drawer] = field(default_factory=list)
@@ -110,30 +110,30 @@ class Cabinet(View):
         )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Door(View):
     handle: Handle
     body: Body
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Wardrobe(View):
     handle: Handle
     body: Body
     container: Container
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Apple(Body): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FruitBox(Symbol):
     name: str
     fruits: List[Body]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContainsType(Predicate):
     """
     Predicate that checks if any object in the iterable is of the given type.
@@ -154,18 +154,18 @@ class ContainsType(Predicate):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
         return clause(
-            Noun(fields["iterable"]),
-            Verb("contain"),
-            Noun("instance"),
+            Noun(content=fields["iterable"]),
+            Verb(lemma="contain"),
+            Noun(content="instance"),
             Prepositions.OF,
-            Noun(fields["obj_type"]),
+            Noun(content=fields["obj_type"]),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class TripleDeclaringItsObjectFirst(Triple[Handle, Drawer]):
     """
     A relation whose field holding its object comes before the field holding its
@@ -194,7 +194,7 @@ class TripleDeclaringItsObjectFirst(Triple[Handle, Drawer]):
         return self.drawer.handle is self.handle
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class GraspConfig(WorldEntity):
     """
     A value object an action reaches through a relationship rather than owning directly.
@@ -207,7 +207,7 @@ class GraspConfig(WorldEntity):
     manipulation_offset: float = field(default=0.0)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class MoveAction(WorldEntity):
     """
     An action with direct fields alongside a relationship to a nested value object.

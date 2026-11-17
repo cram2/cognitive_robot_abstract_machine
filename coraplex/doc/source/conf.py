@@ -201,7 +201,7 @@ nbsphinx_thumbnails = {
     "notebooks/action_designator": os.path.abspath(
         "notebooks/thumbnails/action_designator.png"
     ),
-    "notebooks/motion_designator": os.path.abspath(
+    "notebooks/giskard_goals_in_actions": os.path.abspath(
         "notebooks/thumbnails/motion_designator.png"
     ),
     "notebooks/location_designator": os.path.abspath(

@@ -36,7 +36,7 @@ def truth_values(
     :param sources: The incoming result to evaluate against, if any.
     :return: The truth value of every ``OperationResult`` *expression* yields, in order.
     """
-    return [result.is_true for result in expression._evaluate_(sources)]
+    return [result.is_true for result in expression._evaluate_(sources=sources)]
 
 
 # %% comparators
@@ -150,10 +150,21 @@ def test_universal_quantifier_is_true_when_every_value_satisfies_the_condition()
     assert truth_values(for_all(quantified_value, quantified_value > 5)) == [True]
 
 
-def test_universal_quantifier_yields_nothing_when_a_value_fails_the_condition():
+def test_universal_quantifier_is_false_when_a_value_fails_the_condition():
+    """
+    Like the existential quantifier, a failed universal reports False (negation as
+    failure) rather than yielding nothing, so an enclosing disjunction or rule
+    alternative still evaluates its other branch.
+    """
     quantified_value = variable_from([3, 7])
 
-    assert truth_values(for_all(quantified_value, quantified_value > 5)) == []
+    assert truth_values(for_all(quantified_value, quantified_value > 5)) == [False]
+
+
+def test_universal_quantifier_over_no_values_is_vacuously_true():
+    quantified_value = variable_from([])
+
+    assert truth_values(for_all(quantified_value, quantified_value > 5)) == [True]
 
 
 # %% union
@@ -163,7 +174,10 @@ def test_union_reports_the_truth_value_of_each_child_result():
     value = variable_from([6])
     other_value = variable_from([3])
 
-    assert truth_values(Union((value > 5, other_value > 5))) == [True, False]
+    assert truth_values(Union(_operation_children_=(value > 5, other_value > 5))) == [
+        True,
+        False,
+    ]
 
 
 # %% concatenation
@@ -185,7 +199,7 @@ def test_concatenation_evaluated_on_its_own_yields_the_values_it_selected():
 # %% cost of reading a result's truth
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TruthCountingValue:
     """
     A value that records how often its truth was read.

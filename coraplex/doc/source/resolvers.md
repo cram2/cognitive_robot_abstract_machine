@@ -7,9 +7,10 @@ performed, so there is usually no need to resolve designators by hand.
 ## How resolution works
 
 Resolution is deferred to execution time so that the query always sees the correct world state. When a plan reaches an
-underspecified step, the {class}`~coraplex.plans.executables.UnderspecifiedExecutable` grounds it only after every
-preceding executable has run and mutated the world. Candidates are tried in order until one executes without raising a
-{class}`~coraplex.plans.failures.PlanFailure`; if none succeed, the step fails. This late grounding is what lets a plan
+underspecified step, a {class}`~cramph.composites.StatementNode`, the
+{class}`~coraplex.plans.underspecified.UnderspecifiedChildChooser` grounds it only after every preceding step has run and
+mutated the world. Candidates are tried out in order in a copy of the world until one succeeds its trial, and only that
+one runs in the real world; if none succeed, the step fails. This late grounding is what lets a plan
 adapt to objects that moved, a torso that was already raised, or an object already held in the gripper.
 
 ## Location designators

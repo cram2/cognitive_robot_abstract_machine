@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FactoryMethodRegistry(metaclass=SingletonMeta):
     """
     Process-wide index of methods explicitly marked as factories by ``@factory_method``.
@@ -29,7 +29,7 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
     Maps each declaring class to the factory-method names marked on its own body.
     """
 
-    def register(self, owner: type, name: str) -> None:
+    def register(self, *, owner: type, name: str) -> None:
         """
         Record that ``owner`` declares ``name`` as a factory method.
 
@@ -38,7 +38,7 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
         """
         self.names_by_owner.setdefault(owner, set()).add(name)
 
-    def is_registered(self, cls: type, name: str) -> bool:
+    def is_registered(self, *, cls: type, name: str) -> bool:
         """
         :param cls: The class to look the method up on.
         :param name: The attribute name to check.
@@ -46,7 +46,7 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
         """
         return any(name in self.names_by_owner.get(klass, ()) for klass in cls.__mro__)
 
-    def names_for(self, cls: type) -> set[str]:
+    def names_for(self, *, cls: type) -> set[str]:
         """
         :param cls: The class to inspect.
         :return: Every factory-method name marked on ``cls`` or any of its bases.
