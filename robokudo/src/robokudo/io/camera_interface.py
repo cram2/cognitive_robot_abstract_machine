@@ -145,8 +145,8 @@ class CameraInterface(object):
         Bind a sampled camera pose to the bodies of ``world``.
 
         A camera another process attached, such as a robot's camera, keeps that
-        attachment. Any other camera is mounted below the world frame and moved to the
-        sampled pose, unless ``world`` lacks it and :meth:`adds_missing_camera` is false.
+        attachment. Any other camera hangs below the world frame at the sampled pose,
+        unless ``world`` lacks it and :meth:`adds_missing_camera` is false.
 
         :param world: The world perception perceives into.
         :param world_frame: Name of the pose reference frame.
@@ -316,29 +316,20 @@ class CameraInterface(object):
         modalities: tuple[CameraModality, ...],
     ) -> Camera:
         """
-        Resolve the stream camera or construct an unregistered standalone camera.
+        Resolve the camera annotating the body of the stream frame, or construct an
+        unregistered camera for that body, or for a new standalone body if ``world``
+        lacks one.
 
         :param world: The world perception perceives into.
         :param camera_frame: Optical frame associated with the image stream.
         :param camera_model: First trustworthy calibration for a new camera.
         :param modalities: Kinds of image data produced by a new camera.
         :return: Camera annotation representing the physical image source.
-        :raises CameraAnnotationAmbiguous: If several cameras use the stream frame.
+        :raises InvalidCameraObservation: If the stream frame names several bodies.
+        :raises CameraAnnotationAmbiguous: If several cameras annotate the body of the
+            stream frame.
         """
         camera_frame = normalize_ros_frame_id(camera_frame)
-        cameras = world.get_semantic_annotations_by_type(Camera)
-        frame_cameras = [
-            camera
-            for camera in cameras
-            if normalize_ros_frame_id(camera.root.name.name) == camera_frame
-        ]
-        if len(frame_cameras) == 1:
-            return frame_cameras[0]
-        if len(frame_cameras) > 1:
-            raise CameraAnnotationAmbiguous(
-                camera_names=tuple(str(camera.name) for camera in frame_cameras)
-            )
-
         camera_bodies = find_bodies_for_ros_frame(world, camera_frame)
         if len(camera_bodies) > 1:
             raise InvalidCameraObservation(reason="camera frame is ambiguous")
@@ -347,6 +338,17 @@ class CameraInterface(object):
             if camera_bodies
             else Body(name=PrefixedName(name=camera_frame))
         )
+        body_cameras = [
+            camera
+            for camera in world.get_semantic_annotations_by_type(Camera)
+            if camera.root is camera_body
+        ]
+        if len(body_cameras) > 1:
+            raise CameraAnnotationAmbiguous(
+                camera_names=tuple(str(camera.name) for camera in body_cameras)
+            )
+        if body_cameras:
+            return body_cameras[0]
         return Camera(
             name=PrefixedName(name=camera_frame),
             root=camera_body,

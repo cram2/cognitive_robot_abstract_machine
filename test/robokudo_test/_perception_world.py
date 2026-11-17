@@ -57,6 +57,18 @@ class FrameName(StrEnum):
     """
 
 
+class RobotName(StrEnum):
+    """
+    The names of the robots in test worlds.
+    """
+
+    ROBOT = "robot"
+    """
+    A robot whose parts carry its name as prefix, as the parts of a robot loaded from its
+    description do.
+    """
+
+
 # %% waiting
 
 
@@ -137,12 +149,22 @@ def ros_camera_interface(*, lookup_viewpoint: bool) -> ROSCameraInterface:
     return interface
 
 
+def camera_model() -> PinholeCameraModel:
+    """
+    :return: The calibration of the cameras of the test worlds.
+    """
+    return PinholeCameraModel.from_field_of_view(
+        resolution=CameraResolution(), field_of_view=FieldOfView()
+    )
+
+
 def place_camera_of(
     cas: CAS,
     world: World,
     world_T_camera: HomogeneousTransformationMatrix,
     interface: CameraInterface | None = None,
     world_frame: str = FrameName.WORLD,
+    camera_frame: str = FrameName.CAMERA,
 ) -> None:
     """
     Place the camera of ``cas`` at ``world_T_camera`` in ``world`` and store its
@@ -154,6 +176,7 @@ def place_camera_of(
     :param interface: The camera interface placing the camera; a live camera located
         through TF if omitted.
     :param world_frame: The frame the camera pose is measured against.
+    :param camera_frame: The frame the camera's images are given in.
     """
     interface = (
         interface
@@ -163,16 +186,14 @@ def place_camera_of(
     interface.store_camera_observation(
         cas=cas,
         world=world,
-        camera_model=PinholeCameraModel.from_field_of_view(
-            resolution=CameraResolution(), field_of_view=FieldOfView()
-        ),
-        camera_frame=FrameName.CAMERA,
+        camera_model=camera_model(),
+        camera_frame=camera_frame,
         timestamp_nanoseconds=0,
         modalities=(CameraModality.COLOR, CameraModality.DEPTH),
         world_T_camera=interface.bind_world_T_camera(
             world=world,
             world_frame=world_frame,
-            camera_frame=FrameName.CAMERA,
+            camera_frame=camera_frame,
             world_T_camera=world_T_camera,
         ),
     )
@@ -181,15 +202,17 @@ def place_camera_of(
 # %% robot camera
 
 
-def world_with_a_head_camera() -> World:
+def world_with_a_head_camera(robot_name: str | None = None) -> World:
     """
+    :param robot_name: The prefix of the names of the head and the camera, as a robot
+        loaded from its description prefixes its parts; no prefix if None.
     :return: A world whose camera hangs below a head, as on a robot, 1.5 m above the
         world frame.
     """
     world = World()
     world_body = Body(name=PrefixedName(FrameName.WORLD))
-    head_body = Body(name=PrefixedName(FrameName.HEAD))
-    camera_body = Body(name=PrefixedName(FrameName.CAMERA))
+    head_body = Body(name=PrefixedName(FrameName.HEAD, prefix=robot_name))
+    camera_body = Body(name=PrefixedName(FrameName.CAMERA, prefix=robot_name))
     with world.modify_world():
         world.add_body(world_body)
         world.add_connection(
