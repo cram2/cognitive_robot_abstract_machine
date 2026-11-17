@@ -1,0 +1,24 @@
+name: Install the workspace
+description: >
+  Installs the system libraries the tests need and every workspace package with its dev
+  extra into the CI image's environment, from a checkout in cognitive_robot_abstract_machine.
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash -ieo pipefail {0}
+      env:
+        # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
+        # hardlink packages into site-packages instead of full-copying them. The default cache
+        # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
+        # forces a full copy of every wheel and stores each package twice -- exhausting the runner
+        # disk ("No space left on device") during install.
+        UV_CACHE_DIR: /opt/ros/.uv_cache
+      run: |
+        cd cognitive_robot_abstract_machine
+        source /opt/ros/cram-env/bin/activate
+        sudo apt-get update
+        sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
+        uv sync --extra dev --active
+        uv tree --depth 1
+        python -c "import sys; print(sys.executable)"

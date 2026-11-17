@@ -69,11 +69,21 @@ def convex_mesh():
 
 @pytest.fixture(
     scope="module",
-    params=[COACDMeshDecomposer, VHACDMeshDecomposer, BulletVHACDMeshDecomposer],
+    params=[
+        COACDMeshDecomposer(threshold=0.2),
+        VHACDMeshDecomposer(),
+        BulletVHACDMeshDecomposer(),
+    ],
     ids=["coacd", "vhacd", "bullet_vhacd"],
 )
-def mesh_decomposer(request):
-    return request.param()
+def mesh_decomposer(request: pytest.FixtureRequest) -> MeshDecomposer:
+    """
+    One decomposer of each kind.
+
+    CoACD runs at a coarse threshold: at its default it takes most of a minute to
+    decompose the cup, and these tests only need more than one convex part.
+    """
+    return request.param
 
 
 def test_convert_non_convex_mesh_decomposes(

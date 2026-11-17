@@ -1,6 +1,12 @@
+"""
+Drawings of the structure of a statechart: its nodes, how they nest and which nodes
+their transition conditions read.
+"""
+
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from dataclasses import dataclass, field
 
 import pydot
@@ -421,15 +427,13 @@ class StatechartGraphviz:
         self._add_edges()
         return self.graph
 
-    def to_dot_graph_pdf(self, *, file_name: str):
+    def to_dot_graph_pdf(self, *, file_name: Path) -> None:
         """
         Draws the statechart and writes it to a pdf.
 
         :param file_name: The path of the pdf to write.
         """
         self.to_dot_graph()
-        file_name = file_name
-        # create_path(file_name)
         self.graph.write_pdf(file_name)
         print(f"Saved task graph at {file_name}.")
 
