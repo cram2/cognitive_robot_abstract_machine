@@ -15,6 +15,7 @@ import numpy as np
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 
+from semantic_digital_twin import logger
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
@@ -368,8 +369,8 @@ class WorldStateTrajectoryPlotter:
     def plot_trajectory(self, *, file_name: Path) -> None:
         """
         Plot the recorded trajectory, one subplot per derivative in
-        :attr:`derivatives_to_plot`, and save it to `file_name`; nothing is plotted
-        unless :attr:`has_trajectory_to_plot`.
+        :attr:`derivatives_to_plot`, save it to `file_name` and log where; nothing is
+        plotted unless :attr:`has_trajectory_to_plot`.
 
         :param file_name: The path the plot is saved to.
         """
@@ -400,3 +401,4 @@ class WorldStateTrajectoryPlotter:
         file_name.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name)
         plt.close()
+        logger.info(f"Saved the trajectory plot to {file_name}.")

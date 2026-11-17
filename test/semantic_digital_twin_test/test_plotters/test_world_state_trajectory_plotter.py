@@ -4,6 +4,7 @@ Tests of the plot of a world state trajectory.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
+from semantic_digital_twin import logger
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.testing import world_setup
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
@@ -213,6 +215,24 @@ def test_center_positions_and_suppression_rules(world_setup, monkeypatch):
     # velocity; the moving DOF appears once, the constant DOF not at all
     assert len(position_lines) == 1
     assert len(velocity_axis.get_lines()) == 1
+
+
+# %% the saved plot
+
+
+def test_the_plot_logs_the_file_it_was_saved_to(world_setup, tmp_path, caplog):
+    """
+    Saving the plot tells where to find it.
+    """
+    plotter = WorldStateTrajectoryPlotter()
+    plotter.world_state_trajectory = _record_trajectory(world_setup)
+    file_name = tmp_path / "trajectory.pdf"
+
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        plotter.plot_trajectory(file_name=file_name)
+
+    assert file_name.exists()
+    assert any(str(file_name) in record.getMessage() for record in caplog.records)
 
 
 # %% trajectories too short to plot

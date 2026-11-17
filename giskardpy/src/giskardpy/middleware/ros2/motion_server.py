@@ -328,7 +328,6 @@ class MotionServer:
         plotter = self.trajectory_recording.plotter
         if not plotter.has_trajectory_to_plot:
             return
-        logger = background_node.get_node().get_logger()
         goal_id = self.action_server.goal_id
         file_name = self.plot_directory.goal_plot_path(
             plot_kind=GoalPlotKind.TRAJECTORY, goal_id=goal_id
@@ -336,11 +335,9 @@ class MotionServer:
         try:
             plotter.plot_trajectory(file_name=file_name)
         except Exception as exception:
-            logger.warning(
+            background_node.get_node().get_logger().warning(
                 f"Could not plot the trajectory of goal #{goal_id}: {exception}"
             )
-            return
-        logger.info(f"Saved the trajectory plot to {file_name}.")
 
     def finish_goal(
         self, *, error: Exception | None, debug_output: DebugOutput
