@@ -2,6 +2,7 @@
 Plots how the degrees of freedom of a world moved over a recorded trajectory.
 """
 
+import itertools
 import os
 from dataclasses import dataclass, field
 from enum import Enum
@@ -175,6 +176,12 @@ class WorldStateTrajectoryPlotter:
     For positions this suppresses lines that are always equal to the initial value.
     """
 
+    line_styles: list[str] = field(default_factory=lambda: ["-", "--", "-.", ":"])
+    """
+    The matplotlib line styles that tell lines of the same color apart, each used with
+    every color before the next.
+    """
+
     color_map: dict[UUID, str] | None = None
     """
     A color map to use for plotting the trajectory.
@@ -305,39 +312,42 @@ class WorldStateTrajectoryPlotter:
             return True
         return not np.all(series == float(series[0]))
 
+    def _is_drawn(
+        self, *, trajectory: WorldStateTrajectory, degree_of_freedom_id: UUID
+    ) -> bool:
+        """
+        :return: Whether any subplot draws the degree of freedom with
+            `degree_of_freedom_id`.
+        """
+        column = trajectory._index[degree_of_freedom_id]
+        return any(
+            self._should_plot_series(trajectory.data[:, derivative, column])
+            for derivative in self.derivatives_to_plot
+        )
+
     def _create_styles_for_degrees_of_freedom(
-        self, dof_ids: list[UUID]
+        self, *, degree_of_freedom_ids: list[UUID]
     ) -> dict[UUID, dict]:
         """
-        Assign styles to DOFs, respecting an optional color_map of matplotlib format
-        strings.
+        Give each degree of freedom the format :attr:`color_map` assigns it, or else the
+        next unused combination of a color and one of :attr:`line_styles`; the
+        combinations repeat only once all are taken.
 
-        :param dof_ids: DOF ids for which to create styles.
-        :return: Dict mapping DOF ids to matplotlib style dicts.
+        :return: The matplotlib style of each of `degree_of_freedom_ids`.
         """
-        styles: dict[UUID, dict] = {}
-        if self.color_map is not None:
-            for d in dof_ids:
-                s = self.color_map.get(d)
-                if s is not None:
-                    styles[d] = {"fmt": s}
-        # Default cycle without wrapping colors; then reuse with styles
-        if len(styles) >= len(dof_ids):
-            return styles
-        prop_cycle = plt.rcParams.get("axes.prop_cycle")
-        colors = list(prop_cycle.by_key().get("color", [])) if prop_cycle else []
-        line_styles = ["-", "--", "-.", ":"]
-        assigned = 0
-        for ls in line_styles:
-            for c in colors:
-                if assigned >= len(dof_ids):
-                    break
-                d = dof_ids[assigned]
-                if d not in styles:
-                    styles[d] = {"color": c, "linestyle": ls}
-                    assigned += 1
-            if assigned >= len(dof_ids):
-                break
+        color_map = self.color_map or {}
+        styles = {
+            degree_of_freedom_id: {"fmt": color_map[degree_of_freedom_id]}
+            for degree_of_freedom_id in degree_of_freedom_ids
+            if degree_of_freedom_id in color_map
+        }
+        colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+        combinations = itertools.cycle(itertools.product(self.line_styles, colors))
+        for degree_of_freedom_id in degree_of_freedom_ids:
+            if degree_of_freedom_id in styles:
+                continue
+            line_style, color = next(combinations)
+            styles[degree_of_freedom_id] = {"color": color, "linestyle": line_style}
         return styles
 
     def _create_legend(self, figure: plt.Figure, axes: list[plt.Axes]):
@@ -475,8 +485,16 @@ class WorldStateTrajectoryPlotter:
             duration=duration, number_of_subplots=len(self.derivatives_to_plot)
         )
 
-        degree_of_freedom_ids = self._sort_degrees_of_freedom(trajectory)
-        styles = self._create_styles_for_degrees_of_freedom(degree_of_freedom_ids)
+        degree_of_freedom_ids = [
+            degree_of_freedom_id
+            for degree_of_freedom_id in self._sort_degrees_of_freedom(trajectory)
+            if self._is_drawn(
+                trajectory=trajectory, degree_of_freedom_id=degree_of_freedom_id
+            )
+        ]
+        styles = self._create_styles_for_degrees_of_freedom(
+            degree_of_freedom_ids=degree_of_freedom_ids
+        )
         self._plot_derivatives(axes, styles, degree_of_freedom_ids, trajectory, times)
 
         spacing = self._tick_spacing(duration=duration)

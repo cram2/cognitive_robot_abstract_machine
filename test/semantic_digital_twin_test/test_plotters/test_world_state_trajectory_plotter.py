@@ -15,9 +15,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin import logger
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.testing import world_setup
+from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     TimeAxisTickSpacing,
@@ -85,6 +94,46 @@ def _record_trajectory(
         world.apply_control_commands(command, time_step, Derivatives.jerk)
         trajectory.append(world.state, time)
 
+    return trajectory
+
+
+def _record_a_few_of_many_joints_moving(
+    *, joints: int, moving: int
+) -> WorldStateTrajectory:
+    """
+    Record a second of a world of `joints` prismatic joints named ``joint_00`` and up,
+    of which only the last `moving` in name order move.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    degrees_of_freedom = []
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        for index in range(joints):
+            degree_of_freedom = DegreeOfFreedom(
+                name=PrefixedName(f"joint_{index:02d}"),
+                limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    maximum_speed=1
+                ),
+            )
+            world.add_degree_of_freedom(degree_of_freedom)
+            world.add_connection(
+                PrismaticConnection(
+                    parent=root,
+                    child=Body(name=PrefixedName(f"link_{index:02d}")),
+                    raw_dof=degree_of_freedom,
+                    axis=Vector3.X(reference_frame=root),
+                )
+            )
+            degrees_of_freedom.append(degree_of_freedom)
+    trajectory = WorldStateTrajectory.from_world_state(world.state, 0.0)
+    command = np.zeros(len(world.state))
+    for degree_of_freedom in degrees_of_freedom[-moving:]:
+        command[trajectory._index[degree_of_freedom.id]] = 1.0
+    time_step = 0.1
+    for step in range(1, 11):
+        world.apply_control_commands(command, time_step, Derivatives.jerk)
+        trajectory.append(world.state, step * time_step)
     return trajectory
 
 
@@ -297,6 +346,27 @@ def test_the_plot_logs_the_file_it_was_saved_to(world_setup, tmp_path, caplog):
 
     assert file_name.exists()
     assert any(str(file_name) in record.getMessage() for record in caplog.records)
+
+
+# %% telling the lines apart
+
+
+def test_every_drawn_line_has_a_style_of_its_own(monkeypatch):
+    """
+    Degrees of freedom that never move take no style from those that are drawn, so in a
+    world of many joints every drawn line still differs in color or line style.
+    """
+    moving = 15
+    trajectory = _record_a_few_of_many_joints_moving(joints=60, moving=moving)
+    plotter = WorldStateTrajectoryPlotter(legend=False)
+
+    position_axis = _render_plot(plotter, trajectory, monkeypatch).axes[0]
+
+    styles = {
+        (line.get_color(), line.get_linestyle()) for line in position_axis.get_lines()
+    }
+    assert len(position_axis.get_lines()) == moving
+    assert len(styles) == moving
 
 
 # %% trajectories too short to plot
