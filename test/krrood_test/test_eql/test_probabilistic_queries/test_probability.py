@@ -1,13 +1,19 @@
+"""
+Probabilities of conditions, from a model or by counting rows.
+"""
+
 import pytest
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
 
-from krrood.entity_query_language.backends import (
-    EntityQueryLanguageBackend,
-    ProbabilisticBackend,
-)
+from krrood.entity_query_language.backends import EntityQueryLanguageBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.exceptions import EvidenceHasZeroProbability
-from krrood.entity_query_language.factories import and_, probability_of, variable
+from krrood.entity_query_language.factories import (
+    and_,
+    variable,
+)
+from krrood.entity_query_language.factories import probability_of
 from krrood.parametrization.exceptions import JointQueryAcrossClassesNotSupported
 from krrood.parametrization.model_registries import DictRegistry
 

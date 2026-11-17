@@ -43,8 +43,11 @@ from krrood.entity_query_language.core.variable import (
     Literal,
     ExternallySetVariable,
 )
-from krrood.entity_query_language.enums import DomainSource
-from krrood.entity_query_language.exceptions import UnsupportedExpressionTypeForDistinct
+from krrood.entity_query_language.enums import DomainSource, ProbabilisticLibrary
+from krrood.entity_query_language.exceptions import (
+    ProbabilisticLibrariesNotInstalled,
+    UnsupportedExpressionTypeForDistinct,
+)
 from krrood.entity_query_language.operators.aggregators import (
     Max,
     Min,
@@ -93,7 +96,7 @@ from krrood.entity_query_language.utils import is_iterable
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 
 if TYPE_CHECKING:
-    from krrood.entity_query_language.operators.probabilistic_queries import (
+    from krrood.parametrization.probabilistic_queries import (
         Distribution,
         Probability,
     )
@@ -124,68 +127,6 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
     :return: Set descriptor.
     """
     return SetOf(_selected_variables_=selected_variables)
-
-
-def distribution_of(
-    match: Match, *, marginalize_for: tuple[Attribute, ...] = ()
-) -> Distribution:
-    """
-    Request the distribution a match's conditions describe -- the probabilistic
-    interpretation of :py:func:`a`/:py:func:`an`/:py:func:`the`. Literal-valued kwargs
-    condition the circuit (``arm=0.3``), ``.where(...)`` conditions truncate it, and
-    underspecified (``...``) fields are the joint's free variables, e.g.
-    ``distribution_of(a(Pick)(arm=0.3, outcome=...))``.
-
-    Unlike :py:func:`set_of`/:py:func:`entity`, this never resolves to rows: it must be
-    evaluated with a
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which returns
-    the resolved
-    :class:`~probabilistic_model.probabilistic_model.ProbabilisticModel` instead of
-    sampling instances from it.
-
-    :param match: The match whose conditions describe the distribution.
-    :param marginalize_for: Optionally, a subset of the match's free variables to
-        narrow the result to (further marginalization), e.g. ``distribution_of(match,
-        marginalize_for=(match.outcome,))``. Without it, every one of the
-        match's free variables is kept.
-    :return: Distribution descriptor.
-    """
-    # Local import: avoids a circular import through operators/probabilistic_queries.py.
-    from krrood.entity_query_language.operators.probabilistic_queries import (
-        Distribution,
-    )
-
-    return Distribution(match=match, marginalize_for=marginalize_for)
-
-
-def probability_of(
-    condition: ConditionType, evidence: ConditionType | None = None
-) -> Probability:
-    """
-    Request the probability of a condition, optionally given evidence, e.g.
-    ``probability_of(x.A > 5)`` or ``probability_of(x.A > 5, x.B < 2)`` for
-    ``x = variable(MyClass)``. Condition and evidence may be any expression a
-    ``.where(...)`` condition already accepts; several conditions are joined
-    explicitly with :py:func:`and_`.
-
-    Like :py:func:`distribution_of`, this never resolves to rows: it must be evaluated
-    with a
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which returns
-    the resolved probability as a plain ``float``.
-
-    For the expectation of an attribute, use the existing :py:func:`average` aggregator
-    instead -- {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend`
-    already recognizes a bare ``average(...)`` selection and answers it in closed form.
-
-    :param condition: The condition to compute the probability of.
-    :param evidence: The condition to condition the probability on, or ``None`` for
-        the unconditional probability.
-    :return: Probability descriptor.
-    """
-    # Local import: avoids a circular import through operators/probabilistic_queries.py.
-    from krrood.entity_query_language.operators.probabilistic_queries import Probability
-
-    return Probability(condition=condition, evidence=evidence)
 
 
 # %% Variable Declaration
@@ -841,7 +782,7 @@ def average(
 
     Evaluated bare (``average(x.A).first(backend=...)``, with no enclosing
     ``set_of``/``grouped_by``) against a
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, this resolves
+    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend`, this resolves
     in closed form via ``ProbabilisticModel.moment`` instead of sampling and averaging
     rows -- the same declarative call reads correctly under either backend.
 
@@ -1245,3 +1186,63 @@ def type_(obj: Any) -> type:
     :return: The type of the given object.
     """
     return type(obj)
+
+
+# %% Probabilistic Queries
+
+
+def distribution_of(
+    match: Match, *, marginalize_for: tuple[Attribute, ...] = ()
+) -> Distribution:
+    """
+    Request the distribution a match's conditions describe (see
+    :class:`~krrood.parametrization.probabilistic_queries.Distribution`),
+    e.g. ``distribution_of(a(Pick)(arm=0.3, outcome=...))``. It never resolves to rows:
+    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` answers
+    it with the resolved probabilistic model.
+
+    :param match: The match whose conditions describe the distribution.
+    :param marginalize_for: Optionally, a subset of the match's free variables to narrow
+        the result to (further marginalization), e.g. ``distribution_of(match,
+        marginalize_for=(match.outcome,))``. Without it, every one of the match's free
+        variables is kept.
+    :return: Distribution descriptor.
+    :raises ProbabilisticLibrariesNotInstalled: If a library probabilistic queries need
+        is not installed.
+    """
+    _require_probabilistic_libraries()
+    from krrood.parametrization.probabilistic_queries import Distribution
+
+    return Distribution(match=match, marginalize_for=marginalize_for)
+
+
+def probability_of(
+    condition: ConditionType, evidence: ConditionType | None = None
+) -> Probability:
+    """
+    Request the probability of a condition, optionally given evidence (see
+    :class:`~krrood.parametrization.probabilistic_queries.Probability`), e.g.
+    ``probability_of(x.A > 5, x.B < 2)``. For the expectation of an attribute, use
+    :func:`average` instead.
+
+    :param condition: The condition to compute the probability of.
+    :param evidence: The condition to condition the probability on, or ``None`` for the
+        unconditional probability.
+    :return: Probability descriptor.
+    :raises ProbabilisticLibrariesNotInstalled: If a library probabilistic queries need
+        is not installed.
+    """
+    _require_probabilistic_libraries()
+    from krrood.parametrization.probabilistic_queries import Probability
+
+    return Probability(condition=condition, evidence=evidence)
+
+
+def _require_probabilistic_libraries() -> None:
+    """
+    Raise :class:`ProbabilisticLibrariesNotInstalled` unless every library probabilistic
+    queries need is installed.
+    """
+    missing_libraries = ProbabilisticLibrary.missing()
+    if missing_libraries:
+        raise ProbabilisticLibrariesNotInstalled(missing_libraries=missing_libraries)

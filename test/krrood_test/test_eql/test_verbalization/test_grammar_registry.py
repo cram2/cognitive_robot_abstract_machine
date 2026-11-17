@@ -1,10 +1,6 @@
 """
-The ``RULES`` registry auto-discovers every concrete grammar rule by walking the grammar
-package, rather than hand-maintaining a list of imports — so adding a construct's
-``rules`` module needs no edit to the registry.
-
-``concrete_subclasses`` is the single subclass-discovery primitive shared by the
-registry and the :class:`SpecificityRule` families.
+The registry discovers every concrete grammar rule of the grammar package's ``rules``
+modules, and the rules a module outside it defines once that module is loaded.
 """
 
 from __future__ import annotations
@@ -13,13 +9,17 @@ from abc import ABC, abstractmethod
 
 import pytest
 
+from ...dataset.phrase_rule_outside_grammar import ConstructOutsideGrammarRule
+
 from krrood.entity_query_language.verbalization import grammar as grammar_package
 from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
     select,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.registry import RULES
+from krrood.entity_query_language.verbalization.grammar.framework.registry import (
+    PhraseRuleRegistry,
+)
 from krrood.patterns.specificity_ranking import (
     concrete_subclasses,
     maxima,
@@ -30,11 +30,7 @@ from krrood.patterns.specificity_ranking import (
 def _discovered_grammar_rule_types():
     """
     Concrete ``PhraseRule`` subclasses defined within the grammar package's own rule
-    modules.
-
-    Excludes any subclass defined elsewhere (e.g. by unrelated tests exercising
-    ``PhraseRule``'s dispatch contract with throwaway subclasses) so completeness checks
-    against ``RULES`` stay independent of those subclasses' unrelated object lifetimes.
+    modules, excluding the throwaway subclasses other tests define.
     """
     return {
         subclass
@@ -64,35 +60,83 @@ def test_concrete_subclasses_excludes_abstract_bases():
 
 def test_rules_registry_is_exactly_one_instance_per_concrete_rule():
     """
-    The registry holds exactly one instance of every concrete ``PhraseRule`` subclass —
-    proving auto-discovery is complete and free of duplicates.
+    The registry holds exactly one instance of every concrete ``PhraseRule`` subclass of
+    the grammar package — proving auto-discovery is complete and free of duplicates.
     """
-    discovered = {type(rule) for rule in RULES}
-    assert discovered == _discovered_grammar_rule_types()
-    assert len(RULES) == len(discovered)  # no duplicate instances
+    rules = PhraseRuleRegistry.loaded_rules()
+    discovered = {type(rule) for rule in rules}
+    grammar_rules = [
+        rule for rule in rules if type(rule) in _discovered_grammar_rule_types()
+    ]
+    assert {type(rule) for rule in grammar_rules} == _discovered_grammar_rule_types()
+    assert len(rules) == len(discovered)  # no duplicate instances
 
 
-def test_registry_completeness_check_ignores_phrase_rule_subclasses_defined_outside_grammar():
+def test_registry_includes_a_module_level_rule_defined_outside_the_grammar_package():
     """
-    A ``PhraseRule`` subclass defined outside the grammar package must not affect the
-    registry's completeness check.
+    A rule a loaded module outside the grammar package defines joins the grammar.
+    """
+    assert ConstructOutsideGrammarRule in {
+        type(rule) for rule in PhraseRuleRegistry.loaded_rules()
+    }
 
-    Regression: ``concrete_subclasses(PhraseRule)`` reflects on every live subclass in the whole
-    process via ``__subclasses__()``, including throwaway subclasses other tests define to exercise
-    ``PhraseRule``'s dispatch contract (e.g. ``test_grammar_dispatch.py``'s ``ScopedRule``). Comparing
-    ``RULES`` against the raw, unscoped set made the completeness check fail depending on whether
-    such a subclass happened to still be alive when it ran — a flake tied to unrelated
-    garbage-collection timing rather than any real registry defect.
+
+def test_registry_excludes_a_rule_that_opts_out_of_the_grammar():
+    """
+    A ``PhraseRule`` subclass that sets ``joins_grammar`` to ``False``, as tests do for
+    the rules they define to exercise the dispatch contract, is neither part of the
+    grammar package's rules nor loaded into the grammar, however long it stays alive.
     """
 
     class TransientNonGrammarRule(PhraseRule):
         construct = object
+        joins_grammar = False
 
         def build(self, node, context):
             raise NotImplementedError
 
     assert TransientNonGrammarRule in concrete_subclasses(PhraseRule)
     assert TransientNonGrammarRule not in _discovered_grammar_rule_types()
+    assert TransientNonGrammarRule not in {
+        type(rule) for rule in PhraseRuleRegistry.loaded_rules()
+    }
+
+
+def test_registry_excludes_the_subclasses_of_a_rule_that_opts_out():
+    """
+    A rule inherits the opt-out of its base, so a test base rule covers the rules built
+    on it.
+    """
+
+    class OptedOutBase(PhraseRule, ABC):
+        joins_grammar = False
+
+    class InheritingRule(OptedOutBase):
+        construct = object
+
+        def build(self, node, context):
+            raise NotImplementedError
+
+    assert InheritingRule not in {
+        type(rule) for rule in PhraseRuleRegistry.loaded_rules()
+    }
+
+
+def test_registry_includes_a_rule_that_does_not_opt_out():
+    """
+    A concrete ``PhraseRule`` subclass joins the grammar unless it opts out.
+    """
+
+    class UnrelatedConstruct:
+        pass
+
+    class DefaultRule(PhraseRule):
+        construct = UnrelatedConstruct
+
+        def build(self, node, context):
+            raise NotImplementedError
+
+    assert DefaultRule in {type(rule) for rule in PhraseRuleRegistry.loaded_rules()}
 
 
 def test_maxima_returns_all_co_maximal_candidates():
@@ -125,12 +169,14 @@ def test_select_raises_on_equally_specific_rule_collision():
 
     class FirstRule(PhraseRule):
         construct = Node
+        joins_grammar = False
 
         def build(self, node, context):
             raise NotImplementedError
 
     class SecondRule(PhraseRule):
         construct = Node
+        joins_grammar = False
 
         def build(self, node, context):
             raise NotImplementedError
@@ -145,7 +191,10 @@ def test_every_construct_folder_contributes_rules():
     A representative rule from each construct package is auto-discovered (the walk
     reaches every ``rules`` module, not a hand-listed subset).
     """
-    modules = {type(rule).__module__.rsplit(".", 2)[-2] for rule in RULES}
+    modules = {
+        type(rule).__module__.rsplit(".", 2)[-2]
+        for rule in PhraseRuleRegistry.loaded_rules()
+    }
     for construct_folder in (
         "terms",
         "chain",
@@ -155,6 +204,6 @@ def test_every_construct_folder_contributes_rules():
         "aggregation",
         "instantiated",
     ):
-        assert (
-            construct_folder in modules
-        ), f"no rules discovered for grammar/{construct_folder}"
+        assert construct_folder in modules, (
+            f"no rules discovered for grammar/{construct_folder}"
+        )

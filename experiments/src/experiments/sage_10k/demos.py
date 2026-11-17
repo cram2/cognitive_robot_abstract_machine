@@ -9,7 +9,7 @@ from functools import cached_property
 
 import numpy as np
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import *
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from cramph.context import ContextExtension

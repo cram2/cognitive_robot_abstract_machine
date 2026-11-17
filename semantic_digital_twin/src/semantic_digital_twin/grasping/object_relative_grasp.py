@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, fields
 
 from typing_extensions import TYPE_CHECKING, Self
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import (
