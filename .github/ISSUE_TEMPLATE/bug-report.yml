@@ -14,7 +14,7 @@ body:
     id: "reproduce-the-code-example"
     attributes:
       label: "Reproduce the code example"
-      description: "A short, self contained script that reproduces the problem and runs as it is with `python reproduce.py`. Name the commit or version it ran on."
+      description: "A short, self contained script that reproduces the problem and runs as it is with `python reproduce.py`. Name the commit or version it ran on in a comment at its top."
       render: "python"
     validations:
       required: true

@@ -56,7 +56,8 @@ class BugReportIssueForm(IssueForm):
             label="Reproduce the code example",
             description=(
                 "A short, self contained script that reproduces the problem and runs as "
-                "it is with `python reproduce.py`. Name the commit or version it ran on."
+                "it is with `python reproduce.py`. Name the commit or version it ran on "
+                "in a comment at its top."
             ),
             code_language=CodeLanguage.PYTHON,
             required=True,
