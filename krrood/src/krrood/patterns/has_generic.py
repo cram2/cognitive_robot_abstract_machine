@@ -27,10 +27,10 @@ class HasGeneric(Generic[T]):
         :return: The generic type argument.
         :raises NoGenericError: If no generic argument is found.
         """
-        tp = cls._generic_argument()
-        if tp is None:
+        generic_argument = cls._generic_argument()
+        if generic_argument is None:
             raise NoGenericError(clazz=cls)
-        return tp
+        return generic_argument
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -56,7 +56,7 @@ class HasGeneric(Generic[T]):
         """
         # filter for instances of generic aliases in the superclasses
         for base in filter(
-            lambda x: isinstance(x, _GenericAlias),
+            lambda base: isinstance(base, _GenericAlias),
             cls.__orig_bases__,
         ):
             return get_args(base)[0]
