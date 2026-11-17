@@ -6,8 +6,8 @@ floating point type and the storage of the edges.
 from __future__ import annotations
 
 # %% imports
-import enum
 from dataclasses import dataclass
+from enum import StrEnum
 from types import ModuleType
 
 import array_api_compat.torch as torch_namespace
@@ -15,6 +15,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import torch
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageGenerativeBackend,
+)
+from krrood.entity_query_language.factories import a, variable_from
 from typing_extensions import Any, Self
 
 from probabilistic_model.learning.device_memory import DeviceMemory
@@ -30,7 +34,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 # %% values
 
 
-class ArrayLibrary(enum.Enum):
+class ArrayLibrary(StrEnum):
     """
     The array library a circuit computes with.
     """
@@ -40,7 +44,7 @@ class ArrayLibrary(enum.Enum):
     TORCH = "torch"
 
 
-class Device(enum.Enum):
+class Device(StrEnum):
     """
     The device a circuit computes on.
     """
@@ -49,7 +53,7 @@ class Device(enum.Enum):
     GPU = "gpu"
 
 
-class FloatingPointType(enum.Enum):
+class FloatingPointType(StrEnum):
     """
     The floating point type of a circuit's parameters and computations.
     """
@@ -58,7 +62,7 @@ class FloatingPointType(enum.Enum):
     FLOAT64 = "float64"
 
 
-class EdgeRepresentation(enum.Enum):
+class EdgeRepresentation(StrEnum):
     """
     How the edges of a layered circuit's sum and product layers are stored.
     """
@@ -133,19 +137,16 @@ class ComputationSetting:
         :param devices: The devices of the grid.
         :return: Every setting of these libraries and devices, the reference first.
         """
-        settings = [
-            cls(
-                array_library=array_library,
-                device=device,
-                floating_point_type=floating_point_type,
-                edge_representation=edge_representation,
-            )
-            for array_library in array_libraries
-            for device in devices
-            for floating_point_type in FloatingPointType
-            for edge_representation in EdgeRepresentation
-        ]
-        return sorted(settings, key=lambda setting: setting != cls.reference())
+        settings = a(cls)(
+            array_library=variable_from(array_libraries),
+            device=variable_from(devices),
+            floating_point_type=variable_from(tuple(FloatingPointType)),
+            edge_representation=variable_from(tuple(EdgeRepresentation)),
+        )
+        return sorted(
+            settings.evaluate(backend=EntityQueryLanguageGenerativeBackend()),
+            key=lambda setting: setting != cls.reference(),
+        )
 
     @property
     def key(self) -> str:

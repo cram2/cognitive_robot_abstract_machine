@@ -7,6 +7,7 @@ trainers raise the log-likelihood of their data that way.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 import jax
 import jax.numpy as jnp
@@ -129,7 +130,7 @@ def test_an_elapsed_time_limit_starts_no_further_epoch(convergence):
     Once the time limit has passed, no epoch starts and training ends without having
     converged.
     """
-    convergence.maximum_seconds = 0.0
+    convergence.maximum_duration = timedelta()
     history = convergence.history_until_converged(
         training=scripted_training([1.0] * convergence.maximum_epochs)
     )

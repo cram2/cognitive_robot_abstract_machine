@@ -3,14 +3,13 @@ Runs the circuit learning benchmark: every method on every dataset in every sett
 supports, and the queries of every circuit learned in a method's first setting, each run
 in a process of its own on a share of the GPU or the processor cores.
 
-A restarted benchmark resumes after its finished runs.
+A restarted benchmark resumes after the runs its database records.
 """
 
 from __future__ import annotations
 
 # %% imports
 import argparse
-import enum
 import functools
 import json
 import os
@@ -18,18 +17,18 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
+from enum import StrEnum
 from pathlib import Path
 
 import jax
+import numpy as np
 import psutil
 import torch
-from typing_extensions import Any
+from krrood.adapters.json_serializer import from_json, to_json
 
-from experiments.circuit_learning.datasets import (
-    BenchmarkDataset,
-    DatasetName,
-    DatasetSources,
-)
+from experiments.circuit_learning.database import BenchmarkDatabase
+from experiments.circuit_learning.datasets import DatasetName, PreparedDatasets
 from experiments.circuit_learning.measurements import (
     QueryMeasurement,
     TrainingMeasurement,
@@ -39,43 +38,25 @@ from experiments.circuit_learning.methods import (
     LearningMethod,
     TrainingContext,
 )
+from experiments.circuit_learning.records import (
+    Job,
+    JobKind,
+    RunRecord,
+    RunStatus,
+    TrainedCircuit,
+)
 from experiments.circuit_learning.rows import BenchmarkConfiguration
 from experiments.circuit_learning.settings import (
     ArrayLibrary,
     ComputationSetting,
     Device,
-    EdgeRepresentation,
-    FloatingPointType,
 )
-from experiments.circuit_learning.storage import CircuitFile, PickledFile
-from experiments.experiment_definitions import ExperimentsTable
 from probabilistic_model.learning.training_schedule import Convergence
 
 # %% names
 
 
-class JobKind(enum.Enum):
-    """
-    What a run measures.
-    """
-
-    TRAINING = "training"
-    QUERIES = "queries"
-
-
-class RunStatus(enum.Enum):
-    """
-    How a run ended.
-    """
-
-    FINISHED = "finished"
-    FAILED = "failed"
-    TIMED_OUT = "timed_out"
-    OUT_OF_MEMORY = "out_of_memory"
-    SKIPPED = "skipped"
-
-
-class ThreadVariable(enum.Enum):
+class ThreadVariable(StrEnum):
     """
     The environment variables that cap the threads of the numeric libraries.
     """
@@ -85,87 +66,16 @@ class ThreadVariable(enum.Enum):
     MKL = "MKL_NUM_THREADS"
 
 
-class ResultFile(enum.Enum):
+class OutputFile(StrEnum):
     """
     The files and directories of a benchmark's output directory.
     """
 
-    RUNS = "runs.jsonl"
-    ROWS = "rows"
-    CIRCUITS = "circuits"
+    DATABASE = "results.sqlite"
     LOGS = "logs"
 
 
-# %% jobs
-
-
-@dataclass(kw_only=True, frozen=True)
-class Job:
-    """
-    One run of the benchmark.
-    """
-
-    kind: JobKind
-    """
-    What the run measures.
-    """
-
-    dataset: DatasetName
-    """
-    The dataset.
-    """
-
-    method: LearningMethod
-    """
-    The method that learns, or learned, the circuit.
-    """
-
-    setting: ComputationSetting
-    """
-    The setting the run computes in.
-    """
-
-    @property
-    def key(self) -> str:
-        """
-        :return: A name of the run unique within a benchmark, usable as a file name.
-        """
-        return (
-            f"{self.kind.value}.{self.dataset.value}.{self.method.name.lower()}."
-            f"{self.setting.key}"
-        )
-
-    def to_json(self) -> dict[str, str]:
-        """
-        :return: The run as a JSON object.
-        """
-        return {
-            "kind": self.kind.name,
-            "dataset": self.dataset.name,
-            "method": self.method.name,
-            "array_library": self.setting.array_library.name,
-            "device": self.setting.device.name,
-            "floating_point_type": self.setting.floating_point_type.name,
-            "edge_representation": self.setting.edge_representation.name,
-        }
-
-    @classmethod
-    def from_json(cls, *, data: dict[str, str]) -> Job:
-        """
-        :param data: A run as :meth:`to_json` gives it.
-        :return: The run.
-        """
-        return cls(
-            kind=JobKind[data["kind"]],
-            dataset=DatasetName[data["dataset"]],
-            method=LearningMethod[data["method"]],
-            setting=ComputationSetting(
-                array_library=ArrayLibrary[data["array_library"]],
-                device=Device[data["device"]],
-                floating_point_type=FloatingPointType[data["floating_point_type"]],
-                edge_representation=EdgeRepresentation[data["edge_representation"]],
-            ),
-        )
+# %% limits
 
 
 @dataclass(kw_only=True)
@@ -174,14 +84,20 @@ class JobLimits:
     The limits every run of a benchmark keeps to.
     """
 
-    training_seconds: float = 3600.0
+    training_duration: timedelta = timedelta(hours=1)
     """
     The time after which iterative training starts no further epoch.
     """
 
-    query_seconds: float = 3600.0
+    query_duration: timedelta = timedelta(hours=1)
     """
     The time after which a run of queries is stopped.
+    """
+
+    evaluation_allowance: timedelta = timedelta(minutes=30)
+    """
+    The time a training run has beyond its training, for building the structure and
+    evaluating the circuit.
     """
 
     memory_budget_bytes: int = 0
@@ -190,12 +106,11 @@ class JobLimits:
     """
 
     @property
-    def training_timeout_seconds(self) -> float:
+    def training_timeout(self) -> timedelta:
         """
-        :return: The time after which a training run is stopped, which leaves time for
-            building the structure and evaluating the circuit.
+        :return: The time after which a training run is stopped.
         """
-        return 2 * self.training_seconds + 1800.0
+        return 2 * self.training_duration + self.evaluation_allowance
 
 
 # %% one run
@@ -204,7 +119,7 @@ class JobLimits:
 @dataclass(kw_only=True)
 class JobExecution:
     """
-    Carries out one run in the current process and writes its rows.
+    Carries out one run in the current process and stores what it measured.
     """
 
     job: Job
@@ -212,9 +127,9 @@ class JobExecution:
     The run.
     """
 
-    output: Path
+    database: BenchmarkDatabase
     """
-    The output directory of the benchmark.
+    The database of the benchmark.
     """
 
     cache_directory: Path
@@ -227,112 +142,46 @@ class JobExecution:
     The limits of the run.
     """
 
-    def circuit_file(self, *, job: Job) -> CircuitFile:
-        """
-        :param job: A training run.
-        :return: The file its circuit is stored in.
-        """
-        return CircuitFile(
-            path=self.output / ResultFile.CIRCUITS.value / f"{job.key}.pickle"
-        )
-
     def execute(self) -> None:
         """
-        Measure, and write one JSON line per row to the rows file of the run.
+        Measure, and store the rows, and the learned circuit of a training run, in one
+        transaction.
         """
         jax.config.update("jax_enable_x64", True)
         dataset = PreparedDatasets(cache_directory=self.cache_directory).load(
             name=self.job.dataset
         )
         method = BenchmarkMethods().find(name=self.job.method)
-        if self.job.kind is JobKind.TRAINING:
-            rows = [self.training_row(dataset=dataset, method=method)]
-        else:
-            rows = self.query_rows(dataset=dataset, method=method)
-        path = self.output / ResultFile.ROWS.value / f"{self.job.key}.jsonl"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w") as file:
-            for row in rows:
-                record = ExperimentsTable([row]).as_json_rows()[0]
-                record["row_type"] = type(row).__name__
-                file.write(json.dumps(record) + "\n")
-
-    def training_row(self, *, dataset: BenchmarkDataset, method: Any) -> Any:
-        """
-        :return: The training measurements of the run.
-        """
-        return TrainingMeasurement(
+        if self.job.kind is JobKind.QUERIES:
+            self.database.store(
+                records=QueryMeasurement(
+                    dataset=dataset,
+                    configuration=BenchmarkConfiguration.from_setting(
+                        learning_method=self.job.method,
+                        dataset=self.job.dataset,
+                        setting=self.job.setting,
+                        seed=method.seed,
+                    ),
+                    setting=self.job.setting,
+                    circuit=self.database.trained_circuit(job=self.job.training_job()),
+                ).run()
+            )
+            return
+        measured = TrainingMeasurement(
             dataset=dataset,
             method=method,
             setting=self.job.setting,
             context=TrainingContext(
-                convergence=Convergence(maximum_seconds=self.limits.training_seconds),
+                convergence=Convergence(maximum_duration=self.limits.training_duration),
                 memory_budget_bytes=self.limits.memory_budget_bytes,
             ),
-            circuit_file=self.circuit_file(job=self.job),
         ).run()
-
-    def query_rows(self, *, dataset: BenchmarkDataset, method: Any) -> list[Any]:
-        """
-        :return: The query measurements of the run.
-        """
-        trained = Job(
-            kind=JobKind.TRAINING,
-            dataset=self.job.dataset,
-            method=self.job.method,
-            setting=method.settings()[0],
+        self.database.store(
+            records=[
+                measured.result,
+                TrainedCircuit(job=self.job, circuit=measured.circuit.to_namespace(np)),
+            ]
         )
-        return QueryMeasurement(
-            dataset=dataset,
-            configuration=BenchmarkConfiguration.from_setting(
-                learning_method=self.job.method,
-                dataset=self.job.dataset,
-                setting=self.job.setting,
-                seed=method.seed,
-            ),
-            setting=self.job.setting,
-            circuit=self.circuit_file(job=trained).load(),
-        ).run()
-
-
-# %% prepared datasets
-
-
-@dataclass(kw_only=True)
-class PreparedDatasets:
-    """
-    The datasets of the benchmark, loaded once from their sources and kept as files.
-    """
-
-    cache_directory: Path
-    """
-    The directory of the downloaded and prepared datasets.
-    """
-
-    def file(self, *, name: DatasetName) -> PickledFile:
-        """
-        :param name: A dataset.
-        :return: The file it is kept in.
-        """
-        return PickledFile(
-            path=self.cache_directory / "prepared" / f"{name.value}.pickle"
-        )
-
-    def load(self, *, name: DatasetName) -> BenchmarkDataset:
-        """
-        :param name: A dataset.
-        :return: The dataset, prepared from its source on first use.
-        """
-        file = self.file(name=name)
-        if not file.path.exists():
-            dataset = (
-                DatasetSources(cache_directory=self.cache_directory)
-                .find(name=name)
-                .load()
-            )
-            file.save_object(value=dataset)
-            return dataset
-        return file.load()
 
 
 # %% scheduling
@@ -388,13 +237,20 @@ class RunningJob:
 
     start: float
     """
-    When it started.
+    When it started, as :func:`time.perf_counter` reads it.
     """
 
-    timeout_seconds: float
+    timeout: timedelta
     """
     The time after which it is stopped.
     """
+
+    @property
+    def elapsed(self) -> timedelta:
+        """
+        :return: The time since the run started.
+        """
+        return timedelta(seconds=time.perf_counter() - self.start)
 
 
 @dataclass(kw_only=True)
@@ -423,7 +279,7 @@ class BenchmarkRunner:
     The directory of the downloaded and prepared datasets.
     """
 
-    training_seconds: float = 3600.0
+    training_duration: timedelta = timedelta(hours=1)
     """
     The time after which iterative training starts no further epoch.
     """
@@ -438,7 +294,7 @@ class BenchmarkRunner:
     The number of runs that use processor cores only.
     """
 
-    poll_seconds: float = 5.0
+    poll_interval: timedelta = timedelta(seconds=5)
     """
     How often running jobs are checked.
     """
@@ -457,6 +313,13 @@ class BenchmarkRunner:
     """
     The status of every run that ended, by its key.
     """
+
+    @functools.cached_property
+    def database(self) -> BenchmarkDatabase:
+        """
+        :return: The database of the output directory.
+        """
+        return BenchmarkDatabase(path=self.output / OutputFile.DATABASE)
 
     def jobs(self) -> list[Job]:
         """
@@ -512,18 +375,6 @@ class BenchmarkRunner:
             return first + queries
         return first + queries + rest
 
-    def trained_job(self, *, job: Job) -> Job:
-        """
-        :param job: A query run.
-        :return: The training run whose circuit it queries.
-        """
-        return Job(
-            kind=JobKind.TRAINING,
-            dataset=job.dataset,
-            method=job.method,
-            setting=BenchmarkMethods().find(name=job.method).settings()[0],
-        )
-
     def readiness(self, *, job: Job) -> RunStatus | None:
         """
         :param job: A run that has not started.
@@ -532,7 +383,7 @@ class BenchmarkRunner:
         """
         if job.kind is JobKind.TRAINING:
             return None
-        trained = self.finished.get(self.trained_job(job=job).key)
+        trained = self.finished.get(job.training_job().key)
         if trained is None:
             return RunStatus.FINISHED
         if trained is RunStatus.FINISHED:
@@ -565,41 +416,28 @@ class BenchmarkRunner:
             for index in range(count)
         ]
 
-    def record(self, *, job: Job, status: RunStatus, seconds: float) -> None:
+    def log_file(self, *, job: Job) -> Path:
         """
-        Append the end of a run to the runs file.
+        :param job: A run.
+        :return: The file its output is written to.
+        """
+        return self.output / OutputFile.LOGS / f"{job.key}.log"
+
+    def record(self, *, job: Job, status: RunStatus, duration: timedelta) -> None:
+        """
+        Store how a run ended.
         """
         self.finished[job.key] = status
-        record: dict[str, Any] = {
-            "key": job.key,
-            **job.to_json(),
-            "status": status.value,
-            "wall_seconds": seconds,
-        }
-        log = self.output / ResultFile.LOGS.value / f"{job.key}.log"
+        log = self.log_file(job=job)
+        log_tail = None
         if status is not RunStatus.FINISHED and log.exists():
-            record["log_tail"] = log.read_text(errors="replace")[
-                -self.log_tail_characters :
+            log_tail = log.read_text(errors="replace")[-self.log_tail_characters :]
+        self.database.store(
+            records=[
+                RunRecord(job=job, status=status, duration=duration, log_tail=log_tail)
             ]
-        with (self.output / ResultFile.RUNS.value).open("a") as file:
-            file.write(json.dumps(record) + "\n")
-        print(
-            json.dumps(
-                {key: value for key, value in record.items() if key != "log_tail"}
-            ),
-            flush=True,
         )
-
-    def load_finished(self) -> None:
-        """
-        Read the runs that ended in an earlier start of the benchmark.
-        """
-        path = self.output / ResultFile.RUNS.value
-        if not path.exists():
-            return
-        for line in path.read_text().splitlines():
-            record = json.loads(line)
-            self.finished[record["key"]] = RunStatus(record["status"])
+        print(f"{status} {job.key} {duration}", flush=True)
 
     def start(self, *, job: Job, slot: Slot) -> RunningJob:
         """
@@ -607,32 +445,32 @@ class BenchmarkRunner:
         """
         environment = dict(os.environ)
         for variable in ThreadVariable:
-            environment[variable.value] = str(len(slot.cores))
+            environment[variable] = str(len(slot.cores))
         environment["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
         # autotuning makes compiling a step take minutes on large batches
         environment["XLA_FLAGS"] = "--xla_gpu_autotune_level=0"
         if not slot.uses_gpu:
             environment["CUDA_VISIBLE_DEVICES"] = ""
         limits = JobLimits(
-            training_seconds=self.training_seconds,
+            training_duration=self.training_duration,
             memory_budget_bytes=slot.memory_budget_bytes,
         )
-        log = self.output / ResultFile.LOGS.value / f"{job.key}.log"
+        log = self.log_file(job=job)
         log.parent.mkdir(parents=True, exist_ok=True)
         process = subprocess.Popen(
             [
                 sys.executable,
                 "-m",
                 "experiments.circuit_learning.runner",
-                "execute",
+                Command.EXECUTE,
                 "--job",
-                json.dumps(job.to_json()),
+                json.dumps(to_json(job)),
                 "--output",
                 str(self.output),
                 "--cache-directory",
                 str(self.cache_directory),
                 "--training-seconds",
-                str(limits.training_seconds),
+                str(limits.training_duration.total_seconds()),
                 "--memory-budget-bytes",
                 str(limits.memory_budget_bytes),
             ],
@@ -646,10 +484,10 @@ class BenchmarkRunner:
             process=process,
             slot=slot,
             start=time.perf_counter(),
-            timeout_seconds=(
-                limits.training_timeout_seconds
+            timeout=(
+                limits.training_timeout
                 if job.kind is JobKind.TRAINING
-                else limits.query_seconds
+                else limits.query_duration
             ),
         )
 
@@ -660,11 +498,8 @@ class BenchmarkRunner:
         """
         exit_code = running.process.poll()
         if exit_code is not None:
-            rows = self.output / ResultFile.ROWS.value / f"{running.job.key}.jsonl"
-            if exit_code == 0 and rows.exists():
-                return RunStatus.FINISHED
-            return RunStatus.FAILED
-        if time.perf_counter() - running.start > running.timeout_seconds:
+            return RunStatus.FINISHED if exit_code == 0 else RunStatus.FAILED
+        if running.elapsed > running.timeout:
             running.process.kill()
             running.process.wait()
             return RunStatus.TIMED_OUT
@@ -688,8 +523,9 @@ class BenchmarkRunner:
         :param jobs: The runs, in the order they are started; those that ended in an
             earlier start are left out.
         """
-        self.output.mkdir(parents=True, exist_ok=True)
-        self.load_finished()
+        self.finished.update(
+            {record.job.key: record.status for record in self.database.run_records()}
+        )
         pending = [job for job in jobs if job.key not in self.finished]
         free = self.slots()
         running: list[RunningJob] = []
@@ -700,16 +536,12 @@ class BenchmarkRunner:
                     continue
                 running.remove(current)
                 free.append(current.slot)
-                self.record(
-                    job=current.job,
-                    status=status,
-                    seconds=time.perf_counter() - current.start,
-                )
+                self.record(job=current.job, status=status, duration=current.elapsed)
             for job in list(pending):
                 readiness = self.readiness(job=job)
                 if readiness is RunStatus.SKIPPED:
                     pending.remove(job)
-                    self.record(job=job, status=RunStatus.SKIPPED, seconds=0.0)
+                    self.record(job=job, status=RunStatus.SKIPPED, duration=timedelta())
                     continue
                 if readiness is not None:
                     continue
@@ -722,13 +554,13 @@ class BenchmarkRunner:
                 free.remove(slot)
                 pending.remove(job)
                 running.append(self.start(job=job, slot=slot))
-            time.sleep(self.poll_seconds)
+            time.sleep(self.poll_interval.total_seconds())
 
 
 # %% command line
 
 
-class Command(enum.Enum):
+class Command(StrEnum):
     """
     The commands of the command line.
     """
@@ -742,7 +574,7 @@ def main() -> None:
     Parse the command line and run the benchmark or one of its runs.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=[command.value for command in Command])
+    parser.add_argument("command", choices=list(Command))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
         "--cache-directory",
@@ -762,13 +594,14 @@ def main() -> None:
     parser.add_argument("--job")
     parser.add_argument("--memory-budget-bytes", type=int, default=0)
     arguments = parser.parse_args()
+    training_duration = timedelta(seconds=arguments.training_seconds)
     if Command(arguments.command) is Command.EXECUTE:
         JobExecution(
-            job=Job.from_json(data=json.loads(arguments.job)),
-            output=arguments.output,
+            job=from_json(json.loads(arguments.job)),
+            database=BenchmarkDatabase(path=arguments.output / OutputFile.DATABASE),
             cache_directory=arguments.cache_directory,
             limits=JobLimits(
-                training_seconds=arguments.training_seconds,
+                training_duration=training_duration,
                 memory_budget_bytes=arguments.memory_budget_bytes,
             ),
         ).execute()
@@ -778,7 +611,7 @@ def main() -> None:
         methods=[LearningMethod[name] for name in arguments.methods],
         output=arguments.output,
         cache_directory=arguments.cache_directory,
-        training_seconds=arguments.training_seconds,
+        training_duration=training_duration,
         gpu_slots=arguments.gpu_slots,
         cpu_slots=arguments.cpu_slots,
         first_settings_only=arguments.first_settings_only,

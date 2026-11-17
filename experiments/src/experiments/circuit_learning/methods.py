@@ -8,9 +8,9 @@ from __future__ import annotations
 
 # %% imports
 import dataclasses
-import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 import jax
 import numpy as np
@@ -56,7 +56,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
 # %% names
 
 
-class LearningMethod(enum.Enum):
+class LearningMethod(StrEnum):
     """
     A learning method of the benchmark, baselines included.
     """
@@ -197,9 +197,10 @@ class BenchmarkMethod(ABC):
 
 
 @dataclass(kw_only=True)
-class RandomTensorizedSumProductNetwork(BenchmarkMethod, ABC):
+class RandomTensorizedSumProductNetworkLearning(BenchmarkMethod, ABC):
     """
-    A RAT-SPN :cite:`peharz2020random` built from a random region graph.
+    A way of learning the parameters of a RAT-SPN :cite:`peharz2020random`, built from a
+    random region graph.
     """
 
     depth: int = 3
@@ -241,7 +242,7 @@ class RandomTensorizedSumProductNetwork(BenchmarkMethod, ABC):
 
 @dataclass(kw_only=True)
 class RandomTensorizedSumProductNetworkByGradientDescent(
-    RandomTensorizedSumProductNetwork
+    RandomTensorizedSumProductNetworkLearning
 ):
     """
     A RAT-SPN trained generatively by mini-batch gradient descent with Adam, whose
@@ -317,7 +318,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
 
 @dataclass(kw_only=True)
 class RandomTensorizedSumProductNetworkByExpectationMaximization(
-    RandomTensorizedSumProductNetwork
+    RandomTensorizedSumProductNetworkLearning
 ):
     """
     A RAT-SPN trained by full-batch expectation maximization on its rustworkx form, on

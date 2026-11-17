@@ -574,3 +574,61 @@ class DatasetSources:
             DatasetName.BSDS300: BSDS300Source,
         }
         return continuous[name](cache_directory=self.cache_directory)
+
+
+# %% prepared datasets
+
+
+class DatasetSplit(StrEnum):
+    """
+    The splits of a prepared dataset, as their files are named.
+    """
+
+    TRAIN = "train"
+    VALIDATION = "validation"
+    TEST = "test"
+
+
+@dataclass(kw_only=True)
+class PreparedDatasets:
+    """
+    The datasets of the benchmark, loaded once from their sources and kept as one file
+    per split.
+    """
+
+    cache_directory: Path
+    """
+    The directory of the downloaded and prepared datasets.
+    """
+
+    def split_file(self, *, name: DatasetName, split: DatasetSplit) -> Path:
+        """
+        :param name: A dataset.
+        :param split: One of its splits.
+        :return: The file the rows of the split are kept in.
+        """
+        return self.cache_directory / "prepared" / f"{name}.{split}.pickle"
+
+    def load(self, *, name: DatasetName) -> BenchmarkDataset:
+        """
+        :param name: A dataset.
+        :return: The dataset, prepared from its source on first use.
+        """
+        files = {
+            split: self.split_file(name=name, split=split) for split in DatasetSplit
+        }
+        if all(file.exists() for file in files.values()):
+            return BenchmarkDataset(
+                name=name,
+                train=pd.read_pickle(files[DatasetSplit.TRAIN]),
+                validation=pd.read_pickle(files[DatasetSplit.VALIDATION]),
+                test=pd.read_pickle(files[DatasetSplit.TEST]),
+            )
+        dataset = (
+            DatasetSources(cache_directory=self.cache_directory).find(name=name).load()
+        )
+        files[DatasetSplit.TRAIN].parent.mkdir(parents=True, exist_ok=True)
+        dataset.train.to_pickle(files[DatasetSplit.TRAIN])
+        dataset.validation.to_pickle(files[DatasetSplit.VALIDATION])
+        dataset.test.to_pickle(files[DatasetSplit.TEST])
+        return dataset

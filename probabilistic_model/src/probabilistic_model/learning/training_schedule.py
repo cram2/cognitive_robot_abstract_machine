@@ -5,10 +5,11 @@ array backend that trains.
 
 from __future__ import annotations
 
-import time
 import math
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import numpy as np
 from array_api_compat import array_namespace, device
@@ -40,7 +41,7 @@ class ConvergenceHistory:
     Whether training stopped because the loss converged rather than at a limit.
     """
 
-    seconds: float = 0.0
+    duration: timedelta = timedelta()
     """
     The wall-clock time of the epochs.
     """
@@ -58,7 +59,7 @@ class Convergence:
     """
     Stops training once the average loss of an epoch improved by less than
     :attr:`tolerance` for :attr:`patience` epochs in a row, or after
-    :attr:`maximum_epochs` or :attr:`maximum_seconds`.
+    :attr:`maximum_epochs` or :attr:`maximum_duration`.
     """
 
     tolerance: float = 1e-3
@@ -76,7 +77,7 @@ class Convergence:
     The number of epochs after which training stops without having converged.
     """
 
-    maximum_seconds: float | None = None
+    maximum_duration: timedelta | None = None
     """
     The wall-clock time after which no further epoch starts, no limit if ``None``.
     """
@@ -104,29 +105,32 @@ class Convergence:
         """
         epoch_losses: list[float] = []
         start = time.perf_counter()
+
+        def elapsed() -> timedelta:
+            """
+            :return: The time since training started.
+            """
+            return timedelta(seconds=time.perf_counter() - start)
+
         while len(epoch_losses) < self.maximum_epochs and not self.is_out_of_time(
-            seconds=time.perf_counter() - start
+            elapsed=elapsed()
         ):
             epoch_losses.append(training.train_one_epoch())
             training.finish_epoch(average_loss=epoch_losses[-1])
             if training.has_settled() and self.has_converged(epoch_losses=epoch_losses):
                 return ConvergenceHistory(
-                    epoch_losses=epoch_losses,
-                    converged=True,
-                    seconds=time.perf_counter() - start,
+                    epoch_losses=epoch_losses, converged=True, duration=elapsed()
                 )
         return ConvergenceHistory(
-            epoch_losses=epoch_losses,
-            converged=False,
-            seconds=time.perf_counter() - start,
+            epoch_losses=epoch_losses, converged=False, duration=elapsed()
         )
 
-    def is_out_of_time(self, *, seconds: float) -> bool:
+    def is_out_of_time(self, *, elapsed: timedelta) -> bool:
         """
-        :param seconds: The time training has taken so far.
-        :return: Whether :attr:`maximum_seconds` has passed.
+        :param elapsed: The time training has taken so far.
+        :return: Whether :attr:`maximum_duration` has passed.
         """
-        return self.maximum_seconds is not None and seconds >= self.maximum_seconds
+        return self.maximum_duration is not None and elapsed >= self.maximum_duration
 
 
 # %% learning rate schedule

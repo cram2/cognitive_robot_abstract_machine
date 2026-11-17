@@ -9,6 +9,7 @@ from __future__ import annotations
 # %% imports
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import jax
 import numpy as np
@@ -18,7 +19,7 @@ from random_events.interval import closed_open
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import Any
+from typing_extensions import Any, Callable
 
 from experiments.circuit_learning.datasets import BenchmarkDataset
 from experiments.circuit_learning.methods import (
@@ -36,8 +37,11 @@ from experiments.circuit_learning.rows import (
     TruncationSpeedResult,
 )
 from experiments.circuit_learning.settings import ArrayLibrary, ComputationSetting
-from experiments.circuit_learning.storage import CircuitFile
-from experiments.experiment_definitions import MeanAndStandardDeviation, Unit
+from experiments.experiment_definitions import (
+    ExperimentResult,
+    MeanAndStandardDeviation,
+    Unit,
+)
 from probabilistic_model.learning.device_memory import HostMemory
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
@@ -107,9 +111,26 @@ class LogLikelihoods:
 
 
 @dataclass(kw_only=True)
+class MeasuredTraining:
+    """
+    The measurements of a training and the circuit it learned.
+    """
+
+    result: TrainingResult
+    """
+    The measurements.
+    """
+
+    circuit: LayeredProbabilisticCircuit
+    """
+    The learned circuit, its parameters stored as the setting it was learned in says.
+    """
+
+
+@dataclass(kw_only=True)
 class TrainingMeasurement:
     """
-    Learns a circuit with a method on a dataset in a setting, measures it and stores it.
+    Learns a circuit with a method on a dataset in a setting and measures it.
     """
 
     dataset: BenchmarkDataset
@@ -132,14 +153,9 @@ class TrainingMeasurement:
     The limits of training.
     """
 
-    circuit_file: CircuitFile
-    """
-    Where the learned circuit is stored.
-    """
-
-    def run(self) -> TrainingResult:
+    def run(self) -> MeasuredTraining:
         """
-        :return: The measurements.
+        :return: The measurements and the learned circuit.
         """
         host_memory = HostMemory()
         host_memory.reset_peak()
@@ -147,14 +163,13 @@ class TrainingMeasurement:
         learned = self.method.learn(
             dataset=self.dataset, setting=self.setting, context=self.context
         )
-        training_seconds = time.perf_counter() - start
+        training_duration = timedelta(seconds=time.perf_counter() - start)
         peak_memory_bytes = (
             self.peak_device_memory_bytes()
             if self.setting.uses_gpu
             else host_memory.peak_bytes()
         )
         circuit = learned.circuit
-        self.circuit_file.save(circuit=circuit)
         log_likelihoods = LogLikelihoods(circuit=circuit)
         test = log_likelihoods.compute_log_likelihoods(
             rows=self.dataset.encoded(frame=self.dataset.test)
@@ -162,14 +177,14 @@ class TrainingMeasurement:
         train = log_likelihoods.compute_log_likelihoods(
             rows=self.dataset.encoded(frame=self.dataset.train)
         )
-        return TrainingResult(
+        result = TrainingResult(
             configuration=BenchmarkConfiguration.from_setting(
                 learning_method=self.method.name,
                 dataset=self.dataset.name,
                 setting=self.setting,
                 seed=self.method.seed,
             ),
-            training_seconds=training_seconds,
+            training_duration=training_duration,
             epochs_until_convergence=(
                 None if learned.history is None else learned.history.epochs
             ),
@@ -190,6 +205,7 @@ class TrainingMeasurement:
                 log_likelihoods=test
             ),
         )
+        return MeasuredTraining(result=result, circuit=circuit)
 
     @staticmethod
     def supported_mean(*, log_likelihoods: np.ndarray) -> float:
@@ -213,6 +229,23 @@ class TrainingMeasurement:
 
 
 # %% queries
+
+
+@dataclass(kw_only=True)
+class QueryTiming:
+    """
+    How long a query took the first time and on average after that.
+    """
+
+    first_call: timedelta
+    """
+    The time of the first call, which includes any compilation.
+    """
+
+    later_call: timedelta
+    """
+    The mean time of a call after the first.
+    """
 
 
 @dataclass(kw_only=True)
@@ -252,7 +285,7 @@ class QueryMeasurement:
     The number of samples a sampling call draws.
     """
 
-    minimum_timing_seconds: float = 1.0
+    minimum_timing: timedelta = timedelta(seconds=1)
     """
     How long a query is repeated after its first call to measure its speed.
     """
@@ -283,11 +316,11 @@ class QueryMeasurement:
         """
         self.random_number_generator = np.random.default_rng(self.seed)
 
-    def run(self) -> list[Any]:
+    def run(self) -> list[ExperimentResult]:
         """
         :return: The rows of every query measured in :attr:`setting`.
         """
-        rows: list[Any] = [self.likelihood_speed()]
+        rows: list[ExperimentResult] = [self.likelihood_speed()]
         if self.setting.array_library is not ArrayLibrary.NUMPY:
             return rows
         circuit = self.setting.placed(circuit=self.circuit)
@@ -298,21 +331,25 @@ class QueryMeasurement:
             rows.append(self.exact_queries())
         return rows
 
-    def repeated_seconds_per_call(self, *, query: Any) -> tuple[float, float]:
+    def timed_calls(self, *, query: Callable[[], Any]) -> QueryTiming:
         """
-        :param query: A function without arguments that answers a query on the host.
+        :param query: A function without arguments that answers a query.
         :return: The time of its first call and the mean time of the calls after it,
-            repeated for at least :attr:`minimum_timing_seconds`.
+            repeated for at least :attr:`minimum_timing`.
         """
         start = time.perf_counter()
         query()
-        first = time.perf_counter() - start
+        first_call = timedelta(seconds=time.perf_counter() - start)
+        minimum_seconds = self.minimum_timing.total_seconds()
         calls = 0
         start = time.perf_counter()
-        while calls < 3 or time.perf_counter() - start < self.minimum_timing_seconds:
+        while calls < 3 or time.perf_counter() - start < minimum_seconds:
             query()
             calls += 1
-        return first, (time.perf_counter() - start) / calls
+        return QueryTiming(
+            first_call=first_call,
+            later_call=timedelta(seconds=(time.perf_counter() - start) / calls),
+        )
 
     def likelihood_speed(self) -> LikelihoodSpeedResult:
         """
@@ -322,13 +359,13 @@ class QueryMeasurement:
         chunk_rows = min(self.likelihood_rows, len(self.dataset.test))
         rows = self.dataset.encoded(frame=self.dataset.test)[:chunk_rows]
         log_likelihoods = LogLikelihoods(circuit=circuit, chunk_rows=chunk_rows)
-        first, per_call = self.repeated_seconds_per_call(
+        timing = self.timed_calls(
             query=lambda: log_likelihoods.compute_chunk_log_likelihoods(chunk=rows)
         )
         return LikelihoodSpeedResult(
             configuration=self.configuration,
-            first_call_seconds=first,
-            rows_per_second=chunk_rows / per_call,
+            first_call_duration=timing.first_call,
+            rows_per_second=chunk_rows / timing.later_call.total_seconds(),
         )
 
     def sampling_speed(
@@ -338,13 +375,11 @@ class QueryMeasurement:
         :param circuit: The circuit in :attr:`setting`.
         :return: How fast the circuit draws samples.
         """
-        first, per_call = self.repeated_seconds_per_call(
-            query=lambda: circuit.sample(self.sampled_rows)
-        )
+        timing = self.timed_calls(query=lambda: circuit.sample(self.sampled_rows))
         return SamplingSpeedResult(
             configuration=self.configuration,
-            first_call_seconds=first,
-            samples_per_second=self.sampled_rows / per_call,
+            first_call_duration=timing.first_call,
+            samples_per_second=self.sampled_rows / timing.later_call.total_seconds(),
         )
 
     def conditioning_speeds(

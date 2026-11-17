@@ -6,8 +6,9 @@ configuration it was measured in.
 from __future__ import annotations
 
 # %% imports
-import enum
 from dataclasses import dataclass
+from datetime import timedelta
+from enum import StrEnum
 
 from experiments.circuit_learning.datasets import DatasetName
 from experiments.circuit_learning.methods import LearningMethod
@@ -26,7 +27,7 @@ from experiments.experiment_definitions import (
 # %% configuration values
 
 
-class Query(enum.Enum):
+class Query(StrEnum):
     """
     A query a circuit may answer exactly.
     """
@@ -119,7 +120,7 @@ class TrainingResult(ExperimentResult):
     The setting the circuit was learned in.
     """
 
-    training_seconds: float
+    training_duration: timedelta
     """
     Wall-clock time of learning, structure and compilation included.
     """
@@ -201,7 +202,7 @@ class LikelihoodSpeedResult(ExperimentResult):
     The setting the likelihood was computed in.
     """
 
-    first_call_seconds: float
+    first_call_duration: timedelta
     """
     Time of the first likelihood call, including any compilation.
     """
@@ -223,7 +224,7 @@ class SamplingSpeedResult(ExperimentResult):
     The setting the samples were drawn in.
     """
 
-    first_call_seconds: float
+    first_call_duration: timedelta
     """
     Time of the first sampling call.
     """
