@@ -133,7 +133,7 @@ class CommandLine:
 
         issue_forms_parser = subparsers.add_parser(
             Subcommand.ISSUE_FORMS,
-            help="Generate the file of every issue form the repository declares.",
+            help="Generate the file of every issue form krrood ships and the repository declares.",
         )
         issue_forms_parser.add_argument(
             Option.CHECK,
@@ -202,8 +202,8 @@ class CommandLine:
 
     def generate_issue_forms(self, *, arguments: argparse.Namespace) -> ExitStatus:
         """
-        Generate, or with :attr:`Option.CHECK` verify, the file of every issue form the
-        current directory declares.
+        Generate, or with :attr:`Option.CHECK` verify, the file of every issue form krrood
+        ships and the current directory declares.
 
         :param arguments: The parsed command line.
         :return: :attr:`ExitStatus.FAILURE` if a file was rewritten or is stale.

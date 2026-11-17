@@ -1,5 +1,5 @@
 """
-Generates the file of each issue form a repository declares.
+Generates the file of each issue form krrood ships and a repository declares.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from pathlib import Path
 from krrood.code_generation.generator import CodeGenerator
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.generated_file import GeneratedFile
+from krrood.development_tools.issue_forms import shipped_forms
 from krrood.development_tools.issue_forms.issue_form import IssueForm
 from krrood.development_tools.subcommand import Subcommand
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -79,8 +80,8 @@ class IssueFormFile(GeneratedFile):
 @dataclass(kw_only=True)
 class RepositoryIssueForms:
     """
-    The issue forms a repository declares in its
-    :attr:`RepositoryIssueFormsModule.ISSUE_FORMS` module.
+    The issue forms of a repository: those krrood ships and those the repository
+    declares in its :attr:`RepositoryIssueFormsModule.ISSUE_FORMS` module.
     """
 
     repository_root: Path
@@ -91,19 +92,17 @@ class RepositoryIssueForms:
     @property
     def files(self) -> list[IssueFormFile]:
         """
-        The file of every declared form, in alphabetical order of their titles; none if
-        the repository has no such module.
+        The file of every shipped and declared form, in alphabetical order of their
+        titles.
         """
-        module = RuleModule.import_from(
+        forms = RuleModule(module=shipped_forms).defined_subclasses(base=IssueForm)
+        project_forms = RuleModule.import_from(
             directory=self.repository_root,
             module_name=RepositoryIssueFormsModule.ISSUE_FORMS,
         )
-        if module is None:
-            return []
-        forms = sorted(
-            module.defined_subclasses(base=IssueForm), key=lambda form: form.title
-        )
+        if project_forms is not None:
+            forms += project_forms.defined_subclasses(base=IssueForm)
         return [
             IssueFormFile(repository_root=self.repository_root, form=form)
-            for form in forms
+            for form in sorted(forms, key=lambda form: form.title)
         ]

@@ -12,6 +12,7 @@ from typing_extensions import Callable, Iterator
 
 from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.command_line import CommandLine, ExitStatus, Option
+from krrood.development_tools.issue_forms import shipped_forms
 from krrood.development_tools.issue_forms.issue_form import IssueForm
 from krrood.development_tools.issue_forms.issue_form_files import (
     IssueFormFile,
@@ -129,27 +130,33 @@ def project_issue_forms_repository(
     return repository_root
 
 
-def test_a_repository_without_an_issue_forms_module_has_no_issue_form_files(
+def test_a_repository_without_an_issue_forms_module_has_the_shipped_forms(
     repository_root: Path,
 ) -> None:
     """
-    A repository need not declare any issue form.
+    Every repository gets the issue forms krrood ships.
     """
-    assert RepositoryIssueForms(repository_root=repository_root).files == []
+    files = RepositoryIssueForms(repository_root=repository_root).files
+
+    assert [file.form for file in files] == RuleModule(
+        module=shipped_forms
+    ).defined_subclasses(base=IssueForm)
 
 
-def test_a_repository_has_a_file_for_every_form_it_declares_alphabetically(
+def test_a_repository_has_a_file_for_every_shipped_and_declared_form_alphabetically(
     project_issue_forms_repository: Path,
 ) -> None:
     """
     The files are ordered by the titles of their forms, not by definition order.
     """
     files = RepositoryIssueForms(repository_root=project_issue_forms_repository).files
-
-    assert [file.form.title for file in files] == [
-        AnnouncementIssueForm.title,
-        CrashReportIssueForm.title,
+    forms = [
+        *RuleModule(module=shipped_forms).defined_subclasses(base=IssueForm),
+        AnnouncementIssueForm,
+        CrashReportIssueForm,
     ]
+
+    assert [file.form.title for file in files] == sorted(form.title for form in forms)
 
 
 # %% command line

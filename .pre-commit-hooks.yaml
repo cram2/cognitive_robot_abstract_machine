@@ -33,8 +33,8 @@
 - id: krrood-issue-forms
   name: Update the generated issue forms
   description: >
-    Generates the .github/ISSUE_TEMPLATE file of every issue form the repository
-    declares in issue_forms.py.
+    Generates the .github/ISSUE_TEMPLATE file of every issue form krrood ships and
+    the repository declares in issue_forms.py.
   entry: krrood issue-forms
   language: system
   pass_filenames: false

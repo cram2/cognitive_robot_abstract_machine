@@ -31,7 +31,7 @@ class Subcommand(StrEnum):
 
     ISSUE_FORMS = "issue-forms"
     """
-    Generate the file of every issue form the repository declares.
+    Generate the file of every issue form krrood ships and the repository declares.
     """
 
     CHECK = "check"

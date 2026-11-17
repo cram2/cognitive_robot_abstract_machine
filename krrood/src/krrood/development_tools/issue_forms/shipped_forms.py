@@ -1,6 +1,6 @@
 """
-The issue forms of this repository, which ``krrood issue-forms`` writes into
-``.github/ISSUE_TEMPLATE``.
+The issue forms krrood ships, which ``krrood issue-forms`` writes into every
+repository's ``.github/ISSUE_TEMPLATE`` alongside the repository's own.
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ class BugReportIssueForm(IssueForm):
                 label="Reproduce the code example",
                 description=(
                     "A short, self contained script that reproduces the problem and "
-                    "runs as it is with `python reproduce.py`. Name the commit of "
-                    "cram2 main it ran on."
+                    "runs as it is with `python reproduce.py`. Name the commit or "
+                    "version it ran on."
                 ),
                 code_language=CodeLanguage.PYTHON,
                 required=True,
