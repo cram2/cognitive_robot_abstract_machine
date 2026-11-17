@@ -230,7 +230,8 @@ class DeterminerProcessor(RewritePass):
         ):
             if alternative:
                 return Articles.ANOTHER.as_fragment()
-            return Articles.indefinite(
-                following_word=flatten_fragment_to_plain_text(article_anchor)
-            )
+            following_word = flatten_fragment_to_plain_text(article_anchor)
+            if not following_word:
+                return Articles.A.as_fragment()
+            return WordFragment(text=morphology.indefinite_article(following_word))
         return None  # BARE, or INDEFINITE + PLURAL → the determiner-drop

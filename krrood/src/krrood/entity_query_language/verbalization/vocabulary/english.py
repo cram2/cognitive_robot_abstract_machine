@@ -22,7 +22,6 @@ from krrood.entity_query_language.operators.aggregators import (
 )
 from krrood.entity_query_language.operators.comparator import not_contains
 
-from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.exceptions import UnknownAggregatorError
 
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -57,8 +56,7 @@ class SingularExistential(PlainWord):
     """
     Parameterised existential phrase: *"there's a/an TypeName"*.
 
-    The article (*a* / *an*) is computed phonologically at call time
-    using the ``inflect`` library.
+    The noun is an indefinite noun phrase, so the determiner pass chooses its article.
     """
 
     def build_phrase(
@@ -69,27 +67,19 @@ class SingularExistential(PlainWord):
 
         :param type_name: English noun in singular form (e.g. ``"Robot"``, ``"Apple"``).
         :param referent_id: When given, the noun is a referring noun phrase for that entity.
-        :return: Phrase fragment with the correct indefinite article.
+        :return: Phrase fragment whose noun phrase takes its indefinite article once realised.
 
-        >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(SingularExistential(text="there's").build_phrase(type_name="Apple"))
+        >>> from krrood.entity_query_language.verbalization.rendering.realization import realize_subtree
+        >>> realize_subtree(SingularExistential(text="there's").build_phrase(type_name="Apple"))
         "there's an Apple"
         """
-        if referent_id is not None:
-            return PhraseFragment(
-                parts=[
-                    WordFragment(text=self.text),
-                    NounPhrase(
-                        head=RoleFragment(text=type_name, role=SemanticRole.VARIABLE),
-                        referent_id=referent_id,
-                    ),
-                ],
-            )
-        article = morphology.indefinite_article(type_name)
         return PhraseFragment(
             parts=[
-                WordFragment(text=f"{self.text} {article}"),
-                RoleFragment(text=type_name, role=SemanticRole.VARIABLE),
+                WordFragment(text=self.text),
+                NounPhrase(
+                    head=RoleFragment(text=type_name, role=SemanticRole.VARIABLE),
+                    referent_id=referent_id,
+                ),
             ],
         )
 
@@ -736,24 +726,6 @@ class Articles(VocabEnum):
     """The definite alternative determiner — the same referent once the pair is discourse-old
     (:class:`NounPhrase.alternative` on repeat mention)."""
 
-    @classmethod
-    def indefinite(cls, *, following_word: str) -> WordFragment:
-        """
-        :param following_word: The word immediately following the article.
-        :return: A word fragment containing *"a"* or *"an"* based on the phonological context of
-            *following_word* — ``WordFragment("a")`` or ``WordFragment("an")``.
-
-        >>> Articles.indefinite(following_word="hour").text
-        'an'
-        >>> Articles.indefinite(following_word="robot").text
-        'a'
-        """
-        text = (
-            morphology.indefinite_article(following_word)
-            if following_word
-            else cls.A.text
-        )
-        return WordFragment(text=text)
 
 
 class ExistentialPhrase(VocabEnum):
@@ -786,8 +758,8 @@ class ExistentialPhrase(VocabEnum):
         :param referent_id: Optional referent for coreference (singular only).
         :return: Existential phrase fragment.
 
-        >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS.build_phrase(type_name="Apple"))
+        >>> from krrood.entity_query_language.verbalization.rendering.realization import realize_subtree
+        >>> realize_subtree(ExistentialPhrase.THERE_IS.build_phrase(type_name="Apple"))
         "there's an Apple"
         """
         if referent_id is not None and self is ExistentialPhrase.THERE_IS:

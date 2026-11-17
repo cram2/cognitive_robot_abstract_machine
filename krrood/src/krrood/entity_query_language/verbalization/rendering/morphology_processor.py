@@ -4,8 +4,12 @@ from dataclasses import replace
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
+    CardinalNumber,
+    CollectionElementNoun,
+    IndexOrdinal,
     RoleFragment,
     VerbalizationFragment,
+    VerbFormFragment,
     WordFragment,
 )
 from krrood.entity_query_language.verbalization.fragments.features import (
@@ -40,7 +44,10 @@ class MorphologyProcessor(RewritePass):
     * a copula (an ``OPERATOR`` leaf, *"is"*) → its negative (*"is not"*) and/or plural (*"are"*)
       suppletion;
     * a verb (a ``VERB`` leaf carrying a lemma) → present-tense agreement (*"works"* / *"work"*) or
-      do-support negation (*"does not work"* / *"do not work"*).
+      do-support negation (*"does not work"* / *"do not work"*); a verb given in any form is
+      reduced to its lemma first;
+    * a collection-element noun → its singular, before its number is realised;
+    * a count or a sequence position → its cardinal (*"seven"*) or ordinal (*"last"*) words.
 
     Reference: :cite:t:`gatt2009simplenlg` — the MorphologyProcessor realisation stage.
     """
@@ -53,9 +60,17 @@ class MorphologyProcessor(RewritePass):
         'Robots'
         >>> MorphologyProcessor().rewrite(leaf=WordFragment(text="Robot")).text
         'Robot'
+        >>> MorphologyProcessor().rewrite(leaf=CardinalNumber(count=7)).text
+        'seven'
         """
+        if isinstance(leaf, CardinalNumber):
+            return WordFragment(text=morphology.cardinal(leaf.count))
+        if isinstance(leaf, IndexOrdinal):
+            return WordFragment(text=morphology.index_ordinal(leaf.index))
         if not isinstance(leaf, (WordFragment, RoleFragment)):
             return leaf
+        if isinstance(leaf, CollectionElementNoun):
+            leaf = replace(leaf, text=morphology.singular(leaf.text))
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.VERB:
             return self._realize_verb(leaf=leaf)
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.OPERATOR:
@@ -75,13 +90,20 @@ class MorphologyProcessor(RewritePass):
 
         >>> MorphologyProcessor()._realize_verb(leaf=RoleFragment(text="work", role=SemanticRole.VERB)).text
         'works'
+        >>> MorphologyProcessor()._realize_verb(leaf=VerbFormFragment(text="connects", negated=True)).text
+        'does not connect'
         """
         plural = leaf.number is GrammaticalNumber.PLURAL
+        lemma = (
+            morphology.verb_lemma(leaf.text)
+            if isinstance(leaf, VerbFormFragment)
+            else leaf.text
+        )
         if leaf.negated:
             auxiliary = "do not" if plural else "does not"
-            text = f"{auxiliary} {leaf.text}"
+            text = f"{auxiliary} {lemma}"
         else:
-            text = leaf.text if plural else morphology.third_person_singular(leaf.text)
+            text = lemma if plural else morphology.third_person_singular(lemma)
         return replace(
             leaf, text=text, number=GrammaticalNumber.SINGULAR, negated=False
         )
