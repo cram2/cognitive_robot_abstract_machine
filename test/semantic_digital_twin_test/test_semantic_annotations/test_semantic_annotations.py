@@ -1,3 +1,7 @@
+"""
+Tests of the semantic annotations of an environment and how they are found in a world.
+"""
+
 import logging
 
 import numpy as np
@@ -193,7 +197,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
     wall_annotation = Wall(root=wall_body, _world=world)
 
     result = obstacle_annotation.build_bloated_obstacle_collection(
-        search_space, semantic_wall_annotation=wall_annotation, bloat_walls=0.5
+        search_space=search_space,
+        semantic_wall_annotation=wall_annotation,
+        bloat_walls=0.5,
     )
 
     assert len(result.bounding_boxes) == 2
