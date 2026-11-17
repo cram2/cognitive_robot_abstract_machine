@@ -51,7 +51,7 @@ class Animal:
     habitat: Optional[Species] = None
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(unsafe_hash=True, kw_only=True)
 class Entity:
     """
     A case type whose lower-camel-case name is also the name of a factory the generated
