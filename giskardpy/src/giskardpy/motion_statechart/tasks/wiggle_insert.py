@@ -1,3 +1,7 @@
+"""
+A task that inserts a held object by wiggling it into place.
+"""
+
 from __future__ import annotations
 
 import random
@@ -7,7 +11,7 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.context import ContextExtension
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights

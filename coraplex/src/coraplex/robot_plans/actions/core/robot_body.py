@@ -74,7 +74,7 @@ class SetGripperAction(OperatesGripper, GoalAction):
     """
 
     def create_goal(self) -> StatechartNode:
-        return self.gripper_goal_type.moving_gripper_to(
+        return self.gripper_goal_type.create_gripper_goal(
             configuration=self.configuration
         )
 

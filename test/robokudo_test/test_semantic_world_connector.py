@@ -263,3 +263,24 @@ class TestSemanticDigitalTwinConnector:
         assert len(_stamped_world_poses(hypothesis)) == 1
         assert not np.array_equal(output_image, color_image)
         assert np.array_equal(pipeline.cas.get(CASViews.COLOR_IMAGE), color_image)
+
+
+# %% belief updates as model changes
+
+
+def test_updating_belief_shapes_changes_world_model(semdt_cas: CAS) -> None:
+    """
+    Replacing a belief's box with the one of a new hypothesis changes the world model,
+    so listeners of model changes see the new shapes.
+    """
+    belief = rk_world.add_object_hypothesis_as_belief_state(
+        _make_hypothesis(), semdt_cas
+    )
+    model_manager = rk_world.world_instance().get_world_model_manager()
+    version = model_manager.version
+
+    rk_world.update_belief_state_with_object_hypothesis(
+        belief, _make_hypothesis(translation=(0.5, 0.0, 1.0)), semdt_cas
+    )
+
+    assert model_manager.version == version + 1

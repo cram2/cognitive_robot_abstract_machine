@@ -1,3 +1,7 @@
+"""
+Tests of the grasp candidates semantic annotations offer by default.
+"""
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -7,7 +11,7 @@ import trimesh
 
 from krrood.bounds import Bounds
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,

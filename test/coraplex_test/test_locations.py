@@ -400,8 +400,10 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
         context=context_of(extensions),
     )
     with world.modify_world():
-        box.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(*REACHABILITY_TARGET_POSITION)
+        box.parent_connection.update_parent_T_connection(
+            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+                *REACHABILITY_TARGET_POSITION
+            )
         )
 
     np.testing.assert_allclose(

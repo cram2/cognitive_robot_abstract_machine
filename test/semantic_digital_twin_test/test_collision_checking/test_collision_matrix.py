@@ -523,7 +523,9 @@ class TestCollisionRules:
         with pr2_world_copy.modify_world():
             for dof in pr2_world_copy.degrees_of_freedom:
                 hard_ware_interface_cache[dof.name] = dof.has_hardware_interface
-                dof.has_hardware_interface = False
+            pr2_world_copy.set_dofs_has_hardware_interface(
+                pr2_world_copy.degrees_of_freedom, False
+            )
 
         rule.update(pr2_world_copy)
 
@@ -532,7 +534,9 @@ class TestCollisionRules:
         # add all hardware interfaces back, this should produce the same matrix as before
         with pr2_world_copy.modify_world():
             for dof in pr2_world_copy.degrees_of_freedom:
-                dof.has_hardware_interface = hard_ware_interface_cache[dof.name]
+                pr2_world_copy.set_dofs_has_hardware_interface(
+                    [dof], hard_ware_interface_cache[dof.name]
+                )
 
         rule.update(pr2_world_copy)
         assert len(rule.allowed_collision_pairs) == normal_allowed_pairs

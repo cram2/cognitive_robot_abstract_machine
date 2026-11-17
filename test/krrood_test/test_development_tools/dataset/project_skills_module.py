@@ -8,7 +8,7 @@ from pathlib import Path
 
 from krrood.development_tools.agents.rule import Section
 from krrood.development_tools.agents.skill import AgentTool, Skill
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% sections
 

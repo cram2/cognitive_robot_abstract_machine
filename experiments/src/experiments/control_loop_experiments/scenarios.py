@@ -48,7 +48,7 @@ from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses

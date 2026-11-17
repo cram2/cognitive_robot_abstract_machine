@@ -1,3 +1,7 @@
+"""
+The exceptions raised across the semantic digital twin.
+"""
+
 from __future__ import annotations, absolute_import
 
 # %% Imports
@@ -12,7 +16,7 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 

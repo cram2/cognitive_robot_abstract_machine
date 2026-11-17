@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
     MotionStatechartNode,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
     AvoidedExternalContact,
 )

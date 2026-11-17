@@ -18,7 +18,7 @@ from array_api_compat import (
     is_numpy_namespace,
     is_torch_namespace,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from typing_extensions import Generic, TypeVar
 

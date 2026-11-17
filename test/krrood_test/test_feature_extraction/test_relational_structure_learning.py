@@ -1,3 +1,7 @@
+"""
+Tests of learning the causal structure of a class from tables of its instances.
+"""
+
 import itertools
 from dataclasses import dataclass, field
 
@@ -5,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from krrood.class_diagrams.causal_relation import (
+from krrood.entity_query_language.causal_relation import (
     AttributeEndpoint,
     CausalRelationsOfClass,
     StatisticEndpoint,

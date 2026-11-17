@@ -1,17 +1,24 @@
+"""
+Tests of the endpoints of causal relations between the variables of a class.
+"""
+
 import pytest
 
-from krrood.class_diagrams.causal_relation import AttributeEndpoint
+from krrood.entity_query_language.causal_relation import AttributeEndpoint
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.exceptions import FieldIsUnMappedInClassDiagram
 from krrood.entity_query_language.factories import variable
 
-from ..dataset.example_classes import KRROODPosition, SceneObject, SceneRoom
+from ...dataset.example_classes import KRROODPosition, SceneObject, SceneRoom
 
 # %% a diagram of a class with an attribute behind another class
 
 
 @pytest.fixture
 def class_diagram() -> ClassDiagram:
+    """
+    A class diagram of a room whose position has coordinates.
+    """
     return ClassDiagram(classes=[SceneRoom, SceneObject, KRROODPosition])
 
 
@@ -19,6 +26,9 @@ def class_diagram() -> ClassDiagram:
 
 
 def test_an_attribute_is_named_as_its_symbolic_attribute(class_diagram):
+    """
+    An attribute endpoint is named as the query attribute it stands for.
+    """
     attribute = variable(SceneRoom, []).position.x
 
     assert (
@@ -30,6 +40,9 @@ def test_an_attribute_is_named_as_its_symbolic_attribute(class_diagram):
 
 
 def test_the_fields_to_an_attribute_start_at_the_class(class_diagram):
+    """
+    The fields of an attribute endpoint lead from the class to the attribute.
+    """
     attribute = variable(SceneRoom, []).position.x
 
     assert AttributeEndpoint.along(
@@ -41,5 +54,8 @@ def test_the_fields_to_an_attribute_start_at_the_class(class_diagram):
 
 
 def test_a_field_the_class_lacks_raises(class_diagram):
+    """
+    Asking a class for a field it lacks raises.
+    """
     with pytest.raises(FieldIsUnMappedInClassDiagram):
         class_diagram.get_wrapped_class(clazz=SceneRoom).get_field(name="height")
