@@ -4,6 +4,7 @@ Plots how the degrees of freedom of a world moved over a recorded trajectory.
 
 import os
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from uuid import UUID
 
@@ -21,6 +22,60 @@ from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
     WorldState,
 )
+
+# %% spacing of the time axis
+
+
+@dataclass(frozen=True, kw_only=True)
+class TickSpacing:
+    """
+    Where the time axis of a trajectory plot puts its ticks and grid lines.
+    """
+
+    seconds_between_numbered_ticks: float
+    """
+    The time between two ticks that carry a number.
+    """
+
+    seconds_between_grid_lines: float
+    """
+    The time between two vertical grid lines; those between the numbered ticks carry no
+    number.
+    """
+
+
+class TimeAxisTickSpacing(Enum):
+    """
+    The spacings a trajectory plot chooses its time axis from, finest first.
+    """
+
+    HALF_SECOND = TickSpacing(
+        seconds_between_numbered_ticks=0.5, seconds_between_grid_lines=0.1
+    )
+    ONE_SECOND = TickSpacing(
+        seconds_between_numbered_ticks=1.0, seconds_between_grid_lines=0.2
+    )
+    TWO_SECONDS = TickSpacing(
+        seconds_between_numbered_ticks=2.0, seconds_between_grid_lines=0.5
+    )
+    FIVE_SECONDS = TickSpacing(
+        seconds_between_numbered_ticks=5.0, seconds_between_grid_lines=1.0
+    )
+    TEN_SECONDS = TickSpacing(
+        seconds_between_numbered_ticks=10.0, seconds_between_grid_lines=2.0
+    )
+    TWENTY_SECONDS = TickSpacing(
+        seconds_between_numbered_ticks=20.0, seconds_between_grid_lines=5.0
+    )
+    THIRTY_SECONDS = TickSpacing(
+        seconds_between_numbered_ticks=30.0, seconds_between_grid_lines=10.0
+    )
+    ONE_MINUTE = TickSpacing(
+        seconds_between_numbered_ticks=60.0, seconds_between_grid_lines=10.0
+    )
+
+
+# %% plotting a trajectory
 
 
 @dataclass
@@ -66,26 +121,27 @@ class WorldStateTrajectoryPlotter:
 
     second_width_in_cm: float = 0.5
     """
-    Width of a second in cm.
+    Width of a second in cm, unless the plot would be narrower than
+    :attr:`minimum_plot_width_in_cm`.
     """
 
-    seconds_between_labelled_ticks: float = 5.0
+    minimum_plot_width_in_cm: float = 10.0
     """
-    The time between two ticks of the time axis that carry a number.
-    """
-
-    seconds_between_grid_lines: float = 1.0
-    """
-    The time between two vertical grid lines; those without a numbered tick are drawn
-    fainter.
+    The narrowest the subplots are drawn; a shorter trajectory gets wider seconds.
     """
 
-    unlabelled_grid_line_width: float = 0.4
+    minimum_distance_between_numbered_ticks_in_cm: float = 2.5
+    """
+    How close two numbered ticks of the time axis may come; the axis takes the finest
+    :class:`TimeAxisTickSpacing` that keeps them this far apart.
+    """
+
+    unnumbered_grid_line_width: float = 0.4
     """
     The width, in points, of a vertical grid line without a numbered tick.
     """
 
-    unlabelled_grid_line_opacity: float = 0.4
+    unnumbered_grid_line_opacity: float = 0.4
     """
     The opacity of a vertical grid line without a numbered tick, from 0 to 1.
     """
@@ -135,17 +191,34 @@ class WorldStateTrajectoryPlotter:
             state=initial_state, time=time
         )
 
-    def _seconds_to_inches(self, seconds: float) -> float:
+    def _widened_second_width_in_cm(self, *, duration: float) -> float:
         """
-        Converts seconds to inches.
+        :return: The width of a second in a plot of `duration` seconds:
+            :attr:`second_width_in_cm`, widened until the plot is
+            :attr:`minimum_plot_width_in_cm` wide.
+        """
+        return max(self.second_width_in_cm, self.minimum_plot_width_in_cm / duration)
 
-        :param seconds: Input duration in seconds.
-        :return: The drawable width in inches for a given duration.
+    def _tick_spacing(self, *, duration: float) -> TickSpacing:
         """
-        return max(0.0, float(seconds)) * (self.second_width_in_cm / 2.54)
+        :return: The finest spacing that keeps the numbered ticks of a plot of
+            `duration` seconds :attr:`minimum_distance_between_numbered_ticks_in_cm`
+            apart, or the coarsest one if none does.
+        """
+        second_width_in_cm = self._widened_second_width_in_cm(duration=duration)
+        spacings = [spacing.value for spacing in TimeAxisTickSpacing]
+        return next(
+            (
+                spacing
+                for spacing in spacings
+                if spacing.seconds_between_numbered_ticks * second_width_in_cm
+                >= self.minimum_distance_between_numbered_ticks_in_cm
+            ),
+            spacings[-1],
+        )
 
     def _build_figure(
-        self, duration: float, number_of_subplots: int
+        self, *, duration: float, number_of_subplots: int
     ) -> tuple[plt.Figure, list[plt.Axes]]:
         """
         Create a stacked subplot figure sized so the inner axes width matches duration_s
@@ -155,8 +228,10 @@ class WorldStateTrajectoryPlotter:
         :param number_of_subplots: Number of subplots to create.
         :return: The figure and list of subplot axes.
         """
-        # Inner drawable width must equal seconds-to-inches. Add margins around it in inches
-        inner_w_in = max(0.0, self._seconds_to_inches(duration))
+        # Add margins in inches around the drawable width.
+        inner_w_in = (
+            duration * self._widened_second_width_in_cm(duration=duration) / 2.54
+        )
         # Margins tuned to avoid clipping of yticks, ylabel; right margin reserved for legend
         left_margin_in = 0.8
         right_margin_in = 2.0
@@ -351,8 +426,8 @@ class WorldStateTrajectoryPlotter:
                 True,
                 axis="x",
                 which="minor",
-                linewidth=self.unlabelled_grid_line_width,
-                alpha=self.unlabelled_grid_line_opacity,
+                linewidth=self.unnumbered_grid_line_width,
+                alpha=self.unnumbered_grid_line_opacity,
             )
             axis.grid(True, axis="y")
             # Collect series for all DOFs
@@ -396,19 +471,24 @@ class WorldStateTrajectoryPlotter:
         times = trajectory.times - float(trajectory.times[0])
         duration = float(times[-1])
 
-        figure, axes = self._build_figure(duration, len(self.derivatives_to_plot))
+        figure, axes = self._build_figure(
+            duration=duration, number_of_subplots=len(self.derivatives_to_plot)
+        )
 
         degree_of_freedom_ids = self._sort_degrees_of_freedom(trajectory)
         styles = self._create_styles_for_degrees_of_freedom(degree_of_freedom_ids)
         self._plot_derivatives(axes, styles, degree_of_freedom_ids, trajectory, times)
 
+        spacing = self._tick_spacing(duration=duration)
         ticks = self._times_up_to(
-            duration=duration, step=self.seconds_between_labelled_ticks
+            duration=duration, step=spacing.seconds_between_numbered_ticks
         )
         axes[-1].set_xlim(0.0, duration)
         axes[-1].set_xticks(ticks)
         axes[-1].set_xticks(
-            self._times_up_to(duration=duration, step=self.seconds_between_grid_lines),
+            self._times_up_to(
+                duration=duration, step=spacing.seconds_between_grid_lines
+            ),
             minor=True,
         )
         axes[-1].set_xticklabels(

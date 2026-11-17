@@ -20,6 +20,7 @@ from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.testing import world_setup
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
+    TimeAxisTickSpacing,
     WorldStateTrajectoryPlotter,
 )
 
@@ -179,27 +180,62 @@ def test_subplot_titles_labels_and_shared_xlabel(world_setup, monkeypatch):
         assert any(line.get_visible() for line in axis.get_ygridlines())
 
 
-def test_the_time_axis_numbers_some_ticks_and_draws_grid_lines_in_between(
+def test_a_short_trajectory_is_widened_to_the_minimum_plot_width(
     world_setup, monkeypatch
 ):
     """
-    Ticks with a number mark every :attr:`seconds_between_labelled_ticks`, and every
-    subplot draws a grid line every :attr:`seconds_between_grid_lines`; those between
-    the numbered ticks carry no number.
+    A trajectory too short to fill :attr:`minimum_plot_width_in_cm` at
+    :attr:`second_width_in_cm` gets wider seconds instead.
     """
-    trajectory = _record_trajectory(world_setup, duration=12.1, time_step=0.2)
+    trajectory = _record_trajectory(world_setup, duration=3.1, time_step=0.1)
     plotter = WorldStateTrajectoryPlotter(legend=False)
-    duration = trajectory.times[-1] - trajectory.times[0]
+
+    axes = _render_plot(plotter, trajectory, monkeypatch).axes
+
+    assert _axes_width_in_inches(axes[0]) == pytest.approx(
+        plotter.minimum_plot_width_in_cm / 2.54, rel=0.01
+    )
+
+
+@pytest.mark.parametrize(
+    "duration, time_step, expected_spacing",
+    [
+        (3.1, 0.1, TimeAxisTickSpacing.ONE_SECOND),
+        (6.1, 0.1, TimeAxisTickSpacing.TWO_SECONDS),
+        (30.2, 0.2, TimeAxisTickSpacing.FIVE_SECONDS),
+    ],
+)
+def test_the_time_axis_numbers_ticks_at_least_the_minimum_distance_apart(
+    world_setup,
+    monkeypatch,
+    duration: float,
+    time_step: float,
+    expected_spacing: TimeAxisTickSpacing,
+):
+    """
+    The time axis takes the finest spacing whose numbered ticks are at least
+    :attr:`minimum_distance_between_numbered_ticks_in_cm` apart; every subplot draws
+    the grid lines of that spacing, and those between the numbered ticks carry no number.
+    """
+    trajectory = _record_trajectory(world_setup, duration=duration, time_step=time_step)
+    plotter = WorldStateTrajectoryPlotter(legend=False)
+    recorded_duration = trajectory.times[-1] - trajectory.times[0]
 
     axes = _render_plot(plotter, trajectory, monkeypatch).axes
 
     np.testing.assert_allclose(
         axes[-1].get_xticks(),
-        np.arange(0.0, duration, plotter.seconds_between_labelled_ticks),
+        np.arange(
+            0.0,
+            recorded_duration,
+            expected_spacing.value.seconds_between_numbered_ticks,
+        ),
     )
     np.testing.assert_allclose(
         np.union1d(axes[-1].get_xticks(), axes[-1].get_xticks(minor=True)),
-        np.arange(0.0, duration, plotter.seconds_between_grid_lines),
+        np.arange(
+            0.0, recorded_duration, expected_spacing.value.seconds_between_grid_lines
+        ),
     )
     for axis in axes:
         minor_ticks = axis.xaxis.get_minor_ticks()
