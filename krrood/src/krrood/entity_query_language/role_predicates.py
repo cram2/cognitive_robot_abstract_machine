@@ -84,13 +84,13 @@ class IsSubClassOrRole(Predicate):
     def holds(*, sub_class: type, super_class: type | tuple[type, ...]) -> bool:
         """
         :return: Whether *sub_class* inherits from *super_class*, or is a role whose
-            role takers are of a subclass of it, see :meth:`Role.role_takers_are`.
+            role takers are of a subclass of it, see :meth:`Role.is_role_for`.
         """
         if issubclass(sub_class, super_class):
             return True
         if not issubclass(sub_class, Role) or sub_class is Role:
             return False
-        return sub_class.role_takers_are(taker_class=super_class)
+        return sub_class.is_role_for(taker_class=super_class)
 
     @classmethod
     def _verbalization_fragment_(

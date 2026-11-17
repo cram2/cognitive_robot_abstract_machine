@@ -121,16 +121,16 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         return current_cls
 
     @classmethod
-    def role_takers_are(cls, *, taker_class: type | tuple[type, ...]) -> bool:
+    def is_role_for(cls, *, taker_class: type | tuple[type, ...]) -> bool:
         """
-        :param taker_class: The class, or any of the classes, the role takers must be of.
-        :return: Whether the role takers of this role, or of any role along its taker
-            chain, are of a subclass of *taker_class*.
+        :param taker_class: The class, or any of the classes, to check against.
+        :return: Whether this role is a role for *taker_class*: its role takers, or
+            those of any role along its taker chain, are of a subclass of it.
         """
         taker_type = cls.get_role_taker_type()
         if issubclass(taker_type, taker_class):
             return True
-        return issubclass(taker_type, Role) and taker_type.role_takers_are(
+        return issubclass(taker_type, Role) and taker_type.is_role_for(
             taker_class=taker_class
         )
 
