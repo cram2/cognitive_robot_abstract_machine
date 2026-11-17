@@ -180,6 +180,10 @@ class TransitionCondition(SubclassJSONSerializer):
         self._sanity_check(new_expression=new_expression)
         self.expression = new_expression
         self._child = child
+        if self.owner is not None and self.owner._statechart is not None:
+            self.owner._statechart._note_changed_condition(
+                node=self.owner, transition_kind=self.kind
+            )
 
     def _sanity_check(self, *, new_expression: Scalar) -> None:
         """
@@ -1230,6 +1234,10 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 self._interrupt_condition = transition
             case _:
                 raise UnknownTransitionKindError(transition_kind=transition.kind)
+        if self._statechart is not None:
+            self._statechart._note_changed_condition(
+                node=self, transition_kind=transition.kind
+            )
 
     def create_lifecycle_transitions(
         self, *, own_transitions_allowed: sm.Scalar
@@ -2377,6 +2385,21 @@ class CompositeNode(StatechartNode):
         """
         return list(self.nodes)
 
+    def set_children(self, *, children: list[StatechartNode]) -> None:
+        """
+        Holds `children` as the children of this node from now on, in that order, and
+        records the change in the statechart this node belongs to.
+
+        .. warning:: Changing :attr:`nodes` in place goes unrecorded once the
+            :meth:`~cramph.statechart.Statechart.modify` block this node joined in has
+            ended, so a copy of the statechart repeating its changes misses it.
+
+        :param children: The nodes to hold as children.
+        """
+        self.nodes = list(children)
+        if self._statechart is not None:
+            self._statechart._note_changed_children(node=self)
+
     @classproperty
     def context_extensions_required_to_expand(
         cls,
@@ -2429,7 +2452,7 @@ class CompositeNode(StatechartNode):
         self._add_node_sanity_check(node=node)
         self._check_accepts_children()
         if node not in self.nodes:
-            self.nodes.append(node)
+            self.set_children(children=[*self.nodes, node])
         self._place_child_in_statechart(node=node)
 
     def _place_child_in_statechart(self, *, node: StatechartNode) -> None:
@@ -2501,10 +2524,11 @@ class CompositeNode(StatechartNode):
         :param child: One of :attr:`nodes`.
         :param substitute: The node to list in its place.
         """
-        position = next(
-            index for index, listed in enumerate(self.nodes) if listed is child
+        self.set_children(
+            children=[
+                substitute if listed is child else listed for listed in self.nodes
+            ]
         )
-        self.nodes[position] = substitute
 
     def take_over(self, *, node: StatechartNode) -> None:
         """
