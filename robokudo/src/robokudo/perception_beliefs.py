@@ -197,7 +197,9 @@ class PerceptionBelief:
         )
 
     @staticmethod
-    def _compute_dominant_belief_color(*, hypothesis: ObjectHypothesis) -> geometry.Color | None:
+    def _compute_dominant_belief_color(
+        *, hypothesis: ObjectHypothesis
+    ) -> geometry.Color | None:
         """
         :param hypothesis: The hypothesis.
         :return: The color covering the largest part of ``hypothesis``, or None if no
@@ -245,7 +247,7 @@ class PerceptionBelief:
                 )
             )
             world.add_semantic_annotation(self.annotation)
-        body.parent_connection.origin = self.pose
+            body.parent_connection.origin = self.pose
 
     def update_known_object(self, *, known_object: IsPerceivable, world: World) -> None:
         """

@@ -182,10 +182,10 @@ def add_perceivable_object(
 
 
 @dataclass(kw_only=True)
-class MatcherFacingAConcurrentChange(ObjectMatcher):
+class ConcurrentChange:
     """
-    Matches while another thread tries to add a body to :attr:`changed_world`, as a
-    process sharing the world does when its changes arrive.
+    Another thread adding a body to :attr:`changed_world`, as a process sharing the
+    world does when its changes arrive.
     """
 
     changed_world: World
@@ -195,28 +195,28 @@ class MatcherFacingAConcurrentChange(ObjectMatcher):
 
     patience: timedelta = timedelta(milliseconds=500)
     """
-    How long matching waits for the other thread's change.
+    How long :meth:`start_and_wait` waits for the other thread's change.
     """
 
-    change: Thread | None = field(init=False, default=None)
+    thread: Thread | None = field(init=False, default=None)
     """
-    The thread changing :attr:`changed_world`; None until matching started.
-    """
-
-    change_was_made_while_matching: bool | None = field(init=False, default=None)
-    """
-    Whether the other thread changed :attr:`changed_world` before matching went on; None
-    until matching started.
+    The thread changing :attr:`changed_world`; None until :meth:`start_and_wait`.
     """
 
-    def match(
-        self, *, beliefs: list[PerceptionBelief], world: World
-    ) -> dict[PerceptionBelief, IsPerceivable]:
-        self.change = Thread(target=self._add_a_body, daemon=True)
-        self.change.start()
-        self.change.join(timeout=self.patience.total_seconds())
-        self.change_was_made_while_matching = not self.change.is_alive()
-        return super().match(beliefs=beliefs, world=world)
+    was_made_meanwhile: bool | None = field(init=False, default=None)
+    """
+    Whether the other thread changed :attr:`changed_world` within :attr:`patience`; None
+    until :meth:`start_and_wait`.
+    """
+
+    def start_and_wait(self) -> None:
+        """
+        Start the other thread and wait up to :attr:`patience` for its change.
+        """
+        self.thread = Thread(target=self._add_a_body, daemon=True)
+        self.thread.start()
+        self.thread.join(timeout=self.patience.total_seconds())
+        self.was_made_meanwhile = not self.thread.is_alive()
 
     def _add_a_body(self) -> None:
         """
@@ -230,6 +230,24 @@ class MatcherFacingAConcurrentChange(ObjectMatcher):
                     child=Body(name=PrefixedName("added_by_another_process")),
                 )
             )
+
+
+@dataclass(kw_only=True)
+class MatcherFacingAConcurrentChange(ObjectMatcher):
+    """
+    Matches while :attr:`concurrent_change` tries to change the world.
+    """
+
+    concurrent_change: ConcurrentChange
+    """
+    The change another thread attempts before matching goes on.
+    """
+
+    def match(
+        self, *, beliefs: list[PerceptionBelief], world: World
+    ) -> dict[PerceptionBelief, IsPerceivable]:
+        self.concurrent_change.start_and_wait()
+        return super().match(beliefs=beliefs, world=world)
 
 
 # %% new objects
@@ -946,6 +964,34 @@ class TestPerceivableObjectsOfTheWorld:
         )
         assert np.allclose(body.global_transform.to_np()[:3, :3], rotation_before)
 
+    def test_perceivable_body_moves_in_a_pass_that_also_adds_an_object(
+        self, *, robokudo: RoboKudo, world: World
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        body = add_perceivable_object(world, position=(0.0, 0.0, 1.0))
+        new_hypothesis = make_object_hypothesis(translation=(0.0, 1.0, 1.0))
+        seen_again = make_object_hypothesis(translation=(0.05, 0.0, 1.0))
+
+        put_pass_into_world(robokudo, cas, new_hypothesis, seen_again)
+
+        [new_object] = [
+            annotation
+            for annotation in perceivable_objects(world)
+            if annotation.root is not body
+        ]
+        assert np.allclose(
+            position_of(body),
+            seen_again.latest_annotation_of_type(
+                BoundingBox3DAnnotation
+            ).pose.translation,
+        )
+        assert np.allclose(
+            position_of(new_object.root),
+            new_hypothesis.latest_annotation_of_type(
+                BoundingBox3DAnnotation
+            ).pose.translation,
+        )
+
     def test_perceivable_body_keeps_its_shape(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
@@ -998,10 +1044,60 @@ class TestConcurrentChanges:
         self, *, robokudo: RoboKudo, world: World, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         cas = cas_seen_from(world, camera_pose())
-        matcher = MatcherFacingAConcurrentChange(changed_world=world)
+        concurrent_change = ConcurrentChange(changed_world=world)
+        matcher = MatcherFacingAConcurrentChange(concurrent_change=concurrent_change)
         monkeypatch.setattr("robokudo.process.ObjectMatcher", lambda: matcher)
 
         put_pass_into_world(robokudo, cas, make_object_hypothesis())
 
-        matcher.change.join()
-        assert matcher.change_was_made_while_matching is False
+        concurrent_change.thread.join()
+        assert concurrent_change.was_made_meanwhile is False
+
+    def test_no_other_thread_changes_the_world_between_matching_and_adding_an_object(
+        self, *, robokudo: RoboKudo, world: World, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        concurrent_change = ConcurrentChange(changed_world=world)
+        add_to_world = PerceptionBelief.add_to_world
+
+        def add_to_world_facing_a_concurrent_change(
+            belief: PerceptionBelief, *, world: World
+        ) -> None:
+            concurrent_change.start_and_wait()
+            add_to_world(belief, world=world)
+
+        monkeypatch.setattr(
+            PerceptionBelief, "add_to_world", add_to_world_facing_a_concurrent_change
+        )
+
+        put_pass_into_world(robokudo, cas, make_object_hypothesis())
+
+        concurrent_change.thread.join()
+        assert concurrent_change.was_made_meanwhile is False
+
+    def test_no_other_thread_changes_the_world_between_matching_and_updating_an_object(
+        self, *, robokudo: RoboKudo, world: World, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cas = cas_seen_from(world, camera_pose())
+        add_perceivable_object(world, position=(0.0, 0.0, 1.0))
+        concurrent_change = ConcurrentChange(changed_world=world)
+        update_known_object = PerceptionBelief.update_known_object
+
+        def update_known_object_facing_a_concurrent_change(
+            belief: PerceptionBelief, *, known_object: IsPerceivable, world: World
+        ) -> None:
+            concurrent_change.start_and_wait()
+            update_known_object(belief, known_object=known_object, world=world)
+
+        monkeypatch.setattr(
+            PerceptionBelief,
+            "update_known_object",
+            update_known_object_facing_a_concurrent_change,
+        )
+
+        put_pass_into_world(
+            robokudo, cas, make_object_hypothesis(translation=(0.05, 0.0, 1.0))
+        )
+
+        concurrent_change.thread.join()
+        assert concurrent_change.was_made_meanwhile is False

@@ -310,8 +310,9 @@ class RoboKudo:
         Form a belief about each object the last pass of ``pipeline`` found and match
         the beliefs to the perceivable objects of :attr:`world`. A matched object is
         updated as :meth:`PerceptionBelief.update_known_object` describes; any other
-        belief is added to :attr:`world`. No other thread changes :attr:`world` while the
-        beliefs are matched; each change is published once its modification has ended.
+        belief is added to :attr:`world`. The whole pass is one modification of
+        :attr:`world`: no other thread changes :attr:`world` meanwhile, and the changes
+        are published once it has ended.
 
         A pass without a camera pose in the world is left out, with a warning logged.
 
@@ -333,7 +334,7 @@ class RoboKudo:
             )
             return
         world_T_camera = observation.world_T_camera
-        with self.world.state.world_lock:
+        with self.world.modify_world():
             if (
                 world_T_camera.reference_frame
                 not in self.world.kinematic_structure_entities
@@ -354,14 +355,12 @@ class RoboKudo:
                 is not None
             ]
             matches = matcher.match(beliefs=beliefs, world=self.world)
-        # Released first: a modification publishes only once no outer hold of the
-        # world lock remains, as semDT's modify_world requires.
-        for belief in beliefs:
-            known_object = matches.get(belief)
-            if known_object is None:
-                belief.add_to_world(world=self.world)
-                continue
-            belief.update_known_object(known_object=known_object, world=self.world)
+            for belief in beliefs:
+                known_object = matches.get(belief)
+                if known_object is None:
+                    belief.add_to_world(world=self.world)
+                    continue
+                belief.update_known_object(known_object=known_object, world=self.world)
 
     def close(self) -> None:
         """
