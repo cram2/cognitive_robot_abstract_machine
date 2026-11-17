@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 # %% names a saved module defines
 
 
-class RDRModuleAttribute(StrEnum):
+class RippleDownRulesModuleAttribute(StrEnum):
     """The attributes a saved RDR module defines so that loading it can rebuild
     the RDR."""
 
@@ -133,7 +133,7 @@ class RuleTreeSourceEmitter:
 # %% names a saved module binds besides its handles
 
 
-class RDRModuleLocalName(StrEnum):
+class RippleDownRulesModuleLocalName(StrEnum):
     """The names a saved RDR module binds for itself, which no case variable may
     take."""
 
@@ -145,7 +145,7 @@ class RDRModuleLocalName(StrEnum):
 
 
 @dataclass(kw_only=True)
-class RDRSerializer:
+class RippleDownRulesSerializer:
     """Writes an :class:`EQLSingleClassRDR` as a Python module that rebuilds it
     on import."""
 
@@ -176,7 +176,7 @@ class RDRSerializer:
         in lower camel case, with an underscore appended while a function the module
         calls or a name it binds already has it."""
         taken = {function.__name__ for function in self.rule_authoring_functions} | {
-            local_name.value for local_name in RDRModuleLocalName
+            local_name.value for local_name in RippleDownRulesModuleLocalName
         }
         name = camel_case_to_lower_camel_case(self.rdr.case_type.__name__)
         while name in taken:
@@ -248,8 +248,8 @@ class RDRSerializer:
                 body=body,
                 conclusion_attribute_name=self.rdr.conclusion_attribute_name,
                 corner_cases_dict_src=corner_cases,
-                module_attributes=RDRModuleAttribute,
-                local_names=RDRModuleLocalName,
+                module_attributes=RippleDownRulesModuleAttribute,
+                local_names=RippleDownRulesModuleLocalName,
             )
         )
 
