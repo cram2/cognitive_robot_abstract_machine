@@ -25,50 +25,46 @@ class DeadTimeCompensation:
     Moves measured joint positions forward to where the robot will be once the command
     of the running cycle takes effect.
 
-    Applied after all :attr:`inputs`, so that it overwrites what they wrote; each
-    publisher decides how far its joints move.
+    Each publisher decides how far its joints move.
     """
 
-    inputs: WorldStateInputs
-    """
-    The inputs of the control loop; the latest measurements of its joint state inputs
-    are moved forward, including inputs added after this compensation was created.
-    """
-
-    command_publishers: list[CommandPublisher]
-    """
-    The publishers whose commands move the robot.
-    """
-
-    cycle_timing: CycleTiming
-    """
-    When the command of the running cycle will be published.
-    """
-
-    def apply(self) -> bool:
+    def apply(
+        self,
+        *,
+        inputs: WorldStateInputs,
+        command_publishers: list[CommandPublisher],
+        cycle_timing: CycleTiming,
+    ) -> bool:
         """
         Overwrite the latest measured joint positions with their predictions.
 
+        :param inputs: The inputs whose latest joint state measurements are moved
+            forward; already applied in this cycle.
+        :param command_publishers: The publishers whose commands move the robot.
+        :param cycle_timing: When the command of the running cycle will be published.
         :return: Whether any position was overwritten.
         """
         wrote_any = False
-        for measurement in self.latest_measurements():
-            for publisher in self.command_publishers:
+        for measurement in self.latest_measurements(inputs=inputs):
+            for publisher in command_publishers:
                 wrote_any |= publisher.write_predicted_positions(
-                    measurement=measurement, cycle_timing=self.cycle_timing
+                    measurement=measurement, cycle_timing=cycle_timing
                 )
         return wrote_any
 
-    def latest_measurements(self) -> list[JointPositionMeasurement]:
+    def latest_measurements(
+        self, *, inputs: WorldStateInputs
+    ) -> list[JointPositionMeasurement]:
         """
         The latest measurement of every joint state input, with the measurements sampled
         at the same time merged into one, as the inputs of the parts of a robot that
         share a topic report them.
 
+        :param inputs: The inputs whose joint state inputs are read.
         :return: One measurement per distinct measurement time.
         """
         positions_by_time: dict[float, dict[UUID, float]] = {}
-        for synchronizer in self.inputs.synchronizers:
+        for synchronizer in inputs.synchronizers:
             if not isinstance(synchronizer, JointStateInputSynchronizer):
                 continue
             measurement = synchronizer.latest_measurement

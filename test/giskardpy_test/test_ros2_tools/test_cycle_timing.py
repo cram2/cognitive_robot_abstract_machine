@@ -93,6 +93,27 @@ def test_the_publish_time_is_expected_one_computation_time_after_the_cycle_start
     assert timing.expected_publish_time == pytest.approx(10.1 + 0.04)
 
 
+def test_the_publish_time_is_expected_no_earlier_than_the_inputs_were_read(
+    simulated_clock: SimulatedClock,
+):
+    """
+    A cycle that takes longer to read its inputs than the previous cycle took to publish
+    cannot publish before it has read them.
+    """
+    timing = CycleTiming(clock=simulated_clock.clock)
+    simulated_clock.set_seconds(seconds=10.0)
+    timing.start_cycle()
+    simulated_clock.set_seconds(seconds=10.04)
+    timing.finish_cycle()
+    simulated_clock.set_seconds(seconds=10.1)
+    timing.start_cycle()
+    simulated_clock.set_seconds(seconds=10.2)
+
+    timing.mark_inputs_read()
+
+    assert timing.expected_publish_time == pytest.approx(10.2)
+
+
 def test_finishing_a_cycle_returns_the_publish_time(simulated_clock: SimulatedClock):
     """
     The commands are stamped with the time read from the same clock the cycle start was

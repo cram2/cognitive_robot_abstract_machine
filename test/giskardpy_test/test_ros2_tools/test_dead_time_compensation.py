@@ -9,9 +9,12 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import pytest
+from rclpy.impl import rcutils_logger
+from rclpy.impl.logging_severity import LoggingSeverity
 from sensor_msgs.msg import JointState as JointStateMessage
 
 from giskardpy.middleware.ros2.command_publishing import (
+    CommandPublisher,
     JointGroupVelocityCommandPublisher,
 )
 from giskardpy.middleware.ros2.cycle_timing import CycleTiming
@@ -66,6 +69,12 @@ class CompensatedJoint:
     Commands the velocity of the joint.
     """
 
+    command_publishers: list[CommandPublisher]
+    """
+    The publishers whose commands move the measured joints, :attr:`publisher` among
+    them.
+    """
+
     cycle_timing: CycleTiming
     """
     When the running cycle started and how long the previous one took.
@@ -113,16 +122,31 @@ class CompensatedJoint:
         synchronizer.apply()
         return synchronizer
 
-    def predict(self, *, cycle_start_time: float, computation_time: float) -> bool:
+    def predict(
+        self,
+        *,
+        cycle_start_time: float,
+        computation_time: float,
+        inputs_read_time: float | None = None,
+    ) -> bool:
         """
         Apply the compensation in a cycle that started at ``cycle_start_time``, after a
         cycle that took ``computation_time``.
 
+        :param inputs_read_time: When the cycle read its inputs; ``None`` for at its
+            start.
         :return: Whether the compensation wrote a position.
         """
         self.cycle_timing.cycle_start_time = cycle_start_time
         self.cycle_timing.computation_time = computation_time
-        return self.compensation.apply()
+        self.cycle_timing.inputs_read_time = (
+            cycle_start_time if inputs_read_time is None else inputs_read_time
+        )
+        return self.compensation.apply(
+            inputs=self.inputs,
+            command_publishers=self.command_publishers,
+            cycle_timing=self.cycle_timing,
+        )
 
 
 def build_compensated_joint(*, actuation_delay: timedelta | None) -> CompensatedJoint:
@@ -155,10 +179,9 @@ def build_compensated_joint(*, actuation_delay: timedelta | None) -> Compensated
         inputs=inputs,
         other_connection=world.get_connection_by_name("joint_b"),
         publisher=publisher,
+        command_publishers=[publisher],
         cycle_timing=cycle_timing,
-        compensation=DeadTimeCompensation(
-            inputs=inputs, command_publishers=[publisher], cycle_timing=cycle_timing
-        ),
+        compensation=DeadTimeCompensation(),
     )
 
 
@@ -272,17 +295,67 @@ def test_a_measurement_without_a_stamp_is_not_moved_forward(init_background_node
     assert joint.position == 1.0
 
 
-def test_a_measurement_stamped_after_the_expected_publish_time_is_not_moved_forward(
+def test_a_measurement_stamped_after_the_expected_publish_time_is_moved_forward_to_when_the_inputs_were_read(
     init_background_node,
 ):
     """
-    A robot whose clock runs ahead reports measurements from the future.
+    A cycle that reads its inputs later than the previous cycle published publishes no
+    earlier than that.
     """
-    joint = build_compensated_joint(actuation_delay=timedelta(seconds=0.3))
+    actuation_delay = timedelta(seconds=0.3)
+    joint = build_compensated_joint(actuation_delay=actuation_delay)
+    joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    joint.measure(position=1.0, measurement_time=10.12)
+
+    joint.predict(cycle_start_time=10.05, computation_time=0.05, inputs_read_time=10.15)
+
+    executed_since_measurement = 10.15 - (10.12 - actuation_delay.total_seconds())
+    assert joint.position == pytest.approx(1.0 + 0.5 * executed_since_measurement)
+
+
+def test_a_measurement_stamped_less_than_one_actuation_delay_after_the_inputs_were_read_is_moved_forward(
+    init_background_node,
+):
+    """
+    A robot whose clock runs slightly ahead is still compensated.
+    """
+    actuation_delay = timedelta(seconds=0.3)
+    joint = build_compensated_joint(actuation_delay=actuation_delay)
     joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
     joint.measure(position=1.0, measurement_time=10.2)
 
-    assert joint.predict(cycle_start_time=10.05, computation_time=0.05) is False
+    joint.predict(cycle_start_time=10.05, computation_time=0.05)
+
+    executed_since_measurement = joint.cycle_timing.expected_publish_time - (
+        10.2 - actuation_delay.total_seconds()
+    )
+    assert joint.position == pytest.approx(1.0 + 0.5 * executed_since_measurement)
+
+
+def test_a_measurement_stamped_more_than_one_actuation_delay_after_the_inputs_were_read_is_not_moved_forward(
+    init_background_node,
+):
+    """
+    A robot whose clock runs ahead by more than the actuation delay reports measurements
+    from beyond the command of the running cycle.
+    """
+    actuation_delay = timedelta(seconds=0.3)
+    joint = build_compensated_joint(actuation_delay=actuation_delay)
+    joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    inputs_read_time = 10.05
+    joint.measure(
+        position=1.0,
+        measurement_time=inputs_read_time + actuation_delay.total_seconds() + 0.01,
+    )
+
+    assert (
+        joint.predict(
+            cycle_start_time=10.05,
+            computation_time=0.05,
+            inputs_read_time=inputs_read_time,
+        )
+        is False
+    )
     assert joint.position == 1.0
 
 
@@ -363,17 +436,53 @@ def test_a_stale_input_holding_none_of_the_commanded_joints_is_not_warned_about(
     assert warnings == []
 
 
+def test_every_publisher_warns_about_its_own_unusable_measurements(
+    init_background_node, monkeypatch
+):
+    """
+    Two arms whose joint states are both stale are both reported.
+    """
+    joint = build_compensated_joint(actuation_delay=timedelta(seconds=0.3))
+    other_publisher = JointGroupVelocityCommandPublisher(
+        world=joint.world,
+        command_topic="test_cmd_of_the_other_joint",
+        connections=[joint.other_connection],
+        actuation_delay=timedelta(seconds=0.3),
+    )
+    joint.command_publishers.append(other_publisher)
+    joint.publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    other_publisher.command_history.record(publish_time=9.0, velocities=[0.5])
+    joint.measure(position=1.0, measurement_time=3.0)
+    joint.add_joint_state_input(
+        positions={joint.other_connection.name.name: 0.2}, measurement_time=3.0
+    )
+    warnings = record_warnings(monkeypatch)
+
+    joint.predict(cycle_start_time=10.05, computation_time=0.05)
+
+    assert [
+        any(publisher.command_topic in warning for warning in warnings)
+        for publisher in joint.command_publishers
+    ] == [True, True]
+
+
 def record_warnings(monkeypatch) -> list[str]:
     """
-    Record the warnings of the background node instead of logging them.
+    Record the warnings that pass the logging filters, such as throttling, instead of
+    logging them.
 
     :return: The recorded warnings, filled as they are logged.
     """
     warnings = []
+    log = rcutils_logger._rclpy.rclpy_logging_rcutils_log
     monkeypatch.setattr(
-        background_node.get_node().get_logger(),
-        "warning",
-        lambda message, **_: warnings.append(message),
+        rcutils_logger._rclpy,
+        "rclpy_logging_rcutils_log",
+        lambda severity, name, message, *caller: (
+            warnings.append(message)
+            if severity == LoggingSeverity.WARN
+            else log(severity, name, message, *caller)
+        ),
     )
     return warnings
 
@@ -416,7 +525,7 @@ def test_inputs_sampled_at_the_same_time_are_moved_forward_by_one_displacement(
         connections=[joint.connection, joint.other_connection],
         actuation_delay=timedelta(seconds=0.3),
     )
-    joint.compensation.command_publishers = [publisher]
+    joint.command_publishers = [publisher]
     publisher.command_history.record(publish_time=9.0, velocities=[0.5, -0.5])
     joint.measure(position=1.0, measurement_time=10.0)
     joint.add_joint_state_input(

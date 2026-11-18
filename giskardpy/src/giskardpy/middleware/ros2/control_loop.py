@@ -88,22 +88,13 @@ class ControlLoop:
     Times every cycle from its start to publishing its commands.
     """
 
-    dead_time_compensation: DeadTimeCompensation = field(init=False)
+    dead_time_compensation: DeadTimeCompensation = field(
+        init=False, default_factory=DeadTimeCompensation
+    )
     """
     Moves the measured joint positions forward to where the robot will be once the
     command of the running cycle takes effect.
     """
-
-    def __post_init__(self) -> None:
-        """
-        Compensate the dead time of the inputs and command publishers this loop has,
-        including those added later.
-        """
-        self.dead_time_compensation = DeadTimeCompensation(
-            inputs=self.inputs,
-            command_publishers=self.command_publishers,
-            cycle_timing=self.cycle_timing,
-        )
 
     @property
     def world(self) -> World:
@@ -144,13 +135,15 @@ class ControlLoop:
     def synchronize_inputs(self) -> None:
         """
         Write the inputs into the world state, move the measured joint positions forward
-        by the dead time, and announce the result once.
-
-        Nothing is announced when nothing was written, because announcing recomputes the
-        forward kinematics and reaches every observer of the world.
+        by the dead time, and announce the result once, if anything was written.
         """
         wrote_any = self.inputs.apply_inputs()
-        wrote_any |= self.dead_time_compensation.apply()
+        self.cycle_timing.mark_inputs_read()
+        wrote_any |= self.dead_time_compensation.apply(
+            inputs=self.inputs,
+            command_publishers=self.command_publishers,
+            cycle_timing=self.cycle_timing,
+        )
         if wrote_any:
             self.inputs.announce_state()
 

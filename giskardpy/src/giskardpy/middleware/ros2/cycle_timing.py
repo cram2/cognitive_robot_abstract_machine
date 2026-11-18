@@ -16,11 +16,8 @@ from semantic_digital_twin.adapters.ros.background_node import ros_time_seconds
 @dataclass(kw_only=True)
 class CycleTiming:
     """
-    The start of the running control cycle and the computation time of the previous one,
-    on the ROS clock that header stamps are comparable with.
-
-    The only clock the control loop reads, so the times it stamps commands with and
-    compares measurements against cannot drift apart.
+    When the running control cycle started and read its inputs, and how long the
+    previous one took, on the ROS clock that header stamps are comparable with.
     """
 
     clock: Clock
@@ -33,6 +30,11 @@ class CycleTiming:
     Seconds of :attr:`clock` at which the running cycle started.
     """
 
+    inputs_read_time: float = field(init=False, default=0.0)
+    """
+    Seconds of :attr:`clock` at which the running cycle finished reading its inputs.
+    """
+
     computation_time: float = field(init=False, default=0.0)
     """
     Seconds of :attr:`clock` the previous cycle took from its start to publishing its
@@ -43,9 +45,10 @@ class CycleTiming:
     def expected_publish_time(self) -> float:
         """
         Seconds of :attr:`clock` at which the running cycle is expected to publish its
-        commands, assuming it takes as long as the previous one.
+        commands, assuming it takes as long as the previous one, but no earlier than it
+        finished reading its inputs.
         """
-        return self.cycle_start_time + self.computation_time
+        return max(self.cycle_start_time + self.computation_time, self.inputs_read_time)
 
     def now(self) -> float:
         """
@@ -58,6 +61,12 @@ class CycleTiming:
         Mark the start of a cycle.
         """
         self.cycle_start_time = self.now()
+
+    def mark_inputs_read(self) -> None:
+        """
+        Mark that the running cycle has finished reading its inputs.
+        """
+        self.inputs_read_time = self.now()
 
     def finish_cycle(self) -> float:
         """

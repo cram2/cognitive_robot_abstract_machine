@@ -21,6 +21,7 @@ from typing_extensions import TYPE_CHECKING, Self, TypeVar, Generic, Union
 
 from control_msgs.msg import MultiDOFCommand
 from geometry_msgs.msg import Twist, TwistStamped
+from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64MultiArray
 
@@ -587,10 +588,16 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     The publisher for ``cmd_topic``.
     """
 
+    logger: RcutilsLogger = field(init=False)
+    """
+    Logs about the commands on :attr:`command_topic`, throttled independently of every
+    other publisher.
+    """
+
     def __post_init__(self) -> None:
         """
-        Create the ROS publisher, resolve what to send for every connection and size
-        the command history to the actuation delay.
+        Create the ROS publisher and logger, resolve what to send for every connection
+        and size the command history to the actuation delay.
 
         :raises UnknownMinimumVelocityJointError: If a minimum velocity override applies
             to no connection.
@@ -601,6 +608,9 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         )
         self.command_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
+        )
+        self.logger = (
+            background_node.get_node().get_logger().get_child(self.command_topic)
         )
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
@@ -668,8 +678,9 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         """
         Unlike :meth:`CommandPublisher.write_predicted_positions`, moves the positions
         forward by the commands executed since one :attr:`actuation_delay` before the
-        measurement. A measurement of these joints stamped after the expected publish
-        time, or older than :attr:`command_history_margin`, is left, with a warning.
+        measurement. A measurement of these joints stamped more than one
+        :attr:`actuation_delay` after the inputs were read, or older than
+        :attr:`command_history_margin`, is left, with a warning.
         """
         if self.actuation_delay is None or not self.command_history.held_commands:
             return False
@@ -681,11 +692,13 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         earliest_usable_time = (
             cycle_timing.cycle_start_time - self.command_history_margin.total_seconds()
         )
-        latest_usable_time = cycle_timing.expected_publish_time
+        latest_usable_time = (
+            cycle_timing.inputs_read_time + self.actuation_delay.total_seconds()
+        )
         if not (
             earliest_usable_time <= measurement.measurement_time <= latest_usable_time
         ):
-            background_node.get_node().get_logger().warning(
+            self.logger.warning(
                 f"Not compensating the actuation delay of {self.command_topic}: the "
                 f"joint state stamped {measurement.measurement_time:.3f} s lies outside "
                 f"[{earliest_usable_time:.3f} s, {latest_usable_time:.3f} s]. "
@@ -696,7 +709,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         displacement = self.command_history.displacement(
             start_time=measurement.measurement_time
             - self.actuation_delay.total_seconds(),
-            end_time=latest_usable_time,
+            end_time=cycle_timing.expected_publish_time,
         )
         wrote_any = False
         for connection, distance in zip(self.connections, displacement):

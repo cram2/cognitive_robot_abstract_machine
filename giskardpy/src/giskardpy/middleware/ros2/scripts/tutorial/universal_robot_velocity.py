@@ -3,12 +3,15 @@
 Tutorial: a Giskard that commands a Universal Robots arm through its controller manager.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
-    RobotInterfaceConfig,
 )
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
@@ -17,6 +20,9 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
+
+if TYPE_CHECKING:
+    from giskardpy.middleware.ros2.robot_interface_config import RobotInterfaceConfig
 
 
 @dataclass(kw_only=True)
