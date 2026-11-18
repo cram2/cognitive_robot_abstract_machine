@@ -3,6 +3,7 @@ Symbolic spatial types, checked against the numerical reference implementations.
 """
 
 import dataclasses
+import gc
 from copy import deepcopy
 
 import numpy as np
@@ -2195,6 +2196,21 @@ class TestTransformationMatrix:
         assert [variable.name for variable in transform_copy.free_variables()] == [
             variable.name for variable in transform.free_variables()
         ]
+
+    def test_pose_of_symbolic_matrix_keeps_its_free_variables(self):
+        """
+        The pose of a symbolic matrix keeps reporting the matrix's variables once
+        nothing else holds the matrix.
+        """
+        transform = HomogeneousTransformationMatrix3Dimensional.create_with_variables(
+            "goal"
+        )
+        expected = [variable.name for variable in transform.free_variables()]
+        pose = transform.pose
+        del transform
+        gc.collect()
+
+        assert [variable.name for variable in pose.free_variables()] == expected
 
     def test_robot_kinematics(self):
         """

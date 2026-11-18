@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 import torch
+from krrood_compute_resources.memory import HostMemory, PeakTrackingMemory
+from krrood_compute_resources.torch_memory import TorchDeviceMemory
 
 from probabilistic_model.learning.gradient_descent import (
     GradientDescent,
@@ -16,11 +18,10 @@ from probabilistic_model.learning.gradient_descent import (
     LayerType,
 )
 from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
-from probabilistic_model.learning.device_memory import (
-    HostMemory,
-    PeakTrackingMemory,
+from probabilistic_model.learning.training_schedule import (
+    LearningRatePlateau,
+    MiniBatches,
 )
-from probabilistic_model.learning.training_schedule import MiniBatches
 
 
 # %% gradient descent
@@ -60,18 +61,23 @@ class TorchGradientDescent(GradientDescent[LayerType]):
         ]
 
     def start_training(
-        self, *, arguments: tuple[torch.Tensor, ...], mini_batches: MiniBatches
+        self,
+        *,
+        arguments: tuple[torch.Tensor, ...],
+        mini_batches: MiniBatches,
+        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TorchGradientDescentTraining[LayerType]:
         return TorchGradientDescentTraining(
             arguments=arguments,
             mini_batches=mini_batches,
             gradient_descent=self,
             optimizer=self.optimizer_type(self.parameters, lr=self.learning_rate),
+            learning_rate_plateau=learning_rate_plateau,
         )
 
     def device_memory(self) -> PeakTrackingMemory:
         device = self.parameters[0].device
-        if device.type == TorchDeviceType.CUDA:
+        if device.type == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
             return TorchDeviceMemory(device=device)
         return HostMemory()
 
@@ -82,7 +88,7 @@ class TorchGradientDescent(GradientDescent[LayerType]):
         :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
         """
         device = self.parameters[0].device
-        if device.type != TorchDeviceType.CUDA:
+        if device.type != TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
             raise UnmeasurableHostStepMemoryError()
         memory = TorchDeviceMemory(device=device)
         memory.reset_peak()
@@ -145,6 +151,10 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> float:
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
 
+    def scale_learning_rate(self, *, scale: float) -> None:
+        for group in self.optimizer.param_groups:
+            group["lr"] = self.gradient_descent.learning_rate * scale
+
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
             [parameter.detach() for parameter in self.gradient_descent.parameters]
@@ -159,29 +169,4 @@ class TorchDeviceType(StrEnum):
     The types of torch devices that are told apart.
     """
 
-    CUDA = "cuda"
-
-
-@dataclass(kw_only=True)
-class TorchDeviceMemory(PeakTrackingMemory):
-    """
-    The memory of a CUDA device torch stores tensors on.
-    """
-
-    device: torch.device
-    """
-    The CUDA device.
-    """
-
-    def free_bytes(self) -> int:
-        free, _ = torch.cuda.mem_get_info(self.device)
-        return free
-
-    def in_use_bytes(self) -> int:
-        return torch.cuda.memory_allocated(self.device)
-
-    def peak_bytes(self) -> int:
-        return torch.cuda.max_memory_allocated(self.device)
-
-    def reset_peak(self) -> None:
-        torch.cuda.reset_peak_memory_stats(self.device)
+    COMPUTE_UNIFIED_DEVICE_ARCHITECTURE = "cuda"

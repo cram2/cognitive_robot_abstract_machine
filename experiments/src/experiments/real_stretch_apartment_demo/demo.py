@@ -216,6 +216,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 PlaceAction(
+                    arm=arm,
                     object_designator=cereal,
                     target_location=Pose3Dimensional.from_xyz_rpy(
                         x=0.1,
@@ -272,6 +273,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(PlaceAction)(
+                        arm=arm,
                         object_designator=cereal,
                         target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                     )

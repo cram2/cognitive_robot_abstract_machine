@@ -191,6 +191,7 @@ plan = Sequence(
             arm=tracy.left_arm,
         ),
         PlaceAction(
+            arm=tracy.left_arm,
             object_designator=box2_annotation,
             target_location=Pose3Dimensional.from_xyz_rpy(
                 0.8, 0.0, table_top_z + 1.5 * box_edge, reference_frame=world.root
@@ -208,6 +209,7 @@ plan = Sequence(
             arm=tracy.right_arm,
         ),
         PlaceAction(
+            arm=tracy.right_arm,
             object_designator=box3_annotation,
             target_location=Pose3Dimensional.from_xyz_rpy(
                 0.8, 0.0, table_top_z + 2.5 * box_edge, reference_frame=world.root

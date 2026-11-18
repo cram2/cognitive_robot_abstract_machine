@@ -136,7 +136,9 @@ def _place_at(
             face_at=a(FaceAtAction)(target=target),
             look_at=a(LookAtAction)(target=target),
         ),
-        place=a(PlaceAction)(object_designator=placed, target_location=target),
+        place=a(PlaceAction)(
+            arm=robot.right_arm, object_designator=placed, target_location=target
+        ),
     )
 
 
@@ -226,6 +228,7 @@ def pick_and_place_of_the_milk(world: World, arm: Arm) -> PickAndPlaceAction:
             grasp=variable(GraspCandidate, domain=milk.grasp_candidates()), arm=arm
         ),
         place=a(PlaceAction)(
+            arm=arm,
             object_designator=milk,
             target_location=Pose3Dimensional(reference_frame=world.root),
         ),

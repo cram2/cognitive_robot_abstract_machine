@@ -880,6 +880,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         """
         result = Pose3Dimensional.from_casadi_sx(casadi_sx=copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
+        result.pinned_free_variables = list(self.pinned_free_variables)
         return result
 
     def copy_with_new_reference_frames(

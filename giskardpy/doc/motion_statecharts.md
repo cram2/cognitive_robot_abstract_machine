@@ -101,10 +101,9 @@ executor.tick_until_end()
 `MotionControl` gives the nodes a `MotionControlContext` with the QP controller configuration
 and the collision variable managers, sets the tick duration to the control time step, and
 applies the commands of the QP controller after every tick. Further extensions add what a
-run needs on top: `WorldStateTrajectoryRecording` and `DebugExpressionRecording` record the
-motion, `RosNodeAccess` gives nodes a ROS2 node, and `DebugExpressionPublishing` shows debug
-expressions in RViz. Extensions are called in the order they are listed, so list the
-recordings after `MotionControl`.
+run needs on top: `WorldStateTrajectoryRecording` records the motion, `RosNodeAccess` gives
+nodes a ROS2 node, and `DebugExpressionPublishing` shows debug expressions in RViz. Extensions
+are called in the order they are listed, so list the recording after `MotionControl`.
 
 ## Benefits
 

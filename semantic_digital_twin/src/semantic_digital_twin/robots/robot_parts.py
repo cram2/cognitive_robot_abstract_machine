@@ -946,9 +946,22 @@ class EndEffector(AbstractRobotPart, ABC):
         body = self.held_body
         if body is None:
             raise NothingHeld(self)
+        return self.body_T_grasp(body=body, tool_P_grasp=tool_P_point)
+
+    def body_T_grasp(
+        self, *, body: Body, tool_P_grasp: CartesianPoint3Dimensional
+    ) -> Pose3Dimensional:
+        """
+        The grasp this gripper has on `body` as both stand now, whether or not `body`
+        hangs off the tool frame.
+
+        :param body: The body the grasp is on.
+        :param tool_P_grasp: The point of the gripper the grasp sits at.
+        :return: The grasp frame, in the frame of `body`.
+        """
         body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-            point=body_T_tool @ tool_P_point,
+            point=body_T_tool @ tool_P_grasp,
             rotation_matrix=body_T_tool.rotation_matrix @ self.tool_R_grasp,
             reference_frame=body,
         ).pose
