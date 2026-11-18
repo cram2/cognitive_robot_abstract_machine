@@ -10,7 +10,9 @@ from numpy.typing import NDArray
 
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -57,7 +59,7 @@ class ForwardKinematicsBinding:
     tip: KinematicStructureEntity
     """Tip of the kinematic chain."""
 
-    root_T_tip: HomogeneousTransformationMatrix | None = field(
+    root_T_tip: HomogeneousTransformationMatrix3Dimensional | None = field(
         default=None, kw_only=True
     )
     """
@@ -75,8 +77,10 @@ class ForwardKinematicsBinding:
 
     def __post_init__(self) -> None:
         if self.root_T_tip is None:
-            self.root_T_tip = HomogeneousTransformationMatrix.create_with_variables(
-                str(self.name)
+            self.root_T_tip = (
+                HomogeneousTransformationMatrix3Dimensional.create_with_variables(
+                    str(self.name)
+                )
             )
         self.root_T_tip.reference_frame = self.root
         self.root_T_tip.child_frame = self.tip

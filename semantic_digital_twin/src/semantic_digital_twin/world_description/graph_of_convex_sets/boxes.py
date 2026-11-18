@@ -34,7 +34,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
 )
@@ -202,7 +202,7 @@ class GraphOfBoundingBoxes(
                 box = type(node_list[i]).from_array_bounds(
                     lower,
                     upper,
-                    HomogeneousTransformationMatrix(
+                    HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.search_space.reference_frame
                     ),
                 )
@@ -571,7 +571,7 @@ class VolumetricGraphOfBoundingBoxes(
                     max_x=np.inf,
                     max_y=np.inf,
                     max_z=np.inf,
-                    origin=HomogeneousTransformationMatrix(
+                    origin=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.world.root
                     ),
                 )
@@ -758,7 +758,7 @@ class PlanarGraphOfBoundingBoxes(
                     min_y=-np.inf,
                     max_x=np.inf,
                     max_y=np.inf,
-                    origin=HomogeneousTransformationMatrix(
+                    origin=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.world.root
                     ),
                 )

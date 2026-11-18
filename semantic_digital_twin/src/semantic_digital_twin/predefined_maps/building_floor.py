@@ -14,7 +14,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -56,7 +56,7 @@ class SingleDoorRoom:
         world: World,
         name: str,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Floor:
         """
         Materialize this room in ``world``: a floor, four walls, and a hinged door with
@@ -80,7 +80,7 @@ class SingleDoorRoom:
         wall = None
         for i in range(4):
             yaw = (np.pi / 2) * i
-            wall_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+            wall_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 (self.scale.x / 2) * np.cos(yaw),
                 (self.scale.y / 2) * np.sin(yaw),
                 0,
@@ -99,7 +99,7 @@ class SingleDoorRoom:
             Handle.get_default_root_kinematic_structure_entity_specification()
         )
         handle_root_specification.parent_T_self = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 y=self.door_scale.y / 2 * 0.9, yaw=np.pi
             )
         )
@@ -119,7 +119,7 @@ class SingleDoorRoom:
         ).spawn(
             world,
             parent=wall.root,
-            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=self.door_scale.z / 2
             ),
         )
@@ -152,7 +152,7 @@ class BuildingFloor:
         world: World,
         name: str,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Floor:
         """
         Materialize this building floor in ``world``: a floor slab with a room in each
@@ -174,10 +174,14 @@ class BuildingFloor:
         ).spawn(world, parent=parent, parent_T_self=parent_T_self)
 
         room_poses = [
-            HomogeneousTransformationMatrix.from_xyz_rpy(-1.0, 2.5, 0),
-            HomogeneousTransformationMatrix.from_xyz_rpy(-1.0, -2.5, 0, yaw=np.pi),
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.5, 0),
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.0, -2.5, 0, yaw=np.pi),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(-1.0, 2.5, 0),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                -1.0, -2.5, 0, yaw=np.pi
+            ),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.0, 2.5, 0),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                1.0, -2.5, 0, yaw=np.pi
+            ),
         ]
         for i, room_pose in enumerate(room_poses):
             self.room.spawn(

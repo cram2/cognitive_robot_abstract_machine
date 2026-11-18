@@ -30,7 +30,7 @@ from typing import Optional
 from krrood.entity_query_language.factories import entity, variable, an, the
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation, Body
@@ -98,9 +98,9 @@ class Bottle(SemanticAnnotation):
 
 
 # Geometries (sizes are in meters)
-cap_cylinder = Cylinder(width=0.03, height=0.02, origin=HomogeneousTransformationMatrix())
-bottle_large_cylinder = Cylinder(width=0.08, height=0.30, origin=HomogeneousTransformationMatrix())
-bottle_medium_cylinder = Cylinder(width=0.04, height=0.15, origin=HomogeneousTransformationMatrix())
+cap_cylinder = Cylinder(width=0.03, height=0.02, origin=HomogeneousTransformationMatrix3Dimensional())
+bottle_large_cylinder = Cylinder(width=0.08, height=0.30, origin=HomogeneousTransformationMatrix3Dimensional())
+bottle_medium_cylinder = Cylinder(width=0.04, height=0.15, origin=HomogeneousTransformationMatrix3Dimensional())
 
 # ShapeCollections
 cap_shapes = ShapeCollection([cap_cylinder])
@@ -170,7 +170,7 @@ with world.modify_world():
     world.add_connection(root_C_bottle_medium)
     
 z_offset = bottle_large_cylinder.height / 2.0 + cap_cylinder.height / 2.0
-cap_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+cap_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     z=z_offset, reference_frame=bottle_large_body
 )
 bottle_large_C_cap.origin = cap_pose

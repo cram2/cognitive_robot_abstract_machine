@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy
 from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     Pose3Dimensional,
 )
@@ -133,7 +133,7 @@ class FoundationPoseEstimator(MeshBasedPoseEstimator):
         if result is None:
             return None
         pose_matrix, _, _ = result
-        return HomogeneousTransformationMatrix(data=pose_matrix).pose
+        return HomogeneousTransformationMatrix3Dimensional(data=pose_matrix).pose
 
     def track_pose(
         self, object_observation: ObjectObservation, previous_pose: Pose3Dimensional
@@ -147,7 +147,7 @@ class FoundationPoseEstimator(MeshBasedPoseEstimator):
             previous_pose=previous_pose.to_np(),
             iterations=self.track_iterations,
         )
-        return HomogeneousTransformationMatrix(data=pose_matrix).pose
+        return HomogeneousTransformationMatrix3Dimensional(data=pose_matrix).pose
 
     @classproperty
     def warm_up_object_observation(cls) -> ObjectObservation:

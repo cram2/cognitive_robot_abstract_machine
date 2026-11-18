@@ -39,7 +39,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
@@ -177,7 +177,7 @@ def test_executing_json_parsed_statechart(tmp_path):
 def test_cart_goal_simple(pr2_world_state_reset: World):
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
-    tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    tip_goal = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
 

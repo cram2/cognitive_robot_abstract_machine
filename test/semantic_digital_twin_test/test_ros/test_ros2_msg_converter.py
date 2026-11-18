@@ -25,7 +25,7 @@ from semantic_digital_twin.adapters.ros.semdt_to_ros2_converters import (
     PoseToRos2Converter,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
     Quaternion,
@@ -90,7 +90,7 @@ def test_convert_transform_without_frames(cylinder_bot_world):
         transform, world=cylinder_bot_world
     )
 
-    expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    expected = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=transform.translation.x,
         pos_y=transform.translation.y,
         pos_z=transform.translation.z,
@@ -244,7 +244,9 @@ def test_convert_pose(cylinder_bot_world):
 
 
 def test_no_frame_id(cylinder_bot_world):
-    transform = SemDTToRos2Converter.convert(HomogeneousTransformationMatrix())
+    transform = SemDTToRos2Converter.convert(
+        HomogeneousTransformationMatrix3Dimensional()
+    )
     assert transform.header.frame_id == ""
     assert transform.child_frame_id == ""
     for spatial_type in [
@@ -274,7 +276,7 @@ def test_convert_box_shape(cylinder_bot_world):
     box = Box(
         scale=Scale(1, 2, 3),
         color=Color(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 2, 3, reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),
     )
@@ -292,7 +294,7 @@ def test_convert_cylinder_shape(cylinder_bot_world):
         width=1.0,
         height=2.0,
         color=Color(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1.0, 2.0, 3.0, reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),
     )
@@ -309,7 +311,7 @@ def test_convert_sphere_shape(cylinder_bot_world):
     sphere = Sphere(
         radius=1.0,
         color=Color(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1.0, 2.0, 3.0, reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),
     )
@@ -332,7 +334,7 @@ def test_convert_mesh_shape(cylinder_bot_world):
     mesh = Mesh(
         filename=stl_file,
         color=Color.from_rgba(red=0.0, green=0.0, blue=0.0, opacity=0.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 2, 3, reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),
     )
@@ -359,7 +361,7 @@ def textured_chair(cylinder_bot_world) -> Mesh:
     return Mesh.from_ply_file(
         ply_file_path=os.path.join(ply_directory, "chair.ply"),
         texture_file_path=os.path.join(ply_directory, "chair_texture.png"),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),
     )
@@ -386,11 +388,11 @@ def test_drawing_a_mesh_leaves_its_geometry_unloaded(cylinder_bot_world):
 # %% mesh files that move between machines
 
 
-def map_origin(world) -> HomogeneousTransformationMatrix:
+def map_origin(world) -> HomogeneousTransformationMatrix3Dimensional:
     """
     :return: The identity pose in the map of the given world.
     """
-    return HomogeneousTransformationMatrix.from_xyz_rpy(
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         reference_frame=world.get_body_by_name("map")
     )
 

@@ -15,7 +15,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
 from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -40,7 +40,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             Cylinder(
                 width=fucking_huge_link_length / 10,
                 height=fucking_huge_link_length,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=-(fucking_huge_link_length / 2)
                 ),
             )
@@ -88,7 +88,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
                 child=link2,
                 axis=Vector3Dimensional.X(),
                 dof_limits=dof_limits,
-                connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=fucking_huge_link_length,
                 ),
             )
@@ -107,7 +107,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
                 child=link3,
                 axis=Vector3Dimensional.X(),
                 dof_limits=dof_limits,
-                connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=fucking_huge_link_length,
                 ),
             )

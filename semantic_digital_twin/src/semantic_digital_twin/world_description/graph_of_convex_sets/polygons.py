@@ -16,7 +16,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -284,7 +284,7 @@ def _shape_to_convex_set(
         return VPolytope(vertices.T)
 
     bounding_box = shape.local_frame_bounding_box.transform_to_origin(
-        HomogeneousTransformationMatrix(reference_frame=target_frame)
+        HomogeneousTransformationMatrix3Dimensional(reference_frame=target_frame)
     ).bloat(bloat_x, bloat_y, 0.01)
     bounds = bounding_box.to_array_bounds()
     return HPolyhedron.MakeBox(bounds.lower, bounds.upper)

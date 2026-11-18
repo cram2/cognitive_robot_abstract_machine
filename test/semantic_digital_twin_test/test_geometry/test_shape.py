@@ -15,7 +15,7 @@ from trimesh.visual.material import SimpleMaterial
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -71,7 +71,9 @@ def test_recenter_origin_preserves_existing_rotation():
             CartesianPoint3Dimensional(0, 0, 6),
         ]
     )
-    mesh.origin = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0, 0, 0, np.pi / 2)
+    mesh.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        0, 0, 0, 0, 0, np.pi / 2
+    )
     expected_rotation = mesh.origin.rotation_matrix.to_np()
 
     mesh.recenter_origin()
@@ -542,7 +544,7 @@ def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
             FixedConnection(
                 root,
                 child=obstacle,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=2.0, y=0.0, z=0.0, reference_frame=root
                 ),
             )

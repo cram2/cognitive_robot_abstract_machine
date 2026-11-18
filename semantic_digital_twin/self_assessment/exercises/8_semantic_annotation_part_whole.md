@@ -37,7 +37,7 @@ from semantic_digital_twin.specifications.connections import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Dresser, Handle
 from semantic_digital_twin.world_description.connections import PrismaticConnection
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3Dimensional
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
@@ -83,7 +83,7 @@ with world.modify_world():
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.15),
     )
     # One method, routed by type: handle -> drawer.handle
     drawer.add(handle)

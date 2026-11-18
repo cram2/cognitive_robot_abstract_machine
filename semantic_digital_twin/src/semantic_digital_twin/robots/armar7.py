@@ -37,7 +37,7 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.connections import OmniDrive
@@ -485,7 +485,7 @@ class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
                 robot_root._world.get_body_in_branch_by_name(
                     robot_root, "AzureKinect_RGB_link"
                 ),
-                HomogeneousTransformationMatrix(),
+                HomogeneousTransformationMatrix3Dimensional(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(

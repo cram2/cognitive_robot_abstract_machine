@@ -22,7 +22,9 @@ from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 # %% Camera behavior
 
@@ -321,7 +323,7 @@ class TestStorage:
         with sem_world.modify_world():
             sem_world.add_semantic_annotation(camera)
 
-        transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
             pos_z=0.3,

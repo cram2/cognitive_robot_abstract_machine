@@ -34,7 +34,9 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
@@ -96,7 +98,9 @@ class MilkTransportDemonstration(RobotDemonstration):
         default_factory=lambda: BodySpecification.box(
             SceneBody.FLOOR,
             Scale(4.0, 4.0, 0.02),
-            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=-0.01),
+            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                z=-0.01
+            ),
         )
     )
     """
@@ -107,7 +111,9 @@ class MilkTransportDemonstration(RobotDemonstration):
         default_factory=lambda: BodySpecification.box(
             SceneBody.COUNTER,
             Scale(0.6, 1.0, 0.75),
-            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, z=0.375),
+            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0, z=0.375
+            ),
         )
     )
     """
@@ -118,7 +124,9 @@ class MilkTransportDemonstration(RobotDemonstration):
         default_factory=lambda: BodySpecification.box(
             SceneBody.TABLE,
             Scale(0.6, 1.0, 0.7),
-            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0, z=0.35),
+            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=-1.0, z=0.35
+            ),
         )
     )
     """
@@ -266,7 +274,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         """
         return (
             milk_pose.homogeneous_matrix
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=-self.standing_distance, z=-float(milk_pose.z)
             )
         ).pose
@@ -284,7 +292,7 @@ class MilkTransportDemonstration(RobotDemonstration):
             graspable=milk, standing_position=standing_pose, number_of_grasps=1
         )()
         milk_T_raised_grasp = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=self.grasp_height, reference_frame=milk.root
             )
             @ milk.root._world.transform(

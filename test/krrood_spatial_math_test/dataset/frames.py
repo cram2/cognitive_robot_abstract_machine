@@ -1,3 +1,7 @@
+"""
+Cartesian frames, and the spaces they chart, that tests build values on.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -48,8 +52,8 @@ class NamedFrame(CartesianFrame3Dimensional[str]):
     The identifier serialized coordinate representations refer to the frame with.
     """
 
-    def express_in_own_frame(
-        self, value: CoordinateRepresentationT
+    def transform_into_own_frame(
+        self, *, value: CoordinateRepresentationT
     ) -> CoordinateRepresentationT:
         if value.reference_frame is not self:
             raise ReferenceFrameMismatchError(

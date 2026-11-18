@@ -16,7 +16,7 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3Dimensional,
     CartesianPoint3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
     Quaternion,
@@ -265,8 +265,8 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
 
 
 @dataclass(eq=False)
-class HomogeneousTransformationMatrixMapping(
-    AlternativeMapping[HomogeneousTransformationMatrix]
+class HomogeneousTransformationMatrix3DimensionalMapping(
+    AlternativeMapping[HomogeneousTransformationMatrix3Dimensional]
 ):
     position: CartesianPoint3Dimensional
     axis_angle: AxisAngle
@@ -275,7 +275,7 @@ class HomogeneousTransformationMatrixMapping(
     child_frame: KinematicStructureEntity | None
 
     @classmethod
-    def from_domain_object(cls, *, obj: HomogeneousTransformationMatrix):
+    def from_domain_object(cls, *, obj: HomogeneousTransformationMatrix3Dimensional):
         return cls(
             position=obj.position,
             axis_angle=obj.axis_angle,
@@ -283,8 +283,8 @@ class HomogeneousTransformationMatrixMapping(
             child_frame=obj.child_frame,
         )
 
-    def to_domain_object(self) -> HomogeneousTransformationMatrix:
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+    def to_domain_object(self) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=self.position,
             rotation_matrix=self.axis_angle.rotation_matrix,
             reference_frame=self.reference_frame,

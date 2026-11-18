@@ -46,7 +46,7 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3Dimensional
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.geometry import Scale
@@ -86,7 +86,7 @@ for index, (x, y) in enumerate([(0.55, 0.35), (0.55, -0.35), (-0.55, 0.35), (-0.
         world,
         name=f"leg_{index}",
         parent=table_top,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=x, y=y, z=-0.35),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=x, y=y, z=-0.35),
     )
 ```
 
@@ -216,7 +216,7 @@ class with the poses that place it. `WorldSpecification.robots` takes a list of 
 
 Your goal:
 - Build a `WorldSpecification` from `table_urdf` whose `robots` hold a single `RobotSpecification`
-  for `PR2`, localized at `localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)`
+  for `PR2`, localized at `localization_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0)`
 - Store it in a variable named `robot_specification` and materialize it into `robot_world`
 
 ```{code-cell} ipython3
@@ -236,7 +236,7 @@ robot_specification = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0),
         )
     ],
 )

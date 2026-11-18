@@ -55,7 +55,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.world import World
 from semantic_digital_twin.robots.pr2 import PR2
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose3Dimensional
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Pose3Dimensional
 from coraplex.testing import setup_world
 
 world = setup_world()

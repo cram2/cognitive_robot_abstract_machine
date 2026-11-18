@@ -66,7 +66,9 @@ from semantic_digital_twin.predefined_maps.apartment_environment import (
 )
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from cramph.composites import Sequence, StatementNode
@@ -81,7 +83,7 @@ CEREAL_SHELF_LAYER_NAME = "shelf_layer2"
 Name of the shelf layer the cereal starts on.
 """
 
-CEREAL_SHELF_LAYER_T_CEREAL = HomogeneousTransformationMatrix.from_xyz_rpy(
+CEREAL_SHELF_LAYER_T_CEREAL = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     x=-0.1, y=0.0, z=0.115
 )
 """
@@ -118,7 +120,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+            odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                1, 1
+            ),
         )
 
     def is_scene_populated(self, world: World) -> bool:

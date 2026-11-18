@@ -10,7 +10,9 @@ from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNo
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.robots.hsrb import HSRBJoint
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
@@ -77,13 +79,15 @@ def test_joint_goal_on_a_mimic_joint_moves_the_joint_it_mimics(
     hand_palm_link = hsr_world_copy.get_kinematic_structure_entity_by_name(
         "hand_palm_link"
     )
-    hand_T_finger_expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=-0.01675,
-        pos_y=-0.0907,
-        pos_z=0.0052,
-        quat_x=-0.0434,
-        quat_w=0.999,
-        reference_frame=hand_palm_link,
+    hand_T_finger_expected = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            pos_x=-0.01675,
+            pos_y=-0.0907,
+            pos_z=0.0052,
+            quat_x=-0.0434,
+            quat_w=0.999,
+            reference_frame=hand_palm_link,
+        )
     )
     np.testing.assert_almost_equal(
         hsr_world_copy.compute_forward_kinematics(

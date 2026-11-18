@@ -59,7 +59,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import (
     LineSegment3Dimensional,
     CartesianPoint3Dimensional,
@@ -135,7 +137,9 @@ def bowl(tmp_path) -> Bowl:
     rim_faces = ~np.isclose(rim.triangles_center[:, 2], rim.bounds[0][2])
     mesh_path = tmp_path / "bowl.stl"
     mesh.export(mesh_path)
-    shape = Mesh(origin=HomogeneousTransformationMatrix(), filename=str(mesh_path))
+    shape = Mesh(
+        origin=HomogeneousTransformationMatrix3Dimensional(), filename=str(mesh_path)
+    )
     body = Body(
         name=PrefixedName("bowl", prefix="grasp_candidates"),
         collision=ShapeCollection([shape]),
@@ -160,7 +164,7 @@ def milk() -> Milk:
     body = Body(
         name=PrefixedName("milk", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=BOX_SCALE)]
+            [Box(origin=HomogeneousTransformationMatrix3Dimensional(), scale=BOX_SCALE)]
         ),
     )
     annotation = Milk(root=body)
@@ -414,7 +418,12 @@ def _spoon_lying_along(length_axis: int) -> Spoon:
     body = Body(
         name=PrefixedName(f"spoon_along_{length_axis}", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(*extents))]
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix3Dimensional(),
+                    scale=Scale(*extents),
+                )
+            ]
         ),
     )
     annotation = Spoon(root=body)
@@ -516,7 +525,9 @@ def _mug(with_handle: bool, handle_type: type = Handle) -> Mug:
         [
             Mesh.from_trimesh(
                 mesh=trimesh.util.concatenate([body_shape, handle_shape]),
-                origin=HomogeneousTransformationMatrix(reference_frame=body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,
@@ -638,7 +649,12 @@ def shape_sorting_piece() -> ShapeSortingPiece:
     """
     return _shape_sorting_piece(
         ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix3Dimensional(),
+                    scale=PIECE_SCALE,
+                )
+            ]
         )
     )
 
@@ -715,7 +731,9 @@ def _handle_with_bar_along(
         collision=ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(*bar_center),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                        *bar_center
+                    ),
                     scale=Scale(*extents),
                 )
             ]
@@ -956,7 +974,9 @@ def test_a_grasp_in_the_world_frame_follows_where_the_object_stands():
     world_root = Body(name=PrefixedName("map", prefix="grasp_candidates"))
     body = Body(name=PrefixedName("milk", prefix="grasp_candidates"))
     milk = Milk(root=body)
-    world_T_milk = HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 0.5, yaw=0.3)
+    world_T_milk = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        1.0, 2.0, 0.5, yaw=0.3
+    )
     with world.modify_world():
         world.add_connection(
             FixedConnection(

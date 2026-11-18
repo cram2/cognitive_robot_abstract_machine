@@ -32,7 +32,9 @@ from segmind.detectors.spatial_relation_detector_nodes import (
 )
 from segmind.episode_segmenter import EpisodeSegmentation
 from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -80,8 +82,10 @@ def _events_of(
 
 
 def _place(body: Body, x: float, y: float, z: float) -> None:
-    body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x, y, z, reference_frame=body.parent_connection.parent
+    body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x, y, z, reference_frame=body.parent_connection.parent
+        )
     )
 
 

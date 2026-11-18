@@ -18,7 +18,7 @@ from semantic_digital_twin.exceptions import (
     ZeroLengthURDFJointAxisError,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -282,7 +282,7 @@ class URDFParser(WorldModelParser):
         translation_offset = getattr(joint.origin, "xyz", [0, 0, 0])
         rotation_offset = getattr(joint.origin, "rpy", [0, 0, 0])
 
-        parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=translation_offset[0],
             y=translation_offset[1],
             z=translation_offset[2],
@@ -431,7 +431,7 @@ class URDFParser(WorldModelParser):
         res = []
         for i, geom in enumerate(geometry):
             params = (*(geom.origin.xyz + geom.origin.rpy),) if geom.origin else ()
-            origin_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+            origin_transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 *params, reference_frame=body
             )
             if isinstance(geom.geometry, urdfpy.Box):

@@ -25,7 +25,9 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from krrood_spatial_math.spatial_types import Pose3Dimensional
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 
 try:
@@ -49,7 +51,9 @@ except ModuleNotFoundError:
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 from .world_snapshot import WorldSnapshot
@@ -180,7 +184,7 @@ def whole_scene_region(pr2_apartment_context) -> VolumetricBoundingBox:
     """
     world, _, _ = pr2_apartment_context
     return VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
         min_x=-10,
         min_y=-10,
         min_z=-10,
@@ -199,7 +203,7 @@ def empty_region(pr2_apartment_context) -> VolumetricBoundingBox:
     """
     world, _, _ = pr2_apartment_context
     return VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
         min_x=-10,
         min_y=-10,
         min_z=-10,

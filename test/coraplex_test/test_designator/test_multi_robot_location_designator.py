@@ -24,7 +24,9 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 
 from ...conftest import SAMPLING_SEED
@@ -52,7 +54,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(HSRB)
         view = view[0] if view else HSRB.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
     elif request.param == "stretch":
@@ -63,7 +65,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(Stretch)
         view = view[0] if view else Stretch.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -75,7 +77,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(Tiago)
         view = view[0] if view else Tiago.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -87,7 +89,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(PR2)
         view = view[0] if view else PR2.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -98,7 +100,7 @@ def setup_multi_robot_simple_apartment(
         )
         view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 

@@ -56,7 +56,9 @@ from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from ..conftest import physically_simulated_executor
@@ -213,8 +215,10 @@ def executor_reaching_out_of_range(
     """
     world, robot_view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, 1.5, 50, reference_frame=milk.root.parent_connection.parent
+    milk.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            2, 1.5, 50, reference_frame=milk.root.parent_connection.parent
+        )
     )
     plan = ReachAction(
         grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
@@ -462,7 +466,8 @@ def tiago_world_with_a_stretch(_tiago_world_setup) -> World:
     """
     world = deepcopy(_tiago_world_setup)
     RobotSpecification(
-        Stretch, localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
+        Stretch,
+        localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=3),
     ).spawn(world)
     return world
 

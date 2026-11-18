@@ -57,7 +57,7 @@ from semantic_digital_twin.exceptions import (
     SnapshotDoesNotFitSimulationError,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Quaternion,
     RotationMatrix,
@@ -116,7 +116,7 @@ from semantic_digital_twin.world_description.world_modification import (
 logger = logging.getLogger(__name__)
 
 
-def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> list[float]:
+def cas_pose_to_list(pose: HomogeneousTransformationMatrix3Dimensional) -> list[float]:
     """
     Converts a CAS TransformationMatrix to a list of 7 floats (position + quaternion).
 
@@ -1165,7 +1165,7 @@ class MujocoCamera(MultiSimCamera):
         bounds: numpy.ndarray,
         minimum_distance: float = 1.0,
         distance_factor: float = 1.5,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes a fixed diagonal viewpoint that frames an axis-aligned bounding box.
 
@@ -1185,7 +1185,7 @@ class MujocoCamera(MultiSimCamera):
         direction.scale(1)
         position = center + direction * distance
         rotation = cls._look_at_rotation(position, center)
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             position, rotation
         )
 
@@ -2187,8 +2187,10 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         if not axes:
             return
         child_body_spec = builder.body_spec_of(self.connection.child)
-        child_T_connection = HomogeneousTransformationMatrix.invert_numeric_matrix(
-            self.connection.connection_T_child_expression.to_np()
+        child_T_connection = (
+            HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(
+                self.connection.connection_T_child_expression.to_np()
+            )
         )
         for axis in axes:
             child_body_spec.add_joint(
@@ -4576,7 +4578,9 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         )
         parent_T_conn = connection.parent_T_connection_expression.to_np()
         conn_T_child = (
-            HomogeneousTransformationMatrix.invert_numeric_matrix(parent_T_conn)
+            HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(
+                parent_T_conn
+            )
             @ mj_T_world
         )
         dof_xyz, dof_quat_xyzw = self._decompose_pose_matrix(conn_T_child)

@@ -20,7 +20,7 @@ from semantic_digital_twin.robots.armar7 import AzureKinectRGB
 from semantic_digital_twin.robots.unitree_g1 import D435
 from semantic_digital_twin.robots.robot_parts import Camera, RobotCamera
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.testing import ray_test_world
@@ -54,7 +54,7 @@ def test_optical_root_preserves_mounting_pose(table_world: World) -> None:
     """
     An optical body stores its full fixed mounting pose in the world graph.
     """
-    parent_T_optical = HomogeneousTransformationMatrix.from_xyz_rpy(
+    parent_T_optical = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.1,
         y=0.2,
         z=0.3,
@@ -113,13 +113,13 @@ def test_optical_mount_follows_parent_motion(
     Moving the mounting body carries its fixed optical frame without changing roll.
     """
     world, parent, *_ = ray_test_world
-    parent_T_optical = HomogeneousTransformationMatrix.from_xyz_rpy(
+    parent_T_optical = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.2, roll=0.3, yaw=0.4
     )
     optical_root = RobotCamera.create_optical_body(parent, parent_T_optical)
     with world.modify_world():
-        parent.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 y=0.5, roll=0.6, pitch=0.7
             ),
             reference_frame=parent.parent_connection.parent,

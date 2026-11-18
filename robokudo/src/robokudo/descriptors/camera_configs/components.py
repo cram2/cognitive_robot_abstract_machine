@@ -3,7 +3,9 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 from robokudo.types.cv import ColorToDepthRatio
 
@@ -95,8 +97,8 @@ class StaticCameraTransformComponent:
     World frame ID for the configured static camera transform.
     """
 
-    static_world_T_camera: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
+    static_world_T_camera: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=HomogeneousTransformationMatrix3Dimensional
     )
     """
     Camera pose relative to the configured world frame.

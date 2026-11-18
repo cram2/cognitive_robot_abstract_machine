@@ -28,7 +28,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     PlacementArea,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -61,7 +61,7 @@ class PlacementSamplerRegion:
     translation are applied.
     """
 
-    world_T_sampler: HomogeneousTransformationMatrix
+    world_T_sampler: HomogeneousTransformationMatrix3Dimensional
     """
     Pose of the sampler's frame in world coordinates.
     """
@@ -94,7 +94,7 @@ class PlacementSamplerRegion:
             was resolved for.
         """
         box = Box(
-            origin=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=self.local_center
             ),
             scale=Scale(self.width, self.depth, self.thickness),
@@ -105,7 +105,7 @@ class PlacementSamplerRegion:
         connection = FixedConnection(
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                 self.world_T_sampler.to_np()
             ),
         )
@@ -183,7 +183,7 @@ class PlacementSamplerRegionReader:
                 (x_minimum + x_maximum) / 2.0,
                 (y_minimum + y_maximum) / 2.0,
             ),
-            world_T_sampler=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_T_sampler=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=world_x,
                 y=world_y,
                 z=world_z,
@@ -241,7 +241,7 @@ class GripperExclusionZoneData:
         connection = FixedConnection(
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=self.center
             ),
         )

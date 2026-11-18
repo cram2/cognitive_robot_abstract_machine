@@ -38,7 +38,9 @@ from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -81,7 +83,9 @@ def build_cram_world():
     hsrb_world.merge_world(apartment)
     hsrb_world.get_body_by_name(
         "base_footprint"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.3, 2, 0)
+    )
     hsrb = hsrb_world.get_semantic_annotations_by_type(HSRB)[0]
     extensions = [
         RobotAccess(robot=hsrb),

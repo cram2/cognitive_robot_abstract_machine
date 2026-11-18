@@ -107,7 +107,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
     CartesianPoint3Dimensional,
 )
@@ -311,7 +311,7 @@ def cylinder_bot_world():
         env_connection = FixedConnection(
             parent=body,
             child=environment,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 1
             ),
         )
@@ -324,7 +324,7 @@ def cylinder_bot_world():
         env_connection2 = FixedConnection(
             parent=body,
             child=environment2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 y=0.5
             ),
         )
@@ -388,7 +388,7 @@ def self_collision_bot_world():
                 parent=robot,
                 child=l_shoulder,
                 axis=Vector3Dimensional.Z(),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.2, y=0.2
                 ),
                 world=world,
@@ -399,7 +399,7 @@ def self_collision_bot_world():
                 parent=l_shoulder,
                 child=l_tip,
                 axis=Vector3Dimensional.Z(),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.2
                 ),
                 world=world,
@@ -409,7 +409,7 @@ def self_collision_bot_world():
             FixedConnection(
                 parent=l_tip,
                 child=l_thumb,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=-0.05, z=0.1
                 ),
             )
@@ -420,7 +420,7 @@ def self_collision_bot_world():
                 parent=robot,
                 child=r_shoulder,
                 axis=Vector3Dimensional.Z(),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.2,
                     y=-0.2,
                 ),
@@ -432,7 +432,7 @@ def self_collision_bot_world():
                 parent=r_shoulder,
                 child=r_tip,
                 axis=Vector3Dimensional.Z(),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.2
                 ),
                 world=world,
@@ -442,7 +442,7 @@ def self_collision_bot_world():
             FixedConnection(
                 parent=r_tip,
                 child=r_thumb,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=0.05, z=0.1
                 ),
             )
@@ -492,7 +492,7 @@ def cylinder_bot_diff_world():
         env_connection = FixedConnection(
             parent=body,
             child=environment,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 1
             ),
         )
@@ -509,9 +509,9 @@ def cylinder_bot_diff_world():
 
 def world_with_urdf_factory(
     robot_semantic_annotation: type[HasMobileBase],
-    robot_starting_pose: HomogeneousTransformationMatrix | None = None,
+    robot_starting_pose: HomogeneousTransformationMatrix3Dimensional | None = None,
     urdf_path_resolver: PathResolver | None = None,
-    robot_localization_pose: HomogeneousTransformationMatrix | None = None,
+    robot_localization_pose: HomogeneousTransformationMatrix3Dimensional | None = None,
 ):
     """
     Builds this tree:
@@ -678,13 +678,13 @@ def _apartment_world_setup():
 
     apartment_world.merge_world_at_pose(
         milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             2.37, 2, 1.05, reference_frame=apartment_world.root
         ),
     )
     apartment_world.merge_world_at_pose(
         cereal_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             2.37, 2.5, 1.05, reference_frame=apartment_world.root
         ),
     )
@@ -693,7 +693,7 @@ def _apartment_world_setup():
         FixedConnection(
             parent=apartment_world.get_body_by_name("cabinet10_drawer_top"),
             child=spoon_world.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -0.05, -0.05, -0.02
             ),
         ),
@@ -705,7 +705,9 @@ def _apartment_world_setup():
                 root=apartment_world.root, _world=apartment_world
             )
             .as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=apartment_world.root)
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=apartment_world.root
+                )
             )
             .bounding_box()
         )
@@ -713,7 +715,7 @@ def _apartment_world_setup():
             name="apartment_floor",
             world=apartment_world,
             scale=Scale(footprint.depth, footprint.width, 0.01),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 float(footprint.center.x),
                 float(footprint.center.y),
                 -0.01 / 2,
@@ -767,7 +769,7 @@ def _elevator_world_setup():
             door = Door.create_with_new_body_in_world(
                 name=f"{name.name}_door{i}",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                     CartesianPoint3Dimensional(-scale.x / 2, door_y, 0),
                     reference_frame=world.root,
                 ),
@@ -825,14 +827,14 @@ def _simple_apartment_setup():
         box_1_connection = FixedConnection(
             parent=world.root,
             child=box,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2, 0, 0.375, reference_frame=world.root
             ),
         )
         box_2_connection = FixedConnection(
             parent=root,
             child=box_2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -2, 0, 0.375
             ),
         )
@@ -861,28 +863,28 @@ def _simple_apartment_setup():
         wall_1_connection = FixedConnection(
             parent=root,
             child=wall1,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 0, -4, 1
             ),
         )
         wall_2_connection = FixedConnection(
             parent=root,
             child=wall2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 0, 4, 1
             ),
         )
         wall_3_connection = FixedConnection(
             parent=root,
             child=wall3,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -4, 0, 1, yaw=np.pi / 2
             ),
         )
         wall_4_connection = FixedConnection(
             parent=root,
             child=wall4,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 4, 0, 1, yaw=np.pi / 2
             ),
         )
@@ -906,7 +908,9 @@ def _simple_apartment_setup():
     ).create_world()
     world.merge_world_at_pose(
         milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            -1.7, 0, 1.02, yaw=np.pi
+        ),
     )
     return world
 
@@ -942,14 +946,14 @@ def multi_story_building(_elevator_world_setup):
     BuildingFloor().spawn(
         world,
         "floor_2",
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 3),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0, 0, 3),
     )
     world.merge_world(
         elevator_copy,
         FixedConnection(
             parent=world.root,
             child=elevator_copy.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -5, 0, 1, yaw=np.pi
             ),
         ),
@@ -971,7 +975,7 @@ def multi_story_building(_elevator_world_setup):
             FixedConnection(
                 parent=world.root,
                 child=region,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0, 0, center_height
                 ),
             )
@@ -1018,7 +1022,9 @@ def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     pr2_copy.merge_world(apartment_copy)
     pr2_copy.get_body_by_name(
         "base_footprint"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.3, 2, 0)
+    )
     return pr2_copy
 
 
@@ -1042,7 +1048,7 @@ def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
     robot_view = hsr_copy.get_semantic_annotations_by_type(HSRB)[0]
 
     apartment_copy.merge_world_at_pose(
-        hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+        hsr_copy, HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
     )
 
     return (
@@ -1058,7 +1064,8 @@ def stretch_apartment_world(_stretch_world_setup, _apartment_world_setup):
     stretch_copy = deepcopy(_stretch_world_setup)
 
     apartment_copy.merge_world_at_pose(
-        stretch_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+        stretch_copy,
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0),
     )
 
     return apartment_copy
@@ -1212,7 +1219,7 @@ def kitchen_environment_fixture():
         fruit_table = Table.create_with_new_body_in_world(
             world=world,
             name="fruit_table",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1, z=0
             ),
             scale=Scale(2, 2, 1),
@@ -1221,7 +1228,7 @@ def kitchen_environment_fixture():
         vegetable_table = Table.create_with_new_body_in_world(
             world=world,
             name="vegetable_table",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1, z=2
             ),
             scale=Scale(2, 2, 1),
@@ -1230,7 +1237,7 @@ def kitchen_environment_fixture():
         empty_table = Table.create_with_new_body_in_world(
             world=world,
             name="empty_table",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1, z=4
             ),
             scale=Scale(2, 2, 1),
@@ -1239,7 +1246,7 @@ def kitchen_environment_fixture():
         empty_table2 = Table.create_with_new_body_in_world(
             world=world,
             name="empty_table2",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1, z=6
             ),
             scale=Scale(2, 2, 1),
@@ -1248,7 +1255,7 @@ def kitchen_environment_fixture():
         apple = Apple.create_with_new_body_in_world(
             world=world,
             name="apple",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1, z=0.55
             ),
             scale=Scale(0.10, 0.10, 0.10),
@@ -1259,7 +1266,7 @@ def kitchen_environment_fixture():
         orange = Orange.create_with_new_body_in_world(
             world=world,
             name="orange",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=0.5, z=0.55
             ),
             scale=Scale(0.10, 0.10, 0.10),
@@ -1270,7 +1277,7 @@ def kitchen_environment_fixture():
         banana1 = Banana.create_with_new_body_in_world(
             world=world,
             name="banana1",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=0.6, z=0.75
             ),
             scale=Scale(0.10, 0.10, 0.60),
@@ -1281,7 +1288,7 @@ def kitchen_environment_fixture():
         carrot = Carrot.create_with_new_body_in_world(
             world=world,
             name="carrot",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1, z=2.6
             ),
             scale=Scale(0.05, 0.05, 0.20),
@@ -1292,7 +1299,7 @@ def kitchen_environment_fixture():
         lettuce = Lettuce.create_with_new_body_in_world(
             world=world,
             name="lettuce",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=1.5, z=2.55
             ),
             scale=Scale(0.15, 0.15, 0.10),
@@ -1303,7 +1310,7 @@ def kitchen_environment_fixture():
         banana = Banana.create_with_new_body_in_world(
             world=world,
             name="banana",
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=10, y=10, z=10
             ),
             scale=Scale(0.20, 0.05, 0.05),
@@ -1322,7 +1329,7 @@ def kitchen_environment_fixture():
     root_C_fake_robot = FixedConnection(
         parent=root,
         child=fake_robot_body,
-        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(),
+        parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
     )
     all_elements_connections.append(root_C_fake_robot)
 

@@ -19,7 +19,7 @@ from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.testing import ray_test_world
@@ -37,8 +37,8 @@ def optical_camera(
     """
     world, body, *_ = ray_test_world
     with world.modify_world():
-        body.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        body.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.2, y=0.1, z=0.3, roll=0.4, pitch=0.2, yaw=np.pi / 2
             ),
             reference_frame=body.parent_connection.parent,
@@ -79,8 +79,8 @@ def test_render_preserves_optical_orientation(
     """
     root = optical_camera.root
     with root._world.modify_world():
-        root.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        root.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 roll=optical_roll, pitch=root_pitch
             ),
             reference_frame=root.parent_connection.parent,
@@ -156,17 +156,17 @@ def test_render_places_top_left_optical_ray_at_top_left_pixel(
 @pytest.mark.parametrize(
     "root_pose",
     [
-        HomogeneousTransformationMatrix.from_xyz_rpy(roll=np.pi / 2),
-        HomogeneousTransformationMatrix.from_xyz_rpy(pitch=np.pi / 2),
-        HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2),
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(roll=np.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(pitch=np.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=np.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.8, y=1.4, z=0.9, roll=0.4, pitch=0.7, yaw=0.3
         ),
     ],
 )
 def test_forward_view_preserves_optical_root_orientation_under_robot_motion(
     optical_camera: Camera,
-    root_pose: HomogeneousTransformationMatrix,
+    root_pose: HomogeneousTransformationMatrix3Dimensional,
 ) -> None:
     """
     Camera motion changes the world pose without changing image axes relative to its
@@ -175,7 +175,7 @@ def test_forward_view_preserves_optical_root_orientation_under_robot_motion(
     root = optical_camera.root
     world = root._world
     with world.modify_world():
-        root.parent_connection.origin = HomogeneousTransformationMatrix(
+        root.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
             data=root_pose,
             reference_frame=root.parent_connection.parent,
             child_frame=root,

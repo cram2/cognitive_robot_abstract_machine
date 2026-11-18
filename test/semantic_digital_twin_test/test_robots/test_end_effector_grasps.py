@@ -21,7 +21,9 @@ from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Vector3Dimensional,
@@ -45,7 +47,9 @@ POSITION_TOLERANCE = 0.005
 How close two distances have to be, in meters, to count as the same distance here.
 """
 
-HELD_BODY_OFFSET = HomogeneousTransformationMatrix.from_xyz_rpy(0.01, 0.02, 0.03)
+HELD_BODY_OFFSET = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+    0.01, 0.02, 0.03
+)
 """
 Where the body a gripper holds sits relative to the tool frame.
 """
@@ -100,7 +104,7 @@ def graspable_box(pr2_world_copy) -> Milk:
             FixedConnection(
                 parent=pr2_world_copy.root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.6, z=0.9
                 ),
             )

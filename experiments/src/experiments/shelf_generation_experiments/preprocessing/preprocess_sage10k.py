@@ -37,7 +37,7 @@ from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentShelfLayer,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
@@ -463,7 +463,7 @@ class ShelfExtractor:
         world_offset = CartesianPoint2Dimensional(
             x=position.x - shelf.pose.x, y=position.y - shelf.pose.y
         )
-        shelf_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+        shelf_T_world = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             yaw=-float(shelf.pose.yaw)
         )
         local_offset = world_offset.transform(shelf_T_world)
@@ -511,7 +511,7 @@ class ShelfExtractor:
         world_offset = CartesianPoint2Dimensional(
             x=object_.pose.x - shelf.pose.x, y=object_.pose.y - shelf.pose.y
         )
-        content_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+        content_T_world = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             yaw=-content_frame_yaw_radians
         )
         local_offset = world_offset.transform(content_T_world)

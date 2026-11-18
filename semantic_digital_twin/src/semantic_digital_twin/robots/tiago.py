@@ -56,7 +56,7 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.connection_properties import (
@@ -1041,7 +1041,7 @@ class TiagoMujocoCamera(RobotCamera[FieldOfViewCameraModel]):
                 robot_root._world.get_body_in_branch_by_name(
                     robot_root, TiagoMujocoBody.HEAD
                 ),
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     data=[[0, 0, 1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]]
                 ),
             ),

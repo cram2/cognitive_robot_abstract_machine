@@ -63,17 +63,34 @@ def test_a_point_is_not_a_vector():
 
 
 def test_a_point_is_moved_by_a_vector():
-    assert Point.__parameters__ == (AffineFrameT, CoordinateT, VectorT)
-    assert VectorT.__bound__ is Vector
+    """
+    Adding a vector shifts each coordinate of the point by the vector's.
+    """
+    point = StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+    vector = StoredScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
 
-
-def test_a_metric_point_is_given_in_a_cartesian_frame():
-    assert MetricPoint.__parameters__ == (CartesianFrameT, CoordinateT, VectorT)
-    assert CartesianFrameT.__bound__ is CartesianFrame
+    assert point + vector == StoredScalablePlanePoint(
+        x=4.0, y=6.0, coordinate_system=None
+    )
 
 
 def test_a_point_is_given_in_an_affine_frame():
-    assert AffineFrameT.__bound__ is AffineFrame
+    """
+    A point's frame may be any affine frame, and it is moved by a vector of that frame.
+    """
+    frame_parameter, _, vector_parameter = Point.__parameters__
+
+    assert frame_parameter.__bound__ is AffineFrame
+    assert vector_parameter.__bound__ is Vector
+
+
+def test_a_metric_point_is_given_in_a_cartesian_frame():
+    """
+    Only a Cartesian frame measures the distances a metric point has.
+    """
+    frame_parameter, _, _ = MetricPoint.__parameters__
+
+    assert frame_parameter.__bound__ is CartesianFrame
 
 
 def test_a_point_reports_the_kind_of_frame_it_is_given_in():

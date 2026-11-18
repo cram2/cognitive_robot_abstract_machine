@@ -5,7 +5,9 @@ from typing_extensions import Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -50,7 +52,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
     Sets the odometry of the robot to the given pose.
     """
 
-    base_pose: HomogeneousTransformationMatrix
+    base_pose: HomogeneousTransformationMatrix3Dimensional
     """
     The pose of the robot base.
     """
@@ -112,7 +114,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
         return drive_connections[0]
 
     def on_start(self) -> None:
-        parent_T_pose_ref = HomogeneousTransformationMatrix(
+        parent_T_pose_ref = HomogeneousTransformationMatrix3Dimensional(
             self.context.world.compute_forward_kinematics_np(
                 self.odom_connection.parent, self.base_pose.reference_frame
             )

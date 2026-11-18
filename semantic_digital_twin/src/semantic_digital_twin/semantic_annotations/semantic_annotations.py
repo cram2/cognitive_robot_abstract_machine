@@ -64,7 +64,7 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional, RotationMatrix
@@ -256,7 +256,7 @@ class Aperture(HasRootRegion):
         name: str,
         world: World,
         body: Body,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Self:
         world.update_forward_kinematics()
         body_scale = (
@@ -469,7 +469,7 @@ class Door(HasHandle, HasMovableJoint):
 
     def calculate_self_T_movable_joint(
         self, axis: Vector3Dimensional
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Calculate where the door's hinge sits: on the edge opposite its handle.
 
@@ -494,7 +494,9 @@ class Door(HasHandle, HasMovableJoint):
                     else 1
                 )
                 offset = sign * (scale.z / 2)
-                door_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(z=offset)
+                door_T_hinge = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    z=offset
+                )
 
             case [0, 0, 1, 0]:
                 sign = (
@@ -503,7 +505,9 @@ class Door(HasHandle, HasMovableJoint):
                     else 1
                 )
                 offset = sign * (scale.y / 2)
-                door_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(y=offset)
+                door_T_hinge = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=offset
+                )
             case [1, 0, 0, 0]:
                 sign = (
                     symbolic_math.sign(-1 * door_P_handle.x)
@@ -511,7 +515,9 @@ class Door(HasHandle, HasMovableJoint):
                     else 1
                 )
                 offset = sign * (scale.x / 2)
-                door_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(x=offset)
+                door_T_hinge = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=offset
+                )
 
             case _:
                 raise InvalidHingeActiveAxis(axis=axis)
@@ -529,7 +535,7 @@ class DoubleDoor(SemanticAnnotation):
     door_1: Door = field(kw_only=True)
 
     def calculate_left_right_door_from_view_point(
-        self, world_T_view_point: HomogeneousTransformationMatrix
+        self, world_T_view_point: HomogeneousTransformationMatrix3Dimensional
     ) -> tuple[Door, Door]:
         """
         Calculate which door is the left and which is the right door based on a given
@@ -557,7 +563,7 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
 
     def calculate_self_T_movable_joint(
         self, axis: Vector3Dimensional
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         A drawer slides, which moves it the same wherever its rails sit, so they sit at
         its origin.
@@ -565,7 +571,7 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
         :param axis: The axis the drawer slides along, in the drawer frame.
         :return: The identity: the rails' frame is the drawer's frame.
         """
-        return HomogeneousTransformationMatrix()
+        return HomogeneousTransformationMatrix3Dimensional()
 
 
 @dataclass(eq=False)
@@ -581,7 +587,7 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
 
     def calculate_self_T_movable_joint(
         self, axis: Vector3Dimensional
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         An elevator's drive slides it, which moves it the same wherever the drive sits,
         so it sits at the cabin's origin.
@@ -589,7 +595,7 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         :param axis: The axis the cabin travels along, in the cabin frame.
         :return: The identity: the drive's frame is the cabin's frame.
         """
-        return HomogeneousTransformationMatrix()
+        return HomogeneousTransformationMatrix3Dimensional()
 
     def open(self):
         """
@@ -740,7 +746,7 @@ class Floor(HasSupportingSurface):
         name: str,
         world: World,
         floor_polytope: list[CartesianPoint3Dimensional],
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Self:
         """
         Create a Floor semantic annotation with a new body defined by the given list of
@@ -921,7 +927,7 @@ class Wall(HasApertures):
 
     def bloated_bounding_box_collection(
         self,
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
         bloat_amount: float,
         obstacle_height_clearance: float = 0.01,
     ) -> BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional]:
@@ -1576,14 +1582,14 @@ class BottleCap(HasMovableJoint):
 
     def calculate_self_T_movable_joint(
         self, axis: Vector3Dimensional
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         A cap screws about its own centre line, so its thread sits at its origin.
 
         :param axis: The thread axis, in the cap frame.
         :return: The identity: the thread's frame is the cap's frame.
         """
-        return HomogeneousTransformationMatrix()
+        return HomogeneousTransformationMatrix3Dimensional()
 
 
 @dataclass(eq=False)
@@ -1679,7 +1685,7 @@ class SemanticEnvironmentAnnotation(HasRootBody):
         :return: A collection of the bloated obstacle and wall bounding boxes.
         """
         world_root = search_space.reference_frame
-        origin = HomogeneousTransformationMatrix(reference_frame=world_root)
+        origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world_root)
 
         entities_to_consider = self.obstacle_entities(
             search_space=search_space, excluded_bodies=excluded_bodies
@@ -1830,7 +1836,7 @@ class ToolWithHandle(Tool, HasHandle, ABC):
                 FixedConnection(
                     parent=self.root,
                     child=tip_body,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.1,
                         y=0.0,
                         z=0.0,

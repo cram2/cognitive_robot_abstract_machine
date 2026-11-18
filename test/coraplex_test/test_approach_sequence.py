@@ -6,7 +6,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
     RotationMatrix,
@@ -41,7 +43,7 @@ def boxed_pr2_world(simple_pr2_context):
         )
         connection = Connection6DoF.create_with_dofs(world, world.root, box)
         world.add_connection(connection)
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 0, 1, reference_frame=world.root
         )
         graspable = Milk(root=box)

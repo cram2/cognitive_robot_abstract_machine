@@ -42,7 +42,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Pose3Dimensional,
@@ -691,8 +693,10 @@ def _move_the_milk(world: World) -> Milk:
     :return: The milk.
     """
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *MOVED_MILK_POSITION, reference_frame=world.root
+    milk.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *MOVED_MILK_POSITION, reference_frame=world.root
+        )
     )
     return milk
 
@@ -883,8 +887,10 @@ def test_an_opening_of_a_handle_first_tries_the_grasp_facing_the_robot(
     ]
     facing_grasp = horizontally_approached[facing_grasp_index]
     standing = _standing_in_front_of(facing_grasp, world)
-    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        standing.x, standing.y, 0.0, reference_frame=world.root
+    robot.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            standing.x, standing.y, 0.0, reference_frame=world.root
+        )
     )
 
     first_opening = next(

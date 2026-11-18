@@ -19,7 +19,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Quaternion,
     RotationMatrix,
 )
@@ -546,8 +546,11 @@ class VisibilityCostmap(Costmap):
         origin_copy = deepcopy(self.origin).homogeneous_matrix
 
         for _ in range(4):
-            origin_copy = origin_copy @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                yaw=np.pi / 2
+            origin_copy = (
+                origin_copy
+                @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    yaw=np.pi / 2
+                )
             )
             images.append(
                 ray_tracer.create_depth_map(

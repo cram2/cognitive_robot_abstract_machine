@@ -20,7 +20,9 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
@@ -90,7 +92,7 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
                         CartesianPose(
                             root_link=base_footprint,
                             tip_link=r_tip,
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
                             weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,

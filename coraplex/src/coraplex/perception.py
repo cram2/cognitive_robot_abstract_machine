@@ -27,7 +27,7 @@ from semantic_digital_twin.reasoning.robot_predicates import VisibleTo
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
 )
 from krrood_spatial_math.spatial_types import (
@@ -201,7 +201,7 @@ class Detection:
             )
             parent_origin = body.parent_connection.origin
             body.parent_connection.origin = (
-                HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                     point=parent_T_object.position,
                     rotation_matrix=parent_origin.rotation_matrix,
                     reference_frame=body.parent_connection.parent,
@@ -211,16 +211,16 @@ class Detection:
 
     @staticmethod
     def _with_z_up_and_x_towards(
-        root_T_frame: HomogeneousTransformationMatrix,
+        root_T_frame: HomogeneousTransformationMatrix3Dimensional,
         root_P_target: CartesianPoint3Dimensional,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Return ``root_T_frame`` rotated by 180° around its own axes so that its z axis
         points along the world z axis and its x axis points towards ``root_P_target`` as
         closely as those rotations allow.
 
         The position is left untouched, and every axis stays on the axis it started on.
-        :param root_T_frame:``HomogeneousTransformationMatrix`` which will be rotated
+        :param root_T_frame:``HomogeneousTransformationMatrix3Dimensional`` which will be rotated
         :param root_P_target:``CartesianPoint3Dimensional`` towards which root_T_frame x axis will
             point
         :return: rotated transformation matrix
@@ -230,7 +230,7 @@ class Detection:
         flip_z = root_T_frame[2, 2] < 0
         flip_x = root_T_frame.rotation_matrix.x_vector().dot(root_V_target) > 0
 
-        return root_T_frame @ HomogeneousTransformationMatrix.from_xyz_rpy(
+        return root_T_frame @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             roll=np.pi if flip_z and not flip_x else 0,
             pitch=np.pi if flip_z and flip_x else 0,
             yaw=np.pi if flip_x and not flip_z else 0,

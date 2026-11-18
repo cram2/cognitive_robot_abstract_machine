@@ -39,7 +39,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
@@ -225,7 +225,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
         :return: The floor's bounding box in the world's root frame.
         """
         return floor.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=self.world.root)
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=self.world.root)
         ).bounding_box()
 
     def _stands_on(self, floor: Floor) -> bool:
@@ -264,7 +264,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
             self.robot.root.global_transform, waypoints[0].reference_frame
         ).z
         poses = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 CartesianPoint3Dimensional(
                     waypoint.x, waypoint.y, base_height, waypoint.reference_frame
                 ),

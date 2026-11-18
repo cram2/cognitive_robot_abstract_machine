@@ -27,7 +27,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
 )
 from krrood_spatial_math.spatial_types import Vector3Dimensional
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -114,7 +116,7 @@ class FurnitureUnderTest:
                     world=self.world,
                     parent=parent_body,
                     child=body,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=parent_body
                     ),
                     **connection_kwargs,

@@ -27,7 +27,7 @@ from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -300,7 +300,7 @@ class Sage10kWall(Sage10kWithID):
         center_x = (self.end_point.x + self.start_point.x) / 2
         center_y = (self.end_point.y + self.start_point.y) / 2
 
-        parent_T_wall = HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_wall = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=center_x,
             y=center_y,
             z=0.0,
@@ -331,7 +331,9 @@ class Sage10kWall(Sage10kWithID):
         geometry_with_texture = ShapeCollection(
             [
                 Mesh.from_trimesh(
-                    origin=HomogeneousTransformationMatrix(reference_frame=body),
+                    origin=HomogeneousTransformationMatrix3Dimensional(
+                        reference_frame=body
+                    ),
                     mesh=wall_mesh,
                     texture_file_path=str(
                         directory / "materials" / f"{self.material}.png"
@@ -429,7 +431,7 @@ class Sage10kObject(Sage10kWithID):
         body.name = PrefixedName(name=str(body.id), prefix=self.id)
 
         # Define the pose for the object in the world
-        root_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(
+        root_T_body = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             self.position.x,
             self.position.y,
             self.position.z,
@@ -442,7 +444,9 @@ class Sage10kObject(Sage10kWithID):
         mesh = Mesh.from_ply_file(
             ply_file_path=str(ply_file),
             texture_file_path=str(texture_file),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=body
+            ),
         )
 
         # Create a Body with the loaded mesh as both visual and collision geometry
@@ -617,7 +621,7 @@ class Sage10kDoor(Sage10kWithID):
 
         wall_length, _ = sage_10k_wall.wall_length_and_yaw
 
-        parent_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_body = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             y=-wall_length / 2 + (self.position_on_wall * wall_length),
             z=self.height / 2,
             reference_frame=parent,
@@ -645,7 +649,9 @@ class Sage10kDoor(Sage10kWithID):
         geometry_with_texture = ShapeCollection(
             [
                 Mesh.from_trimesh(
-                    origin=HomogeneousTransformationMatrix(reference_frame=body),
+                    origin=HomogeneousTransformationMatrix3Dimensional(
+                        reference_frame=body
+                    ),
                     mesh=door_mesh,
                     texture_file_path=str(
                         directory / "materials" / f"{self.door_material}_texture.png"
@@ -674,7 +680,7 @@ class Sage10kDoor(Sage10kWithID):
         """
         floor = world.get_semantic_annotations_by_type(Floor)[0]
 
-        door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+        door_T_handle = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             y=0.1,
             x=door.root.collision.min_point.x,
             reference_frame=door.root,
@@ -689,7 +695,7 @@ class Sage10kDoor(Sage10kWithID):
         ).contains((door_T_world.x, door_T_world.y))
 
         if is_handle_in_room and self.opens_inward:
-            door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+            door_T_handle = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 y=0.1,
                 x=door.root.collision.max_point.x,
                 reference_frame=door.root,
@@ -801,7 +807,7 @@ class Sage10kRoom(Sage10kWithID):
         x_center = self.position.x + (self.dimensions.x / 2)
         y_center = self.position.y + (self.dimensions.y / 2)
 
-        parent_T_floor = HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_floor = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=x_center,
             y=y_center,
             z=self.position.z,
@@ -821,7 +827,9 @@ class Sage10kRoom(Sage10kWithID):
         floor_geometry_with_texture = ShapeCollection(
             [
                 Mesh.from_trimesh(
-                    origin=HomogeneousTransformationMatrix(reference_frame=floor_body),
+                    origin=HomogeneousTransformationMatrix3Dimensional(
+                        reference_frame=floor_body
+                    ),
                     mesh=floor_mesh,
                     texture_file_path=str(
                         directory / "materials" / f"{self.floor_material}.png"
@@ -876,7 +884,9 @@ class Sage10kRoom(Sage10kWithID):
             geometry_with_texture = ShapeCollection(
                 [
                     Mesh.from_trimesh(
-                        origin=HomogeneousTransformationMatrix(reference_frame=body),
+                        origin=HomogeneousTransformationMatrix3Dimensional(
+                            reference_frame=body
+                        ),
                         mesh=wall_mesh,
                         texture_file_path=str(
                             directory / "materials" / f"{wall.material}.png"

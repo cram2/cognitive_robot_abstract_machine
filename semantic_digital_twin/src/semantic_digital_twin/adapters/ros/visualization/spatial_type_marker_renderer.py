@@ -29,7 +29,7 @@ from semantic_digital_twin.adapters.ros.visualization.exceptions import (
     CannotRenderSpatialTypeError,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
@@ -316,7 +316,7 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose3Dimensional]):
         return (
             Pose3Dimensional,
             Pose2Dimensional,
-            HomogeneousTransformationMatrix,
+            HomogeneousTransformationMatrix3Dimensional,
             RotationMatrix,
             Quaternion,
         )

@@ -49,7 +49,9 @@ from semantic_digital_twin.robots.robot_parts import (
 from semantic_digital_twin.semantic_annotations.mixins import TKinematicStructureEntity
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -123,7 +125,7 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
 
 @symbolic_function
 def blocking(
-    pose: HomogeneousTransformationMatrix,
+    pose: HomogeneousTransformationMatrix3Dimensional,
     root: Body,
     tip: Body,
 ) -> list[ClosestPoints]:

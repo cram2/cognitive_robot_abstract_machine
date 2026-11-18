@@ -35,7 +35,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     ShapeSortingPiece,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -366,7 +366,7 @@ class MontessoriScene:
                 parent=world.root,
                 child=self.board,
                 name=PrefixedName("shape_sorting_board_connection"),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     self.board_x,
                     self.board_y,
                     self.table_top_z - self.shape_sorting_board.geometry.bottom,
@@ -393,7 +393,7 @@ class MontessoriScene:
         :return: The piece.
         """
         body = Body(name=name)
-        shape.origin = HomogeneousTransformationMatrix(reference_frame=body)
+        shape.origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=body)
         body.collision = ShapeCollection([shape], reference_frame=body)
         body.visual = ShapeCollection([copy.deepcopy(shape)], reference_frame=body)
         world.add_kinematic_structure_entity(body)
@@ -403,7 +403,7 @@ class MontessoriScene:
                 parent=world.root,
                 child=body,
                 name=PrefixedName(f"{name.name}_connection"),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     self.piece_row_x,
                     row_y,
                     self.table_top_z

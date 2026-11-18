@@ -47,7 +47,7 @@ from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentShelfLayer,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
@@ -84,7 +84,7 @@ def _bounding_box(bottom: float, top: float) -> VolumetricBoundingBox:
         max_x=0.0,
         max_y=0.0,
         max_z=top,
-        origin=HomogeneousTransformationMatrix(),
+        origin=HomogeneousTransformationMatrix3Dimensional(),
     )
 
 

@@ -27,7 +27,9 @@ from giskardpy.motion_control import WorldStateTrajectoryRecording, MotionContro
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -120,7 +122,7 @@ def add_cylinder(
     name: str,
     radius: float,
     height: float,
-    parent_T_cylinder: HomogeneousTransformationMatrix,
+    parent_T_cylinder: HomogeneousTransformationMatrix3Dimensional,
 ) -> Body:
     """
     :param world: The world the cylinder is added to.
@@ -161,7 +163,7 @@ def kitchen_with_filled_drawer(
             name="cup",
             radius=0.04,
             height=0.07,
-            parent_T_cylinder=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_cylinder=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, y=0.2, z=-0.05, reference_frame=drawer
             ),
         )
@@ -172,7 +174,7 @@ def kitchen_with_filled_drawer(
             name="bowl",
             radius=0.07,
             height=0.05,
-            parent_T_cylinder=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_cylinder=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, y=-0.2, z=-0.05, reference_frame=drawer
             ),
         )

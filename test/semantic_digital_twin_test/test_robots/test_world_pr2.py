@@ -37,7 +37,9 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     UnreachableException,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -192,7 +194,9 @@ def test_compute_fk_np_pr2_root_left_hand(pr2_world_state_reset):
     )
 
     connection = pr2_world_state_reset.get_connections_by_type(OmniDrive)[0]
-    connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=1)
+    connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1, yaw=1
+    )
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
     np.testing.assert_array_almost_equal(
@@ -241,7 +245,7 @@ def test_compute_ik(pr2_world_state_reset):
     fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
     fk[0, 3] -= 0.2
     joint_state = pr2_world_state_reset.compute_inverse_kinematics(
-        bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
+        bf, eef, HomogeneousTransformationMatrix3Dimensional(fk, reference_frame=bf)
     )
     for joint, state in joint_state.items():
         pr2_world_state_reset.state[joint.id].position = state
@@ -259,7 +263,7 @@ def test_compute_ik_max_iter(pr2_world_state_reset):
     fk[2, 3] = 10
     with pytest.raises(MaxIterationsException):
         pr2_world_state_reset.compute_inverse_kinematics(
-            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
+            bf, eef, HomogeneousTransformationMatrix3Dimensional(fk, reference_frame=bf)
         )
 
 
@@ -270,7 +274,7 @@ def test_compute_ik_unreachable(pr2_world_state_reset):
     fk[2, 3] = -1
     with pytest.raises(UnreachableException):
         pr2_world_state_reset.compute_inverse_kinematics(
-            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
+            bf, eef, HomogeneousTransformationMatrix3Dimensional(fk, reference_frame=bf)
         )
 
 

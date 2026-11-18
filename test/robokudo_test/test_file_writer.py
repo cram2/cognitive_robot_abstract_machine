@@ -22,7 +22,9 @@ from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world import World
 
@@ -50,7 +52,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
         camera_model=camera_model,
     )
     world_frame = Body(name=PrefixedName(name="map"))
-    world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=1.0,
         pos_y=2.0,
         pos_z=3.0,

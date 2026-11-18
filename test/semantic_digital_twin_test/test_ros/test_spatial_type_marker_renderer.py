@@ -17,7 +17,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose2Dimensional,
@@ -98,7 +98,9 @@ def test_vector_renders_arrow_anchored_at_visualisation_frame():
 
 def test_homogeneous_matrix_renders_axis_triad():
     frame = Body(name=PrefixedName("frame"))
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(1, 1, 1, reference_frame=frame)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        1, 1, 1, reference_frame=frame
+    )
 
     markers = render(pose)
 
@@ -112,7 +114,7 @@ def test_homogeneous_matrix_renders_axis_triad():
 
 
 def test_pose_like_adds_text_marker_when_labeled():
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0, 0, 0)
 
     markers = render(pose, label="goal")
 
@@ -192,7 +194,7 @@ def test_pose_like_renders_position_and_quaternion():
     """
     A transformation is drawn from its position followed by its quaternion.
     """
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1, 2, 3)
 
     assert rendered_value(pose).tolist() == [1, 2, 3, 0, 0, 0, 1]
 
@@ -231,7 +233,7 @@ def test_markers_are_drawn_from_the_given_value():
     [
         CartesianPoint3Dimensional(),
         Vector3Dimensional(),
-        HomogeneousTransformationMatrix(),
+        HomogeneousTransformationMatrix3Dimensional(),
     ],
     ids=["point", "vector", "transform"],
 )

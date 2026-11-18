@@ -14,7 +14,9 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Rim
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 from ..conftest import SAMPLING_SEED
@@ -139,7 +141,7 @@ def pr2_and_bowl(simple_pr2_context):
     with world.modify_world():
         world.merge_world_at_pose(
             bowl_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2.4, 2.2, 1, reference_frame=world.root
             ),
         )

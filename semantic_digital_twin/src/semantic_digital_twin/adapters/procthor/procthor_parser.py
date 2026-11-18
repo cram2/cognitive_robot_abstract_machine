@@ -39,7 +39,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     LivingRoom,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
 )
@@ -67,7 +67,7 @@ class ProcthorDoor:
     Width of the parent wall, since we define the door relative to the wall's horizontal center.
     """
 
-    world_T_parent_wall: HomogeneousTransformationMatrix
+    world_T_parent_wall: HomogeneousTransformationMatrix3Dimensional
     """
     Transformation matrix from world root to the parent wall's origin.
     """
@@ -132,7 +132,7 @@ class ProcthorDoor:
         return Scale(self.thickness, width, height)
 
     @cached_property
-    def wall_T_door(self) -> HomogeneousTransformationMatrix:
+    def wall_T_door(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the door position from the wall's horizontal center. Converts the Unity's left-handed Y-up, Z-forward
         convention to the semantic digital twin's right-handed Z-up, X-forward convention.
@@ -146,7 +146,7 @@ class ProcthorDoor:
 
         # In unity, doors are defined as holes in the wall, so we express them as children of walls.
         # This means we just need to translate them, and can assume no rotation
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             CartesianPoint3Dimensional(0, -width_origin_center, height_origin_center)
         )
 
@@ -177,7 +177,7 @@ class ProcthorDoor:
                 vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
             )
 
-            wall_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+            wall_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x_direction,
                 y=(
                     (-y_direction)
@@ -212,7 +212,7 @@ class ProcthorDoor:
         world: World,
         name: str | None = None,
         scale: Scale | None = None,
-        world_T_door: HomogeneousTransformationMatrix | None = None,
+        world_T_door: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Door:
         """
         Parses the parameters according to the single door assumptions, and returns a single door factory.
@@ -223,7 +223,7 @@ class ProcthorDoor:
         sampled_2d_point = semantic_handle_position.sample_point_from_event(
             scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
         )
-        door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+        door_T_handle = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
         )
 
@@ -381,7 +381,7 @@ class ProcthorWall:
         return Scale(x=self.wall_thickness, y=width, z=height)
 
     @cached_property
-    def world_T_wall(self) -> HomogeneousTransformationMatrix:
+    def world_T_wall(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the wall's world position matrix from the wall's x and z coordinates.
         Calculates the yaw angle using the atan2 function based on the wall's width and depth.
@@ -395,7 +395,7 @@ class ProcthorWall:
         x_center = (self.x_coords[0] + self.x_coords[-1]) * 0.5
         z_center = (self.z_coords[0] + self.z_coords[-1]) * 0.5
 
-        world_T_wall = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_wall = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x_center, 0, z_center, 0.0, yaw, 0
         )
 
@@ -479,7 +479,7 @@ class ProcthorRoom:
         self.name = f"{self.room_dict['roomType']}_{room_id}"
 
     @cached_property
-    def world_T_room(self) -> HomogeneousTransformationMatrix:
+    def world_T_room(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the room's world transform
         """
@@ -488,7 +488,9 @@ class ProcthorRoom:
             self.z_center, -self.x_center, self.y_center
         )
 
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(world_P_room)
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+            world_P_room
+        )
 
     def add_to_world(self, world: World):
         """
@@ -536,14 +538,14 @@ class ProcthorObject:
     """
 
     @cached_property
-    def world_T_obj(self) -> HomogeneousTransformationMatrix:
+    def world_T_obj(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the object's world transformation matrix from its position and rotation. Converts Unity's
         left-handed Y-up, Z-forward convention to the right-handed Z-up, X-forward convention.
         """
         obj_position = self.object_dict["position"]
         obj_rotation = self.object_dict["rotation"]
-        world_T_obj = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_obj = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             obj_position["x"],
             obj_position["y"],
             obj_position["z"],
@@ -552,7 +554,7 @@ class ProcthorObject:
             math.radians(obj_rotation["z"]),
         )
 
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             unity_to_semantic_digital_twin_transform(world_T_obj)
         )
 
@@ -590,8 +592,8 @@ class ProcthorObject:
 
 
 def unity_to_semantic_digital_twin_transform(
-    unity_transform_matrix: HomogeneousTransformationMatrix,
-) -> HomogeneousTransformationMatrix:
+    unity_transform_matrix: HomogeneousTransformationMatrix3Dimensional,
+) -> HomogeneousTransformationMatrix3Dimensional:
     """
     Convert a left-handed Y-up, Z-forward Unity transform to the right-handed Z-up, X-forward convention used in the
     semantic digital twin.
@@ -619,7 +621,7 @@ def unity_to_semantic_digital_twin_transform(
 
     unity_transform_matrix = np.asarray(unity_transform_matrix, float).reshape(4, 4)
 
-    return HomogeneousTransformationMatrix(
+    return HomogeneousTransformationMatrix3Dimensional(
         data=conjugation_matrix @ unity_transform_matrix @ inverse_conjugation_matrix
     )
 

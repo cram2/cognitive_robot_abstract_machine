@@ -14,7 +14,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -37,7 +39,7 @@ def camera_placement() -> CameraPlacement:
     )
     return CameraPlacement(
         camera=camera,
-        parent_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_camera=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.2, y=0.3, z=0.4, roll=0.5, pitch=0.6, yaw=0.7
         ),
     )
@@ -101,8 +103,10 @@ def test_camera_placement_follows_parent_motion(
         parent, camera_placement
     )
     with table_world.modify_world():
-        connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8, pitch=0.7),
+        connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                y=0.8, pitch=0.7
+            ),
             reference_frame=table_world.root,
             child_frame=parent,
         )

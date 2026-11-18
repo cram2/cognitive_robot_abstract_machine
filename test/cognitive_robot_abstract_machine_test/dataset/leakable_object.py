@@ -4,7 +4,7 @@ A stand-in for the objects the leak guard watches.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -25,12 +25,19 @@ class LeakableObject:
 @dataclass
 class ObjectMakingItsOwnInstances:
     """
-    Something that takes creating its own instances over, which the record can only watch
-    by replacing what it does.
+    Something that takes creating its own instances over, as a type does that inherits an
+    interface.
+    """
+
+    made_its_own_way: bool = field(init=False)
+    """
+    Whether the instance was made by the type's own way of creating it.
     """
 
     def __new__(cls, *arguments, **keyword_arguments) -> ObjectMakingItsOwnInstances:
         """
-        Make an instance the way the record must not silently take over.
+        Make an instance its own way, which a record watching the type must keep.
         """
-        return super().__new__(cls)
+        instance = super().__new__(cls)
+        instance.made_its_own_way = True
+        return instance

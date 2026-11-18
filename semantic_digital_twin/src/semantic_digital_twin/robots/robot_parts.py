@@ -95,7 +95,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Table,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
@@ -360,7 +360,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         cls,
         name: str,
         world: World,
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         parent_connection_specification: ConnectionSpecification | None = None,
         scale: Scale | None = None,
     ) -> Self:
@@ -705,16 +705,20 @@ class Camera(Sensor, Generic[TCameraModel], SubClassSafeGeneric):
         return Vector3Dimensional.Z(reference_frame=self.root)
 
     @classproperty
-    def optical_R_forward_view(cls: type[Camera]) -> HomogeneousTransformationMatrix:
+    def optical_R_forward_view(
+        cls: type[Camera],
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Express the x-forward viewing frame in right-down-forward optical axes.
 
         :return: Rotation from the forward-view frame into optical axes.
         """
-        return HomogeneousTransformationMatrix.from_xyz_rpy(pitch=-np.pi / 2)
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            pitch=-np.pi / 2
+        )
 
     @property
-    def world_T_forward_view(self) -> HomogeneousTransformationMatrix:
+    def world_T_forward_view(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Return the world-space x-forward pose with the optical image orientation.
 
@@ -752,7 +756,8 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
 
     @staticmethod
     def create_optical_body(
-        mounting_body: Body, parent_T_optical: HomogeneousTransformationMatrix
+        mounting_body: Body,
+        parent_T_optical: HomogeneousTransformationMatrix3Dimensional,
     ) -> Body:
         """
         Add a geometry-free optical body when the robot description lacks an optical frame.
@@ -775,7 +780,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
                 FixedConnection(
                     parent=mounting_body,
                     child=optical_root,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                         data=parent_T_optical,
                         reference_frame=mounting_body,
                         child_frame=optical_root,
@@ -942,7 +947,7 @@ class EndEffector(AbstractRobotPart, ABC):
         if body is None:
             raise NothingHeld(self)
         body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=body_T_tool @ tool_P_point,
             rotation_matrix=body_T_tool.rotation_matrix @ self.tool_R_grasp,
             reference_frame=body,
@@ -1180,7 +1185,7 @@ class MobileBase(
         its x-axis, so the same heading serves bases modelled with different axes. Its
         position is kept as it is.
         """
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             heading.position,
             heading.rotation_matrix @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,

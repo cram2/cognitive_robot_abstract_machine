@@ -115,11 +115,13 @@ class TestPose2DimensionalToPose:
         assert np.allclose(r.to_np()[:3, :3], np.eye(3), atol=1e-6)
 
     def test_to_homogeneous_matrix(self):
-        from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+        from krrood_spatial_math.spatial_types import (
+            HomogeneousTransformationMatrix3Dimensional,
+        )
 
         p2 = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0)
         m = p2.homogeneous_matrix
-        assert isinstance(m, HomogeneousTransformationMatrix)
+        assert isinstance(m, HomogeneousTransformationMatrix3Dimensional)
         assert m[0, 3].to_np() == pytest.approx(1.0)
         assert m[1, 3].to_np() == pytest.approx(2.0)
 

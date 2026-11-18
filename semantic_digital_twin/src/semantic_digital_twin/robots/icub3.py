@@ -42,7 +42,7 @@ from semantic_digital_twin.robots.robot_parts import (
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -571,7 +571,7 @@ class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
         return cls(
             root=cls.create_optical_body(
                 robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-                HomogeneousTransformationMatrix(),
+                HomogeneousTransformationMatrix3Dimensional(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(

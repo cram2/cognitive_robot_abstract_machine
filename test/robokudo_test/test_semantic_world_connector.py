@@ -20,7 +20,9 @@ from robokudo.types.annotation import (
 from robokudo.types.camera import CameraObservation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo import world as rk_world
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
@@ -83,7 +85,7 @@ def _set_camera_to_world_transform(
     observation = cas.require_camera_observation()
     world_body = sem_world.get_body_by_name("map")
     camera_body = observation.camera.root
-    world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=pos_x,
         pos_y=pos_y,
         pos_z=pos_z,

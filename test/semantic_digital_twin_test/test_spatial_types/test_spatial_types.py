@@ -21,7 +21,7 @@ from krrood_spatial_math.spatial_types import (
     Quaternion,
     Vector3Dimensional,
     CartesianPoint3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
@@ -215,7 +215,7 @@ class TestRotationMatrix:
         works = [
             Vector3Dimensional(x=1, y=1, z=1),
             rotation_matrix,
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             Pose3Dimensional(),
             Quaternion(),
             AxisAngle(),
@@ -250,7 +250,7 @@ class TestRotationMatrix:
         r = RotationMatrix.from_rpy(1, 2, s)
         r = RotationMatrix.from_rpy(1, 2, 3)
         assert isinstance(r, RotationMatrix)
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1, 2, 3)
         r = RotationMatrix(data=t)
         assert t[0, 3].to_np() == 1
 
@@ -389,7 +389,9 @@ class TestRotationMatrix:
         assert isinstance(r_from_np, RotationMatrix)
 
         # From TransformationMatrix
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
         r_from_t = RotationMatrix(data=t)
         assert isinstance(r_from_t, RotationMatrix)
         # Should preserve rotation part only
@@ -788,7 +790,7 @@ class TestCartesianPoint3Dimensional:
         p = CartesianPoint3Dimensional(x=l[0], y=l[1], z=l[2])
         r = RotationMatrix()
         q = Quaternion()
-        t = HomogeneousTransformationMatrix()
+        t = HomogeneousTransformationMatrix3Dimensional()
 
         CartesianPoint3Dimensional()
         CartesianPoint3Dimensional(x=s, y=e, z=0)
@@ -944,7 +946,7 @@ class TestCartesianPoint3Dimensional:
             point,
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -959,7 +961,7 @@ class TestCartesianPoint3Dimensional:
             1.0,
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -974,7 +976,7 @@ class TestCartesianPoint3Dimensional:
             1.0,
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -989,7 +991,7 @@ class TestCartesianPoint3Dimensional:
             1.0,
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -1004,7 +1006,7 @@ class TestCartesianPoint3Dimensional:
             1.0,
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -1033,7 +1035,7 @@ class TestCartesianPoint3Dimensional:
         Test transformation matrix operations with points.
         """
         p = CartesianPoint3Dimensional(x=1, y=2, z=3)
-        t = HomogeneousTransformationMatrix()
+        t = HomogeneousTransformationMatrix3Dimensional()
 
         # Test matrix @ point = point (homogeneous transformation)
         result = t @ p
@@ -1159,7 +1161,7 @@ class TestVector3:
         p = CartesianPoint3Dimensional(x=1, y=1, z=1)
         r = RotationMatrix()
         q = Quaternion()
-        t = HomogeneousTransformationMatrix()
+        t = HomogeneousTransformationMatrix3Dimensional()
 
         Vector3Dimensional()
         Vector3Dimensional(x=s, y=e, z=0)
@@ -1323,7 +1325,7 @@ class TestVector3:
             CartesianPoint3Dimensional(),
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -1339,7 +1341,7 @@ class TestVector3:
             CartesianPoint3Dimensional(),
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -1355,7 +1357,7 @@ class TestVector3:
             CartesianPoint3Dimensional(),
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             Pose3Dimensional(),
         ]
         for other in does_not_work:
@@ -1370,7 +1372,7 @@ class TestVector3:
             CartesianPoint3Dimensional(),
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             Pose3Dimensional(),
         ]
         for other in does_not_work:
@@ -1385,7 +1387,7 @@ class TestVector3:
             CartesianPoint3Dimensional(),
             RotationMatrix(),
             Quaternion(),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             sm.FloatVariable(name="s"),
             Pose3Dimensional(),
         ]
@@ -1488,9 +1490,9 @@ class TestTransformationMatrix:
         """
         Test that the JSON serialization works correctly.
         """
-        t = HomogeneousTransformationMatrix()
+        t = HomogeneousTransformationMatrix3Dimensional()
         t_json = t.to_json()
-        t_copy = HomogeneousTransformationMatrix.from_json(data=t_json)
+        t_copy = HomogeneousTransformationMatrix3Dimensional.from_json(data=t_json)
         assert np.allclose(t.to_np(), t_copy.to_np())
 
     def test_reference_frames(self):
@@ -1498,10 +1500,10 @@ class TestTransformationMatrix:
         child_frame = Body(name=PrefixedName("kikariki"))
         reference_frame2 = Body(name=PrefixedName("muh2"))
         child_frame2 = Body(name=PrefixedName("kikariki2"))
-        t1 = HomogeneousTransformationMatrix(
+        t1 = HomogeneousTransformationMatrix3Dimensional(
             reference_frame=reference_frame, child_frame=child_frame
         )
-        t2 = HomogeneousTransformationMatrix(
+        t2 = HomogeneousTransformationMatrix3Dimensional(
             reference_frame=reference_frame2, child_frame=child_frame2
         )
 
@@ -1512,40 +1514,40 @@ class TestTransformationMatrix:
         assert t1.reference_frame == reference_frame
         assert t1.child_frame == child_frame
 
-        t = HomogeneousTransformationMatrix.from_point_rotation_matrix(p, r)
+        t = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(p, r)
         assert t.reference_frame == reference_frame
         assert t.child_frame is None
 
         with pytest.raises(SpatialTypesError):
-            t = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            t = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 CartesianPoint3Dimensional(reference_frame=reference_frame2), r
             )
 
-        t = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        t = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             p, r, reference_frame=reference_frame2, child_frame=child_frame2
         )
         assert t.reference_frame == reference_frame2
         assert t.child_frame == child_frame2
 
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             reference_frame=reference_frame, child_frame=child_frame
         )
         assert t.reference_frame == reference_frame
         assert t.child_frame == child_frame
 
-        t = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             reference_frame=reference_frame, child_frame=child_frame
         )
         assert t.reference_frame == reference_frame
         assert t.child_frame == child_frame
 
-        t = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
             reference_frame=reference_frame, child_frame=child_frame
         )
         assert t.reference_frame == reference_frame
         assert t.child_frame == child_frame
 
-        child_T_child2 = HomogeneousTransformationMatrix(
+        child_T_child2 = HomogeneousTransformationMatrix3Dimensional(
             reference_frame=child_frame, child_frame=child_frame2
         )
         assert (t1 @ child_T_child2).reference_frame == reference_frame
@@ -1572,7 +1574,7 @@ class TestTransformationMatrix:
             assert (t1 @ in_child_frame).reference_frame == reference_frame
 
     def test_matmul_type_preservation(self):
-        transform = HomogeneousTransformationMatrix()
+        transform = HomogeneousTransformationMatrix3Dimensional()
         works = [
             Vector3Dimensional(x=1, y=1, z=1),
             transform,
@@ -1602,12 +1604,12 @@ class TestTransformationMatrix:
     # %% re-expressing a spatial type in another frame
 
     @staticmethod
-    def _transformation() -> HomogeneousTransformationMatrix:
+    def _transformation() -> HomogeneousTransformationMatrix3Dimensional:
         """
         A transformation that rotates about all three axes, so that dropping z, roll or
         pitch is visible in the result.
         """
-        return HomogeneousTransformationMatrix.from_xyz_rpy(
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 2, 3, roll=0.3, pitch=-0.2, yaw=0.5
         )
 
@@ -1682,7 +1684,7 @@ class TestTransformationMatrix:
     @pytest.mark.parametrize("y", numbers)
     @pytest.mark.parametrize("z", numbers)
     def test_translation3(self, x, y, z):
-        r1 = HomogeneousTransformationMatrix.from_xyz_rpy(x, y, z)
+        r1 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x, y, z)
         r2 = np.identity(4)
         r2[0, 3] = x
         r2[1, 3] = y
@@ -1691,18 +1693,21 @@ class TestTransformationMatrix:
 
     def test_dot(self):
         x = sm.FloatVariable(name="x")
-        m1 = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
-        m2 = HomogeneousTransformationMatrix.from_xyz_rpy(x=x)
+        m1 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
+        m2 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=x)
         actual = m1.dot(m2).substitute(old_variables=[x], new_variables=[0.5])
         expected = (
-            m1.to_np() @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5).to_np()
+            m1.to_np()
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.5).to_np()
         )
         assert np.allclose(actual.to_np(), expected)
 
     def test_wrong_dimensions(self):
         data = np.eye(2)
         with pytest.raises(WrongDimensionsError):
-            HomogeneousTransformationMatrix(data=data)
+            HomogeneousTransformationMatrix3Dimensional(data=data)
 
     def test_frame3_axis_angle(self):
         x, y, z, angle = 1, 2, 3, 0.1
@@ -1711,7 +1716,7 @@ class TestTransformationMatrix:
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        r = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        r = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             CartesianPoint3Dimensional(x, y, z),
             RotationMatrix.from_axis_angle(
                 AxisAngle(Vector3Dimensional.from_iterable(axis), angle)
@@ -1726,7 +1731,9 @@ class TestTransformationMatrix:
         r2[1, 3] = y
         r2[2, 3] = z
         assert np.allclose(
-            HomogeneousTransformationMatrix.from_xyz_rpy(x, y, z, roll, pitch, yaw),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x, y, z, roll, pitch, yaw
+            ),
             r2,
         )
 
@@ -1736,18 +1743,22 @@ class TestTransformationMatrix:
         r2[0, 3] = x
         r2[1, 3] = y
         r2[2, 3] = z
-        r = HomogeneousTransformationMatrix.from_xyz_quaternion(x, y, z, qx, qy, qz, qw)
+        r = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            x, y, z, qx, qy, qz, qw
+        )
         assert np.allclose(r, r2)
 
     def test_inverse_frame(self):
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
-        actual = HomogeneousTransformationMatrix(data=t).inverse()
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
+        actual = HomogeneousTransformationMatrix3Dimensional(data=t).inverse()
         expected = np.linalg.inv(t.to_np())
         assert np.allclose(actual, expected, atol=1.0e-4, rtol=1.0e-4)
 
     def test_pos_of(self):
         x, y, z, qx, qy, qz, qw = 1, 2, 3, 1, 0, 0, 0
-        r1 = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        r1 = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             CartesianPoint3Dimensional(x, y, z),
             RotationMatrix.from_quaternion(Quaternion(qx, qy, qz, qw)),
         ).position
@@ -1757,7 +1768,7 @@ class TestTransformationMatrix:
 
     def test_rot_of(self):
         x, y, z, qx, qy, qz, qw = 1, 2, 3, 1, 0, 0, 0
-        r1 = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        r1 = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             x, y, z, qx, qy, qz, qw
         ).rotation_matrix
         r2 = rotation_matrix_from_quaternion(qx, qy, qz, qw)
@@ -1767,7 +1778,7 @@ class TestTransformationMatrix:
         """
         Test to make sure the function doesn't alter the original.
         """
-        f = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
+        f = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1, 2, 3)
         r = f.rotation_matrix
         assert f[0, 3] == 1
         assert f[1, 3] == 2
@@ -1781,31 +1792,31 @@ class TestTransformationMatrix:
         Test various ways to initialize TransformationMatrix.
         """
         # Default initialization (identity)
-        t_identity = HomogeneousTransformationMatrix()
-        assert isinstance(t_identity, HomogeneousTransformationMatrix)
+        t_identity = HomogeneousTransformationMatrix3Dimensional()
+        assert isinstance(t_identity, HomogeneousTransformationMatrix3Dimensional)
         identity_np = t_identity
         expected_identity = np.eye(4)
         assert np.allclose(identity_np, expected_identity)
 
         # From RotationMatrix
         r = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
-        t_from_r = HomogeneousTransformationMatrix(r)
-        assert isinstance(t_from_r, HomogeneousTransformationMatrix)
+        t_from_r = HomogeneousTransformationMatrix3Dimensional(r)
+        assert isinstance(t_from_r, HomogeneousTransformationMatrix3Dimensional)
         # Should preserve rotation, zero translation
         assert t_from_r[0, 3] == 0
         assert t_from_r[1, 3] == 0
         assert t_from_r[2, 3] == 0
 
         # From another TransformationMatrix
-        t_copy = HomogeneousTransformationMatrix(t_from_r)
-        assert isinstance(t_copy, HomogeneousTransformationMatrix)
+        t_copy = HomogeneousTransformationMatrix3Dimensional(t_from_r)
+        assert isinstance(t_copy, HomogeneousTransformationMatrix3Dimensional)
         assert np.allclose(t_copy, t_from_r)
 
         # From numpy array
         transform_data = np.eye(4)
         transform_data[:3, 3] = [1, 2, 3]  # Add translation
-        t_from_np = HomogeneousTransformationMatrix(data=transform_data)
-        assert isinstance(t_from_np, HomogeneousTransformationMatrix)
+        t_from_np = HomogeneousTransformationMatrix3Dimensional(data=transform_data)
+        assert isinstance(t_from_np, HomogeneousTransformationMatrix3Dimensional)
 
     def test_sanity_check(self):
         """
@@ -1814,7 +1825,7 @@ class TestTransformationMatrix:
         # Valid 4x4 matrix should pass
         valid_matrix = np.eye(4)
         valid_matrix[:3, 3] = [1, 2, 3]
-        t = HomogeneousTransformationMatrix(data=valid_matrix)
+        t = HomogeneousTransformationMatrix3Dimensional(data=valid_matrix)
 
         # Check that bottom row is enforced to [0, 0, 0, 1]
         assert t[3, 0] == 0
@@ -1824,16 +1835,22 @@ class TestTransformationMatrix:
 
         # Invalid shape should raise ValueError
         with pytest.raises(WrongDimensionsError):
-            HomogeneousTransformationMatrix(data=np.eye(3))  # 3x3 instead of 4x4
+            HomogeneousTransformationMatrix3Dimensional(
+                data=np.eye(3)
+            )  # 3x3 instead of 4x4
 
         with pytest.raises(WrongDimensionsError):
-            HomogeneousTransformationMatrix(data=np.ones((2, 5)))  # Wrong dimensions
+            HomogeneousTransformationMatrix3Dimensional(
+                data=np.ones((2, 5))
+            )  # Wrong dimensions
 
     def test_properties(self):
         """
         Test x, y, z property getters and setters.
         """
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
 
         # Test getters
         assert t.x.to_np() == 1
@@ -1859,20 +1876,24 @@ class TestTransformationMatrix:
         r = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
 
         # From both point and rotation
-        t1 = HomogeneousTransformationMatrix.from_point_rotation_matrix(p, r)
-        assert isinstance(t1, HomogeneousTransformationMatrix)
+        t1 = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+            p, r
+        )
+        assert isinstance(t1, HomogeneousTransformationMatrix3Dimensional)
         assert np.allclose(t1.x, 1)
         assert np.allclose(t1.y, 2)
         assert np.allclose(t1.z, 3)
 
         # From point only (identity rotation)
-        t2 = HomogeneousTransformationMatrix.from_point_rotation_matrix(point=p)
+        t2 = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+            point=p
+        )
         rotation_part = t2[:3, :3]
         assert np.allclose(rotation_part, np.eye(3))
         assert np.allclose(t2.x, 1)
 
         # From rotation only (zero translation)
-        t3 = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        t3 = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             rotation_matrix=r
         )
         assert np.allclose(t3.x, 0)
@@ -1883,7 +1904,7 @@ class TestTransformationMatrix:
         """
         Test construction from position and quaternion.
         """
-        t = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=1,
             pos_y=2,
             pos_z=3,
@@ -1893,7 +1914,7 @@ class TestTransformationMatrix:
             quat_z=0,  # Identity quaternion
         )
 
-        assert isinstance(t, HomogeneousTransformationMatrix)
+        assert isinstance(t, HomogeneousTransformationMatrix3Dimensional)
         assert t.x.to_np() == 1
         assert t.y.to_np() == 2
         assert t.z.to_np() == 3
@@ -1907,12 +1928,16 @@ class TestTransformationMatrix:
         Test composition of multiple transformations.
         """
         # Translation only
-        t1 = HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 0)  # Translate in X
-        t2 = HomogeneousTransformationMatrix.from_xyz_rpy(0, 1, 0)  # Translate in Y
+        t1 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 0, 0
+        )  # Translate in X
+        t2 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            0, 1, 0
+        )  # Translate in Y
 
         # Compose transformations
         combined = t2 @ t1
-        assert isinstance(combined, HomogeneousTransformationMatrix)
+        assert isinstance(combined, HomogeneousTransformationMatrix3Dimensional)
 
         # Apply to origin point
         origin = CartesianPoint3Dimensional(x=0, y=0, z=0)
@@ -1928,7 +1953,9 @@ class TestTransformationMatrix:
         Test transformation of points.
         """
         # Create a transformation: translate by (1,2,3) and rotate by 90° around Z
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0, 0, np.pi / 2)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0, 0, np.pi / 2
+        )
 
         # Transform a point
         p = CartesianPoint3Dimensional(x=1, y=0, z=0)
@@ -1951,7 +1978,9 @@ class TestTransformationMatrix:
         Test transformation of vectors (no translation effect)
         """
         # Create transformation with both rotation and translation
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0, 0, np.pi / 2)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0, 0, np.pi / 2
+        )
 
         # Transform a vector
         v = Vector3Dimensional(x=1, y=0, z=0)
@@ -1970,14 +1999,16 @@ class TestTransformationMatrix:
         """
         Test matrix inversion.
         """
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
         t_inv = t.inverse()
 
-        assert isinstance(t_inv, HomogeneousTransformationMatrix)
+        assert isinstance(t_inv, HomogeneousTransformationMatrix3Dimensional)
 
         # Test that T @ T^(-1) = I
         identity_check = t @ t_inv
-        identity = HomogeneousTransformationMatrix()
+        identity = HomogeneousTransformationMatrix3Dimensional()
         assert np.allclose(identity_check, identity, atol=1e-10)
 
         # Test that T^(-1) @ T = I
@@ -1993,7 +2024,9 @@ class TestTransformationMatrix:
         """
         Test methods for extracting components.
         """
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
 
         # Extract position
         position = t.position
@@ -2019,15 +2052,19 @@ class TestTransformationMatrix:
         """
         Test reference frame and child frame properties.
         """
-        t = HomogeneousTransformationMatrix()
+        t = HomogeneousTransformationMatrix3Dimensional()
 
         # Initially should be None
         assert t.reference_frame is None
         assert t.child_frame is None
 
         # Test frame preservation in operations
-        t1 = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
-        t2 = HomogeneousTransformationMatrix.from_xyz_rpy(4, 5, 6, 0.4, 0.5, 0.6)
+        t1 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
+        t2 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            4, 5, 6, 0.4, 0.5, 0.6
+        )
 
         result = t1 @ t2
         # Frame handling depends on implementation
@@ -2036,7 +2073,7 @@ class TestTransformationMatrix:
 
     def test_pure_translation(self):
         x, y, z = 1, 2, 3
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(x, y, z)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x, y, z)
 
         # Should have identity rotation
         rotation_part = t[:3, :3]
@@ -2062,15 +2099,15 @@ class TestTransformationMatrix:
         angle_sym = sm.FloatVariable(name="theta")
 
         # Create symbolic transformation
-        t_sym = HomogeneousTransformationMatrix.from_xyz_rpy(
+        t_sym = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x_sym, y_sym, 0, 0, 0, angle_sym
         )
 
         # Should be able to compose with other transformations
-        t_numeric = HomogeneousTransformationMatrix.from_xyz_rpy(1, 1, 1)
+        t_numeric = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1, 1, 1)
         result = t_sym @ t_numeric
 
-        assert isinstance(result, HomogeneousTransformationMatrix)
+        assert isinstance(result, HomogeneousTransformationMatrix3Dimensional)
 
         # Should contain the variables
         variables = result.free_variables()
@@ -2084,7 +2121,7 @@ class TestTransformationMatrix:
         Test compilation and execution of transformation matrices.
         """
         # Test symbolic transformation compilation
-        compiled_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+        compiled_transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 2, 3, 0.1, 0.2, 0.3
         )
 
@@ -2099,13 +2136,15 @@ class TestTransformationMatrix:
         """
         Test deep copy functionality.
         """
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
 
         from copy import deepcopy
 
         t_copy = deepcopy(t)
 
-        assert isinstance(t_copy, HomogeneousTransformationMatrix)
+        assert isinstance(t_copy, HomogeneousTransformationMatrix3Dimensional)
         assert np.allclose(t, t_copy)
 
         # Frames should be preserved but not deep copied (reference equality)
@@ -2116,18 +2155,20 @@ class TestTransformationMatrix:
         """
         The identity shortcut in the constructor still yields a copyable matrix.
         """
-        transform = HomogeneousTransformationMatrix()
+        transform = HomogeneousTransformationMatrix3Dimensional()
 
         transform_copy = deepcopy(transform)
 
-        assert isinstance(transform_copy, HomogeneousTransformationMatrix)
+        assert isinstance(transform_copy, HomogeneousTransformationMatrix3Dimensional)
         np.testing.assert_array_equal(transform_copy.to_np(), transform.to_np())
 
     def test_deepcopy_of_symbolic_matrix_keeps_free_variables(self):
         """
         A copied symbolic matrix keeps reporting the variables of its original.
         """
-        transform = HomogeneousTransformationMatrix.create_with_variables("joint")
+        transform = HomogeneousTransformationMatrix3Dimensional.create_with_variables(
+            "joint"
+        )
 
         transform_copy = deepcopy(transform)
 
@@ -2140,24 +2181,24 @@ class TestTransformationMatrix:
         Test transformation matrices in typical robotics scenarios.
         """
         # Forward kinematics chain: base -> link1 -> link2 -> end_effector
-        base_T_link1 = HomogeneousTransformationMatrix.from_xyz_rpy(
+        base_T_link1 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0, 0, 1, 0, 0, np.pi / 4
         )  # Lift and rotate
-        link1_T_link2 = HomogeneousTransformationMatrix.from_xyz_rpy(
+        link1_T_link2 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 0, 0, 0, np.pi / 2, 0
         )  # Extend and bend
-        link2_T_ee = HomogeneousTransformationMatrix.from_xyz_rpy(
+        link2_T_ee = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0.5, 0, 0
         )  # End effector offset
 
         # Forward kinematics
         base_T_ee = base_T_link1 @ link1_T_link2 @ link2_T_ee
-        assert isinstance(base_T_ee, HomogeneousTransformationMatrix)
+        assert isinstance(base_T_ee, HomogeneousTransformationMatrix3Dimensional)
 
         # Test that inverse kinematics works
         ee_T_base = base_T_ee.inverse()
         identity_check = base_T_ee @ ee_T_base
-        identity = HomogeneousTransformationMatrix()
+        identity = HomogeneousTransformationMatrix3Dimensional()
         assert np.allclose(identity_check, identity, atol=1e-10)
 
     def test_coordinate_transformations(self):
@@ -2165,7 +2206,7 @@ class TestTransformationMatrix:
         Test coordinate frame transformations.
         """
         # Transform from world to robot base
-        world_T_robot = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_robot = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             2, 3, 0, 0, 0, np.pi / 2
         )
 
@@ -2188,23 +2229,27 @@ class TestTransformationMatrix:
         Test edge cases and boundary conditions.
         """
         # Identity transformation
-        t_identity = HomogeneousTransformationMatrix()
+        t_identity = HomogeneousTransformationMatrix3Dimensional()
         point = CartesianPoint3Dimensional(x=1, y=2, z=3)
         transformed = t_identity @ point
         assert np.allclose(point, transformed)
 
         # Zero translation, identity rotation
-        t_zero = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0, 0, 0, 0)
+        t_zero = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            0, 0, 0, 0, 0, 0
+        )
         assert np.allclose(t_zero, t_identity)
 
         # Large translation values
-        t_large = HomogeneousTransformationMatrix.from_xyz_rpy(1e6, -1e6, 1e6)
+        t_large = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1e6, -1e6, 1e6
+        )
         assert t_large.x.to_np() == 1e6
         assert t_large.y.to_np() == -1e6
         assert t_large.z.to_np() == 1e6
 
         # Small rotation angles (numerical stability)
-        t_small = HomogeneousTransformationMatrix.from_xyz_rpy(
+        t_small = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0, 0, 0, 1e-8, 1e-8, 1e-8
         )
         rotation_part = t_small[:3, :3]
@@ -2212,7 +2257,7 @@ class TestTransformationMatrix:
 
     @pytest.mark.parametrize("q", quaternions)
     def test_quaternion_consistency(self, q):
-        t = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=1,
             pos_y=2,
             pos_z=3,
@@ -2224,7 +2269,7 @@ class TestTransformationMatrix:
 
         q_extracted = t.quaternion
 
-        t_roundtrip = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        t_roundtrip = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=1,
             pos_y=2,
             pos_z=3,
@@ -2237,7 +2282,9 @@ class TestTransformationMatrix:
         assert np.allclose(t, t_roundtrip, atol=1e-10)
 
     def test_homogeneous_properties(self):
-        t = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 2, 3, 0.1, 0.2, 0.3
+        )
 
         point = CartesianPoint3Dimensional(x=4, y=5, z=6)
         transformed_point = t @ point
@@ -2391,7 +2438,7 @@ def test_underspecification_of_vector():
 
 
 def test_underspecification_of_transformation():
-    q = a(HomogeneousTransformationMatrix.from_xyz_rpy)(x=1)
+    q = a(HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy)(x=1)
     q = q.where(q.x > 0)
     t1 = q.construct_instance()
     assert t1.x == 1
@@ -2414,13 +2461,13 @@ class TestConstantEntriesAreNormalised:
         return data
 
     def test_transformation_matrix_repairs_its_bottom_row(self):
-        matrix = HomogeneousTransformationMatrix(
+        matrix = HomogeneousTransformationMatrix3Dimensional(
             data=self._matrix_with_wrong_constant_entries()
         )
         np.testing.assert_array_equal(matrix.to_np()[3, :], [0.0, 0.0, 0.0, 1.0])
 
     def test_transformation_matrix_keeps_its_translation(self):
-        matrix = HomogeneousTransformationMatrix(
+        matrix = HomogeneousTransformationMatrix3Dimensional(
             data=self._matrix_with_wrong_constant_entries()
         )
         np.testing.assert_array_equal(matrix.to_np()[:3, 3], [5.0, 5.0, 5.0])
@@ -2461,7 +2508,7 @@ class TestTheReferenceFrameIsInheritedAsAField:
         Vector3Dimensional,
         RotationMatrix,
         Quaternion,
-        HomogeneousTransformationMatrix,
+        HomogeneousTransformationMatrix3Dimensional,
         Pose3Dimensional,
     ]
 

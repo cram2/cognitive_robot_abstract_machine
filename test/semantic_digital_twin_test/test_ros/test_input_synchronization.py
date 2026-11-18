@@ -33,7 +33,7 @@ from semantic_digital_twin.exceptions import (
     UnboundMessageTypeError,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -105,7 +105,7 @@ def joint_state_message(joint_name: str, position: float) -> JointState:
     return message
 
 
-def odometry_message(pose: HomogeneousTransformationMatrix) -> Odometry:
+def odometry_message(pose: HomogeneousTransformationMatrix3Dimensional) -> Odometry:
     """
     An odometry message that reports the given pose.
     """
@@ -627,7 +627,9 @@ def test_the_source_of_a_base_writes_the_reported_pose_into_the_drive(
     rclpy_node, omni_drive_world: World
 ):
     connection = omni_drive_world.get_connection_by_name("root_T_base")
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, yaw=-0.25)
+    expected_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.5, yaw=-0.25
+    )
     source = SubscribedBasePoseSource(
         world=omni_drive_world,
         node=rclpy_node,
@@ -648,7 +650,7 @@ def test_odometry_synchronizer_writes_the_pose_into_the_drive(
     rclpy_node, omni_drive_world: World
 ):
     connection = omni_drive_world.get_connection_by_name("root_T_base")
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    expected_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.5, y=-2.5, yaw=0.75
     )
     synchronizer = OdometrySynchronizer(
@@ -690,7 +692,7 @@ def test_apply_writes_the_looked_up_transform_into_the_connection(
     assert wrote_something
     assert_allclose(
         connection.origin,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.0, y=-2.0, z=0.5, reference_frame=connection.parent
         ),
         atol=1e-9,

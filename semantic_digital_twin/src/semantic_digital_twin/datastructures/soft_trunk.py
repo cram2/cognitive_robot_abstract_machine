@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.soft_connections import (
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 
@@ -252,7 +252,7 @@ class SoftTrunk(SemanticAnnotation):
                 for segment_index in range(section.resolution):
                     color_val = (section_index + 1) / len(sections)
                     visual_shape = Cylinder(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             z=-segment_length / 2
                         ),
                         width=section.radius * 2,
@@ -378,7 +378,7 @@ class SoftTrunk(SemanticAnnotation):
                 for segment_index in range(section.resolution):
                     color_val = (section_index + 1) / len(sections)
                     visual_shape = Cylinder(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             z=-segment_length / 2
                         ),
                         width=section.radius * 2,

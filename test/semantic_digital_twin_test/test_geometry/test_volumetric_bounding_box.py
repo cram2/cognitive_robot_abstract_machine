@@ -6,7 +6,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.hsrb import HSRB
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -27,12 +27,12 @@ def test_volumetric_bounding_box_transform_same_frame(pr2_apartment_state_reset)
         1,
         1,
         1,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             reference_frame=pr2_apartment_state_reset.root
         ),
     )
 
-    new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    new_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         0, 0, 1, reference_frame=pr2_apartment_state_reset.root
     )
 
@@ -60,7 +60,7 @@ def test_volumetric_bounding_box_transform_different_frame(pr2_apartment_state_r
         0, 0, 0, 1, 1, 1, pr2_apartment_state_reset.root.global_pose
     )
 
-    new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    new_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         0,
         0,
         0,
@@ -95,14 +95,18 @@ def test_volumetric_bounding_box_transform_rotated():
         connection = FixedConnection(
             body1,
             body2,
-            HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 0, yaw=np.pi / 2),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                1, 0, 0, yaw=np.pi / 2
+            ),
         )
 
         world.add_connection(connection)
 
     bb = VolumetricBoundingBox(-0.5, -1, 0, 0.5, 1, 1, body2.global_pose)
 
-    new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body1)
+    new_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        reference_frame=body1
+    )
 
     new_bb = bb.transform_to_origin(new_origin)
 
@@ -145,7 +149,7 @@ def test_event_casting(pr2_apartment_state_reset):
 
 def test_volume():
     bb = VolumetricBoundingBox(
-        -0.5, -1, 0, 0.5, 1, 3, HomogeneousTransformationMatrix()
+        -0.5, -1, 0, 0.5, 1, 3, HomogeneousTransformationMatrix3Dimensional()
     )
 
     assert bb.volume == 6.0
@@ -153,7 +157,7 @@ def test_volume():
 
 def test_volume_of_a_flat_bounding_box_vanishes():
     bb = VolumetricBoundingBox(
-        -0.5, -1, 1, 0.5, 1, 1, HomogeneousTransformationMatrix()
+        -0.5, -1, 1, 0.5, 1, 1, HomogeneousTransformationMatrix3Dimensional()
     )
 
     assert bb.volume == 0.0

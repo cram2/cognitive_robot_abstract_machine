@@ -32,7 +32,9 @@ from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% Camera behavior
@@ -61,7 +63,7 @@ def cas_with_cloud_at_world_origin(
     here, keeping the fixture's geometry simple).
     """
     cas = CAS()
-    world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.0,
         pos_y=0.0,
         pos_z=0.0,
@@ -72,7 +74,7 @@ def cas_with_cloud_at_world_origin(
     )
     camera_body = Body(name=PrefixedName(name="camera"))
     world_frame = Body(name=PrefixedName(name="world"))
-    world_T_camera = HomogeneousTransformationMatrix(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional(
         data=world_T_camera,
         reference_frame=world_frame,
         child_frame=camera_body,

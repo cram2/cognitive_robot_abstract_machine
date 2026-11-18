@@ -49,7 +49,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
     Cylinder as SemDTCylinder,
@@ -76,16 +78,18 @@ class TestUtilsAnnotationConversion(object):
             focal_length_y=639.5,
             principal_point=CartesianPoint2Dimensional(x=512.0, y=479.5),
         )
-        world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=0.5,
-            pos_y=0.5,
-            pos_z=0.5,
-            quat_x=-0.5,
-            quat_y=0.5,
-            quat_z=-0.5,
-            quat_w=0.5,
-            reference_frame=world_body,
-            child_frame=camera_body,
+        world_T_camera = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+                pos_x=0.5,
+                pos_y=0.5,
+                pos_z=0.5,
+                quat_x=-0.5,
+                quat_y=0.5,
+                quat_z=-0.5,
+                quat_w=0.5,
+                reference_frame=world_body,
+                child_frame=camera_body,
+            )
         )
         cas.camera_observation = CameraObservation(
             camera=Camera(

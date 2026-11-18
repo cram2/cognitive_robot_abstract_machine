@@ -18,7 +18,7 @@ from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
@@ -123,7 +123,7 @@ class ToolMotionAction(
         """
 
     @abstractmethod
-    def _path_frame(self) -> HomogeneousTransformationMatrix:
+    def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The frame the tool path is expressed in.
         """
@@ -233,7 +233,7 @@ class MixingAction(ToolMotionAction, ParallelAction):
             )
         return build_container_path(self.container, pattern=MixingPattern.SPIRAL)
 
-    def _path_frame(self) -> HomogeneousTransformationMatrix:
+    def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
         return self.container.global_pose.homogeneous_matrix
 
     @property
@@ -286,7 +286,7 @@ class CuttingAction(ToolMotionAction, ParallelAction):
             slicing_priority=self.slicing_priority,
         )
 
-    def _path_frame(self) -> HomogeneousTransformationMatrix:
+    def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
         return self.object_to_cut.global_pose.homogeneous_matrix
 
     @property
@@ -381,7 +381,7 @@ class WipingAction(ToolMotionAction, TryAllAction):
             ]
         )
 
-    def _path_frame(self) -> HomogeneousTransformationMatrix:
+    def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
         if self.surface is not None:
             return self.surface.global_pose.homogeneous_matrix
         if self.target_pose.reference_frame is None:

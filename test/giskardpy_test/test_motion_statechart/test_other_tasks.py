@@ -66,7 +66,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.world_description.geometry import Scale
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
     CartesianPoint3Dimensional,
 )
@@ -723,7 +723,7 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
             world=world,
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2, 0, 1, reference_frame=world.root
             ),
             axis=Vector3Dimensional.Y(),
@@ -919,7 +919,7 @@ def test_keep_held_body_upright_turns_the_body_upright(pr2_world_state_reset: Wo
             FixedConnection(
                 parent=tool_frame,
                 child=held_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     roll=0.4, pitch=0.3, reference_frame=tool_frame
                 ),
             )
@@ -1105,10 +1105,10 @@ class TestArticulateGraspedMechanism:
         """
         The PR2 opens a door by its handle and then closes it again.
         """
-        world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
         )
-        world_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_hinge = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, y=-0.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
         )
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
@@ -1129,7 +1129,7 @@ class TestArticulateGraspedMechanism:
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.5,
                     y=0.45,
                     z=1,
@@ -1159,7 +1159,7 @@ class TestArticulateGraspedMechanism:
                         CartesianPose(
                             root_link=pr2_world_copy.root,
                             tip_link=r_tip,
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
                             ),
                         ),
@@ -1213,7 +1213,7 @@ class TestArticulateGraspedMechanism:
         """
         world = pr2_world_copy
         open_position = 0.4
-        world_T_drawer = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_drawer = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, z=1, yaw=np.pi, reference_frame=world.root
         )
         with world.modify_world():
@@ -1246,7 +1246,7 @@ class TestArticulateGraspedMechanism:
                     CartesianPose(
                         root_link=world.root,
                         tip_link=tip,
-                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             yaw=np.pi, reference_frame=handle.root
                         ),
                     ),
@@ -1292,7 +1292,7 @@ class TestArticulateGraspedMechanism:
             Bottle.create_with_new_body_in_world(
                 name="bottle",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.77, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
                 scale=Scale(0.2, 0.06, 0.06),
@@ -1301,7 +1301,7 @@ class TestArticulateGraspedMechanism:
             bottle_cap = BottleCap.create_with_new_body_in_world(
                 name="bottle_cap",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.65, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
                 scale=Scale(0.02, 0.04, 0.04),
@@ -1336,7 +1336,7 @@ class TestArticulateGraspedMechanism:
                         CartesianPose(
                             root_link=pr2_world_copy.root,
                             tip_link=r_tip,
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 reference_frame=cap_body
                             ),
                         ),

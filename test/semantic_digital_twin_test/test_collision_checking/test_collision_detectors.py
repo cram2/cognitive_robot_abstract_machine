@@ -11,7 +11,9 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
 from semantic_digital_twin.collision_checking.trimesh_collision_detector import (
     FCLCollisionDetector,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.testing import world_setup_simple
 import numpy as np
 
@@ -30,8 +32,10 @@ def test_simple_collision(world_setup_simple, collision_detector):
 @pytest.mark.parametrize("collision_detector", collision_detectors)
 def test_contact_distance(world_setup_simple, collision_detector):
     world, box, cylinder, sphere, mesh, compound = world_setup_simple
-    cylinder.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, 0, 0, reference_frame=cylinder.parent_connection.parent
+    cylinder.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 0, 0, reference_frame=cylinder.parent_connection.parent
+        )
     )
     tcd = collision_detector(_world=world)
     collision = tcd.check_collision_between_bodies(cylinder, sphere, distance=10)
@@ -61,11 +65,13 @@ def test_contact_distance_compound_front(
     world_setup_simple, collision_detector, directions
 ):
     world, box, cylinder, sphere, mesh, compound = world_setup_simple
-    sphere.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        directions[0],
-        directions[1],
-        directions[2],
-        reference_frame=sphere.parent_connection.parent,
+    sphere.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            directions[0],
+            directions[1],
+            directions[2],
+            reference_frame=sphere.parent_connection.parent,
+        )
     )
     tcd = collision_detector(_world=world)
     collision_compound = tcd.check_collision_between_bodies(
@@ -96,8 +102,10 @@ def test_contact_distance_compound_front(
 @pytest.mark.parametrize("collision_detector", collision_detectors)
 def test_no_collision(world_setup_simple, collision_detector):
     world, body1, body2, body3, body4, body5 = world_setup_simple
-    body1.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, 1, 1, reference_frame=body1.parent_connection.parent
+    body1.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 1, 1, reference_frame=body1.parent_connection.parent
+        )
     )
     tcd = collision_detector(_world=world)
     collision = tcd.check_collision_between_bodies(body1, body2)
@@ -108,14 +116,20 @@ def test_no_collision(world_setup_simple, collision_detector):
 def test_all_collisions(world_setup_simple, collision_detector):
     world, body1, body2, body3, body4, body5 = world_setup_simple
     tcd = collision_detector(_world=world)
-    body3.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        -10, -10, 10, reference_frame=body3.parent_connection.parent
+    body3.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            -10, -10, 10, reference_frame=body3.parent_connection.parent
+        )
     )
-    body4.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        10, 10, 10, reference_frame=body4.parent_connection.parent
+    body4.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            10, 10, 10, reference_frame=body4.parent_connection.parent
+        )
     )
-    body5.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        -10, -10, -10, reference_frame=body5.parent_connection.parent
+    body5.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            -10, -10, -10, reference_frame=body5.parent_connection.parent
+        )
     )
 
     collisions = tcd.check_collisions(

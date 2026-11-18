@@ -11,7 +11,7 @@ from pydrake.geometry.optimization import HPolyhedron, VPolytope
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import PointOccupiedError
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -61,7 +61,7 @@ def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
                 max_y=3,
                 min_z=-0.5,
                 max_z=0.5,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=unit_box_world.root
                 ),
             )
@@ -110,7 +110,7 @@ def non_convex_ring_search_space(non_convex_ring_world: World) -> BoundingBoxCol
                 max_y=3,
                 min_z=-0.5,
                 max_z=0.5,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=non_convex_ring_world.root
                 ),
             )
@@ -218,7 +218,9 @@ class TestGraphOfConvexPolygons:
             GraphOfConvexPolygons.from_world(unit_box_world, None)
 
     def test_from_world_rejects_a_multi_box_search_space(self, unit_box_world: World):
-        origin = HomogeneousTransformationMatrix(reference_frame=unit_box_world.root)
+        origin = HomogeneousTransformationMatrix3Dimensional(
+            reference_frame=unit_box_world.root
+        )
         two_boxes = BoundingBoxCollection(
             [
                 VolumetricBoundingBox(-2, -2, -0.5, -1, -1, 0.5, origin),

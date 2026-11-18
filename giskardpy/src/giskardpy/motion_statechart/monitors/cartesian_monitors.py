@@ -17,7 +17,7 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Vector3Dimensional,
     RotationMatrix,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import SymbolicSpatialType
 from semantic_digital_twin.world_description.world_entity import Body
@@ -96,7 +96,7 @@ class PoseReached(RootRelativeGoalMonitor):
     Link that should reach the goal pose.
     """
 
-    goal_pose: HomogeneousTransformationMatrix
+    goal_pose: HomogeneousTransformationMatrix3Dimensional
     """
     Target pose to reach.
     """
@@ -112,7 +112,7 @@ class PoseReached(RootRelativeGoalMonitor):
     """
 
     @property
-    def goal(self) -> HomogeneousTransformationMatrix:
+    def goal(self) -> HomogeneousTransformationMatrix3Dimensional:
         return self.goal_pose
 
     def build_artifacts(self) -> NodeArtifacts:

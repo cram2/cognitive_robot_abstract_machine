@@ -16,7 +16,7 @@ from krrood_spatial_math.spatial_types import (
     AxisAngle,
     CartesianPoint3Dimensional,
     HomogeneousCoordinates,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     HomogeneousTransformationMatrix2Dimensional,
     Orientation,
     Pose3Dimensional,
@@ -25,7 +25,7 @@ from krrood_spatial_math.spatial_types import (
     SpecialEuclideanGroupAction,
     SpecialOrthogonalGroupAction,
     SymbolicSpatialChange,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     Vector3Dimensional,
 )
 
@@ -55,7 +55,7 @@ def test_an_orientation_is_moved_by_rigid_motions(orientation_type):
 
 def test_a_transformation_turns_an_orientation_by_its_rotation_only():
     rotation = RotationMatrix.from_rpy(roll=0.0, pitch=0.0, yaw=np.pi / 2)
-    shifted_rotation = HomogeneousTransformationMatrix.from_xyz_rpy(
+    shifted_rotation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, yaw=np.pi / 2
     )
     orientation = Quaternion.from_rpy(roll=0.3, pitch=0.0, yaw=0.0)
@@ -79,15 +79,18 @@ def test_a_transformation_turns_an_orientation_by_its_rotation_only():
     ],
 )
 def test_a_symbolic_value_is_a_coordinate_representation(value_type):
-    assert issubclass(value_type, SymbolicSpatialValue)
+    assert issubclass(value_type, SymbolicSpatialValue3Dimensional)
     assert issubclass(value_type, CoordinateRepresentation)
 
 
 @pytest.mark.parametrize(
     "change_type",
-    [HomogeneousTransformationMatrix, HomogeneousTransformationMatrix2Dimensional],
+    [
+        HomogeneousTransformationMatrix3Dimensional,
+        HomogeneousTransformationMatrix2Dimensional,
+    ],
 )
 def test_a_symbolic_change_is_a_rigid_change_and_never_a_value(change_type):
     assert issubclass(change_type, SymbolicSpatialChange)
     assert issubclass(change_type, RigidCoordinateChange)
-    assert not issubclass(change_type, SymbolicSpatialValue)
+    assert not issubclass(change_type, SymbolicSpatialValue3Dimensional)

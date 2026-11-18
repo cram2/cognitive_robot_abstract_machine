@@ -94,7 +94,9 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..test_designator.test_multi_robot_action_designator import _handle_annotation
@@ -172,7 +174,7 @@ def _tool(world: World, tool_type: type[Tool]) -> Tool:
 
 def _whole_scene(world: World) -> VolumetricBoundingBox:
     return VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
         min_x=-10,
         min_y=-10,
         min_z=-10,

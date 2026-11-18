@@ -70,7 +70,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Milk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Pose3Dimensional,
@@ -199,11 +201,11 @@ class ScenePlacement:
     """
 
     @property
-    def transform(self) -> HomogeneousTransformationMatrix:
+    def transform(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The placement as a transform.
         """
-        return HomogeneousTransformationMatrix.from_xyz_rpy(
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             self.x, self.y, self.z, pitch=self.pitch, yaw=self.yaw
         )
 
@@ -625,7 +627,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             milk_grasp.moved_to(milk_in_drawer)
         )
         tool_above_place = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=HandDistance.RETRACT_ABOVE_PLACE.value,
                 reference_frame=milk_in_drawer.reference_frame,
             )

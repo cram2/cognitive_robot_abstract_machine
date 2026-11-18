@@ -18,7 +18,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bread,
     CuttingKnife,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 from coraplex.datastructures.enums import CuttingTechnique
@@ -50,7 +52,7 @@ def main() -> None:
     with world.modify_world():
         world.merge_world_at_pose(
             bread_world,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )

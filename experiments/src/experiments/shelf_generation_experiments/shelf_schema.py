@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -110,13 +110,15 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
         mesh = Mesh.from_ply_file(
             ply_file_path=str(ply_file_path),
             texture_file_path=str(texture_file_path),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=body
+            ),
             scale=Scale(1.0, 1.0, 1.0),
         )
         minimum_bound, maximum_bound = mesh.mesh.bounds
         footprint_center_x = (minimum_bound[0] + maximum_bound[0]) / 2
         footprint_center_y = (minimum_bound[1] + maximum_bound[1]) / 2
-        mesh.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        mesh.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             -footprint_center_x,
             -footprint_center_y,
             -minimum_bound[2],
@@ -130,7 +132,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
         mesh_path: Path | None,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         x: float | None = None,
         y: float | None = None,
         z: float = 0.0,
@@ -175,7 +177,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
                 new_reference_frame=_parent, new_child_frame=body
             )
         else:
-            root_T_body = HomogeneousTransformationMatrix.from_xyz_rpy(
+            root_T_body = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 self.pose.x if x is None else x,
                 self.pose.y if y is None else y,
                 z,
@@ -243,7 +245,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
         sin_yaw = abs(math.sin(float(self.pose.yaw)))
         half_x = (cos_yaw * footprint.x + sin_yaw * footprint.y) / 2
         half_y = (sin_yaw * footprint.x + cos_yaw * footprint.y) / 2
-        origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             float(self.pose.x),
             float(self.pose.y),
             0.0,
@@ -343,7 +345,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
         slab_thickness: float,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> ShelfLayer:
         """
         Spawn this layer's slab and reparent it under the shelf ``corpus`` so the whole
@@ -538,12 +540,14 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         """
         mesh_bottom = body.collision.combined_mesh.bounds[0][2]
         origin_z = slab_top_z - mesh_bottom - 0.005
-        body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            object_.pose.x,
-            object_.pose.y,
-            origin_z,
-            yaw=object_.pose.yaw,
-            reference_frame=corpus,
+        body.parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                object_.pose.x,
+                object_.pose.y,
+                origin_z,
+                yaw=object_.pose.yaw,
+                reference_frame=corpus,
+            )
         )
 
     def _rests_on_top(
@@ -690,7 +694,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         *,
         slab_thickness: float,
         corpus_wall_thickness: float,
@@ -723,12 +727,14 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         # slabs are built in that same frame -- see content_frame_yaw.
         yaw_radians = self.content_frame_yaw()
 
-        corpus_pose_in_content_frame = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=0.0,
-            y=0.0,
-            z=footprint.z / 2,
-            yaw=yaw_radians,
-            reference_frame=_parent,
+        corpus_pose_in_content_frame = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=0.0,
+                y=0.0,
+                z=footprint.z / 2,
+                yaw=yaw_radians,
+                reference_frame=_parent,
+            )
         )
         corpus_pose = (
             corpus_pose_in_content_frame
@@ -752,12 +758,14 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         # real geometry needs every slab already standing, not just the ones
         # before it in layer order.
         for index, (layer, height) in enumerate(zip(self.layers, layer_heights)):
-            layer_pose_in_content_frame = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=0.0,
-                y=0.0,
-                z=height,
-                yaw=yaw_radians,
-                reference_frame=_parent,
+            layer_pose_in_content_frame = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=0.0,
+                    y=0.0,
+                    z=height,
+                    yaw=yaw_radians,
+                    reference_frame=_parent,
+                )
             )
             layer_pose = (
                 layer_pose_in_content_frame
@@ -850,7 +858,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
                 body = object_.spawn(
                     world=world,
                     parent=corpus_body,
-                    parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         object_.pose.x,
                         object_.pose.y,
                         slab_top_z,
@@ -868,7 +876,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         slab_thickness: float = 0.02,
         corpus_wall_thickness: float = 0.03,
     ) -> Cabinet:

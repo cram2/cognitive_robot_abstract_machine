@@ -20,7 +20,9 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -399,7 +401,9 @@ class HasApproachesGraspPoses:
         :param distance: How far back along the approach direction, in meters.
         :return: The tool frame goal, in ``reference_T_grasp``'s frame.
         """
-        grasp_T_pre_grasp = HomogeneousTransformationMatrix.from_xyz_rpy(x=-distance)
+        grasp_T_pre_grasp = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=-distance
+        )
         return end_effector.tool_frame_goal_for_grasp(
             (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
         )
@@ -472,7 +476,7 @@ class HasApproachesGraspPoses:
         world_T_grasp = world.transform(
             reference_T_grasp.homogeneous_matrix, world.root
         )
-        world_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_lift = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=self.retreat_distance, reference_frame=world.root
         )
         return Pose3Dimensional(

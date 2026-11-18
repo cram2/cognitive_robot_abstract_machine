@@ -38,7 +38,7 @@ from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
@@ -81,22 +81,28 @@ def robot_setup(request):
 
     with world.modify_world():
         if request.param[1] == Tracy:
-            box1_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.8, 0.5, 0.93
+            box1_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0.8, 0.5, 0.93)
             )
-            box2_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.8, -0.5, 0.93
+            box2_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    0.8, -0.5, 0.93
+                )
             )
         elif request.param[1] == DAiSy:
-            box1_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.6, 1.0, 0.9
+            box1_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0.6, 1.0, 0.9)
             )
-            box2_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.6, 0.1, 1.2
+            box2_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0.6, 0.1, 1.2)
             )
         else:
-            box1_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy()
-            box2_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy()
+            box1_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy()
+            )
+            box2_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy()
+            )
 
         box1_connection = Connection6DoF.create_with_dofs(
             world=world,
@@ -361,7 +367,7 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
     right_arm = right_or_only_arm(view)
     anchor = Pose3Dimensional(anchor_position, reference_frame=world.root)
     anchor_T = anchor.homogeneous_matrix
-    offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+    offset_T = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),
         angle=np.pi / 2,
@@ -410,7 +416,7 @@ def physically_simulated_block_context(stationary_block_context):
                 parent=world.root,
                 child=narrow_box,
                 name=PrefixedName("narrow_box_connection"),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.8, 0.3, view.table.top_z + edge / 2
                 ),
             )

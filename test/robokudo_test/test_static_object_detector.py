@@ -19,7 +19,7 @@ from robokudo.types.annotation import BoundingBox3DAnnotation, PoseAnnotation
 from robokudo.types.camera import CameraObservation
 from robokudo.types.scene import ObjectHypothesis
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
 )
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
@@ -97,7 +97,7 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
     detector = detector_on_half_resolution_depth
     world, root, body = world_with_two_bodies
     shape = Box(
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.0, reference_frame=body
         ),
         scale=Scale(x=0.4, y=0.8, z=1.2),
@@ -108,7 +108,7 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
             FixedConnection(
                 parent=root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=4.0, y=3.0, z=6.0, yaw=np.pi
                 ),
             )
@@ -119,7 +119,7 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
         root=Body(name=PrefixedName("optical_frame")),
         camera_model=camera_model,
     )
-    world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=2.0,
         y=2.0,
         yaw=np.pi / 2,

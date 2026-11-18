@@ -21,7 +21,7 @@ from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
 )
@@ -71,7 +71,7 @@ class GraspClutter6DCameraInfo:
     depth_scale: float
     """Multiply this frame's raw depth image values by this factor to get millimeters."""
 
-    camera_T_world: HomogeneousTransformationMatrix | None = None
+    camera_T_world: HomogeneousTransformationMatrix3Dimensional | None = None
     """
     This frame's world-to-camera transform (`cam_R_w2c`/`cam_t_w2c` bundled together):
     rotates/translates a point given in the dataset's world frame into this camera's
@@ -87,11 +87,15 @@ class GraspClutter6DCameraInfo:
         translation = data.get("cam_t_w2c")
         camera_T_world = None
         if rotation is not None and translation is not None:
-            camera_T_world = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=CartesianPoint3Dimensional(*_millimeters_to_meters(translation)),
-                rotation_matrix=RotationMatrix(
-                    data=np.array(rotation, dtype=float).reshape(3, 3)
-                ),
+            camera_T_world = (
+                HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                    point=CartesianPoint3Dimensional(
+                        *_millimeters_to_meters(translation)
+                    ),
+                    rotation_matrix=RotationMatrix(
+                        data=np.array(rotation, dtype=float).reshape(3, 3)
+                    ),
+                )
             )
         intrinsics = np.array(data["cam_K"], dtype=float).reshape(3, 3)
         focal_x, focal_y = intrinsics[0, 0], intrinsics[1, 1]
@@ -119,19 +123,19 @@ class GraspClutter6DObjectPose:
     and `models_info.json` keys.
     """
 
-    camera_T_object: HomogeneousTransformationMatrix
+    camera_T_object: HomogeneousTransformationMatrix3Dimensional
     """
     This object's pose (`cam_R_m2c`/`cam_t_m2c` bundled together) relative to the
     camera. Not yet bound to a reference/child frame - `GraspClutter6DScene` rebinds it
     to the actual camera/object bodies once they exist, e.g.
-    ``HomogeneousTransformationMatrix(data=pose.camera_T_object, reference_frame=camera_body, child_frame=object_body)``.
+    ``HomogeneousTransformationMatrix3Dimensional(data=pose.camera_T_object, reference_frame=camera_body, child_frame=object_body)``.
     """
 
     @classmethod
     def from_json(cls, data: dict) -> Self:
         return cls(
             object_id=int(data["obj_id"]),
-            camera_T_object=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            camera_T_object=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=CartesianPoint3Dimensional(
                     *_millimeters_to_meters(data["cam_t_m2c"])
                 ),
@@ -322,7 +326,7 @@ class GraspClutter6DScene:
 
         # `camera_T_world` rotates/translates a point from the dataset's world frame
         # into the camera frame; the camera's pose in the map frame is its inverse.
-        camera_T_map = HomogeneousTransformationMatrix(
+        camera_T_map = HomogeneousTransformationMatrix3Dimensional(
             data=camera_info.camera_T_world,
             reference_frame=camera_body,
             child_frame=map_body,
@@ -386,7 +390,7 @@ class GraspClutter6DScene:
             )
         )
 
-        camera_T_object = HomogeneousTransformationMatrix(
+        camera_T_object = HomogeneousTransformationMatrix3Dimensional(
             data=pose.camera_T_object, reference_frame=camera_body, child_frame=body
         )
         root_T_object = world.transform(camera_T_object, root_body)
@@ -395,7 +399,7 @@ class GraspClutter6DScene:
         loaded_mesh.apply_scale(mesh_unit_scale)
         mesh = Mesh.from_trimesh(
             mesh=loaded_mesh,
-            origin=HomogeneousTransformationMatrix(reference_frame=body),
+            origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=body),
         )
         body.visual = ShapeCollection([mesh], reference_frame=body)
         body.collision = ShapeCollection([mesh], reference_frame=body)

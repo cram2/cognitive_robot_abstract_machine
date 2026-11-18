@@ -152,7 +152,7 @@ import os
 import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Spoon
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 spoon = STLParser(
@@ -167,7 +167,7 @@ with world.modify_world():
         FixedConnection(
             parent=world.get_body_by_name("cabinet10_drawer_top"),
             child=spoon.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -0.05, -0.05, 0
             ),
         ),

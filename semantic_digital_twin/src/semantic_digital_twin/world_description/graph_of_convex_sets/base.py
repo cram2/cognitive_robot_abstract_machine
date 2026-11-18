@@ -13,7 +13,7 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -92,7 +92,7 @@ class GraphOfConvexSets(Generic[PointT, SearchSpaceT], SubClassSafeGeneric, ABC)
                     max_x=np.inf,
                     max_y=np.inf,
                     max_z=np.inf,
-                    origin=HomogeneousTransformationMatrix(
+                    origin=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.world.root
                     ),
                 )
@@ -155,7 +155,7 @@ def create_reference_frame_with_only_yaw_from_body(body: Body) -> Body:
     )
 
     world_T_body = world.transform(body.global_pose, world.root)
-    reference_frame_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
+    reference_frame_T_world = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=world_T_body.x,
         y=world_T_body.y,
         z=world_T_body.z,

@@ -19,7 +19,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from numpy import pi
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
@@ -82,7 +82,7 @@ def test_move_base(giskard: HSRTester) -> None:
             node := Sequence(
                 nodes=[
                     SetOdometry(
-                        base_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
+                        base_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
                             x=1.0,
                             y=1.0,
                             axis=Vector3Dimensional.Z(),

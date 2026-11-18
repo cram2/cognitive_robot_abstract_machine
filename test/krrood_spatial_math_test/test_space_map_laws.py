@@ -24,7 +24,7 @@ from krrood_spatial_math.spatial_types import (
     FramePlaneProjection,
 )
 
-from .dataset.frames import NamedFrame
+from .dataset.frames import NamedFrame, Room
 
 # %% the space maps every law runs against
 
@@ -54,7 +54,7 @@ def space_map_case(request: pytest.FixtureRequest) -> SpaceMapCase:
     """
     Each space map implementation, onto the plane of one frame.
     """
-    frame = NamedFrame("plane")
+    frame = NamedFrame("plane", space=Room())
     return SpaceMapCase(
         space_map=request.param(frame),
         target_point=CartesianPoint2Dimensional(1.5, -2.0, reference_frame=frame),
@@ -156,5 +156,7 @@ def test_every_projection_line_of_an_orthogonal_projection_runs_along_the_plane_
     )
     np.testing.assert_array_equal(
         line.point.to_np(),
-        projection.embed_planar_point(point=CartesianPoint2Dimensional(1.0, 2.0)).to_np(),
+        projection.embed_planar_point(
+            point=CartesianPoint2Dimensional(1.0, 2.0)
+        ).to_np(),
     )

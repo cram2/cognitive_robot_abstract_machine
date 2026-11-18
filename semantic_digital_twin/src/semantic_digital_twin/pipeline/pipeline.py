@@ -9,7 +9,9 @@ from typing_extensions import Callable, TYPE_CHECKING
 import numpy as np
 
 from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -114,7 +116,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
                         m.vertices -= center
 
             old_origin_T_new_origin = (
-                HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                     CartesianPoint3Dimensional(*center)
                 )
             )

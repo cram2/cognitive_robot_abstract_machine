@@ -21,8 +21,8 @@ from krrood_spatial_math.exceptions import (
 )
 from krrood_spatial_math.space import EuclideanSpace2Dimensional
 from krrood_spatial_math.spatial_types import (
-    SymbolicSpatialValue,
-    HomogeneousTransformationMatrix,
+    SymbolicSpatialValue3Dimensional,
+    HomogeneousTransformationMatrix3Dimensional,
     HomogeneousTransformationMatrix2Dimensional,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
@@ -57,7 +57,7 @@ def mounted_on(
     return MountedFrame(
         name,
         space=floor_frame.space,
-        mount_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+        mount_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             **pose_on_floor, reference_frame=floor_frame
         ),
     )
@@ -203,7 +203,7 @@ def test_a_planar_value_without_a_reference_frame_has_no_coordinate_system(
 
 @pytest.mark.parametrize("planar_value", planar_values)
 def test_a_planar_value_is_no_value_given_in_a_three_dimensional_frame(planar_value):
-    assert not issubclass(planar_value, SymbolicSpatialValue)
+    assert not issubclass(planar_value, SymbolicSpatialValue3Dimensional)
 
 
 def test_a_two_dimensional_point_is_given_in_a_two_dimensional_cartesian_frame():
@@ -383,7 +383,7 @@ def test_a_change_to_a_frame_facing_the_other_side_of_a_plane_has_no_planar_tran
 
 def test_a_symbolic_change_becomes_a_planar_transformation_unchecked(floor_frame):
     height = sm.FloatVariable(name="height")
-    lifted = HomogeneousTransformationMatrix.from_xyz_rpy(
+    lifted = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, z=height, reference_frame=floor_frame
     )
 
@@ -435,7 +435,7 @@ def test_a_planar_transformation_turns_a_vector_without_shifting_it(
 def test_a_transformation_turns_a_vector_on_a_plane_without_shifting_it(
     floor_frame, robot_base_frame
 ):
-    floor_T_robot_base = HomogeneousTransformationMatrix.from_xyz_rpy(
+    floor_T_robot_base = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1,
         y=2,
         yaw=np.pi / 2,

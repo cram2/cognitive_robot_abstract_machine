@@ -28,7 +28,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Mug,
     Pot,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Mesh, Shape
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -115,7 +117,10 @@ def annotated_mug(world: World | None = None) -> Mug:
     shapes = ShapeCollection(
         [
             Mesh.from_trimesh(
-                mesh=mug(), origin=HomogeneousTransformationMatrix(reference_frame=body)
+                mesh=mug(),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,
@@ -269,7 +274,9 @@ def test_the_pieces_keep_the_colors_of_the_faces_they_were_cut_from():
         [
             Mesh.from_trimesh(
                 mesh=mesh,
-                origin=HomogeneousTransformationMatrix(reference_frame=annotation.root),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=annotation.root
+                ),
             )
         ],
         reference_frame=annotation.root,
@@ -319,7 +326,8 @@ def test_the_mesh_pieces_are_cut_from_copies_none_of_the_shapes(monkeypatch):
     source = trimesh.creation.box()
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
     shape = Mesh.from_trimesh(
-        mesh=source, origin=HomogeneousTransformationMatrix(reference_frame=body)
+        mesh=source,
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=body),
     )
     colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
     shape.mesh
@@ -342,7 +350,7 @@ def test_the_faces_of_a_textured_shape_take_the_colour_of_its_texture(tmp_path):
         mesh=box,
         uv=corner_uv,
         texture_file_path=str(texture_file),
-        origin=HomogeneousTransformationMatrix(reference_frame=body),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=body),
     )
 
     colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
@@ -376,7 +384,9 @@ def mug_with_own_collision() -> Mug:
         [
             Mesh.from_trimesh(
                 mesh=mug().convex_hull,
-                origin=HomogeneousTransformationMatrix(reference_frame=body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,

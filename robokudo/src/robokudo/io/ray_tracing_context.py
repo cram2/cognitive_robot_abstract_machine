@@ -22,7 +22,9 @@ from robokudo.io.exceptions import (
 )
 from robokudo.utils.module_loader import ModuleLoader
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 
@@ -101,7 +103,7 @@ class RayTracingContextResolver:
     def _apply_camera_pose(
         world: World,
         camera: Camera,
-        camera_pose: HomogeneousTransformationMatrix,
+        camera_pose: HomogeneousTransformationMatrix3Dimensional,
     ) -> None:
         """
         Apply the configured initial camera pose.
@@ -123,7 +125,7 @@ class RayTracingContextResolver:
             )
 
         reference_frame = camera_pose.reference_frame or parent_connection.parent
-        reference_T_camera = HomogeneousTransformationMatrix(
+        reference_T_camera = HomogeneousTransformationMatrix3Dimensional(
             data=camera_pose,
             reference_frame=reference_frame,
             child_frame=camera.root,

@@ -48,7 +48,9 @@ from semantic_digital_twin.spatial_computations.mesh_rendering import (
     CameraRing,
     ViewDirection,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -252,7 +254,10 @@ def annotate(mesh: trimesh.Trimesh, annotation_type: type[HasRootBody]) -> HasRo
     shapes = ShapeCollection(
         [
             Mesh.from_trimesh(
-                mesh=mesh, origin=HomogeneousTransformationMatrix(reference_frame=body)
+                mesh=mesh,
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,

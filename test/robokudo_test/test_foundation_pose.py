@@ -8,7 +8,7 @@ import numpy
 import pytest
 import trimesh
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from py_trees.common import Status
@@ -652,7 +652,7 @@ def test_pose_annotation_reaches_the_world_through_the_camera_pose_of_the_cas(
             camera_model=camera_model,
         ),
         effective_camera_model=camera_model,
-        world_T_camera=HomogeneousTransformationMatrix(
+        world_T_camera=HomogeneousTransformationMatrix3Dimensional(
             data=world_T_camera,
             reference_frame=Body(name=PrefixedName(name="world")),
             child_frame=camera_body,

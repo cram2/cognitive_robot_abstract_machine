@@ -7,7 +7,9 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.robots.robot_parts import Arm
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 
@@ -41,8 +43,10 @@ def pr2_holding_milk(simple_pr2_context):
     with world.modify_world():
         world.move_branch(milk_body, tool_frame)
         world.add_semantic_annotation(milk)
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *HELD_AT, yaw=HELD_YAW, reference_frame=tool_frame
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *HELD_AT, yaw=HELD_YAW, reference_frame=tool_frame
+        )
     )
     world.notify_state_change()
     return world, robot, milk, extensions

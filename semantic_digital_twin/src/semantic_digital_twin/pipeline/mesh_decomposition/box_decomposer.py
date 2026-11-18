@@ -7,7 +7,9 @@ import trimesh
 from scipy import ndimage
 
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import Mesh, Box, Scale
 
 
@@ -642,7 +644,7 @@ class BoxDecomposer(MeshDecomposer):
 
         return [
             Box(
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     box.x,
                     box.y,
                     box.z,

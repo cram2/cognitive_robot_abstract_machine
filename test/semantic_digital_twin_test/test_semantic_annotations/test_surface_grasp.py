@@ -33,7 +33,7 @@ from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Twist,
     Vector3Dimensional,
 )
@@ -60,7 +60,9 @@ def carton() -> Milk:
         [
             Mesh.from_trimesh(
                 mesh=trimesh.creation.box(extents=CARTON_EXTENTS),
-                origin=HomogeneousTransformationMatrix(reference_frame=body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,
@@ -257,7 +259,7 @@ def small_twist(rng: np.random.Generator, rise: float) -> Twist:
     """
     rotation_vector = rng.normal(0.0, 0.05, 3)
     return Twist.from_transformation(
-        HomogeneousTransformationMatrix.from_xyz_axis_angle(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
             z=rise,
             axis=Vector3Dimensional(*rotation_vector),
             angle=float(np.linalg.norm(rotation_vector)),

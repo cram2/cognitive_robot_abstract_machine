@@ -37,7 +37,7 @@ from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
@@ -549,8 +549,8 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     Base class for all shapes in the world.
     """
 
-    origin: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
+    origin: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=HomogeneousTransformationMatrix3Dimensional
     )
 
     color: Color = field(default_factory=Color)
@@ -664,7 +664,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         """
         Creates a copy of this shape without the reference frame.
         """
-        new_origin = HomogeneousTransformationMatrix(
+        new_origin = HomogeneousTransformationMatrix3Dimensional(
             self.origin.to_np(),
         )
         shape_props = fields(self)
@@ -700,10 +700,12 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         center_x = (bounding_box.min_x + bounding_box.max_x) / 2
         center_y = (bounding_box.min_y + bounding_box.max_y) / 2
         center_z = (bounding_box.min_z + bounding_box.max_z) / 2
-        self.origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=CartesianPoint3Dimensional(-center_x, -center_y, -center_z),
-            rotation_matrix=self.origin.rotation_matrix,
-            reference_frame=self.origin.reference_frame,
+        self.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=CartesianPoint3Dimensional(-center_x, -center_y, -center_z),
+                rotation_matrix=self.origin.rotation_matrix,
+                reference_frame=self.origin.reference_frame,
+            )
         )
 
 
@@ -950,7 +952,7 @@ class Mesh(Shape):
         cls,
         ply_file_path: str,
         texture_file_path: str | None = None,
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
         scale: Scale | None = None,
     ) -> Mesh:
         """
@@ -1002,7 +1004,7 @@ class Mesh(Shape):
     def from_trimesh(
         cls,
         mesh: trimesh.Trimesh,
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
         scale: Scale | None = None,
         uv: np.ndarray | None = None,
         texture_file_path: str | None = None,
@@ -1032,7 +1034,7 @@ class Mesh(Shape):
         """
         file_type = file_type.lower()
         if origin is None:
-            origin = HomogeneousTransformationMatrix()
+            origin = HomogeneousTransformationMatrix3Dimensional()
         if scale is None:
             scale = Scale()
         if uv is not None:
@@ -1064,7 +1066,7 @@ class Mesh(Shape):
     def box(
         cls,
         extents: tuple[float, float, float] = (1.0, 1.0, 1.0),
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
         scale: Scale | None = None,
     ) -> Mesh:
         """
@@ -1086,7 +1088,7 @@ class Mesh(Shape):
         cls,
         side: float,
         height: float,
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Mesh:
         """
         Create an upright prism of equilateral cross-section, its apex pointing along +x.
@@ -1214,7 +1216,9 @@ class Mesh(Shape):
 
         return cls.from_trimesh(
             mesh=hull,
-            origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
+            origin=HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=reference_frame
+            ),
         )
 
     @classmethod
@@ -1516,7 +1520,9 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
     @classmethod
     @abstractmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls,
+        simple_event: SimpleEvent,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -1576,7 +1582,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         cls,
         lower: npt.NDArray[np.float64],
         upper: npt.NDArray[np.float64],
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Rebuild a bounding box from the plain-float corners :meth:`to_array_bounds`
@@ -1595,7 +1601,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         return cls(*lower, *upper, origin)
 
     def transform_to_origin(
-        self, reference_T_new_origin: HomogeneousTransformationMatrix
+        self, reference_T_new_origin: HomogeneousTransformationMatrix3Dimensional
     ) -> Self:
         """
         Transform the bounding box to a different reference frame.
@@ -1603,7 +1609,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :param reference_T_new_origin: The origin to express the box relative to.
         :return: The box, re-expressed relative to ``reference_T_new_origin``.
         """
-        reference_T_new_origin = HomogeneousTransformationMatrix(
+        reference_T_new_origin = HomogeneousTransformationMatrix3Dimensional(
             data=reference_T_new_origin.to_np(),
             reference_frame=reference_T_new_origin.reference_frame,
         )
@@ -1615,7 +1621,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
 
         list_self_T_corner = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 corner.to_cartesian_point_3_dimensional()
                 if isinstance(corner, CartesianPoint2Dimensional)
                 else corner
@@ -1692,7 +1698,7 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
     The maximum z-coordinate of the bounding box, relative to the origin.
     """
 
-    origin: HomogeneousTransformationMatrix
+    origin: HomogeneousTransformationMatrix3Dimensional
     """
     The origin of the bounding box.
     """
@@ -1810,7 +1816,9 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
 
     @classmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls,
+        simple_event: SimpleEvent,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -1869,7 +1877,7 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
     def from_mesh(
         cls,
         mesh: trimesh.Trimesh,
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Create a bounding box from a trimesh object.
@@ -1907,7 +1915,7 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
         cls,
         min_point: CartesianPoint3Dimensional,
         max_point: CartesianPoint3Dimensional,
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
@@ -1929,7 +1937,7 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
         x = (self.max_x + self.min_x) / 2 + float(self.origin.x)
         y = (self.max_y + self.min_y) / 2 + float(self.origin.y)
         z = (self.max_z + self.min_z) / 2 + float(self.origin.z)
-        origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x, y, z, 0, 0, 0, self.origin.reference_frame
         )
         return Box(origin=origin, scale=scale)
@@ -1976,7 +1984,7 @@ class PlanarBoundingBox(AxisAlignedBox[CartesianPoint2Dimensional]):
     The maximum y-coordinate of the bounding box, relative to the origin.
     """
 
-    origin: HomogeneousTransformationMatrix
+    origin: HomogeneousTransformationMatrix3Dimensional
     """
     The origin of the bounding box.
     """
@@ -2085,7 +2093,9 @@ class PlanarBoundingBox(AxisAlignedBox[CartesianPoint2Dimensional]):
 
     @classmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls,
+        simple_event: SimpleEvent,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.

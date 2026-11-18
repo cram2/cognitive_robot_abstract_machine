@@ -43,7 +43,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     RotationMatrix,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional, SymbolicSpatialType
@@ -73,7 +73,9 @@ class CartesianTask(ConvergingTask, ABC):
     binding_policy: GoalBindingPolicy = GoalBindingPolicy.Bind_on_start
     """Describes when the goal is computed. See GoalBindingPolicy for more information."""
 
-    root_T_goal_reference_frame: HomogeneousTransformationMatrix = field(init=False)
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix3Dimensional = field(
+        init=False
+    )
     """Transformation matrix from root to goal_reference_frame link."""
 
     _forward_kinematics_binding: ForwardKinematicsBinding = field(init=False)
@@ -716,7 +718,7 @@ class CartesianOrientation(CartesianTask):
         # the goal axes are drawn at the tip, next to the current ones
         self.add_goal_and_current_debug_expressions(
             artifacts=artifacts,
-            goal=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            goal=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=root_T_current.position, rotation_matrix=root_R_goal
             ),
             current=root_T_current,

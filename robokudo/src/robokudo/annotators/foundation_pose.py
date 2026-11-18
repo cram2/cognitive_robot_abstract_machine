@@ -16,7 +16,7 @@ import numpy
 import open3d
 import trimesh
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from py_trees.common import Status
@@ -351,14 +351,17 @@ class PoseVisualization:
         """
         if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
             smallest_box = shape.mesh.bounding_box_oriented.primitive
-            box_pose = pose.homogeneous_matrix @ HomogeneousTransformationMatrix(
-                data=smallest_box.transform
+            box_pose = (
+                pose.homogeneous_matrix
+                @ HomogeneousTransformationMatrix3Dimensional(
+                    data=smallest_box.transform
+                )
             )
             return create_oriented_bounding_box(smallest_box.extents, box_pose.to_np())
         mesh_box = shape.local_frame_bounding_box
         box_pose = (
             pose.homogeneous_matrix
-            @ HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            @ HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=mesh_box.center
             )
         )
@@ -366,13 +369,13 @@ class PoseVisualization:
 
     def axes_pose(
         self, shape: Mesh, pose: Pose3Dimensional
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :param shape: The mesh.
         :param pose: Pose of the mesh in the camera frame.
         :return: Pose of the drawn axes in the camera frame.
         """
-        smallest_box_pose = HomogeneousTransformationMatrix(
+        smallest_box_pose = HomogeneousTransformationMatrix3Dimensional(
             data=shape.mesh.bounding_box_oriented.primitive.transform
         )
         if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
@@ -381,7 +384,7 @@ class PoseVisualization:
             return pose.homogeneous_matrix
         return (
             pose.homogeneous_matrix
-            @ HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            @ HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=smallest_box_pose.position
             )
         )
@@ -416,7 +419,7 @@ class PoseVisualization:
             lineType=cv2.LINE_AA,
         )
 
-    def draw_axes(self, axes_pose: HomogeneousTransformationMatrix) -> None:
+    def draw_axes(self, axes_pose: HomogeneousTransformationMatrix3Dimensional) -> None:
         """
         Draw the x, y and z axes of a pose in red, green and blue into the color image,
         unless the end of an axis is not in front of the camera.

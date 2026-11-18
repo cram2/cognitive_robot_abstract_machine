@@ -25,7 +25,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
     Quaternion,
     RotationMatrix,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -56,7 +56,7 @@ class DebugExpression:
         | Vector3Dimensional
         | Quaternion
         | RotationMatrix
-        | HomogeneousTransformationMatrix
+        | HomogeneousTransformationMatrix3Dimensional
         | Pose3Dimensional
     )
     """

@@ -7,7 +7,7 @@ from pathlib import Path
 import trimesh
 
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
 )
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -89,7 +89,7 @@ class MeshMeasurements:
             x=(bounds.min_x + bounds.max_x) / 2,
             y=(bounds.min_y + bounds.max_y) / 2,
         )
-        world_T_local = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_local = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             yaw=math.radians(yaw_degrees)
         )
         world_offset = local_offset.transform(world_T_local)
@@ -157,5 +157,5 @@ class MeshMeasurements:
             # The mesh's own frame has no reference frame of its own to carry; this
             # placeholder is never read back, since nothing here calls the
             # AxisAlignedBox operations that dereference origin.reference_frame.
-            origin=HomogeneousTransformationMatrix(),
+            origin=HomogeneousTransformationMatrix3Dimensional(),
         )

@@ -22,7 +22,7 @@ A `DebugExpression`
 
 - a `name`, used as the label in every debugging tool,
 - an `expression` — either a `Scalar` or a spatial type (`CartesianPoint3Dimensional`, `Vector3Dimensional`, `Quaternion`,
-  `RotationMatrix`, `HomogeneousTransformationMatrix`, or `Pose3Dimensional`), and
+  `RotationMatrix`, `HomogeneousTransformationMatrix3Dimensional`, or `Pose3Dimensional`), and
 - a `color`, used when the expression is rendered.
 
 A node registers a debug expression by appending it to `artifacts.debug_expressions` inside its

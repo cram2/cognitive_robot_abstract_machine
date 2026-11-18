@@ -127,7 +127,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -193,8 +193,8 @@ def _pose(world: World) -> Pose3Dimensional:
     return Pose3Dimensional.from_xyz_rpy(x=0.1, yaw=0.2, reference_frame=_root(world))
 
 
-def _transformation(world: World) -> HomogeneousTransformationMatrix:
-    return HomogeneousTransformationMatrix.from_xyz_rpy(
+def _transformation(world: World) -> HomogeneousTransformationMatrix3Dimensional:
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.1, yaw=0.2, reference_frame=_root(world)
     )
 
@@ -217,7 +217,7 @@ def _driven_base_node(node_type: type[DrivenBaseTask], world: World) -> DrivenBa
     return node_type(
         base=world.get_connections_by_type(DifferentialDrive)[0].child,
         goal_pose=_pose(world),
-        parent_T_goal_reference_frame=HomogeneousTransformationMatrix(
+        parent_T_goal_reference_frame=HomogeneousTransformationMatrix3Dimensional(
             reference_frame=_root(world)
         ),
     )

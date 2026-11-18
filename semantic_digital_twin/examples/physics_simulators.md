@@ -196,7 +196,7 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3Dimensional
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -222,7 +222,7 @@ def spawn_free_box(
     spawn_body = Body(name=PrefixedName(name))
 
     box = Box(
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             reference_frame=spawn_body,
         ),
         scale=scale,
@@ -239,7 +239,7 @@ def spawn_free_box(
         spawn_world.add_connection(connection)
 
         # Set the initial world pose of the box via the 6-DoF DoF state.
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=position[0],
             y=position[1],
             z=position[2],
@@ -256,7 +256,7 @@ def spawn_robot_body(spawn_world: World) -> Body:
     spawn_body = Body(name=PrefixedName("robot"))
 
     # Shape origin is expressed relative to the body frame.
-    box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    box_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         z=0.5,
         reference_frame=spawn_body,
     )
@@ -282,7 +282,7 @@ def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
     spawn_arm_body = Body(name=PrefixedName("arm"))
 
     # Offset the box shape so the link extends along +Y from the joint origin.
-    box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    box_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         y=0.25,
         reference_frame=spawn_arm_body,
     )
@@ -298,7 +298,7 @@ def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
     dof = DegreeOfFreedom(name=PrefixedName("arm_joint"))
 
     # Mount the joint on top of the robot base and rotate into a horizontal pose.
-    connection_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    connection_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.0,
         pos_y=0.3,
         pos_z=0.9,

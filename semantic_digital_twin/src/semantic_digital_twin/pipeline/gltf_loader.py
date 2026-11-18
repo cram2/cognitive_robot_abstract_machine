@@ -12,7 +12,9 @@ from ..world_description.world_entity import Body
 from ..world_description.connections import FixedConnection
 from ..world_description.shape_collection import ShapeCollection
 from ..world_description.geometry import Mesh, Scale
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from ..datastructures.prefixed_name import PrefixedName
 
 
@@ -76,7 +78,7 @@ class GLTFLoader(Step):
 
     def _get_relative_transform(
         self, parent_node: str, child_node: str
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Determine the transformation from a parent node to its child.
         """
@@ -87,7 +89,7 @@ class GLTFLoader(Step):
         parent_T_world = np.linalg.inv(world_T_parent)
         parent_T_child = parent_T_world @ world_T_child
 
-        return HomogeneousTransformationMatrix(parent_T_child)
+        return HomogeneousTransformationMatrix3Dimensional(parent_T_child)
 
     def _trimesh_to_body(self, mesh: trimesh.Trimesh, name: str) -> Body:
         """
@@ -96,7 +98,7 @@ class GLTFLoader(Step):
         # Create TriangleMesh geometry from trimesh
         triangle_mesh = Mesh.from_trimesh(
             mesh=mesh,
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(),  # Identity transform
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),  # Identity transform
             scale=Scale(1.0, 1.0, 1.0),  # No scaling
         )
 
@@ -231,7 +233,7 @@ class GLTFLoader(Step):
             conn = FixedConnection(
                 parent=world.root,
                 child=object_root_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                     root_transform
                 ),
                 name=PrefixedName(f"object_root_{object_root}"),

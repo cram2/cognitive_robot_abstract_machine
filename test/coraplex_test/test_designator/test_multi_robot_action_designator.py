@@ -137,7 +137,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Quaternion,
     Vector3Dimensional,
@@ -228,7 +228,7 @@ def stand_facing(
     world_P_stand: Iterable[float],
     world_P_target: Iterable[float],
     world: World,
-) -> HomogeneousTransformationMatrix:
+) -> HomogeneousTransformationMatrix3Dimensional:
     """
     The base pose from which ``robot`` works on ``world_P_target``, standing at
     ``world_P_stand``.
@@ -258,7 +258,7 @@ def setup_multi_robot_apartment(
     apartment_copy = deepcopy(_apartment_world_setup)
     apartment_copy.merge_world_at_pose(
         deepcopy(multi_story_building),
-        HomogeneousTransformationMatrix.from_xyz_rpy(0, -5, 0),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0, -5, 0),
     )
 
     if request.param == "hsrb":
@@ -270,7 +270,7 @@ def setup_multi_robot_apartment(
         else:
             view = view[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
     elif request.param == "stretch":
@@ -284,7 +284,7 @@ def setup_multi_robot_apartment(
         else:
             view = view[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -299,7 +299,7 @@ def setup_multi_robot_apartment(
         else:
             view = view[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -314,7 +314,7 @@ def setup_multi_robot_apartment(
         else:
             view = view[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -325,7 +325,7 @@ def setup_multi_robot_apartment(
         )
         view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         for arm in view.all_arms:
             joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
@@ -440,8 +440,10 @@ def test_reach_action_multi(multiple_robot_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     grasp_pose = Pose3Dimensional(reference_frame=milk.root)
     milk_body = milk.root
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -2, 0.8, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, -2, 0.8, reference_frame=world.root
+        )
     )
     view.root.parent_connection.origin = stand_facing(
         view, (0.3, -2.4, 0), milk_body.global_pose.position.to_np(), world
@@ -477,7 +479,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
         # do not allow since
         robot.mobile_base.full_body_controlled = False
         robot.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 1.7, 1.7, 0, reference_frame=world.root
             )
         )
@@ -487,7 +489,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
         # do not allow since
         robot.mobile_base.full_body_controlled = False
         robot.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2.12, 2.2, 0, reference_frame=world.root
             )
         )
@@ -499,7 +501,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
     pose_T = world.get_body_by_name("milk.stl").global_transform
     pose = pose_T.pose
     if np.allclose(approach_axis, Vector3Dimensional.Z().to_np()):
-        offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+        offset_T = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
             axis=Vector3Dimensional.Y(),
             angle=np.pi / 2,
             reference_frame=world.root,
@@ -535,8 +537,10 @@ def test_grasping(multiple_robot_apartment_context):
     )
 
     milk_body = milk.root
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -2, 0.8, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, -2, 0.8, reference_frame=world.root
+        )
     )
     robot.root.parent_connection.origin = stand_facing(
         robot, (0.3, -2.4, 0), milk_body.global_pose.position.to_np(), world
@@ -563,8 +567,10 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
 
     left_arm = left_or_only_arm(view)
     milk_body = world.get_body_by_name("milk.stl")
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -2, 0.6, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, -2, 0.6, reference_frame=world.root
+        )
     )
     view.root.parent_connection.origin = stand_facing(
         view, (0.3, -2.4, 0), milk_body.global_pose.position.to_np(), world
@@ -604,8 +610,10 @@ def test_place_multi(multiple_robot_apartment_context):
 
     left_arm = left_or_only_arm(view)
     milk_body = world.get_body_by_name("milk.stl")
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -2, 0.6, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, -2, 0.6, reference_frame=world.root
+        )
     )
     view.root.parent_connection.origin = stand_facing(
         view, (0.3, -2.4, 0), milk_body.global_pose.position.to_np(), world
@@ -670,11 +678,13 @@ def test_detect(multiple_robot_apartment_context):
 
     # East of the multi-storey building the fixture merges in, so that the robot looks
     # at the milk rather than at one of the building's room walls.
-    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, -2, 0
+    robot.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(5, -2, 0)
     )
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        6, -2, 1.2, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            6, -2, 1.2, reference_frame=world.root
+        )
     )
 
     description = DetectAction(
@@ -917,7 +927,7 @@ def test_gcs_navigation_plans_on_the_floor_the_robot_stands_on(
 
     base_pose = robot.root.global_pose
     floor_box = floor.as_bounding_box_collection_at_origin(
-        HomogeneousTransformationMatrix(reference_frame=world.root)
+        HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     ).bounding_box()
     assert floor_box.min_x <= float(base_pose.x) <= floor_box.max_x
     assert floor_box.min_y <= float(base_pose.y) <= floor_box.max_y
@@ -960,8 +970,8 @@ def test_gcs_navigation_needs_a_floor_below_the_robot(
     rather than an unreachable target.
     """
     world, robot, extensions = multiple_robot_apartment_context
-    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        -50, -50, 0
+    robot.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(-50, -50, 0)
     )
     world.notify_state_change()
 
@@ -1080,8 +1090,10 @@ def test_elevator_navigation(multiple_robot_apartment_context, rclpy_node):
     action = ElevatorNavigation(elevator=elevator, target_floor=first_floor)
     plan = action
 
-    robot.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -5, 0, reference_frame=world.root
+    robot.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, -5, 0, reference_frame=world.root
+        )
     )
 
     # The operator watches every model change of the shared world, so it has to stop
@@ -1121,8 +1133,10 @@ def test_search_action(multiple_robot_apartment_context) -> None:
     milk_body = world.get_body_by_name("milk.stl")
     # East of the multi-storey building the fixture merges in, where every robot has the
     # clearance to stand somewhere the milk is visible from.
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        6, -2, 1.2, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            6, -2, 1.2, reference_frame=world.root
+        )
     )
     search = SearchAction.looking_around(
         milk_body.global_pose, Milk, context_of(extensions)
@@ -1198,8 +1212,10 @@ def test_a_search_detects_within_its_cross_and_the_detection_margin(
 def test_a_search_leaves_the_world_as_it_found_it(multiple_robot_apartment_context):
     world, robot, extensions = multiple_robot_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        6, -2, 1.2, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            6, -2, 1.2, reference_frame=world.root
+        )
     )
     bodies_before = list(world.kinematic_structure_entities)
 
@@ -1764,7 +1780,7 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
 
 
 def add_cup(
-    world: World, name: str, world_T_cup: HomogeneousTransformationMatrix
+    world: World, name: str, world_T_cup: HomogeneousTransformationMatrix3Dimensional
 ) -> Cup:
     """
     :param world: The world the cup is added to.
@@ -1802,7 +1818,7 @@ def cup_in_reach(robot: AbstractRobot, name: str, roll: float = 0.0) -> Cup:
     cup = add_cup(
         world,
         name,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, -2, 0.8, roll=roll, reference_frame=world.root
         ),
     )
@@ -1864,7 +1880,7 @@ def cup_held_tilted(robot: AbstractRobot) -> Cup:
             FixedConnection(
                 parent=tool_frame,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     roll=0.4, pitch=0.3, reference_frame=tool_frame
                 ),
             )
@@ -2191,14 +2207,14 @@ def cup_for_each_arm(multiple_robot_apartment_context) -> CupForEachArm:
     near_cup = add_cup(
         world,
         "near_cup",
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.2, y=-1.8, z=0.8, reference_frame=world.root
         ),
     )
     far_cup = add_cup(
         world,
         "far_cup",
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, y=-2.2, z=0.8, reference_frame=world.root
         ),
     )

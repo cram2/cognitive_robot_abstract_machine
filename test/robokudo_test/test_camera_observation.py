@@ -26,7 +26,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -51,7 +53,7 @@ def test_cas_exposes_camera_observation_without_copying_camera():
         root=root,
         camera_model=model,
     )
-    world_T_camera = HomogeneousTransformationMatrix(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=root,
         child_frame=root,
     )
@@ -126,7 +128,7 @@ def test_camera_observation_returns_copy_with_pose():
         world_T_camera=None,
         timestamp_nanoseconds=123,
     )
-    world_T_camera = HomogeneousTransformationMatrix(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=root,
         child_frame=root,
     )
@@ -168,7 +170,7 @@ def test_observation_rejects_pose_without_reference_frame(
     """
     Pose replacement validates the reference frame before accepting the observation.
     """
-    pose = HomogeneousTransformationMatrix(
+    pose = HomogeneousTransformationMatrix3Dimensional(
         child_frame=unposed_camera_observation.camera.root
     )
     with pytest.raises(InvalidCameraObservation):
@@ -181,7 +183,7 @@ def test_observation_rejects_pose_for_another_camera(
     """
     A sampled child must identify the observation's own optical camera.
     """
-    pose = HomogeneousTransformationMatrix(
+    pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=Body(name=PrefixedName(name="world")),
         child_frame=Body(name=PrefixedName(name="another_camera")),
     )
@@ -200,7 +202,7 @@ def test_observation_resolves_unspecified_child_to_camera_root(
     observation = unposed_camera_observation
     if with_pose:
         observation = observation.with_world_T_camera(
-            HomogeneousTransformationMatrix(
+            HomogeneousTransformationMatrix3Dimensional(
                 reference_frame=Body(name=PrefixedName(name="world"))
             )
         )
@@ -215,7 +217,7 @@ def test_observation_accepts_ros_frame_alias(
     """
     root = unposed_camera_observation.camera.root
     alias = Body(name=PrefixedName(name="/" + root.name.name, prefix=root.name.prefix))
-    pose = HomogeneousTransformationMatrix(
+    pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=Body(name=PrefixedName(name="world")), child_frame=alias
     )
     observation = unposed_camera_observation.with_world_T_camera(pose)
@@ -230,7 +232,7 @@ def test_observation_rejects_alias_from_another_robot(
     """
     root = unposed_camera_observation.camera.root
     alias = Body(name=PrefixedName(name="/" + root.name.name, prefix="another_robot"))
-    pose = HomogeneousTransformationMatrix(
+    pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=Body(name=PrefixedName(name="world")), child_frame=alias
     )
     with pytest.raises(InvalidCameraObservation):
@@ -264,7 +266,7 @@ def test_decoded_observation_rejects_invalid_pose_frames(
     recorded = RecordedCameraObservation(
         camera_id=str(observation.camera.id),
         effective_camera_model=observation.effective_camera_model,
-        world_T_camera=HomogeneousTransformationMatrix(
+        world_T_camera=HomogeneousTransformationMatrix3Dimensional(
             reference_frame=None if missing_reference else reference,
             child_frame=observation.camera.root if missing_reference else other_camera,
         ),

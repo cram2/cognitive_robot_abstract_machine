@@ -19,7 +19,7 @@ from semantic_digital_twin.adapters.ros.msg_converter import (
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
     Quaternion,
@@ -38,7 +38,9 @@ from semantic_digital_twin.world_description.geometry import (
 
 @dataclass
 class TransformToSemDTConverter(
-    Ros2ToSemDTConverter[geometry_msgs.Transform, HomogeneousTransformationMatrix]
+    Ros2ToSemDTConverter[
+        geometry_msgs.Transform, HomogeneousTransformationMatrix3Dimensional
+    ]
 ):
     """
     Converts a transform that names no frames into a transformation matrix without
@@ -48,8 +50,8 @@ class TransformToSemDTConverter(
     @classmethod
     def convert(
         cls, data: geometry_msgs.Transform, world: World
-    ) -> HomogeneousTransformationMatrix:
-        return HomogeneousTransformationMatrix.from_xyz_quaternion(
+    ) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=data.translation.x,
             pos_y=data.translation.y,
             pos_z=data.translation.z,
@@ -63,7 +65,7 @@ class TransformToSemDTConverter(
 @dataclass
 class TransformStampedToSemDTConverter(
     Ros2ToSemDTConverter[
-        geometry_msgs.TransformStamped, HomogeneousTransformationMatrix
+        geometry_msgs.TransformStamped, HomogeneousTransformationMatrix3Dimensional
     ]
 ):
     """
@@ -74,7 +76,7 @@ class TransformStampedToSemDTConverter(
     @classmethod
     def convert(
         cls, data: geometry_msgs.TransformStamped, world: World
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         result = TransformToSemDTConverter.convert(data.transform, world)
         if data.header.frame_id != "":
             result.reference_frame = world.get_kinematic_structure_entity_by_name(

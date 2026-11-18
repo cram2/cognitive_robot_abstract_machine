@@ -6,7 +6,7 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
     Quaternion,
@@ -52,7 +52,9 @@ def test_features_of_a_pose_are_read_from_the_pose_itself():
         Quaternion(0.0, 0.0, 0.0, 1.0),
         AxisAngle(axis=Vector3Dimensional(0.0, 1.0, 0.0), angle=0.4),
         RotationMatrix.from_rpy(roll=0.1, pitch=0.2, yaw=0.3),
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.3),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1.0, y=2.0, z=3.0, yaw=0.3
+        ),
         Pose3Dimensional.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.5),
         Inertial(mass=2.0),
     ],

@@ -41,6 +41,7 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     BulletCollisionDetector,
 )
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
+from krrood_spatial_math.space import EuclideanSpace3Dimensional
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import (
@@ -73,7 +74,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
@@ -599,13 +600,12 @@ _LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass
-class World(HasSimulatorProperties):
+class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
     """
-    A class representing the world.
+    The three-dimensional space the frames of its kinematic structure entities chart.
 
-    The world manages a set of kinematic structure entities and connections represented
-    as a tree-like graph. The nodes represent kinematic structure entities in the world,
-    and the edges represent joins between them.
+    It holds those entities as the nodes of a tree-shaped graph whose edges are the
+    connections between them.
     """
 
     kinematic_structure: rx.PyDAG[KinematicStructureEntity] = field(
@@ -1870,7 +1870,7 @@ class World(HasSimulatorProperties):
 
     # %% World Merging
     def merge_world_at_pose(
-        self, other: World, pose: HomogeneousTransformationMatrix
+        self, other: World, pose: HomogeneousTransformationMatrix3Dimensional
     ) -> None:
         """
         Merge another world into the existing one, creates a 6DoF connection between the
@@ -2107,12 +2107,12 @@ class World(HasSimulatorProperties):
             # The pose lives entirely in the degrees of freedom, so the connection sits
             # right on the new parent and the offset below is set from it afterwards.
             new_connection = old_connection.copy_with_new_parent(
-                new_parent, HomogeneousTransformationMatrix()
+                new_parent, HomogeneousTransformationMatrix3Dimensional()
             )
         else:
             # Relocate the connection frame so the branch keeps its world pose, then let the connection
             # copy itself under the new parent (preserving its type and degree of freedom).
-            new_parent_T_connection = HomogeneousTransformationMatrix(
+            new_parent_T_connection = HomogeneousTransformationMatrix3Dimensional(
                 (
                     self.compute_forward_kinematics(
                         new_parent,
@@ -2519,7 +2519,7 @@ class World(HasSimulatorProperties):
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
         enable_unsafe_inside_world_block: bool = False,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip
         KinematicStructureEntity.
@@ -2541,7 +2541,7 @@ class World(HasSimulatorProperties):
 
     def compose_forward_kinematics_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
@@ -2593,7 +2593,7 @@ class World(HasSimulatorProperties):
         self,
         entity_a: KinematicStructureEntity,
         entity_b: KinematicStructureEntity,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the transform entity_a_T_entity_b without using the forward kinematics
         manager.
@@ -2604,16 +2604,16 @@ class World(HasSimulatorProperties):
             transform
         """
         root_T_reference = (
-            HomogeneousTransformationMatrix()
+            HomogeneousTransformationMatrix3Dimensional()
             if entity_a == self.root
             else self._manually_compute_world_root_T_self(entity_a)
         )
         root_T_target = (
-            HomogeneousTransformationMatrix()
+            HomogeneousTransformationMatrix3Dimensional()
             if entity_b == self.root
             else self._manually_compute_world_root_T_self(entity_b)
         )
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             (root_T_reference.inverse() @ root_T_target).evaluate(),
             reference_frame=entity_a,
             child_frame=entity_b,
@@ -2621,7 +2621,7 @@ class World(HasSimulatorProperties):
 
     def _manually_compute_world_root_T_self(
         self, entity: KinematicStructureEntity
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes world_root_T_self without using the world's forward kinematics manager.
 
@@ -2650,7 +2650,7 @@ class World(HasSimulatorProperties):
         self,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
-        target: HomogeneousTransformationMatrix,
+        target: HomogeneousTransformationMatrix3Dimensional,
         dt: float = 0.05,
         max_iterations: int = 200,
         translation_velocity: float = 0.2,

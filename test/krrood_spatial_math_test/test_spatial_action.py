@@ -15,7 +15,7 @@ from krrood_spatial_math.spatial_types import (
     AxisAngle,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     HomogeneousTransformationMatrix2Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -50,7 +50,7 @@ def test_a_transformation_turns_and_shifts_a_point(table_frame, camera_frame):
     """
     A transformation applied to a point turns it and shifts it by the translation.
     """
-    table_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
+    table_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, yaw=math.pi / 2, reference_frame=table_frame, child_frame=camera_frame
     )
 
@@ -67,7 +67,7 @@ def test_a_transformation_turns_an_axis_angle(table_frame, camera_frame):
     A transformation applied to an axis angle composes its rotation with the axis
     angle's and drops its translation.
     """
-    table_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
+    table_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, yaw=math.pi / 2, reference_frame=table_frame, child_frame=camera_frame
     )
     turn_about_x = AxisAngle(Vector3Dimensional.X(), 0.3, reference_frame=camera_frame)
@@ -92,7 +92,7 @@ def test_a_transformation_refuses_a_value_outside_its_child_frame(
     """
     A transformation only applies to a value given in its child frame.
     """
-    table_T_camera = HomogeneousTransformationMatrix(
+    table_T_camera = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=table_frame, child_frame=camera_frame
     )
 
@@ -107,10 +107,10 @@ def test_a_transformation_composes_only_with_a_change_into_its_child_frame(
     A transformation composes only with a change whose reference frame is its child
     frame.
     """
-    table_T_camera = HomogeneousTransformationMatrix(
+    table_T_camera = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=table_frame, child_frame=camera_frame
     )
-    table_T_gripper = HomogeneousTransformationMatrix(
+    table_T_gripper = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=table_frame, child_frame=gripper_frame
     )
 
@@ -122,7 +122,7 @@ def test_a_transformation_accepts_a_value_without_a_frame(table_frame, camera_fr
     """
     A value given in no frame is taken to be given in the transformation's child frame.
     """
-    table_T_camera = HomogeneousTransformationMatrix(
+    table_T_camera = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=table_frame, child_frame=camera_frame
     )
 

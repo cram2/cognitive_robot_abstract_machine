@@ -88,7 +88,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     EntryWay,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
 )
@@ -174,7 +174,9 @@ def test_region_specification_uses_connection_specification(empty_world):
 
 def test_body_and_connection_pose_and_name_override(empty_world):
     spec = BodySpecification.box("box", Scale(1, 1, 1))
-    spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    spec.parent_T_self = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1, y=2, z=3
+    )
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
@@ -183,10 +185,10 @@ def test_body_and_connection_pose_and_name_override(empty_world):
 
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
     spec = BodySpecification.box("box", Scale(1, 1, 1))
-    spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    spec.parent_T_self = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1)
     body = spec.spawn(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=5),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=5),
     )
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
     np.testing.assert_allclose(root_T_body.position.to_np()[0], 5)
@@ -459,7 +461,7 @@ def test_from_event_constructor_spawns(empty_world):
     ],
 )
 def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1, y=2, z=3)
     entity = make_spec(pose).spawn(empty_world)
     root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
     np.testing.assert_allclose(root_T_entity.position.to_np()[:3], [1, 2, 3])
@@ -654,10 +656,10 @@ def test_world_specification_with_robot():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=1.0
                     ),
-                    odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         y=2.0
                     ),
                 )
@@ -757,13 +759,13 @@ def test_world_specification_with_several_robots():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=1.0
                     ),
                 ),
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=-1.0
                     ),
                 ),
@@ -817,7 +819,9 @@ def test_a_localization_is_fixed_by_default(empty_world):
 
 
 def test_a_movable_localization_starts_at_the_localization_pose(empty_world):
-    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, y=2.0
+    )
 
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
@@ -839,7 +843,7 @@ def test_a_movable_localization_moves(empty_world):
         localization_connection_type=Connection6DoF,
     ).spawn(empty_world)
     localization = _localization_of(robot)
-    moved_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    moved_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=3.0, reference_frame=empty_world.root
     )
 
@@ -907,7 +911,9 @@ def test_a_robot_without_a_mobile_base_hangs_from_the_world_root_by_its_localiza
 
 
 def test_a_robot_without_a_mobile_base_starts_at_the_localization_pose(empty_world):
-    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, y=2.0
+    )
 
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
@@ -936,7 +942,9 @@ def test_a_start_pose_is_rejected_for_a_robot_without_a_mobile_base():
     with pytest.raises(StartPoseWithoutMobileBaseError) as raised:
         RobotSpecification(
             semantic_annotation_type=MinimalRobot,
-            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0
+            ),
         )
 
     assert raised.value.robot_class is MinimalRobot
@@ -1264,7 +1272,9 @@ def test_connection_spec_connect_applies_pose(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
     FixedConnectionSpecification().connect(
         empty_world,
-        parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
+        parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1, y=2, z=3
+        ),
         child=child,
     )
     root_T_child = empty_world.compute_forward_kinematics(empty_world.root, child)
@@ -1316,11 +1326,11 @@ def test_connection_spec_connect_without_name_matches_direct_creation(empty_worl
 # like a door whose origin is its centre hanging on a hinge at its edge.
 
 
-def _hinge_T_door() -> HomogeneousTransformationMatrix:
+def _hinge_T_door() -> HomogeneousTransformationMatrix3Dimensional:
     """
     The pose of a door's centre relative to the hinge it swings on.
     """
-    return HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5)
 
 
 def _door_on_hinge_specification() -> BodySpecification:
@@ -1335,7 +1345,7 @@ def _door_on_hinge_specification() -> BodySpecification:
 
 def test_connect_places_the_child_at_its_offset_from_the_connection(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1)
     connection = FixedConnectionSpecification(
         connection_T_child=_hinge_T_door()
     ).connect(empty_world, child=child, parent_T_connection=parent_T_connection)
@@ -1352,7 +1362,9 @@ def test_connect_places_the_child_at_its_offset_from_the_connection(empty_world)
 def test_spawn_places_the_child_at_parent_T_self_when_its_joint_is_at_zero(
     empty_world,
 ):
-    parent_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(x=2, yaw=0.3)
+    parent_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=2, yaw=0.3
+    )
     door = _door_on_hinge_specification().spawn(
         empty_world, parent_T_self=parent_T_door
     )
@@ -1372,7 +1384,7 @@ def test_child_swings_about_its_connection_frame_not_its_own_origin(empty_world)
 
     expected_root_T_door = (
         _hinge_T_door().inverse()
-        @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=angle)
+        @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=angle)
         @ _hinge_T_door()
     )
     np.testing.assert_allclose(
@@ -1402,7 +1414,9 @@ def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
     )
     door = door_specification.spawn(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1, yaw=0.3
+        ),
     )
     handle = empty_world.get_body_by_name("handle")
     root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
@@ -1434,7 +1448,7 @@ def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
 
     expected_root_T_door = (
         _hinge_T_door().inverse()
-        @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=angle)
+        @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=angle)
         @ _hinge_T_door()
     )
     np.testing.assert_allclose(
@@ -1465,7 +1479,9 @@ def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_z
 ):
     door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1, yaw=0.3
+        ),
     )
     root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
 
@@ -1877,7 +1893,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
         ),
     )
     aperture_a.root_specification.parent_T_self = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.8)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=-0.8)
     )
     aperture_b = Aperture.get_annotation_specification(
         "hole_b",
@@ -1886,7 +1902,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
         ),
     )
     aperture_b.root_specification.parent_T_self = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.8)
     )
     wall = Wall.get_annotation_specification(
         "wall",
@@ -1934,7 +1950,7 @@ def test_nested_part_placement_is_relative_to_whole(empty_world):
         ),
     )
     handle_part.root_specification.parent_T_self = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5)
     )
     drawer = _spawn_with_parts(
         empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}

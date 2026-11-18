@@ -44,12 +44,12 @@ coordinate system. Its base depends on `krrood` alone.
   and from where a point of the plane lies in the source space.
 - `krrood_spatial_math.spatial_types`, with the extra `krrood_spatial_math[casadi]`:
   `CartesianPoint2Dimensional`, `CartesianPoint3Dimensional`, `Vector2Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
-  `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix`, `Pose3Dimensional`
+  `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`, `Pose3Dimensional`
   and `Pose2Dimensional`, as symbolic expressions that can also hold plain numbers. The 2D values
   lie on the x-y plane of their reference frame, a `FramePlane`, and are given in its
   `PlanarFrame`; `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two
   frames on one plane, and `FramePlaneProjection` the orthogonal projection onto a
-  frame's plane. Values derive from `SymbolicSpatialValue` (or `SymbolicPlanarValue`)
+  frame's plane. Values derive from `SymbolicSpatialValue3Dimensional` (or `SymbolicSpatialValue2Dimensional`)
   and changes from `SymbolicSpatialChange`; a value names the group that acts on it:
   `SpecialEuclideanGroupAction` (SE(3)), `SpecialOrthogonalGroupAction` (SO(3)) or
   `PlanarSpecialEuclideanGroupAction` (SE(2)).

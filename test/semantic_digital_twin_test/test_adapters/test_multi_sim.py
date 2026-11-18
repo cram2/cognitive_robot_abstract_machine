@@ -19,7 +19,7 @@ from semantic_digital_twin.exceptions import ParsingError, SimulationNotStartedE
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.tracy import Tracy
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
     Pose3Dimensional,
 )
@@ -229,7 +229,7 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
         start_time = time.time()
 
         new_body = Body(name=PrefixedName("test_body"))
-        box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        box_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.2, y=0.4, z=3.0, roll=0, pitch=0.5, yaw=0, reference_frame=new_body
         )
         box = Box(
@@ -257,7 +257,9 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
         region = Region(name=PrefixedName("test_region"))
         region_box = Box(
             scale=Scale(0.1, 0.5, 0.2),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=region),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=region
+            ),
             color=Color.from_rgba(red=0.0, green=1.0, blue=0.0, opacity=0.8),
         )
         region.area = ShapeCollection([region_box], reference_frame=region)
@@ -268,7 +270,7 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
                 FixedConnection(
                     parent=test_urdf_1_world.root,
                     child=region,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         z=0.5
                     ),
                 )
@@ -860,7 +862,7 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
     )
     stl_parser = STLParser(milk_path)
     mesh_world = stl_parser.create_world()
-    transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
+    transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.5, reference_frame=test_urdf_1_world.root
     )
 
@@ -888,7 +890,7 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
 def test_spawn_body_with_connections():
     def spawn_robot_body(spawn_world: World) -> Body:
         spawn_body = Body(name=PrefixedName("robot"))
-        box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        box_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0, y=0, z=0.5, roll=0, pitch=0, yaw=0, reference_frame=spawn_body
         )
         box = Box(
@@ -916,14 +918,16 @@ def test_spawn_body_with_connections():
             [cylinder], reference_frame=spawn_left_shoulder_body
         )
         dof = DegreeOfFreedom(name=PrefixedName("left_shoulder_joint"))
-        left_shoulder_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=0,
-            pos_y=0.3,
-            pos_z=0.9,
-            quat_w=0.707,
-            quat_x=0.707,
-            quat_y=0,
-            quat_z=0,
+        left_shoulder_origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+                pos_x=0,
+                pos_y=0.3,
+                pos_z=0.9,
+                quat_w=0.707,
+                quat_x=0.707,
+                quat_y=0,
+                quat_z=0,
+            )
         )
 
         with spawn_world.modify_world():
@@ -949,14 +953,16 @@ def test_spawn_body_with_connections():
             [cylinder], reference_frame=spawn_right_shoulder_body
         )
         dof = DegreeOfFreedom(name=PrefixedName("right_shoulder_joint"))
-        right_shoulder_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=0,
-            pos_y=-0.3,
-            pos_z=0.9,
-            quat_w=0.707,
-            quat_x=0.707,
-            quat_y=0,
-            quat_z=0,
+        right_shoulder_origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+                pos_x=0,
+                pos_y=-0.3,
+                pos_z=0.9,
+                quat_w=0.707,
+                quat_x=0.707,
+                quat_y=0,
+                quat_z=0,
+            )
         )
 
         with spawn_world.modify_world():
@@ -1018,7 +1024,7 @@ def test_body_frame_excludes_joint_state_at_build_time():
     # A tip offset from the joint axis, so a rotation actually moves its position
     # (the joint child sits on the axis and would not reveal the bug).
     tip_link = Body(name=PrefixedName("tip"))
-    rotated_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    rotated_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.3,
         pos_y=0.0,
         pos_z=0.9,
@@ -1027,7 +1033,9 @@ def test_body_frame_excludes_joint_state_at_build_time():
         quat_y=0.0,
         quat_z=0.0,
     )
-    tip_offset = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, y=0.2, z=0.0)
+    tip_offset = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.5, y=0.2, z=0.0
+    )
     rotated_joint_dof = DegreeOfFreedom(name=PrefixedName("rotated_joint"))
     with world.modify_world():
         world.add_body(base_body)
@@ -1094,7 +1102,7 @@ def test_world_sim_state_sync():
         plane_body.collision = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         reference_frame=plane_body
                     ),
                     scale=Scale(2.0, 2.0, plane_half_thickness * 2),
@@ -1108,7 +1116,7 @@ def test_world_sim_state_sync():
         falling_box.collision = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         reference_frame=falling_box
                     ),
                     scale=Scale(
@@ -1150,11 +1158,13 @@ def test_world_sim_state_sync():
             f"scene bodies were not spawned in the simulator; bodies={body_names}"
         )
 
-        box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=float(init_pos[0]),
-            y=float(init_pos[1]),
-            z=float(init_pos[2]),
-            reference_frame=falling_box,
+        box_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=float(init_pos[0]),
+                y=float(init_pos[1]),
+                z=float(init_pos[2]),
+                reference_frame=falling_box,
+            )
         )
         time.sleep(2.5)
 
@@ -1524,7 +1534,7 @@ def _build_box_on_plane_world() -> BoxOnPlaneWorld:
         ground_plane.collision = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         reference_frame=ground_plane
                     ),
                     scale=Scale(2.0, 2.0, 0.1),
@@ -1539,7 +1549,7 @@ def _build_box_on_plane_world() -> BoxOnPlaneWorld:
         box.collision = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         reference_frame=box
                     ),
                     scale=Scale(0.2, 0.2, 0.2),
@@ -1597,11 +1607,13 @@ def test_pose_written_during_sim_to_world_pull_reaches_the_simulator():
 
     def write_new_pose():
         try:
-            box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=float(target_xyz[0]),
-                y=float(target_xyz[1]),
-                z=float(target_xyz[2]),
-                reference_frame=box,
+            box_connection.origin = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=float(target_xyz[0]),
+                    y=float(target_xyz[1]),
+                    z=float(target_xyz[2]),
+                    reference_frame=box,
+                )
             )
         except BaseException as error:  # surfaced on the main thread below
             write_failed.append(error)
@@ -1679,11 +1691,13 @@ def test_pose_write_waits_for_the_running_physics_step():
 
     def write_new_pose():
         try:
-            box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=float(target_xyz[0]),
-                y=float(target_xyz[1]),
-                z=float(target_xyz[2]),
-                reference_frame=box,
+            box_connection.origin = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=float(target_xyz[0]),
+                    y=float(target_xyz[1]),
+                    z=float(target_xyz[2]),
+                    reference_frame=box,
+                )
             )
         except BaseException as error:  # surfaced on the main thread below
             write_failed.append(error)
@@ -1753,7 +1767,7 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
         ground_plane.collision = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         reference_frame=ground_plane
                     ),
                     scale=Scale(2.0, 2.0, 0.1),
@@ -1766,7 +1780,7 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
             FixedConnection(
                 parent=root,
                 child=ground_plane,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=-0.05, reference_frame=root
                 ),
             )
@@ -1777,7 +1791,7 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
             cube.collision = ShapeCollection(
                 [
                     Box(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             reference_frame=cube
                         ),
                         scale=Scale(
@@ -1795,7 +1809,7 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
                     world=world,
                     parent=root,
                     child=cube,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=float(cube_offset[0]),
                         y=float(cube_offset[1]),
                         z=float(cube_offset[2]),
@@ -1895,7 +1909,7 @@ def falling_box_world() -> World:
         geometry = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         reference_frame=box
                     ),
                     scale=Scale(0.1, 0.1, 0.1),
@@ -1909,7 +1923,7 @@ def falling_box_world() -> World:
                 world=world,
                 parent=root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=1.0, reference_frame=root
                 ),
             )

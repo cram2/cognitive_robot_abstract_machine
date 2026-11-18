@@ -48,7 +48,7 @@ from semantic_digital_twin.robots.robot_parts import (
     RobotCamera,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -441,7 +441,7 @@ class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
         return cls(
             root=cls.create_optical_body(
                 robot_root._world.get_body_in_branch_by_name(robot_root, "camera_link"),
-                HomogeneousTransformationMatrix(),
+                HomogeneousTransformationMatrix3Dimensional(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)

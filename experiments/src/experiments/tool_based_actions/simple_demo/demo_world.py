@@ -11,7 +11,9 @@ import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Arm
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
@@ -105,7 +107,7 @@ def attach_sponge(world: World, arm: Arm) -> Body:
     connection = FixedConnection(
         parent=tool_frame,
         child=sponge_body,
-        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             reference_frame=tool_frame, **WIPE_MOUNT
         ),
     )

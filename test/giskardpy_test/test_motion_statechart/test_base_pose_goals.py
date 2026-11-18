@@ -29,7 +29,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.robots.stretch import Stretch
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
@@ -209,7 +209,7 @@ def _peak_yaw_per_tick_towards(
     turn = BaseOrientation(
         base=base,
         goal_pose=Pose3Dimensional.from_xyz_rpy(yaw=yaw, reference_frame=world.root),
-        parent_T_goal_reference_frame=HomogeneousTransformationMatrix(),
+        parent_T_goal_reference_frame=HomogeneousTransformationMatrix3Dimensional(),
         cruise_velocity=cruise_velocity,
     )
     executor = _compiled(world, turn)

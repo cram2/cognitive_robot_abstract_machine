@@ -35,7 +35,9 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
-    from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+    from krrood_spatial_math.spatial_types import (
+        HomogeneousTransformationMatrix3Dimensional,
+    )
 
 # %% Camera annotations
 
@@ -124,7 +126,7 @@ def test_camera_predicates_use_projection_model_resolution(
 
     def record_resolution(
         ray_tracer: RayTracer,
-        camera_pose: HomogeneousTransformationMatrix,
+        camera_pose: HomogeneousTransformationMatrix3Dimensional,
         resolution: CameraResolution,
         min_distance: float,
         field_of_view: FieldOfView,

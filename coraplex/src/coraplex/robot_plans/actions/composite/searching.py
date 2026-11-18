@@ -13,7 +13,9 @@ from cramph.composites import TryInOrder
 from cramph.context import StatechartContext
 from cramph.node import StatechartNode
 from krrood.entity_query_language.factories import a, variable
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
@@ -90,7 +92,7 @@ class SearchAction(SequentialAction):
         reference_frame = target_location.reference_frame
         half_extent = cross_arm_length + detection_margin
         detection_box = VolumetricBoundingBox(
-            origin=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=target_location.position, reference_frame=reference_frame
             ),
             min_x=-half_extent,

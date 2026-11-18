@@ -14,7 +14,9 @@ from semantic_digital_twin.adapters.exceptions import (
 )
 from semantic_digital_twin.adapters.mesh import MeshParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -196,7 +198,7 @@ class FBXParser(MeshParser):
                             )
 
                             t_mesh = Mesh.from_trimesh(
-                                origin=HomogeneousTransformationMatrix(),
+                                origin=HomogeneousTransformationMatrix3Dimensional(),
                                 mesh=trimesh.Trimesh(
                                     vertices=transformed_vertices, faces=o.faces
                                 ),
@@ -228,7 +230,9 @@ class FBXParser(MeshParser):
                     obj_body = world.get_body_by_name(name)
                     parent_body = world.get_body_by_name(parent_name)
 
-                    parent_T_child = HomogeneousTransformationMatrix(obj.matrix)
+                    parent_T_child = HomogeneousTransformationMatrix3Dimensional(
+                        obj.matrix
+                    )
 
                     connection = FixedConnection(
                         parent=parent_body,

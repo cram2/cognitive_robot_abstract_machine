@@ -23,7 +23,7 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -38,8 +38,10 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.parametrize(
     "world_T_odometry",
     [
-        HomogeneousTransformationMatrix(),
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=-0.5, yaw=numpy.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional(),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1.0, y=-0.5, yaw=numpy.pi / 2
+        ),
     ],
     ids=["odom_at_the_root", "localized_odom"],
 )

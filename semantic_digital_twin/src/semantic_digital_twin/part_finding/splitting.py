@@ -19,7 +19,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import CollisionDiffersFromVisualError
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh, Shape
 from semantic_digital_twin.world_description.inertial_properties import Inertial
@@ -416,7 +418,7 @@ class ColoredShape:
         )
         shape = Mesh.from_trimesh(
             mesh=mesh,
-            origin=HomogeneousTransformationMatrix(reference_frame=body),
+            origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=body),
             finish=self.shared(lambda shape: shape.finish),
         )
         shape.simulator_additional_properties = list(

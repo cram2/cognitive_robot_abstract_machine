@@ -22,7 +22,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import GelatinBox
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.connections import (
@@ -129,7 +129,7 @@ with world.modify_world():
             parent=world.root,
             child=box1,
             world=world,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 0.8, 0.0, table_top_z + box_edge / 2
             ),
         )
@@ -140,7 +140,7 @@ with world.modify_world():
             parent=world.root,
             child=box2,
             world=world,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 0.8, 0.25, table_top_z + box_edge / 2
             ),
         )
@@ -151,7 +151,7 @@ with world.modify_world():
             parent=world.root,
             child=box3,
             world=world,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 0.8, -0.25, table_top_z + box_edge / 2
             ),
         )

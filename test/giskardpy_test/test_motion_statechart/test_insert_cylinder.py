@@ -16,7 +16,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
 )
@@ -48,7 +48,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
                 world=world,
                 parent=tool_frame,
                 child=cylinder,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.0, 0.0, 0.02, reference_frame=tool_frame
                 ),
             )
@@ -62,7 +62,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
                 world=world,
                 parent=world.root,
                 child=hole,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                     point=hole_point, reference_frame=world.root
                 ),
             )

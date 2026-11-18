@@ -5,7 +5,9 @@ from random_events.interval import Bound, SimpleInterval
 from krrood.bounds import BoundsInterface
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
@@ -19,11 +21,11 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @pytest.fixture
-def origin() -> HomogeneousTransformationMatrix:
+def origin() -> HomogeneousTransformationMatrix3Dimensional:
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
-    return HomogeneousTransformationMatrix.from_xyz_rpy(
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         1, 2, 3, reference_frame=world.root
     )
 

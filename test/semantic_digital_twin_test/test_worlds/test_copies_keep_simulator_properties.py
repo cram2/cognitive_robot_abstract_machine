@@ -18,7 +18,7 @@ from typing_extensions import Any, Callable
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.adapters.multi_sim import MujocoJoint, MujocoTendon
@@ -435,7 +435,8 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
     hinge = simulated_world.connections[0]
 
     moved = hinge.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName("new_parent")),
+        HomogeneousTransformationMatrix3Dimensional(),
     )
 
     assert (

@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -66,7 +66,7 @@ class ViewDirection:
 
     def camera_pose(
         self, target: NDArray[np.float64], distance: float
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :param target: The point the camera looks at.
         :param distance: How far the camera is from it.
@@ -80,7 +80,7 @@ class ViewDirection:
         towards_camera = self.towards_camera
         zenith = np.array([0.0, 0.0, 1.0])
         image_up = zenith - (zenith @ towards_camera) * towards_camera
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=CartesianPoint3Dimensional(*(target + towards_camera * distance)),
             rotation_matrix=RotationMatrix.from_vectors(
                 x=Vector3Dimensional(*-towards_camera),

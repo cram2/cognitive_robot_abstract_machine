@@ -41,6 +41,7 @@ from typing_extensions import Iterable, Sequence, Self
 
 from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.spatial_types import (
+    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     FramePlaneProjection,
 )
@@ -380,20 +381,22 @@ class FloorPlan:
     The projection of 3D points onto the plane.
     """
 
+    def project_onto_plane(self, *, point: MetricPoint) -> CartesianPoint2Dimensional:
+        """
+        :param point: A point on the plane, or a 3D point in any frame of its world.
+        :return: The point on the plane, a 3D point projected onto it.
+        """
+        if isinstance(point, CartesianPoint3Dimensional):
+            return self.projection.project(point)
+        return point
+
     def coordinates(self, points: Iterable[MetricPoint]) -> np.ndarray:
         """
         :param points: Points on the plane, or 3D points in any frame of its world.
         :return: The points' coordinates on the plane as an array of x-y rows, in the
-            given order, each 3D point projected onto the plane first.
+            given order.
         """
-        points_on_plane = [
-            (
-                self.projection.project(point)
-                if isinstance(point, CartesianPoint3Dimensional)
-                else point
-            )
-            for point in points
-        ]
+        points_on_plane = [self.project_onto_plane(point=point) for point in points]
         return np.array([[float(point.x), float(point.y)] for point in points_on_plane])
 
 
@@ -743,7 +746,10 @@ class EndpointsLayer(SceneLayer):
         self, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         waypoints = scene.path.waypoints
-        start, goal = scene.floor_plan.coordinates([waypoints[0], waypoints[-1]])
+        start, goal = (
+            scene.floor_plan.project_onto_plane(point=waypoint)
+            for waypoint in (waypoints[0], waypoints[-1])
+        )
         return [
             self._draw_endpoint(axes, start, "start", "o", palette.start, palette),
             self._draw_endpoint(axes, goal, "goal", "s", palette.goal, palette),
@@ -752,7 +758,7 @@ class EndpointsLayer(SceneLayer):
     def _draw_endpoint(
         self,
         axes: Axes,
-        endpoint: np.ndarray,
+        endpoint: CartesianPoint2Dimensional,
         label: str,
         marker: str,
         color: str,
@@ -760,14 +766,14 @@ class EndpointsLayer(SceneLayer):
     ) -> LegendEntry:
         """
         :param axes: The panel to draw into.
-        :param endpoint: The x-y coordinates of the point to mark on the floor plan.
+        :param endpoint: The point to mark on the floor plan.
         :param label: The name written beside the marker.
         :param marker: The matplotlib marker to draw.
         :param color: The color of the marker.
         :param palette: The colors of the figure.
         :return: The legend entry of this endpoint.
         """
-        x, y = float(endpoint[0]), float(endpoint[1])
+        x, y = float(endpoint.x), float(endpoint.y)
         drawn = axes.plot(
             [x],
             [y],

@@ -14,7 +14,7 @@ from coraplex.locations.costmaps import (
 )
 from krrood.entity_query_language.exceptions import NonPositiveLimitValue
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -30,14 +30,16 @@ def test_attachment_exclusion(pr2_apartment_context, rclpy_node):
     world, robot_view, extensions = pr2_apartment_context
 
     robot_view.root.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             -1.5, 1, 0, reference_frame=world.root
         )
     )
     world.get_body_by_name(
         "milk.stl"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        -1.8, 1, 1, reference_frame=world.root
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            -1.8, 1, 1, reference_frame=world.root
+        )
     )
 
     test_world = deepcopy(world)
@@ -129,7 +131,7 @@ def test_a_merged_map_samples_on_the_terms_of_the_map_it_was_merged_into(
 def test_occupancy_robot_exclusion(pr2_apartment_context):
     world, robot_view, extensions = pr2_apartment_context
     robot_view.root.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(10, 10)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(10, 10)
     )
     occupancy_map = OccupancyCostmap(
         resolution=0.02,

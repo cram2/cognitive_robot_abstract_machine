@@ -46,7 +46,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Torso,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
     RotationMatrix,
 )
@@ -201,7 +201,7 @@ class GarmiCamera(RobotCamera[FieldOfViewCameraModel]):
         return cls(
             root=cls.create_optical_body(
                 robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     data=RotationMatrix.from_vectors(
                         x=-Vector3Dimensional.Y(),
                         y=-Vector3Dimensional.Z(),

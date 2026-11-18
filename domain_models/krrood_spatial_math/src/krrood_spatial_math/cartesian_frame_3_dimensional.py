@@ -1,3 +1,8 @@
+"""
+Cartesian frames on a three-dimensional Euclidean space, and how serialized values refer
+to them.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -14,7 +19,12 @@ from krrood_spatial_math.coordinate_system import (
     CartesianFrame,
     CoordinateRepresentationT,
 )
-from krrood_spatial_math.exceptions import MissingCartesianFrame3DimensionalResolver
+from krrood_spatial_math.exceptions import (
+    FrameOutsideSpaceError,
+    FramesOfDifferentSpacesError,
+    MissingCartesianFrame3DimensionalResolver,
+    MissingReferenceFrameError,
+)
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
 
 # %% frames that positions and directions are expressed in
@@ -28,12 +38,33 @@ class CartesianFrame3Dimensional(
     such as the frame of a robot's body.
     """
 
-    @abstractmethod
     def express_in_own_frame(
-        self, value: CoordinateRepresentationT
+        self, *, value: CoordinateRepresentationT
     ) -> CoordinateRepresentationT:
         """
-        :param value: A value in the same space as this frame.
+        :param value: A value given in a frame of the same space as this frame.
+        :return: The same value, given in this frame.
+        :raises MissingReferenceFrameError: If the value is given in no frame.
+        :raises FrameOutsideSpaceError: If this frame or the value's frame charts no
+            known space.
+        :raises FramesOfDifferentSpacesError: If the value's frame charts another space.
+        """
+        value_frame = value.coordinate_system
+        if value_frame is None:
+            raise MissingReferenceFrameError(spatial_type=value)
+        for frame in (self, value_frame):
+            if frame.space is None:
+                raise FrameOutsideSpaceError(frame=frame)
+        if value_frame.space is not self.space:
+            raise FramesOfDifferentSpacesError(frame=self, value_frame=value_frame)
+        return self.transform_into_own_frame(value=value)
+
+    @abstractmethod
+    def transform_into_own_frame(
+        self, *, value: CoordinateRepresentationT
+    ) -> CoordinateRepresentationT:
+        """
+        :param value: A value given in a frame of the same space as this frame.
         :return: The same value, given in this frame.
         """
 

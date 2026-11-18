@@ -1,3 +1,7 @@
+"""
+Errors of spatial types, frames and the spaces they chart.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -52,6 +56,10 @@ class InsufficientVectorsError(SpatialTypesError):
 
 @dataclass
 class ReferenceFrameMismatchError(SpatialTypesError):
+    """
+    Raised when a value is given in another frame than an operation on it requires.
+    """
+
     expected_frame: CoordinateSystem | None
     """
     The frame the operation requires, or ``None`` if it requires no frame.
@@ -88,7 +96,7 @@ class ReferenceFrameMismatchError(SpatialTypesError):
     def suggest_correction(self) -> str:
         return (
             "express it in the expected frame first, with "
-            "expected_frame.express_in_own_frame(value), or construct it with the "
+            "expected_frame.express_in_own_frame(value=value), or construct it with the "
             "expected frame."
         )
 
@@ -110,6 +118,60 @@ class MissingReferenceFrameError(SpatialTypesError):
 
     def suggest_correction(self) -> str:
         return "construct it with an explicit reference frame."
+
+
+# %% frames of one space
+
+
+@dataclass(kw_only=True)
+class FrameOutsideSpaceError(SpatialTypesError):
+    """
+    Raised when a frame charts no known space, so no change relates it to another frame.
+    """
+
+    frame: CoordinateSystem
+    """
+    The frame whose space is not known.
+    """
+
+    def error_message(self) -> str:
+        return f"Frame '{self.frame.name}' charts no known space."
+
+    def suggest_correction(self) -> str:
+        return (
+            "give the frame the space it charts, such as by adding a body to its world "
+            "first."
+        )
+
+
+@dataclass(kw_only=True)
+class FramesOfDifferentSpacesError(SpatialTypesError):
+    """
+    Raised when a value is to be expressed in a frame of another space, whose points
+    relate to its own only through a map between the spaces.
+    """
+
+    frame: CoordinateSystem
+    """
+    The frame the value was to be expressed in.
+    """
+
+    value_frame: CoordinateSystem
+    """
+    The frame the value is given in.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Frame '{self.value_frame.name}' charts another space than frame "
+            f"'{self.frame.name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "express the value in a frame of its own space, or map it between the "
+            "spaces first."
+        )
 
 
 # %% values and changes on the x-y plane of a frame

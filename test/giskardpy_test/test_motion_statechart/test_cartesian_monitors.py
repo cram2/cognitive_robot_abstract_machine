@@ -21,7 +21,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
     RotationMatrix,
@@ -146,7 +146,7 @@ def test_pose_reached(pr2_world_state_reset: World):
         "r_gripper_tool_frame"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
-    goal_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    goal_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.6, y=-0.3, z=1.0, reference_frame=root
     )
 

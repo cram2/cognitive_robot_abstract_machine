@@ -25,7 +25,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
@@ -191,7 +191,7 @@ def pr2_with_box(pr2_world_copy) -> World:
         root_C_box = FixedConnection(
             parent=pr2_world_copy.root,
             child=box,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1.2, z=0.3, reference_frame=pr2_world_copy.root
             ),
         )
@@ -215,7 +215,7 @@ def giskard_factory(init_background_node, robot: GiskardTester):
         statechart.add_node(node=initial_config)
 
         if robot.has_odometry_joint():
-            base_goal = HomogeneousTransformationMatrix(
+            base_goal = HomogeneousTransformationMatrix3Dimensional(
                 reference_frame=robot.api.world.root
             )
             base_pose_reached = SetOdometry(name="initial pose", base_pose=base_goal)

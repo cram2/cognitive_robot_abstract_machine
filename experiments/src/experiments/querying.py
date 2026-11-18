@@ -53,7 +53,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -165,14 +165,14 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     with world.modify_world():
         world.merge_world_at_pose(
             bowl,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 2.4, 2.2, 1, reference_frame=world.root
             ),
         )
         connection = FixedConnection(
             parent=world.get_body_by_name("cabinet10_drawer_top"),
             child=spoon.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -0.05, -0.05, 0
             ),
         )

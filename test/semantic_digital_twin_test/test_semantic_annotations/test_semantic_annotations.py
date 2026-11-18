@@ -164,7 +164,7 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
                 world,
                 root,
                 obstacle_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     -2.0, 0.0, 0.0, reference_frame=root
                 ),
             )
@@ -174,7 +174,7 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
                 world,
                 root,
                 wall_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     2.0, 0.0, 0.0, reference_frame=root
                 ),
             )
@@ -182,7 +182,7 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         obstacle_body.collision.append(Box(scale=Scale(0.2, 0.2, 0.2)))
         wall_body.collision.append(Box(scale=Scale(0.2, 2.0, 0.2)))
 
-    origin = HomogeneousTransformationMatrix(reference_frame=root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=root)
     search_space = BoundingBoxCollection(
         [VolumetricBoundingBox(-5, -5, -5, 5, 5, 5, origin)], root
     )
@@ -410,7 +410,9 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
     link = Body(name=PrefixedName("link", prefix="review"))
     collision = Box(
         scale=Scale(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=link),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=link
+        ),
     )
     link.collision = ShapeCollection([collision], reference_frame=link)
     with world.modify_world():
@@ -517,7 +519,7 @@ class DrawerWithSlidingHandle:
                 world=world,
                 parent=case,
                 child=handle_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=HANDLE_OFFSET_X, reference_frame=case
                 ),
                 axis=Vector3Dimensional.X(reference_frame=case),

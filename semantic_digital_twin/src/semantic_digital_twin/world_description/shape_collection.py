@@ -16,7 +16,7 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, fro
 from random_events.product_algebra import Event, SimpleEvent
 from semantic_digital_twin.exceptions import MismatchingWorld
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world_description.geometry import (
@@ -161,7 +161,7 @@ class ShapeCollection(SubclassJSONSerializer):
         return concatenate(transformed_meshes)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: HomogeneousTransformationMatrix
+        self, origin: HomogeneousTransformationMatrix3Dimensional
     ) -> BoundingBoxCollection:
         """
         Provides the bounding box collection for this entity given a transformation
@@ -195,7 +195,7 @@ class ShapeCollection(SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=reference_frame)
         )
 
     def to_json(self, **kwargs) -> dict[str, Any]:
@@ -237,7 +237,9 @@ class ShapeCollection(SubclassJSONSerializer):
     def scale(self):
         return (
             self.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=self.reference_frame)
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=self.reference_frame
+                )
             )
             .bounding_box()
             .scale
@@ -374,11 +376,13 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
                 np.array([interval.upper for interval in combination])
                 - origin_coordinates
             )
-            origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=CartesianPoint3Dimensional.from_iterable(
-                    _padded_to_3d(origin_coordinates)
-                ),
-                reference_frame=reference_frame,
+            origin = (
+                HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                    point=CartesianPoint3Dimensional.from_iterable(
+                        _padded_to_3d(origin_coordinates)
+                    ),
+                    reference_frame=reference_frame,
+                )
             )
             box = box_type.from_array_bounds(lower, upper, origin)
             if not keep_surface and any(
@@ -452,7 +456,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         return box_type.from_array_bounds(
             lower,
             upper,
-            HomogeneousTransformationMatrix(reference_frame=self.reference_frame),
+            HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=self.reference_frame
+            ),
         )
 
 

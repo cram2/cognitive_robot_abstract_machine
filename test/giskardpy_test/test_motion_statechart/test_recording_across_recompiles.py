@@ -20,7 +20,7 @@ from giskardpy.motion_statechart.debug_expression_trajectory import (
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -174,7 +174,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
             FixedConnection(
                 parent=world.root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5
                 ),
             )

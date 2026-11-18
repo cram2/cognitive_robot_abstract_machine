@@ -12,7 +12,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import InvalidCameraResolutionError
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.testing import ray_test_world
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -36,7 +38,9 @@ def test_create_segmentation_mask(ray_test_world):
         ]
     )
 
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body2
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -44,7 +48,9 @@ def test_create_segmentation_mask(ray_test_world):
 
     resolution = CameraResolution(width=256, height=256)
     seg = rt.create_segmentation_mask(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        HomogeneousTransformationMatrix3Dimensional(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
     assert seg.shape == (resolution.width, resolution.height)
@@ -76,7 +82,9 @@ def test_create_depth_map(ray_test_world):
 
     resolution = CameraResolution(width=512, height=512)
     depth_map = rt.create_depth_map(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        HomogeneousTransformationMatrix3Dimensional(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
     assert depth_map is not None
@@ -95,7 +103,9 @@ def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
 
     resolution = CameraResolution(width=128, height=64)
     camera_rays = ray_tracer.create_camera_rays(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        HomogeneousTransformationMatrix3Dimensional(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
     ray_origins = camera_rays.origin_points
@@ -124,7 +134,9 @@ def test_create_segmentation_mask_with_rectangular_resolution(ray_test_world):
 
     resolution = CameraResolution(width=128, height=64)
     segmentation_mask = ray_tracer.create_segmentation_mask(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        HomogeneousTransformationMatrix3Dimensional(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
 
@@ -146,7 +158,9 @@ def test_create_depth_map_with_rectangular_resolution(ray_test_world):
 
     resolution = CameraResolution(width=128, height=64)
     depth_map = ray_tracer.create_depth_map(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        HomogeneousTransformationMatrix3Dimensional(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
 
@@ -194,12 +208,16 @@ def test_ray_test(ray_test_world):
 
 def test_ray_test_batch(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    world.get_connection(world.root, body1).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body1
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body1,
     )
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body2
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -228,12 +246,16 @@ def test_ray_test_batch(ray_test_world):
 
 def test_min_distance(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    world.get_connection(world.root, body1).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body1
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, 0.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body1,
     )
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body2
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 10], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -256,12 +278,16 @@ def test_min_distance(ray_test_world):
 
 def test_max_distance(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    world.get_connection(world.root, body1).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body1
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body1,
     )
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, body2
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 10], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -318,7 +344,7 @@ def _textured_box_body(name: str, seed: int) -> Body:
         [
             Mesh.from_trimesh(
                 mesh=box,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=body
                 ),
             )
@@ -343,7 +369,7 @@ def textured_world() -> World:
                 FixedConnection(
                     parent=root,
                     child=box,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=2.0 * index, reference_frame=root
                     ),
                 )

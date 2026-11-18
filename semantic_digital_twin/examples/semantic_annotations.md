@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import List
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Sphere, Box, Scale
@@ -56,7 +56,7 @@ with world.modify_world():
 
     # Our first apple
     apple_body = Body(name=PrefixedName("apple_body"))
-    sphere = Sphere(radius=0.15, origin=HomogeneousTransformationMatrix(reference_frame=apple_body))
+    sphere = Sphere(radius=0.15, origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=apple_body))
     apple_body.collision = [sphere]
     apple_body.visual = [sphere]
 
@@ -65,7 +65,7 @@ with world.modify_world():
 
     # Our second apple
     apple_body_2 = Body(name=PrefixedName("apple_body_2"))
-    sphere2 = Sphere(radius=0.15, origin=HomogeneousTransformationMatrix(reference_frame=apple_body_2))
+    sphere2 = Sphere(radius=0.15, origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=apple_body_2))
     apple_body_2.collision = [sphere2]
     apple_body_2.visual = [sphere2]
     c2 = Connection6DoF.create_with_dofs(parent=root, child=apple_body_2, world=world)
@@ -119,7 +119,7 @@ with world.modify_world():
         name="produce_box_with_apples",
         scale=Scale(1.0, 1.0, 0.3),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.3),
     )
     produce_box_with_apples.produces = world.get_semantic_annotations_by_type(Apple)
 
@@ -143,7 +143,7 @@ with world.modify_world():
         name="empty_produce_box",
         scale=Scale(1.0, 1.0, 0.3),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.3),
     )
 
 rt = RayTracer(world)

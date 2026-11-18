@@ -55,7 +55,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional, Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -145,7 +147,7 @@ def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidat
                 world=world,
                 parent=world.root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.6, 1.0, 0.9
                 ),
             )
@@ -675,8 +677,10 @@ def stretch_reaching_milk_from(
         recording.
     """
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, -2, 0.8, reference_frame=world.root
+    milk.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, -2, 0.8, reference_frame=world.root
+        )
     )
     drive = robot.root.parent_connection
     drive.origin = world.transform(root_T_base, drive.parent).homogeneous_matrix

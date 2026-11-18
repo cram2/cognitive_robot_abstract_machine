@@ -11,7 +11,7 @@ from krrood.entity_query_language.orm.model import (
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 from semantic_digital_twin.orm.model import (
     AxisAngleMapping,
-    HomogeneousTransformationMatrixMapping,
+    HomogeneousTransformationMatrix3DimensionalMapping,
     CartesianPoint2DimensionalMapping,
     CartesianPoint3DimensionalMapping,
     Pose2DimensionalMapping,
@@ -25,7 +25,7 @@ from semantic_digital_twin.orm.model import (
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
     RotationMatrix,
@@ -46,7 +46,7 @@ from semantic_digital_twin.world_description.world_entity import Body
         QuaternionMapping,
         AxisAngleMapping,
         RotationMatrixMapping,
-        HomogeneousTransformationMatrixMapping,
+        HomogeneousTransformationMatrix3DimensionalMapping,
         Pose3DimensionalMapping,
         CartesianPoint2DimensionalMapping,
         Pose2DimensionalMapping,
@@ -91,12 +91,16 @@ def test_every_field_of_an_alternative_mapping_is_reachable_on_its_domain_class(
             lambda axis, angle: RotationMatrix.from_axis_angle(AxisAngle(axis, angle)),
         ),
         (
-            HomogeneousTransformationMatrixMapping,
-            HomogeneousTransformationMatrix.from_xyz_axis_angle,
+            HomogeneousTransformationMatrix3DimensionalMapping,
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle,
         ),
         (Pose3DimensionalMapping, Pose3Dimensional.from_xyz_axis_angle),
     ],
-    ids=["RotationMatrix", "HomogeneousTransformationMatrix", "Pose3Dimensional"],
+    ids=[
+        "RotationMatrix",
+        "HomogeneousTransformationMatrix3Dimensional",
+        "Pose3Dimensional",
+    ],
 )
 def test_rotation_survives_being_stored_as_axis_angle(
     mapping, rotation_from_axis_angle, axis, angle
@@ -116,7 +120,7 @@ def test_a_twist_survives_being_stored():
         root = Body(name="root")
         world.add_kinematic_structure_entity(root)
     twist = Twist.from_transformation(
-        HomogeneousTransformationMatrix.from_xyz_axis_angle(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
             x=0.1, z=-0.2, axis=Vector3Dimensional.Y(), angle=0.4, reference_frame=root
         )
     )

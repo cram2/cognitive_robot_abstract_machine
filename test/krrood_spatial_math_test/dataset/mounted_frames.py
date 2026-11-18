@@ -1,10 +1,16 @@
+"""
+Cartesian frames fixed on another frame, which express the values of both.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from krrood_spatial_math.coordinate_system import CoordinateRepresentationT
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 from .frames import NamedFrame
 
@@ -18,7 +24,7 @@ class MountedFrame(NamedFrame):
     in that frame.
     """
 
-    mount_T_self: HomogeneousTransformationMatrix = field(kw_only=True)
+    mount_T_self: HomogeneousTransformationMatrix3Dimensional = field(kw_only=True)
     """
     The change from this frame to the frame it is fixed on, which is its reference
     frame; its child frame becomes this frame.
@@ -29,8 +35,8 @@ class MountedFrame(NamedFrame):
             self.mount_T_self.reference_frame, self
         )
 
-    def express_in_own_frame(
-        self, value: CoordinateRepresentationT
+    def transform_into_own_frame(
+        self, *, value: CoordinateRepresentationT
     ) -> CoordinateRepresentationT:
         if value.reference_frame is self:
             return value

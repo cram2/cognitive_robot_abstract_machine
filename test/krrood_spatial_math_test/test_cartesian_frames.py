@@ -1,3 +1,7 @@
+"""
+The interfaces of Cartesian frames, and how serialized values refer to them.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -36,9 +40,12 @@ def test_a_three_dimensional_cartesian_frame_charts_three_dimensional_euclidean_
     )
 
 
-def test_a_three_dimensional_cartesian_frame_declares_expressing_values_in_it():
+def test_a_three_dimensional_cartesian_frame_declares_how_it_transforms_values_into_it():
+    """
+    Checking the spaces is the frame interface's own; the change itself is the frame's.
+    """
     assert CartesianFrame3Dimensional.__abstractmethods__ == {
-        CartesianFrame3Dimensional.express_in_own_frame.__name__
+        CartesianFrame3Dimensional.transform_into_own_frame.__name__
     }
 
 

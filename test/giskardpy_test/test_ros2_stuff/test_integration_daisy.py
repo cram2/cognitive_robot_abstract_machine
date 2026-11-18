@@ -21,7 +21,9 @@ from cramph.statechart import (
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
@@ -122,14 +124,16 @@ def test_joints1(giskard: DAiSyTester) -> None:
     base_T_finger_current = giskard.world.compute_forward_kinematics(
         root=base, tip=finger_tip
     )
-    base_T_finger_expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.3807,
-        pos_y=0.1862,
-        pos_z=0.5557,
-        quat_x=0.8587,
-        quat_y=0.2248,
-        quat_z=0.4539,
-        quat_w=-0.0767,
-        reference_frame=base,
+    base_T_finger_expected = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            pos_x=0.3807,
+            pos_y=0.1862,
+            pos_z=0.5557,
+            quat_x=0.8587,
+            quat_y=0.2248,
+            quat_z=0.4539,
+            quat_w=-0.0767,
+            reference_frame=base,
+        )
     )
     assert np.allclose(base_T_finger_current, base_T_finger_expected, atol=1e-2)

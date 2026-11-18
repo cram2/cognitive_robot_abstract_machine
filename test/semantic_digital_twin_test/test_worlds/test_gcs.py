@@ -33,7 +33,9 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Pose3Dimensional,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -164,7 +166,7 @@ def test_from_world(table_world: World):
                 max_y=2,
                 min_z=0,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=table_world.root
                 ),
             )
@@ -214,7 +216,7 @@ def test_a_body_left_out_of_the_obstacles_leaves_its_space_free(table_world: Wor
                 max_y=2,
                 min_z=0,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=table_world.root
                 ),
             )
@@ -255,7 +257,9 @@ def test_constrain_to_free_space_requires_floatlike_fields(table_world: World):
                 1,
                 1,
                 1,
-                HomogeneousTransformationMatrix(reference_frame=table_world.root),
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=table_world.root
+                ),
             )
         ],
         table_world.root,
@@ -287,7 +291,9 @@ def test_constrain_to_free_space_adds_a_where_condition(table_world: World):
                 1,
                 1,
                 1,
-                HomogeneousTransformationMatrix(reference_frame=table_world.root),
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=table_world.root
+                ),
             )
         ],
         table_world.root,
@@ -321,7 +327,9 @@ def test_constrain_to_free_space_rejects_a_query_selecting_multiple_variables(
                 1,
                 1,
                 1,
-                HomogeneousTransformationMatrix(reference_frame=table_world.root),
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=table_world.root
+                ),
             )
         ],
         table_world.root,
@@ -351,7 +359,7 @@ def test_navigation_map_from_world(table_world: World):
                 max_y=2,
                 min_z=0,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=table_world.root
                 ),
             )
@@ -394,7 +402,7 @@ def test_navigation_map_path_returns_cartesian_point_2_dimensional_waypoints(
                 max_y=2,
                 min_z=0,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=table_world.root
                 ),
             )
@@ -435,8 +443,10 @@ def test_from_world_with_rotated_box():
 
         # Box 2: at (2, 0, 0) rotated 45 deg around Z
         rotated_box_body = Body(name=PrefixedName("box_two"))
-        rotated_box_body_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-            2, 0, 0, 0, np.pi / 4, np.pi / 4, reference_frame=root_body
+        rotated_box_body_pose = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                2, 0, 0, 0, np.pi / 4, np.pi / 4, reference_frame=root_body
+            )
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
@@ -462,7 +472,7 @@ def test_from_world_with_rotated_box():
                 max_y=5,
                 min_z=0,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=vertical_stabilized_base
                 ),
             )
@@ -599,7 +609,9 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
                 max_y=2.4,
                 min_z=0.0,
                 max_z=1.2,
-                origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=world.root
+                ),
             )
         ],
         world.root,
@@ -641,7 +653,7 @@ def _floor_with_an_obstacle_standing_on_it() -> Floor:
                 world,
                 world.root,
                 obstacle,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.0, 0.0, 0.5, reference_frame=world.root
                 ),
             )
@@ -732,7 +744,7 @@ def test_planar_free_space_computes_a_missing_supporting_surface():
     graph = floor.planar_free_space(max_height=2.0)
 
     surface_box = floor.supporting_surface.area.as_bounding_box_collection_at_origin(
-        HomogeneousTransformationMatrix(reference_frame=floor.root)
+        HomogeneousTransformationMatrix3Dimensional(reference_frame=floor.root)
     ).bounding_box()
     search_box = graph.search_space.bounding_box()
     assert search_box.min_x == pytest.approx(surface_box.min_x)
@@ -775,7 +787,7 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
             name="floor",
             world=world,
             scale=Scale(6, 6, 0.01),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 10.0, 0.0, 0.0, reference_frame=world.root
             ),
         )
@@ -785,7 +797,7 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
                 world,
                 world.root,
                 wall,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     10.0, 0.0, 0.5, reference_frame=world.root
                 ),
             )
@@ -828,7 +840,7 @@ def _navigation_map_around_the_table(
                 max_y=2,
                 min_z=0,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(
+                origin=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=table_world.root
                 ),
             )
@@ -1100,7 +1112,9 @@ def test_free_space_from_world_keeps_the_given_height_clearance_off_obstacles():
                 max_y=2,
                 min_z=-1,
                 max_z=2,
-                origin=HomogeneousTransformationMatrix(reference_frame=root_body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=root_body
+                ),
             )
         ],
         reference_frame=root_body,

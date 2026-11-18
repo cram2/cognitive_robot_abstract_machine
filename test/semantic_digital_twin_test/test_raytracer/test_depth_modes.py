@@ -17,7 +17,9 @@ from semantic_digital_twin.datastructures.camera_rendering import (
     OpticalAxisDepthMode,
     RayDistanceDepthMode,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.testing import ray_test_world
 
 from .test_camera_rendering import camera_intersections
@@ -33,7 +35,7 @@ def test_optical_axis_depth_accepts_spatial_camera_pose() -> None:
     """
     A spatial camera pose determines optical depth for a batch of hits.
     """
-    world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=10.0, y=2.0, z=3.0, pitch=np.pi / 2
     )
 
@@ -64,7 +66,7 @@ def test_depth_mode_with_translated_and_rotated_camera(
     ray_origins = np.array([[10.0, 2.0, 3.0], [10.0, 2.0, 3.0]])
     ray_directions = hit_points - ray_origins
     ray_directions /= np.linalg.norm(ray_directions, axis=1, keepdims=True)
-    world_T_camera = HomogeneousTransformationMatrix(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional(
         [
             [0.0, 0.0, 1.0, 10.0],
             [0.0, 1.0, 0.0, 2.0],
@@ -89,7 +91,7 @@ def test_optical_axis_depth_rejects_hits_outside_forward_half_space() -> None:
         hit_points=hit_points,
         ray_origins=np.zeros((2, 3)),
         ray_directions=np.array([[0.0, 0.0, -1.0], [0.0, 0.0, 1.0]]),
-        world_T_camera=HomogeneousTransformationMatrix(),
+        world_T_camera=HomogeneousTransformationMatrix3Dimensional(),
     )
 
     np.testing.assert_array_equal(depths, np.full(2, -1.0))
@@ -112,7 +114,7 @@ class WorldPlaneDepthMode(DepthMode):
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
-        world_T_camera: HomogeneousTransformationMatrix,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     ) -> npt.NDArray[np.float64]:
         return hit_points[:, 0] - self.plane_x
 
@@ -129,13 +131,13 @@ def test_depth_mode_receives_spatial_camera_pose(
         OpticalAxisDepthMode, "hit_depth", return_value=np.array([2.0, 3.0])
     ) as hit_depth:
         fixture.ray_tracer.create_segmentation_and_depth(
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
             resolution=fixture.resolution,
             depth_mode=OpticalAxisDepthMode(),
         )
 
     world_T_camera = hit_depth.call_args.kwargs["world_T_camera"]
-    assert isinstance(world_T_camera, HomogeneousTransformationMatrix)
+    assert isinstance(world_T_camera, HomogeneousTransformationMatrix3Dimensional)
     np.testing.assert_allclose(
         world_T_camera.to_np(), fixture.ray_tracer.scene.camera_transform
     )
@@ -149,7 +151,7 @@ def test_custom_depth_mode_controls_hit_depths(
     """
     fixture = camera_intersections
     frame = fixture.ray_tracer.create_segmentation_and_depth(
-        HomogeneousTransformationMatrix(),
+        HomogeneousTransformationMatrix3Dimensional(),
         resolution=fixture.resolution,
         depth_mode=WorldPlaneDepthMode(),
     )

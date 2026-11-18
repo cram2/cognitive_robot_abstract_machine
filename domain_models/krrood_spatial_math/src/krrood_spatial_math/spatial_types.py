@@ -111,7 +111,8 @@ class SymbolicSpatialType(ABC):
     """
 
     def transform(
-        self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
+        self,
+        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         This object re-expressed in ``target_frame_T_reference_frame``'s reference
@@ -352,7 +353,7 @@ class SymbolicSpatialChange(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SymbolicSpatialValue(
+class SymbolicSpatialValue3Dimensional(
     SymbolicSpatialType, CoordinateRepresentation[CartesianFrame3Dimensional], ABC
 ):
     """
@@ -395,14 +396,14 @@ The kind of value or change a rotation is applied to.
 class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
     """
     A value or change the rigid motion group SE(3) acts on: a
-    :class:`HomogeneousTransformationMatrix` moves it, giving one of the same type.
+    :class:`HomogeneousTransformationMatrix3Dimensional` moves it, giving one of the same type.
 
     SO(3) is the subgroup of SE(3) that keeps the origin, so it acts on it too.
     """
 
     @abstractmethod
     def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix
+        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> Self:
         """
         :param transformation: A transformation whose child frame is this value's
@@ -452,7 +453,7 @@ class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
     """
 
     def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix
+        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> Self:
         return self._left_product(matrix=transformation)
 
@@ -460,7 +461,7 @@ class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
         return self._left_product(matrix=rotation)
 
     def _left_product(
-        self, *, matrix: HomogeneousTransformationMatrix | RotationMatrix
+        self, *, matrix: HomogeneousTransformationMatrix3Dimensional | RotationMatrix
     ) -> Self:
         """
         :param matrix: The transformation or rotation applied to this value.
@@ -481,13 +482,13 @@ class Orientation(SpecialEuclideanGroupAction, Mixin):
     """
 
     def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix
+        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> Self:
         return self.apply_rotation(rotation=transformation.rotation_matrix)
 
 
 @dataclass(eq=False, init=False, repr=False)
-class HomogeneousTransformationMatrix(
+class HomogeneousTransformationMatrix3Dimensional(
     sm.SymbolicMathType,
     SymbolicSpatialChange[CartesianFrame3Dimensional],
     SubclassJSONSerializer,
@@ -601,7 +602,7 @@ class HomogeneousTransformationMatrix(
         rotation_matrix: RotationMatrix | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Constructs a TransformationMatrix object from a given point, a rotation matrix,
         a reference frame, and a child frame.
@@ -645,7 +646,7 @@ class HomogeneousTransformationMatrix(
         yaw: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Creates a TransformationMatrix object from position (x, y, z) and Euler angles
         (roll, pitch, yaw) values. The function also accepts optional reference and
@@ -680,7 +681,7 @@ class HomogeneousTransformationMatrix(
         quat_w: sm.ScalarData = 1,
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Creates a `TransformationMatrix` instance from the provided position coordinates
         and quaternion values representing rotation. This method constructs a 3D point
@@ -792,9 +793,9 @@ class HomogeneousTransformationMatrix(
         return other.apply_transformation(transformation=self)
 
     def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix
-    ) -> HomogeneousTransformationMatrix:
-        return HomogeneousTransformationMatrix(
+        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional(
             ca.mtimes(transformation.casadi_sx, self.casadi_sx),
             reference_frame=transformation.reference_frame,
             child_frame=self.child_frame,
@@ -802,8 +803,8 @@ class HomogeneousTransformationMatrix(
 
     def apply_rotation(
         self, *, rotation: RotationMatrix
-    ) -> HomogeneousTransformationMatrix:
-        return HomogeneousTransformationMatrix(
+    ) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional(
             ca.mtimes(rotation.casadi_sx, self.casadi_sx),
             reference_frame=rotation.reference_frame,
             child_frame=self.child_frame,
@@ -814,8 +815,8 @@ class HomogeneousTransformationMatrix(
     ) -> SpecialEuclideanGroupActionT:
         return self.dot(other)
 
-    def inverse(self) -> HomogeneousTransformationMatrix:
-        inv = HomogeneousTransformationMatrix(
+    def inverse(self) -> HomogeneousTransformationMatrix3Dimensional:
+        inv = HomogeneousTransformationMatrix3Dimensional(
             child_frame=self.reference_frame, reference_frame=self.child_frame
         )
         inv[:3, :3] = self[:3, :3].T
@@ -885,11 +886,11 @@ class HomogeneousTransformationMatrix(
         self,
         new_reference_frame: CartesianFrame3Dimensional,
         new_child_frame: CartesianFrame3Dimensional | None,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Copies the transformation matrix and changes the reference and child frames.
         """
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             data=deepcopy(self.casadi_sx),
             reference_frame=new_reference_frame,
             child_frame=new_child_frame,
@@ -910,7 +911,7 @@ class HomogeneousTransformationMatrix(
 @dataclass(eq=False, init=False, repr=False)
 class RotationMatrix(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
     SubclassJSONSerializer,
 ):
@@ -1348,10 +1349,10 @@ class FramePlane(EuclideanSpace2Dimensional):
         if self.ambient_space is None or self.ambient_space != other.ambient_space:
             return False
         other_origin = self.frame_3_dimensional.express_in_own_frame(
-            CartesianPoint3Dimensional(reference_frame=other.frame_3_dimensional)
+            value=CartesianPoint3Dimensional(reference_frame=other.frame_3_dimensional)
         )
         other_z_axis = self.frame_3_dimensional.express_in_own_frame(
-            Vector3Dimensional.Z(reference_frame=other.frame_3_dimensional)
+            value=Vector3Dimensional.Z(reference_frame=other.frame_3_dimensional)
         )
         return bool(
             np.isclose(other_origin.z.to_np(), 0).all()
@@ -1398,7 +1399,7 @@ class PlanarFrame(CartesianFrame2Dimensional[NameT]):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SymbolicPlanarValue(
+class SymbolicSpatialValue2Dimensional(
     SymbolicSpatialType, CoordinateRepresentation[CartesianFrame2Dimensional], ABC
 ):
     """
@@ -1417,7 +1418,7 @@ class SymbolicPlanarValue(
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
     SubclassJSONSerializer,
     MetricVector[CartesianFrame3Dimensional, sm.Scalar],
@@ -1816,7 +1817,7 @@ class Vector3Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class CartesianPoint3Dimensional(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
     SubclassJSONSerializer,
     MetricPoint[CartesianFrame3Dimensional, sm.Scalar, Vector3Dimensional],
@@ -2107,7 +2108,7 @@ class CartesianPoint3Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
     sm.SymbolicMathType,
-    SymbolicPlanarValue,
+    SymbolicSpatialValue2Dimensional,
     SubclassJSONSerializer,
     MetricVector[CartesianFrame2Dimensional, sm.Scalar],
     PlanarSpecialEuclideanGroupAction,
@@ -2174,7 +2175,8 @@ class Vector2Dimensional(
         }
 
     def transform(
-        self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
+        self,
+        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Vector2Dimensional:
         """
         This vector re-expressed in ``target_frame_T_reference_frame``'s reference frame.
@@ -2236,7 +2238,7 @@ class Vector2Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class CartesianPoint2Dimensional(
     sm.SymbolicMathType,
-    SymbolicPlanarValue,
+    SymbolicSpatialValue2Dimensional,
     SubclassJSONSerializer,
     MetricPoint[CartesianFrame2Dimensional, sm.Scalar, Vector2Dimensional],
     PlanarSpecialEuclideanGroupAction,
@@ -2352,7 +2354,8 @@ class CartesianPoint2Dimensional(
         }
 
     def transform(
-        self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
+        self,
+        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> CartesianPoint2Dimensional:
         """
         This point re-expressed in ``target_frame_T_reference_frame``'s reference frame.
@@ -2489,7 +2492,7 @@ class FramePlaneProjection(
                     actual_frame=point.reference_frame,
                     context="the projected CartesianPoint3Dimensional",
                 )
-            point = self.plane_frame.express_in_own_frame(point)
+            point = self.plane_frame.express_in_own_frame(value=point)
         return CartesianPoint2Dimensional(
             point.x, point.y, reference_frame=self.plane_frame
         )
@@ -2518,7 +2521,7 @@ class FramePlaneProjection(
 @dataclass(eq=False, init=False, repr=False)
 class Quaternion(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     SubclassJSONSerializer,
     Orientation,
 ):
@@ -2716,7 +2719,7 @@ class Quaternion(
 
     @classmethod
     def from_rotation_matrix(
-        cls, r: RotationMatrix | HomogeneousTransformationMatrix
+        cls, r: RotationMatrix | HomogeneousTransformationMatrix3Dimensional
     ) -> Quaternion:
         """
         Creates a Quaternion object initialized from a given rotation matrix.
@@ -2877,7 +2880,7 @@ class Quaternion(
 @dataclass(eq=False, init=False, repr=False)
 class AxisAngle(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     SubclassJSONSerializer,
     Orientation,
 ):
@@ -3051,7 +3054,7 @@ class AxisAngle(
 @dataclass(eq=False, init=False, repr=False)
 class Twist(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     SubclassJSONSerializer,
 ):
     """
@@ -3113,7 +3116,9 @@ class Twist(
         }
 
     @classmethod
-    def from_transformation(cls, start_T_end: HomogeneousTransformationMatrix) -> Twist:
+    def from_transformation(
+        cls, start_T_end: HomogeneousTransformationMatrix3Dimensional
+    ) -> Twist:
         """
         :param start_T_end: Where the body ended up, relative to where it started.
         :return: The motion from the start to the end, in the reference frame of
@@ -3149,7 +3154,7 @@ class Twist(
 @dataclass(eq=False, init=False, repr=False)
 class Pose3Dimensional(
     sm.SymbolicMathType,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
     SubclassJSONSerializer,
 ):
@@ -3180,7 +3185,7 @@ class Pose3Dimensional(
         if orientation is None:
             orientation = Quaternion()
         transformation_matrix = (
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=position, rotation_matrix=orientation.rotation_matrix
             )
         )
@@ -3380,11 +3385,11 @@ class Pose3Dimensional(
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
     @property
-    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The transformation that moves the reference frame to this pose.
         """
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             data=self, reference_frame=self.reference_frame
         )
 
@@ -3403,7 +3408,7 @@ class Pose3Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Pose2Dimensional(
     sm.SymbolicMathType,
-    SymbolicPlanarValue,
+    SymbolicSpatialValue2Dimensional,
     SubclassJSONSerializer,
     PlanarSpecialEuclideanGroupAction,
 ):
@@ -3511,7 +3516,7 @@ class Pose2Dimensional(
         return self.pose.rotation_matrix
 
     @property
-    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The transformation that moves the reference frame to this pose.
         """
@@ -3542,7 +3547,7 @@ class Pose2Dimensional(
         """
         frame = plane_frame if plane_frame is not None else pose.reference_frame
         if frame is not pose.reference_frame:
-            pose = frame.express_in_own_frame(pose)
+            pose = frame.express_in_own_frame(value=pose)
         rotation = pose.rotation_matrix
         x_axis_x, x_axis_y = rotation[0, 0], rotation[1, 0]
         if (
@@ -3559,7 +3564,8 @@ class Pose2Dimensional(
         )
 
     def transform(
-        self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
+        self,
+        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Pose2Dimensional:
         """
         This pose re-expressed in ``target_frame_T_reference_frame``'s reference frame.
@@ -3717,7 +3723,7 @@ class HomogeneousTransformationMatrix2Dimensional(
 
     @classmethod
     def from_transformation(
-        cls, transformation: HomogeneousTransformationMatrix
+        cls, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> HomogeneousTransformationMatrix2Dimensional:
         """
         :param transformation: A change between two frames that span one x-y plane and

@@ -4,7 +4,7 @@ import pytest
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
     Quaternion,
     RotationMatrix,
@@ -39,13 +39,13 @@ def axis_and_angle_of(axis_angle: AxisAngle) -> tuple[np.ndarray, float]:
     [
         lambda axis, angle: RotationMatrix.from_axis_angle(AxisAngle(axis, angle)),
         lambda axis, angle: Quaternion.from_axis_angle(AxisAngle(axis, angle)),
-        HomogeneousTransformationMatrix.from_xyz_axis_angle,
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle,
         Pose3Dimensional.from_xyz_axis_angle,
     ],
     ids=[
         "RotationMatrix",
         "Quaternion",
-        "HomogeneousTransformationMatrix",
+        "HomogeneousTransformationMatrix3Dimensional",
         "Pose3Dimensional",
     ],
 )

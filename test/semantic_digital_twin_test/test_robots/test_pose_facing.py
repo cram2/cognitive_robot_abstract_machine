@@ -19,7 +19,9 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world import World
 
@@ -238,7 +240,7 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
 
     base_pose = mobile_base.pose_facing(heading)
 
-    read_back = HomogeneousTransformationMatrix.from_point_rotation_matrix(
+    read_back = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
         base_pose.position,
         base_pose.rotation_matrix @ mobile_base.base_R_front,
         reference_frame=base_pose.reference_frame,

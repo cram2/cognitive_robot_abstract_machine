@@ -16,20 +16,22 @@ import open3d as o3d
 
 import robokudo.types.annotation
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Box
 from semantic_digital_twin.world_description.world_entity import Region
 
 
 def _box_obb_from_shape(
-    box: Box, world_T_region: HomogeneousTransformationMatrix
+    box: Box, world_T_region: HomogeneousTransformationMatrix3Dimensional
 ) -> o3d.geometry.OrientedBoundingBox:
     """
     Build an OBB for a single SDT Box shape.
     """
     # Box origin is in the region frame; combine with region global pose
-    box_origin: HomogeneousTransformationMatrix = box.origin
+    box_origin: HomogeneousTransformationMatrix3Dimensional = box.origin
 
     # world_T_box = world_T_region * region_T_box
     world_T_box = world_T_region @ box_origin
@@ -86,13 +88,13 @@ def region_obb(
 def region_obb_in_camera_coordinates(
     world: World,
     region: Region,
-    world_T_camera: np.ndarray | HomogeneousTransformationMatrix,
+    world_T_camera: np.ndarray | HomogeneousTransformationMatrix3Dimensional,
 ) -> o3d.geometry.OrientedBoundingBox:
     """
     Transform region OBB to camera frame using world_to_camera matrix.
     """
     obb = region_obb(region, world=world)
-    if isinstance(world_T_camera, HomogeneousTransformationMatrix):
+    if isinstance(world_T_camera, HomogeneousTransformationMatrix3Dimensional):
         R = world_T_camera.rotation_matrix.to_np()
         t = world_T_camera.position.to_np()
     else:

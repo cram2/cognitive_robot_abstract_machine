@@ -39,7 +39,7 @@ from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -140,18 +140,18 @@ except ImportError:
 
 def _usd_pose_to_transform(
     position: Gf.Vec3d, rotation: Gf.Quatf, **kwargs
-) -> HomogeneousTransformationMatrix:
+) -> HomogeneousTransformationMatrix3Dimensional:
     """
     Build a transform from a USD position and quaternion rotation.
 
     :param position: The translation.
     :param rotation: The rotation.
-    :param kwargs: Forwarded to ``HomogeneousTransformationMatrix.from_xyz_quaternion``
+    :param kwargs: Forwarded to ``HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion``
         (typically ``reference_frame``/``child_frame``).
     :return: The built transform.
     """
     imaginary = rotation.GetImaginary()
-    return HomogeneousTransformationMatrix.from_xyz_quaternion(
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=position[0],
         pos_y=position[1],
         pos_z=position[2],
@@ -165,7 +165,7 @@ def _usd_pose_to_transform(
 
 def _decompose_local_transform(
     prim: Usd.Prim, link_to_world: Gf.Matrix4d
-) -> tuple[HomogeneousTransformationMatrix, Gf.Vec3d]:
+) -> tuple[HomogeneousTransformationMatrix3Dimensional, Gf.Vec3d]:
     """
     Decompose a prim's pose relative to its enclosing link into a rigid transform and a
     scale, regardless of how the prim's ``xformOpOrder`` was authored.
@@ -331,13 +331,17 @@ class USDCylinderShapeBuilder(USDShapeBuilder):
         # below (which only reorients origin), so the axis also picks out which scale
         # components are the cylinder's height vs. its two radial directions.
         if axis == USDAxis.X:
-            alignment = HomogeneousTransformationMatrix.from_xyz_rpy(pitch=math.pi / 2)
+            alignment = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                pitch=math.pi / 2
+            )
             height_scale, radial_scale = scale[0], (scale[1] + scale[2]) / 2.0
         elif axis == USDAxis.Y:
-            alignment = HomogeneousTransformationMatrix.from_xyz_rpy(roll=-math.pi / 2)
+            alignment = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                roll=-math.pi / 2
+            )
             height_scale, radial_scale = scale[1], (scale[0] + scale[2]) / 2.0
         else:
-            alignment = HomogeneousTransformationMatrix()
+            alignment = HomogeneousTransformationMatrix3Dimensional()
             height_scale, radial_scale = scale[2], (scale[0] + scale[1]) / 2.0
         origin = origin @ alignment
         return Cylinder(
@@ -384,7 +388,7 @@ class USDMeshShapeBuilder(USDShapeBuilder):
 
         return Mesh.from_trimesh(
             mesh=trimesh_mesh,
-            origin=HomogeneousTransformationMatrix(),
+            origin=HomogeneousTransformationMatrix3Dimensional(),
             uv=uv,
             texture_file_path=texture_file_path if uv is not None else None,
         )
@@ -708,7 +712,7 @@ class USDStageParser(WorldModelParser, ABC):
         )
         world.add_connection(connection)
         # Gf matrices act on row vectors, so the transpose is the pose.
-        connection.origin = HomogeneousTransformationMatrix(
+        connection.origin = HomogeneousTransformationMatrix3Dimensional(
             data=np.array(self._pose_in_world(prim=prim)).T,
             reference_frame=world.root,
         )

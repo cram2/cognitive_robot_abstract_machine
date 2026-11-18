@@ -40,7 +40,7 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -131,7 +131,7 @@ class Reachable(Predicate):
     Whether a kinematic chain can put its tip at a pose, answered by inverse kinematics.
     """
 
-    pose: HomogeneousTransformationMatrix
+    pose: HomogeneousTransformationMatrix3Dimensional
     """
     The pose to reach.
     """
@@ -505,7 +505,7 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
             Noun(content=fields["point_of_view"]),
         )
 
-    point_of_view: HomogeneousTransformationMatrix
+    point_of_view: HomogeneousTransformationMatrix3Dimensional
     """
     The reference spot from where to look at the bodies.
     """

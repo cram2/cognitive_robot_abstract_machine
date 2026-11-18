@@ -50,7 +50,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
@@ -1050,13 +1050,15 @@ class TestCartesianTasks:
         right_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
-        goal_pose = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=CartesianPoint3Dimensional(0.2, 0.0, reference_frame=left_tip),
-            rotation_matrix=RotationMatrix(
-                [[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]],
+        goal_pose = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=CartesianPoint3Dimensional(0.2, 0.0, reference_frame=left_tip),
+                rotation_matrix=RotationMatrix(
+                    [[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]],
+                    reference_frame=left_tip,
+                ),
                 reference_frame=left_tip,
-            ),
-            reference_frame=left_tip,
+            )
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1225,7 +1227,7 @@ class TestCartesianTasks:
             connection = FixedConnection(
                 parent=_hsr_world_setup.root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=2, z=0.5
                 ),
             )
@@ -1464,7 +1466,7 @@ class TestCartesianTasks:
             root, tip
         )
         # goal2 was captured at build time, so should end at that absolute position
-        expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        expected = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.2, reference_frame=pr2_world_state_reset.root
         ).to_np()
         assert np.allclose(
@@ -2736,8 +2738,10 @@ class TestDebugExpressions:
         current = debug_expression_by_name(
             artifacts.debug_expressions, "orient/current"
         )
-        assert isinstance(goal.expression, HomogeneousTransformationMatrix)
-        assert isinstance(current.expression, HomogeneousTransformationMatrix)
+        assert isinstance(goal.expression, HomogeneousTransformationMatrix3Dimensional)
+        assert isinstance(
+            current.expression, HomogeneousTransformationMatrix3Dimensional
+        )
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 

@@ -21,7 +21,9 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     FramePlaneProjection,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -102,7 +104,7 @@ def add_box_body(world: World, name: str, scale: Scale, x: float, y: float) -> B
             world,
             world.root,
             body,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x, y, ROOM_HEIGHT / 2, reference_frame=world.root
             ),
         )
@@ -151,7 +153,7 @@ def room_scene_of(world: World, clearance: float = CLEARANCE) -> NavigationScene
     :param clearance: Amount obstacles are bloated by while building the graph.
     :return: The scene.
     """
-    origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     search_space = BoundingBoxCollection(
         [
             VolumetricBoundingBox(
@@ -211,7 +213,7 @@ def box_row() -> BoxRowFixture:
         world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
 
     graph = VolumetricGraphOfBoundingBoxes(world)
-    origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     boxes = [
         VolumetricBoundingBox(offset, 0.0, 0.0, offset + 1.0, 1.0, 1.0, origin)
         for offset in (0.0, 1.0, 2.0)
@@ -230,7 +232,7 @@ def test_footprint_projects_a_bounding_box_including_its_origin():
     A footprint is the box's x-y extent in the frame its origin is expressed in, not the
     extent relative to that origin.
     """
-    origin = HomogeneousTransformationMatrix.from_xyz_rpy(2.0, -1.0, 5.0)
+    origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.0, -1.0, 5.0)
     footprint = Footprint.of(
         VolumetricBoundingBox(-0.5, -0.25, 0.0, 0.5, 0.25, 1.0, origin)
     )
@@ -297,7 +299,7 @@ def test_a_graph_with_no_connected_pair_has_nothing_to_plan_between():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
 
     graph = VolumetricGraphOfBoundingBoxes(world)
-    origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     for offset in (0.0, 10.0):
         graph.add_node(
             VolumetricBoundingBox(offset, 0.0, 0.0, offset + 1.0, 1.0, 1.0, origin)
@@ -355,6 +357,24 @@ def test_the_floor_plan_projects_3d_points_and_keeps_points_on_it():
     assert coordinates.tolist() == [[1.0, 2.0], [4.0, 5.0]]
 
 
+def test_the_floor_plan_projects_a_3d_point_onto_a_point_on_it():
+    """
+    An endpoint is drawn as the point on the floor plan its 3D point projects onto.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+    floor_plan = FloorPlan(FramePlaneProjection(world.root))
+
+    point_on_plane = floor_plan.project_onto_plane(
+        point=CartesianPoint3Dimensional(1.0, 2.0, 3.0, reference_frame=world.root)
+    )
+
+    assert isinstance(point_on_plane, CartesianPoint2Dimensional)
+    assert point_on_plane.reference_frame is world.root
+    assert (float(point_on_plane.x), float(point_on_plane.y)) == (1.0, 2.0)
+
+
 def test_query_spans_the_graph_in_coordinate_order(box_row: BoxRowFixture):
     """
     The query connects the two ends of the longest shortest path, oriented so that the
@@ -376,7 +396,7 @@ def test_query_measures_distance_along_the_graph_not_across_it():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
 
     graph = VolumetricGraphOfBoundingBoxes(world)
-    origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     # A U of unit boxes: the two tips face each other one meter apart, but reaching one
     # tip from the other means walking around the whole U.
     corner_offsets = [
@@ -465,7 +485,9 @@ def test_navigation_scene_derives_a_planar_obstacle_collection_for_a_planar_grap
     space and free space; for a planar graph that derivation must stay two-dimensional
     rather than reaching for the volumetric bounding-box collection unconditionally.
     """
-    origin = HomogeneousTransformationMatrix(reference_frame=room_world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(
+        reference_frame=room_world.root
+    )
     search_space = BoundingBoxCollection(
         [
             VolumetricBoundingBox(

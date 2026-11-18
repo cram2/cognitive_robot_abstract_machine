@@ -94,8 +94,8 @@ a_T_c = a_T_b @ b_T_c
 ```python
 c_T_a = a_T_c.inverse()
 # for a numeric 4x4 numpy array:
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-c_T_a = HomogeneousTransformationMatrix.invert_numeric_matrix(a_T_c)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
+c_T_a = HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(a_T_c)
 ```
 Remember that:
 ```python

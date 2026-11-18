@@ -31,7 +31,9 @@ from robokudo.utils.annotator_helper import (
     generate_source_name,
 )
 from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -42,7 +44,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def _camera_observation(
-    world_T_camera: HomogeneousTransformationMatrix,
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional,
 ) -> CameraObservation:
     model = PinholeCameraModel(
         image_resolution=CameraResolution(width=1024, height=1280),
@@ -52,7 +54,7 @@ def _camera_observation(
     )
     camera_body = Body(name=PrefixedName(name="camera"))
     world_frame = Body(name=PrefixedName(name="world"))
-    world_T_camera = HomogeneousTransformationMatrix(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional(
         data=world_T_camera,
         reference_frame=world_frame,
         child_frame=camera_body,
@@ -93,7 +95,7 @@ class TestUtilsAnnotatorHelper(object):
         cas = CAS()
 
         cas.camera_observation = _camera_observation(
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 pos_x=0.0,
                 pos_y=0.0,
                 pos_z=0.0,
@@ -113,7 +115,7 @@ class TestUtilsAnnotatorHelper(object):
         cas = CAS()
 
         cas.camera_observation = _camera_observation(
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 pos_x=2.6818742474793744,
                 pos_y=1.9778799779168073,
                 pos_z=0.9607137539544703,

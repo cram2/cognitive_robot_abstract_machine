@@ -27,7 +27,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
@@ -56,7 +56,11 @@ def test_body_json_serialization():
     world = World()
     body = Body(name=PrefixedName("body"))
     collision = [
-        Box(origin=HomogeneousTransformationMatrix.from_xyz_rpy(0, 1, 0, 0, 0, 1, body))
+        Box(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                0, 1, 0, 0, 0, 1, body
+            )
+        )
     ]
     body.collision = ShapeCollection(collision, reference_frame=body)
 
@@ -104,7 +108,7 @@ def test_dof_hardware_interface_serialization():
 def test_transformation_matrix_json_serialization():
     body = Body(name=PrefixedName("body"))
     body2 = Body(name=PrefixedName("body2"))
-    transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+    transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, y=2, z=3, roll=1, pitch=2, yaw=3, reference_frame=body, child_frame=body2
     )
     json_data = transform.to_json()
@@ -112,7 +116,9 @@ def test_transformation_matrix_json_serialization():
     tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
     tracker.add(key=body.id, tracked_object=body)
     tracker.add(key=body2.id, tracked_object=body2)
-    transform_copy = HomogeneousTransformationMatrix.from_json(data=json_data, **kwargs)
+    transform_copy = HomogeneousTransformationMatrix3Dimensional.from_json(
+        data=json_data, **kwargs
+    )
     assert transform.reference_frame == transform_copy.reference_frame
     assert id(transform.reference_frame) == id(transform_copy.reference_frame)
     assert np.allclose(transform.to_np(), transform_copy.to_np())
@@ -334,7 +340,7 @@ def test_connection_json_serialization_with_world():
         c = FixedConnection(
             parent=body,
             child=body2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, roll=2, reference_frame=body, child_frame=body2
             ),
         )
@@ -376,7 +382,7 @@ def test_screw_connection_json_serialization_with_world():
             screw_pitch=screw_pitch,
             multiplier=2.0,
             offset=0.1,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, reference_frame=body, child_frame=body2
             ),
         )
@@ -483,7 +489,9 @@ def test_joint_state_resolves_the_connection_it_was_built_from():
         Vector3Dimensional(1.0, 2.0, 3.0),
         Quaternion(0.0, 0.0, 0.0, 1.0),
         RotationMatrix.from_rpy(0.1, 0.2, 0.3),
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0, 0.1, 0.2, 0.3),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1.0, 2.0, 3.0, 0.1, 0.2, 0.3
+        ),
         Pose3Dimensional.from_xyz_quaternion(1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 1.0),
         Pose2Dimensional.from_xy_yaw(1.0, 2.0, 0.3),
     ],
@@ -570,8 +578,8 @@ def symbolic_rotation_matrix(variable: FloatVariable, frame: Body) -> RotationMa
 
 def symbolic_transformation_matrix(
     variable: FloatVariable, frame: Body
-) -> HomogeneousTransformationMatrix:
-    return HomogeneousTransformationMatrix.from_xyz_rpy(
+) -> HomogeneousTransformationMatrix3Dimensional:
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         variable, 2.0, 3.0, 0.1, variable, 0.3, reference_frame=frame
     )
 
@@ -625,7 +633,7 @@ def test_a_transformation_over_a_variable_keeps_its_child_frame():
     child_frame = Body(name=PrefixedName("child"))
     # the transformation does not keep its variable alive, so the test has to
     variable = FloatVariable(name="muh")
-    transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
+    transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         variable,
         reference_frame=reference_frame,
         child_frame=child_frame,

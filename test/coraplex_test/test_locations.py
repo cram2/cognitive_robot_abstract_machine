@@ -16,7 +16,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -54,11 +56,13 @@ class RecordsHowItWasSampled(Location):
 
 # The drive is an OmniDrive, which represents x, y and yaw only, so the odom offset stays
 # in that plane.
-_ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(0.5, 0.5, 0, yaw=np.pi / 2)
+_ODOM = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+    0.5, 0.5, 0, yaw=np.pi / 2
+)
 
 
 def _world_with_a_robot_behind_a_displaced_odom(
-    world_T_odometry: HomogeneousTransformationMatrix,
+    world_T_odometry: HomogeneousTransformationMatrix3Dimensional,
 ) -> World:
     """
     A world holding nothing but a PR2, reached through a displaced odom.
@@ -317,7 +321,7 @@ def _box_in(world: World) -> Milk:
             FixedConnection(
                 parent=world.root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.0, y=-1.0, z=0.9
                 ),
             )
@@ -403,7 +407,7 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
     )
     with world.modify_world():
         box.parent_connection.update_parent_T_connection(
-            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 *REACHABILITY_TARGET_POSITION
             )
         )

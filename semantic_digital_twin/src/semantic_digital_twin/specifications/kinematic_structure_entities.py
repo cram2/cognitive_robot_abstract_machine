@@ -14,7 +14,7 @@ from krrood.utils import get_generic_type_parameters
 from random_events.product_algebra import Event
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from semantic_digital_twin.specifications.base import SpawnSpecification
@@ -81,8 +81,8 @@ class KinematicStructureEntitySpecification(
     If set, the spawned entity will be a parent of the children.
     """
 
-    parent_T_self: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
+    parent_T_self: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=HomogeneousTransformationMatrix3Dimensional
     )
     """
     Default placement of the entity in its parent frame, used by :meth:`spawn` when the
@@ -135,7 +135,7 @@ class KinematicStructureEntitySpecification(
         entity: KinematicStructureEntity,
         connection_specification: ConnectionSpecification,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> None:
         """
         Attach an already materialized ``entity`` to ``parent`` via
@@ -170,7 +170,7 @@ class KinematicStructureEntitySpecification(
         connection_specification: ConnectionSpecification,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> TKinematicStructureEntity:
         """
         Materialize this entity, attach it to ``parent`` via
@@ -196,7 +196,7 @@ class KinematicStructureEntitySpecification(
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> TKinematicStructureEntity:
         """
         Materialize the entity and attach it to ``parent`` via
@@ -224,8 +224,8 @@ class KinematicStructureEntitySpecification(
         name: str,
         scale: Scale,
         color: Color | None = None,
-        origin: HomogeneousTransformationMatrix | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         child_specifications: list[KinematicStructureEntitySpecification] | None = None,
         connection_specification: ConnectionSpecification | None = None,
     ) -> Self:
@@ -248,11 +248,13 @@ class KinematicStructureEntitySpecification(
             name,
             Box(
                 scale=scale,
-                origin=(origin or HomogeneousTransformationMatrix()),
+                origin=(origin or HomogeneousTransformationMatrix3Dimensional()),
                 color=color or Color(),
             ).as_shape_collection(),
             child_specifications=(child_specifications or []),
-            parent_T_self=(parent_T_self or HomogeneousTransformationMatrix()),
+            parent_T_self=(
+                parent_T_self or HomogeneousTransformationMatrix3Dimensional()
+            ),
             connection_specification=connection_specification,
         )
 
@@ -262,8 +264,8 @@ class KinematicStructureEntitySpecification(
         name: str,
         radius: float,
         color: Color | None = None,
-        origin: HomogeneousTransformationMatrix | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         child_specifications: list[KinematicStructureEntitySpecification] | None = None,
         connection_specification: ConnectionSpecification | None = None,
     ) -> Self:
@@ -287,11 +289,13 @@ class KinematicStructureEntitySpecification(
             name,
             Sphere(
                 radius=radius,
-                origin=(origin or HomogeneousTransformationMatrix()),
+                origin=(origin or HomogeneousTransformationMatrix3Dimensional()),
                 color=color or Color(),
             ).as_shape_collection(),
             child_specifications=(child_specifications or []),
-            parent_T_self=(parent_T_self or HomogeneousTransformationMatrix()),
+            parent_T_self=(
+                parent_T_self or HomogeneousTransformationMatrix3Dimensional()
+            ),
             connection_specification=connection_specification,
         )
 
@@ -302,8 +306,8 @@ class KinematicStructureEntitySpecification(
         width: float,
         height: float,
         color: Color | None = None,
-        origin: HomogeneousTransformationMatrix | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         child_specifications: list[KinematicStructureEntitySpecification] | None = None,
         connection_specification: ConnectionSpecification | None = None,
     ) -> Self:
@@ -329,11 +333,13 @@ class KinematicStructureEntitySpecification(
             Cylinder(
                 width=width,
                 height=height,
-                origin=(origin or HomogeneousTransformationMatrix()),
+                origin=(origin or HomogeneousTransformationMatrix3Dimensional()),
                 color=color or Color(),
             ).as_shape_collection(),
             child_specifications=(child_specifications or []),
-            parent_T_self=(parent_T_self or HomogeneousTransformationMatrix()),
+            parent_T_self=(
+                parent_T_self or HomogeneousTransformationMatrix3Dimensional()
+            ),
             connection_specification=connection_specification,
         )
 
@@ -344,8 +350,8 @@ class KinematicStructureEntitySpecification(
         filename: str,
         scale: Scale | None = None,
         color: Color | None = None,
-        origin: HomogeneousTransformationMatrix | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         child_specifications: list[KinematicStructureEntitySpecification] | None = None,
         connection_specification: ConnectionSpecification | None = None,
     ) -> Self:
@@ -371,12 +377,14 @@ class KinematicStructureEntitySpecification(
             name,
             Mesh(
                 filename=filename,
-                origin=(origin or HomogeneousTransformationMatrix()),
+                origin=(origin or HomogeneousTransformationMatrix3Dimensional()),
                 scale=scale or Scale(),
                 color=color or Color(),
             ).as_shape_collection(),
             child_specifications=(child_specifications or []),
-            parent_T_self=(parent_T_self or HomogeneousTransformationMatrix()),
+            parent_T_self=(
+                parent_T_self or HomogeneousTransformationMatrix3Dimensional()
+            ),
             connection_specification=connection_specification,
         )
 
@@ -385,7 +393,7 @@ class KinematicStructureEntitySpecification(
         cls,
         name: str,
         event: Event,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         child_specifications: list[KinematicStructureEntitySpecification] | None = None,
         connection_specification: ConnectionSpecification | None = None,
     ) -> Self:
@@ -416,7 +424,9 @@ class KinematicStructureEntitySpecification(
             .as_shapes()
             .copy_without_reference_frame(),
             child_specifications=(child_specifications or []),
-            parent_T_self=(parent_T_self or HomogeneousTransformationMatrix()),
+            parent_T_self=(
+                parent_T_self or HomogeneousTransformationMatrix3Dimensional()
+            ),
             connection_specification=connection_specification,
         )
 
@@ -427,7 +437,7 @@ class KinematicStructureEntitySpecification(
         points_3d: list[CartesianPoint3Dimensional],
         minimum_thickness: float = 0.005,
         singular_value_ratio_tolerance: float = 1e-7,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         child_specifications: list[KinematicStructureEntitySpecification] | None = None,
         connection_specification: ConnectionSpecification | None = None,
     ) -> Self:
@@ -459,7 +469,9 @@ class KinematicStructureEntitySpecification(
                 ]
             ).copy_without_reference_frame(),
             child_specifications=(child_specifications or []),
-            parent_T_self=(parent_T_self or HomogeneousTransformationMatrix()),
+            parent_T_self=(
+                parent_T_self or HomogeneousTransformationMatrix3Dimensional()
+            ),
             connection_specification=connection_specification,
         )
 

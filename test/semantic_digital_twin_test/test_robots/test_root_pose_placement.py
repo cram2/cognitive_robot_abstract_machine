@@ -5,7 +5,9 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -17,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def _pr2_behind_an_odom(
-    world_T_odometry: HomogeneousTransformationMatrix,
+    world_T_odometry: HomogeneousTransformationMatrix3Dimensional,
 ) -> tuple[World, AbstractRobot]:
     """
     A world holding nothing but a PR2, reached through an odom frame at
@@ -41,7 +43,7 @@ def _pr2_behind_an_odom(
 # The drive is an OmniDrive, which represents x, y and yaw only, so the odom is
 # displaced within that plane. A z or roll offset would make these tests assert the
 # drive's limits instead of the frame conversion.
-_DISPLACED_ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(
+_DISPLACED_ODOM = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     0.5, 0.5, 0, yaw=np.pi / 2
 )
 
@@ -60,7 +62,7 @@ def test_root_reaches_a_world_pose_through_a_displaced_odom():
 
 
 def test_root_reaches_a_world_pose_through_an_undisplaced_odom():
-    world, robot = _pr2_behind_an_odom(HomogeneousTransformationMatrix())
+    world, robot = _pr2_behind_an_odom(HomogeneousTransformationMatrix3Dimensional())
     target = Pose3Dimensional.from_xyz_rpy(
         1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root
     )
@@ -105,7 +107,7 @@ def test_a_drive_origin_given_in_the_world_frame_is_reached_through_a_displaced_
         )
         drive = OmniDrive.create_with_dofs(world=world, parent=odometry, child=base)
         world.add_connection(drive)
-    target = HomogeneousTransformationMatrix.from_xyz_rpy(
+    target = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         1.3, 2.0, 0.0, yaw=0.25, reference_frame=root
     )
 

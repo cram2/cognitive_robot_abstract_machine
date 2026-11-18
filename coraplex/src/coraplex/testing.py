@@ -21,7 +21,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -82,7 +82,7 @@ def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
     connection = FixedConnection(
         parent=tool_frame,
         child=tool_world.root,
-        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             reference_frame=tool_frame, **mount
         ),
     )
@@ -133,19 +133,23 @@ def setup_world() -> World:
             parent=apartment_root, child=pr2_root, world=apartment_world
         )
         apartment_world.merge_world(pr2_sem_world, c_root_bf)
-        c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        c_root_bf.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1.5, 2.5, 0, reference_frame=apartment_root
         )
 
     apartment_world.get_body_by_name(
         "milk.stl"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2.37, 2, 1.0345, reference_frame=apartment_world.root
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            2.37, 2, 1.0345, reference_frame=apartment_world.root
+        )
     )
     apartment_world.get_body_by_name(
         "breakfast_cereal.stl"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2.37, 1.8, 1.0487, reference_frame=apartment_world.root
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            2.37, 1.8, 1.0487, reference_frame=apartment_world.root
+        )
     )
     milk_view = Milk(root=apartment_world.get_body_by_name("milk.stl"))
     with apartment_world.modify_world():

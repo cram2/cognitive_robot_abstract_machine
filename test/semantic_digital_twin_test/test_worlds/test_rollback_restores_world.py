@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -54,8 +54,10 @@ def free_item_world() -> tuple[World, Body, Body, RevoluteConnection]:
         )
         world.add_connection(arm_joint)
     with world.modify_world():
-        item.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1.0, y=2.0, z=3.0, yaw=0.5, reference_frame=root
+        item.parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0, y=2.0, z=3.0, yaw=0.5, reference_frame=root
+            )
         )
         arm_joint.position = 0.7
     return world, item, table, arm_joint
@@ -119,8 +121,10 @@ def test_reset_state_context_restores_state_without_model_change(free_item_world
 
     with world.reset_state_context():
         arm_joint.position = -0.3
-        item.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=5.0, reference_frame=item.parent_connection.parent
+        item.parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=5.0, reference_frame=item.parent_connection.parent
+            )
         )
 
     assert (arm_joint.position, item.global_transform.to_np().tolist()) == (

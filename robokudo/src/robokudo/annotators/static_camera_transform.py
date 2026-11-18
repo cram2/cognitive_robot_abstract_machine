@@ -10,7 +10,9 @@ from __future__ import annotations
 from timeit import default_timer
 
 from py_trees.common import Status
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.camera_interface import CameraInterface
@@ -30,8 +32,8 @@ class StaticCameraTransformAnnotator(BaseAnnotator):
                 Reference frame used for the camera-to-world transform.
                 """
 
-                self.world_T_camera: HomogeneousTransformationMatrix = (
-                    HomogeneousTransformationMatrix()
+                self.world_T_camera: HomogeneousTransformationMatrix3Dimensional = (
+                    HomogeneousTransformationMatrix3Dimensional()
                 )
                 """
                 Image-frame pose relative to the configured world frame.

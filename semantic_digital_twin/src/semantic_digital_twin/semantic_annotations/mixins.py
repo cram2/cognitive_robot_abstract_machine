@@ -72,7 +72,7 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
 from krrood_spatial_math.spatial_types import (
     LineSegment3Dimensional,
     CartesianPoint3Dimensional,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional, RotationMatrix
@@ -323,7 +323,7 @@ class HasRootKinematicStructureEntity(
         )
 
     @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
+    def global_transform(self) -> HomogeneousTransformationMatrix3Dimensional:
         return self.root.global_transform
 
     @property
@@ -354,7 +354,7 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
         cls,
         name: str,
         world: World,
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         parent_connection_specification: ConnectionSpecification | None = None,
         scale: Scale | None = None,
     ) -> Self:
@@ -575,7 +575,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
         cls,
         name: str,
         world: World,
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         parent_connection_specification: ConnectionSpecification | None = None,
         scale: Scale | None = None,
     ) -> Self:
@@ -778,7 +778,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
     @abstractmethod
     def calculate_self_T_movable_joint(
         self, axis: Vector3Dimensional
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Calculate where the joint that moves this annotation sits, relative to its root.
 
@@ -1112,7 +1112,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         self_C_supporting_surface = FixedConnection(
             parent=self.root,
             child=supporting_surface,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x, y=y, z=z, reference_frame=self.root
             ),
         )
@@ -1429,7 +1429,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
                 if self.calculate_supporting_surface() is None:
                     raise NoSupportingSurfaceError(self)
 
-        origin = HomogeneousTransformationMatrix(reference_frame=self.root)
+        origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=self.root)
         surface_box = self.supporting_surface.area.as_bounding_box_collection_at_origin(
             origin
         ).bounding_box()

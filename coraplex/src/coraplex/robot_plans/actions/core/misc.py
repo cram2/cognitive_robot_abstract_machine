@@ -22,7 +22,7 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
@@ -141,7 +141,9 @@ class DetectAction(SequentialAction):
         """
         distance = self.default_detection_distance
         return VolumetricBoundingBox(
-            origin=HomogeneousTransformationMatrix(reference_frame=self.robot.root),
+            origin=HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=self.robot.root
+            ),
             min_x=-distance,
             min_y=-distance,
             min_z=0,
@@ -210,13 +212,15 @@ class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPose
             x=target_V_robot, z=world_z
         ) @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
 
-        target_T_robot = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=CartesianPoint3Dimensional(
-                x=self.target_pose_offset_robot.x,
-                y=self.target_pose_offset_robot.y,
-            ),
-            rotation_matrix=target_R_robot_pointing_to_target,
-            reference_frame=self.reference_T_grasp.reference_frame,
+        target_T_robot = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=CartesianPoint3Dimensional(
+                    x=self.target_pose_offset_robot.x,
+                    y=self.target_pose_offset_robot.y,
+                ),
+                rotation_matrix=target_R_robot_pointing_to_target,
+                reference_frame=self.reference_T_grasp.reference_frame,
+            )
         )
         reference_T_robot = reference_T_target @ target_T_robot
         world_T_robot = self.world.transform(reference_T_robot.pose, self.world.root)

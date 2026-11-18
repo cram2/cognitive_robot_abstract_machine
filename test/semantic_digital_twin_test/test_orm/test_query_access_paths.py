@@ -31,7 +31,7 @@ from krrood.parametrization.parameterizer import ConditionParameters
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint2Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
@@ -65,12 +65,16 @@ spatial_types = pytest.mark.parametrize(
             lambda axis, angle: RotationMatrix.from_axis_angle(AxisAngle(axis, angle)),
         ),
         (
-            HomogeneousTransformationMatrix,
-            HomogeneousTransformationMatrix.from_xyz_axis_angle,
+            HomogeneousTransformationMatrix3Dimensional,
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle,
         ),
         (Pose3Dimensional, Pose3Dimensional.from_xyz_axis_angle),
     ],
-    ids=["RotationMatrix", "HomogeneousTransformationMatrix", "Pose3Dimensional"],
+    ids=[
+        "RotationMatrix",
+        "HomogeneousTransformationMatrix3Dimensional",
+        "Pose3Dimensional",
+    ],
 )
 
 access_paths = pytest.mark.parametrize(

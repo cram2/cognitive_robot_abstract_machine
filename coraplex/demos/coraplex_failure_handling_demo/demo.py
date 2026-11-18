@@ -48,7 +48,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood.patterns.path_enumeration import PathEnumeration
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose2Dimensional,
     Vector3Dimensional,
 )
@@ -206,7 +206,7 @@ class Nudge(SucceedsOnObservingTrue, StatechartNode):
         x, y, z = self.displacement.to_np()[:3] / self.duration_in_ticks
         connection = self.body.parent_connection
         connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x, y=y, z=z, reference_frame=connection.parent
             )
             @ connection.origin
@@ -358,18 +358,18 @@ class FailureHandlingDemonstration(RobotDemonstration):
     How often the pick-up is run again after it failed.
     """
 
-    robot_start: HomogeneousTransformationMatrix = field(
-        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
-            1.1, 2.5, 0
+    robot_start: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=lambda: (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.1, 2.5, 0)
         )
     )
     """
     Where the PR2 stands before the plan begins.
     """
 
-    milk_start: HomogeneousTransformationMatrix = field(
-        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.0345
+    milk_start: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=lambda: (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.37, 2, 1.0345)
         )
     )
     """

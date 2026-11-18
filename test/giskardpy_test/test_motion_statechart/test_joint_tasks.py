@@ -32,7 +32,7 @@ from krrood.symbolic_math.symbolic_math import (
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -92,7 +92,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
 
-    goal = HomogeneousTransformationMatrix.from_xyz_rpy(
+    goal = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1,
         y=-1,
         z=1,
@@ -101,7 +101,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
         yaw=1,
         reference_frame=pr2_world_state_reset.root,
     )
-    expected = HomogeneousTransformationMatrix.from_xyz_rpy(
+    expected = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, y=-1, yaw=1, reference_frame=pr2_world_state_reset.root
     )
 

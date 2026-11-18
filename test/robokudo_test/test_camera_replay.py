@@ -38,7 +38,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -129,7 +131,7 @@ def _recorded_scene(
         source_world.add_semantic_annotation(camera)
 
     pose = (
-        HomogeneousTransformationMatrix(
+        HomogeneousTransformationMatrix3Dimensional(
             reference_frame=reference, child_frame=pose_child
         )
         if with_pose
@@ -275,7 +277,7 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> N
     )
     _, first = Storage.decode_view_document(first_document)
 
-    moved_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    moved_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.5,
         pos_y=0.0,
         pos_z=0.0,
@@ -331,7 +333,7 @@ def test_camera_pose_child_must_match_camera_root() -> None:
     """
     scene = _recorded_scene()
     wrong_child = Body(name=PrefixedName(name="different_camera_frame"))
-    wrong_pose = HomogeneousTransformationMatrix(
+    wrong_pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=scene.observation.world_T_camera.reference_frame,
         child_frame=wrong_child,
     )
@@ -347,7 +349,9 @@ def test_camera_pose_requires_a_reference_frame() -> None:
     Reject a pose whose target frame cannot be represented in the sensor world.
     """
     scene = _recorded_scene()
-    pose = HomogeneousTransformationMatrix(child_frame=scene.observation.camera.root)
+    pose = HomogeneousTransformationMatrix3Dimensional(
+        child_frame=scene.observation.camera.root
+    )
 
     with pytest.raises(InvalidCameraObservation):
         RecordedCameraWorld(replace(scene.observation, world_T_camera=pose)).project()

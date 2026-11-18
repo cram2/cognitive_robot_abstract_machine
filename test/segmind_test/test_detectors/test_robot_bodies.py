@@ -23,7 +23,9 @@ from segmind.episode_segmenter import EpisodeSegmentation
 from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -99,11 +101,13 @@ def _box_resting_on(
         )
     x, y, _ = supporter.global_pose.position.to_np()[:3]
     top = _top_of(supporter)
-    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x,
-        y,
-        top + BOX_SIZE / 2 - sunk_by,
-        reference_frame=world.root,
+    box.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x,
+            y,
+            top + BOX_SIZE / 2 - sunk_by,
+            reference_frame=world.root,
+        )
     )
     return box
 
@@ -227,7 +231,7 @@ def _box_inside(world: World, container: Body) -> Body:
             FixedConnection(
                 parent=world.root,
                 child=shelf,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     middle_x,
                     middle_y,
                     middle_z - BOX_SIZE / 2 - SHELF_THICKNESS / 2,
@@ -238,8 +242,10 @@ def _box_inside(world: World, container: Body) -> Body:
         world.add_connection(
             Connection6DoF.create_with_dofs(world=world, parent=world.root, child=box)
         )
-    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        middle_x, middle_y, middle_z, reference_frame=world.root
+    box.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            middle_x, middle_y, middle_z, reference_frame=world.root
+        )
     )
     return box
 

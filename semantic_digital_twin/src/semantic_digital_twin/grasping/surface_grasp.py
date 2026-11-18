@@ -7,7 +7,7 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING
 
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -77,12 +77,14 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         root_V_closing = root_V_across * math.cos(self.roll) + root_V_approach.cross(
             root_V_across
         ) * math.sin(self.roll)
-        root_T_grasp = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=root_P_surface - root_V_outward * self.depth,
-            rotation_matrix=RotationMatrix.from_vectors(
-                x=root_V_approach, y=root_V_closing
-            ),
-            reference_frame=graspable.root,
+        root_T_grasp = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=root_P_surface - root_V_outward * self.depth,
+                rotation_matrix=RotationMatrix.from_vectors(
+                    x=root_V_approach, y=root_V_closing
+                ),
+                reference_frame=graspable.root,
+            )
         )
         return GraspCandidate(graspable, root_T_grasp.pose)
 

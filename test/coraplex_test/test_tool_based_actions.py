@@ -37,7 +37,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Sponge,
     Whisk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -72,7 +74,7 @@ def _add_box_body(world, name, size, position):
             FixedConnection(
                 parent=world.root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     *position, reference_frame=world.root
                 ),
             )
@@ -285,7 +287,7 @@ def _attach_box_to_gripper(world, robot, name, size, mount_z):
             FixedConnection(
                 parent=tool_frame,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=mount_z, reference_frame=tool_frame
                 ),
             )

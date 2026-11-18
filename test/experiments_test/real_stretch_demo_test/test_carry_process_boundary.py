@@ -11,7 +11,7 @@ from cramph.context import StatechartContext
 from cramph.data_types import LifeCycleValues
 from cramph.statechart import Statechart
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -45,7 +45,7 @@ def test_a_carry_runs_against_a_controller_in_another_process(
             FixedConnection(
                 parent=tool_frame,
                 child=held_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     roll=0.4, pitch=0.3, reference_frame=tool_frame
                 ),
             )

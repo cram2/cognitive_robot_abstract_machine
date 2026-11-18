@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Twist,
     Vector3Dimensional,
 )
@@ -67,7 +67,9 @@ def in_world(annotation_type, shape: trimesh.Trimesh, name: str):
         [
             Mesh.from_trimesh(
                 mesh=shape,
-                origin=HomogeneousTransformationMatrix(reference_frame=body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,

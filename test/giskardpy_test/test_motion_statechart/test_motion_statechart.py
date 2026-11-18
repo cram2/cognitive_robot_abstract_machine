@@ -49,7 +49,7 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Quaternion,
     RotationMatrix,
     Vector3Dimensional,
@@ -326,7 +326,7 @@ def test_long_goal(pr2_world_state_reset: World):
                 tip_link=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
                     "base_footprint"
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=50, reference_frame=pr2_world_state_reset.root
                 ),
             ),
@@ -394,7 +394,7 @@ class TestTemplates:
                 FixedConnection(
                     parent=gripper,
                     child=knife,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         z=0.06, reference_frame=gripper
                     ),
                 )
@@ -414,7 +414,7 @@ class TestTemplates:
                 FixedConnection(
                     parent=map_link,
                     child=loaf,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.91, y=0.25, z=0.62, reference_frame=map_link
                     ),
                 )
@@ -576,7 +576,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
 
     expr = Vector3Dimensional.X(tip).angle_between(
-        tip.express_in_own_frame(Vector3Dimensional.Y(root))
+        tip.express_in_own_frame(value=Vector3Dimensional.Y(root))
     )
 
     GeometricConstraintBuilder(collection=col).add_point_goal_constraints(

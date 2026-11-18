@@ -17,7 +17,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bowl,
     PouringCup,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 from coraplex.robot_plans.actions.composite.tool_based import PouringAction
@@ -46,7 +48,7 @@ def main() -> None:
     with world.modify_world():
         world.merge_world_at_pose(
             bowl_world,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )

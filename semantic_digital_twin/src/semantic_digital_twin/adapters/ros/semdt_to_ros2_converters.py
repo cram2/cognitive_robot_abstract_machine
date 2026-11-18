@@ -13,7 +13,7 @@ from semantic_digital_twin.adapters.ros.msg_converter import (
     InputType,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
     Quaternion,
@@ -29,14 +29,14 @@ from semantic_digital_twin.world_description.geometry import (
 
 
 @dataclass
-class HomogeneousTransformationMatrixToRos2Converter(
+class HomogeneousTransformationMatrix3DimensionalToRos2Converter(
     SemDTToRos2Converter[
-        HomogeneousTransformationMatrix, geometry_msgs.TransformStamped
+        HomogeneousTransformationMatrix3Dimensional, geometry_msgs.TransformStamped
     ]
 ):
     @classmethod
     def convert(
-        cls, data: HomogeneousTransformationMatrix
+        cls, data: HomogeneousTransformationMatrix3Dimensional
     ) -> geometry_msgs.TransformStamped:
         result = geometry_msgs.TransformStamped()
         if data.reference_frame is not None:

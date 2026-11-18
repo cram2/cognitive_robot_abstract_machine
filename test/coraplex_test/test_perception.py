@@ -63,7 +63,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Milk
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
@@ -301,8 +301,10 @@ def test_world_perception_reports_the_pose_the_world_holds(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *PERCEIVED_MILK_POSITION, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *PERCEIVED_MILK_POSITION, reference_frame=world.root
+        )
     )
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
@@ -443,8 +445,10 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_body = milk.root
     wrong_prior = (1.0, 1.0, 1.0)
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *wrong_prior, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *wrong_prior, reference_frame=world.root
+        )
     )
 
     plan = PickUpAction(
