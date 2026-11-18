@@ -296,13 +296,12 @@ class ControlStructureNode(CompositeNode, ABC):
         """
         node = self._as_node(node=node)
         self._check_is_not_a_child(node=node)
-        children = [*self.nodes[:position], node, *self.nodes[position:]]
         if not self.belongs_to_statechart():
-            self.set_children(children=children)
+            self.insert_child(position=position, node=node)
             return
         self._check_can_be_a_child(node=node)
         self._check_accepts_children()
-        self.set_children(children=children)
+        self.insert_child(position=position, node=node)
         self._place_child_in_statechart(node=node)
         self._wire_children()
         if self.statechart.compiler.latest_compile_covers(node=self):
@@ -1246,7 +1245,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         self._add_child_to_statechart(node=child)
         self._chosen_children.append(child)
-        self.statechart._note_changed_chosen_children(node=self)
+        self.statechart._record_changed_chosen_children(node=self)
         self.success_condition = logic_or(self.success_condition, child.is_succeeded)
         self.statechart.request_rebuild(node=self)
 
@@ -1259,7 +1258,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         self._chosen_children = list(children)
         if self._statechart is not None:
-            self._statechart._note_changed_chosen_children(node=self)
+            self._statechart._record_changed_chosen_children(node=self)
 
     def give_up_on_child_when(
         self, *, child: StatechartNode, failure_monitors: list[StatechartNode]

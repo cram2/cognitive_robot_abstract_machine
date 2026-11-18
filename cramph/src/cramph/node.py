@@ -181,7 +181,7 @@ class TransitionCondition(SubclassJSONSerializer):
         self.expression = new_expression
         self._child = child
         if self.owner is not None and self.owner._statechart is not None:
-            self.owner._statechart._note_changed_condition(
+            self.owner._statechart._record_changed_condition(
                 node=self.owner, transition_kind=self.kind
             )
 
@@ -1235,7 +1235,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             case _:
                 raise UnknownTransitionKindError(transition_kind=transition.kind)
         if self._statechart is not None:
-            self._statechart._note_changed_condition(
+            self._statechart._record_changed_condition(
                 node=self, transition_kind=transition.kind
             )
 
@@ -2398,7 +2398,31 @@ class CompositeNode(StatechartNode):
         """
         self.nodes = list(children)
         if self._statechart is not None:
-            self._statechart._note_changed_children(node=self)
+            self._statechart._record_changed_children(node=self)
+
+    def insert_child(self, *, position: int, node: StatechartNode) -> None:
+        """
+        Lists `node` among the children at `position`, leaving the statechart as it is,
+        and records the change like :meth:`set_children`.
+
+        :param position: The index among the children `node` takes.
+        :param node: The node to list as a child.
+        """
+        self.set_children(
+            children=[*self.nodes[:position], node, *self.nodes[position:]]
+        )
+
+    def remove_child(self, *, child: StatechartNode) -> None:
+        """
+        Stops listing `child` itself among the children, whatever other child it
+        compares equal to, leaving the statechart as it is, and records the change like
+        :meth:`set_children`.
+
+        :param child: One of :attr:`nodes`.
+        """
+        self.set_children(
+            children=[listed for listed in self.nodes if listed is not child]
+        )
 
     @classproperty
     def context_extensions_required_to_expand(
@@ -2452,7 +2476,7 @@ class CompositeNode(StatechartNode):
         self._add_node_sanity_check(node=node)
         self._check_accepts_children()
         if node not in self.nodes:
-            self.set_children(children=[*self.nodes, node])
+            self.insert_child(position=len(self.nodes), node=node)
         self._place_child_in_statechart(node=node)
 
     def _place_child_in_statechart(self, *, node: StatechartNode) -> None:

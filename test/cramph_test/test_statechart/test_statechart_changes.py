@@ -17,7 +17,7 @@ from cramph.composites import (
     Sequence,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues, TransitionKind
+from cramph.data_types import ObservationStateValue, TransitionKind
 from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode, EndStatechart, StatechartNode
 from cramph.nodes_for_testing import (
@@ -26,7 +26,7 @@ from cramph.nodes_for_testing import (
     NodeSucceedingOnObservingTrue,
 )
 from cramph.statechart import Statechart
-from cramph.statechart_changes import ConditionChange
+from cramph.statechart_changes import ChildrenChange, ConditionChange
 from semantic_digital_twin.world import World
 
 from .test_composite_node_choosing_its_child import ChooserAnsweringInTurn
@@ -125,7 +125,7 @@ def node_arriving_at_once(*, name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -257,6 +257,41 @@ def test_a_condition_reading_a_node_that_did_not_join_yet_waits_for_it(sender):
     receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
 
     assert structure(statechart=receiver) == structure(statechart=sender)
+
+
+# %% changing the children of a composite node
+
+
+def test_removing_and_inserting_a_child_records_the_children_as_they_are_then(sender):
+    """
+    Each change to the children of a node of the statechart closes a block holding the
+    children the node has afterwards.
+    """
+    sequence, first, second = sender.nodes[:3]
+
+    sequence.remove_child(child=second)
+    [removal] = sender.change_blocks[-1].changes
+    sequence.insert_child(position=0, node=second)
+    [insertion] = sender.change_blocks[-1].changes
+
+    assert isinstance(removal, ChildrenChange)
+    assert (removal.node, removal.children) == (sequence, [first])
+    assert isinstance(insertion, ChildrenChange)
+    assert (insertion.node, insertion.children) == (sequence, [second, first])
+
+
+def test_removing_a_child_keeps_a_child_comparing_equal_to_it():
+    """
+    Only the child itself stops being listed, not another child equal to it.
+    """
+    kept = NodeComparingItsFields(name="twin")
+    removed = NodeComparingItsFields(name="twin")
+    parent = Sequence(name="parent", nodes=[kept, removed])
+
+    parent.remove_child(child=removed)
+
+    assert len(parent.nodes) == 1
+    assert parent.nodes[0] is kept
 
 
 # %% requests
