@@ -10,7 +10,7 @@ from functools import cached_property
 
 from typing_extensions import TYPE_CHECKING, Iterator
 
-from krrood.ontomatic.failures import NoObjectOfIndividualDeclaresProperty
+from krrood.ontomatic.exceptions import NoObjectOfIndividualDeclaresProperty
 from krrood.ontomatic.property_descriptor.mixins import (
     HasEquivalentProperties,
     HasInverseProperty,
