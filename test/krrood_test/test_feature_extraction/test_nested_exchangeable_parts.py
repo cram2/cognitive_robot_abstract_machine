@@ -14,7 +14,6 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
     RelationalProbabilisticCircuit,
 )
 
-from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,

@@ -27,10 +27,8 @@ from pathlib import Path
 from typing_extensions import Any
 
 import coraplex as _coraplex_pkg
-import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 import krrood.entity_query_language.factories as eql
 from cramph.data_types import LifeCycleValue
-from coraplex.orm.ormatic_interface import Base  # type: ignore
 from coraplex.plans.failures import PlanFailure
 from coraplex.robot_plans.actions.base import Action
 from cramph.composites import Sequence, StatementNode, TryInOrder
@@ -560,6 +558,8 @@ def persist_plan(plan: StatechartNode) -> tuple[Session, Engine]:
     :param plan: The fully executed plan to persist.
     :return: Tuple of ``(session, engine)`` pointing at the populated database.
     """
+    from coraplex.orm.ormatic_interface import Base
+
     engine = create_engine(f"sqlite:///{_DATABASE_PATH}")
     drop_database(engine)
     Base.metadata.create_all(bind=engine)

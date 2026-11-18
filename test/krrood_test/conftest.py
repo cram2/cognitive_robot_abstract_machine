@@ -159,16 +159,8 @@ def pytest_configure(config):
     logging.getLogger("numpy").setLevel(logging.WARNING)
 
 
-# Generate ormatic_interface.py at module level, before the star import below.
-# This must happen here (not in a pytest hook) because hooks run after the
-# conftest module is fully imported, which means the import on the next line
-# would fail if the generated file is stale or missing.
+# Generate ormatic_interface.py when this conftest is loaded, before any test imports it.
 generate_sqlalchemy_interface()
-
-try:
-    from .dataset.ormatic_interface import *
-except ImportError:
-    pass
 
 # Generate verbalization_results.py the same way: always fresh, so a wording change
 # shows up as an ordinary diff to review before committing, instead of a failing test.
@@ -214,6 +206,14 @@ def cleanup_after_test():
     SymbolGraph().clear()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load the ORM interface, whose import registers the mappers every test may use.
+    """
+    from .dataset import ormatic_interface  # noqa: F401
+
+
 @pytest.fixture(scope="session")
 def engine():
     configure_mappers()
@@ -232,6 +232,8 @@ def session(engine):
 
 @pytest.fixture
 def database(engine, session):
+    from .dataset.ormatic_interface import Base
+
     Base.metadata.create_all(engine)
     yield
     drop_database(engine)
