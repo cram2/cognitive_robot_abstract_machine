@@ -1,20 +1,7 @@
 """
-Constructs for querying a probabilistic model directly from the Entity Query Language:
-``distribution_of`` and ``probability_of``.
-
-A third case -- the expectation of an attribute -- reuses the existing
-:class:`~krrood.entity_query_language.operators.aggregators.Average` aggregator
-(``average(...)``) instead of a bespoke construct here:
-:class:`~krrood.entity_query_language.backends.ProbabilisticBackend` recognizes a bare
-``average(...)`` selection and answers it in closed form via
-``ProbabilisticModel.moment`` instead of sampling and averaging rows, so the same
-declarative call reads correctly under either backend. See
-:meth:`~krrood.entity_query_language.backends.ProbabilisticBackend._resolve_average`.
-
-Bundled in one module rather than one file each (unlike ``operators/causal.py``, which
-is one coupled do()-intervention feature) because these are parallel operations on the
-same base, the same shape ``operators/aggregators.py`` bundles ``Sum``/``Max``/``Min``/
-... in.
+Entity queries that ask a probabilistic model directly, built by
+:func:`~krrood.entity_query_language.factories.distribution_of` and
+:func:`~krrood.entity_query_language.factories.probability_of`.
 """
 
 from __future__ import annotations
@@ -47,6 +34,7 @@ from krrood.parametrization.random_events_translator import (
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import Attribute
+    from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.query.match import Match
     from krrood.parametrization.model_registries import ModelRegistry
 
@@ -54,16 +42,12 @@ if TYPE_CHECKING:
 @dataclass(kw_only=True, eq=False, repr=False)
 class ProbabilisticQuery(Evaluable, HasExpression, ABC):
     """
-    Shared base for EQL constructs that query a probabilistic model directly --
-    ``distribution_of``, ``probability_of`` -- rather than selecting or generating
-    rows/instances.
+    A query that asks a probabilistic model directly rather than selecting or generating
+    instances.
 
-    This is a probabilistic operation, not a data selection, so by default none of
-    these resolve natively or under any backend other than
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which
-    dispatches to :meth:`_resolve_` for whichever subclass it is given.
-    :class:`Probability` is the one exception -- see its own
-    :meth:`~Probability._evaluate_natively_`.
+    Only
+    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` resolves
+    one, through :meth:`_resolve_`, except :class:`Probability`, which also counts rows.
     """
 
     def _evaluate_natively_(self) -> Iterator:
@@ -83,15 +67,12 @@ class ProbabilisticQuery(Evaluable, HasExpression, ABC):
 @dataclass(kw_only=True, eq=False, repr=False)
 class Probability(ProbabilisticQuery):
     """
-    The probability of a condition, optionally given evidence, e.g.
-    ``probability_of(x.A > 5)`` or ``probability_of(x.A > 5, evidence=x.B < 2)`` for
-    ``x = variable(MyClass)``. Condition and evidence accept anything a
-    ``.where(...)`` clause does.
+    The probability of a condition, optionally given evidence, each anything a
+    ``.where(...)`` clause accepts.
 
-    Resolves two ways: exactly via :meth:`_resolve_` under a
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, or by
-    counting matching rows via :meth:`_evaluate_natively_` under any other backend.
-    See :doc:`/krrood/doc/eql/user/probabilistic_queries` for the full walkthrough.
+    Resolved exactly from a model by
+    :meth:`_resolve_`, or by counting matching rows under any other backend; see
+    :doc:`/krrood/doc/eql/user/probabilistic_queries`.
     """
 
     condition: SymbolicExpression
@@ -106,6 +87,9 @@ class Probability(ProbabilisticQuery):
     """
 
     def __post_init__(self):
+        """
+        Wrap a plain value given as condition or evidence in a literal.
+        """
         if not isinstance(self.condition, SymbolicExpression):
             self.condition = Literal(_value_=self.condition)
         if self.evidence is not None and not isinstance(
@@ -177,6 +161,9 @@ class Probability(ProbabilisticQuery):
         return self.condition_and_evidence
 
     def __repr__(self) -> str:
+        """
+        :return: The :func:`~krrood.entity_query_language.factories.probability_of` call that builds this query.
+        """
         evidence = "" if self.evidence is None else f", evidence={self.evidence!r}"
         return f"probability_of({self.condition!r}{evidence})"
 
@@ -184,23 +171,10 @@ class Probability(ProbabilisticQuery):
 @dataclass(kw_only=True, eq=False, repr=False)
 class Distribution(ProbabilisticQuery):
     """
-    Requests the distribution a :class:`~krrood.entity_query_language.query.match.Match`'s
-    conditions describe -- the probabilistic interpretation of
-    :py:func:`~krrood.entity_query_language.factories.a`/:py:func:`~krrood.entity_query_language.factories.an`/
-    :py:func:`~krrood.entity_query_language.factories.the`. Exactly the same sequence
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend` already
-    applies before *sampling* from a match -- literal-valued kwargs condition the
-    circuit (``arm=0.3``), ``.where(...)`` conditions truncate it, and underspecified
-    (``...``) fields are the joint's free variables -- just returned directly instead
-    of sampled from:
-
-    ``distribution_of(a(Pick)(arm=0.3, outcome=...))`` -- the distribution over
-    ``outcome`` given ``arm == 0.3``.
-
-    Optional keyword-only ``marginalize_for`` narrows the result to a subset of the
-    match's free variables (further marginalization), e.g.
-    ``distribution_of(match, marginalize_for=(match.outcome,))``. Without it,
-    every one of the match's free variables is kept.
+    The distribution a :class:`~krrood.entity_query_language.query.match.Match`'s
+    conditions describe: literal-valued keyword arguments condition the model,
+    ``.where(...)`` conditions truncate it, and underspecified (``...``) fields are its
+    free variables, e.g. ``distribution_of(a(Pick)(arm=0.3, outcome=...))``.
     """
 
     match: Match
@@ -210,12 +184,14 @@ class Distribution(ProbabilisticQuery):
 
     marginalize_for: tuple[Attribute, ...] = field(default_factory=tuple)
     """
-    The match's variables to narrow the result to.
-
-    Empty keeps every one of the match's free variables.
+    The match's variables to narrow the result to; empty keeps every free variable.
     """
 
     def __post_init__(self):
+        """
+        Reroot each of :attr:`marginalize_for` that is an attribute of the match's query
+        on the query's selection.
+        """
         query = self.match._get_expression_()
         self.marginalize_for = tuple(
             (
@@ -245,6 +221,9 @@ class Distribution(ProbabilisticQuery):
         return self.match._get_expression_()
 
     def __repr__(self) -> str:
+        """
+        :return: The :func:`~krrood.entity_query_language.factories.distribution_of` call that builds this query.
+        """
         args = (
             f", marginalize_for={self.marginalize_for!r}"
             if self.marginalize_for

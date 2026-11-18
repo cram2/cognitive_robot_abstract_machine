@@ -1,3 +1,7 @@
+"""
+The grammar rules for conditions: comparisons, logical operators and causal effects.
+"""
+
 from __future__ import annotations
 
 import operator
@@ -765,7 +769,7 @@ class CausesEffectRule(PhraseRule):
 
     Evaluates identically to a plain condition under every backend (see
     :class:`~krrood.entity_query_language.operators.causal.CausesEffect`) -- only
-    :class:`~krrood.entity_query_language.backends.ProbabilisticBackend` additionally
+    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` additionally
     reads it -- but names the searched cause explicitly, so a causal query is
     recognisable from its verbalization alone rather than reading as a vague *"what"*.
 

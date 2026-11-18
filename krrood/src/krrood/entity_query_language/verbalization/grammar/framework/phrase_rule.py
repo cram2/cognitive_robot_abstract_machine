@@ -10,6 +10,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.fragments.features import (
     GrammaticalNumber,
 )
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 
@@ -159,6 +160,14 @@ class PhraseRule(ABC):
     enters_query_scope: ClassVar[bool] = False
     """``True`` on a rule whose construct is itself a query body, so an entity found anywhere
     within it renders as a nested noun phrase."""
+
+    @classproperty
+    def joins_grammar(cls) -> bool:
+        """
+        ``True`` when the grammar loads this rule. A rule that must stay out of it, such as
+        one a test defines, and its subclasses set this to ``False``.
+        """
+        return True
 
     def when(self, *, node: FoldNode, context: RuleContext) -> bool:
         """

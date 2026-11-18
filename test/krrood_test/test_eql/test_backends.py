@@ -1,3 +1,7 @@
+"""
+Answering entity queries with each backend.
+"""
+
 from datetime import datetime
 from types import EllipsisType
 
@@ -24,8 +28,8 @@ from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
     EntityQueryLanguageGenerativeBackend,
-    ProbabilisticBackend,
 )
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     ProbabilisticOperationResult,

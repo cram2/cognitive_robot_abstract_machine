@@ -1,3 +1,7 @@
+"""
+The SAGE-10k door-opening demo.
+"""
+
 from copy import deepcopy
 
 import numpy as np
@@ -5,7 +9,7 @@ import pytest
 
 import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
