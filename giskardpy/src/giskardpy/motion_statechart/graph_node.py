@@ -1,7 +1,8 @@
 """
-The nodes of a motion statechart, the tasks built on them, and the artifacts they build:
+The nodes of a motion statechart and the tasks built on them.
 
-the constraints of the QP controller and the debug expressions.
+A node hands its constraints for the QP controller and its debug expressions over in its
+artifacts.
 """
 
 from __future__ import annotations
