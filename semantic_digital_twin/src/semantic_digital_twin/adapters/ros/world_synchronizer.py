@@ -1,3 +1,7 @@
+"""
+Keeping worlds of different processes in step by publishing their changes over ROS.
+"""
+
 from __future__ import annotations
 
 import json
@@ -269,9 +273,8 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         error_throttle_period: float = 1.0,
     ) -> None:
         """
-        Handle a received message; if it cannot be applied, log that, and stop counting
-        its publisher as caught up with, instead of ending the spinning of the node or
-        the batch the message is applied in.
+        Handle a received message this world does not :meth:`contains` yet; log one that
+        cannot be applied and stop counting its publisher as caught up with.
 
         .. warning:: A model modification that fails part-way stays applied as far as it
             got, so the world may hold part of the failed message.
@@ -280,6 +283,8 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         :param handle: What to do with the message.
         :param error_throttle_period: The fewest seconds between two logged errors.
         """
+        if self.contains(position=received.position):
+            return
         try:
             handle(received)
         except DataclassException as error:
@@ -387,6 +392,38 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             applied = self._applied_sequence_numbers.get(position.origin, 0)
         return applied >= position.sequence_number
 
+    def contains(self, *, position: StreamPosition) -> bool:
+        """
+        Whether this world already contains the change published at ``position``,
+        applied from its message or taken in with a fetched world.
+
+        Unlike :meth:`has_applied`, a publisher this world diverged from is not treated
+        differently.
+        """
+        with self._sequence_number_lock:
+            applied = self._applied_sequence_numbers.get(position.origin, 0)
+        return applied >= position.sequence_number
+
+    @property
+    def contained_positions(self) -> list[StreamPosition]:
+        """
+        The position of the last change of each publisher this world contains: its own
+        publications and what it applied of the others.
+        """
+        with self._sequence_number_lock:
+            positions = [
+                StreamPosition(origin=publisher, sequence_number=sequence_number)
+                for publisher, sequence_number in self._applied_sequence_numbers.items()
+            ]
+            if self._published_sequence_number > 0:
+                positions.append(
+                    StreamPosition(
+                        origin=self.meta_data,
+                        sequence_number=self._published_sequence_number,
+                    )
+                )
+        return positions
+
     def record_applied(self, message: Message):
         """
         Remember how far this world caught up with the publisher of ``message``.
@@ -394,12 +431,19 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         Called when a message is applied rather than when it is received, so that a
         buffered message does not count as caught up with.
         """
-        position = message.position
+        self.record_contained_positions(positions=[message.position])
+
+    def record_contained_positions(self, *, positions: list[StreamPosition]) -> None:
+        """
+        Remember that this world contains the changes of each publisher up to its
+        position in ``positions``, so that their messages are not applied again.
+        """
         with self._sequence_number_lock:
-            self._applied_sequence_numbers[position.origin] = max(
-                self._applied_sequence_numbers.get(position.origin, 0),
-                position.sequence_number,
-            )
+            for position in positions:
+                self._applied_sequence_numbers[position.origin] = max(
+                    self._applied_sequence_numbers.get(position.origin, 0),
+                    position.sequence_number,
+                )
 
     @abstractmethod
     def _subscription_callback(self, message: ReceivedMessage) -> None:
@@ -724,11 +768,23 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         }
 
     def _subscription_callback(self, message: ReceivedMessage) -> None:
-        if self._is_paused or self.defer_incoming_updates:
-            with self._missed_message_lock:
+        with self._missed_message_lock:
+            is_buffered = self._is_paused or self.defer_incoming_updates
+            if is_buffered:
                 self.missed_messages.append(message)
+        if is_buffered:
             return
         self.apply_message(message.to_message(world=self._world))
+
+    def stop_deferring_incoming_updates(self) -> None:
+        """
+        Apply the buffered messages, and every later message as it arrives, in the order
+        they were published.
+        """
+        with self._world._world_lock:
+            with self._missed_message_lock:
+                self.defer_incoming_updates = False
+            self.apply_missed_messages()
 
     @property
     def has_buffered_model_modification(self) -> bool:
@@ -763,7 +819,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                 self._apply_model(message.modification_block)
             if message.state_update is not None:
                 self._apply_state(message.state_update)
-        self.record_applied(message)
+            self.record_applied(message)
 
     def _apply_model(self, modification_block_message: ModificationBlock):
         """

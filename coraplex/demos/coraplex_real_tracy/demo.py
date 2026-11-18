@@ -1,3 +1,8 @@
+"""
+Tracy picks up gelatin boxes and places them, on the real robot through Giskard or in a
+simulated world.
+"""
+
 import os
 import signal
 import subprocess
@@ -14,8 +19,7 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.world_fetcher import join_shared_world
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -71,9 +75,7 @@ if controls_real_robot:
     # 300s matches giskardpy's own client (giskardpy/middleware/ros2/giskard_client_executor.py), which waits
     # this long for the same race: this demo's giskard/world-fetcher server is still parsing the URDF
     # and starting up when the client's default 10s budget would otherwise expire.
-    world = fetch_world_from_service(node=node, timeout_seconds=300)
-
-    WorldSynchronizer(_world=world, node=node)
+    world = join_shared_world(node=node, timeout_seconds=300)
 else:
     world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
     Tracy.from_world(world)
