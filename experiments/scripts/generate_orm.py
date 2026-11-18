@@ -1,15 +1,10 @@
 import logging
 from pathlib import Path
 
-import sqlalchemy
-
 import experiments
 import experiments.control_loop_experiments.benchmark
 import experiments.control_loop_experiments.scenarios
 import coraplex.orm.ormatic_interface
-from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
-    LayeredProbabilisticCircuit,
-)
 
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module
@@ -29,7 +24,7 @@ ormatic = ORMatic.from_package(
     packages=[experiments],
     ormatic_interface_dependencies=[coraplex.orm.ormatic_interface],
     ignored_classes=ignored_classes,
-    type_mappings={LayeredProbabilisticCircuit: sqlalchemy.JSON},
+    type_mappings={},
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 
