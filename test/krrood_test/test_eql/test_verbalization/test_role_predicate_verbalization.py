@@ -48,7 +48,7 @@ def test_is_subclass_or_role_gives_each_noun_its_own_preposition():
     """
     assert (
         verbalize_expression(
-            IsSubClassOrRole(sub_class=variable(type, []), super_class=Document)
+            IsSubClassOrRole(sub_class=variable(type, []), super_classes=(Document,))
         )
         == "a type is a subclass of or a role for Document"
     )
