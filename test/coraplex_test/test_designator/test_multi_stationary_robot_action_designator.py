@@ -26,7 +26,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.testing import _make_sine_scan_poses
 from cramph.composites import Sequence, StatementNode
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 from cramph.threaded_nodes import FunctionCall
 from krrood.entity_query_language.factories import a, an, entity, variable
@@ -328,6 +328,7 @@ def test_place_multi(stationary_block_context, place_position):
                 grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
             ),
             PlaceAction(
+                arm=left_or_only_arm(view),
                 object_designator=graspable_annotation(world, box_body),
                 target_location=Pose(place_position, reference_frame=world.root),
             ),
@@ -498,6 +499,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
+                arm=arm,
                 object_designator=graspable_annotation(world, box),
                 target_location=Pose(target, reference_frame=world.root),
             ),
@@ -579,9 +581,9 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
 
     first, second = pick_up.grounded_nodes
     assert [child.life_cycle_state for child in pick_up.chosen_children] == [
-        LifeCycleValues.FAILED,
-        LifeCycleValues.SUCCEEDED,
+        LifeCycleValue.FAILED,
+        LifeCycleValue.SUCCEEDED,
     ]
     assert second.grasp is not first.grasp
     [grasping] = [node for node in second.nodes if isinstance(node, GraspingAction)]
-    assert grasping.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert grasping.life_cycle_state == LifeCycleValue.SUCCEEDED
