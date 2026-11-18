@@ -451,21 +451,9 @@ class ROSCameraInterface(CameraInterface):
         Camera pose from the most recent successful TF lookup, stamped with the time TF
         provided it for.
         """
-        self.color: npt.NDArray | None = None
+        self.latest_frame: CameraFrame | None = None
         """
-        Latest color image.
-        """
-        self.depth: npt.NDArray | None = None
-        """
-        Latest depth image; None for a camera without depth.
-        """
-        self.camera_info: CameraInfo | None = None
-        """
-        Latest camera info message.
-        """
-        self.timestamp: builtin_interfaces.msg.Time | None = None
-        """
-        Acquisition time of the latest frame.
+        The latest frame the camera delivered; None before its first frame.
         """
         self.lock: Lock = Lock()
         """
@@ -487,7 +475,7 @@ class ROSCameraInterface(CameraInterface):
             if not self._has_new_data:
                 return False
             self._has_new_data = self.lookup_transform(
-                timestamp=Time.from_msg(self.timestamp)
+                timestamp=Time.from_msg(self.latest_frame.timestamp)
             )
             return self._has_new_data
 
@@ -499,10 +487,7 @@ class ROSCameraInterface(CameraInterface):
         # delivering TF while a frame is read.
         if not self.lock.acquire(blocking=False):
             return
-        self.color = frame.color
-        self.depth = frame.depth
-        self.camera_info = frame.camera_info
-        self.timestamp = frame.timestamp
+        self.latest_frame = frame
         self._has_new_data = True
         self.lock.release()
 
@@ -897,40 +882,40 @@ class KinectCameraInterface(ROSCameraInterface):
         )
 
     def set_data(self, *, cas: CAS, world: World) -> None:
+        """
+        Put :attr:`latest_frame` into ``cas`` as :meth:`CameraInterface.set_data` does,
+        with its color image and calibration cropped to 1280x960 in high-resolution
+        mode, unless no new frame has arrived since the last call.
+        """
         with self.lock:
             if not self._has_new_data:
                 return
+            frame = self.latest_frame
+            camera_info = frame.camera_info
 
+            color = frame.color
             if self.camera_config.hi_res_mode:
-                self.color = self.color[0:960, 0:1280]
-
-            width = self.camera_info.width
-            height = self.camera_info.height
-            if self.camera_config.hi_res_mode:
-                height = 960
-            self.camera_info.width = width
-            self.camera_info.height = height
+                color = color[0:960, 0:1280]
+                camera_info.height = 960
 
             self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
 
-            cas.set(CASViews.COLOR_IMAGE, self.color)
-            cas.set(CASViews.DEPTH_IMAGE, self.depth)
+            cas.set(CASViews.COLOR_IMAGE, color)
+            cas.set(CASViews.DEPTH_IMAGE, frame.depth)
             cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
 
-            camera_frame = (
-                self.camera_info.header.frame_id or self.camera_config.tf_from
-            )
+            camera_frame = camera_info.header.frame_id or self.camera_config.tf_from
             self.validate_camera_frame_for_tf(camera_frame)
             world_T_camera = self.world_T_camera_from_tf(
-                world=world, timestamp=self.timestamp
+                world=world, timestamp=frame.timestamp
             )
             self.store_camera_observation(
                 cas=cas,
                 world=world,
-                camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),
+                camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
                 camera_frame=camera_frame,
                 timestamp_nanoseconds=(
-                    self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
+                    frame.timestamp.sec * 1_000_000_000 + frame.timestamp.nanosec
                 ),
                 modalities=(CameraModality.COLOR, CameraModality.DEPTH),
                 world_T_camera=world_T_camera,

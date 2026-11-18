@@ -270,14 +270,17 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         with self.lock:
             if not self._has_new_data:
                 return
+            frame = self.latest_frame
+            camera_info = frame.camera_info
+            color = frame.color
 
-            width = self.camera_info.width
-            height = self.camera_info.height
+            width = camera_info.width
+            height = camera_info.height
 
-            focal_length_x = self.camera_info.k[0]
-            principal_point_x = self.camera_info.k[2]
-            focal_length_y = self.camera_info.k[4]
-            principal_point_y = self.camera_info.k[5]
+            focal_length_x = camera_info.k[0]
+            principal_point_x = camera_info.k[2]
+            focal_length_y = camera_info.k[4]
+            principal_point_y = camera_info.k[5]
             if self.camera_config.rotate_image is not None:
                 intrinsic_matrix = np.array(
                     [
@@ -288,19 +291,19 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
                 )
                 rotated_image, rotated_intrinsics, new_size = (
                     self.rotate_image_and_intrinsics(
-                        self.color,
+                        color,
                         intrinsic_matrix=intrinsic_matrix,
                         rotation=self.camera_config.rotate_image,
                     )
                 )
-                self.color = rotated_image
+                color = rotated_image
                 flattened_intrinsics = rotated_intrinsics.flatten()
                 focal_length_x = flattened_intrinsics[0]
                 principal_point_x = flattened_intrinsics[2]
                 focal_length_y = flattened_intrinsics[4]
                 principal_point_y = flattened_intrinsics[5]
                 width, height = new_size
-                self.camera_info.k = (
+                camera_info.k = (
                     focal_length_x,
                     0,
                     principal_point_x,
@@ -311,32 +314,30 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
                     0,
                     1,
                 )
-                self.camera_info.d = self.rotate_camera_distortion(
-                    coefficients=self.camera_info.d,
-                    distortion_model=self.camera_info.distortion_model,
+                camera_info.d = self.rotate_camera_distortion(
+                    coefficients=camera_info.d,
+                    distortion_model=camera_info.distortion_model,
                     rotation=self.camera_config.rotate_image,
                 )
 
-            self.camera_info.width = width
-            self.camera_info.height = height
+            camera_info.width = width
+            camera_info.height = height
 
-            cas.set(CASViews.COLOR_IMAGE, self.color)
+            cas.set(CASViews.COLOR_IMAGE, color)
             cas.set(CASViews.DEPTH_IMAGE, None)
             cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
-            camera_frame = (
-                self.camera_info.header.frame_id or self.camera_config.tf_from
-            )
+            camera_frame = camera_info.header.frame_id or self.camera_config.tf_from
             self.validate_camera_frame_for_tf(camera_frame)
             world_T_camera = self.world_T_camera_from_tf(
-                world=world, timestamp=self.timestamp
+                world=world, timestamp=frame.timestamp
             )
             self.store_camera_observation(
                 cas=cas,
                 world=world,
-                camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),
+                camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
                 camera_frame=camera_frame,
                 timestamp_nanoseconds=(
-                    self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
+                    frame.timestamp.sec * 1_000_000_000 + frame.timestamp.nanosec
                 ),
                 modalities=(CameraModality.COLOR,),
                 world_T_camera=world_T_camera,

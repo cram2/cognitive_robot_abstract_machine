@@ -130,7 +130,7 @@ class TestUndecodableFrame:
 
         receive_a_frame(camera_interface, acquisition_time)
 
-        assert camera_interface.timestamp == acquisition_time
+        assert camera_interface.latest_frame.timestamp == acquisition_time
 
 
 # %% camera pose at acquisition time
