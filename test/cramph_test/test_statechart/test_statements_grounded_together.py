@@ -1,3 +1,7 @@
+"""
+Grounding several statements into combinations of their candidates.
+"""
+
 from __future__ import annotations
 
 from cramph.composites import StatementNode, StatementsGroundedTogether
@@ -120,3 +124,32 @@ def test_a_statement_going_on_counts_only_its_own_candidate_towards_its_limit() 
         == "a1"
     )
     assert statement.reached_candidate_limit
+
+
+# %% statements sharing a variable
+
+
+def test_statements_sharing_a_variable_are_combined_only_where_they_agree() -> None:
+    """
+    Two statements given the same variable are only combined with candidates that give
+    it one value.
+    """
+    names = ["first", "second"]
+    name = variable(str, domain=names)
+    statements = [
+        StatementNode(
+            statement=a(NodeSucceedingOnObservingTrue)(
+                name=name, observation=observation
+            )
+        )
+        for observation in (ObservationStateValue.TRUE, ObservationStateValue.UNKNOWN)
+    ]
+    combinations = StatementsGroundedTogether(
+        statements=statements,
+        query_backend=EntityQueryLanguageGenerativeBackend(),
+        default_candidate_limit=10,
+    )
+
+    assert [_names_of(combination) for combination in combinations] == [
+        [each_name, each_name] for each_name in names
+    ]

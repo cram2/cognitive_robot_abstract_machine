@@ -1,6 +1,11 @@
+"""
+Running the node an underspecified statement grounds to, and sharing the choices
+statements make through the variables they reuse.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 from cramph.composites import (
@@ -8,13 +13,20 @@ from cramph.composites import (
     ChildChooserAccess,
     Parallel,
     Sequence,
+    StatementBindings,
     StatementNode,
     TryAll,
     TryInOrder,
 )
 from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
-from cramph.node import EndStatechart, StatechartNode
+from cramph.node import (
+    EndStatechart,
+    FailsOnObservingFalse,
+    NodeArtifacts,
+    StatechartNode,
+    SucceedsOnObservingTrue,
+)
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
 from krrood.class_diagrams.class_diagram import ClassDiagram
@@ -23,6 +35,7 @@ from krrood.entity_query_language.backends import (
 )
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
+from krrood.symbolic_math.symbolic_math import Scalar
 
 # %% mimics
 
@@ -43,6 +56,44 @@ class ChooserRunningEveryCandidate(ChildChooser[StatementNode]):
             query_backend=EntityQueryLanguageGenerativeBackend(),
             default_candidate_limit=self.default_candidate_limit,
         )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class StepWithATool(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNode):
+    """
+    A step that succeeds with a working tool and fails with a broken one, named after
+    what it does and the tool it uses.
+    """
+
+    step: str
+    """
+    What the step does.
+    """
+
+    tool: str
+    """
+    The tool the step uses.
+    """
+
+    broken_tools: list[str] = field(default_factory=list)
+    """
+    The tools the step fails with.
+    """
+
+    def __post_init__(self) -> None:
+        self.name = f"{self.step} with {self.tool}"
+        super().__post_init__()
+
+    def build_artifacts(self) -> NodeArtifacts:
+        """
+        Observes False with a tool of :attr:`broken_tools`, True with any other.
+        """
+        working = (
+            ObservationStateValue.FALSE
+            if self.tool in self.broken_tools
+            else (ObservationStateValue.TRUE)
+        )
+        return NodeArtifacts(observation=Scalar(float(working)))
 
 
 # %% helpers
@@ -223,6 +274,85 @@ def test_grounding_again_after_stopping_starts_from_the_first_candidate() -> Non
         node.next_candidate(query_backend=backend, default_candidate_limit=2).name
         == "first"
     )
+
+
+# %% statements sharing a variable
+
+
+def test_a_statement_reusing_a_variable_takes_the_value_an_earlier_statement_chose(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The taking step fails with the first tool and goes on to the second, so the putting
+    step, which could use either, has to take the second as well.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    sequence = Sequence(
+        nodes=[
+            a(StepWithATool)(step="take", tool=tool, broken_tools=["hammer"]),
+            a(StepWithATool)(step="put", tool=tool),
+        ]
+    )
+
+    _run(statechart_executor, ChooserRunningEveryCandidate(), sequence)
+
+    taking, putting = sequence.nodes
+    [*failed, took] = taking.grounded_nodes
+    [put] = putting.grounded_nodes
+    assert [each.life_cycle_state for each in failed] == [LifeCycleValue.FAILED]
+    assert put.tool == took.tool
+    assert put.tool != failed[0].tool
+
+
+def test_a_statement_that_is_reset_releases_the_variables_it_bound(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    Once a statement is reset, the values its chosen candidate gave its variables no
+    longer bind any other statement.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    sequence = Sequence(nodes=[a(StepWithATool)(step="take", tool=tool)])
+    _run(statechart_executor, ChooserRunningEveryCandidate(), sequence)
+    [taking] = sequence.nodes
+    bindings = statechart_executor.context.require_extension(
+        extension_type=StatementBindings
+    )
+    assert bindings.values_bound_by_others(statement_id="another statement") == {
+        tool._id_: taking.grounded_nodes[-1].tool
+    }
+
+    taking.on_reset()
+
+    assert bindings.values_bound_by_others(statement_id="another statement") == {}
+
+
+def test_a_statement_keeps_a_value_another_statement_bound() -> None:
+    """
+    A statement cannot take over a variable another statement bound first.
+    """
+    bindings = StatementBindings()
+    tool = variable(str, domain=["hammer", "wrench"])
+    bindings.bind(statement_id="take", variable_values={tool._id_: "wrench"})
+
+    bindings.bind(statement_id="put", variable_values={tool._id_: "hammer"})
+
+    assert bindings.values_bound_by_others(statement_id="put") == {tool._id_: "wrench"}
+    assert bindings.values_bound_by_others(statement_id="take") == {}
+
+
+def test_a_statement_choosing_again_replaces_what_it_bound() -> None:
+    """
+    A statement choosing another candidate binds its variables to that candidate's
+    values instead.
+    """
+    bindings = StatementBindings()
+    tool = variable(str, domain=["hammer", "wrench"])
+    bindings.bind(statement_id="take", variable_values={tool._id_: "hammer"})
+
+    bindings.bind(statement_id="take", variable_values={tool._id_: "wrench"})
+
+    assert bindings.values_bound_by_others(statement_id="put") == {tool._id_: "wrench"}
 
 
 # %% introspecting the node
