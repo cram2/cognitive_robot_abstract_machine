@@ -319,14 +319,15 @@ def test_the_grasp_on_a_body_not_below_the_tool_frame_is_read_the_same(pr2_gripp
             )
         )
     held = hold_body(pr2_gripper)
+    tool_P_grasp = pr2_gripper.tool_P_grasp_when_closed
 
     np.testing.assert_allclose(
-        pr2_gripper.body_T_grasp(body=carried).to_np(),
-        pr2_gripper.body_T_grasp(body=held).to_np(),
+        pr2_gripper.body_T_grasp(body=carried, tool_P_grasp=tool_P_grasp).to_np(),
+        pr2_gripper.body_T_grasp(body=held, tool_P_grasp=tool_P_grasp).to_np(),
         atol=1e-9,
     )
     np.testing.assert_allclose(
-        pr2_gripper.body_T_grasp(body=held).to_np(),
+        pr2_gripper.body_T_grasp(body=held, tool_P_grasp=tool_P_grasp).to_np(),
         pr2_gripper.held_body_T_grasp.to_np(),
         atol=1e-9,
     )

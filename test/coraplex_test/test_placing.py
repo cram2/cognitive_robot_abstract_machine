@@ -10,10 +10,10 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Vector3
 
 from ..conftest import SAMPLING_SEED
-from ..plan_running import expand, simulated_executor, statechart_of
+from ..plan_running import expand, run_plan, simulated_executor, statechart_of
 
 # %% fixtures
 
@@ -122,6 +122,29 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
         [poses.retreat, poses.grasp, poses.grasp, poses.pre_grasp], tool_goals
     ):
         np.testing.assert_allclose(expected.to_np(), actual.evaluate(), atol=1e-9)
+
+
+def test_a_place_leaves_the_object_standing_on_the_target(pr2_holding_milk):
+    world, robot, milk, extensions = pr2_holding_milk
+    # Beside and below where the milk is held, so the arm can reach it from there.
+    target = Pose(
+        position=milk.root.global_pose.position + Vector3(0.0, 0.05, -0.05),
+        orientation=milk.root.global_pose.orientation,
+        reference_frame=world.root,
+    )
+    place = PlaceAction(
+        arm=robot.left_arm, object_designator=milk, target_location=target
+    )
+
+    run_plan(Sequence(nodes=[place]), extensions)
+
+    assert milk.root.parent_connection.parent is world.root
+    # The descent ends within the position threshold of the target.
+    np.testing.assert_allclose(
+        milk.root.global_pose.position.to_np(),
+        target.position.to_np(),
+        atol=2 * place.position_threshold,
+    )
 
 
 # %% releasing what has not been picked up yet

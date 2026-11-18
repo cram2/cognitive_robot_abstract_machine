@@ -78,7 +78,7 @@ class PlaceAction(
     )
     """
     The tool frame goals releasing the object, set to the release of the grasp measured
-    when this place starts. It is protected since it will be automatically calculated 
+    when this place starts. It is protected since it will be automatically calculated
     during expansion and is not to be edited from the outside.
 
     Sent along with the place, because a receiver does not expand it again.
@@ -158,7 +158,10 @@ class PlaceAction(
         end_effector = self.arm.end_effector
         grasp = GraspCandidate(
             self.object_designator,
-            end_effector.body_T_grasp(body=self.object_designator.root),
+            end_effector.body_T_grasp(
+                body=self.object_designator.root,
+                tool_P_grasp=end_effector.tool_P_grasp_when_closed,
+            ),
         )
         place_sequence = self.grasp_pose_sequence(
             grasp.moved_to(self.target_location), end_effector, grasp
