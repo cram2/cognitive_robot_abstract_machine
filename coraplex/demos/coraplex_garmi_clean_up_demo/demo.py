@@ -58,7 +58,6 @@ from giskardpy.motion_statechart.monitors.feature_monitors import DistanceMonito
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from krrood.entity_query_language.factories import a, variable_from, variable
 from krrood.entity_query_language.query.match import Match
-from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
@@ -102,13 +101,6 @@ class SceneFile(StrEnum):
     """
     The milk's mesh.
     """
-
-    @property
-    def path(self) -> str:
-        """
-        :return: Where the file is read from.
-        """
-        return PackageUriResolver().resolve(self.value)
 
 
 class SceneBody(StrEnum):
@@ -293,7 +285,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         geom has to stand in for it.
         """
         return WorldSpecification.from_mjcf(
-            SceneFile.APARTMENT.path, use_visual_as_collision_backup=True
+            SceneFile.APARTMENT, use_visual_as_collision_backup=True
         )
 
     def robot_specification(self) -> RobotSpecification:
@@ -329,7 +321,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             SceneBody.MILK.value,
             BodySpecification.mesh(
                 SceneBody.MILK.value,
-                SceneFile.MILK.path,
+                SceneFile.MILK,
                 parent_T_self=ScenePose.MILK_START.value.transform,
             ),
             parent_connection_specification=Connection6DoFSpecification(),

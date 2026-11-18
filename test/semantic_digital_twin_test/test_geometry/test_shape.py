@@ -659,6 +659,10 @@ def test_a_mesh_in_a_package_is_serialized_without_its_geometry(installed_mesh_f
 def test_a_received_package_mesh_reads_the_file_of_the_receiving_install(
     mesh_package_installer, tmp_path
 ):
+    """
+    A mesh received by its package URI reads the file of the receiver's install, not the
+    sender's.
+    """
     sender_file = mesh_package_installer(tmp_path / "sender")
     payload = Mesh(filename=str(sender_file)).to_json()
     receiver_file = mesh_package_installer(tmp_path / "receiver")

@@ -147,9 +147,6 @@ itself. To see it, the apartment needs a drawer that something lies in — a spo
 drawer of cabinet 10:
 
 ```python
-import os
-
-import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Spoon
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix

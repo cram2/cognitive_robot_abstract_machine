@@ -449,6 +449,10 @@ def test_a_scene_named_by_a_package_uri_is_read_from_that_package(
 
 
 def test_a_mesh_file_named_by_a_package_uri_is_read_from_that_package():
+    """
+    A mesh asset of an MJCF scene named by a ``package://`` URI reads the file the URI
+    resolves to.
+    """
     world = MJCFParser(os.path.join(MJCF_DIR, "jeroen_cups.xml")).create_world()
 
     [cup] = [

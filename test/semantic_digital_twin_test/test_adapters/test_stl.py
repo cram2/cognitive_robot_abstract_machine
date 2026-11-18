@@ -34,6 +34,9 @@ def test_stl_parsing_construct(milk_uri):
 
 
 def test_stl_parsing(milk_uri):
+    """
+    An STL file becomes a world of one body whose visual and collision are its mesh.
+    """
     world = STLParser(milk_uri).create_world()
     world.validate()
 
@@ -44,6 +47,9 @@ def test_stl_parsing(milk_uri):
 
 
 def test_a_mesh_named_by_a_package_uri_is_read_from_that_package(milk_uri):
+    """
+    A mesh named by a ``package://`` URI reads the file the URI resolves to.
+    """
     world = STLParser(milk_uri).create_world()
 
     [mesh] = world.kinematic_structure_entities[0].collision
@@ -51,6 +57,9 @@ def test_a_mesh_named_by_a_package_uri_is_read_from_that_package(milk_uri):
 
 
 def test_parse_and_merge(milk_uri, cup_uri):
+    """
+    Two parsed STL worlds merge into one world holding both bodies.
+    """
     milk_world = STLParser(milk_uri).create_world()
     cup_world = STLParser(cup_uri).create_world()
 
