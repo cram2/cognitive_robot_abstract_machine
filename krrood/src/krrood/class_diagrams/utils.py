@@ -1,3 +1,7 @@
+"""
+Resolution of the type hints of a class from the source files it is defined in.
+"""
+
 from __future__ import annotations
 
 import builtins
@@ -18,6 +22,7 @@ from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.singleton import SingletonMeta
 from krrood.utils import (
+    DeferredImportScope,
     ensure_hashable,
     get_scope_from_imports,
     get_full_class_name,
@@ -337,7 +342,7 @@ def get_type_hints_of_object(
 
 
 @lru_cache(maxsize=None)
-def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> dict[str, Any]:
+def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> DeferredImportScope:
     """
     Import scope for *source_path*, cached per ``(source_path, mtime)``.
 
@@ -349,10 +354,12 @@ def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> dict[str, An
         cache key.
     :return: The import scope dictionary for *source_path*.
     """
-    return get_scope_from_imports(file_path=source_path)
+    return get_scope_from_imports(
+        file_path=source_path, defers_type_checking_imports=True
+    )
 
 
-def _cached_scope_from_imports(source_path: str) -> dict[str, Any]:
+def _cached_scope_from_imports(source_path: str) -> DeferredImportScope:
     """
     Return the import scope of *source_path*, reusing a per-file cache.
 
@@ -373,7 +380,9 @@ def _cached_scope_from_imports(source_path: str) -> dict[str, Any]:
     try:
         mtime = os.path.getmtime(source_path)
     except OSError:
-        return get_scope_from_imports(file_path=source_path)
+        return get_scope_from_imports(
+            file_path=source_path, defers_type_checking_imports=True
+        )
     return _scope_from_imports_by_mtime(source_path, mtime)
 
 
@@ -409,7 +418,7 @@ class ModulesThatFinishedInitializing(metaclass=SingletonMeta):
 @lru_cache(maxsize=None)
 def _fallback_scope_for_import_generation(
     source_path: str, generation: int
-) -> dict[str, Any]:
+) -> DeferredImportScope:
     """
     Recompute *source_path*'s import scope from scratch, memoized per import-system
     generation.
@@ -426,7 +435,9 @@ def _fallback_scope_for_import_generation(
     :param generation: The import-system generation the recompute is valid for.
     :return: The freshly computed import scope for *source_path*.
     """
-    return get_scope_from_imports(file_path=source_path)
+    return get_scope_from_imports(
+        file_path=source_path, defers_type_checking_imports=True
+    )
 
 
 def get_object_by_name_from_another_object_in_same_module(
@@ -470,7 +481,7 @@ def get_object_by_name_from_another_object_in_same_module(
         source_path, ModulesThatFinishedInitializing().count_finished_modules()
     )
     if name in fresh_scope:
-        scope.update(fresh_scope)
+        scope.absorb(other=fresh_scope)
         return fresh_scope[name]
     raise CouldNotResolveType(
         type_name=name,

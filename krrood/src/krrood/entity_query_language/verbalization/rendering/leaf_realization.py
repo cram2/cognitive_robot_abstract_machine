@@ -29,6 +29,8 @@ from krrood.patterns.specificity_ranking import SpecificityRankedAlternative
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 RealizedLeaf = TypeVar("RealizedLeaf", bound=VerbalizationFragment)
+AgreeingLeaf = TypeVar("AgreeingLeaf", bound=WordFragment | RoleFragment)
+PolarLeaf = TypeVar("PolarLeaf", bound=RoleFragment)
 
 # %% the family
 
@@ -108,11 +110,107 @@ class IndexOrdinalRealization(LeafRealization[IndexOrdinal]):
         return WordFragment(text=morphology.index_ordinal(leaf.index))
 
 
+# %% leaves that agree in number
+
+
+@dataclass(kw_only=True)
+class AgreeingRealization(LeafRealization[AgreeingLeaf], ABC):
+    """
+    A realization whose text depends on the grammatical number of the leaf, which is
+    asked here and nowhere else.
+    """
+
+    @classmethod
+    @abstractmethod
+    def singular_text(cls, *, leaf: AgreeingLeaf) -> str:
+        """
+        :return: The text of the leaf agreeing with a singular subject.
+        """
+
+    @classmethod
+    @abstractmethod
+    def plural_text(cls, *, leaf: AgreeingLeaf) -> str:
+        """
+        :return: The text of the leaf agreeing with a plural subject.
+        """
+
+    @classmethod
+    def realize(cls, *, leaf: AgreeingLeaf) -> AgreeingLeaf:
+        """
+        The leaf with the text that agrees with its number, which it then no longer
+        needs to carry.
+        """
+        if leaf.number is GrammaticalNumber.PLURAL:
+            text = cls.plural_text(leaf=leaf)
+        else:
+            text = cls.singular_text(leaf=leaf)
+        return replace(leaf, text=text, number=GrammaticalNumber.SINGULAR)
+
+
+@dataclass(kw_only=True)
+class PolarRealization(LeafRealization[PolarLeaf], ABC):
+    """
+    A realization whose text depends on the grammatical number and the polarity of the
+    leaf, which are asked here and nowhere else.
+    """
+
+    @classmethod
+    @abstractmethod
+    def affirmative_singular(cls, *, leaf: PolarLeaf) -> str:
+        """
+        :return: The text of the leaf agreeing with a singular subject.
+        """
+
+    @classmethod
+    @abstractmethod
+    def affirmative_plural(cls, *, leaf: PolarLeaf) -> str:
+        """
+        :return: The text of the leaf agreeing with a plural subject.
+        """
+
+    @classmethod
+    @abstractmethod
+    def negated_singular(cls, *, leaf: PolarLeaf) -> str:
+        """
+        :return: The negated text of the leaf agreeing with a singular subject.
+        """
+
+    @classmethod
+    @abstractmethod
+    def negated_plural(cls, *, leaf: PolarLeaf) -> str:
+        """
+        :return: The negated text of the leaf agreeing with a plural subject.
+        """
+
+    @classmethod
+    def realize(cls, *, leaf: PolarLeaf) -> PolarLeaf:
+        """
+        The leaf with the text that agrees with its number and polarity, which it then
+        no longer needs to carry.
+        """
+        plural = leaf.number is GrammaticalNumber.PLURAL
+        if leaf.negated:
+            text = (
+                cls.negated_plural(leaf=leaf)
+                if plural
+                else cls.negated_singular(leaf=leaf)
+            )
+        else:
+            text = (
+                cls.affirmative_plural(leaf=leaf)
+                if plural
+                else cls.affirmative_singular(leaf=leaf)
+            )
+        return replace(
+            leaf, text=text, number=GrammaticalNumber.SINGULAR, negated=False
+        )
+
+
 # %% nouns
 
 
 @dataclass(kw_only=True)
-class NounRealization(LeafRealization[WordFragment | RoleFragment]):
+class NounRealization(AgreeingRealization[WordFragment | RoleFragment]):
     """
     A noun, or any other text that is not a verb or a copula, inflected for its number.
     """
@@ -128,22 +226,20 @@ class NounRealization(LeafRealization[WordFragment | RoleFragment]):
         )
 
     @classmethod
-    def realize(
-        cls, *, leaf: WordFragment | RoleFragment
-    ) -> WordFragment | RoleFragment:
+    def singular_text(cls, *, leaf: WordFragment | RoleFragment) -> str:
         """
-        >>> NounRealization.realize(leaf=WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
-        'Robots'
         >>> NounRealization.realize(leaf=WordFragment(text="Robot")).text
         'Robot'
         """
-        if leaf.number is not GrammaticalNumber.PLURAL:
-            return leaf
-        return replace(
-            leaf,
-            text=morphology.ensure_plural(leaf.text),
-            number=GrammaticalNumber.SINGULAR,
-        )
+        return leaf.text
+
+    @classmethod
+    def plural_text(cls, *, leaf: WordFragment | RoleFragment) -> str:
+        """
+        >>> NounRealization.realize(leaf=WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
+        'Robots'
+        """
+        return morphology.ensure_plural(leaf.text)
 
 
 @dataclass(kw_only=True)
@@ -162,23 +258,28 @@ class CollectionElementNounRealization(NounRealization):
         return super().applies(leaf=leaf) and isinstance(leaf, CollectionElementNoun)
 
     @classmethod
-    def realize(cls, *, leaf: CollectionElementNoun) -> CollectionElementNoun:
+    def singular_text(cls, *, leaf: CollectionElementNoun) -> str:
         """
-        Like :meth:`NounRealization.realize`, but of the singular of the leaf's text.
-
         >>> CollectionElementNounRealization.realize(
         ...     leaf=CollectionElementNoun(text="tasks", role=SemanticRole.ATTRIBUTE)
         ... ).text
         'task'
         """
-        return super().realize(leaf=replace(leaf, text=morphology.singular(leaf.text)))
+        return morphology.singular(leaf.text)
+
+    @classmethod
+    def plural_text(cls, *, leaf: CollectionElementNoun) -> str:
+        """
+        Like :meth:`NounRealization.plural_text`, of the singular of the leaf's text.
+        """
+        return morphology.ensure_plural(cls.singular_text(leaf=leaf))
 
 
 # %% verbs
 
 
 @dataclass(kw_only=True)
-class VerbRealization(LeafRealization[RoleFragment]):
+class VerbRealization(PolarRealization[RoleFragment]):
     """
     A verb agreeing with its subject in the present tense, or with do-support when
     negated.
@@ -199,25 +300,30 @@ class VerbRealization(LeafRealization[RoleFragment]):
         return leaf.text
 
     @classmethod
-    def realize(cls, *, leaf: RoleFragment) -> RoleFragment:
+    def affirmative_singular(cls, *, leaf: RoleFragment) -> str:
         """
         >>> VerbRealization.realize(leaf=RoleFragment(text="work", role=SemanticRole.VERB)).text
         'works'
+        """
+        return morphology.third_person_singular(cls.lemma(leaf=leaf))
+
+    @classmethod
+    def affirmative_plural(cls, *, leaf: RoleFragment) -> str:
+        return cls.lemma(leaf=leaf)
+
+    @classmethod
+    def negated_singular(cls, *, leaf: RoleFragment) -> str:
+        """
         >>> VerbRealization.realize(
         ...     leaf=RoleFragment(text="work", role=SemanticRole.VERB, negated=True)
         ... ).text
         'does not work'
         """
-        plural = leaf.number is GrammaticalNumber.PLURAL
-        lemma = cls.lemma(leaf=leaf)
-        if leaf.negated:
-            auxiliary = "do not" if plural else "does not"
-            text = f"{auxiliary} {lemma}"
-        else:
-            text = lemma if plural else morphology.third_person_singular(lemma)
-        return replace(
-            leaf, text=text, number=GrammaticalNumber.SINGULAR, negated=False
-        )
+        return f"does not {cls.lemma(leaf=leaf)}"
+
+    @classmethod
+    def negated_plural(cls, *, leaf: RoleFragment) -> str:
+        return f"do not {cls.lemma(leaf=leaf)}"
 
 
 @dataclass(kw_only=True)
@@ -247,10 +353,12 @@ class VerbFormRealization(VerbRealization):
 
 
 @dataclass(kw_only=True)
-class CopulaRealization(LeafRealization[RoleFragment]):
+class CopulaRealization(PolarRealization[RoleFragment]):
     """
     A copula agreeing in number with its subject and negated by suppletion (*"is not"*,
     *"are"*).
+
+    An operator that is not a copula (*"greater than"*) keeps its text.
     """
 
     @classproperty
@@ -282,20 +390,30 @@ class CopulaRealization(LeafRealization[RoleFragment]):
         return super().applies(leaf=leaf) and leaf.role is SemanticRole.OPERATOR
 
     @classmethod
-    def realize(cls, *, leaf: RoleFragment) -> RoleFragment:
-        """
-        An operator that is not a copula (*"greater than"*) keeps its text.
+    def affirmative_singular(cls, *, leaf: RoleFragment) -> str:
+        return leaf.text
 
+    @classmethod
+    def affirmative_plural(cls, *, leaf: RoleFragment) -> str:
+        """
+        >>> CopulaRealization.realize(
+        ...     leaf=RoleFragment(text="is", role=SemanticRole.OPERATOR, number=GrammaticalNumber.PLURAL)
+        ... ).text
+        'are'
+        """
+        return cls.plural_forms.get(leaf.text, leaf.text)
+
+    @classmethod
+    def negated_singular(cls, *, leaf: RoleFragment) -> str:
+        """
         >>> CopulaRealization.realize(
         ...     leaf=RoleFragment(text="is", role=SemanticRole.OPERATOR, negated=True)
         ... ).text
         'is not'
         """
-        text = leaf.text
-        if leaf.negated:
-            text = cls.negative_forms.get(text, text)
-        if leaf.number is GrammaticalNumber.PLURAL:
-            text = cls.plural_forms.get(text, text)
-        return replace(
-            leaf, text=text, number=GrammaticalNumber.SINGULAR, negated=False
-        )
+        return cls.negative_forms.get(leaf.text, leaf.text)
+
+    @classmethod
+    def negated_plural(cls, *, leaf: RoleFragment) -> str:
+        negative = cls.negated_singular(leaf=leaf)
+        return cls.plural_forms.get(negative, negative)
