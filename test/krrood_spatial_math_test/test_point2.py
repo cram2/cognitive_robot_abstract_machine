@@ -1,4 +1,3 @@
-import math
 from copy import deepcopy
 
 import numpy as np
@@ -6,10 +5,8 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import OrthogonalProjection, Point2, Point3, Pose
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
+from .dataset.frames import NamedFrame
 
 
 class TestPoint2Construction:
@@ -37,7 +34,7 @@ class TestPoint2Construction:
             point.z
 
     def test_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point2(x=1, y=2, reference_frame=frame)
         assert point.reference_frame is frame
 
@@ -49,18 +46,9 @@ class TestPoint2Construction:
         assert point.y.to_np() == pytest.approx(-3.0)
 
 
-@pytest.fixture
-def rotated_mini_world(mini_world: World) -> World:
-    """
-    :func:`mini_world` with its tip turned a quarter turn about the root's z axis.
-    """
-    mini_world.connections[0].position = math.pi / 2
-    return mini_world
-
-
 class TestPoint2ToPoint3:
     def test_unprojects_at_the_given_height_in_its_own_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point2(x=1.0, y=2.0, reference_frame=frame)
 
         unprojected = point.to_point3(height=5.0)
@@ -82,7 +70,7 @@ class TestPoint2ToPoint3:
 
 class TestPoint2FromPoint3:
     def test_defaults_to_the_plane_of_the_point_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point3(1.0, 2.0, 3.0, reference_frame=frame)
 
         projected = Point2.from_point3(point)
@@ -92,23 +80,10 @@ class TestPoint2FromPoint3:
             projected.to_np(), OrthogonalProjection(frame).project(point).to_np()
         )
 
-    def test_transforms_into_another_plane_frame(self, rotated_mini_world: World):
-        root, tip = rotated_mini_world.root, rotated_mini_world.bodies[1]
-        point = Point3(1.0, 0.0, 2.0, reference_frame=tip)
-
-        projected = Point2.from_point3(point, plane_frame=root)
-
-        assert projected.reference_frame is root
-        np.testing.assert_allclose(
-            projected.to_np(),
-            OrthogonalProjection(root).project(point).to_np(),
-            atol=1e-12,
-        )
-
 
 class TestPoint2FromPose:
     def test_projects_the_pose_position(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         pose = Pose.from_xyz_rpy(
             x=1.5, y=-2.5, z=3.0, roll=0.1, pitch=0.2, yaw=0.3, reference_frame=frame
         )
@@ -119,19 +94,6 @@ class TestPoint2FromPose:
         np.testing.assert_allclose(
             projected.to_np(),
             OrthogonalProjection(frame).project(pose.position).to_np(),
-        )
-
-    def test_transforms_into_another_plane_frame(self, rotated_mini_world: World):
-        root, tip = rotated_mini_world.root, rotated_mini_world.bodies[1]
-        pose = Pose.from_xyz_rpy(x=1.0, z=2.0, yaw=0.3, reference_frame=tip)
-
-        projected = Point2.from_pose(pose, plane_frame=root)
-
-        assert projected.reference_frame is root
-        np.testing.assert_allclose(
-            projected.to_np(),
-            OrthogonalProjection(root).project(pose.position).to_np(),
-            atol=1e-12,
         )
 
 

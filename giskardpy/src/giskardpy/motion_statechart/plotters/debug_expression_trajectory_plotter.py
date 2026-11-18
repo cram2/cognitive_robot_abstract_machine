@@ -1,6 +1,11 @@
+"""
+Plots of how the debug expressions of a motion statechart evolved over time.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import matplotlib
 import numpy as np
@@ -15,7 +20,6 @@ from giskardpy.motion_statechart.debug_expression_trajectory import (
 )
 from giskardpy.motion_statechart.exceptions import EmptyDebugExpressionTrajectoryError
 from giskardpy.motion_statechart.graph_node import DebugExpression
-from giskardpy.utils.utils import create_path
 
 
 @dataclass(kw_only=True)
@@ -186,6 +190,6 @@ class DebugExpressionTrajectoryPlotter:
         axes[-1].set_xticks(ticks)
         axes[-1].set_xlabel("Time [s]")
 
-        create_path(file_name)
+        Path(file_name).parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name, bbox_inches="tight")
         plt.close()

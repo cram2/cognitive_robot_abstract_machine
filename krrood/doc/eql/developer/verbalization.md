@@ -100,7 +100,7 @@ graph LR
     A[EQL Expression] --> B[fold + realisation passes]
     B -- realised VerbalizationFragment tree --> C[FragmentRenderer]
     C -- formatted string --> D[Output]
-    E[grammar RULES / select] -. dispatch .-> B
+    E[grammar rules / select] -. dispatch .-> B
     F[MicroplanningServices] -. services .-> B
     G[Formatter] -. markup .-> C
     H[SourceLinkResolver] -. URLs .-> C
@@ -285,7 +285,7 @@ class BetweenRule(PhraseRule):
 
 #### Step 3 — Registration is automatic
 
-`RULES` is **auto-discovered**: {py:data}`~krrood.entity_query_language.verbalization.grammar.framework.registry.RULES` instantiates every concrete `PhraseRule` subclass via `concrete_subclasses(PhraseRule)` (abstract bases filtered out) — the same subclass-discovery primitive the `SpecificityRule` families use.  The registry first walks the `grammar` package and imports every `grammar/<construct>/rules.py`, so the subclasses exist before `RULES` is built; **adding a construct's `rules.py` is enough — there is no import list to edit.**  (`select` is specificity-based, so definition order is irrelevant.)
+The grammar is **auto-discovered**: {py:meth}`~krrood.entity_query_language.verbalization.grammar.framework.registry.PhraseRuleRegistry.loaded_rules` instantiates every concrete `PhraseRule` subclass loaded when it is called whose `joins_grammar` is `True` (a rule that must stay out, such as one a test defines, sets it to `False`), via `concrete_subclasses(PhraseRule)` (abstract bases filtered out) — the same subclass-discovery primitive the `SpecificityRule` families use.  The registry walks the `grammar` package on import and imports every `grammar/<construct>/rules.py`; **adding a construct's `rules.py` is enough — there is no import list to edit.**  A krrood part outside the entity query language, such as `krrood.parametrization`, defines the rules of its own constructs in its own module, which joins the grammar once loaded.  (`select` is specificity-based, so definition order is irrelevant.)
 
 #### Step 4 — Recurse with `context.child`, decide with `context` services
 
@@ -456,7 +456,7 @@ The resolver is passed to the renderer at construction (via the `VerbalizationPi
 | Engine | `engine.py` (`fold`), `verbalizer.py` (`EQLVerbalizer`), `pipeline.py` (`VerbalizationPipeline`, `verbalize_expression`), `context.py` (`MicroplanningServices`), `exceptions.py` (`UnverbalizableExpressionError`) |
 | VerbalizationFragment IR | `fragments/base.py` (the `VerbalizationFragment` hierarchy + `fold_fragment` / `map_structural_children` / `map_fragment` / `oxford_comma` / `flatten_fragment_to_plain_text`), `fragments/features.py`, `fragments/roles.py`, `fragments/source_reference.py` |
 | Lexicon | `vocabulary/english.py`, `vocabulary/words.py` — **all** English words/phrases/punctuation |
-| Grammar framework | `grammar/framework/` — `phrase_rule` (`PhraseRule`, `RuleContext`, `select`), `registry` (`RULES`, auto-discovered by walking the grammar package), `assembler` (`Assembler` base), `planner` (`Planner` base) |
+| Grammar framework | `grammar/framework/` — `phrase_rule` (`PhraseRule`, `RuleContext`, `select`), `registry` (`PhraseRuleRegistry`, auto-discovered by walking the grammar package), `assembler` (`Assembler` base), `planner` (`Planner` base) |
 | Grammar (per construct) | `grammar/<construct>/` — `terms`, `chain`, `conditions`, `query`, `inference`, `aggregation`, `clauses`, `instantiated`, `match`; each has `rules.py`, and the involved ones a `planner.py` + `assembler.py` |
 | Conditions | `grammar/conditions/` — `rules` (entry `PhraseRule`s), `assembler` (`ConditionAssembler` surface-form toolkit), `predication` (`PredicateTransform` registry + operator-word selection `comparator_operator` / `coindexed_operator` + `render_absence`), `placement` (`ConditionForm` registry, `Slot`, `place` / `as_subject_restrictions`), `subject` (`RestrictionSubjectRule`, `restriction_subject`), `recognition` (structural recognizers) |
 | Microplanning | `microplanning/` — `referring`, `binding_scope`, `config` (`RenderConfiguration`), `microplan` (`Microplan`), `coordination`, `possessive` |
@@ -520,7 +520,7 @@ text = VerbalizationPipeline(ParagraphRenderer(MarkdownFormatter())).verbalize(q
 ### Grammar / dispatch
 
 - {py:class}`~krrood.entity_query_language.verbalization.grammar.framework.phrase_rule.PhraseRule` / {py:class}`~krrood.entity_query_language.verbalization.grammar.framework.phrase_rule.RuleContext` / {py:func}`~krrood.entity_query_language.verbalization.grammar.framework.phrase_rule.select`
-- {py:data}`~krrood.entity_query_language.verbalization.grammar.framework.registry.RULES`
+- {py:class}`~krrood.entity_query_language.verbalization.grammar.framework.registry.PhraseRuleRegistry`
 - {py:class}`~krrood.patterns.specificity_ranking.SpecificityRule` / {py:func}`~krrood.patterns.specificity_ranking.sole_maximum` (shared with ORMatic's field storage rules, in `krrood.patterns`)
 - {py:class}`~krrood.entity_query_language.verbalization.grammar.framework.assembler.Assembler` / {py:class}`~krrood.entity_query_language.verbalization.grammar.framework.planner.Planner`
 - {py:class}`~krrood.entity_query_language.verbalization.grammar.query.assembler.QueryAssembler` / {py:class}`~krrood.entity_query_language.verbalization.grammar.chain.assembler.ChainAssembler` / {py:class}`~krrood.entity_query_language.verbalization.grammar.aggregation.assembler.AggregationValueAssembler` / {py:class}`~krrood.entity_query_language.verbalization.grammar.match.assembler.MatchAssembler`

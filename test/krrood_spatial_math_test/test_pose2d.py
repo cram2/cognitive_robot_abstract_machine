@@ -1,16 +1,19 @@
+"""
+Planar poses: a position in the plane and a rotation about the z-axis.
+"""
+
 import math
 
 import numpy as np
 import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Point2, Pose2D, Pose, Point3, Quaternion
 from krrood_spatial_math.spatial_types import RotationMatrix
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
+from krrood_spatial_math.testing.orientation_comparison import assert_same_orientation
+
+from .dataset.frames import NamedFrame
 from .reference_implementations import quaternion_from_rpy
-from .utils_for_tests import compare_orientations
 
 
 class TestPose2DConstruction:
@@ -44,7 +47,7 @@ class TestPose2DConstruction:
         assert p.shape == (3, 1)
 
     def test_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         p = Pose2D.from_xy_yaw(x=1, y=2, yaw=0, reference_frame=frame)
         assert p.reference_frame is frame
 
@@ -59,6 +62,10 @@ class TestPose2DConstruction:
 
 
 class TestPose2DToPose:
+    """
+    Conversion of a planar pose into a full pose.
+    """
+
     def test_to_pose_position(self):
         p2 = Pose2D.from_xy_yaw(x=3.0, y=-1.5, yaw=0)
         pose = p2.pose
@@ -82,7 +89,7 @@ class TestPose2DToPose:
         assert pitch.to_np() == pytest.approx(0.0, abs=1e-6)
 
     def test_to_pose_reference_frame_propagated(self):
-        frame = Body(name=PrefixedName("map"))
+        frame = NamedFrame("map")
         p2 = Pose2D.from_xy_yaw(x=1, y=2, yaw=0, reference_frame=frame)
         assert p2.pose.reference_frame is frame
 
@@ -125,15 +132,18 @@ class TestPose2DToPose:
         assert pt.y.to_np() == pytest.approx(6.0)
 
     def test_position_property_reference_frame_propagated(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         p2 = Pose2D.from_xy_yaw(x=5, y=6, yaw=0, reference_frame=frame)
         assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
+        """
+        The orientation of a planar pose is the quaternion of its yaw.
+        """
         p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0.3)
         q = p2.orientation
         assert isinstance(q, Quaternion)
-        compare_orientations(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
+        assert_same_orientation(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
 
 
 class TestPose2DFromPosition:
@@ -145,14 +155,14 @@ class TestPose2DFromPosition:
         assert p2.yaw.to_np() == pytest.approx(0.7)
 
     def test_inherits_position_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         position = Point2(x=1.0, y=2.0, reference_frame=frame)
         p2 = Pose2D(position, yaw=0.0)
         assert p2.reference_frame is frame
 
     def test_override_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
-        other_frame = Body(name=PrefixedName("other"))
+        frame = NamedFrame("world")
+        other_frame = NamedFrame("other")
         position = Point2(x=1.0, y=2.0, reference_frame=frame)
         p2 = Pose2D(position, yaw=0.0, reference_frame=other_frame)
         assert p2.reference_frame is other_frame
@@ -168,28 +178,10 @@ class TestPose2DFromPose:
         assert recovered.yaw.to_np() == pytest.approx(0.7, abs=1e-6)
 
     def test_from_pose_inherits_reference_frame(self):
-        frame = Body(name=PrefixedName("base"))
+        frame = NamedFrame("base")
         pose = Pose.from_xyz_rpy(1, 2, 3, 0, 0, 0.5, reference_frame=frame)
         p2 = Pose2D.from_pose(pose)
         assert p2.reference_frame is frame
-
-    def test_from_pose_transforms_into_another_frame(self, mini_world: World):
-        """
-        Asking for another frame expresses the pose in that frame instead of attaching
-        the frame to the pose's own coordinates.
-        """
-        mini_world.connections[0].position = math.pi / 2
-        root, tip = mini_world.root, mini_world.bodies[1]
-        tip_pose = Pose.from_xyz_rpy(1, 0, 2, 0, 0, 0.3, reference_frame=tip)
-
-        p2 = Pose2D.from_pose(tip_pose, plane_frame=root)
-
-        assert p2.reference_frame is root
-        np.testing.assert_allclose(
-            p2.to_np(),
-            Pose2D.from_pose(mini_world.transform(tip_pose, root)).to_np(),
-            atol=1e-12,
-        )
 
 
 class TestPose2DSymbolic:

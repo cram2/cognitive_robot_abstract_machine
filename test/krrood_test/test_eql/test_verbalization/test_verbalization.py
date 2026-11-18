@@ -122,15 +122,15 @@ class BankTransaction:
 # %% Sanity / regression tests
 def test_all_rules_registry_is_populated():
     """
-    RULES must be non-empty after import — otherwise every expression falls back to its
-    name string and verbalization is silently broken.
+    The loaded rules must be non-empty after import — otherwise every expression falls
+    back to its name string and verbalization is silently broken.
     """
     from krrood.entity_query_language.verbalization.grammar.framework.registry import (
-        RULES,
+        PhraseRuleRegistry,
     )
 
-    assert len(RULES) > 0, (
-        "RULES is empty — the grammar was not imported, so every expression would "
+    assert len(PhraseRuleRegistry.loaded_rules()) > 0, (
+        "No rule is loaded — the grammar was not imported, so every expression would "
         "fall back to its name string."
     )
 

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from krrood.entity_query_language.causal_relation import (
+from krrood.parametrization.causal_relation import (
     AttributeEndpoint,
     CausalRelationsOfClass,
     StatisticEndpoint,
