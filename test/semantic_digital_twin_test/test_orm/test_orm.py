@@ -372,6 +372,8 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
     The normalized twist and the child's pose survive storing the world and reading it
     back.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
