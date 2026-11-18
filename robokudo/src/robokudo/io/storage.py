@@ -216,7 +216,7 @@ class Storage:
 
     @staticmethod
     def decode_view_document(
-        view_document: dict[str, Any], world: World
+        *, view_document: dict[str, Any], world: World
     ) -> tuple[str, Any]:
         """
         Decode one serialized view document into a CAS view value.
@@ -251,6 +251,7 @@ class Storage:
 
     def load_views_from_mongo_in_cas(
         self,
+        *,
         cas_document: dict[str, Any],
         world: World,
         excluded_view_names: set[str] | None = None,
@@ -282,7 +283,7 @@ class Storage:
                 continue
             view_document = self.load_view_document(cas_document, expected_view_name)
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document, world
+                view_document=view_document, world=world
             )
             if decoded_view_name != expected_view_name:
                 raise RecordedViewNameMismatch(
@@ -311,7 +312,7 @@ class Storage:
 
     @staticmethod
     def load_annotations_from_mongo_in_cas(
-        cas_document: dict[str, Any], cas: CAS, world: World
+        *, cas_document: dict[str, Any], cas: CAS, world: World
     ) -> None:
         """
         Load annotations from MongoDB into a CAS.

@@ -959,7 +959,7 @@ class TestPerceivableObjectsOfTheWorld:
         assert np.allclose(
             position_of(body),
             hypothesis.latest_annotation_of_type(
-                BoundingBox3DAnnotation
+                annotation_type=BoundingBox3DAnnotation
             ).pose.translation,
         )
         assert np.allclose(body.global_transform.to_np()[:3, :3], rotation_before)
@@ -982,13 +982,13 @@ class TestPerceivableObjectsOfTheWorld:
         assert np.allclose(
             position_of(body),
             seen_again.latest_annotation_of_type(
-                BoundingBox3DAnnotation
+                annotation_type=BoundingBox3DAnnotation
             ).pose.translation,
         )
         assert np.allclose(
             position_of(new_object.root),
             new_hypothesis.latest_annotation_of_type(
-                BoundingBox3DAnnotation
+                annotation_type=BoundingBox3DAnnotation
             ).pose.translation,
         )
 

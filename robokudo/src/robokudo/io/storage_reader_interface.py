@@ -283,7 +283,7 @@ class StorageReaderInterface(CameraInterface):
             )
         cas_frame[StorageDocumentField.VIEWS] = {}
         self.storage.load_views_from_mongo_in_cas(
-            cas_frame, world, included_view_names=included_views
+            cas_document=cas_frame, world=world, included_view_names=included_views
         )
 
         # Bring flat CAS representation into the proper CAS class
@@ -302,7 +302,9 @@ class StorageReaderInterface(CameraInterface):
 
         # Restore annotations
         if self.camera_config.restore_annotations:
-            self.storage.load_annotations_from_mongo_in_cas(cas_frame, cas, world)
+            self.storage.load_annotations_from_mongo_in_cas(
+                cas_document=cas_frame, cas=cas, world=world
+            )
 
         if cas.depth_image is None:
             # no depth image available

@@ -504,7 +504,7 @@ class ImageContourMissing(AnalysisPreconditionError):
         return "check the image input and contour extraction thresholds."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboKudoAlreadyRunningError(RoboKudoError, RuntimeError):
     """
     Raised when a RoboKudo starts in a process another RoboKudo already runs in.
@@ -520,7 +520,7 @@ class RoboKudoAlreadyRunningError(RoboKudoError, RuntimeError):
         return "close the running RoboKudo first, or run the second one in its own process."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EngineRootIsNotAPipelineError(RoboKudoError, TypeError):
     """
     Raised when RoboKudo starts an analysis engine whose tree is not rooted at a
@@ -548,7 +548,7 @@ class EngineRootIsNotAPipelineError(RoboKudoError, TypeError):
         return "make a Pipeline the root of the tree the analysis engine builds."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownWorldFrameError(RoboKudoError, LookupError):
     """
     Raised when a camera pose is measured against a frame a world with bodies does not
@@ -574,7 +574,7 @@ class UnknownWorldFrameError(RoboKudoError, LookupError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraPoseOutsideWorldError(RoboKudoError, LookupError):
     """
     Raised when the camera pose of a finished pass is measured against a body that is

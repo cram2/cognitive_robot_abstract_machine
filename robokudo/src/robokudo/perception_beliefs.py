@@ -107,7 +107,7 @@ class PerceptionBelief:
             a warning logged, if it has neither.
         """
         shape_annotation = hypothesis.latest_annotation_of_type(
-            robokudo.types.annotation.Shape
+            annotation_type=robokudo.types.annotation.Shape
         )
         seen_geometry = (
             shape_annotation.geometry
@@ -138,7 +138,9 @@ class PerceptionBelief:
                 if hypothesis.class_label is not None
                 else None
             )
-            classification = hypothesis.latest_annotation_of_type(Classification)
+            classification = hypothesis.latest_annotation_of_type(
+                annotation_type=Classification
+            )
             is_confidently_classified = (
                 classification is not None
                 and classification.confidence >= minimum_class_confidence
@@ -167,7 +169,9 @@ class PerceptionBelief:
             None if it has neither a 3D bounding box nor
             :attr:`minimum_box_point_count` points.
         """
-        bounding_box = hypothesis.latest_annotation_of_type(BoundingBox3DAnnotation)
+        bounding_box = hypothesis.latest_annotation_of_type(
+            annotation_type=BoundingBox3DAnnotation
+        )
         if bounding_box is not None:
             return geometry.Box(
                 origin=HomogeneousTransformationMatrix.from_xyz_quaternion(

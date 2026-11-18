@@ -33,7 +33,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.world import World
-from typing_extensions import TYPE_CHECKING, List, Optional, Type
+from typing_extensions import TYPE_CHECKING
 
 # robokudo.pipeline must be imported before robokudo.garden, whose import otherwise
 # trips the circular import between robokudo.pipeline and robokudo.annotators.core.
@@ -50,7 +50,7 @@ from robokudo.identifier import BBIdentifier
 from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.pipeline import Pipeline
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.tree import find_parent_of_type, setup_with_descendants_rk
+from robokudo.utils.tree import setup_with_descendants_rk
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 # %% perception process
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboKudo:
     """
     The RoboKudo perception process, running an analysis engine on a world.
@@ -99,6 +99,12 @@ class RoboKudo:
     A shared world is published by the process serving it.
     """
 
+    minimum_class_confidence: float = 0.5
+    """
+    How confident a classification has to be for an object to be believed of the class
+    it names; a less confident one is believed a :class:`PerceivedObject`.
+    """
+
     world: World = field(init=False)
     """
     The world perception perceives into: the shared world, or an empty world of its own
@@ -111,15 +117,21 @@ class RoboKudo:
     :attr:`publishes_own_world`; None until then.
     """
 
-    synchronizer: Optional[WorldSynchronizer] = field(init=False, default=None)
+    synchronizer: WorldSynchronizer | None = field(init=False, default=None)
     """
     Shares the world with other processes; None while perception keeps its world to
     itself.
     """
 
-    tree: Optional[BehaviourTree] = field(init=False, default=None)
+    tree: BehaviourTree | None = field(init=False, default=None)
     """
     The behaviour tree of :attr:`analysis_engine`; None until :meth:`start`.
+    """
+
+    pipeline: Pipeline | None = field(init=False, default=None)
+    """
+    The pipeline at the root of the tree of :attr:`analysis_engine`, whose finished
+    passes are put into the world; None until :meth:`start`.
     """
 
     executor: SingleThreadedExecutor = field(init=False)
@@ -170,34 +182,10 @@ class RoboKudo:
                 self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
             closing_on_failure.pop_all()
 
-    @classmethod
-    def from_blackboard(cls) -> RoboKudo:
-        """
-        The RoboKudo running in this process.
-
-        :return: The RoboKudo stored on the blackboard.
-        """
-        return Blackboard().get(BBIdentifier.ROBOKUDO)
-
-    @property
-    def pipeline(self) -> Pipeline:
-        """
-        The pipeline :attr:`analysis_engine` perceives with: the one of :attr:`tree` no
-        other pipeline encloses.
-
-        Its finished passes are put into the world.
-        """
-        return next(
-            behaviour
-            for behaviour in self.tree.root.iterate()
-            if isinstance(behaviour, Pipeline)
-            and find_parent_of_type(behaviour, Pipeline) is None
-        )
-
     # %% lifecycle
 
     def start(
-        self, include_gui: bool = True, visualizer_types: Optional[List[Type]] = None
+        self, *, include_gui: bool = True, visualizer_types: list[type] | None = None
     ) -> None:
         """
         Become the RoboKudo of this process and build the behaviour tree, whose
@@ -219,6 +207,7 @@ class RoboKudo:
                 root_type=type(engine_tree),
             )
         blackboard.set(BBIdentifier.ROBOKUDO, self)
+        self.pipeline = engine_tree
 
         for behaviour in engine_tree.iterate():
             if isinstance(behaviour, Pipeline):
@@ -231,7 +220,7 @@ class RoboKudo:
         )
         setup_with_descendants_rk(self.tree)
 
-    def run(self, tick_rate: float = 5.0) -> None:
+    def run(self, *, tick_rate: float = 5.0) -> None:
         """
         Tick the behaviour tree until its first top-level child fails or the ROS context
         of :attr:`node` shuts down, as it does on SIGINT and SIGTERM.
@@ -277,10 +266,9 @@ class RoboKudo:
         :attr:`publishes_own_world` asks.
         """
         self.tree.tick()
-        pipeline = self.pipeline
-        if pipeline.status != Status.SUCCESS:
+        if self.pipeline.status != Status.SUCCESS:
             return
-        self.update_world_with_perception_beliefs(pipeline=pipeline)
+        self.update_world_with_perception_beliefs(pipeline=self.pipeline)
         if (
             self.publishes_own_world
             and self.synchronizer is None
@@ -323,7 +311,6 @@ class RoboKudo:
             against a body that is not part of :attr:`world`.
         """
         matcher = ObjectMatcher()
-        minimum_class_confidence = 0.5
         cas = pipeline.cas
         observation = cas.camera_observation
         if (
@@ -351,7 +338,7 @@ class RoboKudo:
                     belief := PerceptionBelief.from_hypothesis(
                         hypothesis=hypothesis,
                         world_T_camera=world_T_camera,
-                        minimum_class_confidence=minimum_class_confidence,
+                        minimum_class_confidence=self.minimum_class_confidence,
                     )
                 )
                 is not None

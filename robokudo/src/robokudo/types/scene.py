@@ -66,7 +66,7 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
     """
 
     def latest_annotation_of_type(
-        self, annotation_type: type[AnnotationType]
+        self, *, annotation_type: type[AnnotationType]
     ) -> AnnotationType | None:
         """
         :param annotation_type: The type of the annotation.
@@ -93,7 +93,7 @@ class ObjectHypothesis(AnalyzableAnnotation):
         The class name of the latest classification of this hypothesis, or None if it
         was not classified.
         """
-        classification = self.latest_annotation_of_type(Classification)
+        classification = self.latest_annotation_of_type(annotation_type=Classification)
         if classification is None or not classification.classname:
             return None
         return classification.classname

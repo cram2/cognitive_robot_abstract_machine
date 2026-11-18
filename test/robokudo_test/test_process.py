@@ -1,3 +1,7 @@
+"""
+Tests of the RoboKudo perception process of :mod:`robokudo.process`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -469,6 +473,11 @@ class TestJoiningSharedWorld:
 
 
 class TestJoiningAWorldWithARobot:
+    """
+    A RoboKudo joined to a shared world with a robot places what it perceives where the
+    robot's camera saw it.
+    """
+
     def test_frame_is_placed_where_tf_located_the_camera_of_the_moved_head(
         self,
         shared_world_with_a_robot: SharedWorld,
@@ -505,7 +514,9 @@ class TestJoiningAWorldWithARobot:
     ) -> None:
         shared = shared_world_with_a_robot.world
         hypothesis = make_object_hypothesis(translation=(0.0, 0.5, 2.0))
-        bounding_box = hypothesis.latest_annotation_of_type(BoundingBox3DAnnotation)
+        bounding_box = hypothesis.latest_annotation_of_type(
+            annotation_type=BoundingBox3DAnnotation
+        )
         expected_pose = (
             shared.get_body_by_name(FrameName.CAMERA).global_transform.to_np()
             @ HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -634,6 +645,10 @@ class SynchronizerUnavailableError(DataclassException):
 
 
 class TestOneRoboKudoPerProcess:
+    """
+    Only one RoboKudo runs per process at a time.
+    """
+
     def test_second_robokudo_cannot_start(
         self, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
@@ -649,13 +664,14 @@ class TestOneRoboKudoPerProcess:
     def test_closed_robokudo_makes_room_for_the_next(
         self, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
-        robokudo_of_its_own(node, engine).start(include_gui=False)
-        RoboKudo.from_blackboard().close()
+        closed = robokudo_of_its_own(node, engine)
+        closed.start(include_gui=False)
+        closed.close()
         following = robokudo_of_its_own(following_node, EngineRunningABehaviour())
 
         following.start(include_gui=False)
 
-        assert RoboKudo.from_blackboard() is following
+        assert Blackboard().get(BBIdentifier.ROBOKUDO) is following
         following.close()
 
 
