@@ -70,7 +70,6 @@ from semantic_digital_twin.mixin import (
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
-from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world_description.derivatives import Derivatives
@@ -2641,40 +2640,6 @@ class World(HasSimulatorProperties):
             )
             parent_entity = parent_entity.parent_kinematic_structure_entity
         return future_root_T_self
-
-    # %% Inverse Kinematics
-    def compute_inverse_kinematics(
-        self,
-        root: KinematicStructureEntity,
-        tip: KinematicStructureEntity,
-        target: HomogeneousTransformationMatrix,
-        dt: float = 0.05,
-        max_iterations: int = 200,
-        translation_velocity: float = 0.2,
-        rotation_velocity: float = 0.2,
-    ) -> dict[DegreeOfFreedom, float]:
-        """
-        Compute inverse kinematics using quadratic programming.
-
-        :param root: Root KinematicStructureEntity of the kinematic chain.
-        :param tip: Tip KinematicStructureEntity of the kinematic chain.
-        :param target: Desired tip pose relative to the root KinematicStructureEntity.
-        :param dt: Time step for integration.
-        :param max_iterations: Maximum number of iterations.
-        :param translation_velocity: Maximum translation velocity.
-        :param rotation_velocity: Maximum rotation velocity.
-        :return: Dictionary mapping DOF names to their computed positions.
-        """
-        ik_solver = InverseKinematicsSolver(self)
-        return ik_solver.solve(
-            root,
-            tip,
-            target,
-            dt,
-            max_iterations,
-            translation_velocity,
-            rotation_velocity,
-        )
 
     # %% World Utils
     def clear(self):

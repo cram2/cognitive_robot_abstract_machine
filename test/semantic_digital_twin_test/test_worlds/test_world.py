@@ -424,25 +424,6 @@ def test_compute_fk(world_setup):
     )
 
 
-def test_compute_ik(world_setup):
-    world, l1, l2, bf, r1, r2 = world_setup
-    target = np.array(
-        [
-            [0.540302, -0.841471, 0.0, -1.0],
-            [0.841471, 0.540302, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
-    joint_state = world.compute_inverse_kinematics(
-        l2, r2, HomogeneousTransformationMatrix(target, reference_frame=l2)
-    )
-    for joint, state in joint_state.items():
-        world.state[joint.id].position = state
-    world.notify_state_change()
-    assert np.allclose(world.compute_forward_kinematics_np(l2, r2), target, atol=1e-3)
-
-
 def test_compute_fk_expression(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     connection: ScrewAxisConnection = world.get_connection(r1, r2)
