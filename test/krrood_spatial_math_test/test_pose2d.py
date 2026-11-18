@@ -10,9 +10,10 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import Point2, Pose2D, Pose, Point3, Quaternion
 from krrood_spatial_math.spatial_types import RotationMatrix
+from krrood_spatial_math.testing.orientation_comparison import assert_same_orientation
+
 from .dataset.frames import NamedFrame
 from .reference_implementations import quaternion_from_rpy
-from ..orientation_comparison import assert_same_orientation
 
 
 class TestPose2DConstruction:

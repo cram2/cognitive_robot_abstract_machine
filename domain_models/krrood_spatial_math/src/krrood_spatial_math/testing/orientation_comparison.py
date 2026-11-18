@@ -10,9 +10,7 @@ from __future__ import annotations
 import numpy as np
 from typing_extensions import Any
 
-from .krrood_spatial_math_test.reference_implementations import (
-    shortest_angular_distance,
-)
+from krrood.symbolic_math.symbolic_math import shortest_angular_distance
 
 # %% numerical closeness
 
@@ -23,10 +21,14 @@ def is_almost_equal(*, actual: Any, desired: Any, decimal: int) -> bool:
     :param desired: Numbers, or a constant symbolic expression, to check against.
     :param decimal: Number of decimal places that have to agree, as in
         :func:`numpy.testing.assert_almost_equal`.
-    :return: Whether every element of ``actual`` agrees with the one in ``desired``.
+    :return: Whether ``actual`` has the shape of ``desired`` and every element agrees
+        with the one in ``desired``.
     """
-    difference = np.asarray(actual).astype(float) - np.asarray(desired).astype(float)
-    return bool(np.all(np.abs(difference) < 1.5 * 10.0**-decimal))
+    actual_array = np.asarray(actual).astype(float)
+    desired_array = np.asarray(desired).astype(float)
+    if actual_array.shape != desired_array.shape:
+        return False
+    return bool(np.all(np.abs(actual_array - desired_array) < 1.5 * 10.0**-decimal))
 
 
 def is_angle_almost_equal(*, actual: Any, desired: Any, decimal: int) -> bool:
@@ -36,13 +38,11 @@ def is_angle_almost_equal(*, actual: Any, desired: Any, decimal: int) -> bool:
     :param decimal: Number of decimal places that have to agree.
     :return: Whether both angles describe the same direction.
     """
-    actual_angle = np.asarray(actual).astype(float).item()
-    desired_angle = np.asarray(desired).astype(float).item()
-    return is_almost_equal(
-        actual=shortest_angular_distance(actual_angle, desired_angle),
-        desired=0.0,
-        decimal=decimal,
+    angular_distance = shortest_angular_distance(
+        np.asarray(actual).astype(float).item(),
+        np.asarray(desired).astype(float).item(),
     )
+    return is_almost_equal(actual=float(angular_distance), desired=0.0, decimal=decimal)
 
 
 # %% orientation assertions

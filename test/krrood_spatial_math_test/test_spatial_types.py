@@ -25,6 +25,11 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types import Pose, Point2, Pose2D
 from krrood_spatial_math.spatial_types import Pose, SpatialType
+from krrood_spatial_math.testing.orientation_comparison import (
+    assert_same_axis_angle,
+    assert_same_orientation,
+)
+
 from .dataset.frames import NamedFrame
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
@@ -39,10 +44,6 @@ from .reference_implementations import (
     quaternion_conjugate,
     quaternion_from_rpy,
     quaternion_from_rotation_matrix,
-)
-from ..orientation_comparison import (
-    assert_same_axis_angle,
-    assert_same_orientation,
 )
 
 bool_values = [True, False]
