@@ -3,8 +3,8 @@ import types
 from pathlib import Path
 from collections import defaultdict
 import sys
-import krrood.utils as krrood_utils
-from krrood.utils import (
+import krrood.source_analysis.import_scope as import_scope
+from krrood.source_analysis.import_scope import (
     get_scope_from_imports,
     _log_unresolvable_import_once,
 )
@@ -86,7 +86,7 @@ def test_repeated_unresolvable_type_checking_import_logs_only_once(
 
     log_calls = []
     monkeypatch.setattr(
-        krrood_utils.logger, "debug", lambda message: log_calls.append(message)
+        import_scope.logger, "debug", lambda message: log_calls.append(message)
     )
 
     source = f"""

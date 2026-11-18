@@ -1,5 +1,5 @@
 """
-Tests for :func:`krrood.utils.get_scope_from_imports`, which builds the names a source
+Tests for :func:`krrood.source_analysis.import_scope.get_scope_from_imports`, which builds the names a source
 file's imports bind.
 """
 
@@ -14,7 +14,7 @@ from collections import defaultdict
 from typing_extensions import Optional, Any, Dict
 import pytest
 
-from krrood.utils import get_scope_from_imports
+from krrood.source_analysis.import_scope import get_scope_from_imports
 from krrood.exceptions import SourceDataNotProvided
 
 from ..dataset import deferred_import_owner

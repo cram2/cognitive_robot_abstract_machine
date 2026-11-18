@@ -7,7 +7,8 @@ from krrood.ripple_down_rules.utils import (
     make_set,
     get_imports_from_types,
 )
-from krrood.utils import get_scope_from_imports, get_relative_import
+from krrood.source_analysis.import_scope import get_scope_from_imports
+from krrood.utils import get_relative_import
 
 
 class UtilsTestCase(TestCase):
