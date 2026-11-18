@@ -15,10 +15,13 @@ from abc import ABC, abstractmethod
 
 from typing_extensions import Any, Callable, Sequence, TypeVar
 
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.utils import recursive_subclasses
 
 _T = TypeVar("_T")
+
+# %% ranking primitives
 
 
 def maxima(candidates: Sequence[_T], key: Callable[[_T], Any]) -> list[_T]:
@@ -105,25 +108,80 @@ def concrete_subclasses(base: type[_T]) -> list[type[_T]]:
     ]
 
 
-class SpecificityRule(ABC):
+# %% specificity-ranked alternatives
+
+
+class SpecificityRankedAlternative(ABC):
     """
-    A guarded alternative selected by specificity: the base of a family of rules of
-    which at most one decides for any subject.
+    An alternative of its family: its :attr:`guard` decides whether it applies to a
+    subject and its :attr:`specificity` ranks it; equally specific alternatives that
+    both apply raise :class:`~krrood.patterns.exceptions.AmbiguousRuleError`.
 
-    An alternative is a concrete subclass that implements the ``applies(...)`` guard (its
-    keyword-only parameters are the family's concern) and whatever payload the family needs. Alternatives
-    register themselves by subclassing and are ranked by class specificity: a more-derived
-    alternative, one that subclasses another and refines its guard, outranks the alternative it
-    refines. Alternatives that are not in a subclass relationship must have mutually exclusive
-    guards, so at most one applies; a tie raises
-    :class:`~krrood.patterns.exceptions.AmbiguousRuleError`.
-
-    Precedence comes from the class hierarchy (genuine subsumption) or from disjoint guards,
-    never from a hand-assigned number or the order in which rules are checked.
-
-    Reference: production-rule selection; the systemic-functional "most delicate system wins"
-    principle (:cite:t:`halliday2014functional`).
+    .. seealso:: Production-rule selection; the systemic-functional "most delicate system
+        wins" principle (:cite:t:`halliday2014functional`).
     """
+
+    @classproperty
+    @abstractmethod
+    def guard(cls) -> Callable[..., bool]:
+        """
+        The test that is true when this alternative decides for a subject; it takes the
+        subject as the keyword arguments given to :meth:`most_applicable`.
+        """
+
+    @classproperty
+    def specificity(cls) -> int:
+        """
+        The rank of this alternative among those that apply; the highest wins.
+
+        A more-derived alternative outranks the alternative it refines.
+        """
+        return mro_depth(cls)
+
+    @classmethod
+    def alternatives(cls) -> list[type[SpecificityRankedAlternative]]:
+        """
+        :return: The concrete alternative subclasses of this family, transitively, with abstract
+            family bases excluded.
+        """
+        return concrete_subclasses(cls)
+
+    @classmethod
+    def most_applicable(
+        cls, **subject: Any
+    ) -> type[SpecificityRankedAlternative] | None:
+        """
+        :param subject: Forwarded to each alternative's :attr:`guard`.
+        :return: The most specific alternative whose guard holds for ``subject``, or
+            ``None``.
+        :raises AmbiguousRuleError: When several alternatives are equally specific.
+        """
+        applicable = [
+            alternative
+            for alternative in cls.alternatives()
+            if alternative.guard(**subject)
+        ]
+        return sole_maximum(
+            applicable,
+            key=lambda alternative: alternative.specificity,
+            collision_error=lambda tied: AmbiguousRuleError(
+                subject=subject, candidates=tied
+            ),
+        )
+
+
+class SpecificityRule(SpecificityRankedAlternative, ABC):
+    """
+    A specificity-ranked alternative whose guard is :meth:`applies`, ranked by class
+    depth: an alternative that subclasses another and refines its guard outranks it.
+    """
+
+    @classproperty
+    def guard(cls) -> Callable[..., bool]:
+        """
+        :meth:`applies`.
+        """
+        return cls.applies
 
     @classmethod
     @abstractmethod
@@ -132,32 +190,3 @@ class SpecificityRule(ABC):
         :param subject: The subject, keyed by the parameters of the family's guard.
         :return: True when this alternative decides for the given subject.
         """
-
-    @classmethod
-    def alternatives(cls) -> list[type[SpecificityRule]]:
-        """
-        :return: The concrete alternative subclasses of this family, transitively, with abstract
-            family bases excluded.
-        """
-        return concrete_subclasses(cls)
-
-    @classmethod
-    def most_applicable(cls, **subject: Any) -> type[SpecificityRule] | None:
-        """
-        :param subject: Forwarded to each alternative's ``applies``.
-        :return: The most specific alternative whose ``applies(**subject)`` holds, or
-            ``None``.
-        :raises AmbiguousRuleError: When several alternatives are equally specific.
-        """
-        applicable = [
-            alternative
-            for alternative in cls.alternatives()
-            if alternative.applies(**subject)
-        ]
-        return sole_maximum(
-            applicable,
-            key=mro_depth,
-            collision_error=lambda tied: AmbiguousRuleError(
-                subject=subject, candidates=tied
-            ),
-        )

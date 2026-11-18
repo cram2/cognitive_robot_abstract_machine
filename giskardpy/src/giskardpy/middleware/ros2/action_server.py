@@ -1,20 +1,25 @@
+"""
+Hand-over of ROS 2 action goals to the motion server and of its answers back to the
+action client.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from queue import Queue, Empty
 from time import sleep
-from typing_extensions import Any
 
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.action.server import ServerGoalHandle
+from typing_extensions import Any
 
-from giskardpy.data_types.exceptions import (
+from giskardpy.exceptions import (
     MissingActionResultError,
     MissingGoalOutcomeError,
 )
-from semantic_digital_twin.adapters.ros import background_node
 from krrood.patterns.called_positionally import called_positionally
+from semantic_digital_twin.adapters.ros import background_node
 
 
 class GoalOutcome(Enum):

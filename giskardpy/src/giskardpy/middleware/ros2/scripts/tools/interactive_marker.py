@@ -11,16 +11,16 @@ from visualization_msgs.msg import InteractiveMarkerFeedback
 
 from cramph.monitors import CountSeconds
 from cramph.statechart import Statechart
-from giskardpy.data_types.exceptions import UnpairedKinematicChainParametersError
-from semantic_digital_twin.adapters.ros import background_node
+from giskardpy.exceptions import UnpairedKinematicChainParametersError
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from krrood.patterns.called_positionally import called_positionally
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from krrood.patterns.called_positionally import called_positionally
 
 # %% kinematic chain endpoints
 

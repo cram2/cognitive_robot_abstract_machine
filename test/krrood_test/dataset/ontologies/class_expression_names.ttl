@@ -1,0 +1,53 @@
+@prefix : <http://example.org/class_expression_names#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Each anchor class is declared under the one anonymous class expression a test names.
+
+<http://example.org/class_expression_names> a owl:Ontology .
+
+:Pizza a owl:Class .
+:Cheese a owl:Class .
+:Meat a owl:Class ; owl:disjointWith :Fish .
+:Fish a owl:Class .
+:hasTopping a owl:ObjectProperty .
+:likes a owl:ObjectProperty .
+:isSpicy a owl:DatatypeProperty .
+:hasCalories a owl:DatatypeProperty .
+:Margherita a owl:NamedIndividual .
+:Capricciosa a owl:NamedIndividual .
+
+:Intersection rdfs:subClassOf [ a owl:Class ; owl:intersectionOf ( :Pizza :Cheese ) ] .
+:Union rdfs:subClassOf [ a owl:Class ; owl:unionOf ( :Meat :Fish ) ] .
+:Enumeration rdfs:subClassOf [ a owl:Class ; owl:oneOf ( :Margherita :Capricciosa ) ] .
+:ComplementWithDisjointClasses rdfs:subClassOf [ a owl:Class ; owl:complementOf :Meat ] .
+:Complement rdfs:subClassOf [ a owl:Class ; owl:complementOf :Pizza ] .
+:Nested rdfs:subClassOf [ a owl:Class ; owl:intersectionOf ( :Pizza
+    [ a owl:Restriction ; owl:onProperty :hasTopping ; owl:someValuesFrom :Cheese ] ) ] .
+
+:SomeValues rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ; owl:someValuesFrom :Cheese ] .
+:AllValues rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ; owl:allValuesFrom :Cheese ] .
+:Value rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ; owl:hasValue :Margherita ] .
+:FalseValue rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :isSpicy ; owl:hasValue false ] .
+:Self rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :likes ; owl:hasSelf true ] .
+
+:MinCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:minCardinality "1"^^xsd:nonNegativeInteger ] .
+:MaxCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:maxCardinality "3"^^xsd:nonNegativeInteger ] .
+:ExactCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:cardinality "2"^^xsd:nonNegativeInteger ] .
+:MinQualifiedCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass :Cheese ] .
+:MaxQualifiedCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:maxQualifiedCardinality "2"^^xsd:nonNegativeInteger ; owl:onClass :Cheese ] .
+:ZeroQualifiedCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:maxQualifiedCardinality "0"^^xsd:nonNegativeInteger ; owl:onClass :Cheese ] .
+:ExactQualifiedCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasTopping ;
+    owl:qualifiedCardinality "2"^^xsd:nonNegativeInteger ; owl:onClass :Cheese ] .
+:DataQualifiedCardinality rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasCalories ;
+    owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onDataRange xsd:integer ] .
+
+# Not a class expression: an axiom that the classes are pairwise disjoint.
+[ a owl:AllDisjointClasses ; owl:members ( :Pizza :Cheese ) ] .

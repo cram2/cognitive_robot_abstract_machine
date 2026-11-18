@@ -3,7 +3,7 @@ import random
 import numpy as np
 
 from cramph.executor import SimulationPacer
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -65,7 +65,7 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert wiggle.observation_state == ObservationStateValues.TRUE
+    assert wiggle.observation_state == ObservationStateValue.TRUE
 
 
 def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: World):
@@ -208,5 +208,5 @@ def test_wiggle_insert(hsr_world_state_reset):
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert motion.last_observation_state == ObservationStateValues.TRUE
+    assert motion.last_observation_state == ObservationStateValue.TRUE
     assert not np.allclose(wiggle._current_vector, np.zeros(3))
