@@ -177,3 +177,7 @@ CLAUDE.local.md
 
 # Some robokudo annotators have default models downloaded
 robokudo/src/robokudo/models/
+
+# The collision matrix test writes its SRDF into the directory pytest runs from
+/test.srdf
+/test/test.srdf

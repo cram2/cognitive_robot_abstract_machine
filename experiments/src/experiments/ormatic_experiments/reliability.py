@@ -62,7 +62,9 @@ def _build_hsrb_world() -> World:
         old_root = world.root
         map_body = Body(name=PrefixedName("map"))
         odom = Body(name=PrefixedName("odom_combined"))
-        map_C_odom = Connection6DoF.create_with_dofs(world, map_body, odom)
+        map_C_odom = Connection6DoF.create_with_dofs(
+            world=world, parent=map_body, child=odom
+        )
         world.add_connection(map_C_odom)
         drive = OmniDrive.create_with_dofs(parent=odom, child=old_root, world=world)
         world.add_connection(drive)

@@ -52,7 +52,7 @@ def _servoed_rover(start_yaw: float = 0.0) -> DifferentialDrive:
         world.add_kinematic_structure_entity(odom)
         world.add_kinematic_structure_entity(base)
         drive = DifferentialDrive.create_with_dofs(
-            world, odom, base, name=PrefixedName("drive", "rover")
+            world=world, parent=odom, child=base, name=PrefixedName("drive", "rover")
         )
         world.add_connection(drive)
         for degree_of_freedom in drive.active_dofs:
