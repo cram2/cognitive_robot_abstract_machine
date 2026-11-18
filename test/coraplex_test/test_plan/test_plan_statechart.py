@@ -34,7 +34,7 @@ from cramph.composites import (
     Sequence,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.nodes_for_testing import ConstTrueNode, NodeFailingOnObservingFalse
 from cramph.statechart import Statechart
@@ -128,7 +128,7 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
     assert navigate.statechart is statechart
     assert torso.statechart is statechart
     assert len(statechart.get_nodes_by_type(node_type=EndMotion)) == 1
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before_left(
@@ -515,7 +515,7 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
         "GiskardClientExecutor",
         lambda node_handle, context: GiskardTickingTheGoalUntilItEnded(),
     )
-    plan = NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE)
+    plan = NodeFailingOnObservingFalse(observation=ObservationStateValue.FALSE)
     executor = robot_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))
 
@@ -523,7 +523,7 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
         executor.execute()
 
     assert failure.value.unfinished_motions == [plan]
-    assert plan.life_cycle_state == LifeCycleValues.FAILED
+    assert plan.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empty(
