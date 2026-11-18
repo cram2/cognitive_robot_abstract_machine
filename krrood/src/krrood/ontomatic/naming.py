@@ -16,7 +16,7 @@ from rdflib.collection import Collection
 from typing_extensions import Any, Optional, Union
 
 from krrood.ontomatic.exceptions import UnsupportedClassExpression
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.utils import recursive_subclasses
 
 # %% what an RDF graph says about its nodes
