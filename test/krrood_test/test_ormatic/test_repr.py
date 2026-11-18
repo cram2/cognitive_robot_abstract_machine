@@ -6,11 +6,6 @@ from .test_interface import (
     KRROODPose,
     KRROODOrientation,
 )
-from ..dataset.ormatic_interface import (
-    KRROODPositionDAO,
-    KRROODPoseDAO,
-    KRROODPosition4DDAO,
-)
 
 
 def test_repr_includes_scalar_columns_only():
