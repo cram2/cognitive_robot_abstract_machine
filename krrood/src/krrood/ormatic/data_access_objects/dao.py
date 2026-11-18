@@ -1,3 +1,7 @@
+"""
+The data access object that maps a class to its database rows and back.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -25,9 +29,6 @@ from krrood.entity_query_language.core.mapped_variable import Attribute, IndexBy
 from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.entity_query_language._monitoring import monitored
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-from krrood.ormatic.data_access_objects.base import (
-    HasGeneric,
-)
 from krrood.ormatic.data_access_objects.from_dao import (
     FromDataAccessObjectWorkItem,
     FromDataAccessObjectState,
@@ -40,10 +41,11 @@ from krrood.ormatic.data_access_objects.helper import (
 )
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import (
-    NoGenericError,
     NoDAOFoundDuringParsingError,
     QueryCannotBePersisted,
 )
+from krrood.patterns.exceptions import NoGenericError
+from krrood.patterns.has_generic import HasGeneric
 from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
 
 logger = logging.getLogger(__name__)

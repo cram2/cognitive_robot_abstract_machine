@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 from typing_extensions import Any
 
-from .semantic_digital_twin_test.test_spatial_types.reference_implementations import (
+from .krrood_spatial_math_test.reference_implementations import (
     shortest_angular_distance,
 )
 

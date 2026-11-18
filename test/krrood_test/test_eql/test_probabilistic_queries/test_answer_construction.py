@@ -1,3 +1,7 @@
+"""
+Building the answers of a probabilistic backend from model samples.
+"""
+
 import enum
 from dataclasses import dataclass
 
@@ -15,7 +19,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from probabilistic_model.utils import MissingDict
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import (
     AbstractMatchExpression,

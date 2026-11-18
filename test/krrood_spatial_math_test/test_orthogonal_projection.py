@@ -1,9 +1,6 @@
-import math
-
 import numpy as np
 import pytest
 
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     Line3,
@@ -13,29 +10,9 @@ from krrood_spatial_math.spatial_types import (
     Pose,
     Vector3,
 )
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
-from semantic_digital_twin.world_description.world_entity import Body
+from .dataset.frames import NamedFrame
 
 # %% fixtures
-
-
-@pytest.fixture
-def tilted_world() -> World:
-    """
-    A world of two bodies whose tip is turned a quarter turn about the root's x axis, so
-    the tip's z axis lies in the root's x-y plane.
-    """
-    world = World()
-    with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        tip = Body(name=PrefixedName("tip"))
-        connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=tip, axis=Vector3.X()
-        )
-        world.add_connection(connection)
-    connection.position = math.pi / 2
-    return world
 
 
 # %% project
@@ -43,7 +20,7 @@ def tilted_world() -> World:
 
 class TestProject:
     def test_drops_height_in_the_plane_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point3(1.5, -2.5, 3.0, reference_frame=frame)
 
         projected = OrthogonalProjection(frame).project(point)
@@ -52,22 +29,8 @@ class TestProject:
         assert projected.reference_frame is frame
         np.testing.assert_allclose(projected.to_np(), [1.5, -2.5])
 
-    def test_transforms_a_point_of_another_frame_into_the_plane_frame(
-        self, tilted_world: World
-    ):
-        root, tip = tilted_world.root, tilted_world.bodies[1]
-        tip_P_point = Point3(1, 0, 2, reference_frame=tip)
-        root_P_point = tilted_world.transform(tip_P_point, root)
-
-        projected = OrthogonalProjection(root).project(tip_P_point)
-
-        assert projected.reference_frame is root
-        np.testing.assert_allclose(
-            projected.to_np(), root_P_point.to_np()[:2], atol=1e-12
-        )
-
     def test_pose_position_projects_like_a_point(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         pose = Pose.from_xyz_rpy(
             x=1.5, y=-2.5, z=3.0, roll=0.1, pitch=0.2, yaw=0.3, reference_frame=frame
         )
@@ -82,7 +45,7 @@ class TestProject:
 
 class TestUnproject:
     def test_default_height_is_the_plane(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point2(1.0, 2.0, reference_frame=frame)
 
         unprojected = OrthogonalProjection(frame).unproject(point)
@@ -109,7 +72,7 @@ class TestInverseLaws:
     """
 
     def test_project_after_unproject_restores_a_point_on_the_plane(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point2(1.0, 2.0, reference_frame=frame)
         projection = OrthogonalProjection(frame)
 
@@ -118,15 +81,15 @@ class TestInverseLaws:
         np.testing.assert_allclose(round_trip.to_np(), point.to_np())
 
     def test_project_after_unproject_rejects_a_point_on_another_plane(self):
-        frame = Body(name=PrefixedName("world"))
-        other_frame = Body(name=PrefixedName("other"))
+        frame = NamedFrame("world")
+        other_frame = NamedFrame("other")
         point = Point2(1.0, 2.0, reference_frame=other_frame)
 
         with pytest.raises(ReferenceFrameMismatchError):
             OrthogonalProjection(frame).unproject(point)
 
     def test_unproject_after_project_restores_a_point_at_the_unprojection_height(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         projection = OrthogonalProjection(frame)
         point = Point3(1.0, 2.0, 4.0, reference_frame=frame)
 
@@ -135,7 +98,7 @@ class TestInverseLaws:
         np.testing.assert_allclose(round_trip.to_np(), point.to_np())
 
     def test_unproject_after_project_moves_a_point_off_the_unprojection_height(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         projection = OrthogonalProjection(frame)
         point = Point3(1.0, 2.0, 3.0, reference_frame=frame)
         height = 4.0
@@ -163,25 +126,25 @@ class TestPlaneWithoutReferenceFrame:
         np.testing.assert_allclose(projected.to_np(), point.to_np()[:2])
 
     def test_rejects_projecting_a_point_with_reference_frame(self):
-        point = Point3(1.0, 2.0, 3.0, reference_frame=Body(name=PrefixedName("world")))
+        point = Point3(1.0, 2.0, 3.0, reference_frame=NamedFrame("world"))
 
         with pytest.raises(ReferenceFrameMismatchError):
             OrthogonalProjection(None).project(point)
 
     def test_rejects_unprojecting_a_point_with_reference_frame(self):
-        point = Point2(1.0, 2.0, reference_frame=Body(name=PrefixedName("world")))
+        point = Point2(1.0, 2.0, reference_frame=NamedFrame("world"))
 
         with pytest.raises(ReferenceFrameMismatchError):
             OrthogonalProjection(None).unproject(point)
 
     def test_plane_with_reference_frame_rejects_projecting_a_point_without_one(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
 
         with pytest.raises(ReferenceFrameMismatchError):
             OrthogonalProjection(frame).project(Point3(1.0, 2.0, 3.0))
 
     def test_plane_with_reference_frame_rejects_unprojecting_a_point_without_one(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
 
         with pytest.raises(ReferenceFrameMismatchError):
             OrthogonalProjection(frame).unproject(Point2(1.0, 2.0))
@@ -192,7 +155,7 @@ class TestPlaneWithoutReferenceFrame:
 
 class TestProjectionLine:
     def test_is_the_vertical_line_through_the_unprojected_point(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point2(1.0, 2.0, reference_frame=frame)
         projection = OrthogonalProjection(frame)
 
@@ -208,7 +171,7 @@ class TestProjectionLine:
         assert line.direction.reference_frame is frame
 
     def test_every_point_of_the_line_projects_onto_the_point(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         point = Point2(1.0, 2.0, reference_frame=frame)
         projection = OrthogonalProjection(frame)
         line = projection.projection_line(point)

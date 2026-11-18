@@ -1,3 +1,7 @@
+"""
+Alternative mappings, which store a class through another class.
+"""
+
 from __future__ import annotations
 
 import abc
@@ -9,7 +13,7 @@ from types import FunctionType
 
 from typing_extensions import Optional, Self, List, Type, TypeVar, TYPE_CHECKING
 
-from krrood.ormatic.data_access_objects.base import HasGeneric
+from krrood.patterns.has_generic import HasGeneric
 from krrood.ormatic.exceptions import UncallableFunction
 
 if TYPE_CHECKING:
