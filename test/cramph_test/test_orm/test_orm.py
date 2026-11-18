@@ -21,7 +21,6 @@ from cramph.nodes_for_testing import (
     NodeAssertionError,
     NodeAssertionErrorNamingANode,
 )
-from cramph.orm.ormatic_interface import Base, CountTicksDAO
 from cramph.statechart import Statechart
 from cramph.visualization import RvizVisualization
 
@@ -30,6 +29,8 @@ from cramph.visualization import RvizVisualization
 
 @pytest.fixture
 def session():
+    from cramph.orm.ormatic_interface import Base
+
     session = Session(create_engine("sqlite:///:memory:"))
     Base.metadata.create_all(bind=session.bind)
     yield session
@@ -121,6 +122,8 @@ class TestStatechartNodeSurvivesRoundTrip:
     def test_node_fields_are_read_back_unchanged(
         self, *, session, tick_counting_node
     ) -> None:
+        from cramph.orm.ormatic_interface import CountTicksDAO
+
         session.add(to_dao(tick_counting_node))
         session.commit()
         session.expunge_all()

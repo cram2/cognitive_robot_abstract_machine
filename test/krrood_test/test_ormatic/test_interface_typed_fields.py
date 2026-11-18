@@ -13,17 +13,16 @@ from ..dataset.interface_typed_fields import (
     LabelledPosition2D,
     LabelledPosition3D,
 )
-from ..dataset.ormatic_interface import (
-    HolderOfLabelledPositionsDAO,
-    LabelledPosition2DMappingDAO,
-    LabelledPosition3DMappingDAO,
-    LabelledPositionMappingDAO,
-)
 
 # %% generated schema
 
 
 def test_interface_typed_fields_relate_to_the_base_mapping():
+    from ..dataset.ormatic_interface import (
+        HolderOfLabelledPositionsDAO,
+        LabelledPositionMappingDAO,
+    )
+
     relationships = inspect(HolderOfLabelledPositionsDAO).relationships
     route_association = relationships["route"].mapper
 
@@ -35,6 +34,12 @@ def test_interface_typed_fields_relate_to_the_base_mapping():
 
 
 def test_the_mappings_of_each_dimension_extend_the_base_mapping():
+    from ..dataset.ormatic_interface import (
+        LabelledPosition2DMappingDAO,
+        LabelledPosition3DMappingDAO,
+        LabelledPositionMappingDAO,
+    )
+
     assert issubclass(LabelledPosition2DMappingDAO, LabelledPositionMappingDAO)
     assert issubclass(LabelledPosition3DMappingDAO, LabelledPositionMappingDAO)
 
@@ -43,6 +48,8 @@ def test_the_mappings_of_each_dimension_extend_the_base_mapping():
 
 
 def test_interface_typed_fields_round_trip_to_their_implementations(session, database):
+    from ..dataset.ormatic_interface import HolderOfLabelledPositionsDAO
+
     holder = HolderOfLabelledPositions(
         position=LabelledPosition3D(x=1.0, y=2.0, z=3.0, origin_name="map"),
         route=[

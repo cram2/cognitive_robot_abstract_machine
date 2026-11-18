@@ -1,6 +1,5 @@
 import pytest
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.symbolic_math.symbolic_math import FloatVariable

@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from sqlalchemy.orm import Session
 
-from experiments.orm.ormatic_interface import Base, RelationalCircuitExperimentShelfDAO
 from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
     RelationalCircuitExperimentShelf,
@@ -223,6 +222,11 @@ def test_theme_dominant_type_survives_a_database_round_trip() -> None:
     The theme is what a sampled shelf is conditioned on, so a stored shelf that lost it
     would come back as a shelf of no particular theme.
     """
+    from experiments.orm.ormatic_interface import (
+        Base,
+        RelationalCircuitExperimentShelfDAO,
+    )
+
     shelf = _make_shelf()
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(bind=engine)
@@ -301,8 +305,8 @@ def test_slabs_are_evenly_spaced_whatever_heights_were_drawn() -> None:
 def test_each_slab_is_placed_at_its_own_layers_height_rank() -> None:
     """
     ``_layer_heights`` computes the evenly-spaced grid by walking ``layers`` sorted by
-    ``relative_height``, but a shelf's ``layers`` are drawn from an exchangeable relational circuit
-    template and come back in no particular order.
+    ``relative_height``, but a shelf's ``layers`` are drawn from an exchangeable
+    relational circuit template and come back in no particular order.
 
     A slab must land at the height rank of the layer it was built for, not at whichever
     grid slot the sorted pass happened to produce it in.

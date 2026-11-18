@@ -3,10 +3,11 @@ from sqlalchemy import select
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.ormatic.data_access_objects.helper import to_dao
 from ..dataset.example_classes import KRROODPosition
-from ..dataset.ormatic_interface import *
 
 
 def test_symbol_graph_persistence(session, database):
+
+    from ..dataset.ormatic_interface import KRROODPositionDAO
 
     p1 = KRROODPosition(x=1, y=2, z=3)
 
