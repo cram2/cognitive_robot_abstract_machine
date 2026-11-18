@@ -18,7 +18,6 @@ from typing_extensions import TYPE_CHECKING, TypeVar, Generic
 
 from robokudo_msgs.msg import ShapeSize
 from robokudo.utils.annotator_helper import transform_pose_from_camera_to_world
-from robokudo.defs import PACKAGE_NAME
 from robokudo.types.annotation import (
     PoseAnnotation,
     StampedPoseAnnotation,
@@ -38,6 +37,8 @@ from robokudo.types.core import Annotation
 if TYPE_CHECKING:
     from robokudo_msgs.msg import ObjectDesignator
     from robokudo.cas import CAS
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Annotation)
 S = TypeVar("S", bound=Shape)
@@ -537,8 +538,7 @@ class Sphere2ODConverter(Annotation2ODConverter[Sphere]):
     ) -> None:
         size = ShapeSize(radius=annotation.geometry.radius)
 
-        rk_logger = logging.getLogger(PACKAGE_NAME)
-        rk_logger.info(
+        logger.info(
             "The center point of the Sphere annotation is currently not converted to OD."
         )
 

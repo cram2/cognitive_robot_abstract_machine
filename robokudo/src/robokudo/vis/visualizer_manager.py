@@ -1,4 +1,5 @@
-"""Visualization management for RoboKudo pipelines.
+"""
+Visualization management for RoboKudo pipelines.
 
 This module provides a behavior tree node that manages visualization of pipeline data
 using different visualization backends. It coordinates:
@@ -18,16 +19,18 @@ from py_trees.common import Status
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 
-from robokudo.defs import PACKAGE_NAME
 from robokudo.pipeline import Pipeline
 from robokudo.vis.cv_visualizer import CVVisualizer
 from robokudo.vis.o3d_visualizer import O3DVisualizer
 from robokudo.vis.ros_visualizer import SharedROSVisualizer, AllAnnotatorROSVisualizer
 from robokudo.vis.visualizer import Visualizer
 
+logger = logging.getLogger(__name__)
+
 
 class VisualizationManager(Behaviour):
-    """Behavior tree node for managing pipeline visualizations.
+    """
+    Behavior tree node for managing pipeline visualizations.
 
     This class coordinates visualization of pipeline data across multiple
     visualization backends. It handles:
@@ -46,7 +49,8 @@ class VisualizationManager(Behaviour):
     """
 
     def __init__(self, name: str, visualizer_types: list[type] | None = None) -> None:
-        """Initialize the visualization manager.
+        """
+        Initialize the visualization manager.
 
         :param name: Name of the behavior tree node
         :param visualizer_types: Visualizer backends to instantiate for every pipeline.
@@ -55,24 +59,26 @@ class VisualizationManager(Behaviour):
         super().__init__(name=name)
 
         self.pipelines: dict[str, Pipeline] = {}
-        """Mapping of pipeline names to Pipeline objects"""
-
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """Logger instance for this class"""
-
+        """
+        Mapping of pipeline names to Pipeline objects.
+        """
         self.visualizer_types: list[type] = visualizer_types or [
             CVVisualizer,
             O3DVisualizer,
             SharedROSVisualizer,
             AllAnnotatorROSVisualizer,
         ]
-        """List of available visualizer classes"""
-
+        """
+        List of available visualizer classes.
+        """
         self.visualizers: dict[str, list[Visualizer]] = {}
-        """Mapping of pipeline name to list of Visualizers"""
+        """
+        Mapping of pipeline name to list of Visualizers.
+        """
 
     def create_visualizers_for_pipeline(self, pipeline: Pipeline) -> None:
-        """Create visualizer instances for a pipeline.
+        """
+        Create visualizer instances for a pipeline.
 
         :param pipeline: Pipeline to create visualizers for
 
@@ -92,14 +98,16 @@ class VisualizationManager(Behaviour):
 
     @staticmethod
     def visualizer_instances() -> list[Visualizer]:
-        """Get all active visualizer instances.
+        """
+        Get all active visualizer instances.
 
         :returns: List of all active Visualizer instances
         """
         return Visualizer.instances
 
     def initialise(self) -> None:
-        """Initialize the behavior tree node.
+        """
+        Initialize the behavior tree node.
 
         This method:
 
@@ -111,7 +119,7 @@ class VisualizationManager(Behaviour):
             The VisualizationManager should be placed one level below the top node
             (Parallel) in the behavior tree.
         """
-        self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
+        logger.debug("%s.initialise()" % self.__class__.__name__)
         self.pipelines = {}
         # The GUIManager should live one level below the top-node (Parallel)
         # Initially fill a list of all Pipelines
@@ -120,7 +128,8 @@ class VisualizationManager(Behaviour):
                 self.pipelines[node.name] = node
 
     def update(self) -> Status:
-        """Update visualizations for all pipelines.
+        """
+        Update visualizations for all pipelines.
 
         This method:
 
@@ -136,7 +145,7 @@ class VisualizationManager(Behaviour):
             The update cycle ensures synchronized visualization across all backends
             while maintaining separation between data buffers and visualization state.
         """
-        self.rk_logger.debug("%s.update()" % self.__class__.__name__)
+        logger.debug("%s.update()" % self.__class__.__name__)
         start_timer = default_timer()
 
         blackboard = Blackboard()
@@ -150,7 +159,7 @@ class VisualizationManager(Behaviour):
         # Create Visualized Buffer if new data is available
         for pipeline_name in annotator_output_pipeline_map_buffer.map:
             if annotator_output_pipeline_map_buffer.map[pipeline_name].redraw:
-                self.rk_logger.debug(
+                logger.debug(
                     "%s.update(): Redraw flag on Pipeline %s is true. Copying data"
                     % (self.__class__.__name__, pipeline_name)
                 )
@@ -176,9 +185,9 @@ class VisualizationManager(Behaviour):
                     visualizer.new_data_available()
 
                 # Visualizers have been informed
-                annotator_output_pipeline_map_visualized.map[pipeline_name].redraw = (
-                    False
-                )
+                annotator_output_pipeline_map_visualized.map[
+                    pipeline_name
+                ].redraw = False
 
         # Pre-tick
         for pipeline_name, visualizer_list in self.visualizers.items():

@@ -20,6 +20,7 @@ The module is primarily used for:
 
 from __future__ import annotations
 
+import logging
 from krrood.patterns.classproperty import classproperty
 
 # %% Imports
@@ -58,6 +59,8 @@ from robokudo.io.storage import Storage, StorageDocumentField
 
 if TYPE_CHECKING:
     from robokudo.types.camera import CameraObservation
+
+logger = logging.getLogger(__name__)
 
 # %% Snapshot restoration
 
@@ -150,7 +153,7 @@ class StorageReaderInterface(CameraInterface):
         self._check_sensor_conflicts(observation, world)
         RecordedCameraWorld(observation).install(world)
         self._recorded_camera_id = observation.camera.id
-        self.rk_logger.debug(
+        logger.debug(
             "Mongo sensor replay restored full world in %.6f s and projected camera in %.6f s",
             restored.duration.total_seconds(),
             perf_counter() - projection_started,
@@ -233,7 +236,7 @@ class StorageReaderInterface(CameraInterface):
         """
         world.clear()
         restored = self._restore_world(cas_frame[StorageDocumentField.WORLD], world)
-        self.rk_logger.debug(
+        logger.debug(
             "Mongo full replay restored world in %.3f ms",
             restored.duration.total_seconds() * 1000.0,
         )
@@ -267,7 +270,7 @@ class StorageReaderInterface(CameraInterface):
             raise ReplayWorldShared()
         cas_frame = self.reader.get_next_frame()
         if cas_frame is None:
-            self.rk_logger.debug(f"Reader has no next frame cas_frame:={cas_frame}")
+            logger.debug(f"Reader has no next frame cas_frame:={cas_frame}")
             return
 
         if self.camera_config.replay_mode == MongoReplayMode.SENSOR_CONTEXT:

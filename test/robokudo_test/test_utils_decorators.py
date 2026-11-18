@@ -1,5 +1,9 @@
+"""
+Tests of the annotator decorators in :mod:`robokudo.utils.decorators`.
+"""
+
+import logging
 import time
-from unittest.mock import MagicMock
 
 import py_trees
 import pytest
@@ -43,61 +47,67 @@ class DummyAnnotator(BaseAnnotator):
 
 
 class TestUtilsDecorators(object):
-    def test_timer_decorator_standalone_method(self, capsys):
+    """
+    Timing, time recording and variable publishing of decorated methods.
+    """
+
+    def test_timer_decorator_logs_function_to_its_module_logger(self, *, caplog):
+        """
+        The run time of a decorated function is logged to its module's logger.
+        """
+
         @timer_decorator
         def timer() -> None:
+            """
+            Sleep briefly.
+            """
             time.sleep(0.1)
 
-        timer()
-        captured = capsys.readouterr()
-        assert "Function 'timer' took" in captured.out
+        with caplog.at_level(logging.INFO, logger=__name__):
+            timer()
 
-    def test_timer_decorator_class_method_without_logger(self, capsys):
+        assert [record.name for record in caplog.records] == [__name__]
+        assert (
+            caplog.records[0]
+            .getMessage()
+            .startswith(f"Function '{timer.__qualname__}' took")
+        )
+
+    def test_timer_decorator_names_class_of_method(self, *, caplog):
+        """
+        The run time of a decorated method is logged with its class name.
+        """
         dummy = DummyTimerClass()
 
-        dummy.timer()
-        captured = capsys.readouterr()
-        assert "Function 'timer' took" in captured.out
+        with caplog.at_level(logging.INFO, logger=__name__):
+            dummy.timer()
 
-    def test_timer_decorator_class_method_with_logger_self_kwargs(self):
-        @timer_decorator
-        def timer(self):
-            time.sleep(0.1)
-
-        dummy = DummyTimerClass()
-        dummy.rk_logger = MagicMock()
-
-        timer(self=dummy)
-
-        dummy.rk_logger.info.assert_called_once()
-        expected_prefix = f"Function '{DummyTimerClass}.timer' took"
-        assert expected_prefix in dummy.rk_logger.info.call_args[0][0]
-
-    def test_timer_decorator_class_method_with_logger(self):
-        dummy = DummyTimerClass()
-        dummy.rk_logger = MagicMock()
-
-        dummy.timer()
-        dummy.rk_logger.info.assert_called_once()
-        expected_prefix = f"Function '{DummyTimerClass}.timer' took"
-        assert expected_prefix in dummy.rk_logger.info.call_args[0][0]
+        assert len(caplog.records) == 1
+        assert (
+            caplog.records[0]
+            .getMessage()
+            .startswith(f"Function '{DummyTimerClass.__name__}.timer' took")
+        )
 
     def test_record_time(self):
+        """
+        The decorated method's latest run time is stored under its name.
+        """
         duration = 0.1
         dummy = DummyAnnotator()
 
         dummy.compute(duration)
 
         assert hasattr(dummy, "_times")
-        assert dummy._times["compute"] == pytest.approx(
-            duration, abs=0.01
-        ), "Timing was not updated"
+        assert dummy._times["compute"] == pytest.approx(duration, abs=0.01), (
+            "Timing was not updated"
+        )
 
         dummy.compute(duration * 2)
         assert hasattr(dummy, "_times")
-        assert dummy._times["compute"] == pytest.approx(
-            duration * 2, abs=0.01
-        ), "Timing was not updated"
+        assert dummy._times["compute"] == pytest.approx(duration * 2, abs=0.01), (
+            "Timing was not updated"
+        )
 
     def test_publish_variables(self):
         dummy = DummyAnnotator()

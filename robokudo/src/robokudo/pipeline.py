@@ -29,8 +29,9 @@ from typing_extensions import Any
 import robokudo.annotators.core
 import robokudo.annotators.outputs
 import robokudo.cas as cas
-import robokudo.defs as defs
 import robokudo.utils.tree
+
+logger = logging.getLogger(__name__)
 
 
 class Pipeline(Sequence):
@@ -71,10 +72,6 @@ class Pipeline(Sequence):
         self.cas_start_timer: float | None = None
         """
         Timer for measuring pipeline execution time.
-        """
-        self.rk_logger = logging.getLogger(defs.PACKAGE_NAME)
-        """
-        Logger instance for this pipeline.
         """
         self.create_new_cas()
         # self.update_gui_for_this_pipeline = False
@@ -175,9 +172,9 @@ class Pipeline(Sequence):
         Handles pipeline execution status and triggers GUI updates on failure.
         """
         super().update()
-        self.rk_logger.debug("%s.update()" % self.__class__.__name__)
+        logger.debug("%s.update()" % self.__class__.__name__)
         if self.status == Status.FAILURE:
-            self.rk_logger.debug(
+            logger.debug(
                 "%s: Previous execution was a failure. Update GUI." % self.status
             )
             blackboard = Blackboard()
@@ -195,7 +192,7 @@ class Pipeline(Sequence):
 
         :param new_status: New execution status
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.terminate()[%s->%s]"
             % (self.__class__.__name__, self.status, new_status)
         )
@@ -209,7 +206,7 @@ class Pipeline(Sequence):
 
         if new_status == Status.SUCCESS or new_status == Status.FAILURE:
             self.feedback_message = f"Processing took {(timeit.default_timer() - self.cas_start_timer):.4f}s"
-            self.rk_logger.debug(
+            logger.debug(
                 f"Pipeline Processing took in total {(timeit.default_timer() - self.cas_start_timer):.4f}s"
             )
             self.cas_start_timer = timeit.default_timer()

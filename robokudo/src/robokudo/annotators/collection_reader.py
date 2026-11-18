@@ -5,6 +5,7 @@ Acquire sensor data from one camera interface and initialize the pipeline data s
 from __future__ import annotations
 
 # %% Imports
+import logging
 from timeit import default_timer
 from py_trees.common import Status
 from py_trees.composites import Sequence
@@ -17,6 +18,8 @@ from robokudo.annotators.exceptions import InvalidCollectionReaderParent
 if TYPE_CHECKING:
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
     from robokudo.io.camera_interface import CameraInterface
+
+logger = logging.getLogger(__name__)
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
@@ -110,11 +113,11 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 self.iterations_since_last_data
                 >= self.iterations_since_last_data_warn_threshold
             ):
-                self.rk_logger.warning(
+                logger.warning(
                     "Didn't receive sensor data since %s iterations.",
                     self.iterations_since_last_data,
                 )
-                self.rk_logger.warning("Camera data available?: %s", False)
+                logger.warning("Camera data available?: %s", False)
                 self.iterations_since_last_data = 0
             return Status.RUNNING
 
@@ -135,11 +138,11 @@ class CollectionReaderAnnotator(BaseAnnotator):
         self.feedback_message = (
             f"Got sensor data... Waited for {time_difference} seconds"
         )
-        self.rk_logger.debug(
+        logger.debug(
             "New CAS id=%s after waiting %f seconds",
             pipeline.cas.cas_id,
             time_difference,
         )
         if self.parent is not None:
-            self.rk_logger.info("Current Behavior Tree:\n%s", unicode_tree(self.parent))
+            logger.info("Current Behavior Tree:\n%s", unicode_tree(self.parent))
         return Status.SUCCESS

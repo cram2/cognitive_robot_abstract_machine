@@ -6,6 +6,7 @@ This annotator visualizes predefined objects and regions from a world descriptor
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import numpy as np
@@ -20,6 +21,8 @@ import robokudo.utils.o3d_helper
 from robokudo.cas import CASViews
 from robokudo.utils.region import region_obb_in_camera_coordinates
 from robokudo.world_descriptor import PredefinedObject
+
+logger = logging.getLogger(__name__)
 
 
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
@@ -56,6 +59,12 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
     def compute(self) -> py_trees.common.Status:
+        """
+        Visualize the bounding boxes of the world's bodies together with the point
+        cloud.
+
+        Overrides :meth:`ThreadedAnnotator.compute`.
+        """
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
         runtime_world = self.world
@@ -67,7 +76,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 )
             )
         except KeyError as err:
-            self.rk_logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
             return py_trees.common.Status.FAILURE
 
         visualized_geometries = []

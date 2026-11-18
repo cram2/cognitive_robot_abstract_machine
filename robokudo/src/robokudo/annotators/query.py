@@ -36,7 +36,7 @@ from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.defs import LOGGING_IDENTIFIER_QUERY, PACKAGE_NAME
+from robokudo.defs import LOGGING_IDENTIFIER_QUERY
 from robokudo.identifier import BBIdentifier
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
@@ -74,6 +74,8 @@ from robokudo.utils.error_handling import (
     has_blackboard_exception,
 )
 from robokudo.utils.query import ObjectHypothesisQueryMatcher, QueryHandler
+
+logger = logging.getLogger(__name__)
 
 
 class QueryAnnotator(BaseAnnotator):
@@ -115,7 +117,7 @@ class QueryAnnotator(BaseAnnotator):
         Sets up the action server if not already initialized. Stores server instance on
         blackboard for access by other nodes.
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
+        logger.debug(f"{self.__class__.__name__}.initialise()")
         blackboard = Blackboard()
         if not blackboard.exists(BBIdentifier.QUERY_SERVER):
             query_action_server = QueryActionServer(name="query")
@@ -134,13 +136,13 @@ class QueryAnnotator(BaseAnnotator):
 
         :return: SUCCESS if query processed, RUNNING if waiting
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
+        logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert (
-            self.action_server is not None
-        ), "Action server should be initialized by now."
+        assert self.action_server is not None, (
+            "Action server should be initialized by now."
+        )
         query = self.action_server.new_query
-        self.rk_logger.debug(f"self.action_server.new_query: {query}")
+        logger.debug(f"self.action_server.new_query: {query}")
 
         if query:
             self.feedback_message = f"Query: {query}"
@@ -174,7 +176,12 @@ class QueryFeedback(BaseAnnotator):
         """
 
     def update(self) -> Status:
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
+        """
+        Send :attr:`feedback_str` to the query client.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
+        logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(self.feedback_str)
 
         return Status.SUCCESS
@@ -216,7 +223,13 @@ class QueryFeedbackAndCount(BaseAnnotator):
         """
 
     def update(self) -> Status:
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
+        """
+        Send the current count to the query client.
+
+        Overrides :meth:`BaseAnnotator.update`: returns *SUCCESS* and restarts the count
+        once it exceeds :attr:`count_until`, and :attr:`return_code` before that.
+        """
+        logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(f"Count: {self.i}")
         self.i = self.i + 1
         if self.i > self.count_until:
@@ -246,7 +259,7 @@ class QueryReply(BaseAnnotator):
         """
         Initialize reply generator.
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
+        logger.debug(f"{self.__class__.__name__}.initialise()")
 
     def update(self) -> Status:
         """
@@ -256,7 +269,7 @@ class QueryReply(BaseAnnotator):
 
         :return: SUCCESS after generating response
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
+        logger.debug(f"{self.__class__.__name__}.update()")
         result = Query.Result()
         od = ObjectDesignator()
 
@@ -305,8 +318,6 @@ class GenerateQueryResult(BaseAnnotator):
         :param name: Annotator name
         :param descriptor: Annotator configuration descriptor
         """
-        self.rk_logger = logging.getLogger(PACKAGE_NAME)
-
         self.color_converter = SemanticColor2ODConverter()
         self.class_converter = Classification2ODConverter()
         self.position_converter = Position2ODConverter()
@@ -354,7 +365,7 @@ class GenerateQueryResult(BaseAnnotator):
         """
         if QueryHandler.preempt_requested():
             QueryHandler.acknowledge_preempt_request()
-            self.rk_logger.warning("Acknowledge preempt")
+            logger.warning("Acknowledge preempt")
             return Status.FAILURE
 
         cas = self.get_cas()
@@ -383,18 +394,18 @@ class GenerateQueryResult(BaseAnnotator):
             for oh_annotation in annotation.annotations:
                 converter = self.type_converter.get(type(oh_annotation), None)
                 if converter is None:
-                    self.rk_logger.warning(
+                    logger.warning(
                         f"no converter available for annotation type {type(oh_annotation)}, skipping annotation."
                     )
                     continue
                 if not converter.can_convert(oh_annotation):
-                    self.rk_logger.warning(
+                    logger.warning(
                         f"converter for {type(oh_annotation)} available but cannot convert, skipping annotation."
                     )
                     continue
 
                 converter.convert(oh_annotation, cas, object_designator)
-                self.rk_logger.info(
+                logger.info(
                     f"converted {type(oh_annotation)} on OH {object_hypotheses_count}"
                 )
 

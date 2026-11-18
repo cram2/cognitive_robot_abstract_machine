@@ -21,6 +21,7 @@ The module is used for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 import time
 
 from typing_extensions import TYPE_CHECKING, Any
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
 
     from robokudo.cas import CAS
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 TYPE_VIDEO: int = 0
@@ -113,7 +116,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         """
         Backup of image for single-image file mode.
         """
-        self.rk_logger.info("OpenCVCameraWithoutDepthInterface initialized")
+        logger.info("OpenCVCameraWithoutDepthInterface initialized")
 
     def has_new_data(self) -> bool:
         """
@@ -160,7 +163,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
             retval = True
         timestamp_nanoseconds = time.time_ns()
 
-        self.rk_logger.debug(
+        logger.debug(
             "loaded frame {} of {}".format(
                 self.video_capture.get(cv2.CAP_PROP_POS_FRAMES),
                 self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT),

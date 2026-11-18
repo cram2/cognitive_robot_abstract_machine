@@ -12,6 +12,7 @@ The detector can create object hypotheses with poses, masks, and class labels.
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 from enum import Enum
 from timeit import default_timer
@@ -62,6 +63,8 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.shape_collection import ShapeCollection
     import numpy.typing as npt
     import open3d
+
+logger = logging.getLogger(__name__)
 
 
 class StaticObjectMode(Enum):
@@ -162,7 +165,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.color: npt.NDArray | None = None
         self.depth: npt.NDArray | None = None
         self.cloud: open3d.geometry.PointCloud | None = None
@@ -240,7 +243,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
 
         shape_collection = self._select_body_shape_collection(body)
         if shape_collection is None:
-            self.rk_logger.warning(
+            logger.warning(
                 "Body %s has no collision or visual shapes; skipping.",
                 self._body_name(body),
             )
@@ -269,7 +272,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         image_width = self.get_cas().get(CASViews.COLOR_IMAGE).shape[1]
 
         if rect_outside_image(corner_points, image_width, image_height):
-            self.rk_logger.info(
+            logger.info(
                 f"ROI of object {self._body_name(body)} would be completely out of camera frame. Skipping ..."
             )
             return None
@@ -381,7 +384,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             self.object_bodies_by_name = {
                 self._body_name(body): body for body in object_bodies
             }
-            self.rk_logger.info(
+            logger.info(
                 f"Loaded shared world descriptor bodies: {list(self.object_bodies_by_name.keys())}"
             )
 
@@ -391,7 +394,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                     self.feedback_message = (
                         f"Couldn't find {class_name} in world descriptor"
                     )
-                    self.rk_logger.warning(self.feedback_message)
+                    logger.warning(self.feedback_message)
                     return Status.SUCCESS
 
             world_frame_required = True
@@ -399,9 +402,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         if world_frame_required:
             observation = self.get_cas().camera_observation
             if observation is None or observation.world_T_camera is None:
-                self.rk_logger.warning(
-                    "Could not find world-to-camera transform in the CAS"
-                )
+                logger.warning("Could not find world-to-camera transform in the CAS")
                 return Status.FAILURE
             camera_T_world = observation.camera_T_world
 

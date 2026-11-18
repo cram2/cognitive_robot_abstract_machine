@@ -43,7 +43,6 @@ from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.patterns.classproperty import classproperty
 from robokudo.cas import CASViews, CAS
-from robokudo.defs import PACKAGE_NAME
 from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.exceptions import (
     CameraDataMissing,
@@ -78,6 +77,8 @@ if TYPE_CHECKING:
 
     from robokudo.types.cv import ColorToDepthRatio
 
+logger = logging.getLogger(__name__)
+
 
 # %% Camera definitions
 
@@ -110,10 +111,6 @@ class CameraInterface(object):
         self.camera_config: Any = camera_config
         """
         Camera configuration object.
-        """
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """
-        RoboKudo logger instance.
         """
 
     def has_new_data(self) -> bool:
@@ -576,7 +573,7 @@ class ROSCameraInterface(CameraInterface):
             and angle <= self.camera_config.tolerated_camera_pose_angle
         ):
             return
-        self.rk_logger.warning(
+        logger.warning(
             f"The world places camera '{self.tf_from}' {distance:.3f} m and "
             f"{math.degrees(angle):.1f} degrees away from where TF places it in "
             f"'{self.tf_to}'; perceived objects follow TF and may be misplaced "
@@ -701,10 +698,10 @@ class KinectCameraInterface(ROSCameraInterface):
         )
         ts.registerCallback(self.callback)
 
-        self.rk_logger.info("Subscribed to: ")
-        self.rk_logger.info(f"  {camera_config.topic_color}")
-        self.rk_logger.info(f"  {camera_config.topic_depth}")
-        self.rk_logger.info(f"  {camera_config.topic_camera_info}")
+        logger.info("Subscribed to: ")
+        logger.info(f"  {camera_config.topic_color}")
+        logger.info(f"  {camera_config.topic_depth}")
+        logger.info(f"  {camera_config.topic_camera_info}")
 
         self.color: npt.NDArray | None = None
         """
@@ -788,8 +785,8 @@ class KinectCameraInterface(ROSCameraInterface):
         # delivering TF while a frame is read.
         if not self.lock.acquire(blocking=False):
             return
-        if self.rk_logger.isEnabledFor(logging.DEBUG):
-            self.rk_logger.debug("Received data:")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Received data:")
 
             color_time = Time(
                 seconds=color_data.header.stamp.sec,
@@ -801,7 +798,7 @@ class KinectCameraInterface(ROSCameraInterface):
                     seconds=depth_data.header.stamp.sec,
                     nanoseconds=depth_data.header.stamp.nanosec,
                 )
-                self.rk_logger.debug(
+                logger.debug(
                     f"  Color time - Depth time: {(color_time - depth_time).nanoseconds / 1e9:.6f}"
                 )
 
@@ -810,7 +807,7 @@ class KinectCameraInterface(ROSCameraInterface):
                     seconds=camera_info.header.stamp.sec,
                     nanoseconds=camera_info.header.stamp.nanosec,
                 )
-                self.rk_logger.debug(
+                logger.debug(
                     f"  Color time - Camera Info time: {(color_time - camera_info_time).nanoseconds / 1e9:.6f}"
                 )
 

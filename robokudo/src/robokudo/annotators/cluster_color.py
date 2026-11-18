@@ -11,6 +11,7 @@ using HSV color space segmentation.
 
 from __future__ import annotations
 
+import logging
 import copy
 from enum import Enum
 from timeit import default_timer
@@ -31,6 +32,8 @@ from robokudo.utils.cv_helper import crop_image
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class Color(Enum):
@@ -131,7 +134,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # This list defines the range of a certain color.
         hue_intervals = [
@@ -160,7 +163,7 @@ class ClusterColorAnnotator(BaseAnnotator):
             mask = np.array([[0]])
             self.count_colors_numba(hsv_image, mask)
             end_timer_jit = default_timer()
-            self.rk_logger.info(
+            logger.info(
                 f"Pre-compilation took {(end_timer_jit - start_timer_jit):.4f}s"
             )
 

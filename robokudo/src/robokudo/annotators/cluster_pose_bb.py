@@ -20,6 +20,7 @@ The module uses:
 
 from __future__ import annotations
 
+import logging
 import copy
 import math
 from timeit import default_timer
@@ -46,6 +47,8 @@ from robokudo.utils.transform import (
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterPoseBBAnnotator(BaseAnnotator):
@@ -96,7 +99,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def adjust_bb_orientation_by_bb_size(
         self, pose_orientation: npt.NDArray, bounding_box_extents: list
@@ -173,7 +176,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                     self.get_cas(), cluster_cloud, transform_inplace=True
                 )
             except Exception as e:
-                self.rk_logger.warning(
+                logger.warning(
                     f"Couldn't find camera viewpoint in the CAS.Fail. Error: {e}"
                 )
                 return Status.FAILURE

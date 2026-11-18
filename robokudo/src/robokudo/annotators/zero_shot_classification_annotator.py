@@ -4,6 +4,7 @@ The base of annotators that classify perceived objects with a zero-shot model.
 
 from __future__ import annotations
 
+import logging
 import time
 from abc import ABC, abstractmethod
 
@@ -21,6 +22,8 @@ from robokudo.types.scene import ObjectHypothesis
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
@@ -107,8 +110,8 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
 
         visualization_img = color_image.copy()
 
-        self.rk_logger.info("Image Classification Results:")
-        self.rk_logger.info("Label \t\t Score")
+        logger.info("Image Classification Results:")
+        logger.info("Label \t\t Score")
         for i, classification in enumerate(classifications):
             text = f"{classification.confidence:.2f} /{classification.classname}"
             visualization_img = cv2.putText(
@@ -122,7 +125,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
                 2,
             )
 
-            self.rk_logger.info(
+            logger.info(
                 f"Top {i} prediction: Class {classification.classname} with "
                 f"confidence\t {classification.confidence:.4f}"
             )
@@ -141,14 +144,14 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
             ObjectHypothesis
         )
         if len(ohs) == 0:
-            self.rk_logger.info("Found 0 object hypotheses to analyze")
+            logger.info("Found 0 object hypotheses to analyze")
             return Status.SUCCESS
 
         if self.descriptor.parameters.filter_fn is not None:
             ohs = list(filter(self.descriptor.parameters.filter_fn, ohs))
 
             if len(ohs) == 0:
-                self.rk_logger.info("All object hypotheses were filtered out")
+                logger.info("All object hypotheses were filtered out")
                 return Status.SUCCESS
 
         # Create per-object image crop
@@ -160,7 +163,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
         for object_hypothesis, classifications in zip(
             ohs, self.classify(cropped_images)
         ):
-            self.rk_logger.info(
+            logger.info(
                 f"Classification results for Object hypothesis ID: '{object_hypothesis.id}'"
             )
 
@@ -186,7 +189,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
 
             object_hypothesis.annotations.extend(classifications)
             for i, classification in enumerate(classifications):
-                self.rk_logger.info(
+                logger.info(
                     f"Top {i}: Classified as {classification.classname} "
                     f"with confidence {classification.confidence:.4f}"
                 )

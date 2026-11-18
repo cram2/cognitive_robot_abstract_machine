@@ -17,8 +17,9 @@ import open3d as o3d  # this import creates a SIGINT during unit test execution.
 from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.defs import PACKAGE_NAME
 from robokudo.vis.visualizer import Visualizer
+
+logger = logging.getLogger(__name__)
 
 
 class O3DVisualizer(Visualizer, Visualizer.Observer):
@@ -142,10 +143,6 @@ class Viewer3D(object):
         """
         Name identifier for the point cloud.
         """
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """
-        Logger instance.
-        """
         app: o3d.visualization.gui.Application = (
             o3d.visualization.gui.Application.instance
         )
@@ -154,7 +151,7 @@ class Viewer3D(object):
         """
         app.initialize()
 
-        self.rk_logger.info(
+        logger.info(
             "Starting O3DVisualizer. 3D output might be broken if no success message follows. "
             "Try rebooting the machine if running local or check GPU passthrough in Docker."
         )
@@ -165,7 +162,7 @@ class Viewer3D(object):
         """
         Open3D visualizer instance.
         """
-        self.rk_logger.info("Starting O3DVisualizer was successful")
+        logger.info("Starting O3DVisualizer was successful")
 
         app.add_window(self.main_vis)
 
