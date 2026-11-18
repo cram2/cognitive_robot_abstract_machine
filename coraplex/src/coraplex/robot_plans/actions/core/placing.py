@@ -78,7 +78,8 @@ class PlaceAction(
     )
     """
     The tool frame goals releasing the object, set to the release of the grasp measured
-    when this place starts.
+    when this place starts. It is protected since it will be automatically calculated 
+    during expansion and is not to be edited from the outside.
 
     Sent along with the place, because a receiver does not expand it again.
     """
