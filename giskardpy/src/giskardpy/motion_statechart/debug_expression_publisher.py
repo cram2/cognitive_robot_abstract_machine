@@ -12,7 +12,7 @@ from typing_extensions import TYPE_CHECKING
 
 from rclpy.node import Node
 
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from giskardpy.motion_statechart.exceptions import MarkerPublishingThreadEndedError
 from giskardpy.motion_statechart.graph_node import (
@@ -306,7 +306,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
                         self._owning_nodes,
                         strict=True,
                     )
-                    if node.life_cycle_state == LifeCycleValues.RUNNING
+                    if node.life_cycle_state == LifeCycleValue.RUNNING
                 ]
             )
         )

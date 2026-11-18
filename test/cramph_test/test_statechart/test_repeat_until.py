@@ -14,7 +14,7 @@ import pytest
 
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import ChildCannotFailError
 from cramph.composites import RepeatUntil
 from cramph.node import EndStatechart, StatechartNode
@@ -39,7 +39,7 @@ def _failing_task() -> NodeFailingOnObservingFalse:
     :return: A task that fails on every tick it runs.
     """
     return NodeFailingOnObservingFalse(
-        name="task", observation=ObservationStateValues.FALSE
+        name="task", observation=ObservationStateValue.FALSE
     )
 
 
@@ -85,7 +85,7 @@ def test_repeat_until_retries_until_the_monitor_gives_up(
         executor.tick()
 
     assert loop.stop_retry_monitor.resets == 3
-    assert loop.last_observation_state == ObservationStateValues.FALSE
+    assert loop.last_observation_state == ObservationStateValue.FALSE
 
 
 def test_repeat_until_succeeds_without_retrying(
@@ -96,14 +96,14 @@ def test_repeat_until_succeeds_without_retrying(
     of running to the monitor's bound.
     """
     task = NodeFailingOnObservingFalse(
-        name="task", observation=ObservationStateValues.TRUE
+        name="task", observation=ObservationStateValue.TRUE
     )
     loop, statechart, executor = _repeat(statechart_executor, task, target=3)
 
     executor.tick_until_end(timeout=SETTLE_TICKS)
 
     assert loop.stop_retry_monitor.resets == 0
-    assert loop.last_observation_state == ObservationStateValues.TRUE
+    assert loop.last_observation_state == ObservationStateValue.TRUE
     assert statechart.is_ended()
 
 
@@ -127,9 +127,9 @@ def test_repeat_until_puts_the_task_back_to_not_started(
     restarts = [
         index
         for index in range(1, len(life_cycles) - 1)
-        if life_cycles[index - 1] != LifeCycleValues.NOT_STARTED
-        and life_cycles[index] == LifeCycleValues.NOT_STARTED
-        and life_cycles[index + 1] == LifeCycleValues.RUNNING
+        if life_cycles[index - 1] != LifeCycleValue.NOT_STARTED
+        and life_cycles[index] == LifeCycleValue.NOT_STARTED
+        and life_cycles[index + 1] == LifeCycleValue.RUNNING
     ]
     assert loop.stop_retry_monitor.resets == 3
     assert len(restarts) == loop.stop_retry_monitor.target - 1
@@ -148,14 +148,14 @@ def test_repeat_until_does_not_retry_after_giving_up(
     for _ in range(SETTLE_TICKS):
         executor.tick()
     resets_when_given_up = loop.stop_retry_monitor.resets
-    assert loop.last_observation_state == ObservationStateValues.FALSE
+    assert loop.last_observation_state == ObservationStateValue.FALSE
 
     for _ in range(SETTLE_TICKS):
         executor.tick()
 
     assert loop.stop_retry_monitor.resets == resets_when_given_up
-    assert loop.task.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert loop.last_observation_state == ObservationStateValues.FALSE
+    assert loop.task.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert loop.last_observation_state == ObservationStateValue.FALSE
 
 
 def test_repeat_until_starts_its_task_while_the_stop_monitor_has_not_decided() -> None:
@@ -166,7 +166,7 @@ def test_repeat_until_starts_its_task_while_the_stop_monitor_has_not_decided() -
     loop = RepeatUntil(
         name="loop",
         task=NodeFailingOnObservingFalse(
-            name="task", observation=ObservationStateValues.UNKNOWN
+            name="task", observation=ObservationStateValue.UNKNOWN
         ),
         stop_retry_monitor=NodeObservingNothingYet(name="undecided"),
     )
@@ -177,7 +177,7 @@ def test_repeat_until_starts_its_task_while_the_stop_monitor_has_not_decided() -
 
     executor.tick()
 
-    assert loop.task.life_cycle_state == LifeCycleValues.RUNNING
+    assert loop.task.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_repeat_until_rejects_a_task_that_cannot_fail() -> None:

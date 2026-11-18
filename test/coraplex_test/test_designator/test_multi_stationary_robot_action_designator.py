@@ -26,7 +26,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.testing import _make_sine_scan_poses
 from cramph.composites import Sequence, StatementNode
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 from cramph.threaded_nodes import FunctionCall
 from krrood.entity_query_language.factories import a, an, entity, variable
@@ -600,9 +600,9 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
 
     first, second = pick_up.grounded_nodes
     assert [child.life_cycle_state for child in pick_up.chosen_children] == [
-        LifeCycleValues.FAILED,
-        LifeCycleValues.SUCCEEDED,
+        LifeCycleValue.FAILED,
+        LifeCycleValue.SUCCEEDED,
     ]
     assert second.grasp is not first.grasp
     [grasping] = [node for node in second.nodes if isinstance(node, GraspingAction)]
-    assert grasping.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert grasping.life_cycle_state == LifeCycleValue.SUCCEEDED
