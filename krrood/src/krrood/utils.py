@@ -23,7 +23,7 @@ from typing_extensions import Iterator, get_origin, get_args, Generic, Hashable,
 
 from typing_extensions import TypeVar, Callable, TypeVarTuple, _SpecialForm
 
-from krrood import logger
+import logging
 from krrood.exceptions import (
     NoModuleSourceProvided,
     NoDefaultValueFound,
@@ -31,6 +31,8 @@ from krrood.exceptions import (
     PathMissingRequiredPartsError,
     SourceDataNotProvided,
 )
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 

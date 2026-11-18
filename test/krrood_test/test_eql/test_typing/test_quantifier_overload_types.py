@@ -17,6 +17,7 @@ from pathlib import Path
 from mypy import api as mypy_api
 
 import krrood
+import krrood.exceptions
 
 from . import quantifier_overloads_fixture
 
@@ -66,7 +67,7 @@ def _run_mypy_on_fixture(cache_dir: Path) -> MypyCheckResult:
     :return: The check's outcome.
     """
     fixture_path = Path(quantifier_overloads_fixture.__file__)
-    krrood_src = Path(krrood.__file__).resolve().parent.parent
+    krrood_src = Path(krrood.exceptions.__file__).resolve().parent.parent
 
     previous_mypypath = os.environ.get("MYPYPATH")
     os.environ["MYPYPATH"] = str(krrood_src)

@@ -17,7 +17,7 @@ from typing_extensions import (
 )
 
 
-from krrood import logger
+import logging
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
@@ -33,6 +33,8 @@ from krrood.utils import (
     ensure_hashable,
     get_existing_field_by_name,
 )
+
+logger = logging.getLogger(__name__)
 
 TRANSIENT_TYPE_RESOLUTION_ERRORS = (
     ImportError,

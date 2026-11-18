@@ -14,7 +14,7 @@ from uuid import UUID
 import typing_extensions
 from typing_extensions import Any, Callable, TypeVar, TypeVarTuple, get_origin
 
-from krrood import logger
+import logging
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.singleton import SingletonMeta
 from krrood.utils import (
@@ -23,6 +23,8 @@ from krrood.utils import (
     get_full_class_name,
     is_builtin_type,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def classes_of_module(module) -> list[type]:

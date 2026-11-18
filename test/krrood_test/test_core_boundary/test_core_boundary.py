@@ -16,6 +16,7 @@ import pytest
 from packaging.utils import canonicalize_name
 
 import krrood
+import krrood.exceptions
 from krrood.development_tools.agents.core_boundary import (
     CoreBoundary,
     CoreBoundaryChecker,
@@ -29,7 +30,7 @@ def krrood_core_boundary() -> CoreBoundary:
     :return: The core boundary krrood's own ``pyproject.toml`` declares.
     """
     return CoreBoundary.from_pyproject(
-        path=Path(krrood.__file__).parents[2] / DeclarationFile.PYPROJECT
+        path=Path(krrood.exceptions.__file__).parents[2] / DeclarationFile.PYPROJECT
     )
 
 

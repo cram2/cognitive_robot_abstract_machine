@@ -13,7 +13,6 @@ from typing_extensions import get_args, get_origin, Any
 
 import rustworkx as rx
 
-from krrood import logger
 from krrood.class_diagrams.utils import resolve_type, get_type_hints_of_object
 from krrood.patterns.caching import clear_memoization_cache, memoize
 from krrood.utils import (

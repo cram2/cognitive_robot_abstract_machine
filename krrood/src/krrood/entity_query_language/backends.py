@@ -11,7 +11,7 @@ from typing_extensions import ClassVar, Iterable, Iterator, TypeVar
 
 from sqlalchemy.orm import sessionmaker
 
-from krrood import logger
+import logging
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (
@@ -34,6 +34,8 @@ from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Query
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.patterns.classproperty import classproperty
+
+logger = logging.getLogger(__name__)
 
 
 T = TypeVar("T")

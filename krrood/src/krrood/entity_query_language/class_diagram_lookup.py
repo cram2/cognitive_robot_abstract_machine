@@ -8,7 +8,9 @@ from types import NoneType
 
 from typing_extensions import Any, TypeVar
 
-from krrood import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from krrood.symbolic_math.symbolic_math import Scalar as SymbolicScalar

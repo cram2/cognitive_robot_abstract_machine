@@ -1,3 +1,4 @@
+import importlib.metadata
 from pathlib import Path
 
 PACKAGES = [
@@ -23,8 +24,11 @@ def test_all_package_versions_match_root_version():
     expected = VERSION_FILE.read_text().strip()
 
     for package_name in PACKAGES:
-        package = __import__(package_name)
-        assert package.__version__ == expected, (
-            f"{package_name} version {package.__version__} "
-            f"does not match root VERSION {expected}"
+        version = (
+            importlib.metadata.version(package_name)
+            if package_name == "krrood"
+            else __import__(package_name).__version__
+        )
+        assert version == expected, (
+            f"{package_name} version {version} does not match root VERSION {expected}"
         )
