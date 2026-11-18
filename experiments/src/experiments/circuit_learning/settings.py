@@ -99,7 +99,7 @@ class ComputationSetting:
         """
         return cls(
             array_library=ArrayLibrary.JAX,
-            device=Device.GPU,
+            device=Device.GRAPHICS_PROCESSOR,
             floating_point_type=FloatingPointType.FLOAT32,
             edge_representation=EdgeRepresentation.DENSE,
         )
@@ -111,7 +111,7 @@ class ComputationSetting:
         """
         return cls(
             array_library=ArrayLibrary.NUMPY,
-            device=Device.CPU,
+            device=Device.CENTRAL_PROCESSOR,
             floating_point_type=FloatingPointType.FLOAT64,
             edge_representation=EdgeRepresentation.SPARSE,
         )
@@ -159,7 +159,7 @@ class ComputationSetting:
         """
         :return: Whether the setting computes on the GPU.
         """
-        return self.device is Device.GPU
+        return self.device is Device.GRAPHICS_PROCESSOR
 
     @property
     def namespace(self) -> ModuleType:
@@ -180,7 +180,9 @@ class ComputationSetting:
         if self.array_library is ArrayLibrary.JAX:
             return jax.devices(self.device)[0]
         if self.array_library is ArrayLibrary.TORCH:
-            return torch.device("cuda" if self.device is Device.GPU else "cpu")
+            return torch.device(
+                "cuda" if self.device is Device.GRAPHICS_PROCESSOR else "cpu"
+            )
         return None
 
     @property

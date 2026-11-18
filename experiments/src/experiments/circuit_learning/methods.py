@@ -110,7 +110,7 @@ class TrainingContext:
         :return: The memory of its device within :attr:`memory_budget_bytes`.
         """
         memory = (
-            JaxDeviceMemory(device=jax.devices(Device.GPU)[0])
+            JaxDeviceMemory(device=jax.devices(Device.GRAPHICS_PROCESSOR)[0])
             if setting.uses_graphics_processor
             else HostMemory()
         )

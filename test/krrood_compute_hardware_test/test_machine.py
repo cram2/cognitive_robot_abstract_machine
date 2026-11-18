@@ -56,10 +56,10 @@ def test_shares_of_the_graphics_processor_come_first(
     shares = division.shares(machine=machine_with_graphics_processor)
 
     assert [share.device for share in shares] == [
-        Device.GPU,
-        Device.CPU,
-        Device.CPU,
-        Device.CPU,
+        Device.GRAPHICS_PROCESSOR,
+        Device.CENTRAL_PROCESSOR,
+        Device.CENTRAL_PROCESSOR,
+        Device.CENTRAL_PROCESSOR,
     ]
 
 
@@ -169,5 +169,5 @@ def test_a_graphics_processor_share_does_not_preallocate(
 
     environment = share.process_environment(environment={})
 
-    assert environment[GraphicsProcessorVariable.XLA_PREALLOCATION] == "false"
+    assert environment[GraphicsProcessorVariable.JAX_MEMORY_PREALLOCATION] == "false"
     assert GraphicsProcessorVariable.VISIBLE_DEVICES not in environment

@@ -66,7 +66,7 @@ class CompilerVariable(StrEnum):
     The environment variables that configure the compilers of a run.
     """
 
-    XLA_FLAGS = "XLA_FLAGS"
+    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
     """
     The options of the XLA compiler.
     """
@@ -318,7 +318,8 @@ class BenchmarkRunner:
         first, queries, rest = [], [], []
         query_settings = [
             *ComputationSetting.grid(
-                array_libraries=(ArrayLibrary.NUMPY,), devices=(Device.CPU,)
+                array_libraries=(ArrayLibrary.NUMPY,),
+                devices=(Device.CENTRAL_PROCESSOR,),
             ),
             *ComputationSetting.grid(
                 array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
@@ -430,7 +431,9 @@ class BenchmarkRunner:
         """
         environment = share.process_environment(environment=dict(os.environ))
         # autotuning makes compiling a step take minutes on large batches
-        environment[CompilerVariable.XLA_FLAGS] = "--xla_gpu_autotune_level=0"
+        environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = (
+            "--xla_gpu_autotune_level=0"
+        )
         limits = dataclasses.replace(
             self.limits, memory_budget_bytes=share.memory_budget_bytes
         )

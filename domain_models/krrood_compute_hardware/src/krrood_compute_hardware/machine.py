@@ -25,9 +25,9 @@ class ThreadVariable(StrEnum):
     The environment variables that cap the threads of the numeric libraries.
     """
 
-    OPENMP = "OMP_NUM_THREADS"
-    OPENBLAS = "OPENBLAS_NUM_THREADS"
-    MKL = "MKL_NUM_THREADS"
+    OPEN_MULTI_PROCESSING = "OMP_NUM_THREADS"
+    OPEN_BASIC_LINEAR_ALGEBRA_SUBPROGRAMS = "OPENBLAS_NUM_THREADS"
+    MATH_KERNEL_LIBRARY = "MKL_NUM_THREADS"
 
 
 class GraphicsProcessorVariable(StrEnum):
@@ -35,7 +35,7 @@ class GraphicsProcessorVariable(StrEnum):
     The environment variables that configure how a process uses the GPU.
     """
 
-    XLA_PREALLOCATION = "XLA_PYTHON_CLIENT_PREALLOCATE"
+    JAX_MEMORY_PREALLOCATION = "XLA_PYTHON_CLIENT_PREALLOCATE"
     """
     Whether jax claims most of the GPU memory when it starts.
     """
@@ -125,8 +125,8 @@ class MachineShare:
         confined = dict(environment)
         for variable in ThreadVariable:
             confined[variable] = str(len(self.processor_cores))
-        if self.device is Device.GPU:
-            confined[GraphicsProcessorVariable.XLA_PREALLOCATION] = "false"
+        if self.device is Device.GRAPHICS_PROCESSOR:
+            confined[GraphicsProcessorVariable.JAX_MEMORY_PREALLOCATION] = "false"
         else:
             confined[GraphicsProcessorVariable.VISIBLE_DEVICES] = ""
         return confined
@@ -183,7 +183,7 @@ class MachineDivision:
         :param device: A kind of device.
         :return: Whether the division has a share that computes on it.
         """
-        if device is Device.GPU:
+        if device is Device.GRAPHICS_PROCESSOR:
             return self.graphics_processor_shares > 0
         return self.processor_core_shares > 0
 
@@ -217,7 +217,9 @@ class MachineDivision:
         return [
             MachineShare(
                 device=(
-                    Device.GPU if index < self.graphics_processor_shares else Device.CPU
+                    Device.GRAPHICS_PROCESSOR
+                    if index < self.graphics_processor_shares
+                    else Device.CENTRAL_PROCESSOR
                 ),
                 processor_cores=set(
                     cores[index * cores_per_share : (index + 1) * cores_per_share]

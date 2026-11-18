@@ -25,7 +25,7 @@ license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
     "random-events>=26.10.0",
-    "krrood_compute_hardware[jax]>=26.10.0",
+    "krrood_compute_hardware>=26.10.0",
     "networkx",
     "plotly",
     "scipy>=1.10",
@@ -71,7 +71,6 @@ version = {attr = "probabilistic_model._version.__version__"}
 [project.optional-dependencies]
 torch = [
     "torch>=2.4",
-    "krrood_compute_hardware[torch]>=26.10.0",
 ]
 dev = [
     "pytest",

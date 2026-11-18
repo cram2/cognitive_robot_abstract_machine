@@ -15,5 +15,5 @@ class Device(StrEnum):
     The kind of device a computation runs on, valued as jax names its platform.
     """
 
-    CPU = "cpu"
-    GPU = "gpu"
+    CENTRAL_PROCESSOR = "cpu"
+    GRAPHICS_PROCESSOR = "gpu"
