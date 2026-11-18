@@ -337,6 +337,7 @@ def test_place_multi(stationary_block_context, place_position):
             ),
             PlaceAction(
                 arm=left_or_only_arm(view),
+                graspable=graspable_annotation(world, box_body),
                 goal_pose=Pose(place_position, reference_frame=world.root),
             ),
         ]
@@ -507,6 +508,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             PickUpAction(grasp_candidate=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
                 arm=arm,
+                graspable=graspable_annotation(world, box),
                 goal_pose=Pose(target, reference_frame=world.root),
             ),
         ]

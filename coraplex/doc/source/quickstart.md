@@ -147,6 +147,7 @@ plan = Sequence(
         ),
         PlaceAction(
             arm=pr2.right_arm,
+            graspable=milk,
             goal_pose=Pose.from_xyz_rpy(
                 4.2, 4.0, 1.0, reference_frame=world.root
             ),

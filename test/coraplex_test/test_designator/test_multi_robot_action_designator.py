@@ -632,6 +632,7 @@ def test_place_multi(multiple_robot_apartment_context):
             ),
             PlaceAction(
                 arm=left_or_only_arm(view),
+                graspable=world.get_semantic_annotations_by_type(Milk)[0],
                 goal_pose=Pose(
                     Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root
                 ),
@@ -1759,6 +1760,7 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
             ),
             PlaceAction(
                 arm=right_or_only_arm(robot),
+                graspable=milk,
                 goal_pose=Pose.from_xyz_rpy(1, 1, 0.8, reference_frame=world.root),
             ),
         ]
@@ -2111,7 +2113,7 @@ def test_a_placing_carries_its_object_to_where_it_stands(
     places.
     """
     _, robot, extensions = multiple_robot_apartment_context
-    cup_held_tilted(robot)
+    cup = cup_held_tilted(robot)
     target = Pose.from_xyz_rpy(x=0.8, z=0.8, reference_frame=robot.root)
     move_and_place = MoveAndPlaceAction(
         carry=CarryAction(
@@ -2121,7 +2123,7 @@ def test_a_placing_carries_its_object_to_where_it_stands(
             face_at=FaceAtAction(look_target=target),
             look_at=LookAtAction(look_target=target),
         ),
-        place=PlaceAction(arm=left_or_only_arm(robot), goal_pose=target),
+        place=PlaceAction(arm=left_or_only_arm(robot), graspable=cup, goal_pose=target),
     )
 
     expand(move_and_place, extensions)
@@ -2174,6 +2176,7 @@ class CupForEachArm:
         return [
             PlaceAction(
                 arm=pick_up.arm,
+                graspable=pick_up.grasp_candidate.graspable,
                 goal_pose=self.world.transform(
                     Pose.from_xyz_rpy(
                         y=sideways_distance,

@@ -198,6 +198,7 @@ run(Sequence(nodes=[ParkArmsAction(arms=pr2.all_arms),
      ),
      PlaceAction(
          arm=arm,
+         graspable=milk,
          goal_pose=Pose.from_xyz_rpy(2.4, 2.2, 1, reference_frame=world.root),
      )]))
 ```

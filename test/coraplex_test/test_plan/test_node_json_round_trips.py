@@ -202,9 +202,10 @@ def _pick_up(world: World) -> PickUpAction:
 
 def _place(world: World) -> PlaceAction:
     """
-    :return: A place with the arm of `world`, which has to follow :func:`_pick_up`.
+    :return: A place of the milk with the arm of `world`, which has to follow
+        :func:`_pick_up`.
     """
-    return PlaceAction(arm=_arm(world), goal_pose=_pose(world))
+    return PlaceAction(arm=_arm(world), graspable=_milk(world), goal_pose=_pose(world))
 
 
 def _move_and_pick_up(world: World) -> MoveAndPickUpAction:

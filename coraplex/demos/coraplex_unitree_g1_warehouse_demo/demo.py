@@ -186,6 +186,7 @@ def build_statechart(
                 ),
                 PlaceAction(
                     arm=robot.torso.left_arm,
+                    graspable=parcel,
                     goal_pose=Pose(
                         destination.position,
                         destination.quaternion,

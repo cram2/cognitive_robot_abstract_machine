@@ -189,6 +189,7 @@ plan = Sequence(
         ),
         PlaceAction(
             arm=tracy.left_arm,
+            graspable=box2_annotation,
             goal_pose=Pose.from_xyz_rpy(
                 0.8, 0.0, table_top_z + 1.5 * box_edge, reference_frame=world.root
             ),
@@ -206,6 +207,7 @@ plan = Sequence(
         ),
         PlaceAction(
             arm=tracy.right_arm,
+            graspable=box3_annotation,
             goal_pose=Pose.from_xyz_rpy(
                 0.8, 0.0, table_top_z + 2.5 * box_edge, reference_frame=world.root
             ),

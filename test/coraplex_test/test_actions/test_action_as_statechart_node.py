@@ -711,6 +711,7 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
     )
     place = PlaceAction(
         arm=robot.left_arm,
+        graspable=milk,
         goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
@@ -819,6 +820,7 @@ def test_a_place_reattaches_and_retracts_as_its_own_steps(
     )
     place = PlaceAction(
         arm=robot.left_arm,
+        graspable=milk,
         goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 

@@ -7,7 +7,7 @@ how it carries them out, and the behaviour several actions share.
     strings that would have to be resolved against the action's own module.
 """
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -43,12 +43,14 @@ from semantic_digital_twin.robots.robot_parts import (
     Camera,
     EndEffector,
 )
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
     Pose2D,
 )
+from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -106,6 +108,19 @@ class HasGraspCandidateParameter(ParameterMixin):
 
     One of the object's own
     :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasGraspableParameter(ParameterMixin):
+    """
+    Mixin for actions that act on an object a gripper holds or is to hold, without
+    being given the grasp.
+    """
+
+    graspable: IsGraspable
+    """
+    The object acted on.
     """
 
 
@@ -371,7 +386,7 @@ class HasRetreatDistanceParameter(ParameterMixin):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspPoseSequence:
     """
     The tool frame goals that approach a grasp, reach it and withdraw from it.
@@ -391,6 +406,13 @@ class GraspPoseSequence:
     """
     Where the gripper rises to when it leaves the grasp.
     """
+
+    @property
+    def poses(self) -> list[Pose]:
+        """
+        :return: :attr:`pre_grasp`, :attr:`grasp` and :attr:`retreat`, in this order.
+        """
+        return [self.pre_grasp, self.grasp, self.retreat]
 
 
 # %% behaviour shared by actions
@@ -673,3 +695,55 @@ class ReattachesBranches(Action, ABC):
         if not self.reattaches_in_world_model:
             return []
         return [MoveBranch(branch_root=branch_root, new_parent=new_parent)]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasVariablePoses(Action, ABC):
+    """
+    An action with poses whose values are known only once it runs, such as goals that
+    depend on how an object is held then. The poses are over float variables of the
+    statechart, which the action sets.
+    """
+
+    @property
+    @abstractmethod
+    def variable_poses(self) -> list[Pose]:
+        """
+        :return: The poses of this action made by :meth:`create_variable_pose`.
+        """
+
+    def create_variable_pose(
+        self, *, name: str, reference_frame: CartesianFrame3D
+    ) -> Pose:
+        """
+        :param name: Names the variables of the pose, unique among the variable poses of
+            this action.
+        :param reference_frame: The frame the pose is in.
+        :return: A new pose over float variables of its own, which
+            :meth:`set_variable_pose` sets.
+        """
+        reference_T_pose = HomogeneousTransformationMatrix.create_with_variables(
+            f"{self.name}/{name}"
+        )
+        reference_T_pose.reference_frame = reference_frame
+        return reference_T_pose.pose
+
+    def set_up(self) -> None:
+        """
+        Differs from :meth:`~cramph.node.StatechartNode.set_up` in registering the float
+        variables of :attr:`variable_poses`.
+        """
+        super().set_up()
+        for pose in self.variable_poses:
+            self.context.float_variable_data.register_expression(expression=pose)
+
+    def set_variable_pose(self, *, variable_pose: Pose, value: Pose) -> None:
+        """
+        :param variable_pose: One of :attr:`variable_poses`.
+        :param value: The pose `variable_pose` takes, in any frame.
+        """
+        reference_T_pose = self.world.transform(value, variable_pose.reference_frame)
+        self.context.float_variable_data.set_value(
+            expression=variable_pose,
+            value=reference_T_pose.to_np()[:3, :4].T.flatten(),
+        )

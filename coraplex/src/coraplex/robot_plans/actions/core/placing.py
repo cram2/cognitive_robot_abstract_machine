@@ -4,21 +4,22 @@ The action that puts down what an arm holds.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from coraplex.exceptions import HeldBodyIsNotGraspable, ObjectIsNotHeld
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.composites import Parallel
 from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.mixins import (
+    GraspPoseSequence,
     HasArmParameter,
+    HasGraspableParameter,
     HasGraspApproach,
     HasMaxPlacingLinearVelocityParameter,
     HasMaxTransportLinearVelocityParameter,
     HasMaxReleaseOpeningVelocityParameter,
     HasMaxRetractLinearVelocityParameter,
+    HasVariablePoses,
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
@@ -29,7 +30,10 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
+from krrood.patterns.field_metadata import JSONMetadata
+from krrood_spatial_math.spatial_types import Pose
+
+# %% placing a held object
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -37,8 +41,10 @@ class PlaceAction(
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
+    HasVariablePoses,
     SequentialAction,
     HasArmParameter,
+    HasGraspableParameter,
     HasGoalPoseParameter,
     HasGraspApproach,
     HasMaxPlacingLinearVelocityParameter,
@@ -47,8 +53,24 @@ class PlaceAction(
     HasMaxRetractLinearVelocityParameter,
 ):
     """
-    Puts down what :attr:`arm` holds, so that the object ends up at :attr:`goal_pose`
-    however it is held.
+    Puts down :attr:`graspable`, which :attr:`arm` holds, so that it ends up at
+    :attr:`goal_pose` however it is held.
+
+    The grasp is measured when the place starts, so the place can be planned before the
+    object is picked up.
+    """
+
+    _tool_goals: GraspPoseSequence | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        metadata=JSONMetadata(serialize=True).as_dict(),
+    )
+    """
+    The tool frame goals releasing the object, set to the release of the grasp measured
+    when this place starts.
+
+    Sent along with the place, because a receiver does not expand it again.
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -60,23 +82,28 @@ class PlaceAction(
         return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
 
     def create_steps(self) -> list[StatechartNode]:
-        grasp = self._grasp_on_the_held_object()
+        reference_frame = self.goal_pose.reference_frame
+        self._tool_goals = GraspPoseSequence(
+            pre_grasp=self.create_variable_pose(
+                name="pre_grasp", reference_frame=reference_frame
+            ),
+            grasp=self.create_variable_pose(
+                name="grasp", reference_frame=reference_frame
+            ),
+            retreat=self.create_variable_pose(
+                name="retreat", reference_frame=reference_frame
+            ),
+        )
         # A release runs the grasp backwards: down from above the target, then out
         # along the way the grasp was approached.
-        poses = self.grasp_pose_sequence(
-            reference_T_grasp=grasp.moved_to(self.goal_pose),
-            end_effector=self.arm.end_effector,
-            grasp_candidate=grasp,
-        )
-
         return [
             self.tool_center_point_goal(
-                poses.retreat,
+                self._tool_goals.retreat,
                 self.arm,
                 max_linear_velocity=self.max_transport_linear_velocity,
             ),
             self.tool_center_point_goal(
-                poses.grasp,
+                self._tool_goals.grasp,
                 self.arm,
                 max_linear_velocity=self.max_placing_linear_velocity,
             ),
@@ -90,46 +117,41 @@ class PlaceAction(
                     ),
                     # Keeps the gripper in place while it opens, whatever else
                     # moves the robot meanwhile.
-                    self.tool_center_point_goal(poses.grasp, self.arm),
+                    self.tool_center_point_goal(self._tool_goals.grasp, self.arm),
                 ]
             ),
-            *self.reattach(grasp.graspable.root, self.world.root),
+            *self.reattach(self.graspable.root, self.world.root),
             # The gripper starts out around the object it has just let go of.
             self.tool_center_point_goal(
-                poses.pre_grasp,
+                self._tool_goals.pre_grasp,
                 self.arm,
                 max_linear_velocity=self.max_retract_linear_velocity,
             ),
         ]
 
-    def _grasp_on_the_held_object(self) -> GraspCandidate:
-        """
-        The grasp :attr:`arm` holds its object by when this place runs.
+    @property
+    def variable_poses(self) -> list[Pose]:
+        return self._tool_goals.poses
 
-        That is the grasp of the latest pick-up of :attr:`arm` before this place, unless
-        a place of :attr:`arm` came after it; without either, the grasp its gripper has
-        on what it holds now.
-
-        :return: The grasp, which names the object.
-        :raises ObjectIsNotHeld: If a place of :attr:`arm` precedes this one with no
-            pick-up of :attr:`arm` in between, or if the gripper holds nothing and no
-            pick-up of :attr:`arm` precedes this place.
-        :raises HeldBodyIsNotGraspable: If what the gripper holds is the root of no
-            annotation that can be grasped.
+    def on_start(self) -> None:
         """
-        for previous in self.statechart.get_preceding_nodes_by_type(
-            node=self, node_type=PickUpAction | PlaceAction
-        ):
-            if previous.arm is not self.arm:
-                continue
-            if isinstance(previous, PlaceAction):
-                raise ObjectIsNotHeld(self.arm)
-            return previous.grasp_candidate
+        Differs from :meth:`~coraplex.robot_plans.actions.base.Action.on_start` in also
+        setting :attr:`_tool_goals` to the release of the grasp :attr:`arm` has on
+        :attr:`graspable` now.
+        """
+        super().on_start()
         end_effector = self.arm.end_effector
-        held_body = end_effector.held_body
-        if held_body is None:
-            raise ObjectIsNotHeld(self.arm)
-        for graspable in self.world.get_semantic_annotations_by_type(IsGraspable):
-            if graspable.root is held_body:
-                return GraspCandidate(graspable, end_effector.held_body_T_grasp)
-        raise HeldBodyIsNotGraspable(self.arm, held_body)
+        grasp = GraspCandidate(
+            self.graspable,
+            end_effector.body_T_grasp(
+                body=self.graspable.root,
+                tool_P_grasp=end_effector.tool_P_grasp_when_closed,
+            ),
+        )
+        place_sequence = self.grasp_pose_sequence(
+            reference_T_grasp=grasp.moved_to(self.goal_pose),
+            end_effector=end_effector,
+            grasp_candidate=grasp,
+        )
+        for variable_pose, pose in zip(self._tool_goals.poses, place_sequence.poses):
+            self.set_variable_pose(variable_pose=variable_pose, value=pose)

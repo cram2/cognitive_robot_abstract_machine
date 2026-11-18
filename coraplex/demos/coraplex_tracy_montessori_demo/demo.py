@@ -447,14 +447,15 @@ class ShapeSortingPlan:
         :return: The statechart that sorts the pieces.
         """
         robot = context.require_extension(extension_type=RobotAccess).robot
+        sorting_arm = self.scene.sorting_arm(robot)
         actions = [ParkArmsAction(arms=robot.all_arms)]
         for piece, hole in self.scene.holes_of_pieces.items():
             [grasp] = piece.grasp_candidates()
-            arm = self.scene.sorting_arm(robot)
-            actions.append(PickUpAction(grasp_candidate=grasp, arm=arm))
+            actions.append(PickUpAction(grasp_candidate=grasp, arm=sorting_arm))
             actions.append(
                 PlaceAction(
-                    arm=arm,
+                    arm=sorting_arm,
+                    graspable=piece,
                     goal_pose=self.release_pose_over(hole, context.world),
                 )
             )

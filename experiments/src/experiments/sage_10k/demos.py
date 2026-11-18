@@ -250,6 +250,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
                 MoveAndPlaceAction.from_standing_position(
+                    graspable=object_of_interest,
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     goal_pose=self.place_pose,
@@ -389,6 +390,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
             arm=self.arm,
         )
         mpp = MoveAndPlaceAction.from_standing_position(
+            graspable=self.book_to_pick,
             standing_position=Pose2D.from_xy_yaw(
                 x=5.48, y=6.96, reference_frame=self.world.root
             ),
@@ -531,6 +533,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
             x=0.605, y=1.615, z=0.66, reference_frame=self.world.root
         )
         mpp = MoveAndPlaceAction.from_standing_position(
+            graspable=self.target_to_pick,
             standing_position=Pose2D.from_xy_yaw(
                 x=0.605, y=2.115, yaw=-1.5708, reference_frame=self.world.root
             ),
@@ -662,6 +665,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
                     )
                 ),
                 MoveAndPlaceAction.from_standing_position(
+                    graspable=self.object_of_interest,
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     goal_pose=self.place_pose,
@@ -779,6 +783,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
                 MoveAndPlaceAction.from_standing_position(
+                    graspable=self.object_of_interest,
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     goal_pose=self.place_pose,
@@ -880,6 +885,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
                 ParkArmsAction(arms=self.robot.all_arms),
                 NavigateAction(planar_goal_pose=navigate),
                 MoveAndPlaceAction.from_standing_position(
+                    graspable=self.object_of_interest,
                     standing_position=self.place_navigation_pose,
                     arm=arm,
                     goal_pose=self.place_pose,
