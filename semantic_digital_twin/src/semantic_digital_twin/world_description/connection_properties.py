@@ -60,10 +60,10 @@ class JointDynamics:
 @dataclass(kw_only=True)
 class NormalizedTwist:
     """
-    The screw axis of a screw axis connection as a normalized twist: how far its child
+    The screw axis of a screw axis connection, as a normalized
+    :class:`~krrood_spatial_math.spatial_types.Twist` along that axis: how far its child
     rotates about and translates along the axis per unit of position, one radian if it
-    rotates and one meter otherwise. A rate, unlike the displacement
-    :class:`~krrood_spatial_math.spatial_types.Twist`.
+    rotates and one meter otherwise.
     """
 
     rotation_per_unit_position: float

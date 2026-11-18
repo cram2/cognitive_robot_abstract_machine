@@ -361,7 +361,7 @@ def test_screw_connection_multiplier_mirrors_motion(world_with_two_bodies):
     )
 
 
-def test_screw_connection_copy_with_new_parent_preserves_screw_motion(
+def test_screw_axis_connection_copy_with_new_parent_preserves_normalized_twist(
     world_with_two_bodies,
 ):
     """
@@ -767,7 +767,7 @@ def _expected_screw_axis_transform(
     ],
     ids=["revolute", "prismatic", "screw", "left-handed screw"],
 )
-def test_screw_axis_connection_places_the_child_along_its_screw_motion(
+def test_screw_axis_connection_places_the_child_along_its_normalized_twist(
     world_with_two_bodies, seed, normalized_twist
 ):
     """
@@ -830,7 +830,7 @@ def test_screw_axis_connection_places_the_child_along_its_screw_motion(
         ),
     ],
 )
-def test_screw_motion_behaves_like_the_connection_it_describes(
+def test_normalized_twist_behaves_like_the_connection_it_describes(
     normalized_twist, expected_behaviour
 ):
     """
@@ -854,7 +854,7 @@ def test_screw_motion_behaves_like_the_connection_it_describes(
         pytest.param(0.5, 0.1, id="rotates half a radian"),
     ],
 )
-def test_screw_motion_rejects_unnormalized_parameters(
+def test_normalized_twist_rejects_unnormalized_parameters(
     rotation_per_unit_position, translation_per_unit_position
 ):
     """
