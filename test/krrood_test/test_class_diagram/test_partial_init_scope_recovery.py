@@ -66,7 +66,7 @@ def test_recovered_scope_is_healed_and_not_rebuilt_on_every_lookup(monkeypatch):
     scope build for their owning module happens while ``world`` is still mid-import (a
     legitimate, unavoidable circular reference). The permanent ``lru_cache`` entry never
     gets corrected once ``world`` finishes loading, so every one of those fields falls
-    back to :func:`~krrood.utils.get_scope_from_imports` again, uncached, re-parsing and
+    back to :func:`~krrood.source_analysis.import_scope.get_scope_from_imports` again, uncached, re-parsing and
     re-importing the whole file from scratch thousands of times over process startup.
     """
     owner_source = inspect.getsourcefile(OwnerWithLateBoundAnnotation)

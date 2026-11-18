@@ -1,3 +1,4 @@
+from typing_extensions import TYPE_CHECKING
 from ..dataset.example_classes import ContainerGeneration, ItemWithBackreference
 from krrood.ormatic.data_access_objects.helper import to_dao
 from .test_interface import (
@@ -6,6 +7,13 @@ from .test_interface import (
     KRROODPose,
     KRROODOrientation,
 )
+
+if TYPE_CHECKING:
+    from ..dataset.ormatic_interface import (
+        KRROODPoseDAO,
+        KRROODPosition4DDAO,
+        KRROODPositionDAO,
+    )
 
 
 def test_repr_includes_scalar_columns_only():

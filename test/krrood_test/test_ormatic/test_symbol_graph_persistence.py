@@ -17,6 +17,8 @@ def test_symbol_graph_persistence(session, database):
     """
     from ..dataset.ormatic_interface import KRROODPositionDAO
 
+    from ..dataset.ormatic_interface import KRROODPositionDAO
+
     p1 = KRROODPosition(x=1, y=2, z=3)
 
     symbol_graph = SymbolGraph()

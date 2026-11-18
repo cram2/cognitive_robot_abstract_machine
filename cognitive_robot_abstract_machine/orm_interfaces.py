@@ -27,7 +27,7 @@ from cognitive_robot_abstract_machine.exceptions import (
     UnknownOrmPackageError,
     UnorderableOrmInterfacesError,
 )
-from krrood.utils import module_level_imports
+from krrood.source_analysis.import_scope import module_level_imports
 from krrood.class_diagrams.progress_report import (
     ClassDiagramProgress,
     ProgressEnvironmentVariable,

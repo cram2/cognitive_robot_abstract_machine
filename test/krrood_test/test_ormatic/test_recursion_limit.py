@@ -6,8 +6,13 @@ from __future__ import annotations
 
 import sys
 
+from typing_extensions import TYPE_CHECKING
+
 from krrood.ormatic.data_access_objects.helper import to_dao
 from ..dataset.example_classes import Person
+
+if TYPE_CHECKING:
+    from ..dataset.ormatic_interface import PersonDAO
 
 
 def test_deep_person_chain_to_dao():

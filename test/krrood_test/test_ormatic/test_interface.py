@@ -878,6 +878,8 @@ def test_many_to_many_with_same_type(session, database):
     """
     from ..dataset.ormatic_interface import KRROODPositionDAO, KRROODPositionsDAO
 
+    from ..dataset.ormatic_interface import KRROODPositionDAO, KRROODPositionsDAO
+
     state = ToDataAccessObjectState()
     position = KRROODPosition(x=1, y=2, z=3)
     ps1 = KRROODPositions(positions=[position], some_strings=["a"])
@@ -1083,6 +1085,14 @@ def test_generic_class(session, database):
         GenericClass_floatDAO,
     )
 
+    from ..dataset.ormatic_interface import (
+        GenericClassAssociationDAO,
+        GenericClassAssociationDAO_associated_value_list_association,
+        GenericClassDAO,
+        GenericClass_KRROODPositionDAO,
+        GenericClass_floatDAO,
+    )
+
     assert issubclass(GenericClass_floatDAO, GenericClassDAO)
     assert issubclass(GenericClass_KRROODPositionDAO, GenericClassDAO)
     assert hasattr(GenericClass_KRROODPositionDAO, "value")
@@ -1178,6 +1188,8 @@ def test_class_dependencies(session, database):
     """
     Reading an object back records which of its mappings had to be built before which.
     """
+    from ..dataset.ormatic_interface import EntryPointMappingDAO
+
     from ..dataset.ormatic_interface import EntryPointMappingDAO
 
     b1 = BuildFirst(value="a")
