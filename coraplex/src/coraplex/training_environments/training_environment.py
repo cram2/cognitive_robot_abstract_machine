@@ -1,3 +1,7 @@
+"""
+Environments that generate the data an action's parametrization is learned from.
+"""
+
 import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
@@ -5,7 +9,7 @@ from pathlib import Path
 from typing_extensions import Any, Generic, TypeVar
 
 from krrood.adapters.json_serializer import from_json
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry

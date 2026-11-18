@@ -13,9 +13,9 @@ import numpy as np
 import pytest
 from typing_extensions import Callable
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, cause
-from krrood.entity_query_language.operators.causal import ScoredIntervention
+from krrood.parametrization.causal_search import ScoredIntervention
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters

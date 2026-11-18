@@ -194,3 +194,23 @@ class InterfaceInstantiationError(DataclassException, TypeError):
 
     def suggest_correction(self) -> str:
         return f"Instantiate a subclass that implements {self.interface.__name__}."
+
+
+@dataclass(kw_only=True)
+class NoGenericError(DataclassException, TypeError):
+    """
+    Raised when the generic argument of a class cannot be determined.
+
+    The class inherits a generic base without binding its type parameter.
+    """
+
+    clazz: type
+    """
+    The class whose generic argument is missing.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot determine the generic argument of {self.clazz}."
+
+    def suggest_correction(self) -> str:
+        return "did you forget to parameterise the generic base class?"
