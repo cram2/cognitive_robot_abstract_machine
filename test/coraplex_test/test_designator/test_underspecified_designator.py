@@ -3,7 +3,7 @@ Grounding underspecified actions into executable ones.
 """
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from uuid import UUID, uuid4
 
@@ -17,6 +17,7 @@ from cramph.composites import (
     ChildChooserAccess,
     Parallel,
     Sequence,
+    StatementBindings,
     StatementNode,
 )
 from cramph.context import ContextExtension
@@ -187,6 +188,33 @@ class RecordingAction(SequentialAction):
         world.notify_state_change()
         if len(probe.calls) == self.fail_on_attempt_number:
             raise self.reported_failure()
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ActionRefusingSomeArms(SequentialAction):
+    """
+    An action that fails with some arms and succeeds with every other, without moving.
+    """
+
+    arm: Arm
+    """
+    The arm the action is performed with.
+    """
+
+    refused_arms: list[Arm] = field(default_factory=list)
+    """
+    The arms the action fails with.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        return [FunctionCall(function=self._refuse_arm, failure_types=(PlanFailure,))]
+
+    def _refuse_arm(self) -> None:
+        """
+        Fail if :attr:`arm` is one of :attr:`refused_arms`.
+        """
+        if self.arm in self.refused_arms:
+            raise PlanFailure()
 
 
 # %% mimics claiming slots side by side
@@ -423,6 +451,66 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
         EntityQueryLanguageGenerativeBackend().evaluate(expression=plan_generator)
     )
     assert len(plans) == len(list(target_locations._domain_)) * len(robot.all_arms)
+
+
+# %% statements sharing a variable
+
+
+def _steps_sharing_an_arm(robot) -> Sequence:
+    """
+    :return: Two steps given one arm variable over every arm of `robot`, the first
+        refusing the first arm, so it takes the second.
+    """
+    arm = variable(Arm, domain=robot.all_arms)
+    return Sequence(
+        nodes=[
+            a(ActionRefusingSomeArms)(arm=arm, refused_arms=[robot.all_arms[0]]),
+            a(ActionRefusingSomeArms)(arm=arm),
+        ]
+    )
+
+
+def test_a_statement_reusing_an_arm_variable_uses_the_arm_chosen_before(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The second step could use either arm and would take the first; reusing the variable
+    makes it take the arm the first step was grounded to.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    plan = _steps_sharing_an_arm(robot)
+
+    run_plan(plan, extensions)
+
+    first, second = plan.nodes
+    assert first.grounded_nodes[-1].arm is robot.all_arms[1]
+    assert [step.arm for step in second.grounded_nodes] == [
+        first.grounded_nodes[-1].arm
+    ]
+
+
+def test_a_trial_keeps_the_choices_statements_made_in_the_world_it_copies(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A statement grounded inside a trial reads the values bound before it, referring to
+    the copy the trial runs in.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    plan = _steps_sharing_an_arm(robot)
+    executor = run_plan(plan, extensions)
+    chosen_arm = plan.nodes[0].grounded_nodes[-1].arm
+    trial = executor.child_chooser.trial
+
+    copied = trial._copy()
+    trial_bindings = trial._trial_executor(copied).context.require_extension(
+        extension_type=StatementBindings
+    )
+
+    assert [binding.value for binding in trial_bindings.bindings.values()] == [
+        copied.get_world_entity_with_id_by_id(chosen_arm.id)
+    ]
+    trial.discard()
 
 
 # %% candidate trials

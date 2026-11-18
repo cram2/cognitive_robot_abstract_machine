@@ -151,6 +151,34 @@ holds the allowance, which is how a statement is tried beside it. With the state
 run is just the proposal, which is how a lone statement is tried.
 ```
 
+## Statements that share a variable
+
+A variable object given to several statements stands for one choice. A pick-up and the place after it can leave the
+arm open and still use the same one:
+
+```python
+arm = variable(Arm, domain=robot.all_arms)
+Sequence(
+    nodes=[
+        a(PickUpAction)(arm=arm, grasp=...),
+        a(PlaceAction)(arm=arm, object_designator=milk, target_location=...),
+    ]
+)
+```
+
+Once a statement adopts a candidate, the values that candidate gave the statement's variables are bound in the
+`StatementBindings` context extension. Every other statement grounds under them, so the place above has one arm to
+choose from: the one the pick-up runs with. A statement that tries its next candidate after a failure rebinds its
+variables to that candidate's values, and a statement that is reset releases them. Statements grounded together are
+only combined with candidates that agree on the variables they share. A trial copies the bindings onto its world, so a
+statement grounded inside a trial keeps them too.
+
+```{warning}
+**No look ahead.** The statement that binds a variable first chooses its value without the statements after it in
+mind. If no candidate of a later statement passes its trial with the bound value, that statement fails; the earlier
+one is not grounded again.
+```
+
 ## Known gaps
 
 ```{warning}

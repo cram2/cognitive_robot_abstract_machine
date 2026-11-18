@@ -1,3 +1,8 @@
+"""
+Grounding the underspecified statements of a plan while it runs, trying each candidate
+in a copy of the world before it runs for real.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -19,7 +24,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepStretchInFrontOfTheContainerItCloses,
 )
 from cramph.visualization import RvizVisualization
-from cramph.context import StatechartContext
+from cramph.context import ContextExtension, StatechartContext
 from cramph.composites import (
     ChildChooser,
     CompositeNodeChoosingItsChild,
@@ -27,6 +32,7 @@ from cramph.composites import (
     GenericChoosingNode,
     Parallel,
     Sequence,
+    StatementBindings,
     StatementNode,
     StatementsGroundedTogether,
 )
@@ -470,7 +476,7 @@ class ActionTrial:
                 world=world,
                 extensions=[
                     world.rebind_world_entities(extension)
-                    for extension in self.executor.supplied_context_extensions
+                    for extension in self._extensions_carried_into_trials
                 ],
             ),
             robot_adaptations=self.executor.robot_adaptations,
@@ -478,6 +484,23 @@ class ActionTrial:
             collision_avoidance=self.executor.collision_avoidance,
             extensions=self._trial_visualizations(),
         )
+
+    @property
+    def _extensions_carried_into_trials(self) -> list[ContextExtension]:
+        """
+        :return: The context extensions :attr:`executor` was given, and the values the
+            statements of its plan bound so far, see
+            :class:`~cramph.composites.StatementBindings`.
+        """
+        supplied = [
+            extension
+            for extension in self.executor.supplied_context_extensions
+            if not isinstance(extension, StatementBindings)
+        ]
+        bindings = self.executor.context.get_extension(extension_type=StatementBindings)
+        if bindings is None:
+            return supplied
+        return supplied + [bindings]
 
     def _trial_visualizations(self) -> list[ExecutorExtension]:
         """
