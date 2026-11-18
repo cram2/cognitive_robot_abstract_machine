@@ -1406,7 +1406,7 @@ def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
 
     with pytest.raises(AlreadyBelongsToAWorldError):
-        l1.add_to_world(World())
+        l1.add_to_world(world=World())
 
     assert l1._world is world
     assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
@@ -1419,7 +1419,7 @@ def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup
     """
     world, l1, l2, bf, r1, r2 = world_setup
 
-    l1.add_to_world(world)
+    l1.add_to_world(world=world)
 
     assert l1._world is world
     assert world.get_kinematic_structure_entity_by_id(l1.id) is l1

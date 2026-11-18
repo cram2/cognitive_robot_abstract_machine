@@ -735,7 +735,7 @@ class World(HasSimulatorProperties):
                 _world=self, mesh_decomposer=self.mesh_decomposer
             ),
         )
-        self.collision_manager.add_to_world(self)
+        self.collision_manager.add_to_world(world=self)
 
     @classmethod
     def create_with_root_body(
@@ -1011,7 +1011,7 @@ class World(HasSimulatorProperties):
 
         :param connection: The connection to be added to the kinematic structure.
         """
-        connection.add_to_world(self)
+        connection.add_to_world(world=self)
         self.kinematic_structure.add_edge(
             connection.parent.index, connection.child.index, connection
         )
@@ -1052,7 +1052,7 @@ class World(HasSimulatorProperties):
 
         :param kinematic_structure_entity: The kinematic_structure_entity to add.
         """
-        kinematic_structure_entity.add_to_world(self)
+        kinematic_structure_entity.add_to_world(world=self)
         kinematic_structure_entity.index = self.kinematic_structure.add_node(
             kinematic_structure_entity
         )
@@ -1082,7 +1082,7 @@ class World(HasSimulatorProperties):
         :param dof: The degree of freedom to be added to the system.
         :return: None
         """
-        dof.add_to_world(self)
+        dof.add_to_world(world=self)
         self.state.add_degree_of_freedom(dof)
         self.degrees_of_freedom.append(dof)
 
@@ -1151,7 +1151,7 @@ class World(HasSimulatorProperties):
         The atomic method that adds a semantic annotation to the current list of
         semantic annotations.
         """
-        semantic_annotation.add_to_world(self)
+        semantic_annotation.add_to_world(world=self)
         self.semantic_annotations.append(semantic_annotation)
         self._world_entity_hash_table[hash(semantic_annotation)] = semantic_annotation
 
@@ -1183,7 +1183,7 @@ class World(HasSimulatorProperties):
         :param actuator: The actuator to be added to the system.
         :return: None
         """
-        actuator.add_to_world(self)
+        actuator.add_to_world(world=self)
         self.actuators.append(actuator)
 
     def _raise_error_if_belongs_to_other_world(self, world_entity: WorldEntity):

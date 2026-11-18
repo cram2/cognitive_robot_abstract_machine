@@ -369,9 +369,9 @@ def test_screw_connection_json_serialization_with_world():
         world.add_kinematic_structure_entity(body)
         world.add_kinematic_structure_entity(body2)
         connection = ScrewConnection.create_with_dofs(
-            world,
-            body,
-            body2,
+            world=world,
+            parent=body,
+            child=body2,
             axis=Vector3.Z(),
             screw_pitch=screw_pitch,
             multiplier=2.0,
