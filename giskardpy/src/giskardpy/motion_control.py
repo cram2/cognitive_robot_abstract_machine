@@ -16,7 +16,6 @@ from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.exceptions import WorldStateArrayReplacedError
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from giskardpy.qp.exceptions import EmptyProblemException
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
@@ -195,8 +194,6 @@ class MotionControl(TickingExecutorExtension):
             life_cycle_variables=executor.statechart.life_cycle_state.life_cycle_symbols(),
             float_variables=executor.context.float_variable_data.variables,
         )
-        if self.qp_controller.has_not_free_variables():
-            raise EmptyProblemException()
 
     @staticmethod
     def _combine_constraint_collections_of_nodes(
