@@ -1,3 +1,7 @@
+"""
+The GARMI robot: its joints, cameras, grippers and other robot parts.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -8,7 +12,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
     AvoidSelfCollisions,
@@ -225,7 +229,9 @@ class GarmiNeck(Neck[GarmiCamera]):
         Sets up hardware interfaces for the neck's pan and tilt joints.
         """
         for joint_name in GarmiJoint.head():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -395,7 +401,9 @@ class GarmiLeftGripper(
         Sets up hardware interfaces for the gripper's finger joints.
         """
         for joint_name in GarmiJoint.left_fingers():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -453,7 +461,9 @@ class GarmiRightGripper(
         Sets up hardware interfaces for the gripper's finger joints.
         """
         for joint_name in GarmiJoint.right_fingers():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -508,7 +518,9 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
         Sets up hardware interfaces for the arm joints.
         """
         for joint_name in GarmiJoint.left_arm():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -562,7 +574,9 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
         Sets up hardware interfaces for the arm joints.
         """
         for joint_name in GarmiJoint.right_arm():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -618,7 +632,9 @@ class GarmiTorso(
         Sets up hardware interfaces for the lift joints.
         """
         for joint_name in GarmiJoint.lift():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -682,7 +698,9 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
         Sets up hardware interfaces for the wheel joints.
         """
         for joint_name in GarmiJoint.wheels():
-            self._world.get_connection_by_name(joint_name).has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(
+                self._world.get_connection_by_name(joint_name).active_dofs, True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         """

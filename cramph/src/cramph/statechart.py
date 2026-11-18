@@ -8,6 +8,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 
 import rustworkx as rx
 from typing_extensions import (
@@ -141,7 +142,8 @@ class StatechartModification:
     once, when the outermost of any nested modifications ends.
 
     If the block raises, the nodes added inside it are dropped again, the resets
-    requested inside it are forgotten and the statechart stays as it was.
+    requested inside it are forgotten and the statechart stays as it was; nothing
+    compiles then, so the exception the block raised is the one that propagates.
     """
 
     statechart: Statechart
@@ -199,7 +201,11 @@ class StatechartModification:
         if statechart._open_modifications == 0:
             statechart._replaced_nodes.clear()
         compiler = statechart.compiler
-        if statechart._open_modifications > 0 or not compiler.is_compiled:
+        if (
+            exception is not None
+            or statechart._open_modifications > 0
+            or not compiler.is_compiled
+        ):
             return
         if not compiler.changed_since_compile:
             return
@@ -985,7 +991,7 @@ class Statechart(SubclassJSONSerializer):
         for node in self.nodes:
             node.cleanup()
 
-    def draw(self, *, file_name: str) -> None:
+    def draw(self, *, file_name: Path) -> None:
         """
         Uses graphviz to draw the statechart and safe it at `file_name`.
 
@@ -1029,8 +1035,8 @@ class Statechart(SubclassJSONSerializer):
     def plot_gantt_chart(
         self,
         *,
-        path: str = "./ganttchart.pdf",
-        context: StatechartContext = None,
+        path: Path = Path("ganttchart.pdf"),
+        context: StatechartContext | None = None,
         second_length_in_cm: float = 2.0,
     ) -> None:
         """

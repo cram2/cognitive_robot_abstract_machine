@@ -1,10 +1,16 @@
+"""
+Tests of motion statecharts: giskardpy's nodes run by a statechart executor with motion
+control.
+"""
+
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from giskardpy.data_types.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from cramph.data_types import (
     LifeCycleValues,
@@ -361,6 +367,10 @@ def test_long_goal(pr2_world_state_reset: World):
 
 
 class TestTemplates:
+    """
+    Motions built from reusable statechart templates.
+    """
+
     def test_hsr_cutting(self, *, hsr_world_state_reset: World, rclpy_node):
         """
         The HSR cuts a loaf with a knife: down, up, then a sideways shift, repeated
@@ -491,7 +501,7 @@ class TestTemplates:
         executor.compile(statechart=statechart)
 
         executor.tick_until_end()
-        statechart.draw(file_name="/tmp/muh.pdf")
+        statechart.draw(file_name=Path("/tmp/muh.pdf"))
 
         assert done.observation_state == ObservationStateValues.TRUE
         cut_life_cycle = statechart.state_history.get_life_cycle_history_of_node(

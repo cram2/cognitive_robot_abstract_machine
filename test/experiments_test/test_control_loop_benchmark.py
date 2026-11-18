@@ -1,3 +1,8 @@
+"""
+Tests of the control loop benchmark: its aggregation, its failure reports and its
+measurements of real motions.
+"""
+
 import json
 
 import pytest
@@ -20,6 +25,7 @@ from experiments.control_loop_experiments.scenarios import (
     ScenarioRunner,
 )
 from experiments.experiment_definitions import MeanAndStandardDeviation, Unit
+from giskardpy.middleware.ros2.motion_goal import DebugOutput
 from experiments.control_loop_experiments.control_loop_profiler import (
     CallTreeProfile,
     PhaseSamples,
@@ -107,12 +113,18 @@ class TestRepetitionAggregation:
     """
 
     def test_measurements_are_aggregated_over_the_repetitions(self):
+        """
+        Each measurement of a result is the mean and standard deviation over the
+        repetitions of one plotter mode.
+        """
         profiles = [
             make_profile([0.01, 0.03], [0.005, 0.015], compile_duration=0.4),
             make_profile([0.02, 0.04], [0.005, 0.015], compile_duration=0.6),
         ]
 
-        result = ControlLoopBenchmarkResult.from_profiles(PlotterMode.PLAIN, profiles)
+        result = ControlLoopBenchmarkResult.from_profiles(
+            plotter_mode=PlotterMode.PLAIN, profiles=profiles
+        )
 
         assert result.scenario_name == "measured_motion"
         assert result.plotter_mode is PlotterMode.PLAIN
@@ -131,22 +143,37 @@ class TestRepetitionAggregation:
         )
 
     def test_maximum_of_every_repetition_is_kept(self):
+        """
+        The longest cycle of every repetition enters the aggregate, not only the longest
+        of all.
+        """
         profiles = [
             make_profile([0.01, 0.09], [0.005, 0.015]),
             make_profile([0.01, 0.03], [0.005, 0.015]),
         ]
 
-        result = ControlLoopBenchmarkResult.from_profiles(PlotterMode.DEBUG, profiles)
+        result = ControlLoopBenchmarkResult.from_profiles(
+            plotter_mode=PlotterMode.DEBUG, profiles=profiles
+        )
 
         assert result.cycle_maximum == MeanAndStandardDeviation.from_measurements(
             [0.09, 0.03], unit=Unit.SECONDS
         ).to(Unit.MILLISECONDS)
 
     def test_a_configuration_that_was_never_measured_is_rejected(self):
+        """
+        Aggregating no repetitions raises :class:`NoProfilesMeasuredError`.
+        """
         with pytest.raises(NoProfilesMeasuredError):
-            ControlLoopBenchmarkResult.from_profiles(PlotterMode.PLAIN, [])
+            ControlLoopBenchmarkResult.from_profiles(
+                plotter_mode=PlotterMode.PLAIN, profiles=[]
+            )
 
     def test_every_measurement_becomes_a_column(self):
+        """
+        The result table has one column per field of
+        :class:`ControlLoopBenchmarkResult`, in their order.
+        """
         assert ControlLoopBenchmarkResult.get_column_names() == [
             "scenario_name",
             "plotter_mode",
@@ -160,6 +187,25 @@ class TestRepetitionAggregation:
         ]
 
 
+# %% what the measured goal asks Giskard to record
+
+
+@pytest.mark.parametrize(
+    "plotter_mode, debug_output",
+    [
+        (PlotterMode.PLAIN, DebugOutput()),
+        (PlotterMode.DEBUG, DebugOutput(plots_trajectory=True)),
+    ],
+)
+def test_only_the_debug_mode_asks_for_the_trajectory_plot(
+    *, plotter_mode: PlotterMode, debug_output: DebugOutput
+):
+    """
+    Only :attr:`PlotterMode.DEBUG` makes the measured goal ask for its trajectory plot.
+    """
+    assert plotter_mode.debug_output == debug_output
+
+
 # %% what a failed measurement reports
 
 
@@ -170,12 +216,12 @@ class TestFailureReporting:
     """
 
     def test_missing_repetitions_name_the_plotter_mode(self):
+        """
+        The error names the plotter mode whose repetitions are missing.
+        """
         error = NoProfilesMeasuredError(plotter_mode=PlotterMode.DEBUG)
 
-        assert error.error_message() == (
-            "No repetition was measured under the debug plotter mode, so there is "
-            "nothing to aggregate."
-        )
+        assert PlotterMode.DEBUG.value in error.error_message()
 
     def test_failed_measurement_names_the_scenario_and_the_return_code(self):
         error = MeasurementProcessFailedError(
@@ -233,12 +279,12 @@ class TestPhaseBreakdown:
 
 @pytest.fixture()
 def cartesian_goal_profile(init_background_node) -> CallTreeProfile:
-    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(CartesianGoalScenario())
+    return ScenarioRunner().run(scenario=CartesianGoalScenario())
 
 
 @pytest.fixture()
 def long_sequence_profile(init_background_node) -> CallTreeProfile:
-    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(LongSequenceScenario())
+    return ScenarioRunner().run(scenario=LongSequenceScenario())
 
 
 @pytest.mark.slow
@@ -261,10 +307,7 @@ class TestPhaseAccounting:
 
 @pytest.fixture()
 def benchmark_robot(init_background_node) -> Iterator[BenchmarkRobot]:
-    robot = BenchmarkRobot(
-        plotter_mode=PlotterMode.PLAIN,
-        target_frequency=ScenarioRunner.target_frequency,
-    )
+    robot = BenchmarkRobot(target_frequency=ScenarioRunner.target_frequency)
     yield robot
     robot.close()
 
@@ -313,9 +356,7 @@ class TestControlCycleBudget:
 
 @pytest.fixture()
 def deeply_nested_cascade_profile(init_background_node) -> CallTreeProfile:
-    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(
-        DeeplyNestedCascadeScenario()
-    )
+    return ScenarioRunner().run(scenario=DeeplyNestedCascadeScenario())
 
 
 @pytest.mark.slow

@@ -73,7 +73,7 @@ from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
-from krrood.symbol_graph.helpers import get_field_type_endpoint
+from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
@@ -519,17 +519,14 @@ class Match(
 
     def _evaluate_natively_(self) -> Iterator:
         """
-        Evaluate the match selectively in the current python process: select elements
-        from the match's domain (its variable's domain, or the ``SymbolGraph`` for
-        ``Symbol`` types when no domain was given) that satisfy the structural pattern
-        and ``where`` conditions.
+        Select the elements of the match's domain (its variable's domain, or the
+        ``SymbolGraph`` for ``Symbol`` types without one) that satisfy the structural
+        pattern and ``where`` conditions, in this process.
 
         .. note::
             Constructing *new* instances from an underspecified match is the job of a
-            :class:`~krrood.entity_query_language.backends.GenerativeBackend` (for example
-            :class:`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
-            or :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`), not of the
-            default selective evaluation.
+            :class:`~krrood.entity_query_language.backends.GenerativeBackend`, not of
+            the default selective evaluation.
 
         :return: An iterator over the matching elements.
         """
@@ -818,7 +815,7 @@ class Match(
 
         Sugar for ``self.where(CausesEffect(and_(*conditions), cause_attributes=...))``:
         semantically identical to an ordinary ``.where()`` under every backend except
-        :class:`~krrood.entity_query_language.backends.ProbabilisticBackend`, which reads
+        :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend`, which reads
         the wrapped condition to find which variable(s) a
         :data:`~krrood.entity_query_language.factories.cause` search should optimize for.
         The ``cause``-marked attribute(s) are also attached to the built

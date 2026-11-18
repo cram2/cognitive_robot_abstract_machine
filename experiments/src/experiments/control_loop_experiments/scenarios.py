@@ -1,3 +1,7 @@
+"""
+The robot and the scenarios whose control loop the benchmark measures.
+"""
+
 from __future__ import annotations
 
 import cProfile
@@ -20,6 +24,7 @@ from experiments.control_loop_experiments.control_loop_profiler import (
 )
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
+from giskardpy.middleware.ros2.motion_goal import DebugOutput
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
@@ -44,7 +49,7 @@ from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses
@@ -68,30 +73,28 @@ from semantic_digital_twin.world_description.world_entity import (
 
 class PlotterMode(StrEnum):
     """
-    Whether the post goal plotters record the motion while it is measured.
+    Whether Giskard records the trajectory of the motion while it is measured.
 
     Recording costs time in every cycle, so the same motion is measured under both modes
-    to show what the plotters cost.
+    to show what it costs.
     """
 
     PLAIN = "plain"
     """
-    The plotters are off, so only the control loop itself is measured.
+    Nothing is recorded, so only the control loop itself is measured.
     """
 
     DEBUG = "debug"
     """
-    The plotters record the motion, as they do when a motion is debugged.
+    The trajectory is recorded and plotted, as it is when a motion is debugged.
     """
 
     @property
-    def records_trajectory(self) -> bool:
+    def debug_output(self) -> DebugOutput:
         """
-        Whether Giskard has to keep the trajectory around for the plotters.
-
-        :return: True if the trajectory has to be kept.
+        :return: What the measured goal asks Giskard to produce to debug it.
         """
-        return self is PlotterMode.DEBUG
+        return DebugOutput(plots_trajectory=self is PlotterMode.DEBUG)
 
 
 # %% the robot under measurement
@@ -116,11 +119,6 @@ class BenchmarkRobot(GiskardTester):
     """
     A PR2 that runs its motions in place at the pace of a real robot, so the control
     loop is measured without a simulator or hardware in between.
-    """
-
-    plotter_mode: PlotterMode = PlotterMode.DEBUG
-    """
-    Whether the post goal plotters record the motion, which costs time in every cycle.
     """
 
     target_frequency: float = field(kw_only=True)
@@ -204,16 +202,12 @@ class BenchmarkRobot(GiskardTester):
     """
 
     def setup_giskard(self) -> Giskard:
-        records_trajectory = self.plotter_mode.records_trajectory
         return Giskard(
             world_source=WorldSpecification(
                 robots=[RobotSpecification.specify_real_robot(PR2)]
             ),
             robot_interface_config=RealTimeStandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=records_trajectory,
-                plot_trajectory=records_trajectory,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig(
                 target_frequency=self.target_frequency
             ),
@@ -727,15 +721,15 @@ class IsolatedBenchmarkSession(AbstractContextManager):
         self._class_diagram.clear()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScenarioRunner:
     """
     Sets a scenario up, measures its motion and takes the robot down again.
     """
 
-    plotter_mode: PlotterMode = PlotterMode.DEBUG
+    plotter_mode: PlotterMode = PlotterMode.PLAIN
     """
-    Whether the post goal plotters record the motion while it is measured.
+    Whether Giskard records the trajectory of the motion while it is measured.
     """
 
     target_frequency: float = 100.0
@@ -751,16 +745,14 @@ class ScenarioRunner:
     meshes cannot drown out the control loop.
     """
 
-    def run(self, scenario: BenchmarkScenario) -> CallTreeProfile:
+    def run(self, *, scenario: BenchmarkScenario) -> CallTreeProfile:
         """
         Measure one motion of the given scenario on a freshly built robot.
 
         :param scenario: The scenario whose motion is measured.
         :return: The call tree recorded while the motion ran.
         """
-        robot = BenchmarkRobot(
-            plotter_mode=self.plotter_mode, target_frequency=self.target_frequency
-        )
+        robot = BenchmarkRobot(target_frequency=self.target_frequency)
         try:
             robot.teleport_to_configuration(
                 joint_state=scenario.seed_joint_state(robot)
@@ -783,13 +775,14 @@ class ScenarioRunner:
         :param robot: The robot the motion is executed on.
         :param motion_statechart: The motion that is executed.
         """
+        debug_output = self.plotter_mode.debug_output
         if self.python_profiler is None:
             robot.api.compile(statechart=motion_statechart)
-            robot.api.execute()
+            robot.api.execute(debug_output=debug_output)
             return
         self.python_profiler.enable()
         try:
             robot.api.compile(statechart=motion_statechart)
-            robot.api.execute()
+            robot.api.execute(debug_output=debug_output)
         finally:
             self.python_profiler.disable()

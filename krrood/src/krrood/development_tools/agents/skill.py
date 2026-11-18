@@ -5,12 +5,12 @@ Skills: instructions a coding agent loads for one kind of task, each written int
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from enum import StrEnum
 from pathlib import Path
 
 from krrood.development_tools.agents.rule import ClassNamedDeclaration, Section
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% tools
 
@@ -54,7 +54,7 @@ class AgentTool(StrEnum):
 # %% skills
 
 
-class Skill(ClassNamedDeclaration):
+class Skill(ClassNamedDeclaration, ABC):
     """
     A skill, declared as a class named after it followed by ``Skill``, whose sections
     are written below its introduction in the order :attr:`sections` lists them.

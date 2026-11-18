@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import timedelta
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -284,8 +285,9 @@ def test_external_collision_avoidance_battle():
         weak = world.get_kinematic_structure_entity_by_id(weak.id)
         weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
 
-        omni1.has_hardware_interface = True
-        omni2.has_hardware_interface = True
+        world.set_dofs_has_hardware_interface(
+            omni1.active_dofs + omni2.active_dofs, True
+        )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=world),
@@ -414,6 +416,11 @@ def test_external_collision_avoidance_with_weight_above_ca(
 
 
 def test_update_collision_matrix_later(cylinder_bot_world: World):
+    """
+    Once a statechart that changed the temporary collision rules has ended, the
+    collision matrix is rebuilt from new rules, and none of its collision consumers stay
+    registered.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -470,7 +477,7 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
     executor.compile(statechart=statechart)
 
     executor.tick_until_end(timeout=500)
-    statechart.draw(file_name="muh.pdf")
+    statechart.draw(file_name=Path("muh.pdf"))
     cylinder_bot_world.collision_manager.clear_temporary_rules()
     cylinder_bot_world.collision_manager.add_temporary_rule(AvoidAllCollisions())
     cylinder_bot_world.collision_manager.update_collision_matrix()

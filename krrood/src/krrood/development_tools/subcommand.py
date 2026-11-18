@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 
 class Subcommand(StrEnum):
@@ -27,6 +27,17 @@ class Subcommand(StrEnum):
     SKILLS = "skills"
     """
     Generate the ``SKILL.md`` of every skill the repository declares.
+    """
+
+    ISSUE_FORMS = "issue-forms"
+    """
+    Generate the file of every issue form krrood ships and the repository declares.
+    """
+
+    ISSUE_ANSWER = "issue-answer"
+    """
+    Print the answer an issue's body, read from standard input, gives to one field of an
+    issue form.
     """
 
     CHECK = "check"

@@ -1,5 +1,10 @@
+"""
+Tests of executing statecharts on Giskard through :class:`GiskardClientExecutor`.
+"""
+
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -14,6 +19,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import (
     GiskardClientExecutor,
     GiskardClientExecutorNode,
 )
+from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.world import World
 
@@ -101,6 +107,56 @@ def test_an_extension_is_told_that_an_aborted_goal_stopped(
         executor_with_a_statechart.execute()
 
     assert extension.run_count == 1
+
+
+# %% debug output
+
+
+@pytest.mark.parametrize(
+    "debug_output",
+    [
+        DebugOutput(publishes_expression_markers=True),
+        DebugOutput(plots_trajectory=True),
+    ],
+)
+def test_executing_sends_what_giskard_produces_to_debug_the_goal(
+    giskard_command_server: ActionServerHandler,
+    executor_with_a_statechart: GiskardClientExecutor,
+    debug_output: DebugOutput,
+) -> None:
+    """
+    The goal sent to Giskard carries the debug output passed to
+    :meth:`GiskardClientExecutor.execute`.
+    """
+    server = ServerAnsweringOneGoal(
+        action_server=giskard_command_server,
+        outcome_unless_canceled=GoalOutcome.ABORTED,
+    )
+
+    with pytest.raises(ExecutionAbortedException):
+        executor_with_a_statechart.execute(debug_output=debug_output)
+
+    sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
+    assert sent_goal.debug_output == debug_output
+
+
+def test_executing_asks_for_no_debug_output_unless_told_to(
+    giskard_command_server: ActionServerHandler,
+    executor_with_a_statechart: GiskardClientExecutor,
+) -> None:
+    """
+    A goal executed without a debug output asks for the default :class:`DebugOutput`.
+    """
+    server = ServerAnsweringOneGoal(
+        action_server=giskard_command_server,
+        outcome_unless_canceled=GoalOutcome.ABORTED,
+    )
+
+    with pytest.raises(ExecutionAbortedException):
+        executor_with_a_statechart.execute()
+
+    sent_goal = MotionGoal.from_json(data=json.loads(server.received_goal_message.goal))
+    assert sent_goal.debug_output == DebugOutput()
 
 
 # %% closing

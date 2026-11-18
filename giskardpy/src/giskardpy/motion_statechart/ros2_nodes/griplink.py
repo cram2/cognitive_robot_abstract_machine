@@ -1,3 +1,8 @@
+"""
+Motion statechart tasks that drive a Griplink gripper through its ROS 2 action server,
+with the action's goal, feedback and result messages.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -20,7 +25,7 @@ from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
@@ -204,7 +209,7 @@ class GriplinkActionServerTask(
         """
 
     @classmethod
-    def moving_gripper_to(
+    def create_gripper_goal(
         cls,
         *,
         configuration: GripperConfiguration,
@@ -212,10 +217,10 @@ class GriplinkActionServerTask(
         tolerate_stall: bool = False,
     ) -> StatechartNode:
         """
-        Differs from :meth:`MovesGripperToConfiguration.moving_gripper_to` in driving a
+        Differs from :meth:`MovesGripperToConfiguration.create_gripper_goal` in driving a
         griplink gripper through the griplink action server serving the state of
         `configuration`; any other configuration is reached as
-        :meth:`MoveFingers.moving_gripper_to` reaches it, which alone reads
+        :meth:`MoveFingers.create_gripper_goal` reaches it, which alone reads
         `stall_minimum_time` and `tolerate_stall`.
 
         :raises NoGriplinkEndpoint: If the gripper declares no endpoint for the state of
@@ -230,7 +235,7 @@ class GriplinkActionServerTask(
                 return GriplinkFlexActionServerTask.from_configuration(
                     configuration=configuration
                 )
-        return MoveFingers.moving_gripper_to(
+        return MoveFingers.create_gripper_goal(
             configuration=configuration,
             stall_minimum_time=stall_minimum_time,
             tolerate_stall=tolerate_stall,

@@ -268,7 +268,7 @@ class Rule(ABC):
                 r"def (\w+)", new_function_name, conclusion_lines[0]
             )
             # add type hint
-            from krrood.code_generation.type_hints import stringify_type_hint
+            from krrood.code_generation.object_to_source import stringify_type_hint
 
             if not self.conclusion.mutually_exclusive:
                 type_names = [

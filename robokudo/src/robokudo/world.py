@@ -31,6 +31,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World, Body
 from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 # Module-level singleton-like variables
 this = sys.modules[__name__]
@@ -327,10 +328,12 @@ def _update_belief_body_from_latest_bbox(
     origin, scale = origin_and_scale
     object_belief_body = object_belief.body
 
+    kept_shapes = [] if replace_existing_visuals else object_belief_body.visual.shapes
     with rk_world.modify_world():
-        if replace_existing_visuals:
-            object_belief_body.visual.shapes.clear()
-        object_belief_body.visual.append(Box(scale=scale))
+        object_belief_body.update_shapes(
+            visual=ShapeCollection([*kept_shapes, Box(scale=scale)]),
+            collision=object_belief_body.collision,
+        )
         world_T_object_belief.origin = origin
 
 
