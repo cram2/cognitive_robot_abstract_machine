@@ -41,7 +41,6 @@ from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.factories import a, variable
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -49,10 +48,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Milk,
-    Spoon,
-)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from ...plan_running import robot_executor, run_plan, simulated_executor, statechart_of
@@ -191,6 +187,7 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
+        arm=robot.left_arm,
         object_designator=milk,
         target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
@@ -211,6 +208,7 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
+        arm=robot.left_arm,
         object_designator=milk,
         target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
@@ -223,72 +221,6 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
         statechart.get_preceding_node_by_type(node=place, node_type=PickUpAction)
         is pick_up
     )
-
-
-def test_a_place_after_several_pick_ups_uses_the_arm_that_picked_its_object(
-    pr2_apartment_context,
-) -> None:
-    world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
-    place_milk = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
-    )
-    statechart = Statechart(context=simulated_executor(extensions).context)
-
-    statechart.add_node(
-        node=Sequence(
-            nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
-                place_milk,
-            ]
-        )
-    )
-
-    moved_tool_frames = {
-        node.tip_link
-        for node in place_milk.descendants
-        if isinstance(node, CartesianPose)
-    }
-    assert moved_tool_frames == {robot.left_arm.end_effector.tool_frame}
-
-
-def test_a_place_after_an_earlier_place_uses_the_arm_that_picked_its_object(
-    pr2_apartment_context,
-) -> None:
-    world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
-    place_spoon = PlaceAction(
-        object_designator=spoon,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
-    )
-    statechart = Statechart(context=simulated_executor(extensions).context)
-
-    statechart.add_node(
-        node=Sequence(
-            nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
-                PlaceAction(
-                    object_designator=milk,
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, -1.5, 0.7, reference_frame=world.root
-                    ),
-                ),
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
-                place_spoon,
-            ]
-        )
-    )
-
-    moved_tool_frames = {
-        node.tip_link
-        for node in place_spoon.descendants
-        if isinstance(node, CartesianPose)
-    }
-    assert moved_tool_frames == {robot.right_arm.end_effector.tool_frame}
 
 
 # %% running on the robot
