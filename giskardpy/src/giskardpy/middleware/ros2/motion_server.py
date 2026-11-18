@@ -50,7 +50,7 @@ from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
-from krrood.synchronization.messages import StreamPosition
+from krrood_synchronization.messages import StreamPosition
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )

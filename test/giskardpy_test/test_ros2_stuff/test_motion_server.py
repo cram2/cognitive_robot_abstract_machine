@@ -49,8 +49,8 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import from_json
 from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
-from krrood.synchronization.exceptions import DivergedFromPublisherError
-from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
+from krrood_synchronization.exceptions import DivergedFromPublisherError
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (

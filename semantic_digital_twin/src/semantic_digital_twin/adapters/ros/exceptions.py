@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from krrood.exceptions import DataclassException
-from krrood.synchronization.messages import MessageOrigin
+from krrood_synchronization.messages import MessageOrigin
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import UsageError
 

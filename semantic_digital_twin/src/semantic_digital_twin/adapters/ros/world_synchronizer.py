@@ -29,14 +29,14 @@ from sqlalchemy.orm import Session
 from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.helper import to_dao
-from krrood.synchronization.exceptions import DivergedFromPublisherError
-from krrood.synchronization.messages import (
+from krrood_synchronization.exceptions import DivergedFromPublisherError
+from krrood_synchronization.messages import (
     Message,
     MessageOrigin,
     Sender,
     StreamPosition,
 )
-from krrood.synchronization.stream_participants import (
+from krrood_synchronization.stream_participants import (
     LostMessages,
     StreamPublisher,
     StreamReceiver,

@@ -44,7 +44,7 @@ from giskardpy.middleware.ros2.world_updates import (
     ClientWorldUpdates,
     OutgoingWorldUpdates,
 )
-from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock

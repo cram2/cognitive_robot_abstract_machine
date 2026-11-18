@@ -21,7 +21,7 @@ from rclpy.timer import Timer
 
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood.synchronization.messages import Sender
+from krrood_synchronization.messages import Sender
 from krrood.patterns.called_positionally import called_positionally
 
 # %% where heartbeats are sent and received

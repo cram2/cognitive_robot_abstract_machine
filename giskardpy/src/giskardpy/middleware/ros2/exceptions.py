@@ -11,7 +11,7 @@ from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
-from krrood.synchronization.messages import Sender
+from krrood_synchronization.messages import Sender
 from semantic_digital_twin.world_description.connections import WheeledDrive
 
 

@@ -8,6 +8,7 @@ PACKAGES = [
     "giskardpy",
     "krrood",
     "krrood_spatial_math",
+    "krrood_synchronization",
     "physics_simulators",
     "probabilistic_model",
     "random_events",

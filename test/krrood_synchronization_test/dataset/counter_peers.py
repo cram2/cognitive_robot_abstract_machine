@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.synchronization.messages import Message, MessageOrigin, StreamPosition
-from krrood.synchronization.stream_participants import StreamPublisher, StreamReceiver
+from krrood_synchronization.messages import Message, MessageOrigin, StreamPosition
+from krrood_synchronization.stream_participants import StreamPublisher, StreamReceiver
 
 # %% messages
 
