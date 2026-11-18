@@ -11,7 +11,7 @@ from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from krrood.patterns.mixin import ParameterMixin
-from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix, Vector3
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
@@ -49,12 +49,12 @@ class HasTipLinkParameter(ParameterMixin):
 @dataclass(eq=False, repr=False, kw_only=True)
 class HasKinematicChainParameter(ParameterMixin):
     """
-    A node moving the tip of a kinematic chain relative to its root.
+    Acts on the tip of a kinematic chain relative to its root.
     """
 
     kinematic_chain: KinematicChain
     """
-    The chain whose tip is moved, relative to its root.
+    The chain whose tip is moved or measured, relative to its root.
     """
 
 
@@ -181,6 +181,155 @@ class HasOrientationThresholdParameter(ParameterMixin):
     orientation_threshold: float = 0.01
     """
     Angle at or below which the orientation counts as reached, in radians.
+    """
+
+
+# %% geometric features
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasTipPointParameter(ParameterMixin):
+    """
+    A node moving or observing a point fixed on a link.
+    """
+
+    tip_point: Point3
+    """
+    The point moved or observed, in the frame of the link it is fixed on.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasReferencePointParameter(ParameterMixin):
+    """
+    A node measuring a point it moves or observes against another point.
+    """
+
+    reference_point: Point3
+    """
+    The point the moved or observed point is measured against.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasTipNormalParameter(ParameterMixin):
+    """
+    A node turning or observing a plane fixed on a link.
+    """
+
+    tip_normal: Vector3
+    """
+    The normal of the plane turned or observed, in the frame of the link it is fixed on.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasReferenceNormalParameter(ParameterMixin):
+    """
+    A node relating a plane it turns or observes to another plane.
+    """
+
+    reference_normal: Vector3
+    """
+    The normal of the plane the turned or observed plane is related to.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasTipVectorParameter(ParameterMixin):
+    """
+    A node turning or observing a direction fixed on a link.
+    """
+
+    tip_vector: Vector3
+    """
+    The direction turned or observed, in the frame of the link it is fixed on.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasReferenceVectorParameter(ParameterMixin):
+    """
+    A node measuring the angle of a direction it turns or observes to another direction.
+    """
+
+    reference_vector: Vector3
+    """
+    The direction the angle of the turned or observed direction is measured from.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasLowerLimitParameter(ParameterMixin):
+    """
+    A node keeping a distance between two points above a bound.
+    """
+
+    lower_limit: float
+    """
+    The smallest distance allowed between the two points, in meters, as the node
+    measures it.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasUpperLimitParameter(ParameterMixin):
+    """
+    A node keeping a distance between two points below a bound.
+    """
+
+    upper_limit: float
+    """
+    The largest distance allowed between the two points, in meters, as the node
+    measures it.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasLowerAngleParameter(ParameterMixin):
+    """
+    A node keeping the angle between two directions above a bound.
+    """
+
+    lower_angle: float
+    """
+    The smallest angle allowed between the two directions, in radians.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasUpperAngleParameter(ParameterMixin):
+    """
+    A node keeping the angle between two directions below a bound.
+    """
+
+    upper_angle: float
+    """
+    The largest angle allowed between the two directions, in radians.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasPointingAxisParameter(ParameterMixin):
+    """
+    A node aiming an axis of a link at a point.
+    """
+
+    pointing_axis: Vector3
+    """
+    The axis aimed at the point, in the frame of the link it is fixed on.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasHolePointParameter(ParameterMixin):
+    """
+    A node inserting what a gripper holds into a hole.
+    """
+
+    hole_point: Point3
+    """
+    The center of the opening of the hole.
     """
 
 

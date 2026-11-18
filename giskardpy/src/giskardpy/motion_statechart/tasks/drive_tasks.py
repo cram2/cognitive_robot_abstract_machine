@@ -20,8 +20,9 @@ from cramph.node import (
     SucceedsOnObservingTrue,
     expanded_child_field,
 )
-from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
+)
 from giskardpy.motion_statechart.exceptions import RobotWithoutMobileBaseError
 from giskardpy.motion_statechart.graph_node import (
     BindsGoalReferenceFrame,
@@ -29,6 +30,7 @@ from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
 )
 from giskardpy.motion_statechart.mixins import (
+    HasCruiseAngularVelocityParameter,
     HasCruiseVelocityParameter,
     HasGoalPoseParameter,
     HasThresholdParameter,
@@ -56,9 +58,7 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DrivenBaseTask(
-    ConvergingTask, HasGoalPoseParameter, HasCruiseVelocityParameter, ABC
-):
+class DrivenBaseTask(ConvergingTask, HasGoalPoseParameter, ABC):
     """
     Moves the base a drive carries towards :attr:`goal_pose`, relative to the parent of
     the drive as it is whenever the task is built.
@@ -105,7 +105,7 @@ class DrivenBaseTask(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class BasePosition(DrivenBaseTask):
+class BasePosition(DrivenBaseTask, HasCruiseVelocityParameter):
     """
     Drives the base along the floor to below the position of :attr:`goal_pose`, with an
     error in meters.
@@ -137,15 +137,10 @@ class BasePosition(DrivenBaseTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DrivenBaseRotation(DrivenBaseTask, ABC):
+class DrivenBaseRotation(DrivenBaseTask, HasCruiseAngularVelocityParameter, ABC):
     """
     Turns the base about the vertical until it faces the way the orientation
     :meth:`parent_R_goal` describes does, with an error in radians.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    How fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     @abstractmethod
@@ -169,7 +164,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
         artifacts.geometry.add_yaw_goal_constraint(
             frame_R_current=parent_R_base,
             frame_R_goal=parent_R_goal,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         yaw_error = sm.shortest_angular_distance(

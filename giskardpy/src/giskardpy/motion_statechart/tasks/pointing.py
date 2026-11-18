@@ -6,30 +6,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
-from giskardpy.motion_statechart.mixins import HasGoalPointParameter
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseAngularVelocityParameter,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
+# %% pointing an axis at a point
+
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class Pointing(CartesianTask, HasGoalPointParameter):
+class Pointing(
+    CartesianTask,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
     Will orient :attr:`pointing_axis` at :attr:`goal_point`, with an error in radians.
-    """
-
-    pointing_axis: Vector3
-    """
-    The axis of the tip of :attr:`kinematic_chain` that will be used for pointing.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     @property
@@ -67,7 +66,7 @@ class Pointing(CartesianTask, HasGoalPointParameter):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=tip_V_goal_axis,
             frame_V_goal=tip_V_pointing_axis,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(
@@ -79,25 +78,20 @@ class Pointing(CartesianTask, HasGoalPointParameter):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PointingCone(CartesianTask, HasGoalPointParameter):
+class PointingCone(
+    CartesianTask,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
     Will orient :attr:`pointing_axis` at :attr:`goal_point` with a cone-shaped tolerance
     region, with an error in radians.
     """
 
-    pointing_axis: Vector3
-    """
-    The axis of the tip of :attr:`kinematic_chain` that will be used for pointing.
-    """
-
     cone_theta: float = 0.0
     """
     Slack cone region in radians.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     @property
@@ -138,7 +132,7 @@ class PointingCone(CartesianTask, HasGoalPointParameter):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis_proj,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(

@@ -20,7 +20,7 @@ def joint_position_and_velocity_variables(
     Free variables that are not joint positions are skipped, so they are treated as
     constants when differentiating. That is correct for values which only change between
     runs of a node, such as a goal captured by
-    :class:`~giskardpy.motion_statechart.binding_policy.ForwardKinematicsBinding`, and
+    :class:`~giskardpy.motion_statechart.forward_kinematics_binding.ForwardKinematicsBinding`, and
     wrong for values rewritten every control cycle.
 
     :param expression: The expression to inspect.

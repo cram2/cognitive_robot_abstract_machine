@@ -9,6 +9,7 @@ from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.graph_node import ConvergingTask
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
+    HasMaxJointVelocityParameter,
     HasGoalStateParameter,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
@@ -83,7 +84,7 @@ class JointPositionList(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class JointVelocityLimit(Task):
+class JointVelocityLimit(Task, HasMaxJointVelocityParameter):
     """
     Limits the velocity of a set of joints to a maximum value.
 
@@ -100,7 +101,7 @@ class JointVelocityLimit(Task):
 
     max_joint_velocity: float = 0.1
     """
-    Maximum allowed velocity (in rad/s or m/s, per joint).
+    Never None, as capping the joints is what this task is for.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE

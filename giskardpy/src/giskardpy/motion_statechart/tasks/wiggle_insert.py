@@ -22,11 +22,11 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
+    HasHolePointParameter,
     HasKinematicChainParameter,
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    Point3,
     Vector3,
     RotationMatrix,
 )
@@ -36,6 +36,7 @@ from krrood_spatial_math.spatial_types import (
 class WiggleInsert(
     ConvergingTask,
     HasKinematicChainParameter,
+    HasHolePointParameter,
     HasCruiseVelocityParameter,
 ):
     """
@@ -44,11 +45,6 @@ class WiggleInsert(
 
     The wiggle is driven per control cycle through auxiliary variables that are updated
     in :meth:`on_tick`.
-    """
-
-    hole_point: Point3
-    """
-    Center point of the hole.
     """
 
     noise_translation: float = 0.5

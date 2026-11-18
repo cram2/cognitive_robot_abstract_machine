@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import pytest
 
-from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
+)
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World

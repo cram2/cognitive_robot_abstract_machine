@@ -15,8 +15,9 @@ import krrood.symbolic_math.symbolic_math as sm
 from cramph.composites import Parallel
 from cramph.data_types import ObservationStateValues
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
+)
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.error_signals import (
     joint_position_and_velocity_variables,
@@ -41,8 +42,10 @@ from giskardpy.motion_statechart.mixins import (
     HasPositionThresholdParameter,
     HasOrientationThresholdParameter,
     HasCruiseVelocityParameter,
+    HasReferencePointParameter,
     HasRootLinkParameter,
     HasThresholdParameter,
+    HasTipPointParameter,
     HasMaxAngularVelocityParameter,
     HasMaxLinearVelocityParameter,
     HasWeightParameter,
@@ -78,7 +81,6 @@ class CartesianTask(
     ConvergingTask,
     BindsGoalReferenceFrame,
     HasKinematicChainParameter,
-    HasCruiseVelocityParameter,
     ABC,
 ):
     """
@@ -138,7 +140,9 @@ class CartesianTask(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPosition(CartesianTask, HasGoalPointParameter):
+class CartesianPosition(
+    CartesianTask, HasGoalPointParameter, HasCruiseVelocityParameter
+):
     """
     Move a tip link to a goal position in 3D space, with an error in meters.
 
@@ -184,23 +188,17 @@ class CartesianPosition(CartesianTask, HasGoalPointParameter):
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class DistanceAlongAxis(
-    ConvergingTask, HasRootLinkParameter, HasCruiseVelocityParameter
+    ConvergingTask,
+    HasRootLinkParameter,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasCruiseVelocityParameter,
 ):
     """
     Move two points, each fixed on a link of its own, until they stand a given distance
     apart along an axis, leaving them free in every other direction.
 
     Both links may move. The axis is fixed in :attr:`root_link`.
-    """
-
-    reference_point: Point3
-    """
-    The point the distance is measured from, in the frame of the link it is fixed on.
-    """
-
-    tip_point: Point3
-    """
-    The point the distance is measured to, in the frame of the link it is fixed on.
     """
 
     axis: Vector3
@@ -240,7 +238,9 @@ class DistanceAlongAxis(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPositionTrajectory(CartesianTask, HasGoalPointsParameter):
+class CartesianPositionTrajectory(
+    CartesianTask, HasGoalPointsParameter, HasCruiseVelocityParameter
+):
     """
     Move a tip link along :attr:`goal_points` to the last one, with an error in meters.
 
@@ -539,7 +539,9 @@ class CartesianPositionTrajectory(CartesianTask, HasGoalPointsParameter):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPositionStraight(CartesianTask, HasGoalPointParameter):
+class CartesianPositionStraight(
+    CartesianTask, HasGoalPointParameter, HasCruiseVelocityParameter
+):
     """
     Move a tip link to a goal position along a straight line, with an error in meters.
 
@@ -647,7 +649,9 @@ class CartesianPositionStraight(CartesianTask, HasGoalPointParameter):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianOrientation(CartesianTask, HasGoalOrientationParameter):
+class CartesianOrientation(
+    CartesianTask, HasGoalOrientationParameter, HasCruiseAngularVelocityParameter
+):
     """
     Rotate a tip link to match a goal orientation, with an error in radians.
 
@@ -660,11 +664,6 @@ class CartesianOrientation(CartesianTask, HasGoalOrientationParameter):
     @property
     def goal_reference_frame(self) -> KinematicStructureEntity:
         return self.goal_orientation.reference_frame
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    How fast the goal orientation is approached, in rad/s; not strictly enforced.
-    """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -686,7 +685,7 @@ class CartesianOrientation(CartesianTask, HasGoalOrientationParameter):
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
 
@@ -756,7 +755,7 @@ class CartesianPose(
                 name=f"{self.name}/orientation",
                 kinematic_chain=self.kinematic_chain,
                 goal_orientation=self.goal_pose.rotation_matrix,
-                cruise_velocity=self.cruise_angular_velocity,
+                cruise_angular_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,
                 goal_binding_policy=self.goal_binding_policy,
@@ -862,17 +861,14 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HoldOrientation(HoldLink, HasThresholdParameter, HasCruiseVelocityParameter):
+class HoldOrientation(
+    HoldLink, HasThresholdParameter, HasCruiseAngularVelocityParameter
+):
     """
     Keeps a link in the orientation it had when this task started, leaving it free to
     move.
 
     Its threshold is an angle in radians.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    How fast the orientation is restored, in rad/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -882,7 +878,7 @@ class HoldOrientation(HoldLink, HasThresholdParameter, HasCruiseVelocityParamete
         """
         artifacts = MotionNodeArtifacts()
         artifacts.observation = self._hold_orientation(
-            artifacts, self.cruise_velocity, self.threshold
+            artifacts, self.cruise_angular_velocity, self.threshold
         )
         return artifacts
 
@@ -1176,7 +1172,7 @@ class CartesianPoseStraight(CartesianPose):
                 name=f"{self.name}/orientation",
                 kinematic_chain=self.kinematic_chain,
                 goal_orientation=self.goal_pose.rotation_matrix,
-                cruise_velocity=self.cruise_angular_velocity,
+                cruise_angular_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,
                 goal_binding_policy=self.goal_binding_policy,

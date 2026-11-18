@@ -14,6 +14,7 @@ from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
+    HasHolePointParameter,
     HasTipLinkParameter,
     HasWeightParameter,
     HasKinematicChainParameter,
@@ -91,7 +92,11 @@ class StayOnLineTask(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class InsertCylinder(
-    EndedByOwner, CompositeNode, HasTipLinkParameter, HasWeightParameter
+    EndedByOwner,
+    CompositeNode,
+    HasTipLinkParameter,
+    HasHolePointParameter,
+    HasWeightParameter,
 ):
     """
     Inserts a grasped cylinder into a hole.
@@ -106,11 +111,6 @@ class InsertCylinder(
     tip_P_tool: Point3
     """
     The point of the cylinder that leads the insertion.
-    """
-
-    hole_point: Point3
-    """
-    Position of the hole to insert into.
     """
 
     tip_V_axis: Vector3
@@ -233,7 +233,7 @@ class InsertCylinder(
             kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_normal=self.tip_V_axis,
             reference_normal=root_V_up,
-            cruise_velocity=self.straightening_cruise_velocity,
+            cruise_angular_velocity=self.straightening_cruise_velocity,
             weight=self.weight,
         )
         self._add_children_to_statechart(

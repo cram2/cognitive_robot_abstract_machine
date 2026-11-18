@@ -20,7 +20,10 @@ from giskardpy.motion_statechart.mixins import (
     HasKinematicChainParameter,
     HasPositionThresholdParameter,
     HasOrientationThresholdParameter,
+    HasPointingAxisParameter,
+    HasReferenceNormalParameter,
     HasThresholdParameter,
+    HasTipNormalParameter,
 )
 from krrood_spatial_math.spatial_types import Vector3, Point3
 from semantic_digital_twin.world_description.world_entity import (
@@ -137,16 +140,12 @@ class PointingAt(
     MotionStatechartNode,
     HasKinematicChainParameter,
     HasGoalPointParameter,
+    HasPointingAxisParameter,
     HasThresholdParameter,
 ):
     """
     Observes ``True`` once the pointing axis of the tip link passes within
     :attr:`threshold` meters of :attr:`goal_point`.
-    """
-
-    pointing_axis: Vector3
-    """
-    Axis of the tip link that should point at the goal point.
     """
 
     def build_artifacts(self) -> NodeArtifacts:
@@ -175,21 +174,13 @@ class VectorsAligned(
     EndedByOwner,
     MotionStatechartNode,
     HasKinematicChainParameter,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
     HasThresholdParameter,
 ):
     """
     Observes ``True`` once :attr:`tip_normal` is aligned with :attr:`reference_normal`
     within :attr:`threshold` radians.
-    """
-
-    reference_normal: Vector3
-    """
-    Reference normal the tip normal should align with.
-    """
-
-    tip_normal: Vector3
-    """
-    Normal of the tip link that should align with :attr:`reference_normal`.
     """
 
     def build_artifacts(self) -> NodeArtifacts:

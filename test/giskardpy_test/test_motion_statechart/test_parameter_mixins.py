@@ -16,6 +16,9 @@ import pytest
 
 from giskardpy.motion_statechart import mixins, monitors, tasks
 from giskardpy.motion_statechart.tasks.drive_tasks import (
+    BaseHeading,
+    BaseOrientation,
+    BaseTurnTowardsGoalPosition,
     DrivenBaseGoal,
     HolonomicBaseGoal,
 )
@@ -53,6 +56,21 @@ from giskardpy.motion_statechart.mixins import (
     HasTwoFingerGripperParameter,
     HasWidthParameter,
     HasWeightParameter,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasTipVectorParameter,
+    HasReferenceVectorParameter,
+    HasLowerLimitParameter,
+    HasUpperLimitParameter,
+    HasLowerAngleParameter,
+    HasUpperAngleParameter,
+    HasPointingAxisParameter,
+    HasHolePointParameter,
+)
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
 )
 from giskardpy.motion_statechart.monitors.cartesian_monitors import (
     OrientationReached,
@@ -67,7 +85,11 @@ from giskardpy.motion_statechart.monitors.feature_monitors import (
     HeightMonitor,
     PerpendicularMonitor,
 )
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.align_planes import (
+    AlignPlanes,
+    KeepHeldBodyUpright,
+)
+from giskardpy.motion_statechart.tasks.cylinder_insertion import InsertCylinder
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianOrientation,
     CartesianPose,
@@ -221,13 +243,13 @@ def test_one_concept_has_one_name(retired_name: str):
     "node_class, mixin",
     [
         (CartesianPosition, HasCruiseVelocityParameter),
-        (CartesianOrientation, HasCruiseVelocityParameter),
-        (Pointing, HasCruiseVelocityParameter),
-        (PointingCone, HasCruiseVelocityParameter),
+        (CartesianOrientation, HasCruiseAngularVelocityParameter),
+        (Pointing, HasCruiseAngularVelocityParameter),
+        (PointingCone, HasCruiseAngularVelocityParameter),
         (JointPositionList, HasCruiseVelocityParameter),
-        (AngleGoal, HasCruiseVelocityParameter),
+        (AngleGoal, HasCruiseAngularVelocityParameter),
         (WiggleInsert, HasCruiseVelocityParameter),
-        (HoldOrientation, HasCruiseVelocityParameter),
+        (HoldOrientation, HasCruiseAngularVelocityParameter),
         (ExternalCollisionAvoidance, HasCruiseVelocityParameter),
         (SelfCollisionAvoidance, HasCruiseVelocityParameter),
         (CartesianPose, HasCruiseLinearVelocityParameter),
@@ -261,6 +283,61 @@ def test_one_concept_has_one_name(retired_name: str):
 )
 def test_a_shared_parameter_comes_from_its_mixin(node_class: type, mixin: type):
     assert issubclass(node_class, mixin)
+
+
+def _mixin_declaring(field_name: str) -> type | None:
+    """
+    :return: The parameter mixin declaring a field named `field_name`, if any does.
+    """
+    return next(
+        (
+            mixin
+            for mixin in _parameter_mixins()
+            if field_name in vars(mixin).get("__annotations__", {})
+        ),
+        None,
+    )
+
+
+def test_every_parameter_a_mixin_declares_comes_from_that_mixin():
+    """
+    A node taking a parameter under the name a mixin gives it means what that mixin
+    means by it.
+    """
+    assert [
+        (cls, field.name)
+        for cls in _node_classes()
+        for field in dataclasses.fields(cls)
+        if _mixin_declaring(field.name) is not None
+        and not issubclass(cls, _mixin_declaring(field.name))
+    ] == []
+
+
+@pytest.mark.parametrize(
+    "node_class",
+    [
+        AlignPlanes,
+        KeepHeldBodyUpright,
+        AlignPerpendicular,
+        AngleGoal,
+        CartesianOrientation,
+        HoldOrientation,
+        Pointing,
+        PointingCone,
+        BaseOrientation,
+        BaseHeading,
+        BaseTurnTowardsGoalPosition,
+    ],
+)
+def test_a_task_with_an_error_in_radians_approaches_its_goal_at_an_angular_velocity(
+    node_class: type,
+):
+    assert issubclass(node_class, HasCruiseAngularVelocityParameter)
+    assert not issubclass(node_class, HasCruiseVelocityParameter)
+
+
+def test_a_forward_kinematics_binding_takes_its_chain_from_its_mixin():
+    assert issubclass(ForwardKinematicsBinding, HasKinematicChainParameter)
 
 
 def test_a_joint_velocity_limit_names_its_cap_as_the_cartesian_limits_do():
@@ -467,3 +544,53 @@ def test_a_feature_task_takes_its_features_as_its_monitor_does(
 
 def test_an_alignment_pair_names_its_normals_as_align_planes_takes_them():
     assert _feature_parameters(AlignmentPair) == _feature_parameters(AlignPlanes)
+
+
+@pytest.mark.parametrize(
+    "node_class, mixin",
+    [
+        (AlignPlanes, HasTipNormalParameter),
+        (AlignPlanes, HasReferenceNormalParameter),
+        (AlignPerpendicular, HasTipNormalParameter),
+        (AlignPerpendicular, HasReferenceNormalParameter),
+        (VectorsAligned, HasTipNormalParameter),
+        (VectorsAligned, HasReferenceNormalParameter),
+        (PerpendicularMonitor, HasTipNormalParameter),
+        (PerpendicularMonitor, HasReferenceNormalParameter),
+        (AngleGoal, HasTipVectorParameter),
+        (AngleGoal, HasReferenceVectorParameter),
+        (AngleGoal, HasLowerAngleParameter),
+        (AngleGoal, HasUpperAngleParameter),
+        (AngleMonitor, HasTipVectorParameter),
+        (AngleMonitor, HasReferenceVectorParameter),
+        (AngleMonitor, HasLowerAngleParameter),
+        (AngleMonitor, HasUpperAngleParameter),
+        (DistanceGoal, HasTipPointParameter),
+        (DistanceGoal, HasReferencePointParameter),
+        (DistanceGoal, HasLowerLimitParameter),
+        (DistanceGoal, HasUpperLimitParameter),
+        (DistanceMonitor, HasTipPointParameter),
+        (DistanceMonitor, HasReferencePointParameter),
+        (DistanceMonitor, HasLowerLimitParameter),
+        (DistanceMonitor, HasUpperLimitParameter),
+        (HeightGoal, HasTipPointParameter),
+        (HeightGoal, HasReferencePointParameter),
+        (HeightGoal, HasLowerLimitParameter),
+        (HeightGoal, HasUpperLimitParameter),
+        (HeightMonitor, HasTipPointParameter),
+        (HeightMonitor, HasReferencePointParameter),
+        (HeightMonitor, HasLowerLimitParameter),
+        (HeightMonitor, HasUpperLimitParameter),
+        (ReachPoint, HasTipPointParameter),
+        (ReachPoint, HasReferencePointParameter),
+        (DistanceAlongAxis, HasTipPointParameter),
+        (DistanceAlongAxis, HasReferencePointParameter),
+        (Pointing, HasPointingAxisParameter),
+        (PointingCone, HasPointingAxisParameter),
+        (PointingAt, HasPointingAxisParameter),
+        (WiggleInsert, HasHolePointParameter),
+        (InsertCylinder, HasHolePointParameter),
+    ],
+)
+def test_a_feature_comes_from_its_mixin(node_class: type, mixin: type):
+    assert issubclass(node_class, mixin)

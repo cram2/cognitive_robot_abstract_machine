@@ -8,9 +8,9 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING, Self
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.binding_policy import (
+from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.forward_kinematics_binding import (
     ForwardKinematicsBinding,
-    GoalBindingPolicy,
 )
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionControlContext

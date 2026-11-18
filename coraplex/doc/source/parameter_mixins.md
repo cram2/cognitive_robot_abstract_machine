@@ -26,6 +26,12 @@ One parameter per mixin
   parameter mixin: {class}`~coraplex.robot_plans.mixins.HasPlanarGoalPoseParameter` declares `planar_goal_pose`.
   So the name of a parameter tells which mixin to inherit, and the name of a mixin tells which parameter it adds.
 
+One meaning per mixin
+: A class may give a parameter another default, but never another meaning or unit. A parameter in other units has a
+  mixin of its own: a task with an error in radians takes its cruise velocity from
+  {class}`~giskardpy.motion_statechart.mixins.HasCruiseAngularVelocityParameter`, not from
+  {class}`~giskardpy.motion_statechart.mixins.HasCruiseVelocityParameter` with a default in radians per second.
+
 Values that come together
 : Parameters a class always takes together are one parameter whose type holds them. A node moving the tip of a chain
   relative to its root takes a

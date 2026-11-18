@@ -4,8 +4,9 @@ Tasks turning a plane of a link onto a goal plane.
 
 from dataclasses import dataclass, field
 
-from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
+)
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
@@ -13,9 +14,11 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
 )
 from giskardpy.motion_statechart.mixins import (
-    HasCruiseVelocityParameter,
+    HasCruiseAngularVelocityParameter,
     HasKinematicChainParameter,
+    HasReferenceNormalParameter,
     HasRootLinkParameter,
+    HasTipNormalParameter,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -28,7 +31,11 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class AlignPlanes(
-    ConvergingTask, HasKinematicChainParameter, HasCruiseVelocityParameter
+    ConvergingTask,
+    HasKinematicChainParameter,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
+    HasCruiseAngularVelocityParameter,
 ):
     """
     Will orient the plane fixed on the tip of :attr:`kinematic_chain` to align with the
@@ -36,22 +43,6 @@ class AlignPlanes(
 
     The planes are represented by their normal vectors, :attr:`tip_normal` and
     :attr:`reference_normal`.
-    """
-
-    tip_normal: Vector3
-    """
-    Normal vector of the plane fixed on the tip of :attr:`kinematic_chain`.
-    """
-
-    reference_normal: Vector3
-    """
-    Normal vector of the plane fixed on the root of :attr:`kinematic_chain`, which the
-    other plane is aligned to.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
@@ -102,7 +93,7 @@ class AlignPlanes(
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_root_normal,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)
