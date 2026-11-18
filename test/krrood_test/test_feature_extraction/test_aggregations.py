@@ -19,7 +19,6 @@ from krrood.parametrization.feature_extraction.feature_extractor import (
 from krrood.entity_query_language.core.mapped_variable import Call
 from krrood.patterns.role import Role
 from random_events.interval import SimpleInterval, Bound
-from ..dataset.ormatic_interface import *  # type: ignore
 from ..dataset.example_classes import (
     SceneObject,
     SceneRoom,

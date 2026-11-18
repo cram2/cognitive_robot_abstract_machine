@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing_extensions import TYPE_CHECKING
+
 import os
 import re
 import time
@@ -19,7 +21,9 @@ from semantic_digital_twin.adapters.fbx import FBXParser
 from semantic_digital_twin.adapters.procthor.procthor_pipelines import (
     dresser_from_body_in_world,
 )
-from semantic_digital_twin.orm.ormatic_interface import *
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
@@ -135,6 +139,8 @@ def parse_procthor_files_and_save_to_database(
     Currently, only grp files are parsed, and some files and names are excluded.
     TODO: Ensure all relevant files, even those not inside a grp, are parsed.
     """
+    from semantic_digital_twin.orm.ormatic_interface import Base
+
     semantic_digital_twin_database_uri = os.environ.get(
         "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
     )
