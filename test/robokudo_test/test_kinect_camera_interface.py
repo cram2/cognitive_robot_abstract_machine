@@ -1,3 +1,7 @@
+"""
+Tests of receiving and reading frames through :class:`KinectCameraInterface`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -16,7 +20,7 @@ from sensor_msgs.msg import CameraInfo
 
 from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCameraConfig
-from robokudo.exceptions import UnknownWorldFrameError
+from robokudo.exceptions import CameraDataMissing, UnknownWorldFrameError
 from robokudo.io.camera_interface import KinectCameraInterface
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
@@ -99,6 +103,34 @@ class TestFailedCameraPlacement:
         receiving.join(timeout=timedelta(seconds=5).total_seconds())
 
         assert not receiving.is_alive()
+
+
+# %% frame that cannot be decoded
+
+
+class TestUndecodableFrame:
+    """
+    A frame the camera interface cannot decode is lost, and later frames still arrive.
+    """
+
+    def test_camera_keeps_receiving_after_a_frame_without_depth(
+        self, *, camera_interface: KinectCameraInterface
+    ) -> None:
+        """
+        A frame missing its depth image raises, and the next frame is received.
+        """
+        bridge = CVBridgeWorkaround()
+        with pytest.raises(CameraDataMissing):
+            camera_interface.callback(
+                bridge.cv2_to_imgmsg(np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"),
+                None,
+                CameraInfo(width=4, height=4),
+            )
+        acquisition_time = Time(sec=7)
+
+        receive_a_frame(camera_interface, acquisition_time)
+
+        assert camera_interface.timestamp == acquisition_time
 
 
 # %% camera pose at acquisition time

@@ -1,3 +1,8 @@
+"""
+Tests of the camera observations the camera interfaces put into the CAS, and of the
+frames they receive.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import Mock
@@ -21,11 +26,13 @@ from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraCon
 from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.io.camera_interface import (
+    CameraFrame,
     CameraInterface,
     KinectCameraInterface,
     ROSCameraInterface,
 )
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
+from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.io.camera_without_depth_interface import (
     OpenCVCameraWithoutDepthInterface,
 )
@@ -1079,3 +1086,63 @@ def test_camera_pose_requires_a_sampled_transform(
     """A camera pose cannot be bound before its first successful TF lookup."""
     with pytest.raises(CameraPoseMissing):
         transform_camera.world_T_camera_from_tf(world=World(), timestamp=Time())
+
+
+# %% frame that cannot be decoded
+
+
+def test_rgb_only_reader_keeps_receiving_after_an_undecodable_frame() -> None:
+    """
+    A color image the RGB-only reader cannot convert raises, and leaves the reader free
+    to receive the next frame.
+    """
+    interface = object.__new__(ROSCameraWithoutDepthInterface)
+    interface.lock = Lock()
+    undecodable_color_image = CVBridgeWorkaround().cv2_to_imgmsg(
+        np.zeros((4, 4), dtype=np.float32), "32FC1"
+    )
+
+    with pytest.raises(ValueError):
+        interface.callback(undecodable_color_image, CameraInfo(width=4, height=4))
+
+    assert not interface.lock.locked()
+
+
+# %% camera frame
+
+
+class TestCameraFrameFromMessages:
+    """
+    :meth:`CameraFrame.from_messages` decodes the messages of one frame.
+    """
+
+    def test_decodes_color_and_depth_images(self, *, camera_info: CameraInfo) -> None:
+        """
+        The frame holds the images the messages carry, taken when the color image was.
+        """
+        bridge = CVBridgeWorkaround()
+        color = np.arange(48, dtype=np.uint8).reshape((4, 4, 3))
+        depth = np.arange(16, dtype=np.float32).reshape((4, 4))
+        color_data = bridge.cv2_to_imgmsg(color, "bgr8")
+        color_data.header.stamp = Time(sec=3, nanosec=4)
+
+        frame = CameraFrame.from_messages(
+            color_data=color_data,
+            depth_data=bridge.cv2_to_imgmsg(depth, "32FC1"),
+            camera_info=camera_info,
+        )
+
+        np.testing.assert_array_equal(frame.color, color)
+        np.testing.assert_array_equal(frame.depth, depth)
+        assert frame.camera_info is camera_info
+        assert frame.timestamp == color_data.header.stamp
+
+    def test_frame_without_depth_image_has_no_depth(self) -> None:
+        """
+        A camera without depth delivers a frame without a depth image.
+        """
+        color_data = CVBridgeWorkaround().cv2_to_imgmsg(
+            np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"
+        )
+
+        assert CameraFrame.from_messages(color_data=color_data).depth is None

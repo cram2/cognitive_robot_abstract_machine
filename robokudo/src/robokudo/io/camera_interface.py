@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import math
 import struct
+from dataclasses import dataclass
 from threading import Lock
 
 import builtin_interfaces.msg
@@ -41,6 +42,7 @@ from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import CompressedImage, CameraInfo, Image
 from typing_extensions import Any, TYPE_CHECKING
 
+from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.classproperty import classproperty
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
@@ -449,6 +451,18 @@ class ROSCameraInterface(CameraInterface):
         Camera pose from the most recent successful TF lookup, stamped with the time TF
         provided it for.
         """
+        self.color: npt.NDArray | None = None
+        """
+        Latest color image.
+        """
+        self.depth: npt.NDArray | None = None
+        """
+        Latest depth image; None for a camera without depth.
+        """
+        self.camera_info: CameraInfo | None = None
+        """
+        Latest camera info message.
+        """
         self.timestamp: builtin_interfaces.msg.Time | None = None
         """
         Acquisition time of the latest frame.
@@ -476,6 +490,21 @@ class ROSCameraInterface(CameraInterface):
                 timestamp=Time.from_msg(self.timestamp)
             )
             return self._has_new_data
+
+    def store_frame(self, *, frame: CameraFrame) -> None:
+        """
+        Make ``frame`` the latest frame, or drop it while the latest frame is read.
+        """
+        # Skip the frame instead of waiting, so that the executor delivering it keeps
+        # delivering TF while a frame is read.
+        if not self.lock.acquire(blocking=False):
+            return
+        self.color = frame.color
+        self.depth = frame.depth
+        self.camera_info = frame.camera_info
+        self.timestamp = frame.timestamp
+        self._has_new_data = True
+        self.lock.release()
 
     def adds_missing_camera(self, *, world: World) -> bool:
         """
@@ -653,6 +682,77 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
         raise Exception("Decoding of '" + depth_fmt + "' is not implemented!")
 
 
+# %% camera frame
+
+
+@dataclass(kw_only=True)
+class CameraFrame:
+    """
+    The decoded images of one frame a ROS camera delivered, with its calibration.
+    """
+
+    color: npt.NDArray
+    """
+    The color image, in BGR channel order.
+    """
+
+    depth: npt.NDArray | None = None
+    """
+    The depth image; None for a camera without depth.
+    """
+
+    camera_info: CameraInfo | None = None
+    """
+    The calibration of the camera; None if the camera delivered none.
+    """
+
+    timestamp: builtin_interfaces.msg.Time
+    """
+    Acquisition time of the color image.
+    """
+
+    @classmethod
+    def from_messages(
+        cls,
+        *,
+        color_data: Image | CompressedImage,
+        depth_data: Image | CompressedImage | None = None,
+        camera_info: CameraInfo | None = None,
+    ) -> CameraFrame:
+        """
+        Decode the messages of one frame.
+
+        :param color_data: The color image message.
+        :param depth_data: The depth image message; None for a camera without depth.
+        :param camera_info: The calibration message.
+        :return: The frame the messages carry.
+        """
+        # TODO make this generic. handle the encoding and order properly. For standard
+        # and compressed images. this might also depend on the fix of
+        # image_transport_plugins being published as a package.
+        bridge = CVBridgeWorkaround()
+        color = (
+            cv2.imdecode(np.frombuffer(color_data.data, np.uint8), cv2.IMREAD_COLOR)
+            if isinstance(color_data, CompressedImage)
+            else bridge.imgmsg_to_cv2(color_data, "bgr8")
+        )
+        if depth_data is None:
+            depth = None
+        elif isinstance(depth_data, CompressedImage):
+            depth = depth_convert_workaround(depth_data)
+        else:
+            depth = bridge.imgmsg_to_cv2(depth_data, "32FC1")
+        return cls(
+            color=color,
+            depth=depth,
+            camera_info=camera_info,
+            timestamp=color_data.header.stamp,
+        )
+
+
+# %% RGB-D camera
+
+
 class KinectCameraInterface(ROSCameraInterface):
     """
     Interface for Kinect-style RGB-D cameras using ROS.
@@ -706,25 +806,9 @@ class KinectCameraInterface(ROSCameraInterface):
         self.rk_logger.info(f"  {camera_config.topic_depth}")
         self.rk_logger.info(f"  {camera_config.topic_camera_info}")
 
-        self.color: npt.NDArray | None = None
-        """
-        Latest color image.
-        """
-        self.depth: npt.NDArray | None = None
-        """
-        Latest depth image.
-        """
-        self.camera_info: CameraInfo | None = None
-        """
-        Latest camera info message.
-        """
         self.color_to_depth_ratio: ColorToDepthRatio | None = None
         """
         Ratio between color and depth image sizes.
-        """
-        self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
-        """
-        NumPy-compatible replacement for cv_bridge.
         """
 
     def compressed_depth_configured(self) -> bool:
@@ -761,6 +845,7 @@ class KinectCameraInterface(ROSCameraInterface):
         """
         pass
 
+    @called_positionally
     def callback(
         self,
         color_data: Image | CompressedImage,
@@ -768,26 +853,15 @@ class KinectCameraInterface(ROSCameraInterface):
         camera_info: CameraInfo | None = None,
     ) -> None:
         """
-        Process synchronized camera data.
-
-        This callback handles incoming color, depth, and camera info messages. It
-        converts the data to OpenCV format and stores it for later use.
+        Make the synchronized color, depth and camera info messages the latest frame.
 
         .. note:: A frame arriving while the previous frame is read is dropped.
-
-        TODO make this generic. handle the encoding and order properly. For standard and
-        compressed images. this might also depend on the fix of image_transport_plugins
-        being published as a package. Startpoint can be found at the bottom of this
-        method.
 
         :param color_data: Color image message
         :param depth_data: Depth image message
         :param camera_info: Camera calibration message
+        :raises CameraDataMissing: If the frame has no depth image.
         """
-        # Skip the frame instead of waiting, so that the executor delivering it keeps
-        # delivering TF while a frame is read.
-        if not self.lock.acquire(blocking=False):
-            return
         if self.rk_logger.isEnabledFor(logging.DEBUG):
             self.rk_logger.debug("Received data:")
 
@@ -814,33 +888,13 @@ class KinectCameraInterface(ROSCameraInterface):
                     f"  Color time - Camera Info time: {(color_time - camera_info_time).nanoseconds / 1e9:.6f}"
                 )
 
-        if self.compressed_color_configured():
-            color_arr = np.frombuffer(color_data.data, np.uint8)
-            self.color = cv2.imdecode(color_arr, cv2.IMREAD_COLOR)
-        else:
-            self.color = self.bridge.imgmsg_to_cv2(color_data, "bgr8")
-
-        self.timestamp = color_data.header.stamp
-
-        if self.compressed_depth_configured():
-            if depth_data is None:
-                raise CameraDataMissing(
-                    data_name="Depth data",
-                    context="compressed depth conversion",
-                )
-            self.depth = depth_convert_workaround(depth_data)
-        else:
-            if depth_data is None:
-                raise CameraDataMissing(
-                    data_name="Depth data",
-                    context="uncompressed depth conversion",
-                )
-            self.depth = self.bridge.imgmsg_to_cv2(depth_data, "32FC1")
-
-        self.camera_info = camera_info
-
-        self._has_new_data = True
-        self.lock.release()
+        if depth_data is None:
+            raise CameraDataMissing(data_name="Depth data", context="an RGB-D frame")
+        self.store_frame(
+            frame=CameraFrame.from_messages(
+                color_data=color_data, depth_data=depth_data, camera_info=camera_info
+            )
+        )
 
     def set_data(self, *, cas: CAS, world: World) -> None:
         with self.lock:

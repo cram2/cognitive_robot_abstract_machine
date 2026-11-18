@@ -28,14 +28,15 @@ from message_filters import Subscriber
 from sensor_msgs.msg import CameraInfo, Image
 from typing_extensions import Any, TYPE_CHECKING
 
+from krrood.patterns.called_positionally import called_positionally
+
 from robokudo.cas import CASViews
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.image import ImageRotation
-from robokudo.io.camera_interface import ROSCameraInterface
+from robokudo.io.camera_interface import CameraFrame, ROSCameraInterface
 from robokudo.io.exceptions import UnsupportedImageRotation
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
-from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortionModel,
     CameraModality,
@@ -92,21 +93,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.rk_logger.info(f"  {camera_config.topic_color}")
         self.rk_logger.info(f"  {camera_config.topic_camera_info}")
 
-        self.color: tuple[npt.NDArray] | None = None
-        """
-        Latest RGB image data.
-        """
-        self.camera_info: CameraInfo | None = None
-        """
-        Latest camera calibration info.
-        """
         self.color_to_depth_ratio: ColorToDepthRatio = ColorToDepthRatio()
         """
         Always (1.0, 1.0) since no depth data.
-        """
-        self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
-        """
-        NumPy-compatible replacement for cv_bridge.
         """
         self.rk_logger.info("ROSCameraWithoutDepthInterface initialized")
 
@@ -245,30 +234,25 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         )
         return rotated_image, rotated_intrinsics, new_size
 
+    @called_positionally
     def callback(
         self,
         color_data: Image,
         camera_info: CameraInfo | None = None,
     ) -> None:
         """
-        Process synchronized RGB image and camera info messages.
+        Make the synchronized RGB image and camera info messages the latest frame.
 
         .. note:: A frame arriving while the previous frame is read is dropped.
 
         :param color_data: RGB image message
         :param camera_info: Camera calibration info message, defaults to None
         """
-        # Skip the frame instead of waiting, so that the executor delivering it keeps
-        # delivering TF while a frame is read.
-        if not self.lock.acquire(blocking=False):
-            return
-        self.color = self.bridge.imgmsg_to_cv2(color_data, desired_encoding="bgr8")
-        self.timestamp = color_data.header.stamp
-
-        self.camera_info = camera_info
-
-        self._has_new_data = True
-        self.lock.release()
+        self.store_frame(
+            frame=CameraFrame.from_messages(
+                color_data=color_data, camera_info=camera_info
+            )
+        )
 
     def set_data(self, *, cas: CAS, world: World) -> None:
         """
