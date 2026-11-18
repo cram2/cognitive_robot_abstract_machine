@@ -31,10 +31,9 @@ import time
 import numpy as np
 from krrood.entity_query_language.factories import entity, variable, in_, the
 
+from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-)
+from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
@@ -53,8 +52,8 @@ with world.modify_world():
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
-        parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.X()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            normalized_twist=NormalizedTwist.create_prismatic(), axis=Vector3.X()
         ),
     )
     handle = Handle.create_with_new_body_in_world(
@@ -100,7 +99,10 @@ Note that this only works in this simple way for connections that only have one 
 To show this we first create a new root for the world and make a free connection from the new root to the dresser.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.world_description.connections import Connection6DoF, PrismaticConnection
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    ScrewAxisConnection,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 with world.modify_world():
@@ -141,8 +143,13 @@ Since it is an aggregation of all degree of freedoms existing in the world, it c
 We can close the drawer again as follows:
 
 ```{code-cell} ipython3
-connection = variable(PrismaticConnection, domain=world.connections)
-connection = the(entity(connection).where(in_("drawer", connection.child.name.name))).first()
+connection = variable(ScrewAxisConnection, domain=world.connections)
+connection = the(
+    entity(connection).where(
+        connection.normalized_twist.behaves_like_a_prismatic_connection,
+        in_("drawer", connection.child.name.name),
+    )
+).first()
 with world.modify_world():
     world.state[connection.dof.id] = [0., 0., 0., 0.]
 rt = RayTracer(world)

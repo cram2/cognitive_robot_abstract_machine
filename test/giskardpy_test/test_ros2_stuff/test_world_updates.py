@@ -8,6 +8,9 @@ import pytest
 
 from cramph.executor import NoPacing
 from krrood.patterns.called_positionally import called_positionally
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
@@ -36,7 +39,7 @@ from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -363,11 +366,17 @@ class ControlLoopFixture:
     world_updates: IncomingWorldUpdates
 
     @property
-    def moving_connection(self) -> PrismaticConnection:
+    def moving_connection(self) -> ScrewAxisConnection:
         """
         The connection whose position both worlds share.
         """
-        return self.controlled_world.get_connections_by_type(PrismaticConnection)[0]
+        return [
+            connection
+            for connection in self.controlled_world.get_connections_by_type(
+                ScrewAxisConnection
+            )
+            if connection.normalized_twist.behaves_like_a_prismatic_connection
+        ][0]
 
     def wait_until_buffered(self, *, count: int) -> bool:
         deadline = time.time() + 5.0
@@ -395,7 +404,8 @@ def add_moving_connection(world: World) -> None:
         world.add_body(parent_body)
         world.add_body(child_body)
         world.add_connection(
-            PrismaticConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_prismatic(),
                 world=world,
                 parent=parent_body,
                 child=child_body,
@@ -490,9 +500,13 @@ class TestRealWorldUpdatesDuringAMotion:
     def test_a_state_update_reaches_the_running_motion(
         self, *, control_loop: ControlLoopFixture
     ):
-        remote_connection = control_loop.remote_world.get_connections_by_type(
-            PrismaticConnection
-        )[0]
+        remote_connection = [
+            connection
+            for connection in control_loop.remote_world.get_connections_by_type(
+                ScrewAxisConnection
+            )
+            if connection.normalized_twist.behaves_like_a_prismatic_connection
+        ][0]
         control_loop.remote_world.state[remote_connection.dof.id].position = 0.42
         control_loop.remote_world.notify_state_change()
         assert control_loop.wait_until_buffered(count=1)

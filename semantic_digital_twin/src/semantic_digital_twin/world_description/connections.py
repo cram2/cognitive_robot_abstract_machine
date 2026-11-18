@@ -8,7 +8,10 @@ from uuid import UUID
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Self
 
-from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
@@ -19,10 +22,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
-from semantic_digital_twin.exceptions import (
-    MissingConnectionAxisError,
-    UnnormalizedScrewAxisError,
-)
+from semantic_digital_twin.exceptions import MissingConnectionAxisError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -152,66 +152,6 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     Dynamic properties of the joint.
     """
 
-    @classmethod
-    def create_with_dofs(
-        cls,
-        *,
-        world: World,
-        parent: KinematicStructureEntity,
-        child: KinematicStructureEntity,
-        name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
-        multiplier: float = 1.0,
-        offset: float = 0.0,
-        dof_limits: DegreeOfFreedomLimits | None = None,
-        axis: Vector3 | None = None,
-        dynamics: JointDynamics | None = None,
-    ) -> Self:
-        """
-        Creates and returns an instance of the class with its single degree of freedom,
-        initializing a kinematic relationship between a parent and a child entity along
-        ``axis``.
-
-        :param world: The motion world in which to add the degree of freedom.
-        :param parent: The parent kinematic structure entity.
-        :param child: The child kinematic structure entity.
-        :param name: Optional specific name for the connection. If not provided, a
-            default name is generated based on the parent and child.
-        :param parent_T_connection_expression: Constant pose of the connection relative
-            to its parent.
-        :param connection_T_child_expression: Constant pose of the connection relative
-            to its child.
-        :param multiplier: A scaling factor applied to the DOF's motion. Defaults to
-            1.0.
-        :param offset: A constant offset value applied to the DOF's motion. Defaults to
-            0.0.
-        :param dof_limits: Optional limits for the generated degree of freedom.
-        :param axis: The axis vector defining the joint relation.
-        :param dynamics: The dynamic properties of the joint. Frictionless and undamped
-            if None.
-        :return: An instance of the class representing the defined relationship with its
-            DOF added to the world.
-        """
-        if axis is None:
-            raise MissingConnectionAxisError(connection_type_name=cls.__name__)
-        name = name or cls._generate_default_name(parent=parent, child=child)
-        dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
-        world.add_degree_of_freedom(dof)
-        connection = cls(
-            name=name,
-            parent=parent,
-            child=child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            axis=axis,
-            multiplier=multiplier,
-            offset=offset,
-            raw_dof=dof,
-            dynamics=dynamics or JointDynamics(),
-        )
-        return connection
-
     @property
     def dof(self) -> DegreeOfFreedom:
         """
@@ -282,199 +222,21 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         self._world.notify_state_change()
 
 
-@dataclass(eq=False)
-class PrismaticConnection(ActiveConnection1DOF):
-    """
-    Allows translation along an axis.
-    """
-
-    def add_to_world(self, *, world: World):
-        """
-        Extends :meth:`WorldEntity.add_to_world` by building the translation along
-        ``axis`` from the position.
-        """
-        super().add_to_world(world=world)
-
-        translation_axis = self.axis * self.dof.variables.position
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=translation_axis[0],
-            y=translation_axis[1],
-            z=translation_axis[2],
-            child_frame=self.child,
-        )
-
-
-@dataclass(eq=False)
-class RevoluteConnection(ActiveConnection1DOF):
-    """
-    Allows rotation about an axis.
-    """
-
-    def add_to_world(self, *, world: World):
-        """
-        Extends :meth:`WorldEntity.add_to_world` by building the rotation about ``axis``
-        from the position.
-        """
-        super().add_to_world(world=world)
-
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            axis=self.axis,
-            angle=self.dof.variables.position,
-            child_frame=self.child,
-        )
-
-
-@dataclass(eq=False)
-class ScrewConnection(ActiveConnection1DOF):
-    """
-    A screw pair: couples rotation about ``axis`` with translation along it into a
-    single degree of freedom.
-
-    Increasing the degree of freedom's position rotates the child counterclockwise about
-    ``axis`` (right-hand rule) and translates it along ``axis`` by ``screw_pitch *
-    position / (2 * pi)``, i.e. one full revolution advances the child by one
-    ``screw_pitch``. A right-handed thread whose ``axis`` points from the parent toward
-    the child therefore has a positive ``screw_pitch``: driving the degree of freedom
-    toward its upper limit unscrews the child.
-    """
-
-    screw_pitch: float = field(kw_only=True)
-    """
-    The distance between adjacent threads, measured parallel to ``axis`` in meters.
-
-    Assumes a single-start thread, where the child advances one ``screw_pitch`` along
-    ``axis`` per full revolution. See
-    https://wellfastener.com/blog/what-is-screw-pitch%EF%BC%9Fscrew-pitch-vs-lead/
-    for
-    the distinction between screw pitch and lead. Negative values model left-handed
-    threads.
-
-    .. warning:: Set it only before the connection is added to a world: a later
-        assignment is not recorded, published or rolled back. Replace the connection.
-    """
-
-    def add_to_world(self, *, world: World):
-        """
-        Extends :meth:`WorldEntity.add_to_world` by building the screw motion along
-        ``axis`` from the position.
-        """
-        super().add_to_world(world=world)
-
-        angle = self.dof.variables.position
-        translation_axis = self.axis * (self.screw_pitch * angle / (2 * np.pi))
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            x=translation_axis[0],
-            y=translation_axis[1],
-            z=translation_axis[2],
-            axis=self.axis,
-            angle=angle,
-            child_frame=self.child,
-        )
-
-    def rotation_angle_for_travel_distance(self, travel_distance: float) -> float:
-        """
-        The rotation of the degree of freedom that translates the child by
-        ``travel_distance`` along ``axis``.
-
-        Allows expressing joint goals as travel distances, e.g. how far a cap should
-        move along its thread.
-
-        :param travel_distance: Signed translation along ``axis`` in meters.
-        :return: The signed rotation angle in radians.
-        """
-        return travel_distance * 2 * np.pi / self.screw_pitch
-
-    @classmethod
-    def create_with_dofs(
-        cls,
-        *,
-        world: World,
-        parent: KinematicStructureEntity,
-        child: KinematicStructureEntity,
-        name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
-        multiplier: float = 1.0,
-        offset: float = 0.0,
-        dof_limits: DegreeOfFreedomLimits | None = None,
-        axis: Vector3 | None = None,
-        dynamics: JointDynamics | None = None,
-        screw_pitch: float,
-    ) -> Self:
-        """
-        Creates and returns a screw connection with its single degree of freedom.
-
-        See :meth:`ActiveConnection1DOF.create_with_dofs`; additionally requires the
-        screw's ``screw_pitch``.
-
-        :param screw_pitch: The distance between adjacent threads along ``axis`` in
-            meters.
-        """
-        name = name or cls._generate_default_name(parent=parent, child=child)
-        dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
-        world.add_degree_of_freedom(dof)
-        connection = cls(
-            name=name,
-            parent=parent,
-            child=child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            axis=axis,
-            multiplier=multiplier,
-            offset=offset,
-            raw_dof=dof,
-            screw_pitch=screw_pitch,
-            dynamics=dynamics or JointDynamics(),
-        )
-        return connection
-
-
 @dataclass(eq=False, kw_only=True)
 class ScrewAxisConnection(ActiveConnection1DOF):
     """
     Rotates the child about ``axis`` and translates it along ``axis`` in proportion to
-    the position, so hinges, sliders and screws differ only in their parameters.
-
-    One unit of position turns a rotating connection by one radian and moves one that
-    does not rotate by one meter.
+    the position, so hinges, sliders and screws differ only in their
+    :attr:`normalized_twist`.
     """
 
-    rotation_per_unit_position: float
+    normalized_twist: NormalizedTwist
     """
-    Radians the child rotates about ``axis`` per unit of position, following the
-    right-hand rule: 1 for a connection that rotates, 0 for one that only translates.
+    How far the child rotates and translates per unit of position.
 
     .. warning:: Set it only before the connection is added to a world: a later
         assignment is not recorded, published or rolled back. Replace the connection.
     """
-
-    translation_per_unit_position: float
-    """
-    Meters the child translates along ``axis`` per unit of position: 1 for a connection
-    that only translates, the pitch in meters per radian for one that rotates.
-
-    .. warning:: Set it only before the connection is added to a world: a later
-        assignment is not recorded, published or rolled back. Replace the connection.
-    """
-
-    def __post_init__(self):
-        """
-        Extends :meth:`Connection.__post_init__` by rejecting parameters that are not
-        normalized.
-
-        :raises UnnormalizedScrewAxisError: if the parameters are not normalized.
-        """
-        super().__post_init__()
-        rotates_one_radian = self.rotation_per_unit_position == 1
-        translates_one_meter_only = (
-            self.rotation_per_unit_position == 0
-            and self.translation_per_unit_position == 1
-        )
-        if not (rotates_one_radian or translates_one_meter_only):
-            raise UnnormalizedScrewAxisError(
-                rotation_per_unit_position=self.rotation_per_unit_position,
-                translation_per_unit_position=self.translation_per_unit_position,
-            )
 
     @classmethod
     def create_with_dofs(
@@ -491,14 +253,30 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
         dynamics: JointDynamics | None = None,
-        rotation_per_unit_position: float,
-        translation_per_unit_position: float,
+        normalized_twist: NormalizedTwist,
     ) -> Self:
         """
-        Creates and returns a screw axis connection with its single degree of freedom.
+        Creates and returns a screw axis connection with its single degree of freedom
+        added to ``world``.
 
-        See :meth:`ActiveConnection1DOF.create_with_dofs`; additionally requires
-        :attr:`rotation_per_unit_position` and :attr:`translation_per_unit_position`.
+        :param world: The world in which to add the degree of freedom.
+        :param parent: The parent kinematic structure entity.
+        :param child: The child kinematic structure entity.
+        :param name: Optional specific name for the connection. If not provided, a
+            default name is generated based on the parent and child.
+        :param parent_T_connection_expression: Constant pose of the connection relative
+            to its parent.
+        :param connection_T_child_expression: Constant pose of the child relative to the
+            connection.
+        :param multiplier: A scaling factor applied to the degree of freedom's motion.
+        :param offset: A constant offset applied to the degree of freedom's motion.
+        :param dof_limits: Optional limits for the generated degree of freedom.
+        :param axis: The axis the child rotates about and translates along.
+        :param dynamics: The dynamic properties of the joint. Frictionless and undamped
+            if None.
+        :param normalized_twist: How far the child rotates and translates per unit of
+            position.
+        :raises MissingConnectionAxisError: if no ``axis`` is given.
         """
         if axis is None:
             raise MissingConnectionAxisError(connection_type_name=cls.__name__)
@@ -516,8 +294,7 @@ class ScrewAxisConnection(ActiveConnection1DOF):
             offset=offset,
             raw_dof=dof,
             dynamics=dynamics or JointDynamics(),
-            rotation_per_unit_position=rotation_per_unit_position,
-            translation_per_unit_position=translation_per_unit_position,
+            normalized_twist=normalized_twist,
         )
 
     def add_to_world(self, *, world: World):
@@ -528,41 +305,16 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         super().add_to_world(world=world)
 
         position = self.dof.variables.position
-        connection_V_child = self.axis * (self.translation_per_unit_position * position)
+        connection_V_child = self.axis * (
+            self.normalized_twist.translation_per_unit_position * position
+        )
         self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
             x=connection_V_child[0],
             y=connection_V_child[1],
             z=connection_V_child[2],
             axis=self.axis,
-            angle=self.rotation_per_unit_position * position,
+            angle=self.normalized_twist.rotation_per_unit_position * position,
             child_frame=self.child,
-        )
-
-    @property
-    def behaves_like_a_revolute_connection(self) -> bool:
-        """
-        Whether the child only rotates about ``axis``.
-        """
-        return (
-            self.rotation_per_unit_position != 0
-            and self.translation_per_unit_position == 0
-        )
-
-    @property
-    def behaves_like_a_prismatic_connection(self) -> bool:
-        """
-        Whether the child only translates along ``axis``.
-        """
-        return self.rotation_per_unit_position == 0
-
-    @property
-    def behaves_like_a_screw_connection(self) -> bool:
-        """
-        Whether the child rotates about ``axis`` and translates along it at once.
-        """
-        return (
-            self.rotation_per_unit_position != 0
-            and self.translation_per_unit_position != 0
         )
 
 

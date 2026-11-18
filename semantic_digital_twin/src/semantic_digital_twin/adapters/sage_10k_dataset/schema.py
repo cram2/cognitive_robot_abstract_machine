@@ -10,6 +10,9 @@ import numpy as np
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json
 from krrood.utils import get_full_class_name
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -24,7 +27,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoorWithType,
 )
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
@@ -722,7 +725,8 @@ class Sage10kDoor(Sage10kWithID):
             )
 
         return door.mount_on_movable_joint(
-            RevoluteConnectionSpecification(
+            ScrewAxisConnectionSpecification(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 axis=Vector3.Z(),
                 dof_limits=limits,
             )

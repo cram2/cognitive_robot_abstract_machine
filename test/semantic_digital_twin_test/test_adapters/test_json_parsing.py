@@ -33,10 +33,12 @@ from krrood_spatial_math.spatial_types import (
     Pose2D,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    ScrewConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -368,12 +370,12 @@ def test_screw_connection_json_serialization_with_world():
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_kinematic_structure_entity(body2)
-        connection = ScrewConnection.create_with_dofs(
+        connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=body,
             child=body2,
             axis=Vector3.Z(),
-            screw_pitch=screw_pitch,
+            normalized_twist=NormalizedTwist.create_screw(screw_pitch=screw_pitch),
             multiplier=2.0,
             offset=0.1,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -383,11 +385,13 @@ def test_screw_connection_json_serialization_with_world():
         world.add_connection(connection)
     json_data = connection.to_json()
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    restored_connection = ScrewConnection.from_json(
+    restored_connection = ScrewAxisConnection.from_json(
         data=json_data, **tracker.create_kwargs()
     )
     assert connection == restored_connection
-    assert restored_connection.screw_pitch == screw_pitch
+    assert restored_connection.normalized_twist == NormalizedTwist.create_screw(
+        screw_pitch=screw_pitch
+    )
     assert restored_connection.multiplier == connection.multiplier
     assert restored_connection.offset == connection.offset
     assert np.allclose(restored_connection.axis.to_np(), connection.axis.to_np())
@@ -430,7 +434,7 @@ def test_json_serialization_with_mesh():
 
 
 def _world_with_two_equally_named_connections() -> tuple[
-    World, RevoluteConnection, RevoluteConnection
+    World, ScrewAxisConnection, ScrewAxisConnection
 ]:
     """
     A world holding two revolute connections that share one name.
@@ -443,7 +447,8 @@ def _world_with_two_equally_named_connections() -> tuple[
     for index in range(2):
         with world.modify_world():
             child = Body(name=PrefixedName("link", prefix=f"branch_{index}"))
-            connection = RevoluteConnection.create_with_dofs(
+            connection = ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=world.root,
                 child=child,

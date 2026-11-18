@@ -3,6 +3,9 @@ import math
 import numpy as np
 import pytest
 
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
@@ -14,7 +17,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% fixtures
@@ -30,8 +33,12 @@ def tilted_world() -> World:
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
         tip = Body(name=PrefixedName("tip"))
-        connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=tip, axis=Vector3.X()
+        connection = ScrewAxisConnection.create_with_dofs(
+            normalized_twist=NormalizedTwist.create_revolute(),
+            world=world,
+            parent=root,
+            child=tip,
+            axis=Vector3.X(),
         )
         world.add_connection(connection)
     connection.position = math.pi / 2

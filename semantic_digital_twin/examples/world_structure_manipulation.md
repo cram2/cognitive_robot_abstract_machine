@@ -34,9 +34,10 @@ Let's create a simple world.
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
@@ -57,13 +58,14 @@ with world.modify_world():
     c_root_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
     world.add_connection(c_root_base)
 
-    # 2) Create a custom DoF and use it in an active RevoluteConnection
+    # 2) Create a custom DoF and use it in an active revolute ScrewAxisConnection
     #    from base -> link around the Z axis of the base frame.
     #    We add the DoF first, then reference it from the connection so the
     #    world's DoF set and the connection's DoFs match.
     dof = DegreeOfFreedom(name=PrefixedName("joint_z"))
     world.add_degree_of_freedom(dof)
-    c_base_link = RevoluteConnection(
+    c_base_link = ScrewAxisConnection(
+        normalized_twist=NormalizedTwist.create_revolute(),
         parent=base,
         child=link,
         raw_dof=dof,
@@ -76,7 +78,7 @@ print(f"Connections after additions: {[str(c.name) for c in world.connections]}"
 print(f"Number of DoFs after additions: {len(world.degrees_of_freedom)}")
 ```
 
-Now we want to remove the RevoluteConnection. This will also remove its DoF if no other connection uses it.
+Now we want to remove the revolute connection. This will also remove its DoF if no other connection uses it.
 To keep the world a connected tree, we also have to remove the now-disconnected child body in the same block.
 
 ```{code-cell} ipython3

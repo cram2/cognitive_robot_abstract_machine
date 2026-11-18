@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field, fields
-from typing_extensions import TypeVar, Any, Generic, cast
+from typing_extensions import TypeVar, Any, Generic, Self, cast
 
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
@@ -19,11 +19,12 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
-    ScrewConnection,
+    ScrewAxisConnection,
 )
-from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -293,48 +294,19 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
 
 
 @dataclass
-class PrismaticConnectionSpecification(
-    ActiveConnection1DOFSpecification[PrismaticConnection]
+class ScrewAxisConnectionSpecification(
+    ActiveConnection1DOFSpecification[ScrewAxisConnection]
 ):
     """
     Declares a
-    :class:`~semantic_digital_twin.world_description.connections.PrismaticConnection`.
-
-    Use this for a single translational degree of freedom along the connection axis,
-    such as a drawer sliding in or out.
+    :class:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection`:
+    a door swinging on its hinge, a drawer sliding in or out, or a cap turning on the
+    thread of its bottle, depending on its :attr:`normalized_twist`.
     """
 
-
-@dataclass
-class RevoluteConnectionSpecification(
-    ActiveConnection1DOFSpecification[RevoluteConnection]
-):
+    normalized_twist: NormalizedTwist = field(kw_only=True)
     """
-    Declares a
-    :class:`~semantic_digital_twin.world_description.connections.RevoluteConnection`.
-
-    Use this for a single rotational degree of freedom about the connection axis, such
-    as a door swinging on its hinge.
-    """
-
-
-@dataclass
-class ScrewConnectionSpecification(ActiveConnection1DOFSpecification[ScrewConnection]):
-    """
-    Declares a
-    :class:`~semantic_digital_twin.world_description.connections.ScrewConnection`.
-
-    Use this where rotation about the connection axis and translation along it are
-    coupled into a single degree of freedom, such as the thread between a bottle and its
-    cap.
-    """
-
-    screw_pitch: float = field(kw_only=True)
-    """
-    The distance between adjacent threads along the connection axis in meters.
-
-    Mandatory: a thread without a pitch couples no translation to its rotation, so it
-    cannot be constructed.
+    How far the child rotates and translates per unit of position.
     """
 
 

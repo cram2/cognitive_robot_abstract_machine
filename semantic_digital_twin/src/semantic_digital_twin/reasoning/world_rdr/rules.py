@@ -75,8 +75,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     ActiveConnection1DOF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -644,12 +643,13 @@ def drawers_with_a_handle(world: World) -> list[Drawer]:
     :param world: The world to read.
     :return: Every body a slider pulls straight out of a container, opened by a handle.
     """
-    slider = variable(PrismaticConnection, world.connections)
+    slider = variable(ScrewAxisConnection, world.connections)
     mount = variable(FixedConnection, world.connections)
     handle = variable(Handle, world.semantic_annotations)
     return (
         entity(inference(Drawer)(root=slider.child, handle=handle))
         .where(
+            slider.normalized_twist.behaves_like_a_prismatic_connection,
             HasCollisionGeometry(body=slider.child),
             not_(IsPartOfARobot(body=slider.child)),
             mount.parent == slider.child,
@@ -665,12 +665,13 @@ def drawers_without_a_handle(world: World) -> list[Drawer]:
     :return: Every body a slider pulls straight out of a container that offers nothing to
         pull it by.
     """
-    slider = variable(PrismaticConnection, world.connections)
+    slider = variable(ScrewAxisConnection, world.connections)
     mount = variable(FixedConnection, world.connections)
     handle = variable(Handle, world.semantic_annotations)
     return (
         entity(inference(Drawer)(root=slider.child))
         .where(
+            slider.normalized_twist.behaves_like_a_prismatic_connection,
             HasCollisionGeometry(body=slider.child),
             not_(IsPartOfARobot(body=slider.child)),
             not_(
@@ -689,12 +690,13 @@ def doors_with_a_handle(world: World) -> list[Door]:
     :param world: The world to read.
     :return: Every body a hinge swings to uncover an opening, opened by a handle.
     """
-    hinge = variable(RevoluteConnection, world.connections)
+    hinge = variable(ScrewAxisConnection, world.connections)
     mount = variable(FixedConnection, world.connections)
     handle = variable(Handle, world.semantic_annotations)
     return (
         entity(inference(Door)(root=hinge.child, handle=handle))
         .where(
+            hinge.normalized_twist.behaves_like_a_revolute_connection,
             HasCollisionGeometry(body=hinge.child),
             not_(IsPartOfARobot(body=hinge.child)),
             mount.parent == hinge.child,
@@ -723,7 +725,7 @@ def doors_without_a_handle(
         calls a mimic - so the part it moves is a leaf of the same front.
     :return: Every such leaf.
     """
-    hinge = variable(RevoluteConnection, world.connections)
+    hinge = variable(ScrewAxisConnection, world.connections)
     follower = variable(ActiveConnection1DOF, world.connections)
     mount = variable(FixedConnection, world.connections)
     handle = variable(Handle, world.semantic_annotations)
@@ -731,6 +733,7 @@ def doors_without_a_handle(
     return (
         entity(inference(Door)(root=hinge.child))
         .where(
+            hinge.normalized_twist.behaves_like_a_revolute_connection,
             HasCollisionGeometry(body=hinge.child),
             not_(IsPartOfARobot(body=hinge.child)),
             follower.parent == hinge.child,

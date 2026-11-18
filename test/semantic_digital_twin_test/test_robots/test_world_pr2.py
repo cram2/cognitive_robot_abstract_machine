@@ -42,8 +42,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     DifferentialDrive,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 
@@ -386,7 +385,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         "base_footprint"
     )
 
-    connections = pr2_world_state_reset.get_connections_by_type(PrismaticConnection)
+    connections = [
+        connection
+        for connection in pr2_world_state_reset.get_connections_by_type(
+            ScrewAxisConnection
+        )
+        if connection.normalized_twist.behaves_like_a_prismatic_connection
+    ]
     assert len(connections) == 5
     assert connections[0].name == PrefixedName(name=PR2Joint.TORSO_LIFT, prefix="pr2")
     assert connections[
@@ -424,7 +429,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         "r_gripper_l_finger_tip_frame"
     )
 
-    connections = pr2_world_state_reset.get_connections_by_type(RevoluteConnection)
+    connections = [
+        connection
+        for connection in pr2_world_state_reset.get_connections_by_type(
+            ScrewAxisConnection
+        )
+        if connection.normalized_twist.behaves_like_a_revolute_connection
+    ]
     assert len(connections) == 40
 
 

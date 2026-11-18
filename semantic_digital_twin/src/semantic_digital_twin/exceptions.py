@@ -834,36 +834,57 @@ class MissingConnectionAxisError(UsageError):
 
 
 @dataclass(kw_only=True)
-class UnnormalizedScrewAxisError(UsageError):
+class ScrewJointUnsupportedByMujocoError(UsageError):
     """
-    Raised when a screw axis connection's motion per unit of position is not
-    normalized: a connection that rotates must rotate one radian per unit of position,
-    and one that does not rotate must translate one meter per unit of position.
+    Raised when a connection that rotates and translates at once is exported to MuJoCo,
+    which has hinge and slide joints but no screw joint.
+    """
+
+    connection_name: PrefixedName
+    """
+    The name of the screw connection that was exported.
+    """
+
+    def error_message(self) -> str:
+        return f"MuJoCo has no joint for the screw connection '{self.connection_name}'."
+
+    def suggest_correction(self) -> str:
+        return (
+            "export only connections whose normalized twist behaves like a revolute or "
+            "prismatic connection."
+        )
+
+
+@dataclass(kw_only=True)
+class UnnormalizedTwistError(UsageError):
+    """
+    Raised when a twist is not normalized: a twist that rotates must rotate one radian
+    per unit of position, and one that does not rotate must translate one meter per unit
+    of position.
     """
 
     rotation_per_unit_position: float
     """
-    The rotation the connection was given, in radians per unit of position.
+    The rotation the twist was given, in radians per unit of position.
     """
 
     translation_per_unit_position: float
     """
-    The translation the connection was given, in meters per unit of position.
+    The translation the twist was given, in meters per unit of position.
     """
 
     def error_message(self) -> str:
         return (
-            f"a screw axis connection rotating {self.rotation_per_unit_position} rad "
-            f"and translating {self.translation_per_unit_position} m per unit of "
-            f"position is not normalized."
+            f"a twist rotating {self.rotation_per_unit_position} rad and "
+            f"translating {self.translation_per_unit_position} m per unit of position "
+            f"is not normalized."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "pass rotation_per_unit_position=1 with any translation_per_unit_position, "
-            "or rotation_per_unit_position=0 with translation_per_unit_position=1; "
-            "flip the axis for the opposite direction and use the multiplier to scale "
-            "the position."
+            "use NormalizedTwist.create_revolute(), NormalizedTwist.create_prismatic() or "
+            "NormalizedTwist.create_screw(screw_pitch=...); flip the axis for the opposite "
+            "direction and use the multiplier to scale the position."
         )
 
 

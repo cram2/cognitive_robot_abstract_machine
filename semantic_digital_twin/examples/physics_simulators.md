@@ -198,10 +198,11 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarke
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
@@ -275,7 +276,7 @@ def spawn_robot_body(spawn_world: World) -> Body:
     return spawn_body
 
 
-def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
+def spawn_arm(spawn_world: World, root_body: Body) -> ScrewAxisConnection:
     """
     Spawn a single-link arm attached to ``root_body`` via a revolute joint about Z.
     """
@@ -310,7 +311,8 @@ def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
 
     with spawn_world.modify_world():
         spawn_world.add_degree_of_freedom(dof)
-        arm_connection = RevoluteConnection(
+        arm_connection = ScrewAxisConnection(
+            normalized_twist=NormalizedTwist.create_revolute(),
             name=dof.name,
             parent=root_body,
             child=spawn_arm_body,

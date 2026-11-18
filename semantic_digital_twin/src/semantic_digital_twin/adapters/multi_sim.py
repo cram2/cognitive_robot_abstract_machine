@@ -54,6 +54,7 @@ from semantic_digital_twin.exceptions import (
     MujocoEntityNotFoundError,
     SimulationAlreadyRunningError,
     SimulationNotStartedError,
+    ScrewJointUnsupportedByMujocoError,
     SnapshotDoesNotFitSimulationError,
 )
 from krrood_spatial_math.spatial_types import (
@@ -66,8 +67,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
     FixedConnection,
     Connection6DoF,
@@ -769,24 +769,13 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
 
 
 @dataclass
-class ConnectionRevoluteConverter(Connection1DOFConverter, ABC):
+class ConnectionScrewAxisConverter(Connection1DOFConverter, ABC):
     """
-    Converts a RevoluteConnection object to a dictionary of revolute joint properties for Multiverse simulator.
-    """
-
-    entity_type: ClassVar[type[RevoluteConnection]] = RevoluteConnection
-    """
-    The type of the entity to convert.
+    Converts a ScrewAxisConnection object to a dictionary of joint properties for
+    Multiverse simulator.
     """
 
-
-@dataclass
-class ConnectionPrismaticConverter(Connection1DOFConverter, ABC):
-    """
-    Converts a PrismaticConnection object to a dictionary of prismatic joint properties for Multiverse simulator.
-    """
-
-    entity_type: ClassVar[type[PrismaticConnection]] = PrismaticConnection
+    entity_type: ClassVar[type[ScrewAxisConnection]] = ScrewAxisConnection
     """
     The type of the entity to convert.
     """
@@ -1729,26 +1718,31 @@ class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
 
 
 @dataclass
-class MujocoRevoluteJointConverter(
-    Mujoco1DOFJointConverter, ConnectionRevoluteConverter
+class MujocoScrewAxisJointConverter(
+    Mujoco1DOFJointConverter, ConnectionScrewAxisConverter
 ):
-    type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_HINGE
+    """
+    Converts a screw axis connection to a MuJoCo hinge or slide joint, after how its
+    normalized twist behaves.
+    """
 
     def _post_convert(
-        self, entity: ActiveConnection1DOF, joint_props: dict[str, Any], **kwargs
+        self, entity: ScrewAxisConnection, joint_props: dict[str, Any], **kwargs
     ) -> dict[str, Any]:
+        """
+        :raises ScrewJointUnsupportedByMujocoError: if the connection rotates and
+            translates at once.
+        """
+        if entity.normalized_twist.behaves_like_a_screw_connection:
+            raise ScrewJointUnsupportedByMujocoError(connection_name=entity.name)
         joint_props = super()._post_convert(entity, joint_props, **kwargs)
+        if entity.normalized_twist.behaves_like_a_prismatic_connection:
+            joint_props["type"] = mujoco.mjtJoint.mjJNT_SLIDE
+            return joint_props
         joint_range = joint_props.pop("range")
         if not any(limit is None for limit in joint_range):
             joint_props["range"] = joint_range
         return joint_props
-
-
-@dataclass
-class MujocoPrismaticJointConverter(
-    Mujoco1DOFJointConverter, ConnectionPrismaticConverter
-):
-    type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_SLIDE
 
 
 @dataclass
@@ -3711,24 +3705,12 @@ class Connection1DOFSpawner(ConnectionSpawner, ABC):
 
 
 @dataclass
-class ConnectionPrismaticSpawner(ConnectionSpawner, ABC):
+class ConnectionScrewAxisSpawner(ConnectionSpawner, ABC):
     """
-    A spawner to spawn a PrismaticConnection object in the simulator.
-    """
-
-    entity_type: ClassVar[type[Connection]] = PrismaticConnection
-    """
-    The type of the entity to spawn.
+    A spawner to spawn a ScrewAxisConnection object in the simulator.
     """
 
-
-@dataclass
-class ConnectionRevoluteSpawner(ConnectionSpawner, ABC):
-    """
-    A spawner to spawn a RevoluteConnection object in the simulator.
-    """
-
-    entity_type: ClassVar[type[Connection]] = RevoluteConnection
+    entity_type: ClassVar[type[Connection]] = ScrewAxisConnection
     """
     The type of the entity to spawn.
     """
@@ -3918,24 +3900,13 @@ class MujocoFixedConnectionSpawner(MujocoEntitySpawner, FixedConnectionSpawner):
 
 
 @dataclass
-class MujocoPrismaticJointSpawner(MujocoConnectionSpawner, ConnectionPrismaticSpawner):
+class MujocoScrewAxisJointSpawner(MujocoConnectionSpawner, ConnectionScrewAxisSpawner):
     """
-    A spawner to spawn a PrismaticConnection object in the MuJoCo simulator.
-    """
-
-    mujoco_joint_converter: ClassVar[type[MujocoJointConverter]] = (
-        MujocoPrismaticJointConverter
-    )
-
-
-@dataclass
-class MujocoRevoluteJointSpawner(MujocoConnectionSpawner, ConnectionRevoluteSpawner):
-    """
-    A spawner to spawn a RevoluteConnection object in the MuJoCo simulator.
+    A spawner to spawn a ScrewAxisConnection object in the MuJoCo simulator.
     """
 
     mujoco_joint_converter: ClassVar[type[MujocoJointConverter]] = (
-        MujocoRevoluteJointConverter
+        MujocoScrewAxisJointConverter
     )
 
 

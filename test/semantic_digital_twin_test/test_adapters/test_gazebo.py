@@ -20,11 +20,13 @@ from semantic_digital_twin.adapters.gazebo import (
 from semantic_digital_twin.exceptions import (
     PathResolutionError,
 )
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Cylinder, Mesh, Sphere
 
@@ -245,7 +247,10 @@ class TestJointParsing:
 
     def test_revolute_joint_becomes_revolute_connection(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
-        assert isinstance(connection_named(world, "hinge"), RevoluteConnection)
+        assert (
+            connection_named(world, "hinge").normalized_twist
+            == NormalizedTwist.create_revolute()
+        )
         assert world.validate()
 
     def test_link_pose_is_relative_to_the_model(self, gazebo_paths):
@@ -303,7 +308,7 @@ class TestJointParsing:
     def test_prismatic_joint_becomes_prismatic_connection(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.drawer).create_world()
         connection = connection_named(world, "slide")
-        assert isinstance(connection, PrismaticConnection)
+        assert connection.normalized_twist == NormalizedTwist.create_prismatic()
         assert connection.raw_dof.limits.upper.position == 0.45
         assert world.validate()
 

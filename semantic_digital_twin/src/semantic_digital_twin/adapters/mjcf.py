@@ -37,9 +37,11 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world import World, Body
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     FixedConnection,
     Connection6DoF,
 )
@@ -645,31 +647,24 @@ class MJCFParser(WorldModelParser):
                     ),
                 )
                 if mujoco_joint.type == mujoco.mjtJoint.mjJNT_HINGE:
-                    connection = RevoluteConnection(
-                        name=PrefixedName(mujoco_joint.name),
-                        parent=parent_body,
-                        child=child_body,
-                        parent_T_connection_expression=parent_body_to_joint_transform,
-                        connection_T_child_expression=joint_to_child_body_transform,
-                        axis=joint_axis,
-                        raw_dof=dof,
-                        dynamics=joint_dynamics,
-                    )
+                    normalized_twist = NormalizedTwist.create_revolute()
                 elif mujoco_joint.type == mujoco.mjtJoint.mjJNT_SLIDE:
-                    connection = PrismaticConnection(
-                        name=PrefixedName(mujoco_joint.name),
-                        parent=parent_body,
-                        child=child_body,
-                        parent_T_connection_expression=parent_body_to_joint_transform,
-                        connection_T_child_expression=joint_to_child_body_transform,
-                        axis=joint_axis,
-                        raw_dof=dof,
-                        dynamics=joint_dynamics,
-                    )
+                    normalized_twist = NormalizedTwist.create_prismatic()
                 else:
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
+                connection = ScrewAxisConnection(
+                    name=PrefixedName(mujoco_joint.name),
+                    parent=parent_body,
+                    child=child_body,
+                    parent_T_connection_expression=parent_body_to_joint_transform,
+                    connection_T_child_expression=joint_to_child_body_transform,
+                    axis=joint_axis,
+                    raw_dof=dof,
+                    dynamics=joint_dynamics,
+                    normalized_twist=normalized_twist,
+                )
                 connection.add_simulator_property(
                     MujocoJoint(
                         stiffness=(

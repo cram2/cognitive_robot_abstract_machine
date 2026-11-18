@@ -85,6 +85,9 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
@@ -117,7 +120,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.exceptions import MissingMovableJointError
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -1038,8 +1041,8 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
             name="door",
             world=world,
             scale=Scale(0.05, 1, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Y()
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                normalized_twist=NormalizedTwist.create_prismatic(), axis=Vector3.Y()
             ),
         )
         elevator.add(door)

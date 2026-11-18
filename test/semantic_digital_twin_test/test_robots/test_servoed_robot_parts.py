@@ -8,6 +8,9 @@ from __future__ import annotations
 import pytest
 from typing_extensions import Callable
 
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -24,7 +27,7 @@ from semantic_digital_twin.world_description.connection_properties import (
     JointDynamics,
     ServoGains,
 )
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body, PositionServo
 
@@ -32,7 +35,7 @@ from semantic_digital_twin.world_description.world_entity import Body, PositionS
 
 
 @pytest.fixture
-def described_joint() -> RevoluteConnection:
+def described_joint() -> ScrewAxisConnection:
     """
     A joint whose description states its armature, damping and dry friction.
     """
@@ -42,8 +45,12 @@ def described_joint() -> RevoluteConnection:
         child = Body(name=PrefixedName("child"))
         world.add_kinematic_structure_entity(parent)
         world.add_kinematic_structure_entity(child)
-        joint = RevoluteConnection.create_with_dofs(
-            world=world, parent=parent, child=child, axis=Vector3.Z()
+        joint = ScrewAxisConnection.create_with_dofs(
+            normalized_twist=NormalizedTwist.create_revolute(),
+            world=world,
+            parent=parent,
+            child=child,
+            axis=Vector3.Z(),
         )
         world.add_connection(joint)
     joint.dynamics = JointDynamics(armature=0.2, damping=3.0, dry_friction=0.5)

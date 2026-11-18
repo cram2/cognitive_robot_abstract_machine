@@ -23,14 +23,15 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.soft_trunk import SoftTrunk, SoftTrunkSection
 from semantic_digital_twin.exceptions import DuplicateSimulatorPropertyError
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     DifferentialDrive,
     FixedConnection,
     OmniDrive,
-    PrismaticConnection,
-    RevoluteConnection,
-    ScrewConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.soft_connections import (
@@ -64,8 +65,12 @@ def simulated_world() -> World:
     arm.add_simulator_property(GravityCompensation(fraction=0.5))
     with world.modify_world():
         world.add_simulator_property(MujocoTendon(name="coupling"))
-        hinge = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=arm, axis=Vector3.Z()
+        hinge = ScrewAxisConnection.create_with_dofs(
+            normalized_twist=NormalizedTwist.create_revolute(),
+            world=world,
+            parent=root,
+            child=arm,
+            axis=Vector3.Z(),
         )
         hinge.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
         world.add_connection(hinge)
@@ -367,9 +372,21 @@ def connect_with_dofs(
     "connect",
     [
         lambda world, parent, child: FixedConnection(parent=parent, child=child),
-        connect_with_dofs(RevoluteConnection, axis=Vector3.Z()),
-        connect_with_dofs(PrismaticConnection, axis=Vector3.X()),
-        connect_with_dofs(ScrewConnection, axis=Vector3.Z(), screw_pitch=0.01),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            axis=Vector3.Z(),
+            normalized_twist=NormalizedTwist.create_revolute(),
+        ),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            axis=Vector3.X(),
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        ),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            axis=Vector3.Z(),
+            normalized_twist=NormalizedTwist.create_screw(screw_pitch=0.01),
+        ),
         connect_with_dofs(Connection6DoF),
         connect_with_dofs(OmniDrive),
         connect_with_dofs(DifferentialDrive),

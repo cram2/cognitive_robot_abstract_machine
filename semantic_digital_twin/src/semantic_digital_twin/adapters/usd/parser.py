@@ -31,12 +31,14 @@ from semantic_digital_twin.adapters.usd.exceptions import (
 from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.usd_semantics import USDSemanticLabels
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     FixedConnectionSpecification,
     ConnectionSpecificationWithEndpoints,
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -45,9 +47,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
-)
+from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -230,8 +230,18 @@ class USDPhysicsJointType(StrEnum):
         """
         return {
             USDPhysicsJointType.FIXED: FixedConnectionSpecification,
-            USDPhysicsJointType.REVOLUTE: RevoluteConnectionSpecification,
-            USDPhysicsJointType.PRISMATIC: PrismaticConnectionSpecification,
+            USDPhysicsJointType.REVOLUTE: ScrewAxisConnectionSpecification,
+            USDPhysicsJointType.PRISMATIC: ScrewAxisConnectionSpecification,
+        }[self]
+
+    @property
+    def normalized_twist(self) -> NormalizedTwist:
+        """
+        :return: The motion of the connection this movable joint type becomes.
+        """
+        return {
+            USDPhysicsJointType.REVOLUTE: NormalizedTwist.create_revolute(),
+            USDPhysicsJointType.PRISMATIC: NormalizedTwist.create_prismatic(),
         }[self]
 
 
@@ -847,13 +857,13 @@ class USDStageParser(WorldModelParser, ABC):
 
         axis_joint = (
             UsdPhysics.RevoluteJoint(joint_prim)
-            if specification_type is RevoluteConnectionSpecification
+            if usd_joint_type is USDPhysicsJointType.REVOLUTE
             else UsdPhysics.PrismaticJoint(joint_prim)
         )
         axis = USDAxis(axis_joint.GetAxisAttr().Get()).vector(reference_frame=parent)
         lower = axis_joint.GetLowerLimitAttr().Get()
         upper = axis_joint.GetUpperLimitAttr().Get()
-        if specification_type is RevoluteConnectionSpecification:
+        if usd_joint_type is USDPhysicsJointType.REVOLUTE:
             lower, upper = math.radians(lower), math.radians(upper)
         if lower > upper:
             # Seen authored this way on a mirrored part (e.g. one blade of a pair of
@@ -867,6 +877,7 @@ class USDStageParser(WorldModelParser, ABC):
             connection_specification=specification_type(
                 connection_T_child=connection_T_child,
                 axis=axis,
+                normalized_twist=usd_joint_type.normalized_twist,
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=lower, upper_position=upper
                 ),

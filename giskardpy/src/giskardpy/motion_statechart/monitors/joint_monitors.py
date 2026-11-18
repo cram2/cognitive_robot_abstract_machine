@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 from cramph.node import EndedByOwner
@@ -34,9 +34,9 @@ class JointPositionReached(EndedByOwner, MotionStatechartNode):
     def build_artifacts(self) -> NodeArtifacts:
         current = self.connection.dof.variables.position
         if (
-            isinstance(self.connection, RevoluteConnection)
-            and not self.connection.dof.has_position_limits()
-        ):
+            isinstance(self.connection, ScrewAxisConnection)
+            and self.connection.normalized_twist.behaves_like_a_revolute_connection
+        ) and not self.connection.dof.has_position_limits():
             error = sm.shortest_angular_distance(current, self.position)
         else:
             error = self.position - current

@@ -177,3 +177,6 @@ CLAUDE.local.md
 
 # Some robokudo annotators have default models downloaded
 robokudo/src/robokudo/models/
+
+# The self-collision matrix test writes the SRDF it computes into the working directory.
+/test/test.srdf

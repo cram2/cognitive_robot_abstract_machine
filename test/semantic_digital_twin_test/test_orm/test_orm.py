@@ -14,10 +14,10 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2, PR2RightArm
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    ScrewAxisConnection,
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
 )
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
@@ -61,7 +61,11 @@ def session(engine):
 
 
 def test_table_world(session, table_world):
-    revolute_connection = table_world.get_connections_by_type(RevoluteConnection)[0]
+    revolute_connection = [
+        connection
+        for connection in table_world.get_connections_by_type(ScrewAxisConnection)
+        if connection.normalized_twist.behaves_like_a_revolute_connection
+    ][0]
     revolute_connection.position = 1
     revolute_connection.velocity = 23
     revolute_connection.acceleration = 42
@@ -84,9 +88,11 @@ def test_table_world(session, table_world):
         root=revolute_connection.parent, tip=revolute_connection.child
     )
     assert np.allclose(fk, fk2)
-    reconstructed_connection = reconstructed.get_connections_by_type(
-        RevoluteConnection
-    )[0]
+    reconstructed_connection = [
+        connection
+        for connection in reconstructed.get_connections_by_type(ScrewAxisConnection)
+        if connection.normalized_twist.behaves_like_a_revolute_connection
+    ][0]
     assert reconstructed_connection.position == revolute_connection.position
     assert reconstructed_connection.velocity == revolute_connection.velocity
     assert reconstructed_connection.acceleration == revolute_connection.acceleration
@@ -152,7 +158,7 @@ def test_pr2_world(pr2_world_state_reset, session):
     # confirm the modification history
     deepcopy(reconstructed)
 
-    q = select(RevoluteConnectionDAO)
+    q = select(ScrewAxisConnectionDAO)
     r = session.scalars(q).all()
     assert len(r) > 0
 
@@ -317,8 +323,10 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
             name="door",
             scale=Scale(0.03, 1, 2),
             world=world,
-            parent_connection_specification=RevoluteConnectionSpecification(
-                axis=Vector3.Z(), connection_T_child=hinge_T_door
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                normalized_twist=NormalizedTwist.create_revolute(),
+                axis=Vector3.Z(),
+                connection_T_child=hinge_T_door,
             ),
         )
 
@@ -340,7 +348,8 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
     session, world_with_two_bodies
 ):
     """
-    The parameters and the child's pose survive storing the world and reading it back.
+    The normalized twist and the child's pose survive storing the world and reading it
+    back.
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
@@ -349,8 +358,7 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
             parent=parent,
             child=child,
             axis=Vector3.Y(),
-            rotation_per_unit_position=1.0,
-            translation_per_unit_position=0.04,
+            normalized_twist=NormalizedTwist.create_screw(screw_pitch=0.25),
         )
         world.add_connection(connection)
     connection.position = 2.5
@@ -363,13 +371,7 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
     reconstructed_connection = reconstructed.get_connections_by_type(
         ScrewAxisConnection
     )[0]
-    assert (
-        reconstructed_connection.rotation_per_unit_position,
-        reconstructed_connection.translation_per_unit_position,
-    ) == (
-        connection.rotation_per_unit_position,
-        connection.translation_per_unit_position,
-    )
+    assert reconstructed_connection.normalized_twist == connection.normalized_twist
     assert np.allclose(
         reconstructed.compute_forward_kinematics_np(
             root=reconstructed_connection.parent, tip=reconstructed_connection.child

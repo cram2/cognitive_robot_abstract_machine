@@ -11,12 +11,15 @@ from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import EndStatechart, NodeArtifacts, StatechartNode
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -45,7 +48,7 @@ class SlidingWorld:
     The body fixed to the root, which is moved below :attr:`slider`.
     """
 
-    slider_connection: PrismaticConnection
+    slider_connection: ScrewAxisConnection
     """
     The joint moving :attr:`slider` along x.
     """
@@ -59,8 +62,12 @@ def sliding_world() -> SlidingWorld:
     box = Body(name=PrefixedName("box"))
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
-        slider_connection = PrismaticConnection.create_with_dofs(
-            world=world, parent=root, child=slider, axis=Vector3.X()
+        slider_connection = ScrewAxisConnection.create_with_dofs(
+            normalized_twist=NormalizedTwist.create_prismatic(),
+            world=world,
+            parent=root,
+            child=slider,
+            axis=Vector3.X(),
         )
         world.add_connection(slider_connection)
         world.add_connection(FixedConnection(parent=root, child=box))

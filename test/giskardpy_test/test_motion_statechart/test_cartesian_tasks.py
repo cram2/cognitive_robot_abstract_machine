@@ -44,6 +44,9 @@ from cramph.statechart import (
 )
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -61,7 +64,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -2281,7 +2284,8 @@ class TestDiffDriveBaseGoal:
         base = world.get_connections_by_type(DifferentialDrive)[0].child
         lift = Body(name=PrefixedName("lift"))
         with world.modify_world():
-            lift_connection = PrismaticConnection.create_with_dofs(
+            lift_connection = ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_prismatic(),
                 world=world,
                 parent=world.root,
                 child=lift,

@@ -37,10 +37,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
 )
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 
 # %% the bodies each annotation is expected on
 
@@ -494,7 +494,7 @@ def test_an_annotation_the_world_already_held_keeps_hanging_on_its_own_joint(
     ]
 
     [drawer] = drawers
-    assert isinstance(drawer.movable_joint, PrismaticConnection)
+    assert drawer.movable_joint.normalized_twist == NormalizedTwist.create_prismatic()
 
 
 def test_every_openable_part_hangs_on_the_joint_that_moves_it(
@@ -509,9 +509,11 @@ def test_every_openable_part_hangs_on_the_joint_that_moves_it(
     assert drawers and doors
 
     for drawer in drawers:
-        assert isinstance(drawer.movable_joint, PrismaticConnection)
+        assert (
+            drawer.movable_joint.normalized_twist == NormalizedTwist.create_prismatic()
+        )
     for door in doors:
-        assert isinstance(door.movable_joint, RevoluteConnection)
+        assert door.movable_joint.normalized_twist == NormalizedTwist.create_revolute()
 
     assert reasoned_apartment.validate()
 

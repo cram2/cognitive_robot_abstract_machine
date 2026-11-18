@@ -41,9 +41,10 @@ from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformation
 from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
 )
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
@@ -115,8 +116,12 @@ def test_executing_json_parsed_statechart(tmp_path):
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
-        root_C_tip = RevoluteConnection(
-            parent=root, child=tip, axis=Vector3.Z(), raw_dof=dof
+        root_C_tip = ScrewAxisConnection(
+            normalized_twist=NormalizedTwist.create_revolute(),
+            parent=root,
+            child=tip,
+            axis=Vector3.Z(),
+            raw_dof=dof,
         )
         world.add_connection(root_C_tip)
 
@@ -125,8 +130,12 @@ def test_executing_json_parsed_statechart(tmp_path):
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
-        root_C_tip2 = RevoluteConnection(
-            parent=root, child=tip2, axis=Vector3.Z(), raw_dof=dof
+        root_C_tip2 = ScrewAxisConnection(
+            normalized_twist=NormalizedTwist.create_revolute(),
+            parent=root,
+            child=tip2,
+            axis=Vector3.Z(),
+            raw_dof=dof,
         )
         world.add_connection(root_C_tip2)
 

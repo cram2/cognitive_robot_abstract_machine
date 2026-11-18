@@ -12,10 +12,12 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
     FixedConnection,
     OmniDrive,
 )
@@ -89,11 +91,19 @@ def world_setup() -> tuple[
         )
         world.add_degree_of_freedom(dof)
 
-        c_l1_l2 = PrismaticConnection(
-            parent=l1, child=l2, raw_dof=dof, axis=Vector3.X(reference_frame=l1)
+        c_l1_l2 = ScrewAxisConnection(
+            normalized_twist=NormalizedTwist.create_prismatic(),
+            parent=l1,
+            child=l2,
+            raw_dof=dof,
+            axis=Vector3.X(reference_frame=l1),
         )
-        c_r1_r2 = RevoluteConnection(
-            parent=r1, child=r2, raw_dof=dof, axis=Vector3.Z(reference_frame=r1)
+        c_r1_r2 = ScrewAxisConnection(
+            normalized_twist=NormalizedTwist.create_revolute(),
+            parent=r1,
+            child=r2,
+            raw_dof=dof,
+            axis=Vector3.Z(reference_frame=r1),
         )
         bf_root_l1 = FixedConnection(parent=bf, child=l1)
         bf_root_r1 = FixedConnection(parent=bf, child=r1)

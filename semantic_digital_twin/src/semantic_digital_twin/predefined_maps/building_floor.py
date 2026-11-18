@@ -4,8 +4,11 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
@@ -45,7 +48,7 @@ class SingleDoorRoom:
 
     door_color: Color = field(default_factory=lambda: Color.RED())
     """
-    Color of the door to to visually distinguish it from the wall
+    Color of the door to to visually distinguish it from the wall.
     """
 
     def spawn(
@@ -104,8 +107,8 @@ class SingleDoorRoom:
             f"{name}_door",
             Door.get_default_root_kinematic_structure_entity_specification(
                 scale=self.door_scale,
-                connection_specification=RevoluteConnectionSpecification(
-                    axis=Vector3.Z()
+                connection_specification=ScrewAxisConnectionSpecification(
+                    normalized_twist=NormalizedTwist.create_revolute(), axis=Vector3.Z()
                 ),
             ),
             part_specifications={
@@ -157,8 +160,8 @@ class BuildingFloor:
 
         :param world: The world the building floor is added to.
         :param name: Prefix for the names of every entity this building floor creates.
-        :param parent: The entity the floor slab attaches to. If None, ``world.root``
-            is used.
+        :param parent: The entity the floor slab attaches to. If None, ``world.root`` is
+            used.
         :param parent_T_self: Placement of the floor slab in ``parent``'s frame.
             Identity if None.
         :return: The floor slab's annotation.

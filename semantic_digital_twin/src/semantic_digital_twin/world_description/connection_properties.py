@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from typing_extensions import TYPE_CHECKING
+import numpy as np
+from typing_extensions import TYPE_CHECKING, Self
+
+from semantic_digital_twin.exceptions import UnnormalizedTwistError
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.connections import (
@@ -52,6 +55,95 @@ class JointDynamics:
     """
     Viscous friction coefficient of the joint.
     """
+
+
+@dataclass(kw_only=True)
+class NormalizedTwist:
+    """
+    The screw axis of a screw axis connection as a normalized twist: how far its child
+    rotates about and translates along the axis per unit of position, one radian if it
+    rotates and one meter otherwise. A rate, unlike the displacement
+    :class:`~krrood_spatial_math.spatial_types.Twist`.
+    """
+
+    rotation_per_unit_position: float
+    """
+    Radians the child rotates about the axis per unit of position, following the
+    right-hand rule: 1 for a motion that rotates, 0 for one that only translates.
+    """
+
+    translation_per_unit_position: float
+    """
+    Meters the child translates along the axis per unit of position: 1 for a motion
+    that only translates, the pitch in meters per radian for one that rotates.
+    """
+
+    def __post_init__(self):
+        """
+        :raises UnnormalizedTwistError: if the twist is not normalized.
+        """
+        rotates_one_radian = self.rotation_per_unit_position == 1
+        translates_one_meter_only = (
+            self.rotation_per_unit_position == 0
+            and self.translation_per_unit_position == 1
+        )
+        if not (rotates_one_radian or translates_one_meter_only):
+            raise UnnormalizedTwistError(
+                rotation_per_unit_position=self.rotation_per_unit_position,
+                translation_per_unit_position=self.translation_per_unit_position,
+            )
+
+    @classmethod
+    def create_revolute(cls) -> Self:
+        """
+        A rotation about the axis without translation, as of a door hinge.
+        """
+        return cls(rotation_per_unit_position=1.0, translation_per_unit_position=0.0)
+
+    @classmethod
+    def create_prismatic(cls) -> Self:
+        """
+        A translation along the axis without rotation, as of a drawer slide.
+        """
+        return cls(rotation_per_unit_position=0.0, translation_per_unit_position=1.0)
+
+    @classmethod
+    def create_screw(cls, *, screw_pitch: float) -> Self:
+        """
+        The twist of a single-start thread that advances ``screw_pitch`` meters along
+        the axis per full revolution; a negative pitch models a left-handed thread.
+        """
+        return cls(
+            rotation_per_unit_position=1.0,
+            translation_per_unit_position=screw_pitch / (2 * np.pi),
+        )
+
+    @property
+    def behaves_like_a_revolute_connection(self) -> bool:
+        """
+        Whether the child only rotates about the axis.
+        """
+        return (
+            self.rotation_per_unit_position != 0
+            and self.translation_per_unit_position == 0
+        )
+
+    @property
+    def behaves_like_a_prismatic_connection(self) -> bool:
+        """
+        Whether the child only translates along the axis.
+        """
+        return self.rotation_per_unit_position == 0
+
+    @property
+    def behaves_like_a_screw_connection(self) -> bool:
+        """
+        Whether the child rotates about the axis and translates along it at once.
+        """
+        return (
+            self.rotation_per_unit_position != 0
+            and self.translation_per_unit_position != 0
+        )
 
 
 @dataclass

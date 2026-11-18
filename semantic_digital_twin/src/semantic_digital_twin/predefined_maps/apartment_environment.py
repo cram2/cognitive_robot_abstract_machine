@@ -6,9 +6,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
@@ -32,7 +35,6 @@ from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_source import WorldSource
 
 # %% apartment
-
 
 
 @dataclass
@@ -200,7 +202,8 @@ class ApartmentEnvironment(WorldSource):
                         -0.3246, door_y
                     ),
                 ),
-                parent_connection_specification=RevoluteConnectionSpecification(
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    normalized_twist=NormalizedTwist.create_revolute(),
                     axis=Vector3.Z(),
                     dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=min(0.0, opening_angle),

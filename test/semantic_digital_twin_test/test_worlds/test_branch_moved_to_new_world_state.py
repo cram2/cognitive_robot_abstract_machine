@@ -8,12 +8,15 @@ from __future__ import annotations
 import pytest
 
 from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -33,7 +36,8 @@ def door_world() -> World:
             FixedConnection(parent=Body(name=PrefixedName("root")), child=branch_root)
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=branch_root,
                 child=Body(name=PrefixedName("door")),
@@ -44,18 +48,22 @@ def door_world() -> World:
 
 
 @pytest.fixture
-def door_hinge(door_world: World) -> RevoluteConnection:
+def door_hinge(door_world: World) -> ScrewAxisConnection:
     """
     The hinge of the door in :func:`door_world`.
     """
-    return door_world.get_connections_by_type(RevoluteConnection)[0]
+    return [
+        connection
+        for connection in door_world.get_connections_by_type(ScrewAxisConnection)
+        if connection.normalized_twist.behaves_like_a_revolute_connection
+    ][0]
 
 
 # %% a branch moved to a new world keeps its joint state
 
 
 def test_branch_moved_to_new_world_keeps_its_joint_positions(
-    door_world: World, door_hinge: RevoluteConnection
+    door_world: World, door_hinge: ScrewAxisConnection
 ):
     """
     An opened door stays open after its branch moves to a new world.
@@ -68,7 +76,7 @@ def test_branch_moved_to_new_world_keeps_its_joint_positions(
 
 
 def test_branch_moved_to_new_world_keeps_its_joint_velocities(
-    door_world: World, door_hinge: RevoluteConnection
+    door_world: World, door_hinge: ScrewAxisConnection
 ):
     """
     A door swinging when its branch moves keeps swinging in the new world.

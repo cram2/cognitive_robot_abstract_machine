@@ -32,8 +32,7 @@ from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     FixedConnectionSpecification,
     ConnectionSpecificationWithEndpoints,
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -41,7 +40,10 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -84,10 +86,21 @@ class SdfJointType(StrEnum):
         :return: The specification of the connection this joint type becomes.
         """
         return {
-            SdfJointType.REVOLUTE: RevoluteConnectionSpecification,
-            SdfJointType.CONTINUOUS: RevoluteConnectionSpecification,
-            SdfJointType.PRISMATIC: PrismaticConnectionSpecification,
+            SdfJointType.REVOLUTE: ScrewAxisConnectionSpecification,
+            SdfJointType.CONTINUOUS: ScrewAxisConnectionSpecification,
+            SdfJointType.PRISMATIC: ScrewAxisConnectionSpecification,
             SdfJointType.FIXED: FixedConnectionSpecification,
+        }[self]
+
+    @property
+    def normalized_twist(self) -> NormalizedTwist:
+        """
+        :return: The motion of the connection this movable joint type becomes.
+        """
+        return {
+            SdfJointType.REVOLUTE: NormalizedTwist.create_revolute(),
+            SdfJointType.CONTINUOUS: NormalizedTwist.create_revolute(),
+            SdfJointType.PRISMATIC: NormalizedTwist.create_prismatic(),
         }[self]
 
 
@@ -762,6 +775,7 @@ class GazeboParser(WorldModelParser):
                 axis=self.parse_axis(element, joint_name, bodies[parent_name]),
                 dof_limits=self.parse_limits(element, joint_type, joint_name),
                 dynamics=self.parse_dynamics(element.find("axis/dynamics")),
+                normalized_twist=joint_type.normalized_twist,
             )
         else:
             specification = specification_type(

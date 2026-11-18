@@ -23,6 +23,9 @@ from giskardpy.middleware.ros2.command_publishing import (
     TwistStampedFormat,
 )
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
@@ -30,7 +33,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     DifferentialDrive,
     OmniDrive,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -86,11 +89,6 @@ class ConnectionSpec:
     Scaling between the world state value and the value of the connection.
     """
 
-    connection_type: type[ActiveConnection1DOF] = RevoluteConnection
-    """
-    The concrete connection class to instantiate.
-    """
-
 
 def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     """
@@ -100,7 +98,8 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     with world.modify_world():
         for index, spec in enumerate(specs):
             child = Body(name=PrefixedName(f"body_{index}"))
-            connection = spec.connection_type.create_with_dofs(
+            connection = ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=parent,
                 child=child,
@@ -132,7 +131,8 @@ def add_removable_joint(world: World, parent: Body) -> ActiveConnection1DOF:
     degree of freedom that was added afterwards.
     """
     with world.modify_world():
-        connection = RevoluteConnection.create_with_dofs(
+        connection = ScrewAxisConnection.create_with_dofs(
+            normalized_twist=NormalizedTwist.create_revolute(),
             world=world,
             parent=parent,
             child=Body(name=PrefixedName("removable_body")),

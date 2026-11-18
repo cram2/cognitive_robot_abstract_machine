@@ -106,7 +106,7 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     ActiveConnection1DOF,
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     WheeledDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -633,7 +633,10 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
             child_pose = connection.child.global_pose
             dist = (
                 connection.dof.limits.upper.position
-                if isinstance(connection, PrismaticConnection)
+                if (
+                    isinstance(connection, ScrewAxisConnection)
+                    and connection.normalized_twist.behaves_like_a_prismatic_connection
+                )
                 else parent_pose.position.euclidean_distance(child_pose.position)
             )
             length += dist

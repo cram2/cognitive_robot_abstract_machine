@@ -29,11 +29,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import Vector3
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -165,7 +167,12 @@ def drawer_with_a_grip() -> FurnitureUnderTest:
     return (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add("case", "cabinet", PrismaticConnection)
+        .add(
+            "case",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        )
         .add("grip", "case", FixedConnection)
     )
 
@@ -252,7 +259,12 @@ def test_a_body_named_after_furniture_is_not_a_handle():
     furniture = (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add("case", "cabinet", PrismaticConnection)
+        .add(
+            "case",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        )
         .add("board", "case", FixedConnection)
     )
 
@@ -280,7 +292,12 @@ def test_a_case_with_nothing_to_pull_it_by_is_still_a_drawer():
     furniture = (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add("case", "cabinet", PrismaticConnection)
+        .add(
+            "case",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        )
     )
 
     [drawer] = drawers_without_a_handle(furniture.world)
@@ -306,7 +323,12 @@ def test_a_leaf_a_hinge_swings_is_a_door_with_its_grip():
     furniture = (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add("leaf", "cabinet", RevoluteConnection)
+        .add(
+            "leaf",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
         .add("grip", "leaf", FixedConnection)
         .apply(handles)
     )
@@ -324,8 +346,19 @@ def test_a_leaf_another_follows_is_opened_by_that_leafs_handle():
     furniture = (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add("upper_leaf", "cabinet", RevoluteConnection)
-        .add("lower_leaf", "upper_leaf", RevoluteConnection, multiplier=1.2)
+        .add(
+            "upper_leaf",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
+        .add(
+            "lower_leaf",
+            "upper_leaf",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+            multiplier=1.2,
+        )
         .add("grip", "lower_leaf", FixedConnection)
         .apply(handles)
     )
@@ -343,8 +376,18 @@ def test_a_container_is_not_opened_by_the_handle_on_its_own_door():
     furniture = (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add("appliance", "cabinet", RevoluteConnection)
-        .add("leaf", "appliance", RevoluteConnection)
+        .add(
+            "appliance",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
+        .add(
+            "leaf",
+            "appliance",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
         .add("grip", "leaf", FixedConnection)
         .apply(handles)
     )
@@ -362,8 +405,18 @@ def test_a_linkage_with_no_grip_anywhere_holds_no_door():
     furniture = (
         FurnitureUnderTest.build()
         .add("basin", "root", FixedConnection)
-        .add("spout", "basin", RevoluteConnection)
-        .add("lever", "spout", RevoluteConnection)
+        .add(
+            "spout",
+            "basin",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
+        .add(
+            "lever",
+            "spout",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
         .apply(handles)
     )
 
@@ -412,8 +465,18 @@ def test_a_container_holds_a_part_reached_through_a_shapeless_helper():
     furniture = (
         FurnitureUnderTest.build()
         .add("cabinet", "root", FixedConnection)
-        .add_without_geometry("popout", "cabinet", PrismaticConnection)
-        .add("leaf", "popout", RevoluteConnection)
+        .add_without_geometry(
+            "popout",
+            "cabinet",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        )
+        .add(
+            "leaf",
+            "popout",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_revolute(),
+        )
         .add("grip", "leaf", FixedConnection)
         .apply(handles, doors_with_a_handle)
     )
@@ -431,7 +494,12 @@ def test_a_container_takes_its_kind_from_the_part_that_names_it():
     furniture = (
         FurnitureUnderTest.build()
         .add("unit", "root", FixedConnection)
-        .add("dishwasher_front", "unit", PrismaticConnection)
+        .add(
+            "dishwasher_front",
+            "unit",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        )
         .apply(handles, drawers_without_a_handle)
     )
 
@@ -449,7 +517,12 @@ def test_a_container_naming_no_kind_is_a_plain_cabinet():
     furniture = (
         FurnitureUnderTest.build()
         .add("unit", "root", FixedConnection)
-        .add("case", "unit", PrismaticConnection)
+        .add(
+            "case",
+            "unit",
+            ScrewAxisConnection,
+            normalized_twist=NormalizedTwist.create_prismatic(),
+        )
         .apply(handles, drawers_without_a_handle)
     )
 

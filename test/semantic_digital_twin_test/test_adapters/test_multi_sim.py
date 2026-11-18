@@ -24,10 +24,13 @@ from krrood_spatial_math.spatial_types import (
     Pose,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -795,7 +798,8 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
         )
         world.add_degree_of_freedom(degree_of_freedom)
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 name=PrefixedName("knuckle_joint"),
                 parent=root,
                 child=knuckle,
@@ -804,7 +808,8 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
             )
         )
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 name=PrefixedName("mirrored_knuckle_joint"),
                 parent=root,
                 child=mirrored_knuckle,
@@ -929,7 +934,8 @@ def test_spawn_body_with_connections():
         with spawn_world.modify_world():
             spawn_world.add_degree_of_freedom(dof)
             spawn_world.add_connection(
-                RevoluteConnection(
+                ScrewAxisConnection(
+                    normalized_twist=NormalizedTwist.create_revolute(),
                     name=dof.name,
                     parent=root_body,
                     child=spawn_left_shoulder_body,
@@ -962,7 +968,8 @@ def test_spawn_body_with_connections():
         with spawn_world.modify_world():
             spawn_world.add_degree_of_freedom(dof)
             spawn_world.add_connection(
-                RevoluteConnection(
+                ScrewAxisConnection(
+                    normalized_twist=NormalizedTwist.create_revolute(),
                     name=dof.name,
                     parent=root_body,
                     child=spawn_right_shoulder_body,
@@ -1031,7 +1038,8 @@ def test_body_frame_excludes_joint_state_at_build_time():
         world.add_body(base_body)
         world.add_degree_of_freedom(rotated_joint_dof)
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 name=rotated_joint_dof.name,
                 parent=base_body,
                 child=rotated_link,

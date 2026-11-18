@@ -39,7 +39,7 @@ questions = [
       "type": "multiple_choice",
       "answers": [
         {"answer": "Connection6DoF.create_with_dofs(parent=parent, child=child, world=world)", "correct": True},
-        {"answer": "RevoluteConnection(parent, child)", "correct": False},
+        {"answer": "ScrewAxisConnection(parent, child)", "correct": False},
         {"answer": "FixedConnection(parent, child)", "correct": False},
         {"answer": "AddBodyConnection(parent, child)", "correct": False}
       ],

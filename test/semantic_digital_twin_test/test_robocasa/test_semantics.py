@@ -24,7 +24,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Microwave,
 )
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 
 ROBOCASA_RESOURCES_DIR = (
     Path(__file__).resolve().parents[3]
@@ -212,7 +215,10 @@ def test_attach_semantic_annotation_attaches_door_and_handle_sub_parts():
 
     # the door's real hinge joint (parsed from the fixture's MJCF) must not have been disturbed by
     # recording the part-whole relationship
-    assert isinstance(door_body.parent_connection, RevoluteConnection)
+    assert (
+        door_body.parent_connection.normalized_twist
+        == NormalizedTwist.create_revolute()
+    )
     assert door_body.parent_kinematic_structure_entity == body
 
 

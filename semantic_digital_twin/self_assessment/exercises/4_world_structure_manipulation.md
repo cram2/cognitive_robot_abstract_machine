@@ -24,9 +24,13 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
+from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.connections import Connection6DoF, RevoluteConnection
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    ScrewAxisConnection,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
@@ -38,7 +42,7 @@ from krrood.entity_query_language.factories import entity, variable, an, the
 Your goal:
 - Create a `World` and three bodies named `root`, `base`, and `body`
 - Add a passive `Connection6DoF` between `root` (parent) and `base` (child)
-- Add a `RevoluteConnection` between `base` (parent) and `body` (child) using a Z axis on `base`
+- Add a revolute `ScrewAxisConnection` between `base` (parent) and `body` (child) using a Z axis on `base`
 - Store the world in a variable named `world` and the revolute connection in `base_C_body`
 - Add the Connections to the world.
 
@@ -51,7 +55,7 @@ base: Body = ...
 body: Body = ...
 root_C_base: Connection6DoF = ...
 base_C_body_dof: DegreeOfFreedom = ...
-base_C_body: RevoluteConnection = ...
+base_C_body: ScrewAxisConnection = ...
 
 
 ```
@@ -65,8 +69,8 @@ body = Body(name=PrefixedName("body"))
 
 with world.modify_world():
     root_C_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
-    base_C_body = RevoluteConnection.create_with_dofs(
-            parent=base,
+    base_C_body = ScrewAxisConnection.create_with_dofs(
+            normalized_twist=NormalizedTwist.create_revolute(), parent=base,
             child=body,
             axis=Vector3.Z(reference_frame=base),
             world=world
@@ -95,7 +99,10 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [example-solution]
 
-base_C_body_query = the(entity(variable(RevoluteConnection, world.connections)))
+hinge = variable(ScrewAxisConnection, world.connections)
+base_C_body_query = the(
+    entity(hinge).where(hinge.normalized_twist.behaves_like_a_revolute_connection)
+)
 
 base_C_body = base_C_body_query.first()
 body = base_C_body.child

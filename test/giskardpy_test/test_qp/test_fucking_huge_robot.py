@@ -10,14 +10,15 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.world_description.connection_properties import (
+    NormalizedTwist,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Point3
 from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -63,7 +64,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=root,
                 child=link1,
@@ -79,7 +81,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_cylinder),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=link1,
                 child=link2,
@@ -98,7 +101,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_cylinder),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=link2,
                 child=link3,
@@ -117,7 +121,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=link3,
                 child=link4,
@@ -133,7 +138,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=link4,
                 child=link5,
@@ -149,7 +155,8 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                normalized_twist=NormalizedTwist.create_revolute(),
                 world=world,
                 parent=link5,
                 child=eef,
