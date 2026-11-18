@@ -17,10 +17,8 @@ import pytest
 from array_api_compat import array_namespace
 
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
-from probabilistic_model.learning.gradient_descent import (
-    AverageNegativeLogLikelihood,
-    JaxGradientDescent,
-)
+from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
+from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     LearningRatePlateau,

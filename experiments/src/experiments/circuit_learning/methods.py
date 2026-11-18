@@ -32,10 +32,8 @@ from probabilistic_model.learning.expectation_maximization import (
     ExpectationMaximizationTraining,
     LearnableUnits,
 )
-from probabilistic_model.learning.gradient_descent import (
-    AverageNegativeLogLikelihood,
-    JaxGradientDescent,
-)
+from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
+from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph

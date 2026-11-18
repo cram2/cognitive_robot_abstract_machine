@@ -77,7 +77,7 @@ class TorchGradientDescent(GradientDescent[LayerType]):
 
     def device_memory(self) -> PeakTrackingMemory:
         device = self.parameters[0].device
-        if device.type == TorchDeviceType.CUDA:
+        if device.type == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
             return TorchDeviceMemory(device=device)
         return HostMemory()
 
@@ -88,7 +88,7 @@ class TorchGradientDescent(GradientDescent[LayerType]):
         :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
         """
         device = self.parameters[0].device
-        if device.type != TorchDeviceType.CUDA:
+        if device.type != TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
             raise UnmeasurableHostStepMemoryError()
         memory = TorchDeviceMemory(device=device)
         memory.reset_peak()
@@ -169,4 +169,4 @@ class TorchDeviceType(StrEnum):
     The types of torch devices that are told apart.
     """
 
-    CUDA = "cuda"
+    COMPUTE_UNIFIED_DEVICE_ARCHITECTURE = "cuda"

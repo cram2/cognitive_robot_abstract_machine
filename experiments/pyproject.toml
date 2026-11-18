@@ -16,7 +16,7 @@ dependencies = [
     "h5py",
     "krrood>=26.10.0",
     "krrood_compute_hardware[jax,torch]>=26.10.0",
-    "probabilistic_model>=26.10.0",
+    "probabilistic_model[jax,torch]>=26.10.0",
     "psutil~=5.9.0",
     "pymysql",
     "random_events>=26.10.0",

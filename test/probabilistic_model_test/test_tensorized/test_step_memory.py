@@ -19,10 +19,8 @@ from probabilistic_model.learning.exceptions import (
     UnmeasurableHostStepMemoryError,
     UnmeasurableStepMemoryError,
 )
-from probabilistic_model.learning.gradient_descent import (
-    AverageNegativeLogLikelihood,
-    JaxGradientDescent,
-)
+from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
+from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.training_schedule import MiniBatches
 
 from ...krrood_compute_hardware_test.dataset.memory import FixedFreeMemory
@@ -126,7 +124,10 @@ def torch_trainer(mixture_of_products_case, request):
         "probabilistic_model.learning.torch_gradient_descent"
     )
     device = torch.device(request.param)
-    if device.type == torch_gradient_descent.TorchDeviceType.CUDA:
+    if (
+        device.type
+        == torch_gradient_descent.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+    ):
         if not torch.cuda.is_available():
             pytest.skip("no CUDA device")
     case = mixture_of_products_case

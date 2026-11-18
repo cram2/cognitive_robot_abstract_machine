@@ -394,7 +394,11 @@ class BenchmarkRunner:
         """
         return Machine.from_current_process(
             graphics_processor_memory=(
-                TorchDeviceMemory(device=torch.device(TorchDeviceType.CUDA))
+                TorchDeviceMemory(
+                    device=torch.device(
+                        TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+                    )
+                )
                 if self.division.graphics_processor_shares
                 else None
             )
