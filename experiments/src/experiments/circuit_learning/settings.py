@@ -19,7 +19,7 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
 )
 from krrood.entity_query_language.factories import a, variable_from
-from krrood_compute_hardware.devices import Device
+from krrood_compute_resources.devices import Device
 from typing_extensions import Any, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (

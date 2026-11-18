@@ -13,7 +13,7 @@ from enum import StrEnum
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.path_enumeration import PathEnumeration
 
-from krrood_compute_hardware.exceptions import MissingMemoryFieldError
+from krrood_compute_resources.exceptions import MissingMemoryFieldError
 
 # %% linux memory files
 

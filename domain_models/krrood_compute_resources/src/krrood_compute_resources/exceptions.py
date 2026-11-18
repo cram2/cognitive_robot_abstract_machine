@@ -1,5 +1,5 @@
 """
-Exceptions of the compute hardware model.
+Exceptions of the compute resources model.
 """
 
 from __future__ import annotations

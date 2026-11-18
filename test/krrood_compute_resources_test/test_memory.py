@@ -9,7 +9,7 @@ import os
 
 import numpy as np
 
-from krrood_compute_hardware.memory import BudgetedMemory, HostMemory
+from krrood_compute_resources.memory import BudgetedMemory, HostMemory
 
 from .dataset.memory import FixedFreeMemory
 

@@ -7,12 +7,12 @@ from __future__ import annotations
 # %% imports
 import pytest
 
-from krrood_compute_hardware.devices import Device
-from krrood_compute_hardware.exceptions import (
+from krrood_compute_resources.devices import Device
+from krrood_compute_resources.exceptions import (
     EmptyMachineDivisionError,
     MissingGraphicsProcessorError,
 )
-from krrood_compute_hardware.machine import (
+from krrood_compute_resources.machine import (
     GraphicsProcessorVariable,
     Machine,
     MachineDivision,

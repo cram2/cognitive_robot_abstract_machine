@@ -1,16 +1,16 @@
-name: Publish krrood_compute_hardware to PyPI
+name: Publish krrood_compute_resources to PyPI
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'domain_models/krrood_compute_hardware/**'
+      - 'domain_models/krrood_compute_resources/**'
   workflow_dispatch:
 
 defaults:
   run:
-    working-directory: domain_models/krrood_compute_hardware
+    working-directory: domain_models/krrood_compute_resources
 
 jobs:
   check-version:
@@ -31,10 +31,10 @@ jobs:
       - name: Check version against PyPI
         id: check
         run: |
-          LOCAL_VERSION=$(grep -oP '(?<=__version__ = ")[^"]+' src/krrood_compute_hardware/_version.py)
+          LOCAL_VERSION=$(grep -oP '(?<=__version__ = ")[^"]+' src/krrood_compute_resources/_version.py)
           echo "Local version: $LOCAL_VERSION"
 
-          PYPI_VERSION=$(pip index versions krrood_compute_hardware 2>/dev/null \
+          PYPI_VERSION=$(pip index versions krrood_compute_resources 2>/dev/null \
             | grep -oP '(?<=Available versions: )[^,]+' \
             | tr -d ' ')
           PYPI_VERSION=${PYPI_VERSION:-0.0.0}
@@ -72,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: domain_models/krrood_compute_hardware/dist/
+          path: domain_models/krrood_compute_resources/dist/
 
   publish:
     name: Publish to PyPI
@@ -83,7 +83,7 @@ jobs:
         working-directory: .
     environment:
       name: pypi
-      url: https://pypi.org/p/krrood-compute-hardware
+      url: https://pypi.org/p/krrood-compute-resources
     permissions:
       id-token: write  # required for trusted publishing
     steps:

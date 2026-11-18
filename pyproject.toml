@@ -26,7 +26,7 @@ dependencies = [
   "experiments>=26.10.0",
   "segmind>=26.10.0",
   "krrood_spatial_math>=26.10.0",
-  "krrood_compute_hardware>=26.10.0",
+  "krrood_compute_resources>=26.10.0",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -96,7 +96,7 @@ members = [
   "experiments",
   "segmind",
   "domain_models/krrood_spatial_math",
-  "domain_models/krrood_compute_hardware"
+  "domain_models/krrood_compute_resources"
 ]
 
 [tool.uv.sources]
@@ -112,7 +112,7 @@ physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
 krrood_spatial_math   = { workspace = true }
-krrood_compute_hardware = { workspace = true }
+krrood_compute_resources = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -130,7 +130,7 @@ physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
 krrood_spatial_math = { path = "domain_models/krrood_spatial_math", develop = true }
-krrood_compute_hardware = { path = "domain_models/krrood_compute_hardware", develop = true }
+krrood_compute_resources = { path = "domain_models/krrood_compute_resources", develop = true }
 
 [tool.setuptools]
 packages = ["cognitive_robot_abstract_machine"]

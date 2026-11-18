@@ -13,9 +13,9 @@ from enum import StrEnum
 import jax
 import jax.numpy as jnp
 import optax
-from krrood_compute_hardware.jax_memory import JaxDeviceMemory
+from krrood_compute_resources.jax_memory import JaxDeviceMemory
 from typing_extensions import Callable
-from krrood_compute_hardware.memory import DeviceMemory, HostMemory
+from krrood_compute_resources.memory import DeviceMemory, HostMemory
 
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.gradient_descent import (

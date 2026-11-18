@@ -26,8 +26,8 @@ import jax
 import numpy as np
 import psutil
 import torch
-from krrood_compute_hardware.machine import Machine, MachineDivision, MachineShare
-from krrood_compute_hardware.torch_memory import TorchDeviceMemory
+from krrood_compute_resources.machine import Machine, MachineDivision, MachineShare
+from krrood_compute_resources.torch_memory import TorchDeviceMemory
 from krrood.adapters.json_serializer import from_json, to_json
 
 from experiments.circuit_learning.database import BenchmarkDatabase

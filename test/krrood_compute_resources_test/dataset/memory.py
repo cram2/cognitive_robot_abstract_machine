@@ -7,7 +7,7 @@ from __future__ import annotations
 # %% imports
 from dataclasses import dataclass
 
-from krrood_compute_hardware.memory import DeviceMemory
+from krrood_compute_resources.memory import DeviceMemory
 
 # %% devices
 

@@ -16,9 +16,9 @@ import jax
 import numpy as np
 import optax
 import pandas as pd
-from krrood_compute_hardware.devices import Device
-from krrood_compute_hardware.jax_memory import JaxDeviceMemory
-from krrood_compute_hardware.memory import BudgetedMemory, DeviceMemory, HostMemory
+from krrood_compute_resources.devices import Device
+from krrood_compute_resources.jax_memory import JaxDeviceMemory
+from krrood_compute_resources.memory import BudgetedMemory, DeviceMemory, HostMemory
 
 from experiments.circuit_learning.datasets import BenchmarkDataset
 from experiments.circuit_learning.settings import (

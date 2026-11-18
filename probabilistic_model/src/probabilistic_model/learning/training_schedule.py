@@ -15,7 +15,7 @@ import numpy as np
 from array_api_compat import array_namespace, device
 from typing_extensions import Iterator, Self
 
-from krrood_compute_hardware.memory import DeviceMemory
+from krrood_compute_resources.memory import DeviceMemory
 
 from probabilistic_model.learning.step_memory import StepMemory
 from probabilistic_model.learning.exceptions import NotEnoughMemoryError

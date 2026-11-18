@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from krrood_compute_hardware.machine import MachineDivision
+from krrood_compute_resources.machine import MachineDivision
 
 from experiments.circuit_learning.datasets import (
     DatasetName,

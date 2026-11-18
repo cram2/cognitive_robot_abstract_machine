@@ -18,7 +18,7 @@ from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import Generic, Self, TypeVar
 
-from krrood_compute_hardware.memory import DeviceMemory
+from krrood_compute_resources.memory import DeviceMemory
 
 from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
 from probabilistic_model.learning.training_schedule import (

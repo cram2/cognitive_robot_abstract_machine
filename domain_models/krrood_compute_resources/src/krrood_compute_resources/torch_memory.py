@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import torch
 
-from krrood_compute_hardware.memory import PeakTrackingMemory
+from krrood_compute_resources.memory import PeakTrackingMemory
 
 # %% memory of a torch device
 

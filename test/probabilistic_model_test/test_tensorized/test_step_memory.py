@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from array_api_compat import array_namespace
 
-from krrood_compute_hardware.memory import HostMemory
+from krrood_compute_resources.memory import HostMemory
 
 from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
 from probabilistic_model.learning.exceptions import (
@@ -23,7 +23,7 @@ from probabilistic_model.learning.gradient_descent import AverageNegativeLogLike
 from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.training_schedule import MiniBatches
 
-from ...krrood_compute_hardware_test.dataset.memory import FixedFreeMemory
+from ...krrood_compute_resources_test.dataset.memory import FixedFreeMemory
 from .test_inner_layers_on_array_backends import mixture_of_products_case
 
 # %% memory of a step

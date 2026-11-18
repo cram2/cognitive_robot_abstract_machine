@@ -19,8 +19,8 @@ from random_events.interval import closed_open
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
-from krrood_compute_hardware.devices import Device
-from krrood_compute_hardware.memory import HostMemory
+from krrood_compute_resources.devices import Device
+from krrood_compute_resources.memory import HostMemory
 from typing_extensions import Any, Callable
 
 from experiments.circuit_learning.datasets import BenchmarkDataset

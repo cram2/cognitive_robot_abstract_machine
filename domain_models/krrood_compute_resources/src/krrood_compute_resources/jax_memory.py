@@ -10,7 +10,7 @@ from enum import StrEnum
 
 import jax
 
-from krrood_compute_hardware.memory import DeviceMemory
+from krrood_compute_resources.memory import DeviceMemory
 
 # %% memory of a jax device
 

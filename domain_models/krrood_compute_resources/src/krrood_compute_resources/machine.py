@@ -10,12 +10,12 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
-from krrood_compute_hardware.devices import Device
-from krrood_compute_hardware.exceptions import (
+from krrood_compute_resources.devices import Device
+from krrood_compute_resources.exceptions import (
     EmptyMachineDivisionError,
     MissingGraphicsProcessorError,
 )
-from krrood_compute_hardware.memory import DeviceMemory, HostMemory
+from krrood_compute_resources.memory import DeviceMemory, HostMemory
 
 # %% environment of a process
 

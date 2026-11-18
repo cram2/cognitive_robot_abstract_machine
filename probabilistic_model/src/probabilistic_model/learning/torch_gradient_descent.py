@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 import torch
-from krrood_compute_hardware.memory import HostMemory, PeakTrackingMemory
-from krrood_compute_hardware.torch_memory import TorchDeviceMemory
+from krrood_compute_resources.memory import HostMemory, PeakTrackingMemory
+from krrood_compute_resources.torch_memory import TorchDeviceMemory
 
 from probabilistic_model.learning.gradient_descent import (
     GradientDescent,
