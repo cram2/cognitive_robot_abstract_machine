@@ -7,8 +7,8 @@ import pytest
 from krrood.symbolic_math.symbolic_math import FloatVariable, Scalar
 from cramph.data_types import (
     LifeCyclePredicate,
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
     TransitionKind,
 )
 from cramph.exceptions import TransitionHasNoOutcomeError
@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.geometry import Color
 # %% every state has to be drawable
 
 
-@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
 def test_every_life_cycle_state_has_a_color_and_a_badge(life_cycle_state) -> None:
     """
     A visualization asks a state how it is drawn, so a state without an answer only
@@ -27,7 +27,7 @@ def test_every_life_cycle_state_has_a_color_and_a_badge(life_cycle_state) -> Non
     assert life_cycle_state.badge
 
 
-@pytest.mark.parametrize("observation_state", list(ObservationStateValues))
+@pytest.mark.parametrize("observation_state", list(ObservationStateValue))
 def test_every_observation_state_has_a_color_and_a_badge(observation_state) -> None:
     assert isinstance(observation_state.color, Color)
     assert observation_state.badge
@@ -41,16 +41,16 @@ def test_life_cycle_states_are_drawn_differently_from_each_other() -> None:
     Two states sharing a color or a symbol would be indistinguishable to whoever reads
     the drawing.
     """
-    assert len({state.color for state in LifeCycleValues}) == len(LifeCycleValues)
-    assert len({state.badge for state in LifeCycleValues}) == len(LifeCycleValues)
+    assert len({state.color for state in LifeCycleValue}) == len(LifeCycleValue)
+    assert len({state.badge for state in LifeCycleValue}) == len(LifeCycleValue)
 
 
 def test_observation_states_are_drawn_differently_from_each_other() -> None:
-    assert len({state.color for state in ObservationStateValues}) == len(
-        ObservationStateValues
+    assert len({state.color for state in ObservationStateValue}) == len(
+        ObservationStateValue
     )
-    assert len({state.badge for state in ObservationStateValues}) == len(
-        ObservationStateValues
+    assert len({state.badge for state in ObservationStateValue}) == len(
+        ObservationStateValue
     )
 
 
@@ -62,7 +62,7 @@ def test_a_life_cycle_state_is_found_by_the_number_it_stands_for() -> None:
     Every read of a life cycle state looks the member up by the number stored for it, so
     that number has to stay the member's value.
     """
-    assert LifeCycleValues(int(LifeCycleValues.FAILED)) is LifeCycleValues.FAILED
+    assert LifeCycleValue(int(LifeCycleValue.FAILED)) is LifeCycleValue.FAILED
 
 
 def test_an_observation_state_is_found_by_the_number_it_stands_for() -> None:
@@ -71,8 +71,7 @@ def test_an_observation_state_is_found_by_the_number_it_stands_for() -> None:
     turns one back into the member it stands for.
     """
     assert (
-        ObservationStateValues(float(Scalar.const_true()))
-        is ObservationStateValues.TRUE
+        ObservationStateValue(float(Scalar.const_true())) is ObservationStateValue.TRUE
     )
 
 
@@ -82,24 +81,24 @@ def test_an_observation_state_is_found_by_the_number_it_stands_for() -> None:
 @pytest.mark.parametrize(
     "transition_kind, expected_states",
     [
-        (TransitionKind.START, frozenset({LifeCycleValues.NOT_STARTED})),
+        (TransitionKind.START, frozenset({LifeCycleValue.NOT_STARTED})),
         (
             TransitionKind.PAUSE,
-            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+            frozenset({LifeCycleValue.RUNNING, LifeCycleValue.PAUSED}),
         ),
         (
             TransitionKind.SUCCEED,
-            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+            frozenset({LifeCycleValue.RUNNING, LifeCycleValue.PAUSED}),
         ),
         (
             TransitionKind.INTERRUPT,
-            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+            frozenset({LifeCycleValue.RUNNING, LifeCycleValue.PAUSED}),
         ),
         (
             TransitionKind.FAIL,
-            frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED}),
+            frozenset({LifeCycleValue.RUNNING, LifeCycleValue.PAUSED}),
         ),
-        (TransitionKind.RESET, frozenset(LifeCycleValues)),
+        (TransitionKind.RESET, frozenset(LifeCycleValue)),
     ],
 )
 def test_transition_kind_source_states(transition_kind, expected_states) -> None:
@@ -111,7 +110,7 @@ def test_transition_kind_source_states(transition_kind, expected_states) -> None
 
 
 @pytest.mark.parametrize("transition_kind", list(TransitionKind))
-@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
 def test_transition_kind_can_trigger_from(transition_kind, life_cycle_state) -> None:
     """
     The triggerability check matches membership in the transition kind's source states.
@@ -126,13 +125,13 @@ def test_transition_kind_can_trigger_from(transition_kind, life_cycle_state) -> 
 @pytest.mark.parametrize(
     "transition_kind, expected_outcome",
     [
-        (TransitionKind.SUCCEED, LifeCycleValues.SUCCEEDED),
-        (TransitionKind.FAIL, LifeCycleValues.FAILED),
-        (TransitionKind.INTERRUPT, LifeCycleValues.INTERRUPTED),
+        (TransitionKind.SUCCEED, LifeCycleValue.SUCCEEDED),
+        (TransitionKind.FAIL, LifeCycleValue.FAILED),
+        (TransitionKind.INTERRUPT, LifeCycleValue.INTERRUPTED),
     ],
 )
 def test_an_ending_transition_yields_its_own_outcome(
-    transition_kind: TransitionKind, expected_outcome: LifeCycleValues
+    transition_kind: TransitionKind, expected_outcome: LifeCycleValue
 ) -> None:
     """
     An outcome is declared by the condition that ended a node, never read off what the
@@ -160,16 +159,16 @@ def test_the_terminal_states_are_derived_only_once() -> None:
     Every node asks whether its state is terminal, so the terminal states are derived
     from the ending transitions once and then handed out again.
     """
-    assert LifeCycleValues.terminal_states() is LifeCycleValues.terminal_states()
+    assert LifeCycleValue.terminal_states() is LifeCycleValue.terminal_states()
 
 
 # %% life cycle predicates read off an expression
 
 
 @pytest.mark.parametrize("predicate", list(LifeCyclePredicate))
-@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+@pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
 def test_a_life_cycle_predicate_expression_matches_its_truth_table(
-    predicate: LifeCyclePredicate, life_cycle_state: LifeCycleValues
+    predicate: LifeCyclePredicate, life_cycle_state: LifeCycleValue
 ) -> None:
     life_cycle = FloatVariable(name="life_cycle")
 
