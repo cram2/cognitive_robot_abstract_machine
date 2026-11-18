@@ -103,7 +103,9 @@ class TransportAction(SequentialAction):
                     look_at=a(LookAtAction)(target=target_location),
                 ),
                 place=a(PlaceAction)(
-                    object_designator=graspable, target_location=target_location
+                    arm=arm,
+                    object_designator=graspable,
+                    target_location=target_location,
                 ),
             ),
         )
@@ -189,7 +191,9 @@ class MoveAndPlaceAction(SequentialAction):
                 look_at=LookAtAction(target=target_location),
             ),
             place=PlaceAction(
-                object_designator=object_designator, target_location=target_location
+                arm=arm,
+                object_designator=object_designator,
+                target_location=target_location,
             ),
         )
 
