@@ -3057,7 +3057,7 @@ def test_an_update_referencing_an_entity_this_world_never_received_says_so(rclpy
             publisher=sender.origin
         ).raised_from
         assert isinstance(unknown_entity, WorldUpdateReferencesUnknownEntityError)
-        assert unknown_entity.publisher == sender.origin
+        assert unknown_entity.sender == sender.origin.sender
         assert unknown_entity.entity_id == post_root.id
         assert unknown_entity.entity_name == post_root.name
         assert receiver_world.kinematic_structure_entities == [sender_root]

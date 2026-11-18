@@ -147,7 +147,7 @@ class ReceivedMessage:
                 return from_json(self.content, **tracker.create_kwargs())
             except WorldEntityWithIDNotInKwargs as unknown_entity:
                 raise WorldUpdateReferencesUnknownEntityError(
-                    publisher=self.position.origin,
+                    sender=self.position.origin.sender,
                     entity_id=unknown_entity.key,
                     entity_name=unknown_entity.world_entity_name,
                 ) from unknown_entity
