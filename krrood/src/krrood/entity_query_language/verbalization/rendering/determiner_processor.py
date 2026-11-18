@@ -29,14 +29,27 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 
 class DeterminerProcessor(RewritePass):
     """
-    Lower every noun phrase to a determiner-bearing phrase, choosing its determiner from its
-    definiteness and number; *"a"* versus *"an"* is left to the morphology pass::
+    Lower every noun phrase to a determiner-bearing phrase, choosing its determiner from
+    its definiteness and number; *"a"* versus *"an"* is left to the morphology pass.
 
-        definiteness    singular                plural
-        INDEFINITE      "a" + head              bare head
-        DEFINITE        "the" + head            "the" + head
-        UNIQUE          "the unique" + head     "the unique" + head
-        BARE            bare head               bare head
+    .. list-table::
+       :header-rows: 1
+
+       * - Definiteness
+         - Singular
+         - Plural
+       * - ``INDEFINITE``
+         - *"a"* + head
+         - bare head
+       * - ``DEFINITE``
+         - *"the"* + head
+         - *"the"* + head
+       * - ``UNIQUE``
+         - *"the unique"* + head
+         - *"the unique"* + head
+       * - ``BARE``
+         - bare head
+         - bare head
 
     Reference: :cite:t:`gatt2009simplenlg` — ``NPPhraseSpec`` realisation.
     """
