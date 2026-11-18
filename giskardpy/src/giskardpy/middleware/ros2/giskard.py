@@ -61,7 +61,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_source import WorldSource
-from giskardpy.motion_control import MotionControl
+from giskardpy.motion_control import MotionControl, WorldStateTrajectoryRecording
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from cramph.composites import ChildChooserAccess
 from cramph.context import StatechartContext
@@ -115,6 +115,11 @@ class Giskard:
     debug_expression_publishing: DebugExpressionPublishing = field(init=False)
     """
     Publishes the debug expressions of the goals that ask for them.
+    """
+
+    trajectory_recording: WorldStateTrajectoryRecording = field(init=False)
+    """
+    Records the trajectories of the goals that ask for their plot.
     """
 
     motion_server: MotionServer | None = field(init=False, default=None)
@@ -200,6 +205,9 @@ class Giskard:
         self.debug_expression_publishing = DebugExpressionPublishing(
             ros_node=background_node.get_node(), publishes_markers=False
         )
+        self.trajectory_recording = WorldStateTrajectoryRecording(
+            appends_every_tick=False
+        )
         self.world = self.world_source.create_world()
         with self.world.modify_world():
             clear_memoization_cache(self.world)
@@ -209,6 +217,7 @@ class Giskard:
                 extensions=[
                     RosNodeAccess(ros_node=background_node.get_node()),
                     MotionControl(qp_controller_config=self.qp_controller_config),
+                    self.trajectory_recording,
                     self.debug_expression_publishing,
                 ],
             )
@@ -269,6 +278,7 @@ class Giskard:
             cycle_counter=cycle_counter,
             idle_frequency=self.server_config.idle_frequency,
             debug_expression_publishing=self.debug_expression_publishing,
+            trajectory_recording=self.trajectory_recording,
         )
 
     def receive_child_choices(

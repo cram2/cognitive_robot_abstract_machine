@@ -1,3 +1,7 @@
+"""
+The Toyota HSR B robot: its topics, joints, gripper, cameras and other robot parts.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -9,7 +13,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
@@ -157,6 +161,10 @@ class HSRBRightFinger(Finger):
 class HSRBGripper(
     EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger], ServoedRobotPart
 ):
+    """
+    The HSR B's two-fingered hand.
+    """
+
     @classproperty
     def squeeze(cls) -> float:
         """

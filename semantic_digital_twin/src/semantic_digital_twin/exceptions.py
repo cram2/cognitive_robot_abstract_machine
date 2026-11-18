@@ -1,3 +1,7 @@
+"""
+The exceptions raised across the semantic digital twin.
+"""
+
 from __future__ import annotations, absolute_import
 
 # %% Imports
@@ -12,7 +16,7 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -1430,6 +1434,28 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class StateUpdateContainsNonNumericValuesError(UsageError):
+    """
+    Raised when a received WorldStateUpdate gives a degree of freedom a value that is
+    not a number.
+    """
+
+    non_numeric_states: list[Any]
+    """
+    The values that are not numbers.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Received a WorldStateUpdate whose states {self.non_numeric_states} are "
+            f"not numbers."
+        )
+
+    def suggest_correction(self) -> str:
+        return "publish the positions of degrees of freedom as numbers."
 
 
 @dataclass

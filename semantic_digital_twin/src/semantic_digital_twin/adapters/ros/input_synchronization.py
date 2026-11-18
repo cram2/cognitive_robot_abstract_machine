@@ -93,6 +93,10 @@ class JointPositionMeasurement:
 class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     """
     Writes the positions of a joint state message into the world state.
+
+    A message reports the position of each joint, with the joint's multiplier and offset
+    applied, so a mimic joint reported next to the joint it mimics leaves both where the
+    message put them.
     """
 
     latest_measurement: JointPositionMeasurement | None = field(
@@ -111,8 +115,9 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
             )
             if not self.writes(connection=connection):
                 continue
-            self.world.state[connection.raw_dof.id].position = position
-            positions[connection.raw_dof.id] = position
+            raw_position = (position - connection.offset) / connection.multiplier
+            self.world.state[connection.raw_dof.id].position = raw_position
+            positions[connection.raw_dof.id] = raw_position
         self.latest_measurement = JointPositionMeasurement(
             measurement_time=ros_time_seconds(Time.from_msg(message.header.stamp)),
             positions=positions,

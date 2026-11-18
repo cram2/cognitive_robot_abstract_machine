@@ -30,7 +30,7 @@ from giskardpy.middleware.ros2.exceptions import (
     NoActiveGoalToCancelError,
     StatechartNotEndedByResultError,
 )
-from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
@@ -178,23 +178,20 @@ class GiskardClientExecutor(Executor):
         super().compile(statechart=statechart)
         self._notify_compiled()
 
-    def execute_async(self, *, publishes_debug_expressions: bool = False) -> Future:
+    def execute_async(self, *, debug_output: DebugOutput = DebugOutput()) -> Future:
         """
         Sends the compiled statechart to Giskard without waiting for it to end, see
         :meth:`get_result`.
 
-        :param publishes_debug_expressions: whether Giskard publishes the spatial debug
-            expressions of the running nodes as RViz markers during this goal
+        :param debug_output: what Giskard produces to debug this goal
         :return: future that completes once Giskard accepted or rejected the goal
         """
         self.statechart.sanity_check()
         return self._client.send_goal_async(
-            goal=self._create_goal_message(
-                publishes_debug_expressions=publishes_debug_expressions
-            )
+            goal=self._create_goal_message(debug_output=debug_output)
         )
 
-    def execute(self, *, publishes_debug_expressions: bool = False) -> None:
+    def execute(self, *, debug_output: DebugOutput = DebugOutput()) -> None:
         """
         Sends the compiled statechart to Giskard, keeps its states in step with the ones
         Giskard reports while it runs, waits until it ended there, takes over its final
@@ -204,16 +201,13 @@ class GiskardClientExecutor(Executor):
         :class:`WorldModelModifiedDuringMotionError` when another process modified the
         world model while the motion was running.
 
-        :param publishes_debug_expressions: whether Giskard publishes the spatial debug
-            expressions of the running nodes as RViz markers during this goal
+        :param debug_output: what Giskard produces to debug this goal
         """
         self.statechart.sanity_check()
         child_chooser_access = self.context.get_extension(
             extension_type=ChildChooserAccess
         )
-        goal_message = self._create_goal_message(
-            publishes_debug_expressions=publishes_debug_expressions
-        )
+        goal_message = self._create_goal_message(debug_output=debug_output)
         try:
             if child_chooser_access is None:
                 result = self._client.send_goal(
@@ -305,23 +299,20 @@ class GiskardClientExecutor(Executor):
         if not self.statechart.is_ended():
             raise StatechartNotEndedByResultError()
 
-    def _create_goal_message(
-        self, *, publishes_debug_expressions: bool
-    ) -> JsonAction.Goal:
+    def _create_goal_message(self, *, debug_output: DebugOutput) -> JsonAction.Goal:
         """
         Wrap the compiled statechart into a goal that names the change of this world it
         was built on.
 
-        :param publishes_debug_expressions: whether Giskard publishes the spatial debug
-            expressions of the running nodes as RViz markers during the goal
+        :param debug_output: what Giskard produces to debug the goal
         :return: action goal message holding the serialized motion goal
         """
         goal_msg = JsonAction.Goal()
-        goal = MotionGoal.for_motion_statechart(
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=self.statechart,
             client=self.client,
             required_position=self.world_updates.required_position(),
-            publishes_debug_expressions=publishes_debug_expressions,
+            debug_output=debug_output,
         )
         goal_msg.goal = json.dumps(goal.to_json())
         return goal_msg

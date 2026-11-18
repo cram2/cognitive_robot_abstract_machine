@@ -18,7 +18,7 @@ from std_msgs.msg import ColorRGBA, Header
 from typing_extensions import TypeVar, Generic
 from visualization_msgs.msg import Marker
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbolic_math.symbolic_math import Matrix, Vector as SymbolicVector
 from krrood.utils import recursive_subclasses

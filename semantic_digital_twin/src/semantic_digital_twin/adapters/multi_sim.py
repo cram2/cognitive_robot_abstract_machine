@@ -1,3 +1,8 @@
+"""
+Conversion of worlds into MultiSim simulations, with their cameras, lights and MuJoCo
+properties.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -29,10 +34,12 @@ from physics_simulators.base_simulator import (
     SimulatorCallbackResult,
     SimulatorConstraints,
 )
+from krrood.adapters.json_field import JSONField
+from krrood.adapters.json_serializer import ExternalClassJSONSerializer
 from krrood.exceptions import UnboundGenericParameter
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import recursive_subclasses
+from krrood.utils import get_full_class_name, recursive_subclasses
 from scipy.spatial.transform import Rotation
 from trimesh.visual import TextureVisuals
 
@@ -1258,6 +1265,46 @@ class MujocoLight(MultiSimLight):
     """
     Radius of the light's bulb, used for soft shadows.
     """
+
+
+# %% json of MuJoCo's enums
+
+
+class MujocoEnumJSONKey(StrEnum):
+    """
+    The keys of a serialized MuJoCo enum member besides its type.
+    """
+
+    VALUE = "value"
+    """
+    The integer MuJoCo gives the member.
+    """
+
+
+@dataclass
+class MujocoEnumJSONSerializer(ExternalClassJSONSerializer[None]):
+    """
+    Json serializer for the enums MuJoCo defines, such as :class:`mujoco.mjtLimited`,
+    so that the simulator properties carrying them can be synchronized.
+
+    The enums are bound from C and share no Python base class, which is why T is set to
+    None and they are recognized by the module that defines them.
+    """
+
+    @classmethod
+    def to_json(cls, *, instance: Any, **kwargs) -> dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(instance.__class__),
+            MujocoEnumJSONKey.VALUE: int(instance),
+        }
+
+    @classmethod
+    def from_json(cls, *, data: dict[str, Any], clazz: type, **kwargs: Any) -> Any:
+        return clazz(data[MujocoEnumJSONKey.VALUE])
+
+    @classmethod
+    def matches_generic_type(cls, *, clazz: type) -> bool:
+        return clazz.__module__ == mujoco.mjtLimited.__module__
 
 
 @dataclass

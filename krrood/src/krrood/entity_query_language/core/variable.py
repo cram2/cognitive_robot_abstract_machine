@@ -58,7 +58,7 @@ from krrood.entity_query_language.utils import (
 from krrood.entity_query_language._monitoring import (
     monitored,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 DomainType = Iterable[T] | HasSymbolicOperations

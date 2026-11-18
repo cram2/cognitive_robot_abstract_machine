@@ -1,3 +1,7 @@
+"""
+The base of annotators that classify perceived objects with a zero-shot model.
+"""
+
 from __future__ import annotations
 
 import time
@@ -5,7 +9,7 @@ from abc import ABC, abstractmethod
 
 import cv2
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from PIL import Image
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Callable

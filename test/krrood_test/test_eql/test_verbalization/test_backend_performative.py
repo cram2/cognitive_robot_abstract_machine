@@ -11,10 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.entity_query_language.backends import (
-    EntityQueryLanguageBackend,
-    ProbabilisticBackend,
-)
+from krrood.entity_query_language.backends import EntityQueryLanguageBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import entity, a, an, variable
 from krrood.entity_query_language.verbalization.pipeline import (
     directive_for_backend,

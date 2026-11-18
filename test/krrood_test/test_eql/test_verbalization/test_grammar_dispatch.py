@@ -170,6 +170,7 @@ def test_enters_query_scope_wraps_build_but_not_when():
     class ScopedRule(PhraseRule):
         construct = Mid
         enters_query_scope = True
+        joins_grammar = False
 
         def when(self, node, context):
             observed["when_depth"] = context.configuration.query_depth

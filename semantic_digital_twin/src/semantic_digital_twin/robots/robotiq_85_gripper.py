@@ -1,9 +1,13 @@
+"""
+The Robotiq 2F-85 gripper.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from typing_extensions import Generic
 
 from semantic_digital_twin.robots.robot_part_mixins import (

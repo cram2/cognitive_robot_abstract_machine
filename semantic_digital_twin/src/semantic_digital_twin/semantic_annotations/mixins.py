@@ -15,7 +15,7 @@ import trimesh
 from trimesh.util import concatenate
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.model_registries import ModelRegistry
 from krrood.patterns.mixin import Mixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -1439,13 +1439,13 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         )
 
         return PlanarGraphOfBoundingBoxes.free_space_from_semantic_annotation(
-            search_space,
-            semantic_obstacle_annotation,
-            semantic_wall_annotation,
-            tolerance,
-            bloat_obstacles,
-            bloat_walls,
-            obstacle_height_clearance,
+            search_space=search_space,
+            semantic_obstacle_annotation=semantic_obstacle_annotation,
+            semantic_wall_annotation=semantic_wall_annotation,
+            tolerance=tolerance,
+            bloat_obstacles=bloat_obstacles,
+            bloat_walls=bloat_walls,
+            obstacle_height_clearance=obstacle_height_clearance,
         )
 
 

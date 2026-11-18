@@ -11,6 +11,7 @@ from krrood.development_tools.agents.docstring_presence import (
 from .dataset_files import DocstringSnippet
 from .dataset_lines import (
     ModuleLine,
+    UndocumentedClasspropertiesLine,
     UnimportableDefinitionsLine,
     UndocumentedDefinitionsLine,
 )
@@ -36,6 +37,17 @@ def test_an_undocumented_field_and_methods_are_reported_and_an_abstract_implemen
         UndocumentedDefinitionsLine.FIELD,
         UndocumentedDefinitionsLine.OVERRIDING_METHOD,
         UndocumentedDefinitionsLine.METHOD,
+    ]
+
+
+def test_an_undocumented_override_of_a_classproperty_is_reported_and_an_abstract_implementation_is_not() -> (
+    None
+):
+    """
+    A classproperty is abstract when the function it wraps is.
+    """
+    assert undocumented_first_lines(DocstringSnippet.UNDOCUMENTED_CLASSPROPERTIES) == [
+        UndocumentedClasspropertiesLine.OVERRIDING_CLASSPROPERTY,
     ]
 
 

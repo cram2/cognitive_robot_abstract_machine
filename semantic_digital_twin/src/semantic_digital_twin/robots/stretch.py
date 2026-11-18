@@ -1,3 +1,8 @@
+"""
+The Hello Robot Stretch: its topics, joints, gripper, arm, cameras and other robot
+parts.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -11,7 +16,7 @@ from pathlib import Path
 import numpy as np
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,

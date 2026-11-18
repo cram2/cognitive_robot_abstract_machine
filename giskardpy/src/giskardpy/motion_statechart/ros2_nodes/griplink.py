@@ -1,3 +1,8 @@
+"""
+Motion statechart tasks that drive a Griplink gripper through its ROS 2 action server,
+with the action's goal, feedback and result messages.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -20,7 +25,7 @@ from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )

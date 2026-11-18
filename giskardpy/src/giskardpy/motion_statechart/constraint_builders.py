@@ -1,3 +1,7 @@
+"""
+Builders of the geometric constraints motion statechart tasks hand to the controller.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint import LargeNumber

@@ -1,3 +1,7 @@
+"""
+The parts a robot is made of: kinematic chains, sensors, cameras, fingers and the like.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -27,7 +31,7 @@ from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.entity_query_language.factories import a, contains, entity, variable
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.camera_model import (
