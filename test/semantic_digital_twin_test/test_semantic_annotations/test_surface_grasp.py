@@ -33,7 +33,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
-    Twist,
+    Displacement,
     Vector3,
 )
 from semantic_digital_twin.world import World
@@ -248,19 +248,15 @@ fraction of the carton's height.
 """
 
 
-def small_twist(rng: np.random.Generator, rise: float) -> Twist:
+def small_displacement(rng: np.random.Generator, rise: float) -> Displacement:
     """
-    :param rise: How far the twist moves upwards, in meters.
-    :return: A twist that moves ``rise`` upwards while turning by a few degrees about a
+    :param rise: How far the displacement moves upwards, in meters.
+    :return: A displacement that moves ``rise`` upwards while turning by a few degrees about a
         random axis.
     """
-    rotation_vector = rng.normal(0.0, 0.05, 3)
-    return Twist.from_transformation(
-        HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            z=rise,
-            axis=Vector3(*rotation_vector),
-            angle=float(np.linalg.norm(rotation_vector)),
-        )
+    return Displacement(
+        translation=Vector3(0.0, 0.0, rise),
+        rotation_vector=Vector3(*rng.normal(0.0, 0.05, 3)),
     )
 
 
@@ -277,8 +273,8 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
         grasp.result = GraspResult(
             object_raised=raised,
             motion_completed=True,
-            object_displacement=small_twist(rng, 0.2 if raised else 0.0),
-            slip=small_twist(rng, 0.0 if raised else -0.2),
+            object_displacement=small_displacement(rng, 0.2 if raised else 0.0),
+            slip=small_displacement(rng, 0.0 if raised else -0.2),
         )
     return RelationalCircuitRegistry(
         relational_probabilistic_circuit=RelationalProbabilisticCircuit(

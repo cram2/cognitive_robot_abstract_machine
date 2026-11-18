@@ -18,7 +18,7 @@ from semantic_digital_twin.orm.model import (
     PoseMapping,
     QuaternionMapping,
     RotationMatrixMapping,
-    TwistMapping,
+    DisplacementMapping,
     Vector3Mapping,
     WorldMapping,
     WorldStateMapping,
@@ -29,7 +29,7 @@ from krrood_spatial_math.spatial_types import (
     Pose,
     Pose2D,
     RotationMatrix,
-    Twist,
+    Displacement,
     Vector3,
 )
 from semantic_digital_twin.world import World
@@ -50,7 +50,7 @@ from semantic_digital_twin.world_description.world_entity import Body
         PoseMapping,
         Point2Mapping,
         Pose2DMapping,
-        TwistMapping,
+        DisplacementMapping,
         SymbolGraphMapping,
         WrappedInstanceMapping,
     ],
@@ -110,21 +110,26 @@ def test_rotation_survives_being_stored_as_axis_angle(
     assert np.allclose(restored.to_np(), rotation.to_np())
 
 
-def test_a_twist_survives_being_stored():
+def test_a_displacement_survives_being_stored():
+    """
+    Storing a displacement through its mapping keeps its values and reference frame.
+    """
     world = World()
     with world.modify_world():
         root = Body(name="root")
         world.add_kinematic_structure_entity(root)
-    twist = Twist.from_transformation(
-        HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            x=0.1, z=-0.2, axis=Vector3.Y(), angle=0.4, reference_frame=root
-        )
+    displacement = Displacement(
+        translation=Vector3(0.1, 0.0, -0.2),
+        rotation_vector=Vector3(0.0, 0.4, 0.0),
+        reference_frame=root,
     )
 
-    restored = TwistMapping.from_domain_object(obj=twist).to_domain_object()
+    restored = DisplacementMapping.from_domain_object(
+        obj=displacement
+    ).to_domain_object()
 
     assert restored.reference_frame is root
-    assert np.allclose(restored.to_np(), twist.to_np())
+    assert np.allclose(restored.to_np(), displacement.to_np())
 
 
 def test_world_state_data_and_ids_follow_the_stored_state():
