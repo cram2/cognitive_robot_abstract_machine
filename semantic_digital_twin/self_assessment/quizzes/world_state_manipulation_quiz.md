@@ -38,7 +38,7 @@ questions = [
       "question": "How is a free 6DoF connection created in the example?",
       "type": "multiple_choice",
       "answers": [
-        {"answer": "Connection6DoF.create_with_dofs(parent, child, world=world)", "correct": True},
+        {"answer": "Connection6DoF.create_with_dofs(parent=parent, child=child, world=world)", "correct": True},
         {"answer": "RevoluteConnection(parent, child)", "correct": False},
         {"answer": "FixedConnection(parent, child)", "correct": False},
         {"answer": "AddBodyConnection(parent, child)", "correct": False}

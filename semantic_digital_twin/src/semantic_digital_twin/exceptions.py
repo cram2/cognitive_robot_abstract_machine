@@ -833,6 +833,40 @@ class MissingConnectionAxisError(UsageError):
         return "pass a movement axis via the 'axis' keyword argument."
 
 
+@dataclass(kw_only=True)
+class UnnormalizedScrewAxisError(UsageError):
+    """
+    Raised when a screw axis connection's motion per unit of position is not
+    normalized: a connection that rotates must rotate one radian per unit of position,
+    and one that does not rotate must translate one meter per unit of position.
+    """
+
+    rotation_per_unit_position: float
+    """
+    The rotation the connection was given, in radians per unit of position.
+    """
+
+    translation_per_unit_position: float
+    """
+    The translation the connection was given, in meters per unit of position.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"a screw axis connection rotating {self.rotation_per_unit_position} rad "
+            f"and translating {self.translation_per_unit_position} m per unit of "
+            f"position is not normalized."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "pass rotation_per_unit_position=1 with any translation_per_unit_position, "
+            "or rotation_per_unit_position=0 with translation_per_unit_position=1; "
+            "flip the axis for the opposite direction and use the multiplier to scale "
+            "the position."
+        )
+
+
 @dataclass
 class MissingURDFJointAxisError(UsageError):
     """

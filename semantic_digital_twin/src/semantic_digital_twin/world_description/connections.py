@@ -19,7 +19,10 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
-from semantic_digital_twin.exceptions import MissingConnectionAxisError
+from semantic_digital_twin.exceptions import (
+    MissingConnectionAxisError,
+    UnnormalizedScrewAxisError,
+)
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
@@ -62,10 +65,10 @@ class FixedConnection(Connection):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -152,10 +155,10 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -285,8 +288,12 @@ class PrismaticConnection(ActiveConnection1DOF):
     Allows translation along an axis.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the translation along
+        ``axis`` from the position.
+        """
+        super().add_to_world(world=world)
 
         translation_axis = self.axis * self.dof.variables.position
         self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -303,8 +310,12 @@ class RevoluteConnection(ActiveConnection1DOF):
     Allows rotation about an axis.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the rotation about ``axis``
+        from the position.
+        """
+        super().add_to_world(world=world)
 
         self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
             axis=self.axis,
@@ -342,8 +353,12 @@ class ScrewConnection(ActiveConnection1DOF):
         assignment is not recorded, published or rolled back. Replace the connection.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the screw motion along
+        ``axis`` from the position.
+        """
+        super().add_to_world(world=world)
 
         angle = self.dof.variables.position
         translation_axis = self.axis * (self.screw_pitch * angle / (2 * np.pi))
@@ -372,10 +387,10 @@ class ScrewConnection(ActiveConnection1DOF):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -414,6 +429,143 @@ class ScrewConnection(ActiveConnection1DOF):
         return connection
 
 
+@dataclass(eq=False, kw_only=True)
+class ScrewAxisConnection(ActiveConnection1DOF):
+    """
+    Rotates the child about ``axis`` and translates it along ``axis`` in proportion to
+    the position, so hinges, sliders and screws differ only in their parameters.
+
+    One unit of position turns a rotating connection by one radian and moves one that
+    does not rotate by one meter.
+    """
+
+    rotation_per_unit_position: float
+    """
+    Radians the child rotates about ``axis`` per unit of position, following the
+    right-hand rule: 1 for a connection that rotates, 0 for one that only translates.
+
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
+    """
+
+    translation_per_unit_position: float
+    """
+    Meters the child translates along ``axis`` per unit of position: 1 for a connection
+    that only translates, the pitch in meters per radian for one that rotates.
+
+    .. warning:: Set it only before the connection is added to a world: a later
+        assignment is not recorded, published or rolled back. Replace the connection.
+    """
+
+    def __post_init__(self):
+        """
+        Extends :meth:`Connection.__post_init__` by rejecting parameters that are not
+        normalized.
+
+        :raises UnnormalizedScrewAxisError: if the parameters are not normalized.
+        """
+        super().__post_init__()
+        rotates_one_radian = self.rotation_per_unit_position == 1
+        translates_one_meter_only = (
+            self.rotation_per_unit_position == 0
+            and self.translation_per_unit_position == 1
+        )
+        if not (rotates_one_radian or translates_one_meter_only):
+            raise UnnormalizedScrewAxisError(
+                rotation_per_unit_position=self.rotation_per_unit_position,
+                translation_per_unit_position=self.translation_per_unit_position,
+            )
+
+    @classmethod
+    def create_with_dofs(
+        cls,
+        *,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        multiplier: float = 1.0,
+        offset: float = 0.0,
+        dof_limits: DegreeOfFreedomLimits | None = None,
+        axis: Vector3 | None = None,
+        dynamics: JointDynamics | None = None,
+        rotation_per_unit_position: float,
+        translation_per_unit_position: float,
+    ) -> Self:
+        """
+        Creates and returns a screw axis connection with its single degree of freedom.
+
+        See :meth:`ActiveConnection1DOF.create_with_dofs`; additionally requires
+        :attr:`rotation_per_unit_position` and :attr:`translation_per_unit_position`.
+        """
+        if axis is None:
+            raise MissingConnectionAxisError(connection_type_name=cls.__name__)
+        name = name or cls._generate_default_name(parent=parent, child=child)
+        dof = DegreeOfFreedom(name=PrefixedName("dof", str(name)), limits=dof_limits)
+        world.add_degree_of_freedom(dof)
+        return cls(
+            name=name,
+            parent=parent,
+            child=child,
+            parent_T_connection_expression=parent_T_connection_expression,
+            connection_T_child_expression=connection_T_child_expression,
+            axis=axis,
+            multiplier=multiplier,
+            offset=offset,
+            raw_dof=dof,
+            dynamics=dynamics or JointDynamics(),
+            rotation_per_unit_position=rotation_per_unit_position,
+            translation_per_unit_position=translation_per_unit_position,
+        )
+
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the screw motion about
+        ``axis`` from the position.
+        """
+        super().add_to_world(world=world)
+
+        position = self.dof.variables.position
+        connection_V_child = self.axis * (self.translation_per_unit_position * position)
+        self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+            x=connection_V_child[0],
+            y=connection_V_child[1],
+            z=connection_V_child[2],
+            axis=self.axis,
+            angle=self.rotation_per_unit_position * position,
+            child_frame=self.child,
+        )
+
+    @property
+    def behaves_like_a_revolute_connection(self) -> bool:
+        """
+        Whether the child only rotates about ``axis``.
+        """
+        return (
+            self.rotation_per_unit_position != 0
+            and self.translation_per_unit_position == 0
+        )
+
+    @property
+    def behaves_like_a_prismatic_connection(self) -> bool:
+        """
+        Whether the child only translates along ``axis``.
+        """
+        return self.rotation_per_unit_position == 0
+
+    @property
+    def behaves_like_a_screw_connection(self) -> bool:
+        """
+        Whether the child rotates about ``axis`` and translates along it at once.
+        """
+        return (
+            self.rotation_per_unit_position != 0
+            and self.translation_per_unit_position != 0
+        )
+
+
 @dataclass(eq=False)
 class Connection6DoF(Connection):
     """
@@ -449,8 +601,12 @@ class Connection6DoF(Connection):
     KinematicStructureEntity represented as a quaternion.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the pose from the
+        translation and quaternion degrees of freedom.
+        """
+        super().add_to_world(world=world)
         parent_P_child = Point3(
             x=self.x.variables.position,
             y=self.y.variables.position,
@@ -471,10 +627,10 @@ class Connection6DoF(Connection):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -688,8 +844,12 @@ class OmniDrive(WheeledDrive):
     Represented with respect to the child frame.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the planar pose and the
+        velocity frames from the degrees of freedom.
+        """
+        super().add_to_world(world=world)
         odom_T_bf = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
@@ -712,10 +872,10 @@ class OmniDrive(WheeledDrive):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -839,8 +999,12 @@ class DifferentialDrive(WheeledDrive):
     Represented with respect to the child frame.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        """
+        Extends :meth:`WorldEntity.add_to_world` by building the planar pose and the
+        velocity frames from the degrees of freedom.
+        """
+        super().add_to_world(world=world)
         odom_T_bf = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
@@ -863,10 +1027,10 @@ class DifferentialDrive(WheeledDrive):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,

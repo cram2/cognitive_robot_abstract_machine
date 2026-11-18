@@ -11,7 +11,10 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.exceptions import MissingConnectionAxisError
+from semantic_digital_twin.exceptions import (
+    MissingConnectionAxisError,
+    UnnormalizedScrewAxisError,
+)
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
@@ -22,6 +25,7 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     PrismaticConnection,
     RevoluteConnection,
+    ScrewAxisConnection,
     ScrewConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body, Connection
@@ -33,7 +37,9 @@ def _add_drive(world_with_two_bodies, drive_type):
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = drive_type.create_with_dofs(world, parent, child)
+        connection = drive_type.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
     return connection
 
@@ -43,9 +49,9 @@ def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_
     parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
@@ -70,9 +76,9 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
     connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.05, yaw=0.2)
     with world.modify_world():
         connection = Connection6DoF.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             parent_T_connection_expression=parent_T_connection,
             connection_T_child_expression=connection_T_child,
         )
@@ -89,7 +95,9 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
 def test_connection6dof_origin_setter_requires_a_reference_frame(world_with_two_bodies):
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     transformation_without_reference_frame = (
@@ -114,13 +122,15 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
     with world.modify_world():
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                grandparent,
-                parent,
+                world=world,
+                parent=grandparent,
+                child=parent,
                 parent_T_connection_expression=grandparent_T_parent,
             )
         )
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     desired_origin_in_grandparent = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -144,9 +154,9 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
     parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
@@ -224,9 +234,9 @@ def _add_screw_connection(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = ScrewConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3.Z(),
             screw_pitch=screw_pitch,
             multiplier=multiplier,
@@ -407,6 +417,14 @@ def test_screw_connection_copy_with_new_parent_preserves_screw_pitch(
         (RevoluteConnection, {"axis": Vector3.Z()}),
         (PrismaticConnection, {"axis": Vector3.X()}),
         (ScrewConnection, {"axis": Vector3.Z(), "screw_pitch": 0.01}),
+        (
+            ScrewAxisConnection,
+            {
+                "axis": Vector3.Z(),
+                "rotation_per_unit_position": 1.0,
+                "translation_per_unit_position": 0.01,
+            },
+        ),
     ],
 )
 def test_copy_with_new_parent_keeps_name(
@@ -415,9 +433,9 @@ def test_copy_with_new_parent_keeps_name(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = connection_type.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             name=PrefixedName("named_connection"),
             **additional_arguments,
         )
@@ -488,9 +506,9 @@ def test_create_with_dofs_rejects_unknown_keyword_argument(
     world, parent, child = world_with_two_bodies
     with pytest.raises(TypeError):
         connection_type.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             translation_velocity_limit=0.2,
             **additional_arguments,
         )
@@ -508,9 +526,9 @@ def test_create_with_dofs_applies_drive_velocity_limits(
     rotation_velocity_limit = 0.15
     with world.modify_world():
         connection = drive_type.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             translation_velocity_limits=translation_velocity_limit,
             rotation_velocity_limits=rotation_velocity_limit,
         )
@@ -536,9 +554,9 @@ def test_create_with_dofs_applies_lateral_velocity_limit_of_omni_drive(
     translation_velocity_limit = 0.25
     with world.modify_world():
         connection = OmniDrive.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             translation_velocity_limits=translation_velocity_limit,
         )
         world.add_connection(connection)
@@ -560,9 +578,9 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
     offset = 0.5
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3.Z(),
             multiplier=multiplier,
             offset=offset,
@@ -584,7 +602,7 @@ def test_create_with_dofs_without_axis_raises(world_with_two_bodies, connection_
     """
     world, parent, child = world_with_two_bodies
     with pytest.raises(MissingConnectionAxisError):
-        connection_type.create_with_dofs(world, parent, child)
+        connection_type.create_with_dofs(world=world, parent=parent, child=child)
 
 
 def test_create_with_dofs_registers_the_six_dof_state(world_with_two_bodies):
@@ -593,7 +611,9 @@ def test_create_with_dofs_registers_the_six_dof_state(world_with_two_bodies):
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     assert len(connection.passive_dofs) == 7
@@ -609,7 +629,9 @@ def test_create_with_dofs_of_fixed_connection_adds_no_degrees_of_freedom(
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = FixedConnection.create_with_dofs(world, parent, child)
+        connection = FixedConnection.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     assert connection.dofs == []
@@ -649,6 +671,16 @@ def test_joint_dynamics_custom_values():
         (PrismaticConnection, {"axis": Vector3.Y(), "multiplier": 2.0, "offset": 0.5}),
         (RevoluteConnection, {"axis": Vector3.Y(), "multiplier": 2.0, "offset": 0.5}),
         (ScrewConnection, {"axis": Vector3.Y(), "screw_pitch": 0.25}),
+        (
+            ScrewAxisConnection,
+            {
+                "axis": Vector3.Y(),
+                "multiplier": 2.0,
+                "offset": 0.5,
+                "rotation_per_unit_position": 1.0,
+                "translation_per_unit_position": 0.04,
+            },
+        ),
     ],
 )
 def test_a_connection_survives_a_json_round_trip(
@@ -664,7 +696,7 @@ def test_a_connection_survives_a_json_round_trip(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = connection_type.create_with_dofs(
-            world, parent, child, **additional_arguments
+            world=world, parent=parent, child=child, **additional_arguments
         )
         world.add_connection(connection)
     payload = connection.to_json()
@@ -675,3 +707,186 @@ def test_a_connection_survives_a_json_round_trip(
     assert parsed_connection.to_json() == payload
     assert parsed_connection.parent is parent
     assert parsed_connection.child is child
+
+
+# %% screw axis connection
+
+
+def _random_screw_axis_setup(seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """
+    A random unit axis and a random parent_T_connection pose as x, y, z, roll, pitch and
+    yaw, drawn reproducibly from ``seed``.
+    """
+    random_generator = np.random.default_rng(seed)
+    axis = random_generator.normal(size=3)
+    pose = random_generator.uniform(low=-1.0, high=1.0, size=6)
+    return axis / np.linalg.norm(axis), pose
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+@pytest.mark.parametrize(
+    "generalized_type, generalized_arguments, screw_axis_arguments",
+    [
+        pytest.param(
+            RevoluteConnection,
+            {},
+            {"rotation_per_unit_position": 1.0, "translation_per_unit_position": 0.0},
+            id="revolute",
+        ),
+        pytest.param(
+            PrismaticConnection,
+            {},
+            {"rotation_per_unit_position": 0.0, "translation_per_unit_position": 1.0},
+            id="prismatic",
+        ),
+        pytest.param(
+            ScrewConnection,
+            {"screw_pitch": 0.25},
+            {
+                "rotation_per_unit_position": 1.0,
+                "translation_per_unit_position": 0.25 / (2.0 * math.pi),
+            },
+            id="screw",
+        ),
+    ],
+)
+def test_screw_axis_connection_reproduces_the_forward_kinematics_it_generalizes(
+    world_with_two_bodies,
+    seed,
+    generalized_type,
+    generalized_arguments,
+    screw_axis_arguments,
+):
+    """
+    With the matching parameters, a screw axis connection places its child exactly where
+    a revolute, prismatic or screw connection with the same axis, pose, multiplier and
+    offset places it.
+    """
+    world, parent, generalized_child = world_with_two_bodies
+    screw_axis_child = Body(name=PrefixedName("screw_axis_child"))
+    axis, pose = _random_screw_axis_setup(seed)
+    x, y, z, roll, pitch, yaw = pose
+
+    def shared_arguments() -> dict[
+        str, Vector3 | HomogeneousTransformationMatrix | float
+    ]:
+        """
+        A fresh set of the arguments both connections are created with.
+        """
+        return {
+            "axis": Vector3.from_iterable(axis),
+            "parent_T_connection_expression": HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=x, y=y, z=z, roll=roll, pitch=pitch, yaw=yaw
+            ),
+            "multiplier": -1.5,
+            "offset": 0.3,
+        }
+
+    with world.modify_world():
+        generalized = generalized_type.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=generalized_child,
+            **shared_arguments(),
+            **generalized_arguments,
+        )
+        world.add_connection(generalized)
+        screw_axis = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=screw_axis_child,
+            **shared_arguments(),
+            **screw_axis_arguments,
+        )
+        world.add_connection(screw_axis)
+
+    for raw_position in [-2.0, 0.0, 0.4, 3.0]:
+        with world.modify_world():
+            world.state[generalized.raw_dof.id].position = raw_position
+            world.state[screw_axis.raw_dof.id].position = raw_position
+        assert_allclose(
+            world.compute_forward_kinematics_np(parent, screw_axis_child),
+            world.compute_forward_kinematics_np(parent, generalized_child),
+            atol=1e-12,
+        )
+
+
+@pytest.mark.parametrize(
+    "rotation_per_unit_position, translation_per_unit_position, expected_behaviour",
+    [
+        pytest.param(1.0, 0.0, (True, False, False), id="revolute"),
+        pytest.param(0.0, 1.0, (False, True, False), id="prismatic"),
+        pytest.param(1.0, 0.04, (False, False, True), id="screw"),
+        pytest.param(1.0, -0.04, (False, False, True), id="left-handed screw"),
+    ],
+)
+def test_screw_axis_connection_behaves_like_the_connection_its_parameters_describe(
+    world_with_two_bodies,
+    rotation_per_unit_position,
+    translation_per_unit_position,
+    expected_behaviour,
+):
+    """
+    Each parameter set behaves like exactly the one connection type it describes.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            axis=Vector3.Z(),
+            rotation_per_unit_position=rotation_per_unit_position,
+            translation_per_unit_position=translation_per_unit_position,
+        )
+
+    assert (
+        connection.behaves_like_a_revolute_connection,
+        connection.behaves_like_a_prismatic_connection,
+        connection.behaves_like_a_screw_connection,
+    ) == expected_behaviour
+
+
+@pytest.mark.parametrize(
+    "rotation_per_unit_position, translation_per_unit_position",
+    [
+        pytest.param(2.0, 0.0, id="rotates two radians"),
+        pytest.param(-1.0, 0.0, id="rotates backwards"),
+        pytest.param(0.0, 0.0, id="does not move"),
+        pytest.param(0.0, 2.0, id="translates two meters"),
+        pytest.param(0.0, -1.0, id="translates backwards"),
+        pytest.param(0.5, 0.1, id="rotates half a radian"),
+    ],
+)
+def test_screw_axis_connection_rejects_unnormalized_parameters(
+    world_with_two_bodies, rotation_per_unit_position, translation_per_unit_position
+):
+    """
+    Parameters that neither rotate one radian nor only translate one meter per unit of
+    position are refused.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world(), pytest.raises(UnnormalizedScrewAxisError):
+        ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            axis=Vector3.Z(),
+            rotation_per_unit_position=rotation_per_unit_position,
+            translation_per_unit_position=translation_per_unit_position,
+        )
+
+
+def test_screw_axis_connection_without_axis_raises(world_with_two_bodies):
+    """
+    A screw axis connection has no meaningful default axis, so it must be supplied.
+    """
+    world, parent, child = world_with_two_bodies
+    with pytest.raises(MissingConnectionAxisError):
+        ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            rotation_per_unit_position=1.0,
+            translation_per_unit_position=0.0,
+        )

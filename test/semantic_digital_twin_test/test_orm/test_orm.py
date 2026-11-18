@@ -14,7 +14,10 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2, PR2RightArm
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import (
+    RevoluteConnection,
+    ScrewAxisConnection,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -327,4 +330,49 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     np.testing.assert_allclose(
         reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
         hinge_T_door.to_np(),
+    )
+
+
+# %% screw axis connection
+
+
+def test_screw_axis_connection_survives_an_orm_round_trip(
+    session, world_with_two_bodies
+):
+    """
+    The parameters and the child's pose survive storing the world and reading it back.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            axis=Vector3.Y(),
+            rotation_per_unit_position=1.0,
+            translation_per_unit_position=0.04,
+        )
+        world.add_connection(connection)
+    connection.position = 2.5
+    parent_T_child = world.compute_forward_kinematics_np(root=parent, tip=child)
+
+    session.add(to_dao(world))
+    session.commit()
+    reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
+
+    reconstructed_connection = reconstructed.get_connections_by_type(
+        ScrewAxisConnection
+    )[0]
+    assert (
+        reconstructed_connection.rotation_per_unit_position,
+        reconstructed_connection.translation_per_unit_position,
+    ) == (
+        connection.rotation_per_unit_position,
+        connection.translation_per_unit_position,
+    )
+    assert np.allclose(
+        reconstructed.compute_forward_kinematics_np(
+            root=reconstructed_connection.parent, tip=reconstructed_connection.child
+        ),
+        parent_T_child,
     )
