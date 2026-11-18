@@ -93,7 +93,7 @@ class BrakingProfile:
         for derivative in range(number_of_derivatives - 1):
             last_step = (derivative + 1) * prediction_horizon - 1
             lower_bounds[last_step] = upper_bounds[last_step] = 0
-        link_model = BrakingProfile._derivative_link_model(
+        link_model = cls._derivative_link_model(
             time_step=braking.time_step,
             prediction_horizon=prediction_horizon,
             number_of_derivatives=number_of_derivatives,
