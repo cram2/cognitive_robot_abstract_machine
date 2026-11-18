@@ -208,7 +208,7 @@
 - Never track one again: git refuses to overwrite a tracked path a checkout has generated its own copy of, which makes every branch switch fail
 - Set `CRAM_ORM_BUILD=never` in the environment of the test runs you start, and regenerate them with `scripts/regenerate_all_orm.py` when a change needs it; the `--orm-build` option is rejected when `--confcutdir` excludes `test/conftest.py`, which registers it
 - When regenerating the ORM interfaces does not fix an ORM problem, ask the developer
-- If an ORM import creates an import cycle, ask the user if a local import is fine
+- Import an ORM interface only inside the functions that need it or under `TYPE_CHECKING`, never when the module is loaded. This is an exception to importing at the top of the module. A `generate_orm.py` is exempt: its module-level imports declare the interfaces it builds on (checked by `krrood check`)
 
 # Krrood isolation
 <!-- from KrroodIsolationRules in agent_rules.py -->

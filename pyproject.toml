@@ -142,6 +142,8 @@ exclude = [
     '(^|/)ormatic_interface\.py$',
     # the inputs of krrood's checker tests, which break the rules on purpose
     '^test/krrood_test/test_development_tools/dataset/',
+    # the input of the ORM interface import check's tests, which breaks it on purpose
+    '^test/cognitive_robot_abstract_machine_test/dataset/orm_interface_imports/',
     # the ripple down rules expert answers, left unchecked for now
     '^test/krrood_test/test_ripple_down_rules/test_expert_answers/',
 ]
