@@ -28,7 +28,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
@@ -120,7 +120,7 @@ class ActionServerTask(
         Handles the server's response to the goal submission.
 
         On rejection a failure sentinel is stored so that :meth:`on_tick` can return
-        :attr:`~ObservationStateValues.FALSE` immediately.
+        :attr:`~ObservationStateValue.FALSE` immediately.
         """
         goal_handle = future.result()
         if not goal_handle.accepted:
@@ -217,11 +217,11 @@ class NavigateActionServerTask(
             f"Finished navigation with response status: {self._result.result.status} and result code: {self._result.error_code}"
         )
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         if self._result.result:
             return (
-                ObservationStateValues.TRUE
+                ObservationStateValue.TRUE
                 if self._result.error_code == NavigateToPose.Result.NONE
-                else ObservationStateValues.FALSE
+                else ObservationStateValue.FALSE
             )
-        return ObservationStateValues.UNKNOWN
+        return ObservationStateValue.UNKNOWN
