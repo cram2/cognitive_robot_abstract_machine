@@ -38,7 +38,8 @@
 - Name an enum member for the situation it means, not for the function it dispatches to or the text it renders
 - Never repeat the enclosing type's name in its members, or the same word twice within one name
 - Never take an identifier the language or something in scope already binds: `Enum` reserves `name`, a parameter `field` shadows `dataclasses.field`, a field shadows a method of the same name. These fail at runtime or silently, not at import
-- Never name a variable, parameter or attribute after a builtin such as `id` or `type`, nor a top-level module after a module of the standard library (checked by `krrood check`)
+- Never name a variable, parameter, attribute or import after a builtin such as `id` or `type`, nor a top-level module after a module of the standard library (checked by `krrood check`)
+- Never bind a name again before it is used, assign to a loop variable inside its loop, or reuse a parameter or an import as a loop, `with` or `except` target (checked by `krrood check`)
 - A rename is finished only when every reader of the old name, docstrings and comments included, uses the new one and the tests pass. A mechanical rename across a file is exactly where a method and a field converge on one name
 - When no honest specific name exists, suspect the code, not your vocabulary: a thing that can only be described vaguely usually has no single subject (a container for whatever its caller passed, a function doing two jobs). Remove it instead of hunting for a better word
 

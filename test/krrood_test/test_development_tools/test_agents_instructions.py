@@ -160,6 +160,7 @@ def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
         CodeStyleRules.NO_HAND_WRITTEN_FIELD_ACCESSORS.checker,
         NamingRules.NO_LEADING_PREPOSITIONS.checker,
         NamingRules.NO_BUILTIN_NAMES.checker,
+        NamingRules.NO_REBOUND_NAMES.checker,
         design_principles.DesignPrinciplesRules.NO_PROTOCOLS.checker,
         MethodsRules.NO_SUPERFLUOUS_NESTING.checker,
         ExceptionModellingRules.RAISE_CUSTOM_EXCEPTIONS.checker,

@@ -162,9 +162,39 @@ class RuffRule(StrEnum):
     A class attribute or method named after a builtin the class body then uses.
     """
 
+    BUILTIN_IMPORT_SHADOWING = "A004"
+    """
+    An import binding the name of a builtin.
+    """
+
     STDLIB_MODULE_SHADOWING = "A005"
     """
     A top-level module named after a module of the standard library.
+    """
+
+    BUILTIN_LAMBDA_ARGUMENT_SHADOWING = "A006"
+    """
+    A parameter of a lambda named after a builtin.
+    """
+
+    IMPORT_SHADOWED_BY_LOOP_VARIABLE = "F402"
+    """
+    A loop variable rebinding an imported name.
+    """
+
+    REDEFINED_WHILE_UNUSED = "F811"
+    """
+    A name bound again before its first binding is used.
+    """
+
+    REDEFINED_ARGUMENT_FROM_LOCAL = "PLR1704"
+    """
+    A loop, ``with`` or ``except`` target rebinding a parameter.
+    """
+
+    REDEFINED_LOOP_NAME = "PLW2901"
+    """
+    A loop variable assigned to inside its loop.
     """
 
     SUPERFLUOUS_ELSE_RETURN = "RET505"

@@ -443,6 +443,17 @@ class RuffSnippet(PathEnumeration):
     A variable, a parameter and a method named after builtins.
     """
 
+    BUILTIN_IMPORT_NAMES = DIRECTORY / "builtin_import_names.py"
+    """
+    An import and a lambda parameter named after builtins.
+    """
+
+    REBOUND_NAMES = DIRECTORY / "rebound_names.py"
+    """
+    An import bound twice, a loop variable assigned in its loop, a loop over a
+    parameter's name and a loop over an import's name.
+    """
+
     STANDARD_LIBRARY_NAME = DIRECTORY / "standard_library_name.py"
     """
     A module that breaks no rule but its name, once copied under the name of a standard

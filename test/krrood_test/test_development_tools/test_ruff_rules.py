@@ -344,6 +344,16 @@ def test_a_failing_ruff_run_raises(
             CopiedModuleName.STANDARD_LIBRARY_MODULE,
         ),
         (
+            NamingRules.NO_BUILTIN_NAMES,
+            RuffSnippet.BUILTIN_IMPORT_NAMES,
+            CopiedModuleName.OUTSIDE_TESTS,
+        ),
+        (
+            NamingRules.NO_REBOUND_NAMES,
+            RuffSnippet.REBOUND_NAMES,
+            CopiedModuleName.OUTSIDE_TESTS,
+        ),
+        (
             MethodsRules.NO_SUPERFLUOUS_NESTING,
             RuffSnippet.SUPERFLUOUS_NESTING,
             CopiedModuleName.OUTSIDE_TESTS,

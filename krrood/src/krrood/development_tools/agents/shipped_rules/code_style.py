@@ -217,15 +217,33 @@ class NamingRules(Section):
     )
 
     NO_BUILTIN_NAMES = (
-        "Never name a variable, parameter or attribute after a builtin such as `id` "
-        "or `type`, nor a top-level module after a module of the standard library",
+        "Never name a variable, parameter, attribute or import after a builtin such "
+        "as `id` or `type`, nor a top-level module after a module of the standard "
+        "library",
         (),
         RuffRuleChecker(
             lint_rules=(
                 RuffRule.BUILTIN_VARIABLE_SHADOWING,
                 RuffRule.BUILTIN_ARGUMENT_SHADOWING,
                 RuffRule.BUILTIN_ATTRIBUTE_SHADOWING,
+                RuffRule.BUILTIN_IMPORT_SHADOWING,
                 RuffRule.STDLIB_MODULE_SHADOWING,
+                RuffRule.BUILTIN_LAMBDA_ARGUMENT_SHADOWING,
+            )
+        ),
+    )
+
+    NO_REBOUND_NAMES = (
+        "Never bind a name again before it is used, assign to a loop variable inside "
+        "its loop, or reuse a parameter or an import as a loop, `with` or `except` "
+        "target",
+        (),
+        RuffRuleChecker(
+            lint_rules=(
+                RuffRule.IMPORT_SHADOWED_BY_LOOP_VARIABLE,
+                RuffRule.REDEFINED_WHILE_UNUSED,
+                RuffRule.REDEFINED_ARGUMENT_FROM_LOCAL,
+                RuffRule.REDEFINED_LOOP_NAME,
             )
         ),
     )
