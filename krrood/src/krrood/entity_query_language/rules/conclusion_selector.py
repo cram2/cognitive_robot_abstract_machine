@@ -17,6 +17,7 @@ from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+from krrood.patterns.classproperty import classproperty
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.operators.set_operations import Union as EQLUnion
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -43,6 +44,14 @@ class ConclusionSelector(TruthValueOperator, ABC):
     Base class for operators that selects the conclusions to pass through from it's
     operands' conclusions.
     """
+
+    @classproperty
+    def grows_rule_tree_inward(cls) -> bool:
+        """
+        Whether adding a branch of this type re-anchors it at a fixed base node, growing
+        the rule tree inward, rather than wrapping the current root.
+        """
+        return False
 
     @classmethod
     def create_and_update_rule_tree(
@@ -190,6 +199,14 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     """
     Whether the right branch has yielded any True results.
     """
+
+    @classproperty
+    def grows_rule_tree_inward(cls) -> bool:
+        """
+        Like :attr:`ConclusionSelector.grows_rule_tree_inward`, but true: a refinement
+        is anchored at the rule it refines.
+        """
+        return True
 
     def _evaluate__(
         self,

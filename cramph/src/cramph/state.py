@@ -1,3 +1,8 @@
+"""
+The states a statechart keeps for each of its nodes: their life cycle and their
+observations.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -14,7 +19,7 @@ from typing_extensions import (
 )
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.data_types import (
     LifeCycleValues,
     ObservationStateValues,

@@ -1,3 +1,7 @@
+"""
+The verbalizer that turns an entity query into English text.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,7 +21,9 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     RuleContext,
 )
-from krrood.entity_query_language.verbalization.grammar.framework.registry import RULES
+from krrood.entity_query_language.verbalization.grammar.framework.registry import (
+    PhraseRuleRegistry,
+)
 from krrood.entity_query_language.verbalization.grammar.match.assembler import (
     MatchAssembler,
 )
@@ -77,7 +83,7 @@ class EQLVerbalizer:
                 context=self._match_context(services=services)
             ).assemble(node=expression)
         else:
-            fragment = fold(expression, services, RULES)
+            fragment = fold(expression, services, PhraseRuleRegistry.loaded_rules())
         # The discourse focus per query scope, projected once from the shared plan read model; the
         # coreference pass consults it instead of rule-emitted subject markers.
         discourse = DiscourseModel.from_expression(
@@ -97,4 +103,4 @@ class EQLVerbalizer:
         :return: A root context whose ``child`` is the fold continuation, so the match assembler
             recurses its selection / values / conditions through the standard grammar.
         """
-        return root_context(services, RULES)
+        return root_context(services, PhraseRuleRegistry.loaded_rules())

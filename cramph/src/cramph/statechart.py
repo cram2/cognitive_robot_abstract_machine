@@ -8,6 +8,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 
 import rustworkx as rx
 from typing_extensions import (
@@ -140,13 +141,20 @@ class StatechartModification:
     Batches changes to a statechart, so that a compiled statechart compiles again only
     once, when the outermost of any nested modifications ends.
 
-    If the block raises, the nodes added inside it are dropped again and the statechart
-    stays as it was.
+    If the block raises, the nodes added inside it are dropped again, the resets
+    requested inside it are forgotten and the statechart stays as it was; nothing
+    compiles then, so the exception the block raised is the one that propagates.
     """
 
     statechart: Statechart
     """
     The statechart being changed.
+    """
+
+    rewrites_compiled_nodes: bool = False
+    """
+    Whether composite nodes the latest compile covered take new children inside this
+    block.
     """
 
     _node_count_at_start: int = field(init=False, default=0)
@@ -159,10 +167,19 @@ class StatechartModification:
     How many nodes were replaced in the open modifications when this one started.
     """
 
+    _requested_reset_count_at_start: int = field(init=False, default=0)
+    """
+    How many resets were requested and not carried out yet when this modification
+    started.
+    """
+
     def __enter__(self) -> Self:
         self._node_count_at_start = len(self.statechart.nodes)
         self._replaced_count_at_start = len(self.statechart._replaced_nodes)
+        self._requested_reset_count_at_start = len(self.statechart._requested_resets)
         self.statechart._open_modifications += 1
+        if self.rewrites_compiled_nodes:
+            self.statechart._open_rewriting_modifications += 1
         return self
 
     def __exit__(
@@ -173,7 +190,10 @@ class StatechartModification:
     ) -> None:
         statechart = self.statechart
         statechart._open_modifications -= 1
+        if self.rewrites_compiled_nodes:
+            statechart._open_rewriting_modifications -= 1
         if exception is not None:
+            del statechart._requested_resets[self._requested_reset_count_at_start :]
             statechart._put_back_replaced_nodes_from(
                 first_put_back=self._replaced_count_at_start
             )
@@ -181,7 +201,11 @@ class StatechartModification:
         if statechart._open_modifications == 0:
             statechart._replaced_nodes.clear()
         compiler = statechart.compiler
-        if statechart._open_modifications > 0 or not compiler.is_compiled:
+        if (
+            exception is not None
+            or statechart._open_modifications > 0
+            or not compiler.is_compiled
+        ):
             return
         if not compiler.changed_since_compile:
             return
@@ -291,6 +315,19 @@ class Statechart(SubclassJSONSerializer):
     _open_modifications: int = field(default=0, init=False, repr=False)
     """
     How many :class:`StatechartModification` blocks are open on this statechart.
+    """
+
+    _open_rewriting_modifications: int = field(default=0, init=False, repr=False)
+    """
+    How many of the open :class:`StatechartModification` blocks rewrite compiled nodes.
+    """
+
+    _requested_resets: list[StatechartNode] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    The nodes :meth:`request_reset` was called for since the latest settled tick, in
+    order.
     """
 
     _replaced_nodes: list[ReplacedNode] = field(
@@ -416,13 +453,52 @@ class Statechart(SubclassJSONSerializer):
         """
         return list(set(self.edges))
 
-    def modify(self) -> StatechartModification:
+    def modify(
+        self, *, rewrites_compiled_nodes: bool = False
+    ) -> StatechartModification:
         """
+        :param rewrites_compiled_nodes: Whether composite nodes the latest compile
+            covered take new children inside the block, however their class decides
+            otherwise.
         :return: A block batching changes to this statechart. A compiled statechart
             compiles again once the outermost block ends, keeping the state and the
             history of the nodes it already held.
         """
-        return StatechartModification(statechart=self)
+        return StatechartModification(
+            statechart=self, rewrites_compiled_nodes=rewrites_compiled_nodes
+        )
+
+    @property
+    def may_rewrite_compiled_nodes(self) -> bool:
+        """
+        :return: Whether a block of :meth:`modify` that rewrites compiled nodes is open.
+        """
+        return self._open_rewriting_modifications > 0
+
+    def request_reset(self, *, node: StatechartNode) -> None:
+        """
+        Puts `node` and everything below it back to not started at the start of the next
+        settled tick, so a callback can run a node again without a reset condition.
+
+        What `node` reached this tick stays recorded in the history. It starts again on
+        the tick after the reset at the earliest, if its start condition holds then.
+
+        :param node: A node of this statechart.
+        :raises NotInStatechartError: If `node` does not belong to this statechart.
+        """
+        if node._statechart is not self:
+            raise NotInStatechartError(name=node.name)
+        if node not in self._requested_resets:
+            self._requested_resets.append(node)
+
+    def take_requested_resets(self) -> list[StatechartNode]:
+        """
+        :return: The nodes :meth:`request_reset` was called for since this was last
+            called, in order. They count as carried out from then on.
+        """
+        requested_resets = self._requested_resets
+        self._requested_resets = []
+        return requested_resets
 
     def request_rebuild(self, *, node: StatechartNode) -> None:
         """
@@ -678,6 +754,11 @@ class Statechart(SubclassJSONSerializer):
             for choosing_node in self._choosing_nodes
             if choosing_node in kept_nodes
         ]
+        self._requested_resets = [
+            requested_node
+            for requested_node in self._requested_resets
+            if requested_node in kept_nodes
+        ]
 
     def add_nodes(self, *, nodes: list[StatechartNode]) -> None:
         """
@@ -727,7 +808,8 @@ class Statechart(SubclassJSONSerializer):
         """
         Executes a single tick of the statechart in its :attr:`context`.
 
-        Every node is brought to the state it reaches in this tick, see
+        Every node a reset was requested for is reset, see :meth:`request_reset`, and
+        every node is brought to the state it reaches in this tick, see
         :class:`~cramph.compiled_tick.CompiledTick`, then every node waiting for a child
         chooses one, then the life cycle callbacks of every change run and the tick is
         recorded. A :class:`CancelStatechart` that started in this
@@ -909,7 +991,7 @@ class Statechart(SubclassJSONSerializer):
         for node in self.nodes:
             node.cleanup()
 
-    def draw(self, *, file_name: str) -> None:
+    def draw(self, *, file_name: Path) -> None:
         """
         Uses graphviz to draw the statechart and safe it at `file_name`.
 
@@ -953,8 +1035,8 @@ class Statechart(SubclassJSONSerializer):
     def plot_gantt_chart(
         self,
         *,
-        path: str = "./ganttchart.pdf",
-        context: StatechartContext = None,
+        path: Path = Path("ganttchart.pdf"),
+        context: StatechartContext | None = None,
         second_length_in_cm: float = 2.0,
     ) -> None:
         """

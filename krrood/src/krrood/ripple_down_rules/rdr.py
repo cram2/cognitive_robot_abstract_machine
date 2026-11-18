@@ -1,5 +1,5 @@
 """
-Ripple down rules classifiers for single-class, multi-class and general cases.
+Ripple down rules classifiers: single-class, multi-class and general.
 """
 
 from __future__ import annotations
@@ -17,18 +17,18 @@ from types import NoneType, ModuleType
 from krrood.ripple_down_rules import logger
 from krrood.ripple_down_rules.exceptions import RDRLoadError
 
-try:
-    from matplotlib import pyplot as plt
-
-    Figure = plt.Figure
-except ImportError as e:
-    logger.debug(f"{e}: matplotlib is not installed")
-    matplotlib = None
-    Figure = None
-    plt = None
-
 from sqlalchemy.orm import DeclarativeBase as SQLTable
-from typing_extensions import List, Optional, Dict, Union, Any, Self, Callable, Set
+from typing_extensions import (
+    TYPE_CHECKING,
+    List,
+    Optional,
+    Dict,
+    Union,
+    Any,
+    Self,
+    Callable,
+    Set,
+)
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
@@ -80,6 +80,9 @@ from krrood.utils import (
     get_import_path_from_path,
     get_scope_from_imports,
 )
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 class RippleDownRules(ABC):
@@ -355,13 +358,13 @@ class RippleDownRules(ABC):
         :param n_iter: The number of iterations to fit the classifier for.
         :param animate_tree: Whether to draw the tree while fitting the classifier.
         :param kwargs_for_fit_case: The keyword arguments to pass to the fit_case method.
+        :raises ModuleNotFoundError: If the tree is animated and matplotlib is not
+            installed.
         """
         targets = []
         if animate_tree:
-            if plt is None:
-                raise ImportError(
-                    "matplotlib is not installed, cannot animate the tree."
-                )
+            from matplotlib import pyplot as plt
+
             plt.ion()
         i = 0
         stop_iterating = False
@@ -592,10 +595,14 @@ class RippleDownRules(ABC):
         """
         pass
 
-    def update_figures(self):
+    def update_figures(self) -> None:
         """
         Update the figures of the classifier.
+
+        :raises ModuleNotFoundError: If matplotlib is not installed.
         """
+        from matplotlib import pyplot as plt
+
         if isinstance(self, GeneralRDR):
             for i, (rdr_name, rdr) in enumerate(self.start_rules_dict.items()):
                 if not rdr.fig:
@@ -1188,7 +1195,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
             imports.append(f"from .{self.generated_python_defs_file_name} import *")
             f.write("\n".join(imports) + "\n\n\n")
             f.write(f"attribute_name = '{self.attribute_name}'\n")
-            from krrood.code_generation.type_hints import stringify_type_hint
+            from krrood.code_generation.object_to_source import stringify_type_hint
 
             f.write(
                 f"conclusion_type = ({', '.join([stringify_type_hint(ct) for ct in self.conclusion_type])},)\n"
@@ -1428,7 +1435,7 @@ class SingleClassRDR(RDRWithCodeWriter):
 
     @property
     def conclusion_type_hint(self) -> str:
-        from krrood.code_generation.type_hints import stringify_type_hint
+        from krrood.code_generation.object_to_source import stringify_type_hint
 
         all_types = set(list(self.conclusion_type) + [type(self.default_conclusion)])
         if NoneType in all_types:
@@ -1637,7 +1644,7 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     @property
     def conclusion_type_hint(self) -> str:
-        from krrood.code_generation.type_hints import stringify_type_hint
+        from krrood.code_generation.object_to_source import stringify_type_hint
 
         conclusion_types = [
             stringify_type_hint(ct)

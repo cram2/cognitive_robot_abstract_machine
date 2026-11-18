@@ -1,3 +1,7 @@
+"""
+Tests that motion statecharts survive a round trip through JSON.
+"""
+
 import json
 
 import numpy as np
@@ -96,6 +100,10 @@ def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
 
 
 def test_executing_json_parsed_statechart(tmp_path):
+    """
+    A motion statechart read back from JSON starts with no node started and runs to its
+    end.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -151,9 +159,9 @@ def test_executing_json_parsed_statechart(tmp_path):
     assert end_copy.observation_state == ObservationStateValues.UNKNOWN
     assert task1_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert end_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     executor.tick_until_end()
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     assert task1_copy.observation_state == ObservationStateValues.TRUE
     assert end_copy.observation_state == ObservationStateValues.TRUE
     assert task1_copy.life_cycle_state == LifeCycleValues.RUNNING

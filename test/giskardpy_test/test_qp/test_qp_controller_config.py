@@ -172,7 +172,7 @@ def _peak_acceleration_of_a_joint_goal(
     for _ in range(int(3 * config.target_frequency)):
         executor.tick()
         accelerations.append(world.state[connection.dof.id].acceleration)
-    MotionControl.set_velocity_acceleration_jerk_to_zero(world)
+    MotionControl.set_velocity_acceleration_jerk_to_zero(world=world)
     return float(np.max(np.abs(accelerations)))
 
 

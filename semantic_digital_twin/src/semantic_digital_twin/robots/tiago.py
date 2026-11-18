@@ -1,3 +1,7 @@
+"""
+The TIAGo robot: its joints, grippers and other robot parts.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -10,7 +14,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -35,6 +39,9 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasNeck,
     HasTorso,
     HasTwoFingers,
+)
+from semantic_digital_twin.robots.robotiq_85_gripper import (
+    HasParallelGripperCommandServer,
 )
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -65,6 +72,16 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 # %% Robot parts
+
+
+class TiagoParallelGripperCommandTopic(StrEnum):
+    """
+    The names the drivers of the Tiago's grippers serve their parallel gripper command
+    actions under, one driver per gripper.
+    """
+
+    LEFT_GRIPPER = "gripper_left_controller/gripper_cmd"
+    RIGHT_GRIPPER = "gripper_right_controller/gripper_cmd"
 
 
 class TiagoJoint(JointName):
@@ -190,9 +207,10 @@ class TiagoRightIndexFinger(Finger):
 
 
 @dataclass(eq=False)
-class TiagoGripper(EndEffector, ABC):
+class TiagoGripper(EndEffector, HasParallelGripperCommandServer, ABC):
     """
-    A gripper of a Tiago, whose joints all follow the one joint its controller commands.
+    A Robotiq gripper of a Tiago, whose joints all follow the one joint its controller
+    commands.
     """
 
     @classproperty
@@ -203,11 +221,15 @@ class TiagoGripper(EndEffector, ABC):
         mimics.
         """
 
+    @property
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        return self._world.get_connection_by_name(self.finger_joint)
+
     def setup_hardware_interfaces(self):
         connection: ActiveConnection = self._world.get_connection_by_name(
             self.finger_joint
         )
-        connection.has_hardware_interface = True
+        self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         """
@@ -250,6 +272,10 @@ class TiagoLeftGripper(
     def finger_joint(cls) -> TiagoJoint:
         return TiagoJoint.LEFT_GRIPPER_FINGER
 
+    @classproperty
+    def parallel_gripper_command_topic(cls) -> str:
+        return TiagoParallelGripperCommandTopic.LEFT_GRIPPER
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -271,6 +297,10 @@ class TiagoRightGripper(
     @classproperty
     def finger_joint(cls) -> TiagoJoint:
         return TiagoJoint.RIGHT_GRIPPER_FINGER
+
+    @classproperty
+    def parallel_gripper_command_topic(cls) -> str:
+        return TiagoParallelGripperCommandTopic.RIGHT_GRIPPER
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -302,7 +332,7 @@ class TiagoLeftArm(Arm[TiagoLeftGripper]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
@@ -347,7 +377,7 @@ class TiagoRightArm(Arm[TiagoRightGripper]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
@@ -424,7 +454,7 @@ class TiagoNeck(Neck[TiagoCamera]):
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         return []
@@ -453,7 +483,7 @@ class TiagoTorso(
             connection: ActiveConnection = self._world.get_connection_by_name(
                 joint_name
             )
-            connection.has_hardware_interface = True
+            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
 
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections

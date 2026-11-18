@@ -13,7 +13,7 @@ from enum import StrEnum
 from pathlib import Path
 
 import numpy
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,

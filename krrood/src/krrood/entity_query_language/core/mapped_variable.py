@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import operator
 import uuid
+from enum import Enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields, is_dataclass
 from functools import cached_property
@@ -22,14 +23,6 @@ from typing_extensions import (
     Self,
     get_args,
     get_origin,
-)
-
-
-from random_events.variable import (
-    Continuous,
-    Integer,
-    compatible_types,
-    variable_from_name_and_type,
 )
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
@@ -67,7 +60,7 @@ from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
-from krrood.symbol_graph.helpers import (
+from krrood.entity_query_language.class_diagram_lookup import (
     get_field_type_endpoint,
     get_method_return_type,
     get_wrapped_field,
@@ -818,7 +811,8 @@ class Attribute(SingleValueMapping[T, AttributeTerm]):
 
     def number_like_field(self) -> Self:
         """
-        Assert this attribute resolves to a number-like (integer or continuous) type.
+        Assert this attribute resolves to an integer or floating-point type that is
+        neither a boolean nor an enumeration.
 
         :return: This attribute.
         :raises AmbiguousQueryAttribute: If this attribute is chain-rooted at a query
@@ -829,12 +823,9 @@ class Attribute(SingleValueMapping[T, AttributeTerm]):
         """
         resolved_type = self._variable_rooted_._type_
         is_number_like = (
-            resolved_type is not None
-            and issubclass(resolved_type, compatible_types)
-            and isinstance(
-                variable_from_name_and_type(self._attribute_name_, resolved_type),
-                (Integer, Continuous),
-            )
+            isclass(resolved_type)
+            and issubclass(resolved_type, (int, float))
+            and not issubclass(resolved_type, (bool, Enum))
         )
         if not is_number_like:
             raise NotNumberLikeFieldError(attribute=self, resolved_type=resolved_type)

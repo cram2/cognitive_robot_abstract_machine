@@ -124,16 +124,17 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
                     body.parent_connection.parent_T_connection_expression
                 )
 
-                body.parent_connection.parent_T_connection_expression = (
-                    parent_T_old_origin @ old_origin_T_new_origin
+                body.parent_connection.update_parent_T_connection(
+                    parent_T_connection=parent_T_old_origin @ old_origin_T_new_origin
                 )
 
             for child in world.compute_child_kinematic_structure_entities(body):
                 old_origin_T_child_origin = (
                     child.parent_connection.parent_T_connection_expression
                 )
-                child.parent_connection.parent_T_connection_expression = (
-                    old_origin_T_new_origin.inverse() @ old_origin_T_child_origin
+                child.parent_connection.update_parent_T_connection(
+                    parent_T_connection=old_origin_T_new_origin.inverse()
+                    @ old_origin_T_child_origin
                 )
         return world
 

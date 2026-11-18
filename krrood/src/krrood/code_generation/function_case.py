@@ -17,7 +17,7 @@ from krrood.code_generation.imports import (
     validate_annotations,
 )
 from krrood.code_generation.naming import to_camel_case
-from krrood.code_generation.type_hints import (
+from krrood.code_generation.object_to_source import (
     stringify_type_hint,
     get_types_to_import_from_function_type_hints,
 )

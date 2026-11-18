@@ -1,3 +1,8 @@
+"""
+Perception for robot plans: the queries a plan asks, the detections answering them, and
+the interfaces and statechart task that perceive through the world or RoboKudo.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -6,7 +11,7 @@ from datetime import timedelta
 
 import numpy as np
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner, FailsOnObservingFalse
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues

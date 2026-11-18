@@ -1,3 +1,8 @@
+"""
+Composite statechart nodes that control how their children run: in sequence, in
+parallel, repeated until a condition holds, or tried until one succeeds.
+"""
+
 from __future__ import annotations, division
 
 from abc import ABC, abstractmethod
@@ -10,7 +15,7 @@ from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import QueryBackend
 from krrood.entity_query_language.query.match import Match
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
@@ -299,6 +304,8 @@ class ControlStructureNode(CompositeNode, ABC):
         self.nodes.insert(position, node)
         self._place_child_in_statechart(node=node)
         self._wire_children()
+        if self.statechart.compiler.latest_compile_covers(node=self):
+            self.statechart.request_rebuild(node=self)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)

@@ -1,3 +1,7 @@
+"""
+An interactive visualization of a statechart as a graph.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,7 +10,7 @@ import rustworkx as rx
 from typing_extensions import TYPE_CHECKING
 
 from cramph.node import StatechartNode
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.called_positionally import called_positionally
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
