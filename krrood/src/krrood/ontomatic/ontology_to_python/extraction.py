@@ -14,7 +14,7 @@ from typing_extensions import Dict, List, Optional
 
 from krrood.code_generation.naming import to_camel_case, to_snake_case
 from krrood.ontomatic.exceptions import AmbiguousDescribedClass
-from krrood.ontomatic.naming import HasRDFGraph, NamingRegistry
+from krrood.ontomatic.naming import HasRDFGraph
 from krrood.ontomatic.ontology_to_python.property_type import PropertyType
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -40,7 +40,7 @@ class RDFGraphExtractor(HasRDFGraph):
         :return: The names of the named classes or properties the node is related to.
         """
         return [
-            NamingRegistry.uri_to_python_name(uri=related)
+            self.uri_to_python_name(uri=related)
             for related in self.graph.objects(node, relation)
             if isinstance(related, rdflib.URIRef)
         ]
@@ -55,7 +55,7 @@ class RDFGraphExtractor(HasRDFGraph):
             between the node and, in either direction.
         """
         return self.related_names(node=node, relation=relation) + [
-            NamingRegistry.uri_to_python_name(uri=related)
+            self.uri_to_python_name(uri=related)
             for related in self.graph.subjects(relation, node)
             if isinstance(related, rdflib.URIRef)
         ]
@@ -81,7 +81,7 @@ class RDFClassExtractor(RDFGraphExtractor):
             if described_class is None:
                 superclasses = self.named_conjuncts_of(class_expression=class_uri)
         else:
-            name = NamingRegistry.uri_to_python_name(uri=class_uri)
+            name = self.uri_to_python_name(uri=class_uri)
         return ClassInfo(
             name=name,
             uri=str(class_uri),
@@ -138,7 +138,7 @@ class RDFClassExtractor(RDFGraphExtractor):
         :raises AmbiguousDescribedClass: When it is declared under, or over, several.
         """
         candidates = self.named_superclasses(class_uri=class_expression) or [
-            NamingRegistry.uri_to_python_name(uri=subclass)
+            self.uri_to_python_name(uri=subclass)
             for subclass in self.graph.subjects(RDFS.subClassOf, class_expression)
         ]
         if len(candidates) > 1:
@@ -161,7 +161,7 @@ class RDFClassExtractor(RDFGraphExtractor):
             *self.graph.objects(class_expression, OWL.equivalentClass),
         ]:
             if isinstance(defined, rdflib.URIRef):
-                return NamingRegistry.uri_to_python_name(uri=defined)
+                return self.uri_to_python_name(uri=defined)
         return None
 
     def is_attached_to_a_named_class(self, *, class_expression: rdflib.BNode) -> bool:
@@ -201,7 +201,7 @@ class RDFClassExtractor(RDFGraphExtractor):
         :return: The names of the named classes among its members.
         """
         return [
-            NamingRegistry.uri_to_python_name(uri=member)
+            self.uri_to_python_name(uri=member)
             for intersection in self.graph.objects(class_expression, OWL.intersectionOf)
             for member in self.list_members(head=intersection)
             if isinstance(member, rdflib.URIRef)
@@ -232,7 +232,7 @@ class RDFPropertyExtractor(RDFGraphExtractor):
         :return: The information about the property. Of several inverses, the first by
             name is its inverse.
         """
-        name = NamingRegistry.uri_to_python_name(uri=property_uri)
+        name = self.uri_to_python_name(uri=property_uri)
         range_nodes = list(self.graph.objects(property_uri, RDFS.range))
         inverses = sorted(
             set(self.mutually_related_names(node=property_uri, relation=OWL.inverseOf))
@@ -247,12 +247,11 @@ class RDFPropertyExtractor(RDFGraphExtractor):
                 else PropertyType.OBJECT_PROPERTY
             ),
             domains=[
-                NamingRegistry.uri_to_python_name(uri=domain)
+                self.uri_to_python_name(uri=domain)
                 for domain in self.graph.objects(property_uri, RDFS.domain)
             ],
             ranges=[
-                NamingRegistry.uri_to_python_name(uri=range_node)
-                for range_node in range_nodes
+                self.uri_to_python_name(uri=range_node) for range_node in range_nodes
             ],
             range_uris=range_nodes,
             equivalent_properties=self.mutually_related_names(
@@ -332,9 +331,7 @@ class RDFOntologyExtractor(HasRDFGraph):
         for ontology_node in self.graph.subjects(RDF.type, OWL.Ontology):
             self.ontology_label = self.label(uri=ontology_node)
             if not self.ontology_label:
-                self.ontology_label = NamingRegistry.uri_to_python_name(
-                    uri=ontology_node
-                )
+                self.ontology_label = self.uri_to_python_name(uri=ontology_node)
             break
 
         if not self.ontology_label:

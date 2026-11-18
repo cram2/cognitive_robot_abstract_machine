@@ -12,7 +12,7 @@ from rdflib import Namespace, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
 from krrood.ontomatic.exceptions import UnsupportedClassExpression
-from krrood.ontomatic.naming import HasRDFGraph, NamingRegistry
+from krrood.ontomatic.naming import HasRDFGraph
 
 # %% local names
 
@@ -22,7 +22,7 @@ def test_the_local_name_follows_a_hash():
     The local name of an IRI with a fragment is the fragment.
     """
     assert (
-        NamingRegistry.local_name(uri=URIRef("http://example.org/ontology#Person"))
+        HasRDFGraph.local_name(uri=URIRef("http://example.org/ontology#Person"))
         == "Person"
     )
 
@@ -32,7 +32,7 @@ def test_the_local_name_follows_the_last_slash():
     The local name of an IRI without a fragment is its last path segment.
     """
     assert (
-        NamingRegistry.local_name(uri=URIRef("http://example.org/ontology/Person"))
+        HasRDFGraph.local_name(uri=URIRef("http://example.org/ontology/Person"))
         == "Person"
     )
 

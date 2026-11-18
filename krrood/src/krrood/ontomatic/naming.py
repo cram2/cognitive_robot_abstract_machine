@@ -19,38 +19,6 @@ from krrood.ontomatic.exceptions import UnsupportedClassExpression
 from krrood.ormatic.utils import classproperty
 from krrood.utils import recursive_subclasses
 
-# %% names of IRIs and blank nodes
-
-
-class NamingRegistry:
-    """
-    Registry for converting OWL URIs and names to Python-compatible identifiers.
-    """
-
-    @staticmethod
-    def uri_to_python_name(*, uri: Any) -> str:
-        """
-        :param uri: A named class, individual or property.
-        :return: A valid Python identifier for it, or the text of anything else, such as
-            a literal or a blank node.
-        """
-        if isinstance(uri, rdflib.URIRef):
-            return re.sub(r"[^a-zA-Z0-9_]", "_", NamingRegistry.local_name(uri=uri))
-        return str(uri)
-
-    @staticmethod
-    @lru_cache(maxsize=None)
-    def local_name(*, uri: Union[str, rdflib.URIRef]) -> str:
-        """
-        :param uri: An IRI.
-        :return: The part of the IRI after the last ``#``, or else after the last ``/``.
-        """
-        text = str(uri)
-        if "#" in text:
-            return text.rsplit("#", 1)[1]
-        return text.rstrip("/").rsplit("/", 1)[-1]
-
-
 # %% what an RDF graph says about its nodes
 
 
@@ -66,6 +34,29 @@ class HasRDFGraph:
     The graph that describes the nodes.
     """
 
+    @staticmethod
+    def uri_to_python_name(*, uri: Any) -> str:
+        """
+        :param uri: A named class, individual or property.
+        :return: A valid Python identifier for it, or the text of anything else, such as
+            a literal or a blank node.
+        """
+        if isinstance(uri, rdflib.URIRef):
+            return re.sub(r"[^a-zA-Z0-9_]", "_", HasRDFGraph.local_name(uri=uri))
+        return str(uri)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def local_name(*, uri: Union[str, rdflib.URIRef]) -> str:
+        """
+        :param uri: An IRI.
+        :return: The part of the IRI after the last ``#``, or else after the last ``/``.
+        """
+        text = str(uri)
+        if "#" in text:
+            return text.rsplit("#", 1)[1]
+        return text.rstrip("/").rsplit("/", 1)[-1]
+
     def python_name_of_node(self, *, node: rdflib.term.Node) -> str:
         """
         :param node: A class, individual, literal or anonymous class expression.
@@ -77,7 +68,7 @@ class HasRDFGraph:
         """
         if isinstance(node, rdflib.BNode):
             return ClassExpression.from_node(graph=self.graph, node=node).python_name
-        return NamingRegistry.uri_to_python_name(uri=node)
+        return self.uri_to_python_name(uri=node)
 
     def list_members(self, *, head: rdflib.term.Node) -> list[rdflib.term.Node]:
         """
@@ -314,7 +305,7 @@ class ComplementOf(ClassExpression):
         """
         complemented = self.graph.value(self.node, OWL.complementOf)
         disjoint_names = [
-            NamingRegistry.uri_to_python_name(uri=disjoint)
+            self.uri_to_python_name(uri=disjoint)
             for disjoint in self.graph.objects(complemented, OWL.disjointWith)
         ]
         return UnionOf.join_member_names(
@@ -336,9 +327,7 @@ class Restriction(ClassExpression, ABC):
         """
         The name of the restricted property.
         """
-        return NamingRegistry.uri_to_python_name(
-            uri=self.graph.value(self.node, OWL.onProperty)
-        )
+        return self.uri_to_python_name(uri=self.graph.value(self.node, OWL.onProperty))
 
     @classproperty
     @abstractmethod
