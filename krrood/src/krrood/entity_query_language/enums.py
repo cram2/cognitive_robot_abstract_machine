@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from enum import Enum, auto
+import importlib.util
+from enum import Enum, StrEnum, auto
 
 
 class InferMode(Enum):
@@ -54,3 +55,21 @@ class DomainSource(Enum):
     """
     Derived from grouping operations.
     """
+
+
+class ProbabilisticLibrary(StrEnum):
+    """
+    The top-level packages of the libraries only probabilistic queries need.
+    """
+
+    RANDOM_EVENTS = "random_events"
+    PROBABILISTIC_MODEL = "probabilistic_model"
+
+    @classmethod
+    def missing(cls) -> tuple[ProbabilisticLibrary, ...]:
+        """
+        :return: The members whose library is not installed.
+        """
+        return tuple(
+            library for library in cls if importlib.util.find_spec(library) is None
+        )

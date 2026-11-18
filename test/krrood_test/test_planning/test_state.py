@@ -15,10 +15,10 @@ from typing_extensions import Callable
 
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
-    ProbabilisticBackend,
     QueryBackend,
     SQLAlchemyBackend,
 )
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.exceptions import BackendCannotReadState
 from krrood.entity_query_language.factories import (
     a,

@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 from typing_extensions import Callable
 
 from cramph.node import EndedByOwner
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.node import NodeArtifacts, StatechartNode
 
 # %% tick count check
@@ -41,9 +41,9 @@ class Print(EndedByOwner, StatechartNode):
     The text printed on every tick.
     """
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         print(self.message)
-        return ObservationStateValues.TRUE
+        return ObservationStateValue.TRUE
 
 
 # %% counting time and ticks
@@ -78,10 +78,10 @@ class CountSeconds(EndedByOwner, StatechartNode):
     What :attr:`_now` read when this node started.
     """
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         difference = self._now() - self._start_time
         if difference >= self.seconds - self.tolerance:
-            return ObservationStateValues.TRUE
+            return ObservationStateValue.TRUE
         return None
 
     def on_start(self) -> None:
@@ -106,11 +106,11 @@ class TickCounter(EndedByOwner, StatechartNode, ABC):
     def on_start(self) -> None:
         self._counter = 0
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         self._counter += 1
         if self._reached_target():
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
     @abstractmethod
     def _reached_target(self) -> bool:
@@ -176,12 +176,12 @@ class Pulse(EndedByOwner, StatechartNode):
     def on_start(self) -> None:
         self._counter = 0
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         if self._counter < self.length:
             self._triggered = True
             self._counter += 1
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
 
 # %% counting resets
@@ -212,22 +212,22 @@ class CountNodeResets(EndedByOwner, StatechartNode):
     Resets of :attr:`node` seen so far.
     """
 
-    _previous_life_cycle: LifeCycleValues | None = field(
+    _previous_life_cycle: LifeCycleValue | None = field(
         default=None, init=False, repr=False
     )
     """
     Life cycle state of :attr:`node` on the previous tick.
     """
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         current_life_cycle = self.node.life_cycle_state
         if (
             self._previous_life_cycle is not None
-            and current_life_cycle == LifeCycleValues.NOT_STARTED
-            and self._previous_life_cycle != LifeCycleValues.NOT_STARTED
+            and current_life_cycle == LifeCycleValue.NOT_STARTED
+            and self._previous_life_cycle != LifeCycleValue.NOT_STARTED
         ):
             self.resets += 1
         self._previous_life_cycle = current_life_cycle
         if self.resets >= self.target:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE

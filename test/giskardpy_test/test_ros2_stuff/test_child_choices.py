@@ -15,7 +15,7 @@ from cramph.composites import (
     CompositeNodeChoosingItsChild,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
@@ -152,8 +152,12 @@ class ChoosingGoal:
         return cls(statechart=statechart, choosing_node=choosing_node)
 
     def goal_json(self) -> str:
+        """
+        :return: The json of a goal asking for :attr:`statechart`, from a client no check
+            recognizes.
+        """
         return json.dumps(
-            MotionGoal.for_motion_statechart(
+            MotionGoal.from_motion_statechart(
                 motion_statechart=self.statechart,
                 client=MetaData(node_name="unwatched_client", process_id=0),
             ).to_json()
@@ -254,7 +258,7 @@ def test_a_child_the_client_chooses_runs_and_the_goal_succeeds(
     assert server.action_server.outcome == GoalOutcome.SUCCEEDED
     server_node = _server_choosing_node(server, goal)
     assert [type(node) for node in server_node.children] == [type(child)]
-    assert server_node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert server_node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_the_feedback_names_the_nodes_waiting_for_a_child(
@@ -286,7 +290,7 @@ def test_no_child_left_fails_the_node(
     assert server.action_server.outcome == GoalOutcome.SUCCEEDED
     server_node = _server_choosing_node(server, goal)
     assert server_node.children == []
-    assert server_node.life_cycle_state == LifeCycleValues.FAILED
+    assert server_node.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_child_out_of_step_with_the_statechart_aborts_the_goal(
@@ -333,7 +337,7 @@ def test_a_choice_for_another_goal_is_not_taken(
 
     assert server.action_server.outcome == GoalOutcome.CANCELED
     assert _server_choosing_node(server, goal).life_cycle_state == (
-        LifeCycleValues.RUNNING
+        LifeCycleValue.RUNNING
     )
 
 

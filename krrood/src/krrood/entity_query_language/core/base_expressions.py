@@ -87,7 +87,7 @@ class HasExpression(ABC):
     Anything verbalization/build steps can resolve to a single underlying
     :class:`SymbolicExpression` to scan or build, regardless of what kind of object
     routes to it (a plain expression, a :class:`~krrood.entity_query_language.query.match.Match`,
-    a :class:`~krrood.entity_query_language.operators.probabilistic_queries.ProbabilisticQuery`,
+    a :class:`~krrood.parametrization.probabilistic_queries.ProbabilisticQuery`,
     ...). Callers use :meth:`_get_expression_` polymorphically instead of an
     ``isinstance`` chain over every such wrapper type.
     """

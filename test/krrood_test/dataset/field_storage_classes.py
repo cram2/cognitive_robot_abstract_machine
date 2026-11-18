@@ -23,6 +23,18 @@ class StorageLeaf:
 
 
 @dataclass(kw_only=True)
+class UnmappedRecord:
+    """
+    A dataclass no table maps, which only the serializer for any dataclass writes.
+    """
+
+    number: int
+    """
+    A number.
+    """
+
+
+@dataclass(kw_only=True)
 class FieldsOfEveryStorage:
     """
     Holds one field for each way ORMatic can store a field.
@@ -76,6 +88,16 @@ class FieldsOfEveryStorage:
     days: List[datetime.date]
     """
     A collection of values of a type with a type mapping.
+    """
+
+    record: UnmappedRecord
+    """
+    A value of a dataclass no table maps.
+    """
+
+    records: List[UnmappedRecord]
+    """
+    A collection of values of a dataclass no table maps.
     """
 
     lookup: Dict[str, int]

@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import timedelta
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -32,7 +33,7 @@ from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from cramph.composites import Sequence, Parallel
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
@@ -415,6 +416,11 @@ def test_external_collision_avoidance_with_weight_above_ca(
 
 
 def test_update_collision_matrix_later(cylinder_bot_world: World):
+    """
+    Once a statechart that changed the temporary collision rules has ended, the
+    collision matrix is rebuilt from new rules, and none of its collision consumers stay
+    registered.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -471,7 +477,7 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
     executor.compile(statechart=statechart)
 
     executor.tick_until_end(timeout=500)
-    statechart.draw(file_name="muh.pdf")
+    statechart.draw(file_name=Path("muh.pdf"))
     cylinder_bot_world.collision_manager.clear_temporary_rules()
     cylinder_bot_world.collision_manager.add_temporary_rule(AvoidAllCollisions())
     cylinder_bot_world.collision_manager.update_collision_matrix()
@@ -1554,7 +1560,7 @@ def test_building_a_rules_node_keeps_the_temporary_rules_in_force(
 
     executor.compile(statechart=statechart)
 
-    assert rules_node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert rules_node.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert collision_manager.temporary_rules == [rule_in_force]
 
 
@@ -1722,7 +1728,7 @@ def test_cable_guide_collision(
         end_when=local_min,
     )
 
-    assert joint_goal.observation_state == ObservationStateValues.FALSE
+    assert joint_goal.observation_state == ObservationStateValue.FALSE
 
 
 def test_attached_self_collision_avoid_stick(
@@ -1813,7 +1819,7 @@ def test_box_overlapping_with_gripper(
         end_when=cart_goal,
     )
 
-    assert cart_goal.observation_state == ObservationStateValues.TRUE
+    assert cart_goal.observation_state == ObservationStateValue.TRUE
 
 
 def test_avoid_self_collision_specific_link(
@@ -2089,4 +2095,4 @@ def test_hsr_self_collision_avoidance(
         end_when=cart_goal,
     )
 
-    assert cart_goal.observation_state == ObservationStateValues.TRUE
+    assert cart_goal.observation_state == ObservationStateValue.TRUE

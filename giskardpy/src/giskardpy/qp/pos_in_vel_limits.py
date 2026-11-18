@@ -17,7 +17,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.linear_program_solver_highs import LinearProgramSolverHighs
-from giskardpy.utils.decorators import memoize
+from krrood.patterns.caching import memoize
 from krrood.symbolic_math.symbolic_math import (
     Scalar,
     Vector,
@@ -71,10 +71,10 @@ class BrakingProfile:
             time_step=braking.time_step,
         )
 
-    @staticmethod
+    @classmethod
     @memoize
     def _solve_fastest_braking(
-        *, braking: JerkLimitedBraking, prediction_horizon: int
+        cls, *, braking: JerkLimitedBraking, prediction_horizon: int
     ) -> npt.NDArray:
         """
         Solves the linear program behind :meth:`fastest` and returns its solution: the
@@ -93,7 +93,7 @@ class BrakingProfile:
         for derivative in range(number_of_derivatives - 1):
             last_step = (derivative + 1) * prediction_horizon - 1
             lower_bounds[last_step] = upper_bounds[last_step] = 0
-        link_model = BrakingProfile._derivative_link_model(
+        link_model = cls._derivative_link_model(
             time_step=braking.time_step,
             prediction_horizon=prediction_horizon,
             number_of_derivatives=number_of_derivatives,
@@ -153,19 +153,23 @@ class BrakingProfile:
             column_offset += prediction_horizon
         return link_model
 
-    def shifted_by(self, *, distance: Scalar) -> Vector:
+    def shifted_by(
+        self, *, distance: Scalar, negligible_velocity: float = 1e-4
+    ) -> Vector:
         """
         Returns the velocity profile that brakes to rest after covering exactly
         ``distance``, padded with rest, for any distance up to the one this whole
         profile covers. A longer distance gets this whole profile and, further away, its
-        first velocity at every step.
+        first velocity at every step. A velocity in it that lies between rest and
+        ``negligible_velocity`` is exactly rest.
 
         :param distance: Remaining distance to cover before coming to rest.
+        :param negligible_velocity: See :meth:`zero_negligible_velocities`.
         :return: Velocity at each step of the prediction horizon.
         """
         time_step = self.time_step.total_seconds()
         velocity_profile = self.zero_negligible_velocities(
-            velocity_profile=self.velocity
+            velocity_profile=self.velocity, negligible_velocity=negligible_velocity
         )
         number_of_steps = velocity_profile.shape[0]
         tails = [np.zeros(number_of_steps)]
@@ -188,6 +192,19 @@ class BrakingProfile:
             velocity = (
                 velocity + sm.Vector((tails[index] - tails[index - 1]) / gap) * covered
             )
+        # Interpolating just past a tail's distance leaves velocities a hair above rest,
+        # the same leftovers zero_negligible_velocities clears from the profile itself.
+        velocity = sm.Vector(
+            [
+                sm.if_less(
+                    step_velocity,
+                    0,
+                    step_velocity,
+                    sm.if_less(step_velocity, negligible_velocity, 0, step_velocity),
+                )
+                for step_velocity in velocity
+            ]
+        )
         full_profile_reach = 2 * tail_distances[-1] - tail_distances[-2]
         return sm.if_less_eq(
             distance,

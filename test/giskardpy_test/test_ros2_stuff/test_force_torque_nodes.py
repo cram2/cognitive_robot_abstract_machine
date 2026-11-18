@@ -1,8 +1,13 @@
+"""
+Tests of the statechart nodes that watch a force-torque sensor.
+"""
+
 import json
+from pathlib import Path
 
 from geometry_msgs.msg import WrenchStamped
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
@@ -21,6 +26,10 @@ from cramph.executor import StatechartExecutor
 
 
 def test_force_impact_node(rclpy_node):
+    """
+    A force impact monitor observes false while the measured force stays below its
+    threshold, and true once a larger force arrives.
+    """
     topic_name = "force_torque_topic"
 
     msg_below = WrenchStamped()
@@ -62,16 +71,16 @@ def test_force_impact_node(rclpy_node):
     ft_node = statechart_copy.nodes[0].nodes[0]
 
     executor.tick_until_end(timeout=5_000)
-    statechart_copy.draw(file_name="muh.pdf")
+    statechart_copy.draw(file_name=Path("muh.pdf"))
     assert (
         statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[0]
-        == ObservationStateValues.UNKNOWN
+        == ObservationStateValue.UNKNOWN
     )
     assert (
-        ObservationStateValues.FALSE
+        ObservationStateValue.FALSE
         in statechart_copy.state_history.get_observation_history_of_node(node=ft_node)
     )
     assert (
         statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )

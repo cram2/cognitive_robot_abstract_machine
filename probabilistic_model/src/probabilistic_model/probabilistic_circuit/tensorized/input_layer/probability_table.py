@@ -9,6 +9,7 @@ import numpy as np
 from scipy.sparse import csc_array, csr_array, vstack
 from typing_extensions import Generic, Self, TypeVar
 
+import krrood.adapters.sparse_array_json_serializer  # noqa: F401 registers the serializer of the stored csr_array
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeIndices,
