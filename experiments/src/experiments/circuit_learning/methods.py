@@ -16,17 +16,17 @@ import jax
 import numpy as np
 import optax
 import pandas as pd
+from krrood_compute_hardware.devices import Device
+from krrood_compute_hardware.jax_memory import JaxDeviceMemory
+from krrood_compute_hardware.memory import BudgetedMemory, DeviceMemory, HostMemory
 
 from experiments.circuit_learning.datasets import BenchmarkDataset
 from experiments.circuit_learning.settings import (
     ArrayLibrary,
-    BudgetedMemory,
     ComputationSetting,
-    Device,
     EdgeRepresentation,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.learning.device_memory import DeviceMemory, HostMemory
 from probabilistic_model.learning.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationTraining,
@@ -34,7 +34,6 @@ from probabilistic_model.learning.expectation_maximization import (
 )
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    JaxDeviceMemory,
     JaxGradientDescent,
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree

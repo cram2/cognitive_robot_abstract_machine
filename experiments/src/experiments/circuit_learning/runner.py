@@ -26,11 +26,13 @@ import jax
 import numpy as np
 import psutil
 import torch
+from krrood_compute_hardware.machine import Machine, MachineDivision, MachineShare
+from krrood_compute_hardware.torch_memory import TorchDeviceMemory
 from krrood.adapters.json_serializer import from_json, to_json
 
 from experiments.circuit_learning.database import BenchmarkDatabase
 from experiments.circuit_learning.datasets import DatasetName, PreparedDatasets
-from experiments.circuit_learning.exceptions import NoSlotForRunError
+from experiments.circuit_learning.exceptions import NoShareForRunError
 from experiments.circuit_learning.measurements import (
     QueryMeasurement,
     TrainingMeasurement,
@@ -53,39 +55,20 @@ from experiments.circuit_learning.settings import (
     ComputationSetting,
     Device,
 )
+from probabilistic_model.learning.torch_gradient_descent import TorchDeviceType
 from probabilistic_model.learning.training_schedule import Convergence
 
 # %% names
 
 
-class ThreadVariable(StrEnum):
+class CompilerVariable(StrEnum):
     """
-    The environment variables that cap the threads of the numeric libraries.
-    """
-
-    OPENMP = "OMP_NUM_THREADS"
-    OPENBLAS = "OPENBLAS_NUM_THREADS"
-    MKL = "MKL_NUM_THREADS"
-
-
-class AcceleratorVariable(StrEnum):
-    """
-    The environment variables that configure how a run uses the GPU.
-    """
-
-    XLA_PREALLOCATION = "XLA_PYTHON_CLIENT_PREALLOCATE"
-    """
-    Whether jax claims most of the GPU memory when it starts.
+    The environment variables that configure the compilers of a run.
     """
 
     XLA_FLAGS = "XLA_FLAGS"
     """
     The options of the XLA compiler.
-    """
-
-    VISIBLE_DEVICES = "CUDA_VISIBLE_DEVICES"
-    """
-    The GPUs a run sees.
     """
 
 
@@ -223,107 +206,6 @@ class RunExecution:
 
 
 @dataclass(kw_only=True)
-class Slot:
-    """
-    A share of the machine one run uses at a time.
-    """
-
-    uses_graphics_processor: bool
-    """
-    Whether the share holds part of the GPU.
-    """
-
-    cores: set[int]
-    """
-    The processor cores of the share.
-    """
-
-    memory_budget_bytes: int
-    """
-    The memory of its device a training step of a run may allocate.
-    """
-
-    host_memory_limit_bytes: int
-    """
-    The resident memory above which a run is stopped.
-    """
-
-
-@dataclass(kw_only=True)
-class MachineShares:
-    """
-    The division of the machine into shares that one run uses at a time.
-    """
-
-    graphics_processor_slots: int = 3
-    """
-    The number of runs that share the GPU.
-    """
-
-    processor_core_slots: int = 7
-    """
-    The number of runs that use processor cores only.
-    """
-
-    host_memory_fraction: float = 0.8
-    """
-    The fraction of the available host memory that is divided among the shares.
-    """
-
-    host_memory_limit_shares: float = 2.0
-    """
-    The number of host memory shares a run may hold before it is stopped.
-    """
-
-    graphics_processor_memory_fraction: float = 0.9
-    """
-    The fraction of the GPU memory that is divided among the GPU shares, the rest kept
-    free since the memory of a training step is only estimated.
-    """
-
-    def has_slot_for(self, *, setting: ComputationSetting) -> bool:
-        """
-        :param setting: A setting.
-        :return: Whether a share of the machine can compute in it.
-        """
-        if setting.uses_graphics_processor:
-            return self.graphics_processor_slots > 0
-        return self.processor_core_slots > 0
-
-    def slots(self) -> list[Slot]:
-        """
-        :return: The shares of the machine.
-        """
-        cores = sorted(os.sched_getaffinity(0))
-        count = self.graphics_processor_slots + self.processor_core_slots
-        per_slot = len(cores) // count
-        available = psutil.virtual_memory().available
-        host_share = int(self.host_memory_fraction * available / count)
-        graphics_processor_memory = (
-            torch.cuda.get_device_properties(0).total_memory
-            if self.graphics_processor_slots
-            else 0
-        )
-        return [
-            Slot(
-                uses_graphics_processor=index < self.graphics_processor_slots,
-                cores=set(cores[index * per_slot : (index + 1) * per_slot]),
-                memory_budget_bytes=(
-                    int(
-                        self.graphics_processor_memory_fraction
-                        * graphics_processor_memory
-                        / self.graphics_processor_slots
-                    )
-                    if index < self.graphics_processor_slots
-                    else host_share
-                ),
-                host_memory_limit_bytes=int(self.host_memory_limit_shares * host_share),
-            )
-            for index in range(count)
-        ]
-
-
-@dataclass(kw_only=True)
 class RunInProgress:
     """
     A run and the process carrying it out.
@@ -339,7 +221,7 @@ class RunInProgress:
     Its process.
     """
 
-    slot: Slot
+    share: MachineShare
     """
     The share of the machine it uses.
     """
@@ -393,7 +275,7 @@ class BenchmarkRunner:
     The limits of every run, its memory budget replaced by that of the share it runs on.
     """
 
-    shares: MachineShares = field(default_factory=MachineShares)
+    division: MachineDivision = field(default_factory=MachineDivision)
     """
     How the machine is divided among the runs.
     """
@@ -445,7 +327,7 @@ class BenchmarkRunner:
         query_settings = [
             setting
             for setting in query_settings
-            if self.shares.has_slot_for(setting=setting)
+            if self.division.shares_device(device=setting.device)
         ]
         query_settings.sort(key=lambda setting: setting != ComputationSetting.host())
         for name in self.datasets:
@@ -455,7 +337,7 @@ class BenchmarkRunner:
                 settings = [
                     setting
                     for setting in method.settings()
-                    if self.shares.has_slot_for(setting=setting)
+                    if self.division.shares_device(device=setting.device)
                 ]
                 if not settings or not method.supports(dataset=dataset):
                     continue
@@ -504,6 +386,19 @@ class BenchmarkRunner:
             return None
         return RunStatus.SKIPPED
 
+    def machine(self) -> Machine:
+        """
+        :return: The machine the benchmark runs on, with the memory of the first CUDA
+            device if the division has shares of the GPU.
+        """
+        return Machine.from_current_process(
+            graphics_processor_memory=(
+                TorchDeviceMemory(device=torch.device(TorchDeviceType.CUDA))
+                if self.division.graphics_processor_shares
+                else None
+            )
+        )
+
     def log_file(self, *, run: BenchmarkRun) -> Path:
         """
         :param run: A run.
@@ -529,20 +424,15 @@ class BenchmarkRunner:
         )
         print(f"{status} {run.key} {duration}", flush=True)
 
-    def start(self, *, run: BenchmarkRun, slot: Slot) -> RunInProgress:
+    def start(self, *, run: BenchmarkRun, share: MachineShare) -> RunInProgress:
         """
         :return: The run, started in a process of its own on the share.
         """
-        environment = dict(os.environ)
-        for variable in ThreadVariable:
-            environment[variable] = str(len(slot.cores))
-        environment[AcceleratorVariable.XLA_PREALLOCATION] = "false"
+        environment = share.process_environment(environment=dict(os.environ))
         # autotuning makes compiling a step take minutes on large batches
-        environment[AcceleratorVariable.XLA_FLAGS] = "--xla_gpu_autotune_level=0"
-        if not slot.uses_graphics_processor:
-            environment[AcceleratorVariable.VISIBLE_DEVICES] = ""
+        environment[CompilerVariable.XLA_FLAGS] = "--xla_gpu_autotune_level=0"
         limits = dataclasses.replace(
-            self.limits, memory_budget_bytes=slot.memory_budget_bytes
+            self.limits, memory_budget_bytes=share.memory_budget_bytes
         )
         log = self.log_file(run=run)
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -566,12 +456,12 @@ class BenchmarkRunner:
             env=environment,
             stdout=log.open("w"),
             stderr=subprocess.STDOUT,
-            preexec_fn=functools.partial(os.sched_setaffinity, 0, slot.cores),
+            preexec_fn=share.confine_current_process,
         )
         return RunInProgress(
             run=run,
             process=process,
-            slot=slot,
+            share=share,
             start=time.perf_counter(),
             timeout=(
                 limits.training_timeout
@@ -594,7 +484,7 @@ class BenchmarkRunner:
             return RunStatus.TIMED_OUT
         if (
             psutil.Process(running.process.pid).memory_info().rss
-            > running.slot.host_memory_limit_bytes
+            > running.share.host_memory_limit_bytes
         ):
             running.process.kill()
             running.process.wait()
@@ -611,19 +501,21 @@ class BenchmarkRunner:
         """
         :param runs: The runs, in the order they are started; those that ended in an
             earlier start are left out.
-        :raises NoSlotForRunError: If a run is in a setting no share of the machine can
+        :raises NoShareForRunError: If a run is in a setting no share of the machine can
             compute in.
         """
         impossible = [
-            run for run in runs if not self.shares.has_slot_for(setting=run.setting)
+            run
+            for run in runs
+            if not self.division.shares_device(device=run.setting.device)
         ]
         if impossible:
-            raise NoSlotForRunError(runs=impossible)
+            raise NoShareForRunError(runs=impossible)
         self.finished.update(
             {record.run.key: record.status for record in self.database.run_records()}
         )
         pending = [run for run in runs if run.key not in self.finished]
-        free = self.shares.slots()
+        free = self.division.shares(machine=self.machine())
         running: list[RunInProgress] = []
         while pending or running:
             for current in list(running):
@@ -631,7 +523,7 @@ class BenchmarkRunner:
                 if status is None:
                     continue
                 running.remove(current)
-                free.append(current.slot)
+                free.append(current.share)
                 self.record(run=current.run, status=status, duration=current.elapsed)
             for run in list(pending):
                 readiness = self.readiness(run=run)
@@ -641,20 +533,14 @@ class BenchmarkRunner:
                     continue
                 if readiness is not None:
                     continue
-                slot = next(
-                    (
-                        each
-                        for each in free
-                        if each.uses_graphics_processor
-                        == run.setting.uses_graphics_processor
-                    ),
-                    None,
+                share = next(
+                    (each for each in free if each.device is run.setting.device), None
                 )
-                if slot is None:
+                if share is None:
                     continue
-                free.remove(slot)
+                free.remove(share)
                 pending.remove(run)
-                running.append(self.start(run=run, slot=slot))
+                running.append(self.start(run=run, share=share))
             time.sleep(self.poll_interval.total_seconds())
 
 
@@ -683,7 +569,7 @@ def main() -> None:
         default=Path.home() / ".cache" / "probabilistic_model" / "benchmark",
     )
     default_limits = RunLimits()
-    default_shares = MachineShares()
+    default_division = MachineDivision()
     parser.add_argument(
         "--training-seconds",
         type=float,
@@ -696,12 +582,14 @@ def main() -> None:
         "--methods", nargs="+", default=[name.name for name in LearningMethod]
     )
     parser.add_argument(
-        "--graphics-processor-slots",
+        "--graphics-processor-shares",
         type=int,
-        default=default_shares.graphics_processor_slots,
+        default=default_division.graphics_processor_shares,
     )
     parser.add_argument(
-        "--processor-core-slots", type=int, default=default_shares.processor_core_slots
+        "--processor-core-shares",
+        type=int,
+        default=default_division.processor_core_shares,
     )
     parser.add_argument("--first-settings-only", action="store_true")
     parser.add_argument("--run")
@@ -727,9 +615,9 @@ def main() -> None:
         output=arguments.output,
         cache_directory=arguments.cache_directory,
         limits=limits,
-        shares=MachineShares(
-            graphics_processor_slots=arguments.graphics_processor_slots,
-            processor_core_slots=arguments.processor_core_slots,
+        division=MachineDivision(
+            graphics_processor_shares=arguments.graphics_processor_shares,
+            processor_core_shares=arguments.processor_core_shares,
         ),
         first_settings_only=arguments.first_settings_only,
     ).run()

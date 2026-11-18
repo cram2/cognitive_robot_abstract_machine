@@ -22,12 +22,10 @@ from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
 from typing_extensions import Callable, Generic, Self, TypeVar
 
-from probabilistic_model.learning.device_memory import (
-    DeviceMemory,
-    HostMemory,
-    ProbeMeasurement,
-    StepMemory,
-)
+from krrood_compute_hardware.jax_memory import JaxDeviceMemory
+from krrood_compute_hardware.memory import DeviceMemory, HostMemory
+
+from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.training_schedule import (
     Convergence,
@@ -514,30 +512,3 @@ class JaxPlatform(StrEnum):
     """
 
     CPU = "cpu"
-
-
-class JaxMemoryStatistic(StrEnum):
-    """
-    The entries of :meth:`jax.Device.memory_stats` that are read, each in bytes.
-    """
-
-    LIMIT = "bytes_limit"
-    IN_USE = "bytes_in_use"
-
-
-@dataclass(kw_only=True)
-class JaxDeviceMemory(DeviceMemory):
-    """
-    The memory of an accelerator jax stores arrays on.
-    """
-
-    device: jax.Device
-    """
-    The accelerator.
-    """
-
-    def free_bytes(self) -> int:
-        statistics = self.device.memory_stats()
-        return (
-            statistics[JaxMemoryStatistic.LIMIT] - statistics[JaxMemoryStatistic.IN_USE]
-        )

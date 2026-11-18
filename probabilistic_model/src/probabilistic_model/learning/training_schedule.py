@@ -15,7 +15,9 @@ import numpy as np
 from array_api_compat import array_namespace, device
 from typing_extensions import Iterator, Self
 
-from probabilistic_model.learning.device_memory import DeviceMemory, StepMemory
+from krrood_compute_hardware.memory import DeviceMemory
+
+from probabilistic_model.learning.step_memory import StepMemory
 from probabilistic_model.learning.exceptions import NotEnoughMemoryError
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (

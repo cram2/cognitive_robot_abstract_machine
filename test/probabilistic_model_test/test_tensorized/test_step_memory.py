@@ -1,12 +1,9 @@
 """
-Tests for sizing mini-batches to the free memory of a device: the memory of a device,
-the memory one training step allocates, and the batch size that fits.
+Tests for sizing mini-batches to the free memory of a device: the memory one training
+step allocates, and the batch size that fits.
 """
 
 from __future__ import annotations
-
-import os
-from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
@@ -14,12 +11,9 @@ import numpy as np
 import pytest
 from array_api_compat import array_namespace
 
-from probabilistic_model.learning.device_memory import (
-    DeviceMemory,
-    HostMemory,
-    ProbeMeasurement,
-    StepMemory,
-)
+from krrood_compute_hardware.memory import HostMemory
+
+from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
 from probabilistic_model.learning.exceptions import (
     NotEnoughMemoryError,
     UnmeasurableHostStepMemoryError,
@@ -31,6 +25,7 @@ from probabilistic_model.learning.gradient_descent import (
 )
 from probabilistic_model.learning.training_schedule import MiniBatches
 
+from ...krrood_compute_hardware_test.dataset.memory import FixedFreeMemory
 from .test_inner_layers_on_array_backends import mixture_of_products_case
 
 # %% memory of a step
@@ -64,21 +59,6 @@ def test_probes_without_more_memory_for_more_rows_measure_nothing():
 # %% batch size from free memory
 
 
-@dataclass(kw_only=True)
-class FixedFreeMemory(DeviceMemory):
-    """
-    A device with a fixed amount of free memory.
-    """
-
-    free: int
-    """
-    The bytes the device reports free.
-    """
-
-    def free_bytes(self) -> int:
-        return self.free
-
-
 def test_the_batches_fitting_in_memory_have_the_most_rows_that_fit():
     """
     The batch size is the number of rows whose step, fixed part included, fits in the
@@ -101,31 +81,6 @@ def test_no_batch_fits_when_the_fixed_part_exceeds_the_free_memory():
             memory=FixedFreeMemory(free=100),
             step_memory=StepMemory(fixed_bytes=200, bytes_per_row=10),
         )
-
-
-# %% memory of the host
-
-
-def test_the_free_host_memory_is_at_most_the_physical_memory():
-    """
-    The host reports some memory free, and never more than it has.
-    """
-    physical = os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
-
-    assert 0 < HostMemory().free_bytes() <= physical
-
-
-def test_the_peak_host_memory_records_an_allocation():
-    """
-    An array allocated after the peak was reset raises the peak.
-    """
-    memory = HostMemory()
-    memory.reset_peak()
-    before = memory.peak_bytes()
-
-    array = np.ones(2**23)
-
-    assert memory.peak_bytes() > before
 
 
 # %% memory of the trainers

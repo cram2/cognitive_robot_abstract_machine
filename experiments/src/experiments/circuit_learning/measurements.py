@@ -19,6 +19,8 @@ from random_events.interval import closed_open
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
+from krrood_compute_hardware.devices import Device
+from krrood_compute_hardware.memory import HostMemory
 from typing_extensions import Any, Callable
 
 from experiments.circuit_learning.datasets import BenchmarkDataset
@@ -36,17 +38,12 @@ from experiments.circuit_learning.rows import (
     TrainingResult,
     TruncationSpeedResult,
 )
-from experiments.circuit_learning.settings import (
-    ArrayLibrary,
-    ComputationSetting,
-    Device,
-)
+from experiments.circuit_learning.settings import ArrayLibrary, ComputationSetting
 from experiments.experiment_definitions import (
     ExperimentResult,
     MeanAndStandardDeviation,
     Unit,
 )
-from probabilistic_model.learning.device_memory import HostMemory
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )

@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood_compute_hardware"
+authors = [
+    { name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de" },
+]
+description = "The processor cores, memory and GPUs a computation runs on, and how a machine is divided among processes."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+]
+keywords = ["hardware", "memory", "gpu", "scheduling"]
+license = "LGPL-3.0-only"
+dynamic = ["version"]
+dependencies = [
+    "krrood>=26.10.0",
+    "typing_extensions",
+]
+
+[project.optional-dependencies]
+jax = [
+    "jax>=0.6.0",
+]
+torch = [
+    "torch>=2.4",
+]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood_compute_hardware*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "krrood_compute_hardware._version.__version__" }
+
+[tool.krrood.core-boundary]
+# The modules a plain `pip install krrood_compute_hardware` must be able to load; the
+# memory of jax and torch devices needs the extras of the same name.
+core = [
+    "krrood_compute_hardware._version",
+    "krrood_compute_hardware.devices",
+    "krrood_compute_hardware.exceptions",
+    "krrood_compute_hardware.machine",
+    "krrood_compute_hardware.memory",
+]
+dependencies = [
+    "krrood",
+    "typing-extensions",
+]

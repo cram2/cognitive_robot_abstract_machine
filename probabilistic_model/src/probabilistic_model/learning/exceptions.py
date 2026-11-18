@@ -71,29 +71,6 @@ class StartingCircuitVariablesMismatchError(ProbabilisticModelException, ValueEr
 
 
 @dataclass(kw_only=True)
-class MissingMemoryFieldError(ProbabilisticModelException, LookupError):
-    """
-    Exception raised when a Linux memory file lacks a field that is read from it.
-    """
-
-    memory_file: str
-    """
-    The memory file that was read.
-    """
-
-    memory_field: str
-    """
-    The memory field that was not found in it.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.memory_file} has no field {self.memory_field}."
-
-    def suggest_correction(self) -> str:
-        return "Run on a Linux kernel that reports this field."
-
-
-@dataclass(kw_only=True)
 class NotEnoughMemoryError(ProbabilisticModelException, MemoryError):
     """
     Exception raised when not even a batch of one row fits in the free memory of a

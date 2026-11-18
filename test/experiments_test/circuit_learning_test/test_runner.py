@@ -9,16 +9,17 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from krrood_compute_hardware.machine import MachineDivision
 
 from experiments.circuit_learning.datasets import (
     DatasetName,
     DatasetSplit,
     PreparedDatasets,
 )
-from experiments.circuit_learning.exceptions import NoSlotForRunError
+from experiments.circuit_learning.exceptions import NoShareForRunError
 from experiments.circuit_learning.methods import LearningMethod
 from experiments.circuit_learning.records import BenchmarkRun, RunKind
-from experiments.circuit_learning.runner import BenchmarkRunner, MachineShares
+from experiments.circuit_learning.runner import BenchmarkRunner
 from experiments.circuit_learning.settings import ComputationSetting
 
 # %% fixtures
@@ -46,7 +47,7 @@ def runner_without_graphics_processor(*, cache: Path) -> BenchmarkRunner:
         methods=list(LearningMethod),
         output=cache,
         cache_directory=cache,
-        shares=MachineShares(graphics_processor_slots=0),
+        division=MachineDivision(graphics_processor_shares=0),
     )
 
 
@@ -76,5 +77,5 @@ def test_run_without_a_share_fails(prepared_cache: Path):
         method=LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT,
         setting=ComputationSetting.reference(),
     )
-    with pytest.raises(NoSlotForRunError):
+    with pytest.raises(NoShareForRunError):
         runner_without_graphics_processor(cache=prepared_cache).run_pending(runs=[run])

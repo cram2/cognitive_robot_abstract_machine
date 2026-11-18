@@ -1,22 +1,19 @@
 """
-How much memory the device that trains a circuit has left, and how much memory one
-training step needs, so that mini-batches can be sized to fit.
+The memory of the devices arrays are stored on: how much is free, how much is in use, and
+the most that was in use at once.
 """
 
 from __future__ import annotations
 
-import math
+# %% imports
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
-from krrood.patterns.path_enumeration import PathEnumeration
 from krrood.patterns.classproperty import classproperty
+from krrood.patterns.path_enumeration import PathEnumeration
 
-from probabilistic_model.learning.exceptions import (
-    MissingMemoryFieldError,
-    UnmeasurableStepMemoryError,
-)
+from krrood_compute_hardware.exceptions import MissingMemoryFieldError
 
 # %% linux memory files
 
@@ -160,69 +157,25 @@ class HostMemory(PeakTrackingMemory):
         )
 
 
-# %% memory of a training step
+# %% memory budget
 
 
 @dataclass(kw_only=True)
-class ProbeMeasurement:
+class BudgetedMemory(DeviceMemory):
     """
-    The memory one training step needed on a batch of a given number of rows.
-    """
-
-    rows: int
-    """
-    The number of rows of the batch.
+    The memory of a device of which a process may use at most a fixed amount, since other
+    processes share the device.
     """
 
-    step_bytes: int
+    memory: DeviceMemory
     """
-    The bytes the step allocated beyond what was in use before it.
-    """
-
-
-@dataclass(kw_only=True)
-class StepMemory:
-    """
-    The memory one training step allocates beyond what is already in use, as a fixed
-    part and a part that grows with the rows of the batch.
+    The memory of the device.
     """
 
-    fixed_bytes: float
+    budget_bytes: int
     """
-    The bytes a step allocates whatever the size of its batch.
-    """
-
-    bytes_per_row: float
-    """
-    The bytes a step allocates for every row of its batch.
+    The most bytes the process may allocate.
     """
 
-    @classmethod
-    def from_two_probes(
-        cls, *, smaller: ProbeMeasurement, larger: ProbeMeasurement
-    ) -> StepMemory:
-        """
-        :param smaller: The step on the batch with fewer rows.
-        :param larger: The step on the batch with more rows.
-        :return: The line through both measurements.
-        :raises UnmeasurableStepMemoryError: If the larger batch did not need more
-            memory.
-        """
-        bytes_per_row = (larger.step_bytes - smaller.step_bytes) / (
-            larger.rows - smaller.rows
-        )
-        if bytes_per_row <= 0:
-            raise UnmeasurableStepMemoryError(
-                smaller_rows=smaller.rows, bytes_per_row=bytes_per_row
-            )
-        return cls(
-            fixed_bytes=smaller.step_bytes - bytes_per_row * smaller.rows,
-            bytes_per_row=bytes_per_row,
-        )
-
-    def rows_fitting_in(self, *, free_bytes: int) -> int:
-        """
-        :param free_bytes: The memory a step may allocate.
-        :return: The most rows a batch can have for its step to fit.
-        """
-        return math.floor((free_bytes - self.fixed_bytes) / self.bytes_per_row)
+    def free_bytes(self) -> int:
+        return min(self.memory.free_bytes(), self.budget_bytes)

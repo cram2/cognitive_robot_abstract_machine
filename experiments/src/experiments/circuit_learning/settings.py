@@ -19,9 +19,9 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
 )
 from krrood.entity_query_language.factories import a, variable_from
+from krrood_compute_hardware.devices import Device
 from typing_extensions import Any, Self
 
-from probabilistic_model.learning.device_memory import DeviceMemory
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     DenseEdgeMatrix,
     EdgeMatrix,
@@ -42,15 +42,6 @@ class ArrayLibrary(StrEnum):
     NUMPY = "numpy"
     JAX = "jax"
     TORCH = "torch"
-
-
-class Device(StrEnum):
-    """
-    The device a circuit computes on.
-    """
-
-    CPU = "cpu"
-    GPU = "gpu"
 
 
 class FloatingPointType(StrEnum):
@@ -230,27 +221,3 @@ class ComputationSetting:
         :return: The rows as an array of this setting.
         """
         return self.namespace.asarray(rows, dtype=self.dtype, device=self.device_object)
-
-
-# %% memory budget
-
-
-@dataclass(kw_only=True)
-class BudgetedMemory(DeviceMemory):
-    """
-    The memory of a device of which a run may use at most a fixed amount, since other
-    runs share the device.
-    """
-
-    memory: DeviceMemory
-    """
-    The memory of the device.
-    """
-
-    budget_bytes: int
-    """
-    The most bytes the run may allocate.
-    """
-
-    def free_bytes(self) -> int:
-        return min(self.memory.free_bytes(), self.budget_bytes)

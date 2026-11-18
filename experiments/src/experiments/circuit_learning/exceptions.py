@@ -15,7 +15,7 @@ from experiments.circuit_learning.records import BenchmarkRun
 
 
 @dataclass(kw_only=True)
-class NoSlotForRunError(DataclassException, RuntimeError):
+class NoShareForRunError(DataclassException, RuntimeError):
     """
     Exception raised when a run needs a kind of share of the machine of which the
     benchmark has none, so it could never start.

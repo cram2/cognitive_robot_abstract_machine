@@ -26,3 +26,6 @@
 
 #random_events
 /random_events/ @tomsch420
+
+# krrood_compute_hardware
+/domain_models/krrood_compute_hardware/ @tomsch420
