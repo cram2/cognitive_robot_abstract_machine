@@ -9,7 +9,6 @@ from abc import ABC, abstractmethod
 from copy import deepcopy, copy
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
-from uuid import UUID, uuid5
 
 import casadi as ca
 import numpy as np
@@ -45,10 +44,6 @@ from krrood_spatial_math.exceptions import (
     ReferenceFrameMismatchError,
     SpatialTypesError,
     XAxisNormalToPlaneError,
-)
-from krrood_spatial_math.space import (
-    EuclideanSpace2Dimensional,
-    EuclideanSpace3Dimensional,
 )
 from krrood_spatial_math.space_map import OrthogonalProjection
 
@@ -1311,115 +1306,26 @@ class RotationMatrix(
         return r_distance.angle
 
 
-# %% the x-y plane of a frame
-
-
-@dataclass(eq=False)
-class FramePlane(EuclideanSpace2Dimensional):
-    """
-    The plane through the origin of a three-dimensional frame that the frame's x- and
-    y-axes span.
-
-    A frame has three coordinate planes and this is always its x-y plane, whose normal
-    is the frame's z-axis. Any other plane is the x-y plane of another frame.
-
-    Two planes are equal when they lie in one space and hold the same points, whichever
-    frames span them. The plane of a frame in no known space is equal only to the planes
-    of that frame.
-
-    .. note::
-        Planes of two frames are compared through the constant coordinates of one
-        frame's origin and z-axis in the other frame.
-    """
-
-    frame_3_dimensional: CartesianFrame3Dimensional
-    """
-    The frame whose x- and y-axes span this plane.
-    """
-
-    @property
-    def ambient_space(self) -> EuclideanSpace3Dimensional | None:
-        """
-        The space this plane lies in, which is the space of :attr:`frame_3_dimensional`; ``None``
-        where it is not known.
-        """
-        return self.frame_3_dimensional.space
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, FramePlane):
-            return NotImplemented
-        if other.frame_3_dimensional == self.frame_3_dimensional:
-            return True
-        if self.ambient_space is None or self.ambient_space != other.ambient_space:
-            return False
-        other_origin = self.frame_3_dimensional.express_in_own_frame(
-            value=CartesianPoint3Dimensional(reference_frame=other.frame_3_dimensional)
-        )
-        other_z_axis = self.frame_3_dimensional.express_in_own_frame(
-            value=Vector3Dimensional.Z(reference_frame=other.frame_3_dimensional)
-        )
-        return bool(
-            np.isclose(other_origin.z.to_np(), 0).all()
-            and np.allclose(other_z_axis.to_np()[:2], 0)
-        )
-
-    def __hash__(self) -> int:
-        if self.ambient_space is None:
-            return hash(self.frame_3_dimensional)
-        return hash(self.ambient_space)
-
-
-@dataclass(unsafe_hash=True)
-class PlanarFrame(CartesianFrame2Dimensional[NameT]):
-    """
-    The frame on the x-y plane of a three-dimensional frame that has that frame's
-    origin, x-axis and y-axis.
-
-    The plane is always the x-y plane, never the x-z or y-z plane; a vertical plane
-    needs a three-dimensional frame whose own x-y plane it is.
-
-    Seen from the side the z-axis of :attr:`frame_3_dimensional` points to, this frame is
-    right-handed, so frames on one plane are related by a rigid change only when the
-    z-axes of their three-dimensional frames point the same way.
-    """
-
-    frame_3_dimensional: CartesianFrame3Dimensional
-    """
-    The frame whose origin, x-axis and y-axis this frame has.
-    """
-
-    @property
-    def space(self) -> FramePlane:
-        return FramePlane(self.frame_3_dimensional)
-
-    @property
-    def name(self) -> NameT:
-        return self.frame_3_dimensional.name
-
-    @property
-    def id(self) -> UUID:
-        """
-        The identifier derived from that of :attr:`frame_3_dimensional`, so the frames on the
-        plane of one frame share it.
-        """
-        return uuid5(self.frame_3_dimensional.id, type(self).__name__)
-
-
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue2Dimensional(
     SymbolicSpatialType, CoordinateRepresentation[CartesianFrame2Dimensional], ABC
 ):
     """
     A value, as a symbolic matrix, such as a point or a pose, on the x-y plane of its
-    :attr:`~SymbolicSpatialType.reference_frame`, given in the :class:`PlanarFrame` of
-    that frame.
+    :attr:`~SymbolicSpatialType.reference_frame`, given in the
+    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional`
+    on that plane.
     """
 
     @property
-    def coordinate_system(self) -> PlanarFrame | None:
+    def coordinate_system(self) -> CartesianFrame2Dimensional | None:
+        """
+        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
+        ``None`` for a value without a reference frame.
+        """
         if self.reference_frame is None:
             return None
-        return PlanarFrame(self.reference_frame)
+        return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -2122,7 +2028,7 @@ class Vector2Dimensional(
 ):
     """
     A translation within the x-y plane of its reference frame, given in the
-    :class:`PlanarFrame` of that frame.
+    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of that frame.
 
     Stored as a bare 2×1 symbolic vector ``[x, y]``, like :class:`CartesianPoint2Dimensional`.
     """
@@ -2256,7 +2162,7 @@ class CartesianPoint2Dimensional(
     Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous augmentation --
     the same convention :class:`Pose2Dimensional` uses. The point lies on its reference frame's
     own x-y plane and has no height; it relates to 3D space only through an
-    :class:`FramePlaneProjection` onto that plane, which :meth:`from_cartesian_point_3_dimensional`,
+    :class:`EmbeddedPlaneProjection` onto that plane, which :meth:`from_cartesian_point_3_dimensional`,
     :meth:`from_pose` and :meth:`to_cartesian_point_3_dimensional` apply.
     """
 
@@ -2308,7 +2214,7 @@ class CartesianPoint2Dimensional(
         plane_frame: CartesianFrame3Dimensional | None = None,
     ) -> CartesianPoint2Dimensional:
         """
-        The :meth:`FramePlaneProjection.project` of ``point`` onto the x-y plane of
+        The :meth:`EmbeddedPlaneProjection.project` of ``point`` onto the x-y plane of
         ``plane_frame``.
 
         :param point: The point to project.
@@ -2317,7 +2223,7 @@ class CartesianPoint2Dimensional(
         :return: The point on the plane directly below or above ``point``.
         """
         frame = plane_frame if plane_frame is not None else point.reference_frame
-        return FramePlaneProjection(frame).project(point)
+        return EmbeddedPlaneProjection(plane_frame=frame).project(point)
 
     @classmethod
     def from_pose(
@@ -2339,13 +2245,15 @@ class CartesianPoint2Dimensional(
         self, height: sm.ScalarData = 0
     ) -> CartesianPoint3Dimensional:
         """
-        The :meth:`FramePlaneProjection.unproject` of this point into its own reference
+        The :meth:`EmbeddedPlaneProjection.unproject` of this point into its own reference
         frame.
 
         :param height: The z-coordinate the point is placed at.
         :return: The 3D point at ``height`` above this point.
         """
-        return FramePlaneProjection(self.reference_frame).unproject(self, height)
+        return EmbeddedPlaneProjection(plane_frame=self.reference_frame).unproject(
+            self, height
+        )
 
     @classmethod
     def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
@@ -2370,7 +2278,7 @@ class CartesianPoint2Dimensional(
         .. warning::
             Between frames whose x-y planes are not parallel this is not a change of
             coordinates but a projection: the point is placed at height 0 through an
-            :class:`FramePlaneProjection`, moved, and projected onto the target plane.
+            :class:`EmbeddedPlaneProjection`, moved, and projected onto the target plane.
             The height the rotation produced is lost.
 
         :param target_frame_T_reference_frame: The transformation from this point's
@@ -2462,8 +2370,8 @@ class LineSegment3Dimensional:
         return direction
 
 
-@dataclass
-class FramePlaneProjection(
+@dataclass(kw_only=True)
+class EmbeddedPlaneProjection(
     OrthogonalProjection[
         CartesianPoint3Dimensional,
         CartesianPoint2Dimensional,
@@ -2472,9 +2380,9 @@ class FramePlaneProjection(
     ]
 ):
     """
-    The orthogonal projection of 3D space onto the x-y plane of one frame.
+    The orthogonal projection of 3D space onto the
+    :class:`~krrood_spatial_math.embedded_plane.EmbeddedPlane` of :attr:`plane_frame`.
 
-    The x-y plane is the one convention for a plane of a frame, see :class:`FramePlane`.
     A point's :meth:`projection_line` is the vertical line through it, and its
     position along that line is its height above the plane.
     """
@@ -3653,7 +3561,7 @@ class HomogeneousTransformationMatrix2Dimensional(
 ):
     """
     A 3x3 homogeneous matrix of SE(2): the rigid change from the
-    :class:`PlanarFrame` of its :attr:`~SymbolicSpatialChange.child_frame` into that of its
+    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of its :attr:`~SymbolicSpatialChange.child_frame` into that of its
     :attr:`~SymbolicSpatialType.reference_frame`, two frames on one plane.
 
     It is only a change of coordinates, never a value given in a frame: the value it
@@ -3691,16 +3599,24 @@ class HomogeneousTransformationMatrix2Dimensional(
         self[2, :] = [0, 0, 1]
 
     @property
-    def source_coordinate_system(self) -> PlanarFrame | None:
+    def source_coordinate_system(self) -> CartesianFrame2Dimensional | None:
+        """
+        The frame on the x-y plane of :attr:`~SymbolicSpatialChange.child_frame`;
+        ``None`` for a change without a child frame.
+        """
         if self.child_frame is None:
             return None
-        return PlanarFrame(self.child_frame)
+        return CartesianFrame2Dimensional(frame_3_dimensional=self.child_frame)
 
     @property
-    def target_coordinate_system(self) -> PlanarFrame | None:
+    def target_coordinate_system(self) -> CartesianFrame2Dimensional | None:
+        """
+        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
+        ``None`` for a change without a reference frame.
+        """
         if self.reference_frame is None:
             return None
-        return PlanarFrame(self.reference_frame)
+        return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
 
     # %% construction
 

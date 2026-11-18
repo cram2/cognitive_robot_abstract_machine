@@ -21,7 +21,7 @@ from krrood_spatial_math.space_map import (
 )
 from krrood_spatial_math.spatial_types import (
     CartesianPoint2Dimensional,
-    FramePlaneProjection,
+    EmbeddedPlaneProjection,
 )
 
 from .dataset.frames import NamedFrame, Room
@@ -47,7 +47,7 @@ class SpaceMapCase:
 
 
 @pytest.fixture(
-    params=[FramePlaneProjection],
+    params=[EmbeddedPlaneProjection],
     ids=lambda space_map_type: space_map_type.__name__,
 )
 def space_map_case(request: pytest.FixtureRequest) -> SpaceMapCase:
@@ -56,7 +56,7 @@ def space_map_case(request: pytest.FixtureRequest) -> SpaceMapCase:
     """
     frame = NamedFrame("plane", space=Room())
     return SpaceMapCase(
-        space_map=request.param(frame),
+        space_map=request.param(plane_frame=frame),
         target_point=CartesianPoint2Dimensional(1.5, -2.0, reference_frame=frame),
     )
 
@@ -140,7 +140,7 @@ def test_an_orthogonal_projection_is_a_space_map():
 
 
 def test_the_projection_onto_a_frames_plane_is_an_orthogonal_projection():
-    assert issubclass(FramePlaneProjection, OrthogonalProjection)
+    assert issubclass(EmbeddedPlaneProjection, OrthogonalProjection)
 
 
 def test_an_orthogonal_projection_declares_only_its_plane_and_where_points_lie_on_it():
@@ -148,7 +148,7 @@ def test_an_orthogonal_projection_declares_only_its_plane_and_where_points_lie_o
 
 
 def test_every_projection_line_of_an_orthogonal_projection_runs_along_the_plane_normal():
-    projection = FramePlaneProjection(None)
+    projection = EmbeddedPlaneProjection(plane_frame=None)
     line = projection.projection_line(CartesianPoint2Dimensional(1.0, 2.0))
 
     np.testing.assert_array_equal(

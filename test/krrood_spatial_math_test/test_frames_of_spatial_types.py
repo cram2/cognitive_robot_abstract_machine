@@ -32,7 +32,7 @@ from krrood_spatial_math.spatial_types import (
     SymbolicSpatialValue3Dimensional,
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,
-    FramePlaneProjection,
+    EmbeddedPlaneProjection,
     CartesianPoint3Dimensional,
     Line3Dimensional,
     Pose3Dimensional,
@@ -299,7 +299,7 @@ def test_a_transformation_applies_to_a_point_without_a_frame(table_frame, camera
 def test_a_point_projected_onto_another_frames_plane_is_expressed_in_that_frame(
     table_frame, shelf_frame
 ):
-    projection = FramePlaneProjection(plane_frame=shelf_frame)
+    projection = EmbeddedPlaneProjection(plane_frame=shelf_frame)
 
     point_on_shelf = projection.project(
         CartesianPoint3Dimensional(1, 2, 3, reference_frame=table_frame)

@@ -9,6 +9,7 @@ from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.vector import VectorT, MetricVector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.coordinate_system import (
+    CartesianFrame,
     CoordinateSystemT,
     CoordinateT,
     RigidCoordinateChange,
@@ -19,6 +20,7 @@ from krrood_spatial_math.exceptions import (
     ReferenceFrameMismatchError,
     XAxisNormalToPlaneError,
 )
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.space import EuclideanSpace2Dimensional
 from krrood_spatial_math.spatial_types import (
     SymbolicSpatialValue3Dimensional,
@@ -28,8 +30,6 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Pose3Dimensional,
     Pose2Dimensional,
-    FramePlane,
-    PlanarFrame,
     Vector2Dimensional,
 )
 
@@ -95,66 +95,46 @@ def coordinates(*values: sm.Scalar) -> np.ndarray:
 
 
 def test_a_frames_xy_plane_is_a_two_dimensional_euclidean_space():
-    assert issubclass(FramePlane, EuclideanSpace2Dimensional)
+    assert issubclass(EmbeddedPlane, EuclideanSpace2Dimensional)
 
 
-def test_a_plane_lies_in_the_space_of_its_frame(floor_frame, room):
-    assert FramePlane(floor_frame).ambient_space is room
+def test_the_planes_of_one_frame_are_one_plane(floor_frame):
+    plane = EmbeddedPlane(frame_3_dimensional=floor_frame)
+    plane_copy = EmbeddedPlane(frame_3_dimensional=floor_frame)
+
+    assert plane == plane_copy
+    assert hash(plane) == hash(plane_copy)
 
 
-def test_a_frame_moved_within_a_plane_spans_that_plane(floor_frame, robot_base_frame):
-    assert FramePlane(robot_base_frame) == FramePlane(floor_frame)
-
-
-def test_a_frame_turned_upside_down_spans_the_same_plane(
-    floor_frame, upside_down_frame
-):
-    assert FramePlane(upside_down_frame) == FramePlane(floor_frame)
-
-
-def test_a_frame_lifted_off_a_plane_spans_another_plane(floor_frame, shelf_frame):
-    assert FramePlane(shelf_frame) != FramePlane(floor_frame)
-
-
-def test_a_tilted_frame_spans_another_plane(floor_frame, wall_frame):
-    assert FramePlane(wall_frame) != FramePlane(floor_frame)
-
-
-def test_frames_in_no_known_space_share_a_plane_only_with_themselves(
-    table_frame, camera_frame
-):
-    assert FramePlane(table_frame) == FramePlane(table_frame)
-    assert FramePlane(table_frame) != FramePlane(camera_frame)
-
-
-def test_frames_in_different_spaces_span_different_planes(floor_frame):
-    other_floor_frame = NamedFrame("other floor", space=Room())
-
-    assert FramePlane(other_floor_frame) != FramePlane(floor_frame)
-
-
-def test_equal_planes_hash_alike(floor_frame, robot_base_frame):
-    assert hash(FramePlane(robot_base_frame)) == hash(FramePlane(floor_frame))
+def test_the_planes_of_two_frames_are_two_planes(floor_frame, robot_base_frame):
+    assert EmbeddedPlane(frame_3_dimensional=robot_base_frame) != EmbeddedPlane(
+        frame_3_dimensional=floor_frame
+    )
 
 
 # %% the frame a plane's values are given in
 
 
-def test_a_plane_frame_is_a_two_dimensional_cartesian_frame():
-    assert issubclass(PlanarFrame, CartesianFrame2Dimensional)
+def test_a_plane_frame_is_a_cartesian_frame():
+    assert issubclass(CartesianFrame2Dimensional, CartesianFrame)
 
 
 def test_a_plane_frame_lies_on_the_xy_plane_of_its_frame(floor_frame):
-    assert PlanarFrame(floor_frame).space == FramePlane(floor_frame)
+    assert CartesianFrame2Dimensional(
+        frame_3_dimensional=floor_frame
+    ).space == EmbeddedPlane(frame_3_dimensional=floor_frame)
 
 
 def test_a_plane_frame_is_called_like_its_frame(floor_frame):
-    assert PlanarFrame(floor_frame).name == floor_frame.name
+    assert (
+        CartesianFrame2Dimensional(frame_3_dimensional=floor_frame).name
+        == floor_frame.name
+    )
 
 
 def test_the_plane_frames_of_one_frame_are_one_frame(floor_frame):
-    plane_frame = PlanarFrame(floor_frame)
-    plane_frame_copy = PlanarFrame(floor_frame)
+    plane_frame = CartesianFrame2Dimensional(frame_3_dimensional=floor_frame)
+    plane_frame_copy = CartesianFrame2Dimensional(frame_3_dimensional=floor_frame)
 
     assert plane_frame == plane_frame_copy
     assert plane_frame.id == plane_frame_copy.id
@@ -164,15 +144,17 @@ def test_the_plane_frames_of_one_frame_are_one_frame(floor_frame):
 def test_the_plane_frames_of_two_frames_on_one_plane_are_two_frames(
     floor_frame, robot_base_frame
 ):
-    plane_frame = PlanarFrame(floor_frame)
-    other_plane_frame = PlanarFrame(robot_base_frame)
+    plane_frame = CartesianFrame2Dimensional(frame_3_dimensional=floor_frame)
+    other_plane_frame = CartesianFrame2Dimensional(frame_3_dimensional=robot_base_frame)
 
     assert plane_frame != other_plane_frame
     assert plane_frame.id != other_plane_frame.id
 
 
 def test_a_plane_frame_is_told_apart_from_its_frame(floor_frame):
-    assert PlanarFrame(floor_frame).id != floor_frame.id
+    assert (
+        CartesianFrame2Dimensional(frame_3_dimensional=floor_frame).id != floor_frame.id
+    )
 
 
 # %% values on a frame's plane
@@ -186,7 +168,9 @@ def test_a_planar_value_is_given_in_the_frame_on_its_reference_frames_plane(
 ):
     value = planar_value(reference_frame=floor_frame)
 
-    assert value.coordinate_system == PlanarFrame(floor_frame)
+    assert value.coordinate_system == CartesianFrame2Dimensional(
+        frame_3_dimensional=floor_frame
+    )
 
 
 @pytest.mark.parametrize("planar_value", planar_values)
@@ -331,7 +315,10 @@ def test_a_planar_transformation_changes_between_the_plane_frames_of_its_frames(
     assert (
         floor_T_robot_base.source_coordinate_system,
         floor_T_robot_base.target_coordinate_system,
-    ) == (PlanarFrame(robot_base_frame), PlanarFrame(floor_frame))
+    ) == (
+        CartesianFrame2Dimensional(frame_3_dimensional=robot_base_frame),
+        CartesianFrame2Dimensional(frame_3_dimensional=floor_frame),
+    )
 
 
 def test_a_planar_transformation_without_frames_has_no_coordinate_systems():

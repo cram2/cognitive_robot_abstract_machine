@@ -6,7 +6,7 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.spatial_types import (
-    FramePlaneProjection,
+    EmbeddedPlaneProjection,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
@@ -61,7 +61,7 @@ class TestCartesianPoint2DimensionalToPoint3:
         assert unprojected.reference_frame is frame
         np.testing.assert_allclose(
             unprojected.to_np(),
-            FramePlaneProjection(frame)
+            EmbeddedPlaneProjection(plane_frame=frame)
             .unproject(point, position_along_line=5.0)
             .to_np(),
         )
@@ -71,7 +71,7 @@ class TestCartesianPoint2DimensionalToPoint3:
 
         np.testing.assert_allclose(
             point.to_cartesian_point_3_dimensional().to_np(),
-            FramePlaneProjection(None).unproject(point).to_np(),
+            EmbeddedPlaneProjection(plane_frame=None).unproject(point).to_np(),
         )
 
 
@@ -84,7 +84,8 @@ class TestCartesianPoint2DimensionalFromPoint3:
 
         assert projected.reference_frame is frame
         np.testing.assert_allclose(
-            projected.to_np(), FramePlaneProjection(frame).project(point).to_np()
+            projected.to_np(),
+            EmbeddedPlaneProjection(plane_frame=frame).project(point).to_np(),
         )
 
 
@@ -100,7 +101,7 @@ class TestCartesianPoint2DimensionalFromPose:
         assert projected.reference_frame is frame
         np.testing.assert_allclose(
             projected.to_np(),
-            FramePlaneProjection(frame).project(pose.position).to_np(),
+            EmbeddedPlaneProjection(plane_frame=frame).project(pose.position).to_np(),
         )
 
 

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from krrood_spatial_math.spatial_types import (
-    FramePlaneProjection,
+    EmbeddedPlaneProjection,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
@@ -67,7 +67,7 @@ class TestCartesianPoint2DimensionalFromPoint3InWorld:
         assert projected.reference_frame is root
         np.testing.assert_allclose(
             projected.to_np(),
-            FramePlaneProjection(root).project(point).to_np(),
+            EmbeddedPlaneProjection(plane_frame=root).project(point).to_np(),
             atol=1e-12,
         )
 
@@ -82,7 +82,7 @@ class TestCartesianPoint2DimensionalFromPoseInWorld:
         assert projected.reference_frame is root
         np.testing.assert_allclose(
             projected.to_np(),
-            FramePlaneProjection(root).project(pose.position).to_np(),
+            EmbeddedPlaneProjection(plane_frame=root).project(pose.position).to_np(),
             atol=1e-12,
         )
 
@@ -117,7 +117,7 @@ class TestOrthogonalProjectionInWorld:
         tip_P_point = CartesianPoint3Dimensional(1, 0, 2, reference_frame=tip)
         root_P_point = tilted_world.transform(tip_P_point, root)
 
-        projected = FramePlaneProjection(root).project(tip_P_point)
+        projected = EmbeddedPlaneProjection(plane_frame=root).project(tip_P_point)
 
         assert projected.reference_frame is root
         np.testing.assert_allclose(

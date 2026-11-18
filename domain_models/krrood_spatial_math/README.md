@@ -24,9 +24,12 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.cartesian_frame_3_dimensional`: `CartesianFrame3Dimensional`, the right-handed
   Cartesian frame of physical space that positions and directions are expressed in,
   and how serialized values refer to one.
-- `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the right-handed
-  Cartesian frame that values on a plane, such as the x-y plane of a
-  `CartesianFrame3Dimensional`, are given in.
+- `krrood_spatial_math.embedded_plane`: `EmbeddedPlane`, a plane lying in a known
+  three-dimensional space: the x-y plane of a `CartesianFrame3Dimensional`. Every plane
+  is the x-y plane of some frame.
+- `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the
+  right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
+  with that frame's origin, x-axis and y-axis, that values on the plane are given in.
 - `krrood_spatial_math.point`: `Point`, a point of an affine space given by its
   coordinates in an affine frame, and `MetricPoint`, one given in a Cartesian frame,
   whose distance to another point its frame kind measures. Each implementation binds
@@ -46,9 +49,9 @@ coordinate system. Its base depends on `krrood` alone.
   `CartesianPoint2Dimensional`, `CartesianPoint3Dimensional`, `Vector2Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
   `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`, `Pose3Dimensional`
   and `Pose2Dimensional`, as symbolic expressions that can also hold plain numbers. The 2D values
-  lie on the x-y plane of their reference frame, a `FramePlane`, and are given in its
-  `PlanarFrame`; `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two
-  frames on one plane, and `FramePlaneProjection` the orthogonal projection onto a
+  lie on the x-y plane of their reference frame, an `EmbeddedPlane`, and are given in its
+  `CartesianFrame2Dimensional`; `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two
+  frames on one plane, and `EmbeddedPlaneProjection` the orthogonal projection onto a
   frame's plane. Values derive from `SymbolicSpatialValue3Dimensional` (or `SymbolicSpatialValue2Dimensional`)
   and changes from `SymbolicSpatialChange`; a value names the group that acts on it:
   `SpecialEuclideanGroupAction` (SE(3)), `SpecialOrthogonalGroupAction` (SO(3)) or

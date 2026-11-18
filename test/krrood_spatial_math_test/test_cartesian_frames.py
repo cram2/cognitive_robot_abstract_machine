@@ -1,5 +1,5 @@
 """
-The interfaces of Cartesian frames, and how serialized values refer to them.
+Cartesian frames, and how serialized values refer to them.
 """
 
 from __future__ import annotations
@@ -13,11 +13,9 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3DimensionalReference,
 )
 from krrood_spatial_math.coordinate_system import CartesianFrame, SpaceT
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import MissingCartesianFrame3DimensionalResolver
-from krrood_spatial_math.space import (
-    EuclideanSpace2Dimensional,
-    EuclideanSpace3Dimensional,
-)
+from krrood_spatial_math.space import EuclideanSpace3Dimensional
 
 from .dataset.frames import KnownFrames, ThingFrame
 
@@ -53,22 +51,17 @@ def test_a_frame_can_extend_an_object_named_before_it_is_identified():
     assert issubclass(ThingFrame, CartesianFrame3Dimensional)
 
 
-# %% the frame interface of a plane
-
-
-def test_a_two_dimensional_cartesian_frame_cannot_be_instantiated():
-    with pytest.raises(InterfaceInstantiationError):
-        CartesianFrame2Dimensional()
+# %% the frame on a plane
 
 
 def test_a_two_dimensional_cartesian_frame_is_a_cartesian_frame():
     assert issubclass(CartesianFrame2Dimensional, CartesianFrame)
 
 
-def test_a_two_dimensional_cartesian_frame_charts_two_dimensional_euclidean_space():
+def test_a_two_dimensional_cartesian_frame_charts_a_plane_in_three_dimensional_space():
     assert (
         CartesianFrame2Dimensional.get_type_of_generic_parameter(parameter=SpaceT)
-        is EuclideanSpace2Dimensional
+        is EmbeddedPlane
     )
 
 

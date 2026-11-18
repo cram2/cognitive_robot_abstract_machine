@@ -4,7 +4,7 @@ import pytest
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     Line3Dimensional,
-    FramePlaneProjection,
+    EmbeddedPlaneProjection,
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
@@ -23,7 +23,7 @@ class TestProject:
         frame = NamedFrame("world")
         point = CartesianPoint3Dimensional(1.5, -2.5, 3.0, reference_frame=frame)
 
-        projected = FramePlaneProjection(frame).project(point)
+        projected = EmbeddedPlaneProjection(plane_frame=frame).project(point)
 
         assert isinstance(projected, CartesianPoint2Dimensional)
         assert projected.reference_frame is frame
@@ -35,7 +35,7 @@ class TestProject:
             x=1.5, y=-2.5, z=3.0, roll=0.1, pitch=0.2, yaw=0.3, reference_frame=frame
         )
 
-        projected = FramePlaneProjection(frame).project(pose.position)
+        projected = EmbeddedPlaneProjection(plane_frame=frame).project(pose.position)
 
         np.testing.assert_allclose(projected.to_np(), [1.5, -2.5])
 
@@ -48,7 +48,7 @@ class TestUnproject:
         frame = NamedFrame("world")
         point = CartesianPoint2Dimensional(1.0, 2.0, reference_frame=frame)
 
-        unprojected = FramePlaneProjection(frame).unproject(point)
+        unprojected = EmbeddedPlaneProjection(plane_frame=frame).unproject(point)
 
         assert isinstance(unprojected, CartesianPoint3Dimensional)
         assert unprojected.reference_frame is frame
@@ -57,7 +57,7 @@ class TestUnproject:
     def test_explicit_height(self):
         point = CartesianPoint2Dimensional(1.0, 2.0)
 
-        unprojected = FramePlaneProjection(None).unproject(
+        unprojected = EmbeddedPlaneProjection(plane_frame=None).unproject(
             point, position_along_line=5.0
         )
 
@@ -76,7 +76,7 @@ class TestInverseLaws:
     def test_project_after_unproject_restores_a_point_on_the_plane(self):
         frame = NamedFrame("world")
         point = CartesianPoint2Dimensional(1.0, 2.0, reference_frame=frame)
-        projection = FramePlaneProjection(frame)
+        projection = EmbeddedPlaneProjection(plane_frame=frame)
 
         round_trip = projection.project(
             projection.unproject(point, position_along_line=4.0)
@@ -90,11 +90,11 @@ class TestInverseLaws:
         point = CartesianPoint2Dimensional(1.0, 2.0, reference_frame=other_frame)
 
         with pytest.raises(ReferenceFrameMismatchError):
-            FramePlaneProjection(frame).unproject(point)
+            EmbeddedPlaneProjection(plane_frame=frame).unproject(point)
 
     def test_unproject_after_project_restores_a_point_at_the_unprojection_height(self):
         frame = NamedFrame("world")
-        projection = FramePlaneProjection(frame)
+        projection = EmbeddedPlaneProjection(plane_frame=frame)
         point = CartesianPoint3Dimensional(1.0, 2.0, 4.0, reference_frame=frame)
 
         round_trip = projection.unproject(
@@ -105,7 +105,7 @@ class TestInverseLaws:
 
     def test_unproject_after_project_moves_a_point_off_the_unprojection_height(self):
         frame = NamedFrame("world")
-        projection = FramePlaneProjection(frame)
+        projection = EmbeddedPlaneProjection(plane_frame=frame)
         point = CartesianPoint3Dimensional(1.0, 2.0, 3.0, reference_frame=frame)
         height = 4.0
 
@@ -121,14 +121,14 @@ class TestInverseLaws:
 
 class TestPlaneWithoutReferenceFrame:
     """
-    A projection with no :attr:`FramePlaneProjection.plane_frame` relates only points
+    A projection with no :attr:`EmbeddedPlaneProjection.plane_frame` relates only points
     that have no reference frame either.
     """
 
     def test_projects_a_point_without_reference_frame(self):
         point = CartesianPoint3Dimensional(1.0, 2.0, 3.0)
 
-        projected = FramePlaneProjection(None).project(point)
+        projected = EmbeddedPlaneProjection(plane_frame=None).project(point)
 
         assert projected.reference_frame is None
         np.testing.assert_allclose(projected.to_np(), point.to_np()[:2])
@@ -139,7 +139,7 @@ class TestPlaneWithoutReferenceFrame:
         )
 
         with pytest.raises(ReferenceFrameMismatchError):
-            FramePlaneProjection(None).project(point)
+            EmbeddedPlaneProjection(plane_frame=None).project(point)
 
     def test_rejects_unprojecting_a_point_with_reference_frame(self):
         point = CartesianPoint2Dimensional(
@@ -147,13 +147,13 @@ class TestPlaneWithoutReferenceFrame:
         )
 
         with pytest.raises(ReferenceFrameMismatchError):
-            FramePlaneProjection(None).unproject(point)
+            EmbeddedPlaneProjection(plane_frame=None).unproject(point)
 
     def test_plane_with_reference_frame_rejects_projecting_a_point_without_one(self):
         frame = NamedFrame("world")
 
         with pytest.raises(ReferenceFrameMismatchError):
-            FramePlaneProjection(frame).project(
+            EmbeddedPlaneProjection(plane_frame=frame).project(
                 CartesianPoint3Dimensional(1.0, 2.0, 3.0)
             )
 
@@ -161,7 +161,9 @@ class TestPlaneWithoutReferenceFrame:
         frame = NamedFrame("world")
 
         with pytest.raises(ReferenceFrameMismatchError):
-            FramePlaneProjection(frame).unproject(CartesianPoint2Dimensional(1.0, 2.0))
+            EmbeddedPlaneProjection(plane_frame=frame).unproject(
+                CartesianPoint2Dimensional(1.0, 2.0)
+            )
 
 
 # %% projection_line
@@ -171,7 +173,7 @@ class TestProjectionLine:
     def test_is_the_vertical_line_through_the_unprojected_point(self):
         frame = NamedFrame("world")
         point = CartesianPoint2Dimensional(1.0, 2.0, reference_frame=frame)
-        projection = FramePlaneProjection(frame)
+        projection = EmbeddedPlaneProjection(plane_frame=frame)
 
         line = projection.projection_line(point)
 
@@ -187,7 +189,7 @@ class TestProjectionLine:
     def test_every_point_of_the_line_projects_onto_the_point(self):
         frame = NamedFrame("world")
         point = CartesianPoint2Dimensional(1.0, 2.0, reference_frame=frame)
-        projection = FramePlaneProjection(frame)
+        projection = EmbeddedPlaneProjection(plane_frame=frame)
         line = projection.projection_line(point)
 
         point_on_line = line.point + line.direction * 7.0

@@ -118,4 +118,7 @@ class OrthogonalProjection(
         Differs from :meth:`SpaceMap.unproject` in defaulting ``position_along_line`` to
         zero, the point on the plane itself.
         """
-        return self.embed_planar_point(point=point) + self.plane_normal * position_along_line
+        return (
+            self.embed_planar_point(point=point)
+            + self.plane_normal * position_along_line
+        )

@@ -43,7 +43,7 @@ from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.spatial_types import (
     CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
-    FramePlaneProjection,
+    EmbeddedPlaneProjection,
 )
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
@@ -376,7 +376,7 @@ class FloorPlan:
     on.
     """
 
-    projection: FramePlaneProjection
+    projection: EmbeddedPlaneProjection
     """
     The projection of 3D points onto the plane.
     """
@@ -465,7 +465,9 @@ class NavigationScene:
         """
         :return: The plane the top-down panels draw on.
         """
-        return FloorPlan(FramePlaneProjection(self.search_space.reference_frame))
+        return FloorPlan(
+            EmbeddedPlaneProjection(plane_frame=self.search_space.reference_frame)
+        )
 
     @property
     def extent(self) -> Footprint:
