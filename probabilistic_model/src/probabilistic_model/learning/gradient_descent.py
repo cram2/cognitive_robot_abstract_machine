@@ -1,7 +1,7 @@
 """
 Training the parameters of a layered circuit by gradient descent, with a loss that is a
-pure function of the parameter arrays so that :func:`jax.grad` and :func:`jax.jit`
-apply.
+pure function of the parameter arrays, on any array library that a subclass of
+:class:`GradientDescent` supports.
 """
 
 from __future__ import annotations
@@ -9,30 +9,24 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import functools
 from dataclasses import dataclass, field
-from enum import StrEnum
 
-import jax
-import jax.numpy as jnp
-import optax
 import tqdm
 import array_api_compat
 from array_api_compat import array_namespace
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import Callable, Generic, Self, TypeVar
+from typing_extensions import Generic, Self, TypeVar
 
-from probabilistic_model.learning.device_memory import (
-    DeviceMemory,
-    HostMemory,
-    ProbeMeasurement,
-    StepMemory,
-)
+from krrood_compute_resources.memory import DeviceMemory
+
+from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
+    LearningRatePlateau,
     MiniBatches,
-    MiniBatchTraining,
+    PlateauScheduledTraining,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -131,29 +125,6 @@ class CrossEntropy(Loss[LayerType]):
 # %% gradient descent
 
 
-@jax.tree_util.register_dataclass
-@dataclass
-class TrainingState:
-    """
-    The values one compiled training step reads and returns.
-    """
-
-    parameters: list[jax.Array]
-    """
-    The parameter arrays of the circuit, in the order of its ``circuit_parameters``.
-    """
-
-    optimizer_state: optax.OptState
-    """
-    The state of the optimizer after the last step.
-    """
-
-    loss: jax.Array
-    """
-    The loss of the parameters before the last step.
-    """
-
-
 @dataclass(kw_only=True)
 class TrainingRun(Generic[LayerType], SubClassSafeGeneric):
     """
@@ -173,7 +144,7 @@ class TrainingRun(Generic[LayerType], SubClassSafeGeneric):
 
 @dataclass(kw_only=True)
 class GradientDescentTraining(
-    MiniBatchTraining, Generic[LayerType], SubClassSafeGeneric, ABC
+    PlateauScheduledTraining, Generic[LayerType], SubClassSafeGeneric, ABC
 ):
     """
     Mini-batch training of the parameters of a circuit by a :class:`GradientDescent`.
@@ -227,12 +198,18 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
 
     @abstractmethod
     def start_training(
-        self, *, arguments: tuple[BackendArray, ...], mini_batches: MiniBatches
+        self,
+        *,
+        arguments: tuple[BackendArray, ...],
+        mini_batches: MiniBatches,
+        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> GradientDescentTraining[LayerType]:
         """
         :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
             per training example each.
         :param mini_batches: How the rows are split into the batches of every epoch.
+        :param learning_rate_plateau: The schedule of the learning rate, a constant
+            learning rate if ``None``.
         :return: Training that starts from the parameters of the circuit.
         """
         raise NotImplementedError
@@ -271,6 +248,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         *arguments: BackendArray,
         convergence: Convergence | None = None,
         mini_batches: MiniBatches | None = None,
+        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TrainingRun[LayerType]:
         """
         Minimize the :attr:`loss` on shuffled mini-batches, one step per batch, until
@@ -282,11 +260,14 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
             if ``None``.
         :param mini_batches: How the rows are split into the batches of every epoch,
             :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
+        :param learning_rate_plateau: The schedule of the learning rate, a constant
+            learning rate if ``None``.
         :return: The trained circuit and the losses of its epochs.
         """
         training = self.start_training(
             arguments=arguments,
             mini_batches=MiniBatches() if mini_batches is None else mini_batches,
+            learning_rate_plateau=learning_rate_plateau,
         )
         history = (
             Convergence() if convergence is None else convergence
@@ -315,187 +296,4 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
                     batch=tuple(argument[: 2 * smaller_rows] for argument in arguments)
                 ),
             ),
-        )
-
-
-@dataclass
-class JaxGradientDescent(GradientDescent[LayerType]):
-    """
-    Gradient descent with jax, one compiled step per batch.
-
-    A circuit with torch parameters is trained the same way by
-    :class:`~probabilistic_model.learning.torch_gradient_descent.TorchGradientDescent`.
-    """
-
-    optimizer: optax.GradientTransformation | None = None
-    """
-    The optimizer to use.
-
-    If `None`, the Adam optimizer with a learning rate of 1e-3 is used.
-    """
-
-    initial_parameters: list[jax.Array] = field(init=False)
-    """
-    The parameter arrays of the circuit before training.
-    """
-
-    def __post_init__(self) -> None:
-        """
-        Default the optimizer and record the parameters before training.
-        """
-        super().__post_init__()
-        if self.optimizer is None:
-            self.optimizer = optax.adam(1e-3)
-        self.initial_parameters = list(self.layer.circuit_parameters)
-
-    def loss_of_parameters(
-        self, parameters: list[jax.Array], *arguments: jax.Array
-    ) -> jax.Array:
-        """
-        :param parameters: Arrays in the order of :attr:`initial_parameters`.
-        :param arguments: The arrays passed to :meth:`minimize`.
-        :return: The :attr:`loss` of the circuit with these parameter arrays.
-        """
-        return self.loss.evaluate(
-            self.layer.copy_with_circuit_parameters(parameters), *arguments
-        )
-
-    def step(self, state: TrainingState, *arguments: jax.Array) -> TrainingState:
-        """
-        :param state: The state before the step.
-        :param arguments: The arrays passed to :meth:`minimize`.
-        :return: The state after one update of the optimizer.
-        """
-        loss, gradients = jax.value_and_grad(self.loss_of_parameters)(
-            state.parameters, *arguments
-        )
-        updates, optimizer_state = self.optimizer.update(
-            gradients, state.optimizer_state, state.parameters
-        )
-        updated = [
-            jnp.where(zero_probability, -jnp.inf, parameter)
-            for zero_probability, parameter in zip(
-                self.zero_probability_entries,
-                optax.apply_updates(state.parameters, updates),
-            )
-        ]
-        parameters = self.layer.projected_circuit_parameters(updated)
-        return TrainingState(parameters, optimizer_state, loss)
-
-    def start_training(
-        self, *, arguments: tuple[jax.Array, ...], mini_batches: MiniBatches
-    ) -> JaxGradientDescentTraining[LayerType]:
-        return JaxGradientDescentTraining(
-            arguments=arguments, mini_batches=mini_batches, gradient_descent=self
-        )
-
-    def device_memory(self) -> DeviceMemory:
-        [device] = self.initial_parameters[0].devices()
-        if device.platform == JaxPlatform.CPU:
-            return HostMemory()
-        return JaxDeviceMemory(device=device)
-
-    def probe_step_bytes(self, *, batch: tuple[jax.Array, ...]) -> int:
-        """
-        :return: The bytes the step compiled for this batch allocates, as XLA reports
-            them: its batch, its temporaries and its new state.
-        """
-        analysis = (
-            jax.jit(self.step).lower(self.initial_state(), *batch).compile()
-        ).memory_analysis()
-        return (
-            sum(argument.nbytes for argument in batch)
-            + analysis.temp_size_in_bytes
-            + analysis.output_size_in_bytes
-            - analysis.alias_size_in_bytes
-        )
-
-    def initial_state(self) -> TrainingState:
-        """
-        :return: The state before the first step: the parameters before training and a
-            fresh optimizer state.
-        """
-        return TrainingState(
-            self.initial_parameters,
-            self.optimizer.init(self.initial_parameters),
-            jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
-        )
-
-
-# %% training on mini-batches
-
-
-@dataclass(kw_only=True)
-class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
-    """
-    Mini-batch training by :class:`JaxGradientDescent`, one compiled step per batch.
-    """
-
-    gradient_descent: JaxGradientDescent[LayerType]
-    """
-    The gradient descent whose steps are taken.
-    """
-
-    compiled_step: Callable[..., TrainingState] = field(init=False)
-    """
-    :meth:`JaxGradientDescent.step`, compiled once for every shape of batch.
-    """
-
-    state: TrainingState = field(init=False)
-    """
-    The state after the last step.
-    """
-
-    def __post_init__(self) -> None:
-        """
-        Compile the step and start from the state before training.
-        """
-        self.compiled_step = jax.jit(self.gradient_descent.step)
-        self.state = self.gradient_descent.initial_state()
-
-    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> float:
-        self.state = self.compiled_step(self.state, *batch)
-        return float(self.state.loss)
-
-    def trained_root(self) -> LayerType:
-        return self.gradient_descent.layer.copy_with_circuit_parameters(
-            self.state.parameters
-        )
-
-
-# %% device memory
-
-
-class JaxPlatform(StrEnum):
-    """
-    The platforms of jax devices that are told apart.
-    """
-
-    CPU = "cpu"
-
-
-class JaxMemoryStatistic(StrEnum):
-    """
-    The entries of :meth:`jax.Device.memory_stats` that are read, each in bytes.
-    """
-
-    LIMIT = "bytes_limit"
-    IN_USE = "bytes_in_use"
-
-
-@dataclass(kw_only=True)
-class JaxDeviceMemory(DeviceMemory):
-    """
-    The memory of an accelerator jax stores arrays on.
-    """
-
-    device: jax.Device
-    """
-    The accelerator.
-    """
-
-    def free_bytes(self) -> int:
-        statistics = self.device.memory_stats()
-        return (
-            statistics[JaxMemoryStatistic.LIMIT] - statistics[JaxMemoryStatistic.IN_USE]
         )

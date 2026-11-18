@@ -14,13 +14,7 @@ from cramph.data_types import LifeCycleValues
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.exceptions import WorldStateArrayReplacedError
-from giskardpy.motion_statechart.graph_node import (
-    DebugExpression,
-    MotionStatechartNode,
-)
-from giskardpy.motion_statechart.plotters.debug_expression_trajectory_plotter import (
-    DebugExpressionTrajectoryPlotter,
-)
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.exceptions import EmptyProblemException
 from giskardpy.qp.qp_controller import QPController
@@ -284,43 +278,3 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
             return
         trajectory.adopt_world_model_of(state)
         trajectory.append(state, executor.time)
-
-
-@dataclass(kw_only=True)
-class DebugExpressionRecording(TickingExecutorExtension):
-    """
-    Records the value of every debug expression of the statechart after every tick.
-
-    .. note:: List it after :class:`MotionControl`, so its values belong to the same
-        world state a :class:`WorldStateTrajectoryRecording` records for that time.
-    """
-
-    plotter: DebugExpressionTrajectoryPlotter = field(
-        default_factory=DebugExpressionTrajectoryPlotter
-    )
-    """
-    Holds the recorded values and plots them.
-    """
-
-    def after_compile(self, *, executor: StatechartExecutor) -> None:
-        self.plotter.reset(
-            debug_expressions=DebugExpression.collect_from(
-                statechart=executor.statechart
-            )
-        )
-        self.plotter.debug_expression_trajectory.append(time=executor.time)
-
-    def after_recompile(self, *, executor: StatechartExecutor) -> None:
-        """
-        Keeps the recorded values, unlike :meth:`after_compile`, and records the debug
-        expressions the statechart has now, see :meth:`~giskardpy.motion_statechart.debu
-        g_expression_trajectory.DebugExpressionTrajectory.follow`.
-        """
-        self.plotter.debug_expression_trajectory.follow(
-            debug_expressions=DebugExpression.collect_from(
-                statechart=executor.statechart
-            )
-        )
-
-    def after_tick(self, *, executor: StatechartExecutor) -> None:
-        self.plotter.debug_expression_trajectory.append(time=executor.time)
