@@ -11,12 +11,11 @@ import copy
 from dataclasses import dataclass
 
 import numpy as np
-import optax
 from array_api_compat import array_namespace, is_numpy_array
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Iterable, Self
+from typing_extensions import TYPE_CHECKING, Any, Iterable, Self
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.distributions import (
@@ -35,7 +34,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    JaxGradientDescent,
     Loss,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
@@ -109,6 +107,9 @@ from probabilistic_model.probabilistic_model import (
     PartialPointType,
 )
 from probabilistic_model.utils import logsumexp
+
+if TYPE_CHECKING:
+    import optax
 
 
 @dataclass
@@ -358,6 +359,9 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             log-likelihood if ``None``.
         :return: This circuit.
         """
+        # jax is optional, see the core boundary in pyproject.toml
+        from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+
         self.root = JaxGradientDescent(
             self.root,
             AverageNegativeLogLikelihood() if loss is None else loss,
