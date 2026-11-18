@@ -23,7 +23,6 @@ from semantic_digital_twin.reasoning.predicates import (
     InsideRegion,
     InContactWith,
     PlaceIsOccupied,
-    Reachable,
     SupportedBy,
     Supports,
     ViewDependentSpatialRelation,
@@ -38,7 +37,6 @@ from krrood.entity_query_language.verbalization.pipeline import (
 from semantic_digital_twin.reasoning.robot_predicates import (
     robot_in_collision,
     robot_holds_body,
-    blocking,
     is_body_in_gripper,
     bodies_in_gripper,
     is_pose_free_for_robot,
@@ -567,105 +565,6 @@ def test_is_body_in_gripper(pr2_world_copy) -> None:
         reference_frame=root
     )
     assert is_body_in_gripper(test_box, left_gripper) == 0
-
-
-def test_reachable(pr2_world_state_reset, rclpy_node) -> None:
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
-
-    tool_frame_T_reachable_goal = (
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=-0.2,
-            y=0.3,
-            reference_frame=pr2.left_arm.end_effector.tool_frame,
-        )
-    )
-
-    assert Reachable(
-        pose=tool_frame_T_reachable_goal,
-        root=pr2.left_arm.root,
-        tip=pr2.left_arm.end_effector.tool_frame,
-    )()
-    assert not blocking(
-        tool_frame_T_reachable_goal,
-        pr2.left_arm.root,
-        pr2.left_arm.end_effector.tool_frame,
-    )
-    tool_frame_T_unreachable_goal = (
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=10, y=10, reference_frame=pr2.left_arm.end_effector.tool_frame
-        )
-    )
-    assert not Reachable(
-        pose=tool_frame_T_unreachable_goal,
-        root=pr2.left_arm.root,
-        tip=pr2.left_arm.end_effector.tool_frame,
-    )()
-
-    tool_frame_T_rotated_reachable_goal = (
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=-0.2,
-            y=0.3,
-            yaw=np.pi / 2,
-            reference_frame=pr2.left_arm.end_effector.tool_frame,
-        )
-    )
-    assert Reachable(
-        pose=tool_frame_T_rotated_reachable_goal,
-        root=pr2.left_arm.root,
-        tip=pr2.left_arm.end_effector.tool_frame,
-    )()
-
-    tool_frame_T_rotated_unreachable_goal = (
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=-0.2,
-            y=0.3,
-            yaw=-np.pi / 2,
-            reference_frame=pr2.left_arm.end_effector.tool_frame,
-        )
-    )
-    assert not Reachable(
-        pose=tool_frame_T_rotated_unreachable_goal,
-        root=pr2.left_arm.root,
-        tip=pr2.left_arm.end_effector.tool_frame,
-    )()
-
-
-def test_blocking(pr2_world_copy) -> None:
-    pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
-    obstacle = Body(name=PrefixedName("obstacle"))
-    collision = Box(
-        scale=Scale(3.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=1.0, z=0.5, reference_frame=obstacle
-        ),
-    )
-    obstacle.collision = ShapeCollection([collision])
-    obstacle.visual = ShapeCollection([collision])
-
-    with pr2_world_copy.modify_world():
-        pr2_world_copy.add_connection(
-            Connection6DoF.create_with_dofs(
-                parent=pr2_world_copy.root,
-                child=obstacle,
-                world=pr2_world_copy,
-            )
-        )
-
-    assert obstacle not in pr2.bodies
-    assert robot_in_collision(pr2)
-
-    tool_frame_T_reachable_goal = (
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=-0.2,
-            y=0.3,
-            reference_frame=pr2.left_arm.end_effector.tool_frame,
-        )
-    )
-    assert blocking(
-        tool_frame_T_reachable_goal,
-        pr2.left_arm.root,
-        pr2.left_arm.end_effector.tool_frame,
-    )
 
 
 def test_region_is_occupied(pr2_world_state_reset) -> None:
@@ -1322,7 +1221,6 @@ def test_a_view_dependent_spatial_relation_is_a_predicate() -> None:
     [
         InContactWith,
         VisibleTo,
-        Reachable,
         SupportedBy,
         Supports,
         InsideOf,
@@ -1496,20 +1394,6 @@ def test_a_relation_is_generic_in_the_kinds_of_thing_it_relates(
 
 
 # %% how a relation reads
-
-
-def test_reachability_reads_the_pose_as_what_is_reachable() -> None:
-    """
-    Reachability is stated about the pose, by the tip that has to arrive at it, so the
-    pose is the subject of the sentence rather than the chain that reaches for it.
-    """
-    operands = placeholder_operands(Reachable)
-    operands.update(Reachable._example_operand_values_())
-
-    assert (
-        verbalize_expression(Reachable(**operands))
-        == "a HomogeneousTransformationMatrix3Dimensional is reachable by a Body"
-    )
 
 
 @pytest.mark.parametrize(

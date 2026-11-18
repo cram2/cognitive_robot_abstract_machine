@@ -10,9 +10,7 @@ import trimesh.sample
 from krrood.entity_query_language.factories import (
     entity,
     variable,
-    contains,
     an,
-    the,
 )
 from krrood.entity_query_language.predicate import (
     RenderedFields,
@@ -49,9 +47,6 @@ from semantic_digital_twin.robots.robot_parts import (
 from semantic_digital_twin.semantic_annotations.mixins import TKinematicStructureEntity
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix3Dimensional,
-)
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -121,40 +116,6 @@ def robot_holds_body(robot: AbstractRobot, body: Body) -> bool:
     return any(
         [is_body_in_gripper(body, gripper) > 0.0 for gripper in grippers.evaluate()]
     )
-
-
-@symbolic_function
-def blocking(
-    pose: HomogeneousTransformationMatrix3Dimensional,
-    root: Body,
-    tip: Body,
-) -> list[ClosestPoints]:
-    """
-    Get the bodies that are blocking the robot from reaching a given position.
-
-    The blocking are all bodies that are in collision with the robot when reaching for
-    the pose.
-
-    :param pose: The pose to reach
-    :param root: The root of the kinematic chain.
-    :param tip: The threshold between the end effector and the position.
-    :return: A list of bodies the robot is in collision with when reaching for the
-        specified object or None if the pose or object is not reachable.
-    """
-    result = root._world.compute_inverse_kinematics(
-        root=root, tip=tip, target=pose, max_iterations=1000
-    )
-    with root._world.modify_world():
-        for dof, state in result.items():
-            root._world.state[dof.id].position = state
-
-    r = variable(AbstractRobot, root._world.semantic_annotations)
-    robot = the(
-        entity(r).where(
-            contains(r.bodies, tip),
-        )
-    )
-    return robot_in_collision(robot.first(), [])
 
 
 @symbolic_function

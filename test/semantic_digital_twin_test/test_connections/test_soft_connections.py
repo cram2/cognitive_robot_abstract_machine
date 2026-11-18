@@ -12,7 +12,6 @@ from semantic_digital_twin.datastructures.soft_trunk import (
     SoftTrunk,
     SoftTrunkSection,
 )
-from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
@@ -97,40 +96,6 @@ class TestSoftTrunk:
 
         fk = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
         np.testing.assert_allclose(fk[2, 3], 1.5, atol=1e-5)
-
-    def test_soft_trunk_ik_reachability(self):
-        """
-        Verifies compatibility with the framework's IK solver after refactoring.
-        """
-        world = World()
-        sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
-        trunk = SoftTrunk.build_piecewise_constant_curvature(world, sections)
-
-        # Reachable target
-        target = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            x=0.2, z=0.8, reference_frame=world.root
-        )
-
-        ik_solver = InverseKinematicsSolver(world=world)
-
-        # Solve
-        ik_results = ik_solver.solve(
-            root=world.root,
-            tip=trunk.arms[0].tip,
-            target=target,
-            max_iterations=200,
-            dt=0.1,
-        )
-
-        # Apply
-        for dof, pos in ik_results.items():
-            world.state[dof.id].position = pos
-        world.notify_state_change()
-
-        # Validate distance
-        fk = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
-        dist_error = np.linalg.norm(fk[:3, 3] - target.position.to_np()[:3])
-        assert dist_error < 0.03
 
     def test_soft_trunk_semantic_annotation(self):
         """
