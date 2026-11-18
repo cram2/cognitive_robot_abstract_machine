@@ -12,14 +12,24 @@ import os
 import sys
 import types
 from dataclasses import Field
-from dataclasses import fields, MISSING
+from dataclasses import dataclass, field, fields, MISSING
 from functools import lru_cache
 from importlib.util import resolve_name
 from inspect import isclass
 from os import PathLike
 from os.path import dirname
 from pathlib import Path
-from typing_extensions import Iterator, get_origin, get_args, Generic, Hashable, Any
+from typing_extensions import (
+    Iterator,
+    Literal,
+    Mapping,
+    overload,
+    get_origin,
+    get_args,
+    Generic,
+    Hashable,
+    Any,
+)
 
 from typing_extensions import TypeVar, Callable, TypeVarTuple, _SpecialForm
 
@@ -452,6 +462,34 @@ def ensure_hashable(obj) -> Hashable:
     return obj
 
 
+@overload
+def get_scope_from_imports(
+    file_path: str | None = None,
+    tree: ast.AST | None = None,
+    package_name: str | None = None,
+    source: str | None = None,
+    *,
+    defers_type_checking_imports: Literal[False] = False,
+) -> dict[str, Any]:
+    """
+    The imports of the file or tree, all run.
+    """
+
+
+@overload
+def get_scope_from_imports(
+    file_path: str | None = None,
+    tree: ast.AST | None = None,
+    package_name: str | None = None,
+    source: str | None = None,
+    *,
+    defers_type_checking_imports: Literal[True],
+) -> DeferredImportScope:
+    """
+    The imports of the file or tree, those under ``TYPE_CHECKING`` deferred.
+    """
+
+
 def get_scope_from_imports(
     file_path: str | None = None,
     tree: ast.AST | None = None,
@@ -459,7 +497,7 @@ def get_scope_from_imports(
     source: str | None = None,
     *,
     defers_type_checking_imports: bool = False,
-) -> dict[str, Any]:
+) -> dict[str, Any] | DeferredImportScope:
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
 
@@ -472,11 +510,10 @@ def get_scope_from_imports(
     :param source: The source code to extract imports from. If provided, file_path and
         tree are ignored.
     :param defers_type_checking_imports: Whether an import in an ``if TYPE_CHECKING:``
-        block runs only when one of the names it binds is first looked up in the
-        returned :class:`DeferredImportScope`, so a module nothing asks for is never
-        loaded.
+        block waits until a name it binds is first looked up, so a module nothing asks
+        for is never loaded.
     :return: A dictionary representing the scope with imported modules and their
-        attributes.
+        attributes, or the :class:`DeferredImportScope` when imports are deferred.
     """
     if tree is None and file_path is None and source is None:
         raise SourceDataNotProvided(file_path=file_path, tree=tree, source_code=source)
@@ -491,15 +528,52 @@ def get_scope_from_imports(
         else ast.parse(source, filename=file_path)
     )
 
-    scope = DeferredImportScope()
+    if defers_type_checking_imports:
+        deferred_scope = DeferredImportScope()
+        bind_imports(
+            parsed_tree=parsed_tree,
+            file_path=file_path,
+            package_name=package_name,
+            scope=deferred_scope.bound_names,
+            deferred_scope=deferred_scope,
+        )
+        return deferred_scope
+    scope: dict[str, Any] = {}
+    bind_imports(
+        parsed_tree=parsed_tree,
+        file_path=file_path,
+        package_name=package_name,
+        scope=scope,
+    )
+    return scope
+
+
+def bind_imports(
+    *,
+    parsed_tree: ast.AST,
+    file_path: str | None,
+    package_name: str | None,
+    scope: dict[str, Any],
+    deferred_scope: DeferredImportScope | None = None,
+) -> None:
+    """
+    Run the module-level imports of a tree and bind the names they import in a scope.
+
+    :param parsed_tree: The tree whose imports run.
+    :param file_path: The file the tree was parsed from.
+    :param package_name: The package that relative imports resolve against.
+    :param scope: The scope the imported names are bound in.
+    :param deferred_scope: Where the imports in ``if TYPE_CHECKING:`` blocks wait for a
+        name they bind to be looked up. They run with the others when ``None``.
+    """
     imports_that_never_run = set(type_checking_imports(parsed_tree))
 
     for node in module_level_imports(parsed_tree):
-        if defers_type_checking_imports and node in imports_that_never_run:
-            scope.defer(
-                node=node,
-                file_path=file_path,
-                package_name=package_name,
+        if deferred_scope is not None and node in imports_that_never_run:
+            deferred_scope.deferred_imports.append(
+                DeferredImport(
+                    node=node, file_path=file_path, package_name=package_name
+                )
             )
         elif isinstance(node, ast.Import):
             _handle_import_node(
@@ -517,105 +591,121 @@ def get_scope_from_imports(
                 package_name=package_name,
             )
 
-    return scope
+
+@dataclass(kw_only=True)
+class DeferredImport:
+    """
+    An import statement held back until a name it binds is looked up.
+    """
+
+    node: ast.Import | ast.ImportFrom
+    """
+    The import statement.
+    """
+
+    file_path: str | None
+    """
+    The file the statement was found in.
+    """
+
+    package_name: str | None
+    """
+    The package that a relative import resolves against.
+    """
+
+    def binds(self, *, name: str) -> bool:
+        """
+        :return: Whether the statement binds *name*; a star import may bind any.
+        """
+        return any(
+            alias.name == "*" or (alias.asname or alias.name) == name
+            for alias in self.node.names
+        )
 
 
-class DeferredImportScope(dict[str, Any]):
+@dataclass(kw_only=True)
+class DeferredImportScope(Mapping[str, Any]):
     """
     A scope whose deferred import statements run when a name they bind is first looked
     up.
     """
 
-    def __init__(self) -> None:
-        """
-        An empty scope with no deferred statements.
-        """
-        super().__init__()
-        self.deferred_imports: list[
-            tuple[ast.Import | ast.ImportFrom, str | None, str | None]
-        ] = []
-        """
-        The deferred statements with the file and package they were found in.
-        """
+    bound_names: dict[str, Any] = field(default_factory=dict)
+    """
+    The names the statements run so far have bound.
+    """
 
-    def defer(
-        self,
-        *,
-        node: ast.Import | ast.ImportFrom,
-        file_path: str | None,
-        package_name: str | None,
-    ) -> None:
-        """
-        Hold *node* back until a name it binds is looked up.
-        """
-        self.deferred_imports.append((node, file_path, package_name))
+    deferred_imports: list[DeferredImport] = field(default_factory=list)
+    """
+    The statements that have not run yet.
+    """
 
     def run_deferred_imports_binding(self, *, name: str) -> None:
         """
         Run the deferred statements that bind *name*, each at most once.
         """
         binding = [
-            deferred
-            for deferred in self.deferred_imports
-            if any(
-                alias.name == "*" or (alias.asname or alias.name) == name
-                for alias in deferred[0].names
-            )
+            deferred for deferred in self.deferred_imports if deferred.binds(name=name)
         ]
         for deferred in binding:
             self.deferred_imports.remove(deferred)
-            node, file_path, package_name = deferred
-            if isinstance(node, ast.Import):
+            if isinstance(deferred.node, ast.Import):
                 _handle_import_node(
-                    node=node,
-                    scope=self,
-                    file_path=file_path,
-                    package_name=package_name,
+                    node=deferred.node,
+                    scope=self.bound_names,
+                    file_path=deferred.file_path,
+                    package_name=deferred.package_name,
                     skips_unimportable_module=True,
                 )
             else:
                 _handle_import_from_node(
-                    node=node,
-                    scope=self,
-                    file_path=file_path,
-                    package_name=package_name,
+                    node=deferred.node,
+                    scope=self.bound_names,
+                    file_path=deferred.file_path,
+                    package_name=deferred.package_name,
                 )
 
     def absorb(self, *, other: DeferredImportScope) -> None:
         """
         Take over the names *other* has bound and the statements it still defers.
         """
-        self.update(other)
+        self.bound_names.update(other.bound_names)
         self.deferred_imports.extend(
             deferred
             for deferred in other.deferred_imports
             if deferred not in self.deferred_imports
         )
 
+    def __getitem__(self, name: str) -> Any:
+        """
+        :return: The object *name* is bound to, after running the deferred statements
+            that bind it.
+        :raises KeyError: If no statement binds it.
+        """
+        if name not in self.bound_names:
+            self.run_deferred_imports_binding(name=name)
+        return self.bound_names[name]
+
     def __contains__(self, name: object) -> bool:
         """
         :return: Whether *name* is bound, after running the deferred statements that
             bind it.
         """
-        if isinstance(name, str) and not super().__contains__(name):
+        if isinstance(name, str) and name not in self.bound_names:
             self.run_deferred_imports_binding(name=name)
-        return super().__contains__(name)
+        return name in self.bound_names
 
-    def __missing__(self, name: str) -> Any:
+    def __iter__(self) -> Iterator[str]:
         """
-        :return: The object *name* is bound to by a deferred statement.
-        :raises KeyError: If no statement binds it.
+        :return: The names bound so far.
         """
-        self.run_deferred_imports_binding(name=name)
-        if not super().__contains__(name):
-            raise KeyError(name)
-        return self[name]
+        return iter(self.bound_names)
 
-    def get(self, name: str, default: Any = None) -> Any:
+    def __len__(self) -> int:
         """
-        :return: The object *name* is bound to, or *default* when no import binds it.
+        :return: The number of names bound so far.
         """
-        return self[name] if name in self else default
+        return len(self.bound_names)
 
 
 def module_level_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]:
