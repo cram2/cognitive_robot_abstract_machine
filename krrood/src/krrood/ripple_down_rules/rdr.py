@@ -76,10 +76,8 @@ from krrood.ripple_down_rules.utils import (
 )
 from krrood.code_generation.imports import get_imports_from_types
 from krrood.source_analysis.source_extraction import extract_function_source
-from krrood.utils import (
-    get_import_path_from_path,
-    get_scope_from_imports,
-)
+from krrood.source_analysis.import_scope import get_scope_from_imports
+from krrood.utils import get_import_path_from_path
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
