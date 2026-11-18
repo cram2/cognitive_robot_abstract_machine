@@ -10,6 +10,7 @@ from __future__ import annotations
 
 # %% imports
 import argparse
+import dataclasses
 import functools
 import json
 import os
@@ -29,6 +30,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 
 from experiments.circuit_learning.database import BenchmarkDatabase
 from experiments.circuit_learning.datasets import DatasetName, PreparedDatasets
+from experiments.circuit_learning.exceptions import NoSlotForRunError
 from experiments.circuit_learning.measurements import (
     QueryMeasurement,
     TrainingMeasurement,
@@ -66,6 +68,27 @@ class ThreadVariable(StrEnum):
     MKL = "MKL_NUM_THREADS"
 
 
+class AcceleratorVariable(StrEnum):
+    """
+    The environment variables that configure how a run uses the GPU.
+    """
+
+    XLA_PREALLOCATION = "XLA_PYTHON_CLIENT_PREALLOCATE"
+    """
+    Whether jax claims most of the GPU memory when it starts.
+    """
+
+    XLA_FLAGS = "XLA_FLAGS"
+    """
+    The options of the XLA compiler.
+    """
+
+    VISIBLE_DEVICES = "CUDA_VISIBLE_DEVICES"
+    """
+    The GPUs a run sees.
+    """
+
+
 class OutputFile(StrEnum):
     """
     The files and directories of a benchmark's output directory.
@@ -100,6 +123,13 @@ class RunLimits:
     evaluating the circuit.
     """
 
+    training_timeout_factor: float = 2.0
+    """
+    The multiple of :attr:`training_duration` a training run may train before it is
+    stopped, since the epoch that is running when :attr:`training_duration` passes still
+    finishes.
+    """
+
     memory_budget_bytes: int = 0
     """
     The most memory of its device a training step may allocate.
@@ -110,7 +140,10 @@ class RunLimits:
         """
         :return: The time after which a training run is stopped.
         """
-        return 2 * self.training_duration + self.evaluation_allowance
+        return (
+            self.training_timeout_factor * self.training_duration
+            + self.evaluation_allowance
+        )
 
 
 # %% one run
@@ -217,6 +250,80 @@ class Slot:
 
 
 @dataclass(kw_only=True)
+class MachineShares:
+    """
+    The division of the machine into shares that one run uses at a time.
+    """
+
+    graphics_processor_slots: int = 3
+    """
+    The number of runs that share the GPU.
+    """
+
+    processor_core_slots: int = 7
+    """
+    The number of runs that use processor cores only.
+    """
+
+    host_memory_fraction: float = 0.8
+    """
+    The fraction of the available host memory that is divided among the shares.
+    """
+
+    host_memory_limit_shares: float = 2.0
+    """
+    The number of host memory shares a run may hold before it is stopped.
+    """
+
+    graphics_processor_memory_fraction: float = 0.9
+    """
+    The fraction of the GPU memory that is divided among the GPU shares, the rest kept
+    free since the memory of a training step is only estimated.
+    """
+
+    def has_slot_for(self, *, setting: ComputationSetting) -> bool:
+        """
+        :param setting: A setting.
+        :return: Whether a share of the machine can compute in it.
+        """
+        if setting.uses_graphics_processor:
+            return self.graphics_processor_slots > 0
+        return self.processor_core_slots > 0
+
+    def slots(self) -> list[Slot]:
+        """
+        :return: The shares of the machine.
+        """
+        cores = sorted(os.sched_getaffinity(0))
+        count = self.graphics_processor_slots + self.processor_core_slots
+        per_slot = len(cores) // count
+        available = psutil.virtual_memory().available
+        host_share = int(self.host_memory_fraction * available / count)
+        graphics_processor_memory = (
+            torch.cuda.get_device_properties(0).total_memory
+            if self.graphics_processor_slots
+            else 0
+        )
+        return [
+            Slot(
+                uses_graphics_processor=index < self.graphics_processor_slots,
+                cores=set(cores[index * per_slot : (index + 1) * per_slot]),
+                memory_budget_bytes=(
+                    int(
+                        self.graphics_processor_memory_fraction
+                        * graphics_processor_memory
+                        / self.graphics_processor_slots
+                    )
+                    if index < self.graphics_processor_slots
+                    else host_share
+                ),
+                host_memory_limit_bytes=int(self.host_memory_limit_shares * host_share),
+            )
+            for index in range(count)
+        ]
+
+
+@dataclass(kw_only=True)
 class RunInProgress:
     """
     A run and the process carrying it out.
@@ -281,19 +388,14 @@ class BenchmarkRunner:
     The directory of the downloaded and prepared datasets.
     """
 
-    training_duration: timedelta = timedelta(hours=1)
+    limits: RunLimits = field(default_factory=RunLimits)
     """
-    The time after which iterative training starts no further epoch.
-    """
-
-    graphics_processor_slots: int = 3
-    """
-    The number of runs that share the GPU.
+    The limits of every run, its memory budget replaced by that of the share it runs on.
     """
 
-    processor_core_slots: int = 7
+    shares: MachineShares = field(default_factory=MachineShares)
     """
-    The number of runs that use processor cores only.
+    How the machine is divided among the runs.
     """
 
     poll_interval: timedelta = timedelta(seconds=5)
@@ -325,8 +427,9 @@ class BenchmarkRunner:
 
     def runs(self) -> list[BenchmarkRun]:
         """
-        :return: Every run in the order it is started: the training in each method's
-            first setting, the queries of those circuits, then every other setting.
+        :return: Every run in a setting the shares of the machine can compute in, in the
+            order it is started: the training in each method's first such setting, the
+            queries of those circuits, then every other setting.
         """
         methods = BenchmarkMethods()
         datasets = PreparedDatasets(cache_directory=self.cache_directory)
@@ -339,14 +442,23 @@ class BenchmarkRunner:
                 array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
             ),
         ]
+        query_settings = [
+            setting
+            for setting in query_settings
+            if self.shares.has_slot_for(setting=setting)
+        ]
         query_settings.sort(key=lambda setting: setting != ComputationSetting.host())
         for name in self.datasets:
             dataset = datasets.load(name=name)
             for method_name in self.methods:
                 method = methods.find(name=method_name)
-                if not method.supports(dataset=dataset):
+                settings = [
+                    setting
+                    for setting in method.settings()
+                    if self.shares.has_slot_for(setting=setting)
+                ]
+                if not settings or not method.supports(dataset=dataset):
                     continue
-                settings = method.settings()
                 first.append(
                     BenchmarkRun(
                         kind=RunKind.TRAINING,
@@ -392,38 +504,6 @@ class BenchmarkRunner:
             return None
         return RunStatus.SKIPPED
 
-    def slots(self) -> list[Slot]:
-        """
-        :return: The shares of the machine.
-        """
-        cores = sorted(os.sched_getaffinity(0))
-        count = self.graphics_processor_slots + self.processor_core_slots
-        per_slot = len(cores) // count
-        available = psutil.virtual_memory().available
-        host_share = int(0.8 * available / count)
-        graphics_processor_memory = (
-            torch.cuda.get_device_properties(0).total_memory
-            if self.graphics_processor_slots
-            else 0
-        )
-        return [
-            Slot(
-                uses_graphics_processor=index < self.graphics_processor_slots,
-                cores=set(cores[index * per_slot : (index + 1) * per_slot]),
-                memory_budget_bytes=(
-                    int(
-                        0.9
-                        * graphics_processor_memory
-                        / max(self.graphics_processor_slots, 1)
-                    )
-                    if index < self.graphics_processor_slots
-                    else host_share
-                ),
-                host_memory_limit_bytes=2 * host_share,
-            )
-            for index in range(count)
-        ]
-
     def log_file(self, *, run: BenchmarkRun) -> Path:
         """
         :param run: A run.
@@ -456,14 +536,13 @@ class BenchmarkRunner:
         environment = dict(os.environ)
         for variable in ThreadVariable:
             environment[variable] = str(len(slot.cores))
-        environment["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+        environment[AcceleratorVariable.XLA_PREALLOCATION] = "false"
         # autotuning makes compiling a step take minutes on large batches
-        environment["XLA_FLAGS"] = "--xla_gpu_autotune_level=0"
+        environment[AcceleratorVariable.XLA_FLAGS] = "--xla_gpu_autotune_level=0"
         if not slot.uses_graphics_processor:
-            environment["CUDA_VISIBLE_DEVICES"] = ""
-        limits = RunLimits(
-            training_duration=self.training_duration,
-            memory_budget_bytes=slot.memory_budget_bytes,
+            environment[AcceleratorVariable.VISIBLE_DEVICES] = ""
+        limits = dataclasses.replace(
+            self.limits, memory_budget_bytes=slot.memory_budget_bytes
         )
         log = self.log_file(run=run)
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -532,12 +611,19 @@ class BenchmarkRunner:
         """
         :param runs: The runs, in the order they are started; those that ended in an
             earlier start are left out.
+        :raises NoSlotForRunError: If a run is in a setting no share of the machine can
+            compute in.
         """
+        impossible = [
+            run for run in runs if not self.shares.has_slot_for(setting=run.setting)
+        ]
+        if impossible:
+            raise NoSlotForRunError(runs=impossible)
         self.finished.update(
             {record.run.key: record.status for record in self.database.run_records()}
         )
         pending = [run for run in runs if run.key not in self.finished]
-        free = self.slots()
+        free = self.shares.slots()
         running: list[RunInProgress] = []
         while pending or running:
             for current in list(running):
@@ -596,29 +682,43 @@ def main() -> None:
         type=Path,
         default=Path.home() / ".cache" / "probabilistic_model" / "benchmark",
     )
-    parser.add_argument("--training-seconds", type=float, default=3600.0)
+    default_limits = RunLimits()
+    default_shares = MachineShares()
+    parser.add_argument(
+        "--training-seconds",
+        type=float,
+        default=default_limits.training_duration.total_seconds(),
+    )
     parser.add_argument(
         "--datasets", nargs="+", default=[name.name for name in DatasetName]
     )
     parser.add_argument(
         "--methods", nargs="+", default=[name.name for name in LearningMethod]
     )
-    parser.add_argument("--graphics-processor-slots", type=int, default=3)
-    parser.add_argument("--processor-core-slots", type=int, default=7)
+    parser.add_argument(
+        "--graphics-processor-slots",
+        type=int,
+        default=default_shares.graphics_processor_slots,
+    )
+    parser.add_argument(
+        "--processor-core-slots", type=int, default=default_shares.processor_core_slots
+    )
     parser.add_argument("--first-settings-only", action="store_true")
     parser.add_argument("--run")
-    parser.add_argument("--memory-budget-bytes", type=int, default=0)
+    parser.add_argument(
+        "--memory-budget-bytes", type=int, default=default_limits.memory_budget_bytes
+    )
     arguments = parser.parse_args()
-    training_duration = timedelta(seconds=arguments.training_seconds)
+    limits = RunLimits(
+        training_duration=timedelta(seconds=arguments.training_seconds),
+        memory_budget_bytes=arguments.memory_budget_bytes,
+    )
     if Command(arguments.command) is Command.EXECUTE:
         RunExecution(
             run=from_json(json.loads(arguments.run)),
             database=BenchmarkDatabase(path=arguments.output / OutputFile.DATABASE),
             cache_directory=arguments.cache_directory,
-            limits=RunLimits(
-                training_duration=training_duration,
-                memory_budget_bytes=arguments.memory_budget_bytes,
-            ),
+            limits=limits,
         ).execute()
         return
     BenchmarkRunner(
@@ -626,9 +726,11 @@ def main() -> None:
         methods=[LearningMethod[name] for name in arguments.methods],
         output=arguments.output,
         cache_directory=arguments.cache_directory,
-        training_duration=training_duration,
-        graphics_processor_slots=arguments.graphics_processor_slots,
-        processor_core_slots=arguments.processor_core_slots,
+        limits=limits,
+        shares=MachineShares(
+            graphics_processor_slots=arguments.graphics_processor_slots,
+            processor_core_slots=arguments.processor_core_slots,
+        ),
         first_settings_only=arguments.first_settings_only,
     ).run()
 

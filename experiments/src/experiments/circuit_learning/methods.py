@@ -22,6 +22,7 @@ from experiments.circuit_learning.settings import (
     ArrayLibrary,
     BudgetedMemory,
     ComputationSetting,
+    Device,
     EdgeRepresentation,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
@@ -61,8 +62,10 @@ class LearningMethod(StrEnum):
     A learning method of the benchmark, baselines included.
     """
 
-    RAT_SPN_GRADIENT_DESCENT = "RAT-SPN, gradient descent"
-    RAT_SPN_EXPECTATION_MAXIMIZATION = "RAT-SPN, expectation maximization"
+    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT = "RAT-SPN, gradient descent"
+    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_EXPECTATION_MAXIMIZATION = (
+        "RAT-SPN, expectation maximization"
+    )
     JOINT_PROBABILITY_TREE = "joint probability tree"
 
 
@@ -108,7 +111,7 @@ class TrainingContext:
         :return: The memory of its device within :attr:`memory_budget_bytes`.
         """
         memory = (
-            JaxDeviceMemory(device=jax.devices("gpu")[0])
+            JaxDeviceMemory(device=jax.devices(Device.GPU)[0])
             if setting.uses_graphics_processor
             else HostMemory()
         )
@@ -269,7 +272,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
 
     @property
     def name(self) -> LearningMethod:
-        return LearningMethod.RAT_SPN_GRADIENT_DESCENT
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT
 
     def settings(self) -> list[ComputationSetting]:
         return ComputationSetting.grid(
@@ -334,7 +337,7 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
 
     @property
     def name(self) -> LearningMethod:
-        return LearningMethod.RAT_SPN_EXPECTATION_MAXIMIZATION
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_EXPECTATION_MAXIMIZATION
 
     def settings(self) -> list[ComputationSetting]:
         return [ComputationSetting.host()]

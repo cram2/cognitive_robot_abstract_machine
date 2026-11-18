@@ -13,6 +13,7 @@ dependencies = [
     "coraplex>=26.10.0",
     "cramph>=26.10.0",
     "giskardpy>=26.10.0",
+    "h5py",
     "krrood>=26.10.0",
     "probabilistic_model>=26.10.0",
     "psutil~=5.9.0",

@@ -187,9 +187,7 @@ class ComputationSetting:
         :return: The device as the array library names it.
         """
         if self.array_library is ArrayLibrary.JAX:
-            return jax.devices(
-                "gpu" if self.device is Device.GPU else Device.CPU.value
-            )[0]
+            return jax.devices(self.device)[0]
         if self.array_library is ArrayLibrary.TORCH:
             return torch.device("cuda" if self.device is Device.GPU else "cpu")
         return None

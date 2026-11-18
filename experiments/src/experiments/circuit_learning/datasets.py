@@ -8,6 +8,9 @@ from __future__ import annotations
 
 # %% imports
 import io
+import pickle
+import shutil
+import tarfile
 import urllib.request
 from abc import ABC, abstractmethod
 from collections import Counter
@@ -15,12 +18,14 @@ from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pandas as pd
 from random_events.set import Set
 from random_events.variable import Continuous, Symbolic, Variable
 from sklearn.datasets import fetch_openml
 from sortedcontainers import SortedSet
+from typing_extensions import Any
 
 # %% names
 
@@ -141,18 +146,22 @@ class DatasetSource(ABC):
         :return: The dataset, downloaded if it is not in the cache yet.
         """
 
-    def cached_bytes(self, *, url: str, filename: str) -> bytes:
+    def cached_file(self, *, url: str, filename: str) -> Path:
         """
         :param url: The address of the file.
         :param filename: The name of the file in the cache.
-        :return: The content of the file, downloaded on first use.
+        :return: The file in the cache, downloaded on first use; an interrupted
+            download leaves no file behind under that name.
         """
         path = self.cache_directory / filename
-        if not path.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with urllib.request.urlopen(url) as response:
-                path.write_bytes(response.read())
-        return path.read_bytes()
+        if path.exists():
+            return path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = path.with_name(f"{path.name}.partial")
+        with urllib.request.urlopen(url) as response, partial.open("wb") as file:
+            shutil.copyfileobj(response, file)
+        partial.rename(path)
+        return path
 
     @staticmethod
     def float_frame(*, values: np.ndarray) -> pd.DataFrame:
@@ -213,10 +222,10 @@ class BinaryDatasetSource(DatasetSource):
         frames = {}
         for split in BinarySplit:
             filename = f"{self.dataset}.{split}.data"
-            content = self.cached_bytes(
+            content = self.cached_file(
                 url=f"{self.repository_url}/{self.dataset}/{filename}",
                 filename=f"binary/{filename}",
-            )
+            ).read_bytes()
             values = np.loadtxt(io.BytesIO(content), delimiter=",", dtype=int)
             frames[split] = pd.DataFrame(
                 values.astype(str),
@@ -230,6 +239,48 @@ class BinaryDatasetSource(DatasetSource):
         )
 
 
+# %% pickles of old pandas versions
+
+
+class PandasModule(StrEnum):
+    """
+    The pandas modules that held the index classes.
+    """
+
+    REMOVED_INDEX = "pandas.core.index"
+    """
+    The module of the index classes in pandas before 0.20.
+    """
+
+    INDEX = "pandas.core.indexes.base"
+    """
+    The module of the index classes since pandas 0.20.
+    """
+
+
+class RemovedPandasIndex(StrEnum):
+    """
+    The index classes that pandas 2 merged into :class:`pandas.Index`.
+    """
+
+    INT64 = "Int64Index"
+    FLOAT64 = "Float64Index"
+
+
+class LegacyPandasUnpickler(pickle.Unpickler):
+    """
+    Reads a frame pickled by a pandas version before 0.20, which current pandas no
+    longer reads, by finding its index classes where current pandas keeps them.
+    """
+
+    def find_class(self, module: str, name: str) -> Any:
+        if module != PandasModule.REMOVED_INDEX:
+            return super().find_class(module, name)
+        if name in list(RemovedPandasIndex):
+            return pd.Index
+        return super().find_class(PandasModule.INDEX, name)
+
+
 # %% continuous
 
 
@@ -237,7 +288,8 @@ class BinaryDatasetSource(DatasetSource):
 class MaskedAutoregressiveFlowSource(DatasetSource, ABC):
     """
     A continuous dataset prepared as :cite:`papamakarios2017masked` prepares it, read
-    from the ``data`` directory of their archive at :attr:`archive_url`.
+    from the ``data`` directory of their archive at :attr:`archive_url`, which is
+    downloaded and unpacked once.
     """
 
     archive_url: str = "https://zenodo.org/record/1161203/files/data.tar.gz"
@@ -246,11 +298,34 @@ class MaskedAutoregressiveFlowSource(DatasetSource, ABC):
     """
 
     @property
+    def archive_directory(self) -> Path:
+        """
+        :return: The directory the archive is downloaded and unpacked in.
+        """
+        return self.cache_directory / "maf"
+
+    @property
     def data_directory(self) -> Path:
         """
-        :return: The directory the archive was unpacked into.
+        :return: The ``data`` directory of the unpacked archive.
         """
-        return self.cache_directory / "maf" / "data"
+        return self.archive_directory / "data"
+
+    def unpack_archive(self) -> None:
+        """
+        Download the archive and unpack its ``data`` directory into
+        :attr:`data_directory`, unless an earlier call did; an interrupted unpacking
+        leaves no :attr:`data_directory` behind.
+        """
+        if self.data_directory.exists():
+            return
+        archive = self.cached_file(url=self.archive_url, filename="maf/data.tar.gz")
+        unpacking = self.archive_directory / "unpacking"
+        shutil.rmtree(unpacking, ignore_errors=True)
+        with tarfile.open(archive) as file:
+            file.extractall(unpacking, filter="data")
+        (unpacking / "data").rename(self.data_directory)
+        shutil.rmtree(unpacking)
 
     @abstractmethod
     def splits(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -266,6 +341,7 @@ class MaskedAutoregressiveFlowSource(DatasetSource, ABC):
         """
 
     def load(self) -> BenchmarkDataset:
+        self.unpack_archive()
         train, validation, test = self.splits()
         return BenchmarkDataset(
             name=self.name,
@@ -342,8 +418,7 @@ class PowerSource(MaskedAutoregressiveFlowSource):
 @dataclass(kw_only=True)
 class GasSource(MaskedAutoregressiveFlowSource):
     """
-    GAS, ``datasets/gas.py`` of the paper's code, from its pickle converted to
-    ``ethylene_CO.csv``, since current pandas no longer reads that pickle.
+    GAS, ``datasets/gas.py`` of the paper's code.
     """
 
     correlation_threshold: float = 0.98
@@ -356,7 +431,8 @@ class GasSource(MaskedAutoregressiveFlowSource):
         return DatasetName.GAS
 
     def splits(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        data = pd.read_csv(self.data_directory / "gas" / "ethylene_CO.csv")
+        with (self.data_directory / "gas" / "ethylene_CO.pickle").open("rb") as file:
+            data = LegacyPandasUnpickler(file, encoding="latin1").load()
         data = data.drop(columns=["Meth", "Eth", "Time"])
         correlated = self.correlated_counts(data=data)
         while np.any(correlated > 1):
@@ -437,8 +513,7 @@ class MiniBooNESource(MaskedAutoregressiveFlowSource):
 @dataclass(kw_only=True)
 class BSDS300Source(MaskedAutoregressiveFlowSource):
     """
-    BSDS300, ``datasets/bsds300.py`` of the paper's code, from its splits converted to
-    ``train.npy``, ``validation.npy`` and ``test.npy``.
+    BSDS300, ``datasets/bsds300.py`` of the paper's code.
     """
 
     @property
@@ -446,12 +521,12 @@ class BSDS300Source(MaskedAutoregressiveFlowSource):
         return DatasetName.BSDS300
 
     def splits(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        directory = self.data_directory / "BSDS300"
-        return (
-            np.load(directory / "train.npy"),
-            np.load(directory / "validation.npy"),
-            np.load(directory / "test.npy"),
-        )
+        with h5py.File(self.data_directory / "BSDS300" / "BSDS300.hdf5", "r") as file:
+            return (
+                file[DatasetSplit.TRAIN][()],
+                file[DatasetSplit.VALIDATION][()],
+                file[DatasetSplit.TEST][()],
+            )
 
 
 # %% mixed

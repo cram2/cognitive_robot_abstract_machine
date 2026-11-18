@@ -36,7 +36,11 @@ from experiments.circuit_learning.rows import (
     TrainingResult,
     TruncationSpeedResult,
 )
-from experiments.circuit_learning.settings import ArrayLibrary, ComputationSetting
+from experiments.circuit_learning.settings import (
+    ArrayLibrary,
+    ComputationSetting,
+    Device,
+)
 from experiments.experiment_definitions import (
     ExperimentResult,
     MeanAndStandardDeviation,
@@ -222,7 +226,7 @@ class TrainingMeasurement:
         :return: The most GPU memory jax and torch held at once since the process
             started, summed.
         """
-        statistics = jax.devices("gpu")[0].memory_stats() or {}
+        statistics = jax.devices(Device.GPU)[0].memory_stats() or {}
         return int(
             statistics.get("peak_bytes_in_use", 0) + torch.cuda.max_memory_allocated()
         )
