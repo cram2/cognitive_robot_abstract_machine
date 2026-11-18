@@ -1320,6 +1320,9 @@ class FramePlane(EuclideanSpace2Dimensional):
     The plane through the origin of a three-dimensional frame that the frame's x- and
     y-axes span.
 
+    A frame has three coordinate planes and this is always its x-y plane, whose normal
+    is the frame's z-axis. Any other plane is the x-y plane of another frame.
+
     Two planes are equal when they lie in one space and hold the same points, whichever
     frames span them. The plane of a frame in no known space is equal only to the planes
     of that frame.
@@ -1371,6 +1374,9 @@ class PlanarFrame(CartesianFrame2Dimensional[NameT]):
     """
     The frame on the x-y plane of a three-dimensional frame that has that frame's
     origin, x-axis and y-axis.
+
+    The plane is always the x-y plane, never the x-z or y-z plane; a vertical plane
+    needs a three-dimensional frame whose own x-y plane it is.
 
     Seen from the side the z-axis of :attr:`frame_3_dimensional` points to, this frame is
     right-handed, so frames on one plane are related by a rigid change only when the
@@ -2468,6 +2474,7 @@ class FramePlaneProjection(
     """
     The orthogonal projection of 3D space onto the x-y plane of one frame.
 
+    The x-y plane is the one convention for a plane of a frame, see :class:`FramePlane`.
     A point's :meth:`projection_line` is the vertical line through it, and its
     position along that line is its height above the plane.
     """
