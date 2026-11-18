@@ -1,6 +1,10 @@
+"""
+Tests for pairing the root links and tip links of the interactive marker tool.
+"""
+
 import pytest
 
-from giskardpy.data_types.exceptions import UnpairedKinematicChainParametersError
+from giskardpy.exceptions import UnpairedKinematicChainParametersError
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import RootTipPair
 
 # %% pairing root links with tip links

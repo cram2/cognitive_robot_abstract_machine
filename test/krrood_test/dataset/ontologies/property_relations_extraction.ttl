@@ -1,0 +1,28 @@
+@prefix : <http://example.org/property_relations_extraction#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/property_relations_extraction> a owl:Ontology .
+
+:Person a owl:Class .
+:Place a owl:Class .
+
+# Equivalence and disjointness stated in one direction only.
+:livesIn a owl:ObjectProperty ;
+    rdfs:range :Place, :Person ;
+    owl:equivalentProperty :resides ;
+    owl:propertyDisjointWith :visits .
+:resides a owl:ObjectProperty .
+:visits a owl:ObjectProperty .
+
+# Two properties stated as the inverse of one property.
+:parentOf a owl:ObjectProperty .
+:hasParent a owl:ObjectProperty ; owl:inverseOf :parentOf .
+:childOf a owl:ObjectProperty ; owl:inverseOf :parentOf .
+
+:dominates a owl:ObjectProperty, owl:AsymmetricProperty, owl:IrreflexiveProperty .
+:sameAgeAs a owl:ObjectProperty, owl:ReflexiveProperty .
+
+# Names with acronyms, with and without underscores.
+:hasURIValue a owl:DatatypeProperty .
+:part_of_CHEBI a owl:ObjectProperty .

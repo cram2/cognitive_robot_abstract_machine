@@ -73,3 +73,31 @@ class ObjectNotSerializableError(DataclassException):
 
     def suggest_correction(self) -> str:
         return "For other types, implement a custom ObjectSourceSerializer."
+
+
+@dataclass(kw_only=True)
+class NoApplicableSourceEmitterError(DataclassException):
+    """
+    Raised when no emitter of a source-emitter family can rebuild a subject.
+    """
+
+    subject: Any
+    """
+    The object no emitter of the family applies to.
+    """
+
+    family: type
+    """
+    The family of source emitters that was searched.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No {self.family.__name__} can emit the source of "
+            f"{type(self.subject).__name__!r} object {self.subject!r}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Add a {self.family.__name__} that binds the subject's type to the family."
+        )

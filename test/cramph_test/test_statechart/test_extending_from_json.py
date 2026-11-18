@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.statechart import StatechartJSONKey
 from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
@@ -19,7 +19,7 @@ def _node_arriving_at_once(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -87,7 +87,7 @@ def test_sent_nodes_join_a_running_statechart_and_read_its_nodes(
     for _ in range(4):
         statechart_executor.tick()
     received_second = receiver.nodes[1]
-    assert received_second.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert received_second.life_cycle_state == LifeCycleValue.SUCCEEDED
     third: StatechartNode = _node_arriving_at_once("third")
     sender.add_node(node=third)
     third.start_condition = sender.nodes[1].is_succeeded
@@ -100,8 +100,8 @@ def test_sent_nodes_join_a_running_statechart_and_read_its_nodes(
 
     received_third = receiver.nodes[2]
     assert received_third.name == third.name
-    assert received_third.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert received_second.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert received_third.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert received_second.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert (
         received_third.start_condition.free_variables()[0].statechart_node
         is received_second
