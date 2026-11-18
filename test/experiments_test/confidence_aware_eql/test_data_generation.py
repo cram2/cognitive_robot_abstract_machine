@@ -1,7 +1,12 @@
+"""
+Tests of generating familiar kitchen objects from an underspecified query.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Pot
@@ -17,6 +22,8 @@ from experiments.confidence_aware_eql.feature_pipeline import (
     ObjectClass,
     extract_feature_dataframe,
 )
+
+pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
 
 # %% mass variable extraction assumption
 

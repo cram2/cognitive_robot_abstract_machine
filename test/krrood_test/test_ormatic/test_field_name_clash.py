@@ -1,3 +1,7 @@
+"""
+Tests of mapping fields whose names clash with the columns ORMatic adds.
+"""
+
 from __future__ import annotations
 import sqlalchemy
 

@@ -1,3 +1,9 @@
+"""
+Tests of storing the symbol graph in a database.
+"""
+
+from __future__ import annotations
+
 from sqlalchemy import select
 
 from krrood.symbol_graph.symbol_graph import SymbolGraph
@@ -6,7 +12,9 @@ from ..dataset.example_classes import KRROODPosition
 
 
 def test_symbol_graph_persistence(session, database):
-
+    """
+    Storing the symbol graph stores the symbols it holds, which come back unchanged.
+    """
     from ..dataset.ormatic_interface import KRROODPositionDAO
 
     p1 = KRROODPosition(x=1, y=2, z=3)

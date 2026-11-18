@@ -1,3 +1,9 @@
+"""
+Tests of mapping a field typed with an unparametrized generic class.
+"""
+
+from __future__ import annotations
+
 from sqlalchemy import select, inspect
 
 from krrood.ormatic.data_access_objects.helper import to_dao

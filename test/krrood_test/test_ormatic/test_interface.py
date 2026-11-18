@@ -1,3 +1,10 @@
+"""
+Tests of converting the example classes to data access objects and back through a
+database.
+"""
+
+from __future__ import annotations
+
 import pytest
 from sqlalchemy import select, inspect, event as sa_event
 from sqlalchemy.orm.exc import DetachedInstanceError
@@ -26,6 +33,10 @@ import uuid
 
 
 def test_position(session, database):
+    """
+    A position keeps its coordinates in its data access object and in the database, and
+    comes back equal.
+    """
     from ..dataset.ormatic_interface import KRROODPositionDAO
 
     p1 = KRROODPosition(x=1, y=2, z=3)
@@ -50,6 +61,10 @@ def test_position(session, database):
 
 
 def test_position4d(session, database):
+    """
+    A subclass of a mapped class is stored with its own field, read back through the
+    parent's table and comes back equal.
+    """
     from ..dataset.ormatic_interface import KRROODPositionDAO
 
     p4d = KRROODPosition4D(x=1.0, y=2.0, z=3.0, w=4.0)
@@ -77,6 +92,9 @@ def test_position4d(session, database):
 
 
 def test_orientation(session, database):
+    """
+    An orientation with an unset component keeps it unset through the database.
+    """
     from ..dataset.ormatic_interface import KRROODOrientationDAO
 
     o1 = KRROODOrientation(x=1.0, y=2.0, z=3.0, w=None)
@@ -103,6 +121,9 @@ def test_orientation(session, database):
 
 
 def test_pose(session, database):
+    """
+    A pose stores its position and orientation as related rows and comes back equal.
+    """
     from ..dataset.ormatic_interface import (
         KRROODOrientationDAO,
         KRROODPoseDAO,
@@ -129,6 +150,9 @@ def test_pose(session, database):
 
 
 def test_atom(session, database):
+    """
+    An enum field is stored and read back as the enum member.
+    """
     from ..dataset.ormatic_interface import AtomDAO
 
     atom = Atom(element=Element.C, type=1, charge=2.0)
@@ -146,6 +170,10 @@ def test_atom(session, database):
 
 
 def test_entity_and_derived(session, database):
+    """
+    A class with an alternative mapping, and a subclass of it, are stored under the
+    mapping's field names and come back as the original classes.
+    """
     from ..dataset.ormatic_interface import DerivedEntityDAO, EntityMappingDAO
 
     entity = Entity(name="TestEntity")
@@ -178,6 +206,10 @@ def test_entity_and_derived(session, database):
 
 
 def test_parent_and_child(session, database):
+    """
+    A mapped subclass is a row of its parent's table too, while an unmapped subclass is
+    not stored.
+    """
     from ..dataset.ormatic_interface import ChildMappedDAO, ParentDAO
 
     parent = Parent(name="TestParent")
@@ -215,6 +247,10 @@ def test_parent_and_child(session, database):
 
 
 def test_node(session, database):
+    """
+    Storing a node stores the parent it refers to, but not the siblings that only refer
+    to the same parent.
+    """
     from ..dataset.ormatic_interface import NodeDAO
 
     n1 = Node()
@@ -231,6 +267,9 @@ def test_node(session, database):
 
 
 def test_position_type_wrapper(session, database):
+    """
+    A field holding a class is stored as that class.
+    """
     from ..dataset.ormatic_interface import KRROODPositionTypeWrapperDAO
 
     wrapper = KRROODPositionTypeWrapper(position_type=KRROODPosition)
@@ -244,6 +283,9 @@ def test_position_type_wrapper(session, database):
 
 
 def test_a_collection_of_classes_survives_a_round_trip(session, database):
+    """
+    A field holding a list of classes comes back as the same classes.
+    """
     from ..dataset.ormatic_interface import KRROODPositionTypesWrapperDAO
 
     wrapper = KRROODPositionTypesWrapper(
@@ -259,6 +301,10 @@ def test_a_collection_of_classes_survives_a_round_trip(session, database):
 
 
 def test_positions(session, database):
+    """
+    A list of related objects is stored as rows of their own table, and a list of
+    strings as a column.
+    """
     from ..dataset.ormatic_interface import KRROODPositionDAO, KRROODPositionsDAO
 
     p1 = KRROODPosition(x=1, y=2, z=3)
@@ -280,6 +326,9 @@ def test_positions(session, database):
 
 
 def test_positions_with_duplicated_entry_in_list(session, database):
+    """
+    An object listed twice is stored once, with one association row per entry.
+    """
     from ..dataset.ormatic_interface import (
         KRROODPositionsDAO,
         KRROODPositionsDAO_positions_association,
@@ -302,6 +351,9 @@ def test_positions_with_duplicated_entry_in_list(session, database):
 
 
 def test_double_position_aggregator(session, database):
+    """
+    An object shared by two lists is stored once and referred to from both.
+    """
     from ..dataset.ormatic_interface import (
         DoubleKRROODPositionAggregatorDAO,
         KRROODPositionDAO,
@@ -326,6 +378,10 @@ def test_double_position_aggregator(session, database):
 
 
 def test_kinematic_chain_and_torso(session, database):
+    """
+    An object holding a list of named objects reads back as the data access object it
+    was stored as.
+    """
     from ..dataset.ormatic_interface import KRROODTorsoDAO
 
     k1 = KRROODKinematicChain(name="a")
@@ -341,6 +397,9 @@ def test_kinematic_chain_and_torso(session, database):
 
 
 def test_custom_types(session, database):
+    """
+    A field of a custom column type is stored and read back as its value.
+    """
     from ..dataset.ormatic_interface import OriginalSimulatedObjectDAO
 
     ogs = OriginalSimulatedObject(concept=KRROODBowl(), placeholder=1)
@@ -356,6 +415,10 @@ def test_custom_types(session, database):
 
 
 def test_inheriting_from_explicit_mapping(session, database):
+    """
+    A subclass of an alternatively mapped class is stored as a row of the mapping's
+    table too, and comes back equal.
+    """
     from ..dataset.ormatic_interface import DerivedEntityDAO, EntityMappingDAO
 
     entity: DerivedEntity = DerivedEntity(name="TestEntity")
@@ -376,6 +439,10 @@ def test_inheriting_from_explicit_mapping(session, database):
 
 
 def test_entity_association(session, database):
+    """
+    A field holding an alternatively mapped object refers to the mapping's row, and
+    comes back as the original object.
+    """
     from ..dataset.ormatic_interface import EntityAssociationDAO, EntityMappingDAO
 
     entity = Entity(name="TestEntity")
@@ -413,6 +480,10 @@ def test_KRROODPositionsSubclassWithAnotherKRROODPosition(session, database):
 
 
 def test_inheriting_from_inherited_class(session, database):
+    """
+    A class two levels below a mapped class is a row of every table above it, and its
+    own table holds only the field it adds.
+    """
     from ..dataset.ormatic_interface import (
         KRROODPosition4DDAO,
         KRROODPosition5DDAO,
@@ -466,6 +537,10 @@ def test_backreference_with_mapping(session, database):
 
 
 def test_alternative_mapping_aggregator(session, database):
+    """
+    An alternatively mapped object shared by two lists is stored once and comes back as
+    one object.
+    """
     from ..dataset.ormatic_interface import AlternativeMappingAggregatorDAO
 
     e1 = Entity(name="E1")
@@ -486,6 +561,10 @@ def test_alternative_mapping_aggregator(session, database):
 
 
 def test_container_item(session, database):
+    """
+    Items referring back to the container holding them come back with that container and
+    all its items.
+    """
     from ..dataset.ormatic_interface import (
         ContainerGenerationDAO,
         ItemWithBackreferenceDAO,
@@ -536,6 +615,10 @@ def test_nested_mappings(session, database):
 
 
 def test_vector_mapped(session, database):
+    """
+    A class whose mapping stores a property instead of its field comes back with the
+    property's values.
+    """
     from ..dataset.ormatic_interface import KRROODVectorsWithPropertyMappedDAO
 
     vector = KRROODVector(x=1.0)
@@ -552,6 +635,10 @@ def test_vector_mapped(session, database):
 
 
 def test_test_classes(session, database):
+    """
+    A parent and a child class with alternative mappings each come back as the original
+    class.
+    """
     from ..dataset.ormatic_interface import ChildBaseMappingDAO, ParentBaseMappingDAO
 
     parent = ParentBase(name="x", value=0)
@@ -585,6 +672,10 @@ def test_private_factories(session, database):
 
 
 def test_relationship_overloading(session, database):
+    """
+    A subclass that narrows the type of a related field stores and restores it through
+    the parent's table.
+    """
     from ..dataset.ormatic_interface import RelationshipParentDAO
 
     obj = RelationshipChild(positions=KRROODPosition(x=1, y=2, z=3))
@@ -598,12 +689,19 @@ def test_relationship_overloading(session, database):
 
 
 def test_alternative_mapping_inheritance(session, database):
+    """
+    The mapping of a subclass extends the mapping of its parent.
+    """
     from ..dataset.ormatic_interface import ChildBaseMappingDAO, ParentBaseMappingDAO
 
     assert issubclass(ChildBaseMappingDAO, ParentBaseMappingDAO)
 
 
 def test_inheritance_mapper_args(session, database):
+    """
+    A mapping inherited by a class without its own symbol still declares how SQLAlchemy
+    maps the inheritance.
+    """
     from ..dataset.ormatic_interface import (
         InheritanceBaseWithoutSymbolButAlternativelyMappedMappingDAO,
     )
@@ -612,6 +710,10 @@ def test_inheritance_mapper_args(session, database):
 
 
 def test_to_dao_alternatively_mapped_parent(session, database):
+    """
+    A normally mapped class below an alternatively mapped parent stores the parent's
+    related objects through the parent's mapping.
+    """
     from ..dataset.ormatic_interface import (
         ChildLevel2NormallyMappedDAO,
         EntityMappingDAO,
@@ -698,6 +800,9 @@ def test_callable_mapping(session, database):
 
 
 def test_uuid(session, database):
+    """
+    A UUID field is stored and read back unchanged.
+    """
     from ..dataset.ormatic_interface import UUIDWrapperDAO
 
     obj = UUIDWrapper(identification=uuid.uuid4())
@@ -710,6 +815,9 @@ def test_uuid(session, database):
 
 
 def test_list_of_custom_type(session, database):
+    """
+    A list of UUIDs is stored and read back unchanged, next to a single UUID.
+    """
     from ..dataset.ormatic_interface import UUIDWrapperDAO
 
     obj = UUIDWrapper(
@@ -726,6 +834,9 @@ def test_list_of_custom_type(session, database):
 
 
 def test_json_integration(session, database):
+    """
+    Fields holding objects serialized as JSON, alone and in a list, come back equal.
+    """
     from ..dataset.ormatic_interface import JSONWrapperDAO
 
     obj = JSONWrapper(
@@ -761,7 +872,10 @@ def test_custom_type_from_foreign_package(session, database):
 
 
 def test_many_to_many_with_same_type(session, database):
-
+    """
+    An object shared by two objects converted with one state is stored once and referred
+    to from both.
+    """
     from ..dataset.ormatic_interface import KRROODPositionDAO, KRROODPositionsDAO
 
     state = ToDataAccessObjectState()
@@ -787,6 +901,10 @@ def test_many_to_many_with_same_type(session, database):
 
 
 def test_multiple_inheritance(session, database):
+    """
+    A class with two mapped bases extends both data access objects, keeps all their
+    fields and comes back equal.
+    """
     from ..dataset.ormatic_interface import (
         MixinDAO,
         MultipleInheritanceDAO,
@@ -810,6 +928,9 @@ def test_multiple_inheritance(session, database):
 
 
 def test_list_of_enum(session, database):
+    """
+    A list of enum members comes back as the same members in the same order.
+    """
     from ..dataset.ormatic_interface import ListOfEnumDAO
 
     obj = ListOfEnum(
@@ -831,6 +952,9 @@ def test_list_of_enum(session, database):
 
 
 def test_persons(session, database):
+    """
+    A person knowing another stores the other through an association row.
+    """
     from ..dataset.ormatic_interface import PersonDAO
 
     p1 = Person(name="Alice")
@@ -856,6 +980,9 @@ def test_underspecified_types():
 
 
 def test_position_set(session, database):
+    """
+    A set of objects comes back as an equal set.
+    """
     from ..dataset.ormatic_interface import TestKRROODPositionSetDAO
 
     p1, p2 = KRROODPosition(x=1, y=2, z=3), KRROODPosition(x=2, y=3, z=4)
@@ -912,6 +1039,10 @@ def test_post_init_and_circular_reference(session, database):
 
 
 def test_polymorphic_enum(session, database):
+    """
+    Members of different subclasses of an enum are stored in one column, come back as
+    themselves and can be filtered on.
+    """
     from ..dataset.ormatic_interface import PolymorphicEnumAssociationDAO
 
     v1 = PolymorphicEnumAssociation(value=ChildEnum1.A)
@@ -940,7 +1071,10 @@ def test_polymorphic_enum(session, database):
 
 
 def test_generic_class(session, database):
-
+    """
+    Each parametrization of a generic class gets its own data access object extending
+    the generic one, and objects of any parametrization come back equal.
+    """
     from ..dataset.ormatic_interface import (
         GenericClassAssociationDAO,
         GenericClassAssociationDAO_associated_value_list_association,
@@ -1029,6 +1163,9 @@ def test_shared_parametrization_resolves_the_same_whichever_field_reaches_it_fir
 
 
 def test_consistent_hashes_of_association_object_table_names():
+    """
+    The table of an association is named by a hash that stays the same across runs.
+    """
     from ..dataset.ormatic_interface import PersonDAO_knows_association
 
     assert (
@@ -1038,7 +1175,9 @@ def test_consistent_hashes_of_association_object_table_names():
 
 
 def test_class_dependencies(session, database):
-
+    """
+    Reading an object back records which of its mappings had to be built before which.
+    """
     from ..dataset.ormatic_interface import EntryPointMappingDAO
 
     b1 = BuildFirst(value="a")
@@ -1069,6 +1208,9 @@ def test_class_dependencies(session, database):
 
 
 def test_path_custom_type(session, database):
+    """
+    A path field comes back as an equal path.
+    """
     from ..dataset.ormatic_interface import PathAssociationDAO
 
     path = PathAssociation(path=Path.home())
@@ -1084,6 +1226,9 @@ def test_path_custom_type(session, database):
 
 
 def test_duration_keeps_sub_second_resolution(session, database):
+    """
+    A duration keeps its microseconds through the database.
+    """
     from ..dataset.ormatic_interface import DurationAssociationDAO
 
     duration = DurationAssociation(duration=timedelta(seconds=3, microseconds=12500))

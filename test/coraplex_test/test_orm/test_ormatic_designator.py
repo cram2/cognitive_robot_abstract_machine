@@ -10,7 +10,6 @@ from krrood.ormatic.data_access_objects.helper import (
 )
 from sqlalchemy import select
 from krrood.ormatic.exceptions import QueryCannotBePersisted
-from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndPickUpAction,
@@ -26,6 +25,8 @@ from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import context_of, simulated_executor, statechart_of
 from cramph.context import ContextExtension
+
+pytestmark = pytest.mark.usefixtures("coraplex_orm_mappers")
 
 
 @pytest.fixture()

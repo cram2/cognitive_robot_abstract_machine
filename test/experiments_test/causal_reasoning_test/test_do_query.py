@@ -7,7 +7,6 @@ module keeps running in CI without network access.
 
 from __future__ import annotations
 
-import experiments.orm.ormatic_interface  # type: ignore  # noqa: F401
 import numpy as np
 import pytest
 from krrood.entity_query_language.factories import variable
@@ -29,6 +28,8 @@ from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisMolecule,
     MutagenesisMoleculeAggregations,
 )
+
+pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
 
 
 @pytest.fixture(scope="module")

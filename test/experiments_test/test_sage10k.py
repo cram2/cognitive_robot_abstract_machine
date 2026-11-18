@@ -7,7 +7,6 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
-import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from semantic_digital_twin.specifications.connections import (
@@ -30,6 +29,8 @@ from coraplex.plans.executors import PlanExecutor
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from ..plan_running import run_plan
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+
+pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
 
 
 @pytest.fixture

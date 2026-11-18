@@ -1,6 +1,11 @@
+"""
+Tests of extracting features from spatial types and their data access objects.
+"""
+
+from __future__ import annotations
+
 import pytest
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.symbolic_math.symbolic_math import FloatVariable
@@ -14,6 +19,8 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world_description.inertial_properties import Inertial
+
+pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
 
 
 def feature_names(extractor: FeatureExtractor) -> list[str]:

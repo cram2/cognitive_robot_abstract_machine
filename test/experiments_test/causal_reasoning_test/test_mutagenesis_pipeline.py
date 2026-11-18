@@ -13,7 +13,6 @@ skipping there.
 
 from __future__ import annotations
 
-import experiments.orm.ormatic_interface  # type: ignore  # noqa: F401
 import numpy as np
 import pytest
 from random_events.product_algebra import SimpleEvent
@@ -33,6 +32,8 @@ from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
+
+pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
 
 CHLORINE_COUNT_VARIABLE_NAME = "MutagenesisMoleculeAggregations.chlorine_count()"
 MUTAGENIC_VARIABLE_NAME = "MutagenesisMolecule.mutagenic"

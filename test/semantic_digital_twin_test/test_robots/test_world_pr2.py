@@ -1,3 +1,9 @@
+"""
+Tests of the PR2's kinematics, control commands and semantic annotations.
+"""
+
+from __future__ import annotations
+
 from collections import defaultdict
 
 import numpy as np
@@ -9,7 +15,6 @@ from semantic_digital_twin.exceptions import (
     DuplicateRobotAssignmentsError,
     PartiallyAppliedWorldModificationError,
 )
-from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import (
@@ -46,6 +51,8 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ActiveConnection1DOF,
 )
+
+pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
 
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):

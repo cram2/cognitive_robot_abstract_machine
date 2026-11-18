@@ -1,3 +1,9 @@
+"""
+Tests of converting object chains deeper than Python's recursion limit.
+"""
+
+from __future__ import annotations
+
 import sys
 
 from krrood.ormatic.data_access_objects.helper import to_dao

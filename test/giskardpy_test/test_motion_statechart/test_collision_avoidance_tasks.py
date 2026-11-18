@@ -37,8 +37,6 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
-from cramph.orm.ormatic_interface import StatechartMappingDAO
-from giskardpy.orm.ormatic_interface import Base
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.patterns.called_positionally import called_positionally
 from krrood.ormatic.utils import create_engine
@@ -1355,6 +1353,9 @@ def test_violated_body_pairs_survive_storing_the_history(
     The body pairs that came too close are still known once the state history is stored
     and read back.
     """
+    from cramph.orm.ormatic_interface import StatechartMappingDAO
+    from giskardpy.orm.ormatic_interface import Base
+
     with pytest.raises(CollisionViolatedError) as exc_info:
         executor_driving_into_obstacles.tick_until_end()
     statechart = executor_driving_into_obstacles.statechart

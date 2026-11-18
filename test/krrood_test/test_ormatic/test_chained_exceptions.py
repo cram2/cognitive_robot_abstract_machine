@@ -90,6 +90,9 @@ def test_cause_of_plain_cause_survives_round_trip(
 def test_every_exception_is_a_row(
     chained_exception: ExceptionWithOwnField, session, database
 ):
+    """
+    Storing an exception stores its context and its chain of causes too, one row each.
+    """
     from ..dataset.ormatic_interface import ExceptionMappingDAO
 
     session.add(to_dao(chained_exception))

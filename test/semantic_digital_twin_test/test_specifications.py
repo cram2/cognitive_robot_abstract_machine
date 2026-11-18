@@ -46,7 +46,6 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 )
 from semantic_digital_twin.world_source import WorldSource
 from krrood.ormatic.data_access_objects.helper import to_dao
-import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao looks up
 
 from .test_adapters.test_mjcf import VISUAL_ONLY_GEOM_SCENE
 from .test_adapters.test_urdf import VISUAL_ONLY_LINK_URDF
@@ -121,6 +120,8 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
     Region,
 )
+
+pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
 
 RESOURCES = Path(__file__).resolve().parents[2] / "semantic_digital_twin" / "resources"
 

@@ -7,7 +7,6 @@ conditioning against backdoor adjustment.
 
 from __future__ import annotations
 
-import experiments.orm.ormatic_interface  # type: ignore  # noqa: F401
 import numpy as np
 import pytest
 
@@ -25,6 +24,8 @@ from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisMolecule,
     MutagenesisMoleculeAggregations,
 )
+
+pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
 
 requires_mutagenesis_dataset = pytest.mark.skipif(
     not is_mutagenesis_dataset_reachable(),

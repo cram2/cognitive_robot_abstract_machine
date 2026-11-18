@@ -23,7 +23,6 @@ from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, and_, or_
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import GraspNotOnObjectError
-from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
 from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
     draw_grasps,
@@ -41,6 +40,8 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
 
 # %% fixtures
 

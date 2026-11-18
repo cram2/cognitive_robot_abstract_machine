@@ -23,7 +23,6 @@ from semantic_digital_twin.exceptions import (
     MissingSemanticAnnotationError,
     MismatchingWorld,
 )
-from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.semantic_annotations.mixins import (
     PartWholeRelationship,
     HasRootBody,
@@ -91,6 +90,8 @@ from semantic_digital_twin.specifications.connections import (
 from semantic_digital_twin.specifications.semantic_annotations import (
     SemanticAnnotationWithRootSpecification,
 )
+
+pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
 
 
 class TestFactories(unittest.TestCase):

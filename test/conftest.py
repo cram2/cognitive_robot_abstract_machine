@@ -1,3 +1,9 @@
+"""
+Fixtures, options and hooks shared by the test suites of every package.
+"""
+
+from __future__ import annotations
+
 import os
 import threading
 import time
@@ -1331,3 +1337,30 @@ def kitchen_environment_fixture():
             world.add_connection(conn)
 
     return world
+
+
+# %% the ORM interfaces whose import registers their mappers
+
+
+@pytest.fixture(scope="session")
+def semantic_digital_twin_orm_mappers() -> None:
+    """
+    Load semantic_digital_twin's ORM interface, whose import registers its mappers.
+    """
+    import semantic_digital_twin.orm.ormatic_interface  # noqa: F401
+
+
+@pytest.fixture(scope="session")
+def coraplex_orm_mappers() -> None:
+    """
+    Load coraplex's ORM interface, whose import registers its mappers.
+    """
+    import coraplex.orm.ormatic_interface  # noqa: F401
+
+
+@pytest.fixture(scope="session")
+def experiments_orm_mappers() -> None:
+    """
+    Load the experiments' ORM interface, whose import registers its mappers.
+    """
+    import experiments.orm.ormatic_interface  # noqa: F401
