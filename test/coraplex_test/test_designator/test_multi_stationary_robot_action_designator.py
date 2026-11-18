@@ -1,3 +1,7 @@
+"""
+Actions performed by each stationary robot in the shared block world.
+"""
+
 from dataclasses import dataclass, field
 
 import mujoco
@@ -22,10 +26,9 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from coraplex.testing import _make_sine_scan_poses
 from cramph.composites import Sequence, StatementNode
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 from cramph.threaded_nodes import FunctionCall
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
 from krrood.entity_query_language.factories import a, an, entity, variable
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import (
@@ -44,6 +47,10 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+from krrood_spatial_math.testing.orientation_comparison import (
+    assert_same_axis_angle,
+    assert_same_orientation,
+)
 from ..conftest import grasp_point_of, left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
 from ...plan_running import (
@@ -168,6 +175,9 @@ def stationary_block_context(robot_setup):
 
 
 def test_park_arms_multi(stationary_block_context):
+    """
+    Parking every arm of the robot moves each arm joint to its park position.
+    """
     world, view, extensions = stationary_block_context
 
     description = ParkArmsAction(arms=view.all_arms)
@@ -180,7 +190,7 @@ def test_park_arms_multi(stationary_block_context):
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):
-        compare_axis_angle(
+        assert_same_axis_angle(
             connection.position,
             np.array([1, 0, 0]),
             value,
@@ -190,6 +200,10 @@ def test_park_arms_multi(stationary_block_context):
 
 
 def test_reach_action_multi(stationary_block_context):
+    """
+    Reaching for the box moves the grasp point of the left arm onto the box and its tool
+    frame into the orientation the grasp asks for.
+    """
     world, view, extensions = stationary_block_context
     left_arm = left_or_only_arm(view)
 
@@ -215,7 +229,7 @@ def test_reach_action_multi(stationary_block_context):
     target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
     assert grasp_point_of(left_arm) == pytest.approx(position[:3], abs=0.01)
-    compare_orientations(
+    assert_same_orientation(
         end_effector_orientation, target_orientation.to_np(), decimal=2
     )
 
@@ -314,6 +328,7 @@ def test_place_multi(stationary_block_context, place_position):
                 grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
             ),
             PlaceAction(
+                arm=left_or_only_arm(view),
                 object_designator=graspable_annotation(world, box_body),
                 target_location=Pose(place_position, reference_frame=world.root),
             ),
@@ -484,6 +499,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
+                arm=arm,
                 object_designator=graspable_annotation(world, box),
                 target_location=Pose(target, reference_frame=world.root),
             ),
@@ -565,9 +581,9 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
 
     first, second = pick_up.grounded_nodes
     assert [child.life_cycle_state for child in pick_up.chosen_children] == [
-        LifeCycleValues.FAILED,
-        LifeCycleValues.SUCCEEDED,
+        LifeCycleValue.FAILED,
+        LifeCycleValue.SUCCEEDED,
     ]
     assert second.grasp is not first.grasp
     [grasping] = [node for node in second.nodes if isinstance(node, GraspingAction)]
-    assert grasping.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert grasping.life_cycle_state == LifeCycleValue.SUCCEEDED

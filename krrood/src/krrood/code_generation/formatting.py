@@ -56,3 +56,34 @@ def run_ruff_format_on_file(filename: str) -> None:
     """
     command = ["ruff", "format", filename]
     run_subprocess_on_file(command)
+
+
+def remove_unused_imports(source: str) -> str:
+    """
+    Remove the imports *source* never uses, as Ruff's unused-import fix does.
+
+    :param source: The Python module source.
+    :return: The module source without its unused imports.
+    :raises SubprocessExecutionError: If Ruff cannot fix the source.
+    """
+    command = [
+        sys.executable,
+        "-m",
+        "ruff",
+        "check",
+        "--isolated",
+        "--select",
+        "F401",
+        "--fix",
+        "--quiet",
+        "-",
+    ]
+    result = subprocess.run(command, input=source, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise SubprocessExecutionError(
+            command=command,
+            return_code=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
+    return result.stdout

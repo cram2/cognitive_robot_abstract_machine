@@ -47,7 +47,7 @@ from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from cramph.composites import TryInOrder
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import NodesMissingContextExtensionsError
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -773,7 +773,7 @@ def run_perception_task(task: PerceptionTask) -> None:
     :param task: The built task to run.
     """
     task.on_start()
-    assert task.on_tick() == ObservationStateValues.TRUE
+    assert task.on_tick() == ObservationStateValue.TRUE
 
 
 def test_perception_task_is_a_plain_statechart_node(
@@ -848,7 +848,7 @@ def test_a_source_that_sees_nothing_leaves_the_task_observing_false(
 
     task.on_start()
 
-    assert task.on_tick() == ObservationStateValues.FALSE
+    assert task.on_tick() == ObservationStateValue.FALSE
     np.testing.assert_allclose(milk_body.global_pose.to_np(), spawned_pose, atol=1e-9)
 
 
@@ -905,7 +905,7 @@ def test_perception_task_answers_its_query_only_once(
     build_perception_task(task, world, rclpy_node)
 
     run_perception_task(task)
-    assert task.on_tick() == ObservationStateValues.TRUE
+    assert task.on_tick() == ObservationStateValue.TRUE
 
     assert robokudo_query_server.received_types == ["milk"]
 
@@ -1095,8 +1095,8 @@ def test_a_detection_that_sees_nothing_lets_the_next_alternative_run(
 
     run_plan(plan, extensions)
 
-    assert not_seen.life_cycle_state == LifeCycleValues.FAILED
-    assert seen.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert not_seen.life_cycle_state == LifeCycleValue.FAILED
+    assert seen.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_detection_looks_only_inside_the_box_it_is_given(
@@ -1116,7 +1116,7 @@ def test_a_detection_looks_only_inside_the_box_it_is_given(
     with pytest.raises(MotionDidNotFinish):
         run_plan(detection, extensions)
 
-    assert detection.life_cycle_state == LifeCycleValues.FAILED
+    assert detection.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_detection_without_a_box_looks_as_far_to_every_side_of_the_robot(

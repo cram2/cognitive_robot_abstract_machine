@@ -15,7 +15,7 @@ from cramph.nodes_for_testing import ConstTrueNode
 
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
@@ -93,7 +93,7 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert carry.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert carry.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert np.allclose(
         world.compute_forward_kinematics(world.root, box), goal_pose, atol=0.02
     )
@@ -204,7 +204,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
             break
         executor.tick()
         holding_still = (
-            choosing.life_cycle_state == LifeCycleValues.RUNNING
+            choosing.life_cycle_state == LifeCycleValue.RUNNING
             and not chooser.speeds_when_asked
         )
         if holding_still:

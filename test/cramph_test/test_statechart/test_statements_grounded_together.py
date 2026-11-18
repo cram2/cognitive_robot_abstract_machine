@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from cramph.composites import StatementNode, StatementsGroundedTogether
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
@@ -17,7 +17,7 @@ def _statement_of_names(names: list[str]) -> Match[NodeSucceedingOnObservingTrue
     :return: A statement with one candidate per name in `names`, ranked in that order.
     """
     return a(NodeSucceedingOnObservingTrue)(
-        name=variable(str, domain=names), observation=ObservationStateValues.TRUE
+        name=variable(str, domain=names), observation=ObservationStateValue.TRUE
     )
 
 

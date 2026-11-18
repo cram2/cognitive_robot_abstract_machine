@@ -13,7 +13,7 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.compiler import RecompileCallback
 from cramph.composites import ControlStructureNode, Sequence
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import (
     ChildCannotFailError,
     ChildTransitionAlreadyWiredError,
@@ -82,10 +82,10 @@ class NodeFailingItsFirstRuns(
     def on_reset(self) -> None:
         self.resets += 1
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         if self.runs <= self.failing_runs:
-            return ObservationStateValues.FALSE
-        return ObservationStateValues.TRUE
+            return ObservationStateValue.FALSE
+        return ObservationStateValue.TRUE
 
 
 @dataclass(kw_only=True)
@@ -165,13 +165,13 @@ def _node_arriving_at_once(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
 def _life_cycle_changes_of(
     statechart: Statechart, node: StatechartNode
-) -> list[LifeCycleValues]:
+) -> list[LifeCycleValue]:
     """
     :return: The life cycle states recorded for `node`, without consecutive repetitions.
     """
@@ -208,18 +208,18 @@ def test_a_requested_reset_keeps_the_failure_in_the_history(
     node = NodeFailingItsFirstRuns(failing_runs=1)
     statechart = _compile_with_nodes(statechart_executor, [node])
     statechart_executor.tick()
-    assert node.life_cycle_state == LifeCycleValues.FAILED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
 
     statechart.request_reset(node=node)
-    assert node.life_cycle_state == LifeCycleValues.FAILED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
     _tick_times(statechart_executor, 2)
 
     assert _life_cycle_changes_of(statechart, node) == [
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
-        LifeCycleValues.FAILED,
-        LifeCycleValues.NOT_STARTED,
-        LifeCycleValues.RUNNING,
+        LifeCycleValue.NOT_STARTED,
+        LifeCycleValue.RUNNING,
+        LifeCycleValue.FAILED,
+        LifeCycleValue.NOT_STARTED,
+        LifeCycleValue.RUNNING,
     ]
 
 
@@ -233,7 +233,7 @@ def test_a_node_stays_not_started_on_the_tick_its_requested_reset_lands(
     statechart.request_reset(node=node)
     statechart_executor.tick()
 
-    assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert node.runs == 1
 
 
@@ -258,13 +258,13 @@ def test_a_requested_reset_of_a_composite_node_resets_its_children(
     sequence = Sequence(nodes=[step])
     statechart = _compile_with_nodes(statechart_executor, [sequence])
     statechart_executor.tick()
-    assert sequence.life_cycle_state == LifeCycleValues.FAILED
+    assert sequence.life_cycle_state == LifeCycleValue.FAILED
 
     statechart.request_reset(node=sequence)
     statechart_executor.tick()
 
-    assert sequence.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert step.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert sequence.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert step.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert step.resets == 1
 
 
@@ -292,7 +292,7 @@ def test_a_requested_reset_of_a_node_not_started_changes_nothing(
     statechart_executor.tick()
 
     assert node.take_callbacks() == []
-    assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 def test_a_reset_cannot_be_requested_for_a_node_of_another_statechart(
@@ -316,11 +316,11 @@ def test_a_requested_reset_waits_while_a_recompile_is_held_back(
 
     statechart.request_reset(node=node)
     statechart_executor.tick()
-    assert node.life_cycle_state == LifeCycleValues.FAILED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
 
     holding_back.at_rest = True
     statechart_executor.tick()
-    assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 def test_an_abandoned_modification_drops_the_resets_requested_in_it(
@@ -336,7 +336,7 @@ def test_an_abandoned_modification_drops_the_resets_requested_in_it(
             raise ModificationDeliberatelyFailed()
     statechart_executor.tick()
 
-    assert node.life_cycle_state == LifeCycleValues.FAILED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
 
 
 # %% the failure handling node
@@ -354,8 +354,8 @@ def test_the_strategy_does_not_run_for_a_node_that_succeeds(
 
     _tick_times(statechart_executor, 3)
 
-    assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert handler.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert handler.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert strategy.failed_nodes == []
 
 
@@ -371,7 +371,7 @@ def test_the_strategy_is_given_the_failed_node_on_the_tick_it_fails(
 
     statechart_executor.tick()
 
-    assert node.life_cycle_state == LifeCycleValues.FAILED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
     assert strategy.failed_nodes == [node]
 
 
@@ -386,8 +386,8 @@ def test_the_handler_succeeds_once_the_strategy_ran(
 
     _tick_times(statechart_executor, 2)
 
-    assert handler.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert node.life_cycle_state == LifeCycleValues.FAILED
+    assert handler.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_the_strategy_runs_once_for_every_failure(
@@ -403,7 +403,7 @@ def test_the_strategy_runs_once_for_every_failure(
 
     _tick_times(statechart_executor, 12)
 
-    assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert strategy.failed_nodes == [node] * failing_runs
     assert node.runs == failing_runs + 1
 
@@ -453,8 +453,8 @@ def test_a_sequence_keeps_running_while_its_step_is_recovered(
 
     statechart_executor.tick()
 
-    assert node.life_cycle_state == LifeCycleValues.FAILED
-    assert sequence.life_cycle_state == LifeCycleValues.RUNNING
+    assert node.life_cycle_state == LifeCycleValue.FAILED
+    assert sequence.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_a_sequence_goes_on_once_its_step_recovered(
@@ -470,9 +470,9 @@ def test_a_sequence_goes_on_once_its_step_recovered(
 
     _tick_times(statechart_executor, 8)
 
-    assert handled.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert after.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert handled.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert after.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_sequence_fails_once_the_strategy_gave_up(
@@ -488,9 +488,9 @@ def test_a_sequence_fails_once_the_strategy_gave_up(
 
     _tick_times(statechart_executor, 3)
 
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
-    assert sequence.life_cycle_state == LifeCycleValues.FAILED
-    assert after.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
+    assert sequence.life_cycle_state == LifeCycleValue.FAILED
+    assert after.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 def test_the_strategy_does_not_run_for_a_step_that_succeeds(
@@ -505,14 +505,14 @@ def test_the_strategy_does_not_run_for_a_step_that_succeeds(
 
     _tick_times(statechart_executor, 3)
 
-    assert handled.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert handled.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert strategy.failed_nodes == []
 
 
 def test_a_handled_node_its_owner_ends_succeeds_at_its_goal(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    node = NodeFailingOnObservingFalse(observation=ObservationStateValues.TRUE)
+    node = NodeFailingOnObservingFalse(observation=ObservationStateValue.TRUE)
     handled = HandledOnFailure(
         handled_node=node, failure_handling_strategy=StrategyGivingUp()
     )
@@ -520,8 +520,8 @@ def test_a_handled_node_its_owner_ends_succeeds_at_its_goal(
 
     _tick_times(statechart_executor, 3)
 
-    assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert handled.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert handled.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_that_cannot_fail_is_rejected(
@@ -576,7 +576,7 @@ def test_retrying_recovers_a_node_within_the_attempts(
     _tick_times(statechart_executor, 10)
 
     assert node.runs == maximum_attempts + 1
-    assert handled.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert handled.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_retrying_gives_up_once_the_attempts_ran_out(
@@ -594,8 +594,8 @@ def test_retrying_gives_up_once_the_attempts_ran_out(
 
     assert node.resets == maximum_attempts
     assert node.runs == maximum_attempts + 1
-    assert node.life_cycle_state == LifeCycleValues.FAILED
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
+    assert node.life_cycle_state == LifeCycleValue.FAILED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_the_attempts_are_not_counted_anew_when_the_handled_node_is_reset(
@@ -608,14 +608,14 @@ def test_the_attempts_are_not_counted_anew_when_the_handled_node_is_reset(
     )
     statechart = _compile_with_nodes(statechart_executor, [handled])
     _tick_times(statechart_executor, 10)
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
     runs_before = node.runs
 
     statechart.request_reset(node=handled)
     _tick_times(statechart_executor, 10)
 
     assert node.runs == runs_before + 1
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
 
 
 # %% inserting into a compiled plan
@@ -711,20 +711,20 @@ def test_the_failed_step_runs_again_only_after_the_inserted_one(
     statechart_executor.tick()
 
     statechart_executor.tick()
-    assert inserted.life_cycle_state == LifeCycleValues.RUNNING
-    assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert inserted.life_cycle_state == LifeCycleValue.RUNNING
+    assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert node.runs == 1
 
     _tick_times(statechart_executor, 5)
-    assert inserted.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert inserted.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert node.runs == 2
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_inserted_step_failing_fails_the_compiled_sequence(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    inserted = NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE)
+    inserted = NodeFailingOnObservingFalse(observation=ObservationStateValue.FALSE)
     handled = HandledOnFailure(
         handled_node=NodeFailingItsFirstRuns(failing_runs=1),
         failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(
@@ -736,5 +736,5 @@ def test_an_inserted_step_failing_fails_the_compiled_sequence(
 
     _tick_times(statechart_executor, 5)
 
-    assert inserted.life_cycle_state == LifeCycleValues.FAILED
-    assert sequence.life_cycle_state == LifeCycleValues.FAILED
+    assert inserted.life_cycle_state == LifeCycleValue.FAILED
+    assert sequence.life_cycle_state == LifeCycleValue.FAILED

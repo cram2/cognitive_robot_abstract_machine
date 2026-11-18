@@ -14,7 +14,7 @@ from cramph.composites import (
     TryAll,
     TryInOrder,
 )
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode, EndedByOwner, StatechartNode
 from cramph.nodes_for_testing import (
@@ -428,14 +428,14 @@ def _self_deciding_step() -> NodeObservingAFixedValue:
     :return: A node a control structure node takes as its child as it is, without an
         attempt around it.
     """
-    return NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+    return NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
 
 
 def _step_decided_by_its_owner() -> NodeObservingAFixedValue:
     """
     :return: A node a control structure node ends once it observes True.
     """
-    return NodeObservingAFixedValue(observation=ObservationStateValues.TRUE)
+    return NodeObservingAFixedValue(observation=ObservationStateValue.TRUE)
 
 
 def _paused_until_true(monitored_node: StatechartNode) -> PausedUntilTrue:

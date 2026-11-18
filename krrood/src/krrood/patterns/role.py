@@ -120,6 +120,20 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
             current_cls = current_cls.get_role_taker_type()
         return current_cls
 
+    @classmethod
+    def is_role_for(cls, *, taker_classes: tuple[type, ...]) -> bool:
+        """
+        :param taker_classes: The classes to check against.
+        :return: Whether this role is a role for any of *taker_classes*: its role
+            takers, or those of any role along its taker chain, are of a subclass of one.
+        """
+        taker_type = cls.get_role_taker_type()
+        if issubclass(taker_type, taker_classes):
+            return True
+        return issubclass(taker_type, Role) and taker_type.is_role_for(
+            taker_classes=taker_classes
+        )
+
     @property
     def root_persistent_entity(self) -> Any:
         """
