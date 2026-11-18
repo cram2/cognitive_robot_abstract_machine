@@ -1,3 +1,8 @@
+"""
+Tests for the world updates Giskard exchanges with other processes, while idle and
+during a motion.
+"""
+
 import json
 import time
 from dataclasses import dataclass, field
@@ -563,10 +568,10 @@ class CommandPublisherRecordingCalls(CommandPublisher):
     The methods that ran, each by its name.
     """
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         self.calls.append(self.publish.__name__)
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         self.calls.append(self.stop.__name__)
 
 

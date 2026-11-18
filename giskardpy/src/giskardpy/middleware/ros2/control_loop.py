@@ -1,3 +1,7 @@
+"""
+The loop that executes a compiled motion statechart on a robot.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,6 +10,8 @@ from cramph.executor import StatechartExecutor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
+from giskardpy.middleware.ros2.cycle_timing import CycleTiming
+from giskardpy.middleware.ros2.dead_time_compensation import DeadTimeCompensation
 from giskardpy.middleware.ros2.exceptions import (
     ClientDisconnectedError,
     ExecutionCanceledException,
@@ -16,6 +22,7 @@ from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates
 from giskardpy.motion_control import MotionControl
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.world import World
 
 
@@ -72,6 +79,23 @@ class ControlLoop:
     Sends the computed velocities to the robot at the end of every cycle.
     """
 
+    cycle_timing: CycleTiming = field(
+        default_factory=lambda: CycleTiming(
+            clock=background_node.get_node().get_clock()
+        )
+    )
+    """
+    Times every cycle from its start to publishing its commands.
+    """
+
+    dead_time_compensation: DeadTimeCompensation = field(
+        init=False, default_factory=DeadTimeCompensation
+    )
+    """
+    Moves the measured joint positions forward to where the robot will be once the
+    command of the running cycle takes effect.
+    """
+
     @property
     def world(self) -> World:
         return self.executor.context.world
@@ -98,14 +122,30 @@ class ControlLoop:
         :raises WorldModelModifiedDuringMotionError: If another process modified the
             world model.
         """
+        self.cycle_timing.start_cycle()
         self.apply_world_updates()
-        self.inputs.synchronize()
+        self.synchronize_inputs()
         self.raise_if_canceled()
         self.raise_if_client_disconnected()
         self.executor.tick()
-        self.publish_commands()
+        self.publish_commands(publish_time=self.cycle_timing.finish_cycle())
         self.feedback_publisher.publish_if_changed()
         self.cycle_counter.tick()
+
+    def synchronize_inputs(self) -> None:
+        """
+        Write the inputs into the world state, move the measured joint positions forward
+        by the dead time, and announce the result once, if anything was written.
+        """
+        wrote_any = self.inputs.apply_inputs()
+        self.cycle_timing.mark_inputs_read()
+        wrote_any |= self.dead_time_compensation.apply(
+            inputs=self.inputs,
+            command_publishers=self.command_publishers,
+            cycle_timing=self.cycle_timing,
+        )
+        if wrote_any:
+            self.inputs.announce_state()
 
     def apply_world_updates(self) -> None:
         """
@@ -142,18 +182,21 @@ class ControlLoop:
         self.action_server.loginfo(message="client disconnected")
         raise ClientDisconnectedError(client=self.client_watchdog.client)
 
-    def publish_commands(self) -> None:
+    def publish_commands(self, *, publish_time: float) -> None:
         """
         Send the velocities of the current cycle to the robot.
+
+        :param publish_time: Seconds of the cycle's clock at which they are sent.
         """
         for command_publisher in self.command_publishers:
-            command_publisher.publish()
+            command_publisher.publish(publish_time=publish_time)
 
     def stop(self) -> None:
         """
         Bring the robot to a halt and clear the commanded velocities.
         """
+        publish_time = self.cycle_timing.now()
         for command_publisher in self.command_publishers:
-            command_publisher.stop()
+            command_publisher.stop(publish_time=publish_time)
         MotionControl.set_velocity_acceleration_jerk_to_zero(world=self.world)
         self.world.notify_state_change()

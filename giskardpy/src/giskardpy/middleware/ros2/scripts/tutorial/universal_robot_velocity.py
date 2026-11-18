@@ -1,5 +1,13 @@
 #!/usr/bin/env python
+"""
+Tutorial: a Giskard that commands a Universal Robots arm through its controller manager.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
+
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
@@ -13,6 +21,9 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
+if TYPE_CHECKING:
+    from giskardpy.middleware.ros2.robot_interface_config import RobotInterfaceConfig
+
 
 @dataclass(kw_only=True)
 class ControllerManagerInterface(ClosedLoopRobotInterfaceConfig):
@@ -25,12 +36,15 @@ class ControllerManagerInterface(ClosedLoopRobotInterfaceConfig):
         self.discover_interfaces_from_controller_manager()
 
 
-def create_giskard(node: Node) -> Giskard:
+def create_giskard(
+    node: Node, *, robot_interface_config: RobotInterfaceConfig | None = None
+) -> Giskard:
     """
-    Build a Giskard that commands the robot described on ``/robot_description`` through
-    its controller manager.
+    Build a Giskard that commands the robot described on ``/robot_description``.
 
     :param node: The node Giskard runs on, which reads the robot description.
+    :param robot_interface_config: How Giskard reads and commands the robot; through the
+        active controllers of its controller manager if ``None``.
     """
     return Giskard(
         world_source=WorldSpecification(
@@ -40,7 +54,7 @@ def create_giskard(node: Node) -> Giskard:
                 )
             ]
         ),
-        robot_interface_config=ControllerManagerInterface(),
+        robot_interface_config=robot_interface_config or ControllerManagerInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=50),
     )

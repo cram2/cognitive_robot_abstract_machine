@@ -318,10 +318,10 @@ class RecordingCommandPublisher(CommandPublisher):
     The world the commanded velocities are read from.
     """
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         self.published_velocities.append(float(self.world.state.velocities.sum()))
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         self.stop_count += 1
 
 
@@ -337,10 +337,10 @@ class PublishingCommandPublisher(CommandPublisher):
     The progress that is advanced on every publish.
     """
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         self.publication_progress.publish_one_update()
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         pass
 
 

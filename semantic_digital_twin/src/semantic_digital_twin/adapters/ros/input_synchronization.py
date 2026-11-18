@@ -1,12 +1,19 @@
+"""
+Synchronizers that write ROS topics and tf frames into the world state.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from uuid import UUID
 
 from nav_msgs.msg import Odometry
+from rclpy.time import Time
 from sensor_msgs.msg import JointState
 from typing_extensions import Union
 
+from semantic_digital_twin.adapters.ros.background_node import ros_time_seconds
 from semantic_digital_twin.adapters.ros.latest_message_subscriber import (
     LatestMessageSubscriber,
     MessageType,
@@ -64,7 +71,25 @@ class TopicInputSynchronizer(
 # %% joint states
 
 
-@dataclass
+@dataclass(kw_only=True)
+class JointPositionMeasurement:
+    """
+    The joint positions one joint state message reported, as they were written into the
+    world state.
+    """
+
+    measurement_time: float
+    """
+    Seconds of the message's header stamp, the time the positions were sampled at.
+    """
+
+    positions: dict[UUID, float]
+    """
+    The written position of every degree of freedom, by the id of the degree of freedom.
+    """
+
+
+@dataclass(kw_only=True)
 class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     """
     Writes the positions of a joint state message into the world state.
@@ -74,18 +99,31 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     message put them.
     """
 
+    latest_measurement: JointPositionMeasurement | None = field(
+        init=False, default=None
+    )
+    """
+    The positions this synchronizer wrote most recently, ``None`` before the first
+    message.
+    """
+
     def apply_message(self, message: JointState) -> None:
+        positions = {}
         for joint_name, position in zip(message.name, message.position):
             connection: ActiveConnection1DOF = self.world.get_connection_by_name(
                 joint_name
             )
-            if not self.writes(connection):
+            if not self.writes(connection=connection):
                 continue
-            self.world.state[connection.raw_dof.id].position = (
-                position - connection.offset
-            ) / connection.multiplier
+            raw_position = (position - connection.offset) / connection.multiplier
+            self.world.state[connection.raw_dof.id].position = raw_position
+            positions[connection.raw_dof.id] = raw_position
+        self.latest_measurement = JointPositionMeasurement(
+            measurement_time=ros_time_seconds(Time.from_msg(message.header.stamp)),
+            positions=positions,
+        )
 
-    def writes(self, connection: ActiveConnection1DOF) -> bool:
+    def writes(self, *, connection: ActiveConnection1DOF) -> bool:
         """
         Whether the position this synchronizer received for a connection is its to
         write.
@@ -150,7 +188,11 @@ class SubscribedJointPositionSource(
     The connections of the part this source is attached to.
     """
 
-    def writes(self, connection: ActiveConnection1DOF) -> bool:
+    def writes(self, *, connection: ActiveConnection1DOF) -> bool:
+        """
+        Unlike :meth:`JointStateInputSynchronizer.writes`, writes only the connections
+        of the part this source is attached to.
+        """
         return connection in self.connections
 
 

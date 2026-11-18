@@ -1,7 +1,12 @@
+"""
+How Giskard reads the state of a robot and how it commands it.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing_extensions import TYPE_CHECKING
 
 from nav_msgs.msg import Odometry
@@ -305,6 +310,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         minimum_valid_velocity: float = 0.0,
         minimum_velocity_overrides: dict[str, float] | None = None,
         command_format: GroupCommandFormat | None = None,
+        actuation_delay: timedelta | None = None,
     ) -> None:
         """
         Tell Giskard to send the velocities of a group of joints, all in one message, to
@@ -319,6 +325,8 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             ``minimum_valid_velocity``; ``0.0`` exempts a joint.
         :param command_format: message format the controller consumes; defaults to
             :class:`~giskardpy.middleware.ros2.command_publishing.Float64MultiArrayFormat`.
+        :param actuation_delay: how long the robot takes to execute a command, which
+            Giskard then compensates; ``None`` compensates nothing.
         """
         controlled_connections: list[ActiveConnection1DOF] = [
             self.world.get_connection_by_name(connection_name)
@@ -333,6 +341,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                     default=minimum_valid_velocity, overrides=minimum_velocity_overrides
                 ),
                 command_format=command_format or Float64MultiArrayFormat(),
+                actuation_delay=actuation_delay,
             )
         )
 
@@ -343,6 +352,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         *,
         controller_manager_name: str = "controller_manager",
         whitelist: list[str] | None = None,
+        actuation_delay: timedelta | None = None,
     ) -> None:
         """
         Tell Giskard to read and command the robot through the active controllers of a
@@ -351,6 +361,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param controller_manager_name: The controller manager node, including the
             namespace it runs in.
         :param whitelist: The names of the controllers to consider, all if ``None``.
+        :param actuation_delay: how long the robot takes to execute a command sent to a
+            joint group velocity controller, which Giskard then compensates; ``None``
+            compensates nothing.
         """
         controller_manager = ControllerManager(
             name=controller_manager_name, ros_graph=RosGraph(background_node.get_node())
@@ -374,6 +387,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                             controller_name=controller.name
                         ),
                         command_format=command_format,
+                        actuation_delay=actuation_delay,
                     )
                 case ControllerType.DIFF_DRIVE:
                     command_format = TwistStampedFormat()

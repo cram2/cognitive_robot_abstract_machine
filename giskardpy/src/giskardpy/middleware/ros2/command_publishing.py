@@ -12,11 +12,16 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from collections import deque
 from dataclasses import dataclass, field
-from typing_extensions import Self, TypeVar, Generic, Union
+from datetime import timedelta
+
+import numpy as np
+from typing_extensions import TYPE_CHECKING, Self, TypeVar, Generic, Union
 
 from control_msgs.msg import MultiDOFCommand
 from geometry_msgs.msg import Twist, TwistStamped
+from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64MultiArray
 
@@ -30,6 +35,12 @@ from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+
+if TYPE_CHECKING:
+    from giskardpy.middleware.ros2.cycle_timing import CycleTiming
+    from semantic_digital_twin.adapters.ros.input_synchronization import (
+        JointPositionMeasurement,
+    )
 
 # %% minimum velocities
 
@@ -260,6 +271,91 @@ class JointVelocityCommand:
         ]
 
 
+# %% remembering the published commands
+
+
+@dataclass(kw_only=True)
+class HeldCommand:
+    """
+    Velocities a publisher sent, which the robot holds until the next command.
+    """
+
+    publish_time: float
+    """
+    Seconds of the ROS clock at which the command was published.
+    """
+
+    velocities: np.ndarray
+    """
+    The velocity of every commanded degree of freedom.
+    """
+
+
+@dataclass(kw_only=True)
+class CommandHistory:
+    """
+    The commands a publisher sent recently, oldest first.
+
+    Before the oldest remembered command, the commanded degrees of freedom count as
+    resting.
+    """
+
+    kept_duration: timedelta
+    """
+    How long a command is remembered after the next one replaced it.
+    """
+
+    held_commands: deque[HeldCommand] = field(init=False, default_factory=deque)
+    """
+    The remembered commands, oldest first.
+    """
+
+    def record(self, *, publish_time: float, velocities: list[float]) -> None:
+        """
+        Remember a command and forget the ones replaced longer than
+        :attr:`kept_duration` ago.
+
+        A command published before the newest remembered one means the clock jumped
+        back, as a restarted simulation's does; the remembered commands then belong to
+        another timeline and are forgotten.
+
+        :param publish_time: Seconds of the ROS clock at which the command was
+            published.
+        :param velocities: The velocity of every commanded degree of freedom.
+        """
+        if self.held_commands and publish_time < self.held_commands[-1].publish_time:
+            self.held_commands.clear()
+        self.held_commands.append(
+            HeldCommand(publish_time=publish_time, velocities=np.array(velocities))
+        )
+        oldest_needed_time = publish_time - self.kept_duration.total_seconds()
+        while (
+            len(self.held_commands) > 1
+            and self.held_commands[1].publish_time < oldest_needed_time
+        ):
+            self.held_commands.popleft()
+
+    def displacement(self, *, start_time: float, end_time: float) -> np.ndarray:
+        """
+        How far the commands move every degree of freedom between two times, each
+        command being held until the next one and the newest until ``end_time``.
+
+        :param start_time: Seconds of the ROS clock the displacement starts at.
+        :param end_time: Seconds of the ROS clock the displacement ends at.
+        :return: The displacement of every commanded degree of freedom.
+        """
+        displacement = np.zeros_like(self.held_commands[-1].velocities)
+        held_until = end_time
+        for command in reversed(self.held_commands):
+            held_since = max(command.publish_time, start_time)
+            if held_since < held_until:
+                displacement += command.velocities * (held_until - held_since)
+            if command.publish_time <= start_time:
+                break
+            held_until = min(held_until, command.publish_time)
+        return displacement
+
+
 # %% message formats
 
 CommandMessage = TypeVar("CommandMessage")
@@ -387,16 +483,38 @@ class CommandPublisher(ABC):
     """
 
     @abstractmethod
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         """
         Publish the velocities currently stored in the world state.
+
+        :param publish_time: Seconds of the ROS clock at which the command is
+            published.
         """
 
     @abstractmethod
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         """
         Publish zero velocities so the robot comes to a halt.
+
+        :param publish_time: Seconds of the ROS clock at which the command is
+            published.
         """
+
+    def write_predicted_positions(
+        self, *, measurement: JointPositionMeasurement, cycle_timing: CycleTiming
+    ) -> bool:
+        """
+        Overwrite the measured positions of the joints this publisher commands with
+        where they will be once the command of the running cycle takes effect.
+
+        Does nothing by default, as a publisher that knows no actuation delay predicts
+        nothing.
+
+        :param measurement: The measured positions to move forward.
+        :param cycle_timing: When the command of the running cycle will be published.
+        :return: Whether any position was overwritten.
+        """
+        return False
 
 
 @dataclass(kw_only=True)
@@ -432,6 +550,29 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     Message format the controller on ``command_topic`` consumes.
     """
 
+    actuation_delay: timedelta | None = None
+    """
+    How long the robot takes to execute a published command, compensated by
+    :meth:`write_predicted_positions`; ``None`` compensates nothing.
+    """
+
+    command_history_margin: timedelta = timedelta(seconds=1)
+    """
+    How much longer than :attr:`actuation_delay` the published commands are remembered,
+    and so the age a measurement may have to still be moved forward.
+    """
+
+    unusable_measurement_warning_period: timedelta = timedelta(seconds=5)
+    """
+    How often at most a measurement that cannot be moved forward is warned about.
+    """
+
+    command_history: CommandHistory = field(init=False)
+    """
+    The commands published recently, as velocities of the raw degrees of freedom; kept
+    only with an :attr:`actuation_delay`.
+    """
+
     commands: list[JointVelocityCommand] = field(init=False, default_factory=list)
     """
     What to send for every connection.
@@ -447,9 +588,29 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     The publisher for ``cmd_topic``.
     """
 
-    def __post_init__(self):
+    logger: RcutilsLogger = field(init=False)
+    """
+    Logs about the commands on :attr:`command_topic`, throttled independently of every
+    other publisher.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Create the ROS publisher and logger, resolve what to send for every connection
+        and size the command history to the actuation delay.
+
+        :raises UnknownMinimumVelocityJointError: If a minimum velocity override applies
+            to no connection.
+        """
+        self.command_history = CommandHistory(
+            kept_duration=(self.actuation_delay or timedelta(0))
+            + self.command_history_margin
+        )
         self.command_publisher = background_node.get_node().create_publisher(
             self.command_format.message_type(), self.command_topic, 10
+        )
+        self.logger = (
+            background_node.get_node().get_logger().get_child(self.command_topic)
         )
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
@@ -472,21 +633,94 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
             f"{[connection.name.name for connection in self.connections]}"
         )
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
+        state_velocities = self.velocity_reader.velocities()
         velocities = [
             command.from_state_velocity(state_velocity=state_velocity)
-            for command, state_velocity in zip(
-                self.commands, self.velocity_reader.velocities()
-            )
+            for command, state_velocity in zip(self.commands, state_velocities)
         ]
         self.command_publisher.publish(
             self.command_format.create_message(velocities=velocities)
         )
+        self._record_command(publish_time=publish_time, sent_velocities=velocities)
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
+        velocities = [0.0] * len(self.commands)
         self.command_publisher.publish(
-            self.command_format.create_message(velocities=[0.0] * len(self.commands))
+            self.command_format.create_message(velocities=velocities)
         )
+        self._record_command(publish_time=publish_time, sent_velocities=velocities)
+
+    def _record_command(
+        self, *, publish_time: float, sent_velocities: list[float]
+    ) -> None:
+        """
+        Remember the command just published as the raw state velocities the joints
+        execute; nothing without an actuation delay.
+
+        :param publish_time: Seconds of the ROS clock at which the command was
+            published.
+        :param sent_velocities: The velocity sent to every joint.
+        """
+        if self.actuation_delay is None:
+            return
+        self.command_history.record(
+            publish_time=publish_time,
+            velocities=[
+                sent_velocity / command.connection.multiplier
+                for command, sent_velocity in zip(self.commands, sent_velocities)
+            ],
+        )
+
+    def write_predicted_positions(
+        self, *, measurement: JointPositionMeasurement, cycle_timing: CycleTiming
+    ) -> bool:
+        """
+        Unlike :meth:`CommandPublisher.write_predicted_positions`, moves the positions
+        forward by the commands executed since one :attr:`actuation_delay` before the
+        measurement. A measurement of these joints stamped more than one
+        :attr:`actuation_delay` after the inputs were read, or older than
+        :attr:`command_history_margin`, is left, with a warning.
+        """
+        if self.actuation_delay is None or not self.command_history.held_commands:
+            return False
+        if not any(
+            connection.raw_dof.id in measurement.positions
+            for connection in self.connections
+        ):
+            return False
+        earliest_usable_time = (
+            cycle_timing.cycle_start_time - self.command_history_margin.total_seconds()
+        )
+        latest_usable_time = (
+            cycle_timing.inputs_read_time + self.actuation_delay.total_seconds()
+        )
+        if not (
+            earliest_usable_time <= measurement.measurement_time <= latest_usable_time
+        ):
+            self.logger.warning(
+                f"Not compensating the actuation delay of {self.command_topic}: the "
+                f"joint state stamped {measurement.measurement_time:.3f} s lies outside "
+                f"[{earliest_usable_time:.3f} s, {latest_usable_time:.3f} s]. "
+                f"Check the header stamps of the joint states and the clocks.",
+                throttle_duration_sec=self.unusable_measurement_warning_period.total_seconds(),
+            )
+            return False
+        displacement = self.command_history.displacement(
+            start_time=measurement.measurement_time
+            - self.actuation_delay.total_seconds(),
+            end_time=cycle_timing.expected_publish_time,
+        )
+        wrote_any = False
+        for connection, distance in zip(self.connections, displacement):
+            measured_position = measurement.positions.get(connection.raw_dof.id)
+            if measured_position is None:
+                continue
+            self.world.state[connection.raw_dof.id].position = (
+                measured_position + distance
+            )
+            wrote_any = True
+        return wrote_any
 
 
 @dataclass(kw_only=True)
@@ -569,7 +803,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
             return [self.connection.x_velocity, self.connection.y_velocity]
         return [self.connection.x_velocity]
 
-    def publish(self) -> None:
+    def publish(self, *, publish_time: float) -> None:
         velocities = self.velocity_reader.velocities()
         linear_velocities = self.minimum_linear_velocity.enforce_on_vector(
             velocities=velocities[:-1]
@@ -582,7 +816,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
         )
         self._publish_twist()
 
-    def stop(self) -> None:
+    def stop(self, *, publish_time: float) -> None:
         self.twist.linear.x = 0.0
         self.twist.linear.y = 0.0
         self.twist.angular.z = 0.0

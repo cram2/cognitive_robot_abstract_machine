@@ -1,5 +1,10 @@
+"""
+Tests for publishing the commanded velocities to the hardware interfaces of a robot.
+"""
+
 from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing_extensions import Any
 
 from krrood.patterns.called_positionally import called_positionally
@@ -11,6 +16,7 @@ from geometry_msgs.msg import Twist, TwistStamped
 from std_msgs.msg import Float64MultiArray
 
 from giskardpy.middleware.ros2.command_publishing import (
+    CommandHistory,
     DriveVelocityCommandPublisher,
     Float64MultiArrayFormat,
     GroupCommandFormat,
@@ -158,6 +164,7 @@ def build_group_publisher(
     minimum_valid_velocity: float = 0.0,
     minimum_velocity_overrides: dict[str, float] | None = None,
     command_format: GroupCommandFormat | None = None,
+    actuation_delay: timedelta | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over a chain of freshly created connections.
@@ -168,6 +175,7 @@ def build_group_publisher(
         minimum_valid_velocity,
         minimum_velocity_overrides,
         command_format,
+        actuation_delay,
     )
 
 
@@ -177,6 +185,7 @@ def group_publisher_for(
     minimum_valid_velocity: float = 0.0,
     minimum_velocity_overrides: dict[str, float] | None = None,
     command_format: GroupCommandFormat | None = None,
+    actuation_delay: timedelta | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over connections that already exist in a world.
@@ -189,6 +198,7 @@ def group_publisher_for(
             default=minimum_valid_velocity, overrides=minimum_velocity_overrides
         ),
         command_format=command_format or Float64MultiArrayFormat(),
+        actuation_delay=actuation_delay,
     )
 
 
@@ -198,7 +208,7 @@ def publish_group_message(controller: JointGroupVelocityCommandPublisher) -> Any
     """
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
-    controller.publish()
+    controller.publish(publish_time=0.0)
     return recorder.published_message
 
 
@@ -208,7 +218,7 @@ def stop_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
     """
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
-    controller.stop()
+    controller.stop(publish_time=0.0)
     return recorder.published_message
 
 
@@ -225,7 +235,7 @@ def publish_drive(publisher: DriveVelocityCommandPublisher) -> RecordingPublishe
     """
     recorder = RecordingPublisher()
     publisher.velocity_publisher = recorder
-    publisher.publish()
+    publisher.publish(publish_time=0.0)
     return recorder
 
 
@@ -434,15 +444,18 @@ def test_group_publisher_follows_its_joints_through_a_model_change(
 def test_group_publisher_publishes_the_velocities_of_the_current_cycle(
     init_background_node,
 ):
+    """
+    Every publish reads the velocities the world state holds at that moment.
+    """
     specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
     world = build_world_with_joints(specs)
     controller = group_publisher_for(world, specs)
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
 
-    controller.publish()
+    controller.publish(publish_time=0.0)
     world.get_connection_by_name("joint_a").velocity = 0.4
-    controller.publish()
+    controller.publish(publish_time=0.0)
 
     recorded = [list(message.data) for message in recorder.published_messages]
     assert recorded[0] == pytest.approx([0.1])
@@ -672,6 +685,9 @@ def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
 def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
     init_background_node,
 ):
+    """
+    A stopped drive is sent a zero twist in the message type its controller consumes.
+    """
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -679,7 +695,7 @@ def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
     recorder = RecordingPublisher()
     publisher.velocity_publisher = recorder
 
-    publisher.stop()
+    publisher.stop(publish_time=0.0)
 
     assert isinstance(recorder.published_message, TwistStamped)
     assert recorder.published_message.twist == Twist()
@@ -711,6 +727,9 @@ def test_drive_publisher_follows_its_dofs_through_a_model_change(init_background
 def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
     init_background_node,
 ):
+    """
+    Every publish reads the drive velocities the world state holds at that moment.
+    """
     world = build_drive_world(OmniDrive)
     drive = world.get_connection_by_name("brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
@@ -718,9 +737,9 @@ def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
     recorder = RecordingPublisher()
     publisher.velocity_publisher = recorder
 
-    publisher.publish()
+    publisher.publish(publish_time=0.0)
     world.state[drive.x_velocity.id].velocity = 0.6
-    publisher.publish()
+    publisher.publish(publish_time=0.0)
 
     assert [
         message.linear.x for message in recorder.published_messages
@@ -737,3 +756,176 @@ def test_differential_drive_is_raised_along_x_only(init_background_node):
 
     assert command.linear.x == pytest.approx(-0.05)
     assert command.linear.y == pytest.approx(0.0)
+
+
+# %% command history
+
+
+def test_displacement_integrates_each_command_while_it_is_held():
+    """
+    Each command moves the joint only until the next command replaces it.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=2))
+    history.record(publish_time=10.0, velocities=[1.0])
+    history.record(publish_time=11.0, velocities=[2.0])
+
+    displacement = history.displacement(start_time=10.5, end_time=11.5)
+
+    assert displacement == pytest.approx([0.5 * 1.0 + 0.5 * 2.0])
+
+
+def test_the_newest_command_is_held_until_the_end_time():
+    """
+    Nothing replaces the newest command, so the robot keeps executing it.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=2))
+    history.record(publish_time=10.0, velocities=[1.0, -2.0])
+
+    displacement = history.displacement(start_time=10.0, end_time=10.25)
+
+    assert displacement == pytest.approx([0.25, -0.5])
+
+
+def test_the_robot_rests_before_the_first_command():
+    """
+    Time before any command was published adds no displacement.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=2))
+    history.record(publish_time=10.0, velocities=[1.0])
+
+    displacement = history.displacement(start_time=9.0, end_time=10.5)
+
+    assert displacement == pytest.approx([0.5])
+
+
+def test_commands_replaced_longer_ago_than_the_kept_duration_are_forgotten():
+    """
+    The history stays bounded but keeps the command that is still held across the kept
+    duration.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=1))
+    history.record(publish_time=0.0, velocities=[1.0])
+    history.record(publish_time=5.0, velocities=[2.0])
+    history.record(publish_time=10.0, velocities=[3.0])
+
+    assert history.displacement(start_time=4.0, end_time=6.0) == pytest.approx([2.0])
+    assert history.displacement(start_time=9.5, end_time=10.5) == pytest.approx(
+        [0.5 * 2.0 + 0.5 * 3.0]
+    )
+
+
+def test_a_clock_jumping_back_forgets_the_commands_of_the_old_timeline():
+    """
+    A restarted simulation's clock starts over; the commands stamped before the jump
+    would otherwise never be forgotten.
+    """
+    history = CommandHistory(kept_duration=timedelta(seconds=1))
+    history.record(publish_time=999.0, velocities=[1.0])
+    history.record(publish_time=1000.0, velocities=[2.0])
+
+    history.record(publish_time=0.5, velocities=[3.0])
+
+    assert [command.publish_time for command in history.held_commands] == [0.5]
+
+
+def test_a_command_is_remembered_at_the_time_it_was_published(init_background_node):
+    """
+    The publish time comes from the control loop, whose clock the measurements are
+    compared against.
+    """
+    controller = build_group_publisher(
+        [ConnectionSpec(name="joint_a", velocity=0.1)],
+        actuation_delay=timedelta(seconds=0.3),
+    )
+    controller.command_publisher = RecordingPublisher()
+
+    controller.publish(publish_time=12.5)
+
+    assert controller.command_history.held_commands[-1].publish_time == 12.5
+
+
+def test_publishing_records_the_commanded_velocities(init_background_node):
+    """
+    The history holds the velocities of the raw degrees of freedom, as the world state
+    holds them.
+    """
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=-0.2),
+    ]
+    controller = build_group_publisher(specs, actuation_delay=timedelta(seconds=0.3))
+
+    publish_group(controller)
+
+    assert controller.command_history.held_commands[-1].velocities == pytest.approx(
+        [spec.velocity for spec in specs]
+    )
+
+
+def test_the_history_holds_the_velocity_the_robot_executes(init_background_node):
+    """
+    A command raised to the minimum velocity and scaled to the joint is remembered as
+    the velocity it moves the raw degree of freedom at.
+    """
+    [spec] = [ConnectionSpec(name="joint_a", velocity=0.002, multiplier=2.0)]
+    controller = build_group_publisher(
+        [spec], minimum_valid_velocity=0.03, actuation_delay=timedelta(seconds=0.3)
+    )
+
+    [sent_velocity] = publish_group(controller)
+
+    assert controller.command_history.held_commands[-1].velocities == pytest.approx(
+        [sent_velocity / spec.multiplier]
+    )
+
+
+def test_stopping_records_zero_velocities(init_background_node):
+    """
+    A stopped robot is remembered as resting from then on.
+    """
+    specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
+    controller = build_group_publisher(specs, actuation_delay=timedelta(seconds=0.3))
+
+    publish_group(controller)
+    stop_group_message(controller)
+
+    assert controller.command_history.held_commands[-1].velocities == pytest.approx(
+        [0.0]
+    )
+
+
+def test_a_publisher_without_actuation_delay_remembers_no_commands(
+    init_background_node,
+):
+    """
+    Without a delay to compensate, nothing ever reads the history.
+    """
+    controller = build_group_publisher([ConnectionSpec(name="joint_a", velocity=0.1)])
+
+    publish_group(controller)
+    stop_group_message(controller)
+
+    assert len(controller.command_history.held_commands) == 0
+
+
+def test_a_long_actuation_delay_keeps_the_commands_it_needs(init_background_node):
+    """
+    The publisher remembers commands for at least its actuation delay, however long.
+    """
+    specs = [ConnectionSpec(name="joint_a", velocity=0.0)]
+    world = build_world_with_joints(specs)
+    controller = JointGroupVelocityCommandPublisher(
+        world=world,
+        command_topic="test_cmd",
+        connections=[world.get_connection_by_name(spec.name) for spec in specs],
+        actuation_delay=timedelta(seconds=5),
+    )
+    controller.command_history.record(publish_time=0.0, velocities=[1.0])
+    controller.command_history.record(publish_time=4.0, velocities=[2.0])
+    controller.command_history.record(publish_time=8.0, velocities=[3.0])
+
+    displacement = controller.command_history.displacement(
+        start_time=8.0 - controller.actuation_delay.total_seconds(), end_time=8.5
+    )
+
+    assert displacement == pytest.approx([1.0 * 1.0 + 2.0 * 4.0 + 3.0 * 0.5])
