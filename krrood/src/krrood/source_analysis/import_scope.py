@@ -466,8 +466,7 @@ def _handle_import_from_node(
 
     A statement whose module cannot be imported contributes no names, so one that cannot
     be bound does not cost the caller the others. A module a generator is about to write
-    is absent while it runs, and a ``TYPE_CHECKING`` import may target a module that
-    imports this file back.
+    is absent while it runs.
 
     :param node: The from-import node to process.
     :param scope: The scope mapping to update.
