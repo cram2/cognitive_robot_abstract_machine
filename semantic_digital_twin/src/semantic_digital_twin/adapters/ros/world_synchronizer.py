@@ -1,3 +1,8 @@
+"""
+Keeping worlds in several processes in step over ROS: each world publishes its model and
+state changes, and applies the changes the other worlds publish.
+"""
+
 from __future__ import annotations
 
 import json
@@ -750,18 +755,15 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         state that came with it. A state that cannot be applied leaves the model
         untouched too.
         """
-        with self._world._world_lock:
+        with self._world.modify_world(publish_changes=False):
             if message.state_update is not None:
                 self._check_state_update(
                     state_update=message.state_update,
                     modification_block=message.modification_block,
                 )
             if message.modification_block is not None:
-                with self._world.modify_world(publish_changes=False):
-                    self._apply_model(message.modification_block)
-                    if message.state_update is not None:
-                        self._apply_state(message.state_update)
-            elif message.state_update is not None:
+                self._apply_model(message.modification_block)
+            if message.state_update is not None:
                 self._apply_state(message.state_update)
         self.record_applied(message)
 
