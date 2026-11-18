@@ -1,3 +1,7 @@
+"""
+Giskard, the motion server of one robot, assembled from the configs of its setup.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -29,12 +33,6 @@ from giskardpy.middleware.ros2.graceful_shutdown import GracefulShutdownSignals
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_server import MotionServer
-from giskardpy.middleware.ros2.post_goal_plotters import (
-    GoalGanttChartPlotter,
-    GoalTrajectoryPlotter,
-    MotionStatechartPlotter,
-    PostGoalPlotter,
-)
 from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
     StandAloneRobotInterfaceConfig,
@@ -63,16 +61,19 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_source import WorldSource
-from giskardpy.motion_control import MotionControl
+from giskardpy.motion_control import MotionControl, WorldStateTrajectoryRecording
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from cramph.composites import ChildChooserAccess
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from giskardpy.motion_statechart.debug_expression_publisher import (
+    DebugExpressionPublishing,
+)
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Giskard:
     """
     A motion server for one robot.
@@ -109,6 +110,16 @@ class Giskard:
     executor: StatechartExecutor = field(init=False)
     """
     Runs the motion statecharts of the goals.
+    """
+
+    debug_expression_publishing: DebugExpressionPublishing = field(init=False)
+    """
+    Publishes the debug expressions of the goals that ask for them.
+    """
+
+    trajectory_recording: WorldStateTrajectoryRecording = field(init=False)
+    """
+    Records the trajectories of the goals that ask for their plot.
     """
 
     motion_server: MotionServer | None = field(init=False, default=None)
@@ -153,26 +164,25 @@ class Giskard:
 
     @classmethod
     def standalone(
-        cls, world_source: WorldSource, qp_controller_config: QPControllerConfig
+        cls, *, world_source: WorldSource, qp_controller_config: QPControllerConfig
     ) -> Self:
         """
         :param world_source: Describes the world Giskard controls, including the robot
             in it.
         :param qp_controller_config: The control frequency and the tuning of the
             controller.
-        :return: A Giskard that simulates the robot instead of commanding it, with
-            debug output enabled.
+        :return: A Giskard that simulates the robot instead of commanding it.
         """
         return cls(
             world_source=world_source,
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(debug_mode=True),
+            server_config=GiskardServerConfig(),
             qp_controller_config=qp_controller_config,
         )
 
     @classmethod
     def launch(
-        cls, create_giskard: Callable[[Node], Giskard], node_name: str = "giskard"
+        cls, *, create_giskard: Callable[[Node], Giskard], node_name: str = "giskard"
     ) -> None:
         """
         Run a Giskard as a ros node until ROS shuts down.
@@ -192,6 +202,12 @@ class Giskard:
         """
         node_logger = background_node.get_node().get_logger()
         node_logger.info("Building the world.")
+        self.debug_expression_publishing = DebugExpressionPublishing(
+            ros_node=background_node.get_node(), publishes_markers=False
+        )
+        self.trajectory_recording = WorldStateTrajectoryRecording(
+            appends_every_tick=False
+        )
         self.world = self.world_source.create_world()
         with self.world.modify_world():
             clear_memoization_cache(self.world)
@@ -201,13 +217,15 @@ class Giskard:
                 extensions=[
                     RosNodeAccess(ros_node=background_node.get_node()),
                     MotionControl(qp_controller_config=self.qp_controller_config),
+                    self.trajectory_recording,
+                    self.debug_expression_publishing,
                 ],
             )
 
         self.setup_world_model_ros_interface()
         self.motion_server = self.create_motion_server()
         node_logger.info("Connecting to the robot.")
-        self.robot_interface_config.attach(self)
+        self.robot_interface_config.attach(giskard=self)
         self.robot_interface_config.connect()
         self.sanity_check()
 
@@ -236,7 +254,9 @@ class Giskard:
             world_synchronizer=self.world_synchronizer,
             model_reload_synchronizer=self.model_reload_synchronizer,
         )
-        self.receive_child_choices(world_updates, action_server)
+        self.receive_child_choices(
+            world_updates=world_updates, action_server=action_server
+        )
         control_loop = ControlLoop(
             executor=self.executor,
             action_server=action_server,
@@ -257,11 +277,12 @@ class Giskard:
             inputs=WorldStateInputs(world=world),
             cycle_counter=cycle_counter,
             idle_frequency=self.server_config.idle_frequency,
-            post_goal_plotters=self.create_post_goal_plotters(),
+            debug_expression_publishing=self.debug_expression_publishing,
+            trajectory_recording=self.trajectory_recording,
         )
 
     def receive_child_choices(
-        self, world_updates: IncomingWorldUpdates, action_server: ActionServerHandler
+        self, *, world_updates: IncomingWorldUpdates, action_server: ActionServerHandler
     ) -> None:
         """
         Let the nodes of a goal that choose their child run the children the client
@@ -278,28 +299,10 @@ class Giskard:
             String,
             child_choices_topic(node.get_name()),
             lambda message: chooser.receive(
-                ChildChoiceMessage.from_json(data=json.loads(message.data))
+                message=ChildChoiceMessage.from_json(data=json.loads(message.data))
             ),
             10,
         )
-
-    def create_post_goal_plotters(self) -> list[PostGoalPlotter]:
-        """
-        Create the debug plotters that are configured and let them record what they
-        need.
-        """
-        if not self.server_config.debug_mode:
-            return []
-        plotters: list[PostGoalPlotter] = []
-        if self.server_config.plot_trajectory:
-            plotters.append(GoalTrajectoryPlotter(executor=self.executor))
-        if self.server_config.plot_gantt_chart:
-            plotters.append(GoalGanttChartPlotter(executor=self.executor))
-        if self.server_config.plot_motion_statechart:
-            plotters.append(MotionStatechartPlotter(executor=self.executor))
-        for plotter in plotters:
-            plotter.start_recording()
-        return plotters
 
     def setup_world_model_ros_interface(self):
         try:

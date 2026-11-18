@@ -30,7 +30,7 @@ from experiments.experiment_definitions import (
     MeanAndStandardDeviation,
     TypstRenderer,
 )
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
@@ -66,7 +66,7 @@ def _build_hsrb_world() -> World:
         world.add_connection(map_C_odom)
         drive = OmniDrive.create_with_dofs(parent=odom, child=old_root, world=world)
         world.add_connection(drive)
-        drive.has_hardware_interface = True
+        world.set_dofs_has_hardware_interface(drive.active_dofs, True)
 
     return world
 

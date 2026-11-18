@@ -26,6 +26,7 @@ them wires its children; this page runs them.
 | **Parallel**        | Holds all children at once and succeeds once enough of them, all by default, are at their goals together. |
 | **TryAll**          | Runs all children at once and succeeds once one of them succeeded.                                         |
 | **RepeatUntil**     | Attempts a child again whenever an attempt fails, until it succeeds or a monitor calls the repeating off.  |
+| **HandledOnFailure** | Runs a strategy when its child failed, which changes the plan to recover, and fails if the child stays failed. |
 | **Monitored nodes** | `CancelledWhenTrue`, `PausedWhileTrue` and `PausedUntilTrue` cancel or pause a child depending on a monitor. |
 
 ## Running a plan
@@ -203,6 +204,63 @@ try:
     run(plan)
 except RepetitionsExhausted as exhausted:
     print(exhausted)
+```
+
+## Recovering from a failure
+
+`HandledOnFailure` runs a `failure_handling_strategy` when its child failed. A strategy is a
+`FailureHandlingStrategy` whose `handle_failure` gets the failed node; `RetryFailedNode` runs the
+node again, up to `maximum_attempts` times. While the step is being recovered, the sequence holding it keeps running.
+
+```{code-cell} ipython3
+from cramph.failure_handling import HandledOnFailure, RetryFailedNode
+
+attempts = []
+
+
+def slip_twice():
+    attempts.append("attempt")
+    if len(attempts) <= 2:
+        raise RuntimeError("the gripper slipped")
+
+
+grasp = FunctionCall(name="grasp", function=slip_twice, failure_types=(RuntimeError,))
+
+run(
+    Sequence(
+        name="recovering",
+        nodes=[
+            HandledOnFailure(
+                name="grasp, retrying",
+                handled_node=grasp,
+                failure_handling_strategy=RetryFailedNode(maximum_attempts=2),
+            ),
+            CountTicks(name="lift", ticks=2),
+        ],
+    )
+)
+print(f"attempts: {len(attempts)}")
+```
+
+With fewer attempts than failures the strategy gives up, and the failure reaches the sequence.
+
+```{code-cell} ipython3
+lift = CountTicks(name="lift", ticks=2)
+
+run(
+    Sequence(
+        name="giving up",
+        nodes=[
+            HandledOnFailure(
+                name="grasp, retrying",
+                handled_node=failing_step("grasp"),
+                failure_handling_strategy=RetryFailedNode(maximum_attempts=2),
+            ),
+            lift,
+        ],
+    )
+)
+print(f"lift: {lift.life_cycle_state.name}")
 ```
 
 ## Monitors

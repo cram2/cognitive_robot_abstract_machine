@@ -1,3 +1,7 @@
+"""
+A task that inserts a held object by wiggling it into place.
+"""
+
 from __future__ import annotations
 
 import random
@@ -7,7 +11,7 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.context import ContextExtension
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
@@ -211,7 +215,7 @@ class WiggleInsert(ConvergingTask):
         )
 
         self._perpendicular_basis_first, self._perpendicular_basis_second = (
-            self._calculate_perpendicular_basis(hole_normal.to_np()[:3])
+            self._calculate_perpendicular_basis(normal=hole_normal.to_np()[:3])
         )
 
         root_P_current = self.context.world.compose_forward_kinematics_expression(
@@ -249,10 +253,12 @@ class WiggleInsert(ConvergingTask):
         )
 
         artifacts.debug_expressions.append(
-            DebugExpression(f"{self.name}/root_P_hole", root_P_hole)
+            DebugExpression(name=f"{self.name}/root_P_hole", expression=root_P_hole)
         )
         artifacts.debug_expressions.append(
-            DebugExpression(f"{self.name}/root_P_hole_wiggled", root_P_hole_wiggled)
+            DebugExpression(
+                name=f"{self.name}/root_P_hole_wiggled", expression=root_P_hole_wiggled
+            )
         )
 
         artifacts.error = root_P_current.euclidean_distance(root_P_hole)
@@ -350,6 +356,7 @@ class WiggleInsert(ConvergingTask):
 
     @staticmethod
     def _calculate_perpendicular_basis(
+        *,
         normal: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
         """

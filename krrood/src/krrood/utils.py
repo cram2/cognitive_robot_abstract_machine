@@ -1,3 +1,8 @@
+"""
+Standard-library helpers for naming and resolving classes, modules and import paths,
+reading dataclass fields, and building the names a source file's imports bind.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -456,6 +461,9 @@ def get_scope_from_imports(
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
 
+    An import in an ``if TYPE_CHECKING:`` block whose module cannot be imported
+    contributes no names; elsewhere, a plain ``import`` of such a module raises.
+
     :param file_path: The path to the Python file to extract imports from.
     :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
     :param package_name: The name of the package to use for relative imports.
@@ -478,10 +486,17 @@ def get_scope_from_imports(
     )
 
     scope: dict[str, Any] = {}
+    imports_that_never_run = set(type_checking_imports(parsed_tree))
 
     for node in module_level_imports(parsed_tree):
         if isinstance(node, ast.Import):
-            _handle_import_node(node, scope, package_name)
+            _handle_import_node(
+                node=node,
+                scope=scope,
+                file_path=file_path,
+                package_name=package_name,
+                skips_unimportable_module=node in imports_that_never_run,
+            )
         elif isinstance(node, ast.ImportFrom):
             package_name = _handle_import_from_node(
                 node=node,
@@ -511,6 +526,28 @@ def module_level_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]
             child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
         ):
             yield from module_level_imports(child)
+
+
+def type_checking_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]:
+    """
+    Yield the module-level import statements that only run while type checking.
+
+    :param node: The node whose statements are searched.
+    :return: The module-level import statements inside ``if TYPE_CHECKING:`` blocks,
+        whether the condition names ``TYPE_CHECKING`` directly or as a module attribute.
+    """
+    for child in ast.iter_child_nodes(node):
+        if (
+            isinstance(child, ast.If)
+            and ast.unparse(child.test).rpartition(".")[2] == "TYPE_CHECKING"
+        ):
+            yield from module_level_imports(
+                ast.Module(body=child.body, type_ignores=[])
+            )
+        elif not isinstance(
+            child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+        ):
+            yield from type_checking_imports(child)
 
 
 def get_and_import_module(
@@ -609,20 +646,30 @@ def _resolve_relative_import(
 
 
 def _handle_import_node(
-    node: ast.Import, scope: dict[str, Any], package_name: str | None
+    node: ast.Import,
+    scope: dict[str, Any],
+    file_path: str | None,
+    package_name: str | None,
+    skips_unimportable_module: bool,
 ) -> None:
     """
     Process a standard import node and update the provided scope mapping.
 
     :param node: The import node to process.
     :param scope: The scope mapping to update.
+    :param file_path: The path to the file containing the import statement.
     :param package_name: The package name to use for relative imports.
+    :param skips_unimportable_module: Whether a module that cannot be imported
+        contributes no name instead of raising.
     """
     for alias in node.names:
-        module_name = alias.name
         asname = alias.asname or alias.name
-        module = get_and_import_module(module_name, package_name)
-        scope[asname] = module
+        try:
+            scope[asname] = get_and_import_module(alias.name, package_name)
+        except ImportError as error:
+            if not skips_unimportable_module:
+                raise
+            _log_unresolvable_import_once(alias.name, asname, file_path, str(error))
 
 
 @lru_cache(maxsize=None)

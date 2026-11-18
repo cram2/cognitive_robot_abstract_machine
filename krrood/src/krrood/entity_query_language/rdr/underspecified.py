@@ -36,7 +36,7 @@ from krrood.entity_query_language.rdr.exceptions import (
     UndeclaredInferenceTarget,
     UnsupportedInferenceTarget,
 )
-from krrood.symbol_graph.helpers import get_wrapped_field
+from krrood.entity_query_language.class_diagram_lookup import get_wrapped_field
 
 
 @dataclass(kw_only=True)

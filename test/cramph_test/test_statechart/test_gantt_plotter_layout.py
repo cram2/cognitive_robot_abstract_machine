@@ -1,3 +1,10 @@
+"""
+Tests of the physical layout of the Gantt chart: the widths of its axes and where the
+final-state column is placed.
+"""
+
+from pathlib import Path
+
 import matplotlib
 
 from cramph.context import StatechartContext
@@ -38,6 +45,12 @@ def _rightmost_text_pixel_x(texts, fig) -> float:
 
 
 def _render_and_capture_axes(plotter: HistoryGanttChartPlotter, monkeypatch):
+    """
+    Draw the chart of `plotter` without writing a file.
+
+    :return: The main axis and the final-state axis, under the keys ``main`` and
+        ``final``.
+    """
     # Avoid file output
     monkeypatch.setattr(plotter, "_save_figure", lambda file_name=None, **kwargs: None)
     captured = {}
@@ -51,7 +64,7 @@ def _render_and_capture_axes(plotter: HistoryGanttChartPlotter, monkeypatch):
 
     monkeypatch.setattr(plotter, "_build_subplots", spy)
 
-    plotter.plot_gantt_chart(file_name="/dev/null")
+    plotter.plot_gantt_chart(file_name=Path("/dev/null"))
     return captured
 
 

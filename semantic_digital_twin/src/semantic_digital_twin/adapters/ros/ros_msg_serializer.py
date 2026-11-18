@@ -23,7 +23,7 @@ from krrood.adapters.json_serializer import (
     to_json,
     from_json,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.utils import get_full_class_name
 from semantic_digital_twin.adapters.ros.utils import is_ros2_message_class
 

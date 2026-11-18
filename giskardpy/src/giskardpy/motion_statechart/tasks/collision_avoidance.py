@@ -1,3 +1,8 @@
+"""
+Motion statechart tasks that keep a robot clear of collisions with itself and its
+environment, and the nodes that update the collision rules they follow.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field, dataclass
@@ -8,7 +13,7 @@ from itertools import combinations
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues
@@ -93,7 +98,7 @@ class _CollisionAvoidanceTask(ABC, Task):
         return super().required_context_extensions + (MotionControlContext,)
 
     @staticmethod
-    def _weight_while_close(contact_normal: Vector3) -> Scalar:
+    def _weight_while_close(*, contact_normal: Vector3) -> Scalar:
         """
         :param contact_normal: The contact normal of one avoided collision, zero while no
             collision data was computed for it.
@@ -217,7 +222,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         """
         self.collision_variable_manager = self.context.require_extension(
             extension_type=MotionControlContext
-        ).get_or_create_external_collision_manager(self.context)
+        ).get_or_create_external_collision_manager(context=self.context)
         self.avoided_contacts = []
         for group in self._groups_avoiding_external_collisions():
             self.collision_variable_manager.register_group_of_body(group.root)
@@ -259,7 +264,9 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
-                quadratic_weight=self._weight_while_close(root_V_contact_normal),
+                quadratic_weight=self._weight_while_close(
+                    contact_normal=root_V_contact_normal
+                ),
                 # the position distance is not accurate, but the derivative is still correct
                 task_expression=root_V_contact_normal @ root_V_point_on_group,
             )
@@ -357,7 +364,7 @@ class UpdateTemporaryCollisionRules(EndedByOwner, MotionStatechartNode):
 
     @classmethod
     def for_end_effector(
-        cls, end_effector: EndEffector
+        cls, *, end_effector: EndEffector
     ) -> UpdateTemporaryCollisionRules:
         """
         :param end_effector: The end effector that may touch its surroundings.
@@ -485,7 +492,7 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
         """
         self.collision_variable_manager = self.context.require_extension(
             extension_type=MotionControlContext
-        ).get_or_create_self_collision_manager(self.context)
+        ).get_or_create_self_collision_manager(context=self.context)
         collision_matrix = self.create_self_collision_matrix()
         kinematic_structure_entities = self.robot.kinematic_structure_entities
         self.checked_combinations = []
@@ -547,7 +554,9 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
-                quadratic_weight=self._weight_while_close(group_b_V_contact_normal),
+                quadratic_weight=self._weight_while_close(
+                    contact_normal=group_b_V_contact_normal
+                ),
                 task_expression=group_b_V_contact_normal
                 @ group_b_V_point_on_b_to_point_on_a,
             )

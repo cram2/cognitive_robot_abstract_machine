@@ -1,3 +1,7 @@
+"""
+Integration tests of Giskard controlling the PR2.
+"""
+
 from __future__ import division
 
 import asyncio
@@ -46,10 +50,8 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
 
-from ...pytest_environment import runs_in_continuous_integration
 
-
-@dataclass
+@dataclass(kw_only=True)
 class PR2Tester(GiskardTester):
     better_pose_left = {
         PR2Joint.LEFT_SHOULDER_PAN: 1.9652,
@@ -81,10 +83,7 @@ class PR2Tester(GiskardTester):
                 robots=[RobotSpecification.specify_real_robot(PR2)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=not runs_in_continuous_integration(),
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig(
                 target_frequency=20,
             ),
@@ -115,7 +114,11 @@ def pocky_pose_setup(giskard_factory, pocky_pr2_pose: dict[str, float]) -> PR2Te
 
 
 class TestJointGoals:
-    def test_joint_goal(self, giskard: PR2Tester):
+    """
+    Moving the joints of the PR2 to goal positions.
+    """
+
+    def test_joint_goal(self, *, giskard: PR2Tester):
         js = {
             PR2Joint.TORSO_LIFT: 0.2999225173357618,
             PR2Joint.HEAD_PAN: 0.041880780651479044,
@@ -164,7 +167,11 @@ class TestJointGoals:
 
 
 class TestCartGoals:
-    def test_cart_goal_1eef(self, giskard: PR2Tester):
+    """
+    Moving links of the PR2 to Cartesian goal poses.
+    """
+
+    def test_cart_goal_1eef(self, *, giskard: PR2Tester):
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=giskard.right_tip
         )
@@ -216,13 +223,13 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
         pose=poses_relative_to_r_tip["box"],
     )
     pocky_pose_setup.add_box_to_world(
-        "b1", (0.01, 0.2, 0.2), pose=poses_relative_to_r_tip["b1"]
+        name="b1", size=(0.01, 0.2, 0.2), pose=poses_relative_to_r_tip["b1"]
     )
     pocky_pose_setup.add_box_to_world(
-        "bl", (0.1, 0.01, 0.2), pose=poses_relative_to_r_tip["bl"]
+        name="bl", size=(0.1, 0.01, 0.2), pose=poses_relative_to_r_tip["bl"]
     )
     pocky_pose_setup.add_box_to_world(
-        "br", (0.1, 0.01, 0.2), pose=poses_relative_to_r_tip["br"]
+        name="br", size=(0.1, 0.01, 0.2), pose=poses_relative_to_r_tip["br"]
     )
 
     server_world = pocky_pose_setup.world
@@ -239,7 +246,11 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
 
 
 class TestActionServerEvents:
-    def test_wrong_params1(self, giskard: PR2Tester):
+    """
+    How the action server answers goals that cannot be executed.
+    """
+
+    def test_wrong_params1(self, *, giskard: PR2Tester) -> None:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=(
@@ -268,7 +279,7 @@ class TestActionServerEvents:
         giskard.api.execute()
 
     @pytest.mark.asyncio
-    async def test_cancel_with_new_goal(self, giskard: PR2Tester):
+    async def test_cancel_with_new_goal(self, *, giskard: PR2Tester) -> None:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
@@ -307,7 +318,7 @@ class TestActionServerEvents:
         await giskard.api.get_result()
 
     @pytest.mark.asyncio
-    async def test_interrupt(self, giskard: PR2Tester):
+    async def test_interrupt(self, *, giskard: PR2Tester) -> None:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
@@ -331,7 +342,7 @@ class TestActionServerEvents:
 
     @pytest.mark.asyncio
     async def test_a_goal_whose_client_stops_announcing_itself_is_aborted(
-        self, giskard: PR2Tester
+        self, *, giskard: PR2Tester
     ):
         """
         Nobody is waiting for a motion whose client died, so it is stopped instead of
@@ -368,14 +379,14 @@ class TestActionServerEvents:
             await giskard.api.get_result()
         assert disconnect.value.client == giskard.api.client
 
-    def test_empty_goal(self, giskard: PR2Tester):
+    def test_empty_goal(self, *, giskard: PR2Tester):
         giskard.api.compile(statechart=Statechart(context=giskard.api.context))
         with pytest.raises(EmptyStatechartError):
             giskard.api.execute()
 
     @pytest.mark.asyncio
     async def test_world_model_modification_terminates_the_motion(
-        self, giskard: PR2Tester
+        self, *, giskard: PR2Tester
     ):
         """
         The running motion was compiled against the structure of the world, so a body

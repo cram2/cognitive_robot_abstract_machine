@@ -21,7 +21,9 @@ from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.robots.tiago import TiagoMujoco
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -285,3 +287,36 @@ def test_the_base_turns_at_the_commanded_angular_velocity(mounted_tiago):
     reached = _drive_at(mounted_tiago, 0.0, 0.3, timedelta(seconds=2))
 
     assert reached == pytest.approx((0.0, 0.0, 0.6), abs=0.02)
+
+
+@pytest.mark.skipif(
+    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
+)
+def test_the_floor_the_wheels_stand_on_does_not_hold_the_turning_base_back(
+    mounted_tiago,
+):
+    """
+    Turning on the spot skids the wheels sideways, but the drive holds its base at its
+    height, so the floor cannot carry the base and would only drag it: the base turns as
+    far as without a floor to collide with.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+    with world.modify_world():
+        Floor.create_with_new_body_from_polytope_in_world(
+            name="floor",
+            world=world,
+            floor_polytope=[
+                Point3(-3, -3, 0),
+                Point3(3, -3, 0),
+                Point3(3, 3, 0),
+                Point3(-3, 3, 0),
+            ],
+        )
+    tiago_on_the_floor = RobotSpecification(TiagoMujoco).spawn(world)
+
+    reached_without_a_floor = _drive_at(mounted_tiago, 0.0, 0.3, timedelta(seconds=2))
+    reached_on_the_floor = _drive_at(tiago_on_the_floor, 0.0, 0.3, timedelta(seconds=2))
+
+    assert reached_on_the_floor == pytest.approx(reached_without_a_floor, abs=0.005)

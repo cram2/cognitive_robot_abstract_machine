@@ -20,11 +20,12 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 # %% kinematic chain endpoints
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RootTipPair:
     """
     The two links that delimit a kinematic chain a marker controls.
@@ -41,7 +42,9 @@ class RootTipPair:
     """
 
     @classmethod
-    def pair_up(cls, root_links: list[str], tip_links: list[str]) -> list[RootTipPair]:
+    def pair_up(
+        cls, *, root_links: list[str], tip_links: list[str]
+    ) -> list[RootTipPair]:
         """
         Pair each root link with the tip link at the same index.
 
@@ -63,7 +66,7 @@ class RootTipPair:
 # %% the marker node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InteractiveMarkerNode:
     """
     ROS 2 node that manages interactive markers for Cartesian pose control.
@@ -167,12 +170,12 @@ class InteractiveMarkerNode:
             ],
         )
         return RootTipPair.pair_up(
-            self.giskard.node_handle.get_parameter("root_links").value,
-            self.giskard.node_handle.get_parameter("tip_links").value,
+            root_links=self.giskard.node_handle.get_parameter("root_links").value,
+            tip_links=self.giskard.node_handle.get_parameter("tip_links").value,
         )
 
     @classmethod
-    def start_in_background_thread(cls, chains: list[RootTipPair]) -> Thread:
+    def start_in_background_thread(cls, *, chains: list[RootTipPair]) -> Thread:
         """
         Start an interactive marker node for the given kinematic chains in a daemon
         thread.
@@ -202,7 +205,10 @@ class InteractiveMarkerNode:
                 chain.tip_link
             )
             kinematic_chain = KinematicChainMarker(
-                chain.root_link, chain.tip_link, root_body, tip_body
+                root_link=chain.root_link,
+                tip_link=chain.tip_link,
+                root_body=root_body,
+                tip_body=tip_body,
             )
             self.markers[kinematic_chain.name] = kinematic_chain
 
@@ -224,6 +230,7 @@ class InteractiveMarkerNode:
 
         self.server.applyChanges()
 
+    @called_positionally
     def process_feedback(self, feedback: InteractiveMarkerFeedback) -> None:
         """
         Process feedback from interactive markers when user interactions occur.
@@ -279,7 +286,7 @@ class InteractiveMarkerNode:
         self.server.applyChanges()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KinematicChainMarker:
     """
     Represents an interactive marker for a kinematic chain in RViz.
@@ -392,13 +399,28 @@ class KinematicChainMarker:
         Add translation controls for X, Y, Z axes.
         """
         self.add_control(
-            "move_x", InteractiveMarkerControl.MOVE_AXIS, 1.0, 0.0, 0.0, 1.0
+            name="move_x",
+            interaction_mode=InteractiveMarkerControl.MOVE_AXIS,
+            x=1.0,
+            y=0.0,
+            z=0.0,
+            w=1.0,
         )
         self.add_control(
-            "move_y", InteractiveMarkerControl.MOVE_AXIS, 0.0, 1.0, 0.0, 1.0
+            name="move_y",
+            interaction_mode=InteractiveMarkerControl.MOVE_AXIS,
+            x=0.0,
+            y=1.0,
+            z=0.0,
+            w=1.0,
         )
         self.add_control(
-            "move_z", InteractiveMarkerControl.MOVE_AXIS, 0.0, 0.0, 1.0, 1.0
+            name="move_z",
+            interaction_mode=InteractiveMarkerControl.MOVE_AXIS,
+            x=0.0,
+            y=0.0,
+            z=1.0,
+            w=1.0,
         )
 
     def _add_rotation_controls(self) -> None:
@@ -406,32 +428,33 @@ class KinematicChainMarker:
         Add rotation controls for X, Y, Z axes.
         """
         self.add_control(
-            "rotate_x",
-            InteractiveMarkerControl.ROTATE_AXIS,
-            1.0,
-            0.0,
-            0.0,
-            1.0,
+            name="rotate_x",
+            interaction_mode=InteractiveMarkerControl.ROTATE_AXIS,
+            x=1.0,
+            y=0.0,
+            z=0.0,
+            w=1.0,
         )
         self.add_control(
-            "rotate_y",
-            InteractiveMarkerControl.ROTATE_AXIS,
-            0.0,
-            1.0,
-            0.0,
-            1.0,
+            name="rotate_y",
+            interaction_mode=InteractiveMarkerControl.ROTATE_AXIS,
+            x=0.0,
+            y=1.0,
+            z=0.0,
+            w=1.0,
         )
         self.add_control(
-            "rotate_z",
-            InteractiveMarkerControl.ROTATE_AXIS,
-            0.0,
-            0.0,
-            1.0,
-            1.0,
+            name="rotate_z",
+            interaction_mode=InteractiveMarkerControl.ROTATE_AXIS,
+            x=0.0,
+            y=0.0,
+            z=1.0,
+            w=1.0,
         )
 
     def add_control(
         self,
+        *,
         name: str,
         interaction_mode: int,
         x: float,
