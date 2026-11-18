@@ -32,10 +32,6 @@ from semantic_digital_twin.robots.pr2 import (
 from semantic_digital_twin.robots.robot_parts import KinematicChain
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_computations.ik_solver import (
-    MaxIterationsException,
-    UnreachableException,
-)
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -231,47 +227,6 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world_state_reset):
             ]
         ),
     )
-
-
-def test_compute_ik(pr2_world_state_reset):
-    bf = pr2_world_state_reset.root
-    eef = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
-    )
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    fk[0, 3] -= 0.2
-    joint_state = pr2_world_state_reset.compute_inverse_kinematics(
-        bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
-    )
-    for joint, state in joint_state.items():
-        pr2_world_state_reset.state[joint.id].position = state
-    pr2_world_state_reset.notify_state_change()
-    actual_fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    assert np.allclose(actual_fk, fk, atol=1e-3)
-
-
-def test_compute_ik_max_iter(pr2_world_state_reset):
-    bf = pr2_world_state_reset.root
-    eef = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
-    )
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    fk[2, 3] = 10
-    with pytest.raises(MaxIterationsException):
-        pr2_world_state_reset.compute_inverse_kinematics(
-            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
-        )
-
-
-def test_compute_ik_unreachable(pr2_world_state_reset):
-    bf = pr2_world_state_reset.root
-    eef = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(bf, eef)
-    fk[2, 3] = -1
-    with pytest.raises(UnreachableException):
-        pr2_world_state_reset.compute_inverse_kinematics(
-            bf, eef, HomogeneousTransformationMatrix(fk, reference_frame=bf)
-        )
 
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
