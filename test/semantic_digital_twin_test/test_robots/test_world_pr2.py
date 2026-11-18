@@ -52,8 +52,6 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
 )
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
     root_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(

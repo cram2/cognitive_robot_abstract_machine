@@ -21,8 +21,6 @@ from experiments.confidence_aware_eql.confidence_guard import (
 )
 from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 # %% fixtures
 
 

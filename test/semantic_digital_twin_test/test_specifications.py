@@ -121,8 +121,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Region,
 )
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 RESOURCES = Path(__file__).resolve().parents[2] / "semantic_digital_twin" / "resources"
 
 

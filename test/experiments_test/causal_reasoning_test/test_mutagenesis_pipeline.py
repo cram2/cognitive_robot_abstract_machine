@@ -33,8 +33,6 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
     RelationalProbabilisticCircuit,
 )
 
-pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
-
 CHLORINE_COUNT_VARIABLE_NAME = "MutagenesisMoleculeAggregations.chlorine_count()"
 MUTAGENIC_VARIABLE_NAME = "MutagenesisMolecule.mutagenic"
 

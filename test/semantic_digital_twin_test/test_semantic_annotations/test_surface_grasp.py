@@ -41,8 +41,6 @@ from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 # %% fixtures
 
 CARTON_EXTENTS = (0.06, 0.08, 0.2)

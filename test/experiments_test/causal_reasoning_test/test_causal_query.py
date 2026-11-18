@@ -25,8 +25,6 @@ from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisMoleculeAggregations,
 )
 
-pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
-
 requires_mutagenesis_dataset = pytest.mark.skipif(
     not is_mutagenesis_dataset_reachable(),
     reason="CTU relational-dataset repository is not reachable from this environment",

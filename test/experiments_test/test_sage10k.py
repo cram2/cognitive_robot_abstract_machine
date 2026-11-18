@@ -30,8 +30,6 @@ from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from ..plan_running import run_plan
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
-pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
-
 
 @pytest.fixture
 def wall_door_handle_world():

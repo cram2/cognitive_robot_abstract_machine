@@ -54,8 +54,6 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
-
 
 def _empty_world() -> tuple[World, Body]:
     """

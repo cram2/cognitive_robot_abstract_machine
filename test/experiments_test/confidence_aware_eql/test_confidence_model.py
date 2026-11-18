@@ -13,8 +13,6 @@ from semantic_digital_twin.world_description.inertial_properties import Inertial
 
 from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 
 @pytest.fixture
 def familiar_kitchen_objects():

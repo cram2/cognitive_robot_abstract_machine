@@ -29,8 +29,6 @@ from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisMoleculeAggregations,
 )
 
-pytestmark = pytest.mark.usefixtures("experiments_orm_mappers")
-
 
 @pytest.fixture(scope="module")
 def probability_tolerance() -> float:

@@ -91,8 +91,6 @@ from semantic_digital_twin.specifications.semantic_annotations import (
     SemanticAnnotationWithRootSpecification,
 )
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 
 class TestFactories(unittest.TestCase):
     def test_handle_factory(self):

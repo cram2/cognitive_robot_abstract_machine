@@ -38,8 +38,6 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 # %% rotated instances of every spatial type that stores its rotation as an axis angle
 
 axes = [

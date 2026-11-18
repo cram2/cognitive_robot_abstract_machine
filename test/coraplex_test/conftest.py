@@ -329,3 +329,15 @@ def motion_nodes_in_physics_of(
     """
     statechart_of(physically_simulated_executor(extensions), plan)
     return [plan, *plan.descendants]
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load coraplex's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import coraplex.orm.ormatic_interface  # noqa: F401

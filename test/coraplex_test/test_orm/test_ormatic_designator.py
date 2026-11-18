@@ -26,8 +26,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import context_of, simulated_executor, statechart_of
 from cramph.context import ContextExtension
 
-pytestmark = pytest.mark.usefixtures("coraplex_orm_mappers")
-
 
 @pytest.fixture()
 def simple_plan(pr2_apartment_context):

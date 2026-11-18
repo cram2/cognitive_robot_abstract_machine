@@ -23,8 +23,6 @@ from experiments.confidence_aware_eql.feature_pipeline import (
     extract_feature_dataframe,
 )
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 # %% mass variable extraction assumption
 
 

@@ -20,8 +20,6 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 
-pytestmark = pytest.mark.usefixtures("semantic_digital_twin_orm_mappers")
-
 
 def feature_names(extractor: FeatureExtractor) -> list[str]:
     return [
