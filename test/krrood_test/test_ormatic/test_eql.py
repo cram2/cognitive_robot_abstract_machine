@@ -17,21 +17,6 @@ from ..dataset.semantic_world_like_classes import (
     MoveAction,
     GraspConfig,
 )
-from ..dataset.ormatic_interface import (
-    KRROODPositionDAO,
-    KRROODPoseDAO,
-    KRROODOrientationDAO,
-    FixedConnectionDAO,
-    PrismaticConnectionDAO,
-    BodyDAO,
-    MoveActionDAO,
-    GraspConfigDAO,
-    ContainerDAO,
-    HandleDAO,
-    NestedActionDAO,
-    SymbolDAO,
-    WorldEntityDAO,
-)
 from krrood.entity_query_language.factories import (
     entity,
     variable,
@@ -58,6 +43,8 @@ from krrood.entity_query_language.query.query import UnificationDict
 
 
 def test_translate_simple_greater(session, database):
+    from ..dataset.ormatic_interface import KRROODPositionDAO
+
     session.add(KRROODPositionDAO(x=1, y=2, z=3))
     session.add(KRROODPositionDAO(x=1, y=2, z=4))
     session.commit()
@@ -78,6 +65,8 @@ def test_translate_simple_greater(session, database):
 
 
 def test_translate_or_condition(session, database):
+    from ..dataset.ormatic_interface import KRROODPositionDAO
+
     session.add(KRROODPositionDAO(x=1, y=2, z=3))
     session.add(KRROODPositionDAO(x=1, y=2, z=4))
     session.add(KRROODPositionDAO(x=2, y=9, z=10))
@@ -108,6 +97,12 @@ def test_translate_or_condition(session, database):
 
 
 def test_translate_join_one_to_one(session, database):
+    from ..dataset.ormatic_interface import (
+        KRROODOrientationDAO,
+        KRROODPoseDAO,
+        KRROODPositionDAO,
+    )
+
     session.add(
         KRROODPoseDAO(
             position=KRROODPositionDAO(x=1, y=2, z=3),
@@ -143,6 +138,8 @@ def test_translate_join_one_to_one(session, database):
 
 
 def test_translate_in_operator(session, database):
+    from ..dataset.ormatic_interface import KRROODPositionDAO
+
     session.add(KRROODPositionDAO(x=1, y=2, z=3))
     session.add(KRROODPositionDAO(x=5, y=2, z=6))
     session.add(KRROODPositionDAO(x=7, y=8, z=9))
@@ -169,6 +166,8 @@ def test_translate_in_operator(session, database):
 
 
 def test_the_quantifier(session, database):
+    from ..dataset.ormatic_interface import KRROODPositionDAO
+
     position_daos = [KRROODPositionDAO(x=1, y=2, z=3), KRROODPositionDAO(x=5, y=2, z=6)]
     positions = [KRROODPosition(x=dao.x, y=dao.y, z=dao.z) for dao in position_daos]
     session.add_all(position_daos)
@@ -201,6 +200,8 @@ def test_the_quantifier(session, database):
 
 
 def test_equal(session, database):
+    from ..dataset.ormatic_interface import FixedConnectionDAO, PrismaticConnectionDAO
+
     # Create the world with its bodies and connections
     world = World(
         id=1,
@@ -257,6 +258,13 @@ def test_complicated_equal(session, database):
     Verify that a multi-variable entity query with equality constraints translates
     correctly and returns the same result as EQL evaluation.
     """
+    from ..dataset.ormatic_interface import (
+        ContainerDAO,
+        FixedConnectionDAO,
+        HandleDAO,
+        PrismaticConnectionDAO,
+    )
+
     world = World(
         id=1,
         bodies=[
@@ -324,6 +332,8 @@ def test_complicated_equal(session, database):
 
 
 def test_contains(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     body1 = BodyDAO(name="Body1", size=1)
     session.add(body1)
     session.add(BodyDAO(name="Body2", size=1))
@@ -344,6 +354,8 @@ def test_contains(session, database):
 
 
 def test_translate_limit(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=1))
     session.add(BodyDAO(name="Body2", size=2))
     session.add(BodyDAO(name="Body3", size=3))
@@ -365,6 +377,8 @@ def test_translate_limit(session, database):
 
 
 def test_order_by(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="BigBody", size=100))
     session.add(BodyDAO(name="SmallBody", size=10))
     session.commit()
@@ -384,6 +398,8 @@ def test_order_by(session, database):
 
 
 def test_order_by_descending(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="BigBody", size=100))
     session.add(BodyDAO(name="SmallBody", size=10))
     session.commit()
@@ -403,6 +419,8 @@ def test_order_by_descending(session, database):
 
 
 def test_translate_distinct(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="UniqueBody", size=10))
     session.add(BodyDAO(name="UniqueBody", size=20))
     session.commit()
@@ -420,6 +438,8 @@ def test_translate_distinct(session, database):
 
 
 def test_translate_not(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.add(BodyDAO(name="Body3", size=30))
@@ -440,6 +460,8 @@ def test_translate_not(session, database):
 
 
 def test_group_by(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=10))
     session.add(BodyDAO(name="Body3", size=20))
@@ -460,6 +482,8 @@ def test_group_by(session, database):
 
 
 def test_group_by_with_count(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=10))
     session.add(BodyDAO(name="Body3", size=20))
@@ -477,6 +501,8 @@ def test_group_by_with_count(session, database):
 
 
 def test_having(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=10))
     session.add(BodyDAO(name="Body3", size=20))
@@ -496,6 +522,8 @@ def test_having(session, database):
 
 
 def test_having_no_results(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.commit()
@@ -511,6 +539,8 @@ def test_having_no_results(session, database):
 
 
 def test_having_with_max(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.add(BodyDAO(name="Body3", size=30))
@@ -533,6 +563,8 @@ def test_having_with_max(session, database):
 
 
 def test_having_with_min(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=5))
     session.add(BodyDAO(name="Body1", size=3))
     session.add(BodyDAO(name="Body2", size=20))
@@ -554,6 +586,8 @@ def test_having_with_min(session, database):
 
 
 def test_having_with_sum(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Group1", size=10))
     session.add(BodyDAO(name="Group1", size=20))
     session.add(BodyDAO(name="Group2", size=5))
@@ -575,6 +609,8 @@ def test_having_with_sum(session, database):
 
 
 def test_having_with_average(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Group1", size=10))
     session.add(BodyDAO(name="Group1", size=30))
     session.add(BodyDAO(name="Group2", size=5))
@@ -596,6 +632,8 @@ def test_having_with_average(session, database):
 
 
 def test_where_and_order_by(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=30))
     session.add(BodyDAO(name="Body3", size=20))
@@ -617,6 +655,8 @@ def test_where_and_order_by(session, database):
 
 
 def test_limit_and_order_by(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=30))
     session.add(BodyDAO(name="Body3", size=20))
@@ -637,6 +677,8 @@ def test_limit_and_order_by(session, database):
 
 
 def test_where_and_limit(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.add(BodyDAO(name="Body3", size=30))
@@ -656,6 +698,8 @@ def test_where_and_limit(session, database):
 
 
 def test_where_and_group_by_and_having(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=10))
     session.add(BodyDAO(name="Body3", size=20))
@@ -683,6 +727,8 @@ def test_where_and_group_by_and_having(session, database):
 
 
 def test_not_and_combined(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.add(BodyDAO(name="Body3", size=30))
@@ -702,6 +748,8 @@ def test_not_and_combined(session, database):
 
 
 def test_order_by_descending_and_limit(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=30))
     session.add(BodyDAO(name="Body3", size=20))
@@ -722,6 +770,12 @@ def test_order_by_descending_and_limit(session, database):
 
 
 def test_join_and_where(session, database):
+    from ..dataset.ormatic_interface import (
+        KRROODOrientationDAO,
+        KRROODPoseDAO,
+        KRROODPositionDAO,
+    )
+
     session.add(
         KRROODPoseDAO(
             position=KRROODPositionDAO(x=1, y=2, z=3),
@@ -754,6 +808,8 @@ def test_join_and_where(session, database):
 
 
 def test_no_results(session, database):
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.commit()
 
@@ -773,6 +829,8 @@ def test_set_of(session):
     """
     Verify that set_of translates to SELECT of individual columns.
     """
+    from ..dataset.ormatic_interface import BodyDAO
+
     b = variable(type_=Body, domain=[])
     query = an(set_of(b.size))
 
@@ -786,6 +844,8 @@ def test_set_of_with_join(session):
     """
     Verify that set_of with transitive attributes generates correct JOINs.
     """
+    from ..dataset.ormatic_interface import KRROODPoseDAO, KRROODPositionDAO
+
     pose = variable(type_=KRROODPose, domain=[])
     query = an(set_of(pose.position.z))
 
@@ -796,6 +856,13 @@ def test_set_of_with_join(session):
 
 
 def test_set_of_multi_variable(session, database):
+    from ..dataset.ormatic_interface import (
+        ContainerDAO,
+        FixedConnectionDAO,
+        HandleDAO,
+        PrismaticConnectionDAO,
+    )
+
     world = World(id=1, bodies=[Container(name="Container1"), Handle(name="Handle1")])
     fc = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
     pc = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
@@ -844,6 +911,8 @@ def test_set_of_move_action_transitive(session):
     Verify that set_of with both direct and transitive attributes generates correct
     JOINs.
     """
+    from ..dataset.ormatic_interface import GraspConfigDAO, MoveActionDAO
+
     from sqlalchemy.orm import aliased
 
     move = variable(type_=MoveAction, domain=[])
@@ -882,6 +951,8 @@ def test_set_of_with_where(session):
 
     Simulates: SELECT x, y, z FROM PoseDAO JOIN PositionDAO WHERE z < 0.9
     """
+    from ..dataset.ormatic_interface import KRROODPoseDAO, KRROODPositionDAO
+
     pose = variable(type_=KRROODPose, domain=[])
     query = an(
         set_of(
@@ -919,6 +990,8 @@ def test_set_of_same_table_twice(session):
     Simulates: JOIN NavigateActionDAO np ON ... JOIN NavigateActionDAO np2 ON ...
     This uses two KRROODPose variables to test the same pattern.
     """
+    from ..dataset.ormatic_interface import ContainerDAO
+
     world = World(
         id=1,
         bodies=[
@@ -959,6 +1032,12 @@ def test_plan_like_query(session):
 
     Uses MoveAction/GraspConfig to simulate PickUpAction/NavigateAction pattern.
     """
+    from ..dataset.ormatic_interface import (
+        FixedConnectionDAO,
+        GraspConfigDAO,
+        MoveActionDAO,
+    )
+
     world = World(
         id=1,
         bodies=[
@@ -1052,6 +1131,8 @@ def test_set_of_attribute_evaluate(session, database):
     """
     Verify that evaluate() for set_of with Attribute variables returns dicts.
     """
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add(BodyDAO(name="Body1", size=10))
     session.add(BodyDAO(name="Body2", size=20))
     session.commit()
@@ -1074,6 +1155,12 @@ def test_set_of_transitive_evaluate(session, database):
     """
     Verify evaluate() for set_of with transitive attributes returns dicts.
     """
+    from ..dataset.ormatic_interface import (
+        KRROODOrientationDAO,
+        KRROODPoseDAO,
+        KRROODPositionDAO,
+    )
+
     session.add(
         KRROODPoseDAO(
             position=KRROODPositionDAO(x=1.0, y=2.0, z=3.0),
@@ -1111,6 +1198,8 @@ def test_big_query_select_part(session):
     Simulates: SELECT robot_x, robot_y, rotate_gripper FROM ...
                WHERE rotate_gripper < 0.9 ORDER BY robot_x
     """
+    from ..dataset.ormatic_interface import GraspConfigDAO, MoveActionDAO
+
     move_pick = variable(type_=MoveAction, domain=[])
     move_place = variable(type_=MoveAction, domain=[])
 
@@ -1159,6 +1248,8 @@ def test_cte_from_eql(session, database):
     WITH large_bodies AS (SELECT * FROM BodyDAO WHERE size > 5)
     SELECT * FROM ContainerDAO JOIN large_bodies ON large_bodies.database_id = ContainerDAO.database_id
     """
+    from ..dataset.ormatic_interface import BodyDAO, ContainerDAO
+
     session.add(BodyDAO(name="SmallBody", size=1))
     session.add(ContainerDAO(name="LargeContainer", size=10))
     session.commit()
@@ -1197,6 +1288,8 @@ def test_case_when_with_min(session):
     THEN ... END). Simulates: MIN(CASE WHEN d.polymorphic_type='PickUpActionDAO' THEN id
     END) from the big plan query.
     """
+    from ..dataset.ormatic_interface import MoveActionDAO, SymbolDAO
+
     action = variable(MoveAction, domain=None)
 
     query = an(
@@ -1261,6 +1354,8 @@ def test_case_when_with_max(session):
     """
     Verify max(case_when(...)) translates correctly.
     """
+    from ..dataset.ormatic_interface import MoveActionDAO, SymbolDAO
+
     action = variable(MoveAction, domain=None)
     query = an(
         set_of(
@@ -1298,6 +1393,14 @@ def test_entity_from_multi_hop_attribute(session, database):
     After the fix the translator must join through KRROODPoseDAO and return
     KRROODPositionDAO instances for all linked actions.
     """
+    from ..dataset.ormatic_interface import (
+        BodyDAO,
+        KRROODOrientationDAO,
+        KRROODPoseDAO,
+        KRROODPositionDAO,
+        NestedActionDAO,
+    )
+
     orientation = KRROODOrientationDAO(x=0.0, y=0.0, z=0.0, w=1.0)
     position_low = KRROODPositionDAO(x=0.0, y=0.0, z=3.0)
     position_high = KRROODPositionDAO(x=0.0, y=0.0, z=30.0)
@@ -1332,6 +1435,8 @@ def test_entity_with_relationship_selected_variable(session, database):
     After the fix, GraspConfigDAO must be joined with MoveActionDAO via the FK so only
     the grasp_config linked to a high-robot_x move is returned.
     """
+    from ..dataset.ormatic_interface import GraspConfigDAO, MoveActionDAO
+
     grasp_matching = GraspConfigDAO(
         rotate_gripper=0.3, approach_direction=0.0, manipulation_offset=0.0
     )
@@ -1370,6 +1475,8 @@ def test_count_all_derives_dao_from_where_clause(session, database):
     After the fix, the translator must fall back to the WHERE clause to find the base
     DAO (MoveActionDAO via m.robot_x) and emit SELECT count(*) FROM MoveActionDAO.
     """
+    from ..dataset.ormatic_interface import MoveActionDAO
+
     session.add(MoveActionDAO(robot_x=1.0, robot_y=0.0, hip_rotation=0.0))
     session.add(MoveActionDAO(robot_x=2.0, robot_y=0.0, hip_rotation=0.0))
     session.add(MoveActionDAO(robot_x=0.1, robot_y=0.0, hip_rotation=0.0))
@@ -1396,6 +1503,8 @@ def test_order_by_aggregate(session, database):
     size ORDER BY COUNT(*) DESC and return rows ordered with the most-frequent size
     first.
     """
+    from ..dataset.ormatic_interface import BodyDAO
+
     session.add_all(
         [
             BodyDAO(name="Body1", size=10),
@@ -1438,6 +1547,8 @@ def test_exists_in_where_clause(session, database):
 
     so only MoveActions that have an associated GraspConfig are returned.
     """
+    from ..dataset.ormatic_interface import GraspConfigDAO, MoveActionDAO
+
     grasp_a = GraspConfigDAO(
         rotate_gripper=0.1, approach_direction=0.0, manipulation_offset=0.0
     )

@@ -1,13 +1,14 @@
 from sqlalchemy import select
 
 from krrood.ormatic.data_access_objects.helper import to_dao
-from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.training_environments.training_environment import (
     MoveToReachTrainingEnvironment,
 )
 
 
 def test_move_to_reach(coraplex_testing_session):
+    from coraplex.orm.ormatic_interface import MoveToReachDAO
+
     training_environment = MoveToReachTrainingEnvironment(visualize=False)
 
     training_environment.generate_episodes(2)
