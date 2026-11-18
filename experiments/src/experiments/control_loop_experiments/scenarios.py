@@ -24,6 +24,7 @@ from experiments.control_loop_experiments.control_loop_profiler import (
 )
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
+from giskardpy.middleware.ros2.motion_goal import DebugOutput
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
@@ -68,6 +69,32 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 # %% how much the measurement records
+
+
+class PlotterMode(StrEnum):
+    """
+    Whether Giskard records the trajectory of the motion while it is measured.
+
+    Recording costs time in every cycle, so the same motion is measured under both modes
+    to show what it costs.
+    """
+
+    PLAIN = "plain"
+    """
+    Nothing is recorded, so only the control loop itself is measured.
+    """
+
+    DEBUG = "debug"
+    """
+    The trajectory is recorded and plotted, as it is when a motion is debugged.
+    """
+
+    @property
+    def debug_output(self) -> DebugOutput:
+        """
+        :return: What the measured goal asks Giskard to produce to debug it.
+        """
+        return DebugOutput(plots_trajectory=self is PlotterMode.DEBUG)
 
 
 # %% the robot under measurement
@@ -700,6 +727,11 @@ class ScenarioRunner:
     Sets a scenario up, measures its motion and takes the robot down again.
     """
 
+    plotter_mode: PlotterMode = PlotterMode.PLAIN
+    """
+    Whether Giskard records the trajectory of the motion while it is measured.
+    """
+
     target_frequency: float = 100.0
     """
     Frequency the controller is discretized for, in hertz.
@@ -743,13 +775,14 @@ class ScenarioRunner:
         :param robot: The robot the motion is executed on.
         :param motion_statechart: The motion that is executed.
         """
+        debug_output = self.plotter_mode.debug_output
         if self.python_profiler is None:
             robot.api.compile(statechart=motion_statechart)
-            robot.api.execute()
+            robot.api.execute(debug_output=debug_output)
             return
         self.python_profiler.enable()
         try:
             robot.api.compile(statechart=motion_statechart)
-            robot.api.execute()
+            robot.api.execute(debug_output=debug_output)
         finally:
             self.python_profiler.disable()

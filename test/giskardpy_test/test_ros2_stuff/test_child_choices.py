@@ -152,8 +152,12 @@ class ChoosingGoal:
         return cls(statechart=statechart, choosing_node=choosing_node)
 
     def goal_json(self) -> str:
+        """
+        :return: The json of a goal asking for :attr:`statechart`, from a client no check
+            recognizes.
+        """
         return json.dumps(
-            MotionGoal.for_motion_statechart(
+            MotionGoal.from_motion_statechart(
                 motion_statechart=self.statechart,
                 client=MetaData(node_name="unwatched_client", process_id=0),
             ).to_json()

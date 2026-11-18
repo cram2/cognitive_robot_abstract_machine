@@ -41,6 +41,17 @@ class UndocumentedDefinitionsLine(IntEnum):
     """
 
 
+class UndocumentedClasspropertiesLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.DocstringSnippet.UNDOCUMENTED_CLASSPROPERTIES`.
+    """
+
+    OVERRIDING_CLASSPROPERTY = 42
+    """
+    The undocumented override of an implemented classproperty, from its decorator.
+    """
+
+
 class UnimportableDefinitionsLine(IntEnum):
     """
     Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.DocstringSnippet.UNIMPORTABLE_DEFINITIONS`.

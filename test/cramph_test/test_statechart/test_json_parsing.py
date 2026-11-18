@@ -1,3 +1,7 @@
+"""
+Tests that statecharts and their nodes survive a round trip through JSON.
+"""
+
 import json
 
 import pytest
@@ -104,6 +108,10 @@ def test_ending_condition_round_trip(transition_kind: TransitionKind) -> None:
 
 
 def test_nested_goals(tmp_path) -> None:
+    """
+    A composite node nested in another keeps its index and its parent after a round trip
+    through JSON.
+    """
     msc = Statechart(context=StatechartContext(world=World()))
     msc.add_node(
         node=(
@@ -124,7 +132,7 @@ def test_nested_goals(tmp_path) -> None:
         data=new_json_data, context=StatechartContext(world=World())
     )
     msc_copy.compiler.add_transitions()
-    msc.draw(file_name=str(tmp_path / "statechart.pdf"))
+    msc.draw(file_name=tmp_path / "statechart.pdf")
 
     for node in msc.nodes:
         node_copy = msc_copy.get_node_by_index(index=node.index)

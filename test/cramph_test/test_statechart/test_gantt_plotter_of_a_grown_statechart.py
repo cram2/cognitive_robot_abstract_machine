@@ -1,3 +1,7 @@
+"""
+Tests of the Gantt chart of a statechart that gained a node after it ran.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -84,6 +88,9 @@ def test_the_observation_bars_of_a_late_node_start_when_it_joined(
 def test_a_node_no_snapshot_records_has_no_bars(
     statechart_executor: StatechartExecutor, tmp_path: Path
 ) -> None:
+    """
+    A node added after the statechart ran has no bars, and the chart is still drawn.
+    """
     _run_a_statechart_gaining_a_node(statechart_executor)
     statechart = statechart_executor.statechart
     unrecorded = NodeSucceedingOnObservingTrue(
@@ -94,7 +101,7 @@ def test_a_node_no_snapshot_records_has_no_bars(
 
     assert plotter.life_cycle_spans(node=unrecorded) == []
     assert plotter.observation_spans(node=unrecorded) == []
-    plotter.plot_gantt_chart(file_name=str(tmp_path / "gantt_chart.pdf"))
+    plotter.plot_gantt_chart(file_name=tmp_path / "gantt_chart.pdf")
 
 
 # %% rows of a statechart that grew
