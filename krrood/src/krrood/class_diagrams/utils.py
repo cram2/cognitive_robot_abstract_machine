@@ -21,10 +21,12 @@ from typing_extensions import Any, Callable, TypeVar, TypeVarTuple, get_origin
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.singleton import SingletonMeta
-from krrood.utils import (
+from krrood.source_analysis.import_scope import (
     DeferredImportScope,
-    ensure_hashable,
     get_scope_from_imports,
+)
+from krrood.utils import (
+    ensure_hashable,
     get_full_class_name,
     is_builtin_type,
 )
@@ -361,18 +363,11 @@ def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> DeferredImpo
 
 def _cached_scope_from_imports(source_path: str) -> DeferredImportScope:
     """
-    Return the import scope of *source_path*, reusing a per-file cache.
+    Return the import scope of *source_path*, cached per ``(path, mtime)``.
 
-    The class-diagram type-hint fallback re-parses the same handful of library source
-    files thousands of times; caching by ``(path, mtime)`` collapses that to one parse
-    per file while self-invalidating if the file changes on disk. The returned
-    dictionary is shared between callers and must be treated as read-only, consistent
-    with the :func:`lru_cache`-d :func:`get_type_hints_of_object`.
-
-    This cache is intentionally local to the class-diagram resolution path and not
-    applied to :func:`~krrood.utils.get_scope_from_imports` itself, because other
-    callers (ripple-down-rules code generation) re-read regenerated files within a
-    single process and rely on the uncached behaviour.
+    The returned scope is shared between callers and must be treated as read-only. The
+    cache is not applied to :func:`~krrood.source_analysis.import_scope.get_scope_from_imports`
+    itself, because ripple-down-rules code generation re-reads regenerated files.
 
     :param source_path: Path to the source file whose import scope is needed.
     :return: The import scope dictionary for *source_path*.
@@ -420,16 +415,11 @@ def _fallback_scope_for_import_generation(
     source_path: str, generation: int
 ) -> DeferredImportScope:
     """
-    Recompute *source_path*'s import scope from scratch, memoized per import-system
-    generation.
+    Recompute *source_path*'s import scope, memoized per import-system generation.
 
-    A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every retry
-    until that module finishes loading. Keying this on *generation*
-    (:meth:`ModulesThatFinishedInitializing.count_finished_modules`) means the expensive, uncached
-    :func:`~krrood.utils.get_scope_from_imports` recompute only actually runs again once something
-    has genuinely changed, instead of once per failed lookup: many dataclasses across a codebase can
-    independently need the same still-unavailable name while a dependency is mid-import, and without
-    this every one of those lookups would re-parse the file and re-import everything it references.
+    A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every
+    retry, so the recompute runs again only once *generation*
+    (:meth:`ModulesThatFinishedInitializing.count_finished_modules`) has advanced.
 
     :param source_path: The file whose import scope is recomputed.
     :param generation: The import-system generation the recompute is valid for.

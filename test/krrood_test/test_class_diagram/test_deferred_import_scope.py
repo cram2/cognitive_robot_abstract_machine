@@ -6,7 +6,7 @@ a module nothing asked for.
 import inspect
 import sys
 
-from krrood.utils import get_scope_from_imports
+from krrood.source_analysis.import_scope import get_scope_from_imports
 
 from ..dataset.latebound_annotation_owner import OwnerWithLateBoundAnnotation
 
