@@ -330,7 +330,7 @@ def test_bowl_and_cup_picked_up_as_statements_are_moved_onto_the_kitchen_island(
     """
     kitchen = kitchen_with_filled_drawer
     pick_ups = [
-        a(PickUpAction)(grasp=pick_up.grasp, arm=pick_up.arm)
+        a(PickUpAction)(grasp_candidate=pick_up.grasp_candidate, arm=pick_up.arm)
         for pick_up in pick_ups_from_above(kitchen)
     ]
 
