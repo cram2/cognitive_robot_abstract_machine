@@ -368,8 +368,10 @@ class TruncatedGaussianLayer(
         result = (
             untruncated - self.cumulative_distribution_to_lower
         ) / self.normalizing_constant
-        return self.namespace.minimum(
-            1.0, self.namespace.where(left_included, result, 0.0)
+        return self.namespace.where(
+            left_included,
+            self.namespace.minimum(self.namespace.maximum(result, 0.0), 1.0),
+            0.0,
         )
 
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
