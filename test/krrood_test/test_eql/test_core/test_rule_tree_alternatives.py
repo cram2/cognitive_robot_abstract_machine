@@ -15,7 +15,7 @@ from krrood.entity_query_language.factories import (
     variable,
 )
 
-from ...dataset.rule_tree_subjects import (
+from ...dataset.rule_tree_domains import (
     Child,
     ChildLabel,
     Household,

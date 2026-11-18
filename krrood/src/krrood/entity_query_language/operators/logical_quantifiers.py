@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import Iterable
+from typing_extensions import Iterable, Iterator
 
 from krrood.entity_query_language.core.base_expressions import (
     Operand,
@@ -29,6 +29,91 @@ from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.utils import (
     cartesian_product_while_passing_the_bindings_around,
 )
+
+
+# %% occurrences in a quantifier's enclosing query
+
+
+@dataclass(kw_only=True, frozen=True)
+class ExpressionOccurrence:
+    """
+    One place an expression occurs in the enclosing query of a quantifier, as that query
+    is walked to find the quantifier's outer-visible variables.
+    """
+
+    expression: SymbolicExpression
+    """
+    The expression that occurs.
+    """
+
+    is_inside_quantifier: bool
+    """
+    Whether the occurrence is inside the quantifier whose outer-visible variables are
+    being found.
+    """
+
+    variables_of_enclosing_quantifiers: tuple[SymbolicExpression, ...] = ()
+    """
+    The variables of the other quantifiers this occurrence is nested in.
+    """
+
+    @property
+    def key(self) -> tuple[uuid.UUID, bool, tuple[uuid.UUID, ...]]:
+        """
+        What tells this occurrence apart from the other occurrences of its expression.
+        """
+        return (
+            self.expression._id_,
+            self.is_inside_quantifier,
+            tuple(
+                variable._id_ for variable in self.variables_of_enclosing_quantifiers
+            ),
+        )
+
+    def depends_on_an_enclosing_quantifier(self) -> bool:
+        """
+        :return: Whether the expression contains the variable of another quantifier it
+            is nested in, which binds that variable itself.
+        """
+        return any(
+            self.expression._contains_(expression=variable)
+            for variable in self.variables_of_enclosing_quantifiers
+        )
+
+    def occurrence_of(
+        self, *, expression: SymbolicExpression, is_inside_quantifier: bool
+    ) -> ExpressionOccurrence:
+        """
+        :param expression: An expression nested directly in this occurrence.
+        :param is_inside_quantifier: Whether it is inside the quantifier being looked
+            at.
+        :return: The occurrence of *expression* there.
+        """
+        variables = self.variables_of_enclosing_quantifiers
+        if isinstance(self.expression, QuantifiedConditional):
+            variables = (*variables, self.expression.variable)
+        return ExpressionOccurrence(
+            expression=expression,
+            is_inside_quantifier=is_inside_quantifier,
+            variables_of_enclosing_quantifiers=variables,
+        )
+
+    def child_occurrences(self) -> list[ExpressionOccurrence]:
+        """
+        :return: The occurrences of the children of the expression, in order. A nested
+            query is a scope of its own, so it has none.
+        """
+        if isinstance(self.expression, Query):
+            return []
+        return [
+            self.occurrence_of(
+                expression=child, is_inside_quantifier=self.is_inside_quantifier
+            )
+            for child in self.expression._children_
+        ]
+
+
+# %% quantifiers
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
@@ -124,53 +209,47 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
             return ()
         inside_this_quantifier: dict[uuid.UUID, SymbolicExpression] = {}
         ids_outside_this_quantifier = set()
-        visited_occurrences = set()
-        no_quantified_variables: tuple[SymbolicExpression, ...] = ()
-        stack = [
-            (child, False, no_quantified_variables)
-            for child in reversed(scope._children_)
-        ]
-        while stack:
-            expression, is_inside, quantified_by_others = stack.pop()
-            occurrence = (
-                expression._id_,
-                is_inside,
-                tuple(variable._id_ for variable in quantified_by_others),
-            )
-            if occurrence in visited_occurrences:
-                continue
-            visited_occurrences.add(occurrence)
-            if expression._id_ == self._id_:
-                stack.extend(
-                    [
-                        (self.condition, True, quantified_by_others),
-                        (self.variable, True, quantified_by_others),
-                    ]
-                )
-                continue
-            if is_inside:
+        for occurrence in self._occurrences_in_(scope=scope):
+            expression = occurrence.expression
+            if occurrence.is_inside_quantifier:
                 inside_this_quantifier.setdefault(expression._id_, expression)
-            elif not any(
-                expression._contains_(expression=variable)
-                for variable in quantified_by_others
-            ):
+            elif not occurrence.depends_on_an_enclosing_quantifier():
                 ids_outside_this_quantifier.add(expression._id_)
-            # Another quantifier binds its own variable, so what depends on that
-            # variable inside it does not occur outside this quantifier.
-            if isinstance(expression, QuantifiedConditional):
-                quantified_by_others = (*quantified_by_others, expression.variable)
-            # A nested query is a scope of its own, so its variables are not entered.
-            if not isinstance(expression, Query):
-                stack.extend(
-                    (child, is_inside, quantified_by_others)
-                    for child in reversed(expression._children_)
-                )
         return tuple(
             expression
             for expression_id, expression in inside_this_quantifier.items()
             if isinstance(expression, Selectable)
             and expression_id in ids_outside_this_quantifier
         )
+
+    def _occurrences_in_(self, *, scope: Query) -> Iterator[ExpressionOccurrence]:
+        """
+        :param scope: The query enclosing this quantifier.
+        :return: Every occurrence of an expression in *scope*, depth first, apart from
+            this quantifier itself, whose condition and variable are inside it.
+        """
+        visited_keys = set()
+        stack = [
+            ExpressionOccurrence(expression=child, is_inside_quantifier=False)
+            for child in reversed(scope._children_)
+        ]
+        while stack:
+            occurrence = stack.pop()
+            if occurrence.key in visited_keys:
+                continue
+            visited_keys.add(occurrence.key)
+            if occurrence.expression._id_ == self._id_:
+                stack.extend(
+                    ExpressionOccurrence(
+                        expression=expression,
+                        is_inside_quantifier=True,
+                        variables_of_enclosing_quantifiers=occurrence.variables_of_enclosing_quantifiers,
+                    )
+                    for expression in (self.condition, self.variable)
+                )
+                continue
+            yield occurrence
+            stack.extend(reversed(occurrence.child_occurrences()))
 
     def _enclosing_query_(self) -> Query | None:
         """

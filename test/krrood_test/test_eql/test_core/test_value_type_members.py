@@ -14,7 +14,7 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.factories import an, entity, variable
 
-from ...dataset.rule_tree_subjects import Payment, Period, TaxYear
+from ...dataset.rule_tree_domains import Payment, Period, TaxYear
 
 
 # %% calls with variables as arguments

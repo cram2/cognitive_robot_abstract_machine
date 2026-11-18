@@ -42,7 +42,7 @@ from krrood.entity_query_language.rules.conclusion import Add
 from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import Symbol
 
-from ...dataset.rule_tree_subjects import Birth, Voter
+from ...dataset.rule_tree_domains import Birth, Voter
 
 
 @dataclass(kw_only=True, eq=False)

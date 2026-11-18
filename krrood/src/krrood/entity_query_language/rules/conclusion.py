@@ -71,7 +71,7 @@ class Conclusion(BinaryExpression, ABC):
         return self.right
 
     @cached_property
-    def variables_concluded_about(self) -> tuple[Variable, ...]:
+    def variables_in_concluded_value(self) -> tuple[Variable, ...]:
         """
         The variables with a domain of their own that the concluded value is built from,
         such as the child a label is inferred for.

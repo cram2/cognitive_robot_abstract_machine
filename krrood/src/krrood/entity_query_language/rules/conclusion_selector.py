@@ -287,46 +287,46 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 
 
 @dataclass(kw_only=True)
-class SubjectsConcludedAbout:
+class ConcludedValueCombinations:
     """
-    The combinations of values of the subject variables of an :class:`Alternative` that
-    one of its branches already concluded about, told apart by identity since a variable
-    ranges over the objects of its domain.
+    The combinations of values of :attr:`Alternative._variables_shared_by_conclusions_`
+    that one branch of an :class:`Alternative` already concluded for, told apart by
+    identity since a variable ranges over the objects of its domain.
     """
 
-    subject_variables: tuple[Variable, ...]
+    variables: tuple[Variable, ...]
     """
-    The variables whose values make up a subject.
+    The variables whose values make up a combination.
     """
 
     values_by_identity: dict[tuple[int, ...], tuple[Any, ...]] = field(
         default_factory=dict
     )
     """
-    Each subject's values, keyed by their identities; holding the values keeps those
+    Each combination's values, keyed by their identities; holding the values keeps those
     identities from being reused while they are compared.
     """
 
     def _identities_(self, *, bindings: Bindings) -> tuple[int, ...]:
         """
-        :param bindings: Bindings holding a value for every subject variable.
+        :param bindings: Bindings holding a value for every one of :attr:`variables`.
         :return: The identities of those values.
         """
-        return tuple(id(bindings[variable._id_]) for variable in self.subject_variables)
+        return tuple(id(bindings[variable._id_]) for variable in self.variables)
 
     def add(self, *, bindings: Bindings) -> None:
         """
-        :param bindings: Bindings holding a value for every subject variable, whose
-            subject is now concluded about.
+        :param bindings: Bindings holding a value for every one of :attr:`variables`,
+            whose combination is now concluded for.
         """
         self.values_by_identity[self._identities_(bindings=bindings)] = tuple(
-            bindings[variable._id_] for variable in self.subject_variables
+            bindings[variable._id_] for variable in self.variables
         )
 
     def contains(self, *, bindings: Bindings) -> bool:
         """
-        :param bindings: Bindings holding a value for every subject variable.
-        :return: Whether their subject was already concluded about.
+        :param bindings: Bindings holding a value for every one of :attr:`variables`.
+        :return: Whether their combination was already concluded for.
         """
         return self._identities_(bindings=bindings) in self.values_by_identity
 
@@ -346,28 +346,28 @@ class Alternative(OR, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         """
         Overrides :meth:`OR._evaluate__`: the right branch concludes only for the values
-        of :attr:`_subject_variables_` that the left branch holds for none of, whatever
-        else either branch binds.
+        of :attr:`_variables_shared_by_conclusions_` that the left branch holds for none
+        of, whatever else either branch binds.
 
-        Branches that share no subject variable fall back to
+        Branches whose conclusions share no variable fall back to
         :meth:`_evaluate_for_every_failing_binding_`.
         """
-        subject_variables = self._subject_variables_
-        if not subject_variables:
+        shared_variables = self._variables_shared_by_conclusions_
+        if not shared_variables:
             yield from self._evaluate_for_every_failing_binding_(sources=sources)
             return
-        concluded = SubjectsConcludedAbout(subject_variables=subject_variables)
+        concluded = ConcludedValueCombinations(variables=shared_variables)
         for left_value in self._evaluate_child_as_condition_(
             child=self.left, sources=sources
         ):
             if left_value.is_false:
                 continue
-            for subject in cartesian_product_while_passing_the_bindings_around(
-                subject_variables, left_value
+            for combination in cartesian_product_while_passing_the_bindings_around(
+                shared_variables, left_value
             ):
-                concluded.add(bindings=subject.bindings)
+                concluded.add(bindings=combination.bindings)
                 yield from self._result_with_conclusions_of_(
-                    branch_result=left_value, bindings=subject.bindings
+                    branch_result=left_value, bindings=combination.bindings
                 )
         for right_value in self._evaluate_child_as_condition_(
             child=self.right, sources=sources
@@ -377,13 +377,13 @@ class Alternative(OR, ConclusionSelector):
                     truth=False, bindings=right_value.bindings, child_result=right_value
                 )
                 continue
-            for subject in cartesian_product_while_passing_the_bindings_around(
-                subject_variables, right_value
+            for combination in cartesian_product_while_passing_the_bindings_around(
+                shared_variables, right_value
             ):
-                if concluded.contains(bindings=subject.bindings):
+                if concluded.contains(bindings=combination.bindings):
                     continue
                 yield from self._result_with_conclusions_of_(
-                    branch_result=right_value, bindings=subject.bindings
+                    branch_result=right_value, bindings=combination.bindings
                 )
 
     def _evaluate_for_every_failing_binding_(
@@ -405,10 +405,10 @@ class Alternative(OR, ConclusionSelector):
             self._conclusions_.clear()
 
     @property
-    def _subject_variables_(self) -> tuple[Variable, ...]:
+    def _variables_shared_by_conclusions_(self) -> tuple[Variable, ...]:
         """
-        The variables every conclusion of either branch is about, for whose values the
-        branches are alternatives to each other.
+        The variables in the concluded value of every conclusion of either branch, for
+        whose values the branches are alternatives to each other.
         """
         conclusions = [
             conclusion
@@ -419,13 +419,14 @@ class Alternative(OR, ConclusionSelector):
             return ()
         shared_ids = set.intersection(
             *(
-                {variable._id_ for variable in conclusion.variables_concluded_about}
+                {variable._id_ for variable in conclusion.variables_in_concluded_value}
                 for conclusion in conclusions
             )
         )
+        # Every shared variable is in the first conclusion, whose order is kept.
         return tuple(
             variable
-            for variable in conclusions[0].variables_concluded_about
+            for variable in conclusions[0].variables_in_concluded_value
             if variable._id_ in shared_ids
         )
 
@@ -434,8 +435,8 @@ class Alternative(OR, ConclusionSelector):
     ) -> Iterable[OperationResult]:
         """
         :param branch_result: A result of one of the two branches that holds.
-        :param bindings: The bindings of that result, extended by the values of the
-            subject variables.
+        :param bindings: The bindings of that result, extended by the values of
+            :attr:`_variables_shared_by_conclusions_`.
         :return: This alternative's result for it, carrying the branch's conclusions.
         """
         self._conclusions_.update(branch_result.operand._conclusions_)

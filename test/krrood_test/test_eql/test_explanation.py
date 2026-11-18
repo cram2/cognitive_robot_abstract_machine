@@ -39,7 +39,7 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.symbol_graph.symbol_graph import Symbol
-from ..dataset.rule_tree_subjects import (
+from ..dataset.rule_tree_domains import (
     Birth,
     Child,
     ChildLabel,
