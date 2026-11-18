@@ -22,6 +22,7 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
+    HasHoleNormalParameter,
     HasHolePointParameter,
     HasKinematicChainParameter,
 )
@@ -37,6 +38,7 @@ class WiggleInsert(
     ConvergingTask,
     HasKinematicChainParameter,
     HasHolePointParameter,
+    HasHoleNormalParameter,
     HasCruiseVelocityParameter,
 ):
     """
@@ -59,13 +61,6 @@ class WiggleInsert(
     Strength of the angular wiggle.
 
     Default is an untuned preset, not a calibrated value.
-    """
-
-    hole_normal: Vector3 | None = None
-    """
-    Vector perpendicular to the hole.
-
-    Defaults to the root z-axis.
     """
 
     random_walk: bool = True
@@ -187,15 +182,8 @@ class WiggleInsert(
             and the hole.
         """
         artifacts = MotionNodeArtifacts()
-        # The previous default was a zero vector, which has no well-defined perpendicular plane;
-        # the root z-axis is used instead so the default is usable.
         hole_normal = self.context.world.transform(
-            target_frame=self.kinematic_chain.root,
-            spatial_object=(
-                self.hole_normal
-                if self.hole_normal is not None
-                else Vector3.Z(reference_frame=self.kinematic_chain.root)
-            ),
+            target_frame=self.kinematic_chain.root, spatial_object=self.hole_normal
         )
 
         self._perpendicular_basis_first, self._perpendicular_basis_second = (

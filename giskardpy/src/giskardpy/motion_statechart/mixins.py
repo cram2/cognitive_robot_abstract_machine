@@ -333,6 +333,18 @@ class HasHolePointParameter(ParameterMixin):
     """
 
 
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasHoleNormalParameter(ParameterMixin):
+    """
+    A node inserting what a gripper holds along the axis of a hole.
+    """
+
+    hole_normal: Vector3
+    """
+    The axis of the hole, pointing out of its opening.
+    """
+
+
 # %% velocities
 
 

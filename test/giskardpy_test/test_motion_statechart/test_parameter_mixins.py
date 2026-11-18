@@ -68,6 +68,7 @@ from giskardpy.motion_statechart.mixins import (
     HasUpperAngleParameter,
     HasPointingAxisParameter,
     HasHolePointParameter,
+    HasHoleNormalParameter,
 )
 from giskardpy.motion_statechart.forward_kinematics_binding import (
     ForwardKinematicsBinding,
@@ -590,6 +591,8 @@ def test_an_alignment_pair_names_its_normals_as_align_planes_takes_them():
         (PointingAt, HasPointingAxisParameter),
         (WiggleInsert, HasHolePointParameter),
         (InsertCylinder, HasHolePointParameter),
+        (WiggleInsert, HasHoleNormalParameter),
+        (InsertCylinder, HasHoleNormalParameter),
     ],
 )
 def test_a_feature_comes_from_its_mixin(node_class: type, mixin: type):

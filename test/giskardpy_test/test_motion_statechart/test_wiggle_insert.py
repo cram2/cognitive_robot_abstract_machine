@@ -178,6 +178,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                                 name="wiggle",
                                 kinematic_chain=KinematicChain(root=root_link, tip=hpl),
                                 hole_point=hole_point,
+                                hole_normal=Vector3.Z(reference_frame=root_link),
                                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                             ),
                             barrier := Parallel(

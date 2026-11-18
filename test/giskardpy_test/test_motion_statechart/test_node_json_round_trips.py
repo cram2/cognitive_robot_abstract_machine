@@ -470,6 +470,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 WiggleInsert(
                     kinematic_chain=KinematicChain(root=_root(world), tip=_tip(world)),
                     hole_point=_point(world),
+                    hole_normal=_root_axis(world),
                 )
             ],
             WorldFixture.PR2_WORLD,

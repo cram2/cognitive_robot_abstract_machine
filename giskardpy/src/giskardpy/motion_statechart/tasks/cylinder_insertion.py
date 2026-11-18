@@ -14,6 +14,7 @@ from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
+    HasHoleNormalParameter,
     HasHolePointParameter,
     HasTipLinkParameter,
     HasWeightParameter,
@@ -96,6 +97,7 @@ class InsertCylinder(
     CompositeNode,
     HasTipLinkParameter,
     HasHolePointParameter,
+    HasHoleNormalParameter,
     HasWeightParameter,
 ):
     """
@@ -116,11 +118,6 @@ class InsertCylinder(
     tip_V_axis: Vector3
     """
     Insertion axis of the cylinder.
-    """
-
-    hole_normal: Vector3
-    """
-    Axis pointing out of the hole.
     """
 
     pre_grasp_height: float = 0.2

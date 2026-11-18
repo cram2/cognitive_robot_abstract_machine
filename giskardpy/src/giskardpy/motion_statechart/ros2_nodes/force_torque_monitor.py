@@ -44,15 +44,18 @@ class ForceTorqueNode(TopicSubscriberNode[WrenchStamped]):
 @dataclass(eq=False, repr=False, kw_only=True)
 class ForceImpactMonitor(ForceTorqueNode):
     """
-    This node checks if the force magnitude is above a threshold.
+    This node checks if the force magnitude is above :attr:`force_threshold`.
     """
 
-    threshold: float
+    force_threshold: float
+    """
+    The force magnitude above which this monitor observes true, in newtons.
+    """
 
     def on_tick(self) -> ObservationStateValues | None:
         super().on_tick()
         if not self.has_msg():
             return ObservationStateValues.UNKNOWN
-        if self.force_magnitude() > self.threshold:
+        if self.force_magnitude() > self.force_threshold:
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
