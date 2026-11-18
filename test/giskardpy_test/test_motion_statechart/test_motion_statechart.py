@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from giskardpy.data_types.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from cramph.data_types import (
     LifeCycleValues,

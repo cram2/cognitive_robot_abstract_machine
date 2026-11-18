@@ -8,7 +8,7 @@ from coraplex.plans.failures import EmptyUnderspecified
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     variable_from,
     a,

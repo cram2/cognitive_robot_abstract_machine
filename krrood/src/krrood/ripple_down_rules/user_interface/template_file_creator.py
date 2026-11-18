@@ -25,7 +25,7 @@ from krrood.ripple_down_rules.utils import (
 )
 from krrood.code_generation.imports import get_imports_from_types
 from krrood.source_analysis.source_extraction import extract_function_source
-from krrood.code_generation.type_hints import stringify_type_hint
+from krrood.code_generation.object_to_source import stringify_type_hint
 from krrood.utils import get_scope_from_imports
 
 

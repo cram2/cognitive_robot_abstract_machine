@@ -1,8 +1,13 @@
+"""
+Tests for the robot interface configurations: their construction, pacing and the joints
+they control.
+"""
+
 from dataclasses import dataclass, fields, is_dataclass
 
 import pytest
 
-from giskardpy.data_types.exceptions import NoControlledJointsError
+from giskardpy.exceptions import NoControlledJointsError
 from cramph.executor import NoPacing, RealTimePacer
 from giskardpy.middleware.ros2.exceptions import NoUniqueDriveError
 from giskardpy.middleware.ros2.giskard import Giskard

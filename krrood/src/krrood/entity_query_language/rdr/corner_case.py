@@ -1,10 +1,9 @@
 """
 Corner-case provenance store for the EQL-native RDR.
 
-Every rule in an RDR is created to handle one specific exception case — the *corner
-case*. This module provides :class:`CornerCaseStore`, which records that case against
-the rule's condition node and survives the save/load round-trip via a stable positional
-index (see :func:`~krrood.entity_query_language.rdr.serialization.walk_rules_in_emission_order`).
+Every rule is created for one exception case, its *corner case*; :class:`CornerCaseStore`
+records it against the rule's condition, keyed for saving by the rule's position in
+:meth:`~krrood.entity_query_language.rules.decomposition.DecomposedRuleTree.rule_conditions`.
 """
 
 from __future__ import annotations
@@ -73,7 +72,7 @@ class CornerCaseStore:
         Delegates to ``self.serializer.to_source`` for each recorded case.
 
         :param ordered_nodes: Rule condition nodes in the order returned by
-            :func:`~krrood.entity_query_language.rdr.serialization.walk_rules_in_emission_order`.
+            :meth:`~krrood.entity_query_language.rules.decomposition.DecomposedRuleTree.rule_conditions`.
         :return: Mapping from index to :class:`~krrood.code_generation.dataclass_source.ObjectSource` for nodes that have a
             recorded corner case; nodes without one are absent.
         """
@@ -95,7 +94,7 @@ class CornerCaseStore:
 
         :param ordered_nodes: Rule condition nodes in the same emission order used at
             save time (from
-            :func:`~krrood.entity_query_language.rdr.serialization.walk_rules_in_emission_order`
+            :meth:`~krrood.entity_query_language.rules.decomposition.DecomposedRuleTree.rule_conditions`
             over the freshly loaded rule tree).
         :param cases_by_index: Mapping from positional index to case instance (as loaded
             from the ``RDR_CORNER_CASES`` module-level dict).
