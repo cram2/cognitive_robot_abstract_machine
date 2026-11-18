@@ -87,25 +87,11 @@ def test_only_code_changed_since_the_revision_is_reported(repository: Path) -> N
     ]
 
 
-def test_every_line_of_an_untracked_file_has_changed(repository: Path) -> None:
-    """
-    A file git does not track yet is new in every line.
-    """
-    path = repository / "untracked.py"
-    shutil.copy(ProseSnippet.OVERLONG_MODULE_DOCSTRING, path)
-
-    changed_lines = LinesChangedSince(
-        repository=repository, revision="HEAD"
-    ).find_changed_lines(path=path)
-
-    assert changed_lines == set(range(1, len(path.read_text().splitlines()) + 1))
-
-
 def test_the_changed_files_are_the_python_files_modified_or_added(
     repository: Path,
 ) -> None:
     """
-    Deleted, ignored and non-Python files are left out.
+    Deleted, untracked and non-Python files are left out.
     """
     shutil.copy(ProseSnippet.COMMENT_BLOCKS, repository / "deleted.py")
     git(repository, "add", "deleted.py")
@@ -114,9 +100,10 @@ def test_the_changed_files_are_the_python_files_modified_or_added(
     with (repository / "module.py").open("a") as source:
         source.write("\n")
     shutil.copy(ProseSnippet.COMMENT_BLOCKS, repository / "added.py")
-    shutil.copy(ProseSnippet.COMMENT_BLOCKS, repository / "ignored.py")
-    (repository / ".gitignore").write_text("ignored.py\n")
+    git(repository, "add", "added.py")
+    shutil.copy(ProseSnippet.COMMENT_BLOCKS, repository / "untracked.py")
     (repository / "notes.txt").write_text("not Python\n")
+    git(repository, "add", "notes.txt")
 
     changed_files = LinesChangedSince(
         repository=repository, revision="HEAD"
@@ -133,44 +120,3 @@ def test_comparing_with_an_unknown_revision_fails(repository: Path) -> None:
         LinesChangedSince(
             repository=repository, revision="no-such-revision"
         ).find_changed_files()
-
-
-def test_the_changed_files_are_found_from_a_subdirectory(repository: Path) -> None:
-    """
-    Run from a subdirectory, the changed files below it are found where they are.
-    """
-    subdirectory = repository / "package"
-    subdirectory.mkdir()
-    shutil.copy(ProseSnippet.COMMENT_BLOCKS, subdirectory / "modified.py")
-    git(repository, "add", "package/modified.py")
-    git(repository, "commit", "--quiet", "-m", "Add a module to modify")
-    with (subdirectory / "modified.py").open("a") as source:
-        source.write("\n")
-    shutil.copy(ProseSnippet.COMMENT_BLOCKS, subdirectory / "added.py")
-
-    changed_files = LinesChangedSince(
-        repository=subdirectory, revision="HEAD"
-    ).find_changed_files()
-
-    assert sorted(changed_files) == [
-        subdirectory / "added.py",
-        subdirectory / "modified.py",
-    ]
-
-
-def test_changes_the_revision_made_after_the_branch_forked_are_left_out(
-    repository: Path,
-) -> None:
-    """
-    The working tree is compared with where it forked from the revision, so code the
-    revision changed since then does not count as changed by the working tree.
-    """
-    git(repository, "switch", "--quiet", "--create", "base")
-    path = repository / "module.py"
-    path.write_text(f"\n{path.read_text()}")
-    git(repository, "commit", "--quiet", "--all", "-m", "Change the module on base")
-    git(repository, "switch", "--quiet", "-")
-    changed_lines = LinesChangedSince(repository=repository, revision="base")
-
-    assert changed_lines.find_changed_files() == []
-    assert changed_lines.find_changed_lines(path=path) == set()

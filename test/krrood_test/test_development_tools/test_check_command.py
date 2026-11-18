@@ -18,6 +18,7 @@ from krrood.development_tools.command_line import (
 from krrood.development_tools.subcommand import Subcommand
 
 from .dataset_files import DatasetFile, DocstringSnippet, ProseSnippet
+from .git_repository import git
 
 # %% check command
 
@@ -67,10 +68,11 @@ def test_checking_since_a_revision_finds_the_changed_files(
 ) -> None:
     """
     Without files named, the Python files changed since the revision are checked: an
-    untracked module with an overlong comment block fails the check.
+    added module with an overlong comment block fails the check.
     """
     monkeypatch.chdir(repository)
     shutil.copy(ProseSnippet.COMMENT_BLOCKS, repository / "added.py")
+    git(repository, "add", "added.py")
 
     exit_status = CommandLine.main(
         command_line=[Subcommand.CHECK, Option.SINCE, "HEAD"]

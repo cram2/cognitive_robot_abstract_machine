@@ -55,8 +55,8 @@ class Option(StrEnum):
 
     SINCE = "--since"
     """
-    Check the lines the working tree changes since it forked from the revision that
-    follows, instead of the staged change.
+    Check the lines the working tree changes since the revision that follows, instead of
+    the staged change.
     """
 
     FORM = "--form"
@@ -186,8 +186,8 @@ class CommandLine:
             Option.SINCE,
             metavar="REVISION",
             help=(
-                "Check the lines changed since the merge base with REVISION, staged or "
-                "not; without files, check every Python file changed since then."
+                "Check the lines changed since REVISION, staged or not; without files, "
+                "check every tracked Python file changed since then."
             ),
         )
         check_parser.set_defaults(run=self.check_files)

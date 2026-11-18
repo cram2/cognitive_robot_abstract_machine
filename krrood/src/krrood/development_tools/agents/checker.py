@@ -9,7 +9,6 @@ import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from functools import cached_property
 from pathlib import Path
 
 from typing_extensions import Iterator, Sequence, override
@@ -116,39 +115,9 @@ class GitArgument(StrEnum):
     List only the paths of the changed files.
     """
 
-    RELATIVE = "--relative"
-    """
-    List the paths relative to the working directory, as the other listings do.
-    """
-
-    MERGE_BASE = "merge-base"
-    """
-    Find the newest commit two commits share in their history.
-    """
-
-    HEAD = "HEAD"
-    """
-    The commit the working tree is checked out from.
-    """
-
     EXCLUDING_DELETED = "--diff-filter=d"
     """
     Leave out the files the change deletes.
-    """
-
-    LIST_FILES = "ls-files"
-    """
-    List the files of the repository.
-    """
-
-    UNTRACKED = "--others"
-    """
-    List the files git does not track.
-    """
-
-    EXCLUDE_IGNORED = "--exclude-standard"
-    """
-    Leave out the files the repository's ignore rules match.
     """
 
     PATHS_FOLLOW = "--"
@@ -249,79 +218,36 @@ class StagedLines(ChangedLines):
 @dataclass(kw_only=True, frozen=True)
 class LinesChangedSince(ChangedLines):
     """
-    The lines the working tree adds or alters since it forked from a revision, staged or
-    not.
+    The lines the working tree adds or alters since a revision, staged or not.
     """
 
     revision: str
     """
-    The git revision the working tree forked from, such as a commit or a branch.
+    The git revision the working tree is compared with, such as a commit or a branch.
     """
-
-    @cached_property
-    def merge_base(self) -> str:
-        """
-        The commit the working tree is compared with: the newest one :attr:`revision`
-        and ``HEAD`` share, so what :attr:`revision` changed after it does not count.
-
-        :raises GitCommandFailed: If git cannot resolve the revision.
-        """
-        return self.run_git(
-            arguments=(GitArgument.MERGE_BASE, self.revision, GitArgument.HEAD)
-        ).strip()
 
     @property
     @override
     def compared_version(self) -> tuple[str, ...]:
-        return (self.merge_base,)
-
-    @override
-    def find_changed_lines(self, *, path: Path) -> set[int]:
-        """
-        Unlike :meth:`ChangedLines.find_changed_lines`, every line of a file git does
-        not track counts as changed.
-        """
-        untracked = self.run_git(
-            arguments=(
-                GitArgument.LIST_FILES,
-                GitArgument.UNTRACKED,
-                GitArgument.EXCLUDE_IGNORED,
-                GitArgument.PATHS_FOLLOW,
-                str(path),
-            )
-        )
-        if untracked:
-            return set(range(1, len(path.read_text().splitlines()) + 1))
-        return super().find_changed_lines(path=path)
+        return (self.revision,)
 
     def find_changed_files(self) -> list[Path]:
         """
-        :return: The Python files below :attr:`repository` the working tree adds or
-            modifies since :attr:`merge_base`, tracked or not, leaving out those the
-            repository ignores.
+        :return: The tracked Python files the working tree adds or modifies since
+            :attr:`revision`.
         :raises GitCommandFailed: If git cannot resolve the revision.
         """
-        tracked = self.run_git(
+        names = self.run_git(
             arguments=(
                 GitArgument.DIFFERENCE,
                 GitArgument.NAME_ONLY,
-                GitArgument.RELATIVE,
                 GitArgument.EXCLUDING_DELETED,
-                self.merge_base,
+                self.revision,
                 GitArgument.PATHS_FOLLOW,
                 GitArgument.PYTHON_FILES,
             )
         )
-        untracked = self.run_git(
-            arguments=(
-                GitArgument.LIST_FILES,
-                GitArgument.UNTRACKED,
-                GitArgument.EXCLUDE_IGNORED,
-                GitArgument.PATHS_FOLLOW,
-                GitArgument.PYTHON_FILES,
-            )
-        )
-        return [self.repository / name for name in (tracked + untracked).splitlines()]
+        return [self.repository / name for name in names.splitlines()]
 
 
 # %% checking files
