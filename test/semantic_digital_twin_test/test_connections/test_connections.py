@@ -12,16 +12,19 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.exceptions import (
-    MissingConnectionAxisError,
-    UnnormalizedTwistError,
+    ScrewAxisOffConnectionOriginError,
+    UnnormalizedScrewAxisError,
 )
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+    Twist,
+)
 from scipy.spatial.transform import Rotation
 
 from semantic_digital_twin.world_description.connection_properties import (
     JointDynamics,
-    NormalizedTwist,
 )
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -51,11 +54,10 @@ def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_
     parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
         world.add_connection(connection)
@@ -157,11 +159,10 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
     parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
         world.add_connection(connection)
@@ -241,8 +242,9 @@ def _add_screw_connection(
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
-            normalized_twist=NormalizedTwist.create_screw(screw_pitch=screw_pitch),
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=screw_pitch
+            ),
             multiplier=multiplier,
             parent_T_connection_expression=parent_T_connection_expression,
         )
@@ -361,12 +363,11 @@ def test_screw_connection_multiplier_mirrors_motion(world_with_two_bodies):
     )
 
 
-def test_screw_axis_connection_copy_with_new_parent_preserves_normalized_twist(
+def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
     world_with_two_bodies,
 ):
     """
-    Re-parenting a screw connection keeps its normalized twist, degree of freedom and
-    axis.
+    Re-parenting a screw connection keeps its screw axis and degree of freedom.
     """
     world, parent, child = world_with_two_bodies
     screw_pitch = 0.01
@@ -377,9 +378,8 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_normalized_twist(
         new_parent, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1)
     )
 
-    assert copied_connection.normalized_twist == connection.normalized_twist
+    assert copied_connection.screw_axis is connection.screw_axis
     assert copied_connection.raw_dof is connection.raw_dof
-    assert copied_connection.axis == connection.axis
     assert copied_connection.parent is new_parent
 
 
@@ -396,22 +396,25 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_normalized_twist(
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.Z(),
-                "normalized_twist": NormalizedTwist.create_revolute(),
+                "screw_axis": ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
             },
         ),
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.X(),
-                "normalized_twist": NormalizedTwist.create_prismatic(),
+                "screw_axis": ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
             },
         ),
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.Z(),
-                "normalized_twist": NormalizedTwist.create_screw(screw_pitch=0.01),
+                "screw_axis": ScrewAxisConnection.create_helical_screw_axis(
+                    axis=Vector3.Z(), pitch=0.01
+                ),
             },
         ),
     ],
@@ -483,8 +486,9 @@ def test_create_with_dofs_accepts_the_shared_parameters(connection_type):
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.Z(),
-                "normalized_twist": NormalizedTwist.create_revolute(),
+                "screw_axis": ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
             },
         ),
     ],
@@ -573,11 +577,10 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
     offset = 0.5
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
             multiplier=multiplier,
             offset=offset,
         )
@@ -589,22 +592,6 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
     raw_position = 1.0
     world.state[connection.raw_dof.id].position = raw_position
     assert_allclose(connection.position, raw_position * multiplier + offset)
-
-
-@pytest.mark.parametrize(
-    "normalized_twist",
-    [NormalizedTwist.create_revolute(), NormalizedTwist.create_prismatic()],
-    ids=["revolute", "prismatic"],
-)
-def test_create_with_dofs_without_axis_raises(world_with_two_bodies, normalized_twist):
-    """
-    A single-DoF connection has no meaningful default axis, so it must be supplied.
-    """
-    world, parent, child = world_with_two_bodies
-    with pytest.raises(MissingConnectionAxisError):
-        ScrewAxisConnection.create_with_dofs(
-            world=world, parent=parent, child=child, normalized_twist=normalized_twist
-        )
 
 
 def test_create_with_dofs_registers_the_six_dof_state(world_with_two_bodies):
@@ -673,26 +660,29 @@ def test_joint_dynamics_custom_values():
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.Y(),
+                "screw_axis": ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 "multiplier": 2.0,
                 "offset": 0.5,
-                "normalized_twist": NormalizedTwist.create_prismatic(),
             },
         ),
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.Y(),
+                "screw_axis": ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 "multiplier": 2.0,
                 "offset": 0.5,
-                "normalized_twist": NormalizedTwist.create_revolute(),
             },
         ),
         (
             ScrewAxisConnection,
             {
-                "axis": Vector3.Y(),
-                "normalized_twist": NormalizedTwist.create_screw(screw_pitch=0.25),
+                "screw_axis": ScrewAxisConnection.create_helical_screw_axis(
+                    axis=Vector3.Y(), pitch=0.25
+                ),
             },
         ),
     ],
@@ -737,10 +727,24 @@ def _random_screw_axis_setup(seed: int) -> tuple[np.ndarray, np.ndarray]:
     return axis / np.linalg.norm(axis), pose
 
 
+def _screw_axis_along(
+    axis: np.ndarray, rotation_per_position: float, translation_per_position: float
+) -> Twist:
+    """
+    The screw axis that rotates ``rotation_per_position`` radians about ``axis`` and
+    translates ``translation_per_position`` meters along it per unit of position.
+    """
+    return Twist(
+        angular_velocity=Vector3.from_iterable(axis * rotation_per_position),
+        linear_velocity=Vector3.from_iterable(axis * translation_per_position),
+    )
+
+
 def _expected_screw_axis_transform(
     parent_T_connection: np.ndarray,
     axis: np.ndarray,
-    normalized_twist: NormalizedTwist,
+    rotation_per_position: float,
+    translation_per_position: float,
     position: float,
 ) -> np.ndarray:
     """
@@ -748,31 +752,28 @@ def _expected_screw_axis_transform(
     """
     connection_T_child = np.eye(4)
     connection_T_child[:3, :3] = Rotation.from_rotvec(
-        axis * normalized_twist.rotation_per_unit_position * position
+        axis * rotation_per_position * position
     ).as_matrix()
-    connection_T_child[:3, 3] = (
-        axis * normalized_twist.translation_per_unit_position * position
-    )
+    connection_T_child[:3, 3] = axis * translation_per_position * position
     return parent_T_connection @ connection_T_child
 
 
 @pytest.mark.parametrize("seed", [0, 1, 2])
 @pytest.mark.parametrize(
-    "normalized_twist",
+    "rotation_per_position, translation_per_position",
     [
-        NormalizedTwist.create_revolute(),
-        NormalizedTwist.create_prismatic(),
-        NormalizedTwist.create_screw(screw_pitch=0.25),
-        NormalizedTwist.create_screw(screw_pitch=-0.25),
+        pytest.param(1.0, 0.0, id="revolute"),
+        pytest.param(0.0, 1.0, id="prismatic"),
+        pytest.param(1.0, 0.25 / (2 * np.pi), id="screw"),
+        pytest.param(1.0, -0.25 / (2 * np.pi), id="left-handed screw"),
     ],
-    ids=["revolute", "prismatic", "screw", "left-handed screw"],
 )
-def test_screw_axis_connection_places_the_child_along_its_normalized_twist(
-    world_with_two_bodies, seed, normalized_twist
+def test_screw_axis_connection_places_the_child_along_its_screw_axis(
+    world_with_two_bodies, seed, rotation_per_position, translation_per_position
 ):
     """
-    The child sits where rotating about and translating along the axis by the screw
-    motion, scaled by the position with multiplier and offset applied, puts it.
+    The child sits where rotating about and translating along the axis, scaled by the
+    position with multiplier and offset applied, puts it.
     """
     world, parent, child = world_with_two_bodies
     axis, pose = _random_screw_axis_setup(seed)
@@ -786,11 +787,12 @@ def test_screw_axis_connection_places_the_child_along_its_normalized_twist(
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.from_iterable(axis),
             parent_T_connection_expression=parent_T_connection,
             multiplier=multiplier,
             offset=offset,
-            normalized_twist=normalized_twist,
+            screw_axis=_screw_axis_along(
+                axis, rotation_per_position, translation_per_position
+            ),
         )
         world.add_connection(connection)
 
@@ -802,7 +804,8 @@ def test_screw_axis_connection_places_the_child_along_its_normalized_twist(
             _expected_screw_axis_transform(
                 parent_T_connection.to_np(),
                 axis,
-                normalized_twist,
+                rotation_per_position,
+                translation_per_position,
                 multiplier * raw_position + offset,
             ),
             atol=1e-12,
@@ -810,59 +813,86 @@ def test_screw_axis_connection_places_the_child_along_its_normalized_twist(
 
 
 @pytest.mark.parametrize(
-    "normalized_twist, expected_behaviour",
+    "rotation_per_position, translation_per_position, expected_behaviour",
     [
-        pytest.param(
-            NormalizedTwist.create_revolute(), (True, False, False), id="revolute"
-        ),
-        pytest.param(
-            NormalizedTwist.create_prismatic(), (False, True, False), id="prismatic"
-        ),
-        pytest.param(
-            NormalizedTwist.create_screw(screw_pitch=0.25),
-            (False, False, True),
-            id="screw",
-        ),
-        pytest.param(
-            NormalizedTwist.create_screw(screw_pitch=-0.25),
-            (False, False, True),
-            id="left-handed screw",
-        ),
+        pytest.param(1.0, 0.0, (True, False, False), id="revolute"),
+        pytest.param(0.0, 1.0, (False, True, False), id="prismatic"),
+        pytest.param(1.0, 0.04, (False, False, True), id="screw"),
+        pytest.param(1.0, -0.04, (False, False, True), id="left-handed screw"),
     ],
 )
-def test_normalized_twist_behaves_like_the_connection_it_describes(
-    normalized_twist, expected_behaviour
+def test_screw_axis_connection_behaves_like_the_connection_its_screw_axis_describes(
+    world_with_two_bodies,
+    rotation_per_position,
+    translation_per_position,
+    expected_behaviour,
 ):
     """
-    Each normalized twist behaves like exactly the one connection type it describes.
+    Each screw axis makes the connection behave like exactly one connection type.
     """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            screw_axis=_screw_axis_along(
+                np.array([0.0, 0.0, 1.0]),
+                rotation_per_position,
+                translation_per_position,
+            ),
+        )
     assert (
-        normalized_twist.behaves_like_a_revolute_connection,
-        normalized_twist.behaves_like_a_prismatic_connection,
-        normalized_twist.behaves_like_a_screw_connection,
+        connection.behaves_like_a_revolute_connection,
+        connection.behaves_like_a_prismatic_connection,
+        connection.behaves_like_a_screw_connection,
     ) == expected_behaviour
 
 
 @pytest.mark.parametrize(
-    "rotation_per_unit_position, translation_per_unit_position",
+    "rotation_per_position, translation_per_position",
     [
         pytest.param(2.0, 0.0, id="rotates two radians"),
-        pytest.param(-1.0, 0.0, id="rotates backwards"),
         pytest.param(0.0, 0.0, id="does not move"),
         pytest.param(0.0, 2.0, id="translates two meters"),
-        pytest.param(0.0, -1.0, id="translates backwards"),
         pytest.param(0.5, 0.1, id="rotates half a radian"),
     ],
 )
-def test_normalized_twist_rejects_unnormalized_parameters(
-    rotation_per_unit_position, translation_per_unit_position
+def test_screw_axis_connection_rejects_an_unnormalized_screw_axis(
+    world_with_two_bodies, rotation_per_position, translation_per_position
 ):
     """
-    Motions that neither rotate one radian nor only translate one meter per unit of
+    Screw axes that neither rotate one radian nor only translate one meter per unit of
     position are refused.
     """
-    with pytest.raises(UnnormalizedTwistError):
-        NormalizedTwist(
-            rotation_per_unit_position=rotation_per_unit_position,
-            translation_per_unit_position=translation_per_unit_position,
+    world, parent, child = world_with_two_bodies
+    with world.modify_world(), pytest.raises(UnnormalizedScrewAxisError):
+        ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            screw_axis=_screw_axis_along(
+                np.array([0.0, 1.0, 0.0]),
+                rotation_per_position,
+                translation_per_position,
+            ),
+        )
+
+
+def test_screw_axis_connection_rejects_a_screw_axis_off_the_connection_origin(
+    world_with_two_bodies,
+):
+    """
+    A screw axis whose line misses the origin of the connection frame is refused: the
+    connection's fixed transforms place the axis.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world(), pytest.raises(ScrewAxisOffConnectionOriginError):
+        ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            screw_axis=Twist(
+                angular_velocity=Vector3.Z(), linear_velocity=Vector3(0, -0.4, 0)
+            ),
         )

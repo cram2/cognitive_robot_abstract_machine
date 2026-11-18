@@ -1,10 +1,8 @@
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 import re
 
 import numpy as np
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )
@@ -20,7 +18,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Door,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -97,7 +98,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
         door.add(handle)
     door.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
-            normalized_twist=NormalizedTwist.create_revolute(), axis=Vector3.Z()
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         )
     )
 

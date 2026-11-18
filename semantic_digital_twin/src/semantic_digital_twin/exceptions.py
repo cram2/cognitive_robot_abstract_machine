@@ -21,6 +21,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from krrood_spatial_math.spatial_types import Twist
     from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
@@ -815,24 +816,6 @@ class MissingConnectionParentError(UsageError):
         )
 
 
-@dataclass
-class MissingConnectionAxisError(UsageError):
-    """
-    Raised when an active connection is created without a movement axis.
-    """
-
-    connection_type_name: str
-    """
-    The name of the active connection type that was created without an axis.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.connection_type_name}' is an active connection and requires an axis."
-
-    def suggest_correction(self) -> str:
-        return "pass a movement axis via the 'axis' keyword argument."
-
-
 @dataclass(kw_only=True)
 class ScrewJointUnsupportedByMujocoError(UsageError):
     """
@@ -856,35 +839,53 @@ class ScrewJointUnsupportedByMujocoError(UsageError):
 
 
 @dataclass(kw_only=True)
-class UnnormalizedTwistError(UsageError):
+class UnnormalizedScrewAxisError(UsageError):
     """
-    Raised when a twist is not normalized: a twist that rotates must rotate one radian
-    per unit of position, and one that does not rotate must translate one meter per unit
-    of position.
-    """
-
-    rotation_per_unit_position: float
-    """
-    The rotation the twist was given, in radians per unit of position.
+    Raised when the screw axis of a screw axis connection is not normalized: one that
+    rotates must rotate one radian per unit of position, and one that does not rotate
+    must translate one meter per unit of position.
     """
 
-    translation_per_unit_position: float
+    screw_axis: Twist
     """
-    The translation the twist was given, in meters per unit of position.
+    The screw axis the connection was given.
     """
 
     def error_message(self) -> str:
         return (
-            f"a twist rotating {self.rotation_per_unit_position} rad and "
-            f"translating {self.translation_per_unit_position} m per unit of position "
-            f"is not normalized."
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} is not "
+            f"normalized."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "use NormalizedTwist.create_revolute(), NormalizedTwist.create_prismatic() or "
-            "NormalizedTwist.create_screw(screw_pitch=...); flip the axis for the opposite "
-            "direction and use the multiplier to scale the position."
+            "give a rotating screw axis a unit angular velocity, and a translating one "
+            "a unit linear velocity; use the multiplier to scale the position."
+        )
+
+
+@dataclass(kw_only=True)
+class ScrewAxisOffConnectionOriginError(UsageError):
+    """
+    Raised when the screw axis of a screw axis connection does not pass through the
+    origin of the connection frame, which places the axis.
+    """
+
+    screw_axis: Twist
+    """
+    The screw axis the connection was given.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} does not "
+            f"pass through the origin of the connection frame."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "place the axis with parent_T_connection_expression and give the screw "
+            "axis a linear velocity parallel to its angular velocity."
         )
 
 

@@ -649,7 +649,7 @@ def drawers_with_a_handle(world: World) -> list[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child, handle=handle))
         .where(
-            slider.normalized_twist.behaves_like_a_prismatic_connection,
+            slider.behaves_like_a_prismatic_connection,
             HasCollisionGeometry(body=slider.child),
             not_(IsPartOfARobot(body=slider.child)),
             mount.parent == slider.child,
@@ -671,7 +671,7 @@ def drawers_without_a_handle(world: World) -> list[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child))
         .where(
-            slider.normalized_twist.behaves_like_a_prismatic_connection,
+            slider.behaves_like_a_prismatic_connection,
             HasCollisionGeometry(body=slider.child),
             not_(IsPartOfARobot(body=slider.child)),
             not_(
@@ -696,7 +696,7 @@ def doors_with_a_handle(world: World) -> list[Door]:
     return (
         entity(inference(Door)(root=hinge.child, handle=handle))
         .where(
-            hinge.normalized_twist.behaves_like_a_revolute_connection,
+            hinge.behaves_like_a_revolute_connection,
             HasCollisionGeometry(body=hinge.child),
             not_(IsPartOfARobot(body=hinge.child)),
             mount.parent == hinge.child,
@@ -733,7 +733,7 @@ def doors_without_a_handle(
     return (
         entity(inference(Door)(root=hinge.child))
         .where(
-            hinge.normalized_twist.behaves_like_a_revolute_connection,
+            hinge.behaves_like_a_revolute_connection,
             HasCollisionGeometry(body=hinge.child),
             not_(IsPartOfARobot(body=hinge.child)),
             follower.parent == hinge.child,

@@ -31,7 +31,6 @@ from semantic_digital_twin.utils import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
     JointDynamics,
-    NormalizedTwist,
 )
 from semantic_digital_twin.world_description.connections import (
     ScrewAxisConnection,
@@ -327,13 +326,16 @@ class URDFParser(WorldModelParser):
             parent_T_connection_expression=parent_T_connection,
             multiplier=multiplier,
             offset=offset,
-            axis=Vector3(*urdf_joint_axis(joint), reference_frame=parent),
             raw_dof=dof,
             dynamics=self.parse_dynamics(joint),
-            normalized_twist=(
-                NormalizedTwist.create_prismatic()
+            screw_axis=(
+                ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3(*urdf_joint_axis(joint))
+                )
                 if joint.type == "prismatic"
-                else NormalizedTwist.create_revolute()
+                else ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3(*urdf_joint_axis(joint))
+                )
             ),
         )
         return result

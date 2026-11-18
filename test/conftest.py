@@ -7,9 +7,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import pytest
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     ActiveConnection1DOFSpecification,
@@ -274,11 +271,10 @@ def mini_world() -> World:
         body = Body(name=PrefixedName("root"))
         body2 = Body(name=PrefixedName("tip"))
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=body,
             child=body2,
-            axis=Vector3.Z(),
         )
         world.add_connection(connection)
     return world
@@ -392,10 +388,11 @@ def self_collision_bot_world():
 
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=robot,
                 child=l_shoulder,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2, y=0.2
                 ),
@@ -404,10 +401,11 @@ def self_collision_bot_world():
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=l_shoulder,
                 child=l_tip,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2
                 ),
@@ -426,10 +424,11 @@ def self_collision_bot_world():
 
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=robot,
                 child=r_shoulder,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2,
                     y=-0.2,
@@ -439,10 +438,11 @@ def self_collision_bot_world():
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=r_shoulder,
                 child=r_tip,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2
                 ),
@@ -765,8 +765,9 @@ def _elevator_world_setup():
                 scale=Scale(2, 2, 2), wall_thickness=0.05
             ),
             parent_connection_specification=ScrewAxisConnectionSpecification(
-                normalized_twist=NormalizedTwist.create_prismatic(),
-                axis=Vector3.Z(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1.0
                 ),
@@ -784,8 +785,9 @@ def _elevator_world_setup():
                     reference_frame=world.root,
                 ),
                 parent_connection_specification=ScrewAxisConnectionSpecification(
-                    normalized_twist=NormalizedTwist.create_prismatic(),
-                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.Y() * ((-1) ** (i + 1))
+                    ),
                     dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=0.0, upper_position=door_travel
                     ),

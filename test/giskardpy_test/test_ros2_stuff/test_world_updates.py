@@ -8,9 +8,6 @@ import pytest
 
 from cramph.executor import NoPacing
 from krrood.patterns.called_positionally import called_positionally
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
@@ -375,7 +372,7 @@ class ControlLoopFixture:
             for connection in self.controlled_world.get_connections_by_type(
                 ScrewAxisConnection
             )
-            if connection.normalized_twist.behaves_like_a_prismatic_connection
+            if connection.behaves_like_a_prismatic_connection
         ][0]
 
     def wait_until_buffered(self, *, count: int) -> bool:
@@ -405,11 +402,12 @@ def add_moving_connection(world: World) -> None:
         world.add_body(child_body)
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_prismatic(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=parent_body,
                 child=child_body,
-                axis=Vector3.X(),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=-1.0, upper_position=1.0, maximum_speed=1.0
                 ),
@@ -505,7 +503,7 @@ class TestRealWorldUpdatesDuringAMotion:
             for connection in control_loop.remote_world.get_connections_by_type(
                 ScrewAxisConnection
             )
-            if connection.normalized_twist.behaves_like_a_prismatic_connection
+            if connection.behaves_like_a_prismatic_connection
         ][0]
         control_loop.remote_world.state[remote_connection.dof.id].position = 0.42
         control_loop.remote_world.notify_state_change()

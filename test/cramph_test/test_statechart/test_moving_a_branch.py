@@ -11,9 +11,6 @@ from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import EndStatechart, NodeArtifacts, StatechartNode
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
@@ -63,11 +60,12 @@ def sliding_world() -> SlidingWorld:
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         slider_connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=world,
             parent=root,
             child=slider,
-            axis=Vector3.X(),
         )
         world.add_connection(slider_connection)
         world.add_connection(FixedConnection(parent=root, child=box))

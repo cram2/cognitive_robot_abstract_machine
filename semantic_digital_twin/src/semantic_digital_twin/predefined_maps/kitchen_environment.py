@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # %% Imports
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, field
 from pathlib import Path
 from enum import StrEnum
@@ -12,9 +13,6 @@ import numpy as np
 
 from krrood.patterns.float_enumeration import FloatEnum
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Room, Floor
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -793,8 +791,7 @@ class KitchenEnvironment(WorldSource):
         :param upper_angle: The angle the door can open to, in rad.
         """
         return ScrewAxisConnectionSpecification(
-            normalized_twist=NormalizedTwist.create_revolute(),
-            axis=axis,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=axis),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=lower_angle,
                 upper_position=upper_angle,
@@ -813,8 +810,9 @@ class KitchenEnvironment(WorldSource):
         :param travel: How far the drawer can be pulled out, in m.
         """
         return ScrewAxisConnectionSpecification(
-            normalized_twist=NormalizedTwist.create_prismatic(),
-            axis=Vector3.NEGATIVE_X(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.NEGATIVE_X()
+            ),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.0,
                 upper_position=travel,

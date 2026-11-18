@@ -81,7 +81,7 @@ def conditions_248676565933633239858802311504377126882(case) -> bool:
         return any(
             (
                 isinstance(c, ScrewAxisConnection)
-                and c.normalized_twist.behaves_like_a_prismatic_connection
+                and c.behaves_like_a_prismatic_connection
             )
             for c in case.connections
         )
@@ -107,7 +107,7 @@ def conditions_317079062995625045064213599855869838805(case) -> bool:
         return any(
             (
                 isinstance(c, ScrewAxisConnection)
-                and c.normalized_twist.behaves_like_a_revolute_connection
+                and c.behaves_like_a_revolute_connection
             )
             for c in case.connections
         )

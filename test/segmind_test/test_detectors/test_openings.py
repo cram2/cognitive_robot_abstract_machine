@@ -15,9 +15,6 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ScrewAxisConnection,
@@ -122,11 +119,12 @@ def drawer_on_rails(starting_position: float) -> DrawerOnRails:
         )
         world.add_degree_of_freedom(degree_of_freedom)
         rails = ScrewAxisConnection(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X(reference_frame=drawer)
+            ),
             name=PrefixedName("rails"),
             parent=cabinet,
             child=drawer,
-            axis=Vector3.X(reference_frame=drawer),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(rails)

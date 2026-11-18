@@ -753,7 +753,9 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
             {
                 self.pos_str: joint_pos,
                 self.quat_str: joint_quat,
-                self.axis_str: entity.axis.to_np().tolist()[:3],
+                self.axis_str: entity.screw_axis.screw_axis_direction.to_np().tolist()[
+                    :3
+                ],
                 self.range_str: joint_range,
                 self.armature_str: entity.dynamics.armature,
                 self.dry_friction_str: entity.dynamics.dry_friction,
@@ -1733,10 +1735,10 @@ class MujocoScrewAxisJointConverter(
         :raises ScrewJointUnsupportedByMujocoError: if the connection rotates and
             translates at once.
         """
-        if entity.normalized_twist.behaves_like_a_screw_connection:
+        if entity.behaves_like_a_screw_connection:
             raise ScrewJointUnsupportedByMujocoError(connection_name=entity.name)
         joint_props = super()._post_convert(entity, joint_props, **kwargs)
-        if entity.normalized_twist.behaves_like_a_prismatic_connection:
+        if entity.behaves_like_a_prismatic_connection:
             joint_props["type"] = mujoco.mjtJoint.mjJNT_SLIDE
             return joint_props
         joint_range = joint_props.pop("range")

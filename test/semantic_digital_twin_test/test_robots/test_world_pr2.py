@@ -390,7 +390,7 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         for connection in pr2_world_state_reset.get_connections_by_type(
             ScrewAxisConnection
         )
-        if connection.normalized_twist.behaves_like_a_prismatic_connection
+        if connection.behaves_like_a_prismatic_connection
     ]
     assert len(connections) == 5
     assert connections[0].name == PrefixedName(name=PR2Joint.TORSO_LIFT, prefix="pr2")
@@ -434,7 +434,7 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         for connection in pr2_world_state_reset.get_connections_by_type(
             ScrewAxisConnection
         )
-        if connection.normalized_twist.behaves_like_a_revolute_connection
+        if connection.behaves_like_a_revolute_connection
     ]
     assert len(connections) == 40
 

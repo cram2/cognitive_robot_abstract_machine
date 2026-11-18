@@ -34,7 +34,7 @@ Let's create a simple world.
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
+from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     ScrewAxisConnection,
@@ -65,12 +65,11 @@ with world.modify_world():
     dof = DegreeOfFreedom(name=PrefixedName("joint_z"))
     world.add_degree_of_freedom(dof)
     c_base_link = ScrewAxisConnection(
-        normalized_twist=NormalizedTwist.create_revolute(),
+        screw_axis=Twist(angular_velocity=Vector3.Z(reference_frame=base)),
         parent=base,
         child=link,
         raw_dof=dof,
-        axis=Vector3.Z(reference_frame=base),
-    )
+        )
     world.add_connection(c_base_link)
 
 print(f"Bodies after additions: {[str(b.name) for b in world.bodies]}")

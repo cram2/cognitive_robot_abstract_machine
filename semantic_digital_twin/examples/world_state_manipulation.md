@@ -31,7 +31,7 @@ import time
 import numpy as np
 from krrood.entity_query_language.factories import entity, variable, in_, the
 
-from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
+from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
@@ -53,7 +53,7 @@ with world.modify_world():
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            normalized_twist=NormalizedTwist.create_prismatic(), axis=Vector3.X()
+            screw_axis=Twist(linear_velocity=Vector3.X()),
         ),
     )
     handle = Handle.create_with_new_body_in_world(
@@ -146,7 +146,7 @@ We can close the drawer again as follows:
 connection = variable(ScrewAxisConnection, domain=world.connections)
 connection = the(
     entity(connection).where(
-        connection.normalized_twist.behaves_like_a_prismatic_connection,
+        connection.behaves_like_a_prismatic_connection,
         in_("drawer", connection.child.name.name),
     )
 ).first()

@@ -2,6 +2,7 @@
 The SAGE-10k door-opening demo.
 """
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from copy import deepcopy
 
 import numpy as np
@@ -10,9 +11,6 @@ import pytest
 import experiments.orm.ormatic_interface  # type: ignore
 from experiments.sage_10k.sage10k_actions import Sage10kOpenDoor
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )
@@ -75,8 +73,7 @@ def wall_door_handle_world():
 
     door.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
-            normalized_twist=NormalizedTwist.create_revolute(),
-            axis=Vector3.Z(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             dof_limits=DegreeOfFreedomLimits(
                 lower=DerivativeMap(position=0.0, velocity=0.0),
                 upper=DerivativeMap(position=np.pi / 2, velocity=1.0),

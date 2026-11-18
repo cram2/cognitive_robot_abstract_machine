@@ -13,9 +13,6 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     RollbackBeforeClearError,
@@ -50,11 +47,10 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
         world.add_connection(FixedConnection(parent=root, child=table))
     with world.modify_world():
         arm_joint = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=root,
             child=Body(name=PrefixedName("arm")),
-            axis=Vector3.Z(),
         )
         world.add_connection(arm_joint)
     with world.modify_world():
@@ -74,11 +70,10 @@ def test_rollback_of_body_removal_reconnects_it():
     leaf = Body(name=PrefixedName("leaf"))
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=root,
             child=leaf,
-            axis=Vector3.Z(),
         )
         world.add_connection(connection)
     version = world.get_world_model_manager().version
@@ -145,11 +140,12 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
     with world.reset_state_context():
         with world.modify_world():
             drawer_joint = ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=table,
                 child=Body(name=PrefixedName("drawer")),
-                axis=Vector3.Z(),
             )
             world.add_connection(drawer_joint)
         drawer_joint.position = 0.4

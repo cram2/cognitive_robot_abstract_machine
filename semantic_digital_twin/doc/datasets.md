@@ -81,7 +81,7 @@ obj.world  # one Body per rigid link
 ```
 
 Objects are USD stages parsed by `semantic_digital_twin.adapters.usd.parser.USDParser` (the USD counterpart to
-`URDFParser`/`MJCFParser`): a `ScrewAxisConnection` with a revolute or prismatic `NormalizedTwist` per USD Physics
+`URDFParser`/`MJCFParser`): a `ScrewAxisConnection` with a revolute or prismatic `screw_axis` per USD Physics
 joint of the matching type, `FixedConnection` otherwise. The catalog is 450 objects across the 9 `ArtVipCategory`
 values; `available_objects` returns each object's path relative to its category, occasionally nested a
 subcategory deeper (e.g. `major_appliances/refrigerator/fridge/fridge_01`).

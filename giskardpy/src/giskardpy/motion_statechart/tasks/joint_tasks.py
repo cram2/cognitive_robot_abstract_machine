@@ -61,7 +61,7 @@ class JointPositionList(ConvergingTask):
             target = self.apply_limits_to_target(target=target, connection=connection)
             if (
                 isinstance(connection, ScrewAxisConnection)
-                and connection.normalized_twist.behaves_like_a_revolute_connection
+                and connection.behaves_like_a_revolute_connection
             ) and not connection.dof.has_position_limits():
                 error = sm.shortest_angular_distance(current, target)
             else:

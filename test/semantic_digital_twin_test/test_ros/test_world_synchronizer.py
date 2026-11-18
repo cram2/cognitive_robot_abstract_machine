@@ -67,9 +67,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -744,11 +741,12 @@ def test_ChangeDifHasHardwareInterface(rclpy_node):
             dof = DegreeOfFreedom(name=PrefixedName("dof"))
             w1.add_degree_of_freedom(dof)
             connection = ScrewAxisConnection(
-                normalized_twist=NormalizedTwist.create_prismatic(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.unit_vector(1, 1, 1)
+                ),
                 raw_dof=dof,
                 parent=body1,
                 child=body2,
-                axis=Vector3(1, 1, 1),
             )
             w1.add_connection(connection)
 
@@ -1348,11 +1346,12 @@ def test_simultaneous_state_and_model_updates(rclpy_node):
         w1.add_body(b1)
         w1.add_body(b2)
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=w1,
             parent=b1,
             child=b2,
-            axis=Vector3.X(),
         )
         w1.add_connection(connection)
 
@@ -1361,7 +1360,7 @@ def test_simultaneous_state_and_model_updates(rclpy_node):
     synced_connection = [
         connection
         for connection in w2.get_connections_by_type(ScrewAxisConnection)
-        if connection.normalized_twist.behaves_like_a_prismatic_connection
+        if connection.behaves_like_a_prismatic_connection
     ][0]
 
     with w2.modify_world():
@@ -1717,11 +1716,12 @@ def test_world_synchronizer_basic_model_sync(rclpy_node):
         w1.add_body(b1)
         w1.add_body(b2)
         conn = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=w1,
             parent=b1,
             child=b2,
-            axis=Vector3.X(),
         )
         w1.add_connection(conn)
 
@@ -1760,11 +1760,12 @@ def test_world_synchronizer_ordering_no_key_error_after_model_change(rclpy_node)
         w1.add_body(b1)
         w1.add_body(b2)
         conn = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=w1,
             parent=b1,
             child=b2,
-            axis=Vector3.X(),
         )
         w1.add_connection(conn)
 
@@ -1897,11 +1898,12 @@ def test_apply_missed_messages_interleaved_model_and_state(rclpy_node):
         world_1.add_body(body_1)
         world_1.add_body(body_2)
         prismatic_connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=world_1,
             parent=body_1,
             child=body_2,
-            axis=Vector3.X(),
         )
         world_1.add_connection(prismatic_connection)
 
@@ -1924,7 +1926,7 @@ def test_apply_missed_messages_interleaved_model_and_state(rclpy_node):
     synchronized_prismatic_connections = [
         connection
         for connection in world_2.get_connections_by_type(ScrewAxisConnection)
-        if connection.normalized_twist.behaves_like_a_prismatic_connection
+        if connection.behaves_like_a_prismatic_connection
     ]
     assert len(synchronized_prismatic_connections) == 1
     assert synchronized_prismatic_connections[0].position == pytest.approx(
@@ -2350,11 +2352,12 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
         new_body = Body(name=PrefixedName("atomic_body"))
         source_world.add_body(new_body)
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=source_world,
             parent=source_world.root,
             child=new_body,
-            axis=Vector3.X(),
         )
         source_world.add_connection(connection)
 
@@ -2549,11 +2552,12 @@ def create_connected_worlds(
         publisher_world.add_body(child_body)
         publisher_world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_prismatic(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=publisher_world,
                 parent=parent_body,
                 child=child_body,
-                axis=Vector3.X(),
             )
         )
     assert wait_for_condition(
@@ -2576,7 +2580,7 @@ def publish_position(world: World, position: float) -> None:
     connection = [
         connection
         for connection in world.get_connections_by_type(ScrewAxisConnection)
-        if connection.normalized_twist.behaves_like_a_prismatic_connection
+        if connection.behaves_like_a_prismatic_connection
     ][0]
     world.state[connection.dof.id].position = position
     world.notify_state_change()
@@ -2603,11 +2607,12 @@ def test_deferring_incoming_updates_keeps_outgoing_publishing_alive(rclpy_node):
             world_1.add_body(child_body)
             world_1.add_connection(
                 ScrewAxisConnection.create_with_dofs(
-                    normalized_twist=NormalizedTwist.create_prismatic(),
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.X()
+                    ),
                     world=world_1,
                     parent=parent_body,
                     child=child_body,
-                    axis=Vector3.X(),
                 )
             )
         assert wait_for_condition(
@@ -2622,7 +2627,7 @@ def test_deferring_incoming_updates_keeps_outgoing_publishing_alive(rclpy_node):
                     for connection in world_2.get_connections_by_type(
                         ScrewAxisConnection
                     )
-                    if connection.normalized_twist.behaves_like_a_prismatic_connection
+                    if connection.behaves_like_a_prismatic_connection
                 ][0].position
                 == pytest.approx(1.25, abs=1e-9)
             )
@@ -2653,11 +2658,12 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             publisher_world.add_body(parent_body)
             publisher_world.add_body(child_body)
             connection = ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_prismatic(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=publisher_world,
                 parent=parent_body,
                 child=child_body,
-                axis=Vector3.X(),
             )
             publisher_world.add_connection(connection)
         # Building the receiver from the block of the publisher leaves both worlds with the
@@ -2690,7 +2696,7 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             for connection in receiver_world.get_connections_by_type(
                 ScrewAxisConnection
             )
-            if connection.normalized_twist.behaves_like_a_prismatic_connection
+            if connection.behaves_like_a_prismatic_connection
         ][0].position == pytest.approx(1.5, abs=1e-9)
         assert len(receiver_world.kinematic_structure_entities) == 2
         assert len(receiver_synchronizer.missed_messages) == 3
@@ -2704,7 +2710,7 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             for connection in receiver_world.get_connections_by_type(
                 ScrewAxisConnection
             )
-            if connection.normalized_twist.behaves_like_a_prismatic_connection
+            if connection.behaves_like_a_prismatic_connection
         ][0].position == pytest.approx(2.5, abs=1e-9)
         assert not receiver_synchronizer.has_buffered_model_modification
         assert receiver_synchronizer.missed_messages == []
@@ -2786,7 +2792,7 @@ def test_draining_state_updates_leaves_nothing_behind_without_model_modification
             for connection in receiver_world.get_connections_by_type(
                 ScrewAxisConnection
             )
-            if connection.normalized_twist.behaves_like_a_prismatic_connection
+            if connection.behaves_like_a_prismatic_connection
         ][0].position == pytest.approx(1.5, abs=1e-9)
     finally:
         publisher_synchronizer.close()
@@ -3222,11 +3228,12 @@ def add_prismatic_connection(world: World, name: str) -> ScrewAxisConnection:
         child_body = Body(name=PrefixedName(name))
         world.add_body(child_body)
         connection = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
             world=world,
             parent=world.root,
             child=child_body,
-            axis=Vector3.X(),
         )
         world.add_connection(connection)
     return connection
@@ -3260,7 +3267,7 @@ def test_updates_published_while_a_receiver_is_busy_are_not_lost(rclpy_node) -> 
             for connection in publisher_world.get_connections_by_type(
                 ScrewAxisConnection
             )
-            if connection.normalized_twist.behaves_like_a_prismatic_connection
+            if connection.behaves_like_a_prismatic_connection
         ][0]
         moved_once = add_prismatic_connection(publisher_world, "busy_receiver_once")
         assert wait_for_condition(

@@ -72,10 +72,7 @@ def test_door_cabinet_builds_a_tree_with_one_hinge(door_object):
     [hinge] = [
         c
         for c in world.connections
-        if (
-            isinstance(c, ScrewAxisConnection)
-            and c.normalized_twist.behaves_like_a_revolute_connection
-        )
+        if (isinstance(c, ScrewAxisConnection) and c.behaves_like_a_revolute_connection)
     ]
     assert hinge.raw_dof.limits.lower.position == pytest.approx(-1.5707963267948966)
     assert hinge.raw_dof.limits.upper.position == pytest.approx(0.0)
@@ -94,8 +91,7 @@ def test_drawer_cabinet_builds_a_tree_with_two_slides(drawers_object):
         c
         for c in world.connections
         if (
-            isinstance(c, ScrewAxisConnection)
-            and c.normalized_twist.behaves_like_a_prismatic_connection
+            isinstance(c, ScrewAxisConnection) and c.behaves_like_a_prismatic_connection
         )
     ]
     assert len(slides) == 2
@@ -121,10 +117,7 @@ def test_hinged_door_is_reachable_as_an_active_connection_from_its_body(door_obj
     [hinge] = [
         c
         for c in world.connections
-        if (
-            isinstance(c, ScrewAxisConnection)
-            and c.normalized_twist.behaves_like_a_revolute_connection
-        )
+        if (isinstance(c, ScrewAxisConnection) and c.behaves_like_a_revolute_connection)
     ]
 
     assert (

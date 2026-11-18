@@ -1,3 +1,4 @@
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 import json
 import logging
 import math
@@ -11,9 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.adapters.procthor.exceptions import (
     ProcthorDoorWallNotFound,
     UnpairedProcthorWalls,
@@ -251,7 +249,9 @@ class ProcthorDoor:
 
         door.mount_on_movable_joint(
             ScrewAxisConnectionSpecification(
-                normalized_twist=NormalizedTwist.create_revolute(), axis=Vector3.Z()
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
             )
         )
         return door

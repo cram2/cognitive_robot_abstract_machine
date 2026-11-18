@@ -23,13 +23,9 @@ from semantic_digital_twin.adapters.usd.parser import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.usd_semantics import USDSemanticLabels
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Cylinder, Sphere
 from semantic_digital_twin.world_description.world_entity import Body
@@ -83,7 +79,7 @@ def test_parse_connects_a_revolute_joint():
 
     assert len(world.bodies) == 2  # root + child
     [connection] = world.connections
-    assert connection.normalized_twist == NormalizedTwist.create_revolute()
+    assert connection.behaves_like_a_revolute_connection
 
 
 def test_parse_connects_a_prismatic_joint():
@@ -91,7 +87,7 @@ def test_parse_connects_a_prismatic_joint():
     world = parse(stage)
 
     [connection] = world.connections
-    assert connection.normalized_twist == NormalizedTwist.create_prismatic()
+    assert connection.behaves_like_a_prismatic_connection
 
 
 def test_parse_connects_a_fixed_joint():
@@ -361,7 +357,7 @@ def test_component_parser_connects_a_link_inside_a_component_to_the_component():
     [door_connection] = [
         connection for connection in world.connections if connection.child is door
     ]
-    assert door_connection.normalized_twist == NormalizedTwist.create_revolute()
+    assert door_connection.behaves_like_a_revolute_connection
     assert door_connection.parent is cabinet
 
 

@@ -31,9 +31,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
 )
 from semantic_digital_twin.testing import *
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.shape_collection import (
@@ -304,8 +301,8 @@ def test_explain_inferred_semantic_annotations(apartment_world_copy):
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
     assert explanation.get_satisfied_conditions_as_string() == (
-        "ScrewAxisConnection.normalized_twist.behaves_like_a_prismatic_connection"
-        " (ScrewAxisConnection.normalized_twist)"
+        "ScrewAxisConnection.behaves_like_a_prismatic_connection"
+        " (ScrewAxisConnection)"
         "\nAND HasCollisionGeometry (ScrewAxisConnection.child)"
         "\nAND (FixedConnection.parent == ScrewAxisConnection.child)"
         "\nAND (FixedConnection.child == Handle.root)"
@@ -324,7 +321,7 @@ def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy
         renderer=HierarchicalRenderer()
     ).verbalize(expression=explanation.query_root)
     assert verbalization_paragraph == (
-        "If the normalized_twist of a ScrewAxisConnection has"
+        "If a ScrewAxisConnection has"
         " behaves_like_a_prismatic_connection,"
         " the child of the ScrewAxisConnection has collision geometry,"
         " the child of the ScrewAxisConnection is not part of a robot,"
@@ -335,7 +332,7 @@ def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy
     )
     assert verbalization_hierarchical == (
         "If\n"
-        "  - the normalized_twist of a ScrewAxisConnection has"
+        "  - a ScrewAxisConnection has"
         " behaves_like_a_prismatic_connection\n"
         "  - the child of the ScrewAxisConnection has collision geometry\n"
         "  - the child of the ScrewAxisConnection is not part of a robot\n"
@@ -423,11 +420,12 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(link)
         joint = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=root)
+            ),
             world=world,
             parent=root,
             child=link,
-            axis=Vector3.Z(reference_frame=root),
         )
         world.add_connection(joint)
         chain = ReviewKinematicChain(
@@ -521,14 +519,15 @@ class DrawerWithSlidingHandle:
             )
             world.add_connection(base_connection)
             handle_connection = ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_prismatic(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X(reference_frame=case)
+                ),
                 world=world,
                 parent=case,
                 child=handle_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=HANDLE_OFFSET_X, reference_frame=case
                 ),
-                axis=Vector3.X(reference_frame=case),
             )
             world.add_connection(handle_connection)
             world.add_semantic_annotation(handle)
@@ -663,9 +662,7 @@ def test_door_joint_is_the_revolute_connection_it_hangs_from_its_whole_on(
     )
 
     assert fridge_door.movable_joint is fridge_door.root.parent_connection
-    assert (
-        fridge_door.movable_joint.normalized_twist == NormalizedTwist.create_revolute()
-    )
+    assert fridge_door.movable_joint.behaves_like_a_revolute_connection
     assert fridge_door.movable_joint.parent is refrigerator.root
 
 
@@ -677,7 +674,7 @@ def test_drawer_joint_is_the_prismatic_connection_it_hangs_from_its_whole_on(
     )
 
     assert drawer.movable_joint is drawer.root.parent_connection
-    assert drawer.movable_joint.normalized_twist == NormalizedTwist.create_prismatic()
+    assert drawer.movable_joint.behaves_like_a_prismatic_connection
 
 
 def test_a_drawer_built_with_rails_reports_how_far_it_stands_open(

@@ -19,9 +19,6 @@ from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin import logger
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -122,11 +119,12 @@ def _record_a_few_of_many_joints_moving(
             world.add_degree_of_freedom(degree_of_freedom)
             world.add_connection(
                 ScrewAxisConnection(
-                    normalized_twist=NormalizedTwist.create_prismatic(),
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.X(reference_frame=root)
+                    ),
                     parent=root,
                     child=Body(name=PrefixedName(f"link_{index:02d}")),
                     raw_dof=degree_of_freedom,
-                    axis=Vector3.X(reference_frame=root),
                 )
             )
             degrees_of_freedom.append(degree_of_freedom)

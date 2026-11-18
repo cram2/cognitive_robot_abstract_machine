@@ -24,7 +24,7 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
-from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
+from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
@@ -71,9 +71,8 @@ root = Body(name=PrefixedName("root"), visual=red_box, collision=red_box)
 slider = Body(name=PrefixedName("slider"), visual=green_box, collision=green_box)
 with world.modify_world():
     root_C_slider: ScrewAxisConnection = ScrewAxisConnection.create_with_dofs(
-        normalized_twist=NormalizedTwist.create_prismatic(), parent=root,
+        screw_axis=Twist(linear_velocity=Vector3.X(reference_frame=root)), parent=root,
         child=slider,
-        axis=Vector3.X(reference_frame=root),
         world=world,
     )
     world.add_connection(root_C_slider)
@@ -92,7 +91,7 @@ if slider is ...: raise ExerciseVerificationFailed("The slider body should be cr
 if root_C_slider is ...: raise ExerciseVerificationFailed("The prismatic connection should be created.")
 if not isinstance(root, Body): raise ExerciseVerificationFailed("`root` must be a Body.")
 if not isinstance(slider, Body): raise ExerciseVerificationFailed("`slider` must be a Body.")
-if not (isinstance(root_C_slider, ScrewAxisConnection) and root_C_slider.normalized_twist.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("`root_C_slider` must be a prismatic ScrewAxisConnection.")
+if not (isinstance(root_C_slider, ScrewAxisConnection) and root_C_slider.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("`root_C_slider` must be a prismatic ScrewAxisConnection.")
 if not abs(root_C_slider.position - 0.2) < 1e-6: raise ExerciseVerificationFailed("The slider should be at position 0.1 along X.")
 rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
 ```

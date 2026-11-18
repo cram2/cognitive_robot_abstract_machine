@@ -24,7 +24,7 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
-from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
+from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import (
@@ -70,9 +70,8 @@ body = Body(name=PrefixedName("body"))
 with world.modify_world():
     root_C_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
     base_C_body = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(), parent=base,
+            screw_axis=Twist(angular_velocity=Vector3.Z(reference_frame=base)), parent=base,
             child=body,
-            axis=Vector3.Z(reference_frame=base),
             world=world
         )
     world.add_connection(root_C_base)    
@@ -101,7 +100,7 @@ Your goal:
 
 hinge = variable(ScrewAxisConnection, world.connections)
 base_C_body_query = the(
-    entity(hinge).where(hinge.normalized_twist.behaves_like_a_revolute_connection)
+    entity(hinge).where(hinge.behaves_like_a_revolute_connection)
 )
 
 base_C_body = base_C_body_query.first()

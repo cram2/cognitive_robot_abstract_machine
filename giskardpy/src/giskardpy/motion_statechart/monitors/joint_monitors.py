@@ -35,7 +35,7 @@ class JointPositionReached(EndedByOwner, MotionStatechartNode):
         current = self.connection.dof.variables.position
         if (
             isinstance(self.connection, ScrewAxisConnection)
-            and self.connection.normalized_twist.behaves_like_a_revolute_connection
+            and self.connection.behaves_like_a_revolute_connection
         ) and not self.connection.dof.has_position_limits():
             error = sm.shortest_angular_distance(current, self.position)
         else:

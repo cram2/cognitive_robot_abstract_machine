@@ -2,13 +2,11 @@
 The apartment described by the ``iai_apartment`` package, built from its visual meshes.
 """
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass
 
 import numpy as np
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
@@ -26,7 +24,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
     Wardrobe,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -203,8 +204,9 @@ class ApartmentEnvironment(WorldSource):
                     ),
                 ),
                 parent_connection_specification=ScrewAxisConnectionSpecification(
-                    normalized_twist=NormalizedTwist.create_revolute(),
-                    axis=Vector3.Z(),
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                     dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=min(0.0, opening_angle),
                         upper_position=max(0.0, opening_angle),

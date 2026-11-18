@@ -118,7 +118,7 @@ def drawers(world: World) -> List[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child))
         .where(
-            slider.normalized_twist.behaves_like_a_prismatic_connection,
+            slider.behaves_like_a_prismatic_connection,
             slider.child.has_collision(),
         )
         .tolist()

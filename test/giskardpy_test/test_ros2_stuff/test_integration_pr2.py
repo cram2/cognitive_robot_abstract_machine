@@ -153,7 +153,7 @@ class TestJointGoals:
             actual = giskard.api.world.state[connection.dof.id].position
             if (
                 isinstance(connection, ScrewAxisConnection)
-                and connection.normalized_twist.behaves_like_a_revolute_connection
+                and connection.behaves_like_a_revolute_connection
             ) and not connection.dof.has_position_limits():
                 assert sm.shortest_angular_distance(actual, goal).to_np()[0] < 0.01
             else:

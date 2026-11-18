@@ -67,7 +67,7 @@ import numpy as np
 
 from semantic_digital_twin.world import World
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
+from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ScrewAxisConnection,
@@ -283,12 +283,11 @@ parameters that family needs:
 
 Every entity specification carries an optional `connection_specification`; when it is left unset,
 `spawn` attaches the entity with a fixed connection. Set it to give the entity a degree of freedom.
-A `ScrewAxisConnectionSpecification` requires a movement `axis` and a `normalized_twist`, and optionally
-accepts a `multiplier`, an `offset`, and `dof_limits`. The `normalized_twist` says how far the child
-rotates and translates per unit of position: `NormalizedTwist.create_revolute()` for a hinge,
-`NormalizedTwist.create_prismatic()` for a slide, and `NormalizedTwist.create_screw(screw_pitch=...)` for a thread,
-whose `screw_pitch` is the distance between adjacent threads along the axis, which is what couples its
-rotation to its translation.
+A `ScrewAxisConnectionSpecification` requires a `screw_axis`, and optionally accepts a `multiplier`, an
+`offset`, and `dof_limits`. The `screw_axis` is a `Twist`: how fast the child rotates and translates per
+unit of position. `Twist(angular_velocity=axis)` makes a hinge, `Twist(linear_velocity=axis)` a slide, and
+`Twist(angular_velocity=axis, linear_velocity=axis * (pitch / (2 * np.pi)))` a thread, whose `pitch` is the
+distance between adjacent threads along the axis, which is what couples its rotation to its translation.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
@@ -300,11 +299,11 @@ drawer = BodySpecification.box(
     name="drawer",
     scale=Scale(0.4, 0.5, 0.2),
     connection_specification=ScrewAxisConnectionSpecification(
-        axis=Vector3.Z(), normalized_twist=NormalizedTwist.create_prismatic()
+        screw_axis=Twist(linear_velocity=Vector3.Z())
     ),
 ).spawn(world)
 
-assert drawer.parent_connection.normalized_twist == NormalizedTwist.create_prismatic()
+assert drawer.parent_connection.behaves_like_a_prismatic_connection
 print("Drawer is attached by a", type(drawer.parent_connection).__name__)
 ```
 
@@ -401,12 +400,12 @@ drawer = SemanticAnnotationWithRootSpecification(
     root_specification=BodySpecification.box(
         "drawer",
         Scale(0.4, 0.5, 0.2),
-        connection_specification=ScrewAxisConnectionSpecification(normalized_twist=NormalizedTwist.create_prismatic(), axis=Vector3.X()),
+        connection_specification=ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X())),
     ),
 ).spawn(world)
 
 assert drawer.movable_joint is drawer.root.parent_connection
-assert drawer.movable_joint.normalized_twist == NormalizedTwist.create_prismatic()
+assert drawer.movable_joint.behaves_like_a_prismatic_connection
 print("The drawer slides on a", type(drawer.movable_joint).__name__)
 ```
 
@@ -580,10 +579,10 @@ door = Door.get_annotation_specification(
     "door",
     Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.03, 1, 2)),
     parent_connection_specification=ScrewAxisConnectionSpecification(
-        normalized_twist=NormalizedTwist.create_revolute(), axis=Vector3.Z(), connection_T_child=hinge_T_door
+        screw_axis=Twist(angular_velocity=Vector3.Z()), connection_T_child=hinge_T_door
     ),
 ).spawn(world)
-assert door.movable_joint.normalized_twist == NormalizedTwist.create_revolute()
+assert door.movable_joint.behaves_like_a_revolute_connection
 
 door.movable_joint.position = np.pi / 2
 world.notify_state_change()

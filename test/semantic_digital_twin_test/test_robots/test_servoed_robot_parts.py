@@ -8,9 +8,6 @@ from __future__ import annotations
 import pytest
 from typing_extensions import Callable
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.adapters.mjcf import MJCFParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -46,11 +43,10 @@ def described_joint() -> ScrewAxisConnection:
         world.add_kinematic_structure_entity(parent)
         world.add_kinematic_structure_entity(child)
         joint = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
         )
         world.add_connection(joint)
     joint.dynamics = JointDynamics(armature=0.2, damping=3.0, dry_friction=0.5)

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, field
 
 import numpy as np
 
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )
@@ -16,7 +14,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Wall,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
 from semantic_digital_twin.world_description.world_entity import (
@@ -108,7 +109,9 @@ class SingleDoorRoom:
             Door.get_default_root_kinematic_structure_entity_specification(
                 scale=self.door_scale,
                 connection_specification=ScrewAxisConnectionSpecification(
-                    normalized_twist=NormalizedTwist.create_revolute(), axis=Vector3.Z()
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                 ),
             ),
             part_specifications={

@@ -2647,6 +2647,24 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
         )
 
+    @property
+    def screw_axis_direction(self) -> Vector3:
+        """
+        :return: The unit direction of the twist's screw axis: that of the angular
+            velocity, or of the linear velocity for a twist that does not turn (Lynch
+            and Park, *Modern Robotics*, §3.3.2.2). The zero vector for a zero twist.
+        """
+        angular_velocity = self.angular_velocity
+        linear_velocity = self.linear_velocity
+        angular_speed = angular_velocity.norm()
+        result = sm.if_greater_zero(
+            angular_speed,
+            angular_velocity.safe_division(other=angular_speed),
+            linear_velocity.safe_division(other=linear_velocity.norm()),
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):

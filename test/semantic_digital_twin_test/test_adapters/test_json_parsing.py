@@ -33,9 +33,6 @@ from krrood_spatial_math.spatial_types import (
     Pose2D,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ScrewAxisConnection,
@@ -374,8 +371,9 @@ def test_screw_connection_json_serialization_with_world():
             world=world,
             parent=body,
             child=body2,
-            axis=Vector3.Z(),
-            normalized_twist=NormalizedTwist.create_screw(screw_pitch=screw_pitch),
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=screw_pitch
+            ),
             multiplier=2.0,
             offset=0.1,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -389,12 +387,13 @@ def test_screw_connection_json_serialization_with_world():
         data=json_data, **tracker.create_kwargs()
     )
     assert connection == restored_connection
-    assert restored_connection.normalized_twist == NormalizedTwist.create_screw(
-        screw_pitch=screw_pitch
+    assert np.allclose(
+        restored_connection.screw_axis.linear_velocity,
+        restored_connection.screw_axis.angular_velocity * (screw_pitch / (2 * np.pi)),
     )
     assert restored_connection.multiplier == connection.multiplier
     assert restored_connection.offset == connection.offset
-    assert np.allclose(restored_connection.axis.to_np(), connection.axis.to_np())
+    assert np.allclose(restored_connection.screw_axis, connection.screw_axis)
     assert restored_connection.raw_dof.id == connection.raw_dof.id
 
 
@@ -448,11 +447,12 @@ def _world_with_two_equally_named_connections() -> tuple[
         with world.modify_world():
             child = Body(name=PrefixedName("link", prefix=f"branch_{index}"))
             connection = ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=world.root,
                 child=child,
-                axis=Vector3.Z(),
                 name=PrefixedName("shared_joint"),
             )
             world.add_connection(connection)

@@ -8,6 +8,7 @@ sends the nodes it chose instead.
 
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, replace
 
 import pytest
@@ -67,9 +68,6 @@ from coraplex.plans.executors import PlanExecutor
 from cramph.context import ContextExtension, StatechartContext
 from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -233,8 +231,9 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             world=world,
             scale=Scale(2, 2, 2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
-                normalized_twist=NormalizedTwist.create_prismatic(),
-                axis=Vector3.Z(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1.0
                 ),
@@ -245,8 +244,9 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             world=world,
             scale=Scale(0.05, 1, 2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
-                normalized_twist=NormalizedTwist.create_prismatic(),
-                axis=Vector3.Y(),
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.0
                 ),

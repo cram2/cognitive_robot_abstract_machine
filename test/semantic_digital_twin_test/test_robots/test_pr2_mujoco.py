@@ -208,7 +208,7 @@ def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
         for connection in world.connections
         if (
             isinstance(connection, ScrewAxisConnection)
-            and connection.normalized_twist.behaves_like_a_revolute_connection
+            and connection.behaves_like_a_revolute_connection
         )
     )
     fixed = next(

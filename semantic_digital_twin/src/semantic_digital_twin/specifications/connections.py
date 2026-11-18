@@ -13,7 +13,7 @@ from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospect
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.exceptions import MissingConnectionParentError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Twist
 from semantic_digital_twin.specifications.base import NamedSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -23,7 +23,6 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.connection_properties import (
     JointDynamics,
-    NormalizedTwist,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -264,14 +263,6 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
     prismatic or revolute).
     """
 
-    axis: Vector3 = field(kw_only=True)
-    """
-    Movement axis of the connection.
-
-    Mandatory: a single-DoF connection without an axis has no meaning, so it cannot be
-    constructed.
-    """
-
     multiplier: float = 1.0
     """
     Scaling factor applied to the degree of freedom's motion.
@@ -301,12 +292,13 @@ class ScrewAxisConnectionSpecification(
     Declares a
     :class:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection`:
     a door swinging on its hinge, a drawer sliding in or out, or a cap turning on the
-    thread of its bottle, depending on its :attr:`normalized_twist`.
+    thread of its bottle, depending on its :attr:`screw_axis`.
     """
 
-    normalized_twist: NormalizedTwist = field(kw_only=True)
+    screw_axis: Twist = field(kw_only=True)
     """
-    How far the child rotates and translates per unit of position.
+    The twist of the child per unit of position, see
+    :attr:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection.screw_axis`.
     """
 
 

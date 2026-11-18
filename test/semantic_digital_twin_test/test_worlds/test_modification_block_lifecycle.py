@@ -17,9 +17,6 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ScrewAxisConnection,
@@ -49,10 +46,11 @@ def test_nested_block_keeps_degree_of_freedom_of_outer_block(
             world.add_kinematic_structure_entity(child)
         world.add_connection(
             ScrewAxisConnection(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=parent,
                 child=child,
-                axis=Vector3.Z(),
                 raw_dof=degree_of_freedom,
             )
         )

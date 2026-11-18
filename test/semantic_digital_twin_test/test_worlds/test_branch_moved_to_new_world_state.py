@@ -8,9 +8,6 @@ from __future__ import annotations
 import pytest
 
 from krrood_spatial_math.spatial_types import Vector3
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -37,11 +34,12 @@ def door_world() -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=branch_root,
                 child=Body(name=PrefixedName("door")),
-                axis=Vector3.Z(),
             )
         )
     return world
@@ -55,7 +53,7 @@ def door_hinge(door_world: World) -> ScrewAxisConnection:
     return [
         connection
         for connection in door_world.get_connections_by_type(ScrewAxisConnection)
-        if connection.normalized_twist.behaves_like_a_revolute_connection
+        if connection.behaves_like_a_revolute_connection
     ][0]
 
 

@@ -19,9 +19,6 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -51,8 +48,7 @@ def tilted_world() -> World:
             world=world,
             parent=root,
             child=tip,
-            axis=Vector3.X(),
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         world.add_connection(connection)
     connection.position = math.pi / 2

@@ -10,9 +10,6 @@ import pytest
 
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.data_types import LifeCycleValues, ObservationStateValues
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
@@ -719,14 +716,15 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
         region = Body(name=PrefixedName("region"))
         world.add_kinematic_structure_entity(region)
         region_joint = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.Y()
+            ),
             world=world,
             parent=world.root,
             child=region,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 2, 0, 1, reference_frame=world.root
             ),
-            axis=Vector3.Y(),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=-1.0, upper_position=1.0, maximum_speed=0.5
             ),
@@ -1119,9 +1117,10 @@ class TestArticulateGraspedMechanism:
                 world=pr2_world_copy,
                 world_root_T_self=world_T_door,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
-                    normalized_twist=NormalizedTwist.create_revolute(),
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                     dof_limits=limits,
-                    axis=Vector3.Z(),
                     connection_T_child=world_T_hinge.inverse() @ world_T_door,
                 ),
             )
@@ -1222,8 +1221,9 @@ class TestArticulateGraspedMechanism:
                 world=world,
                 world_root_T_self=world_T_drawer,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
-                    normalized_twist=NormalizedTwist.create_prismatic(),
-                    axis=Vector3.X(),
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.X()
+                    ),
                     dof_limits=DegreeOfFreedomLimits(
                         lower=DerivativeMap(position=0.0, velocity=-10.0),
                         upper=DerivativeMap(position=open_position, velocity=10.0),
@@ -1309,10 +1309,9 @@ class TestArticulateGraspedMechanism:
                 # The thread axis points from the bottle out through the cap, here
                 # towards the robot, so unscrewing moves the cap away from the bottle.
                 parent_connection_specification=ScrewAxisConnectionSpecification(
-                    axis=Vector3(-1, 0, 0),
                     dof_limits=limits,
-                    normalized_twist=NormalizedTwist.create_screw(
-                        screw_pitch=screw_pitch
+                    screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                        axis=Vector3(-1, 0, 0), pitch=screw_pitch
                     ),
                 ),
             )
@@ -1370,10 +1369,8 @@ class TestArticulateGraspedMechanism:
         # Tighten again, this time commanding how far the cap must travel back down
         # the thread instead of how far it must rotate.
         unscrew_travel_distance = float(np.linalg.norm(cap_translation))
-        tightened_goal_joint_state = (
-            unscrew_goal
-            - unscrew_travel_distance
-            / root_C_screw.normalized_twist.translation_per_unit_position
+        tightened_goal_joint_state = unscrew_goal - unscrew_travel_distance / float(
+            root_C_screw.screw_axis.linear_velocity.norm()
         )
 
         executor = StatechartExecutor(

@@ -10,9 +10,6 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Point3
@@ -65,11 +62,12 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=root,
                 child=link1,
-                axis=Vector3.Z(),
                 dof_limits=dof_limits,
             )
         )
@@ -82,11 +80,12 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=link1,
                 child=link2,
-                axis=Vector3.X(),
                 dof_limits=dof_limits,
                 connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     z=fucking_huge_link_length,
@@ -102,11 +101,12 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=link2,
                 child=link3,
-                axis=Vector3.X(),
                 dof_limits=dof_limits,
                 connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     z=fucking_huge_link_length,
@@ -122,12 +122,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=link3,
                 child=link4,
                 dof_limits=dof_limits,
-                axis=Vector3.Z(),
             )
         )
 
@@ -139,11 +140,12 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=link4,
                 child=link5,
-                axis=Vector3.X(),
                 dof_limits=dof_limits,
             )
         )
@@ -156,11 +158,12 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
-                normalized_twist=NormalizedTwist.create_revolute(),
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 world=world,
                 parent=link5,
                 child=eef,
-                axis=Vector3.Y(),
                 dof_limits=dof_limits,
             )
         )

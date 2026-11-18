@@ -33,7 +33,7 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.world_description.connection_properties import NormalizedTwist
+from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
@@ -118,13 +118,13 @@ Your goal:
 sliding_drawer = BodySpecification.box(
     name="sliding_drawer",
     scale=Scale(0.4, 0.5, 0.2),
-    connection_specification=ScrewAxisConnectionSpecification(normalized_twist=NormalizedTwist.create_prismatic(), axis=Vector3.X()),
+    connection_specification=ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X())),
 ).spawn(world)
 ```
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if not (isinstance(sliding_drawer.parent_connection, ScrewAxisConnection) and sliding_drawer.parent_connection.normalized_twist.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("The drawer should slide.")
+if not (isinstance(sliding_drawer.parent_connection, ScrewAxisConnection) and sliding_drawer.parent_connection.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("The drawer should slide.")
 ```
 
 ## 3. Build an annotation specification with a nested part

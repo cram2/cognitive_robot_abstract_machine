@@ -31,9 +31,7 @@ from semantic_digital_twin.adapters.usd.exceptions import (
 from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.usd_semantics import USDSemanticLabels
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     FixedConnectionSpecification,
@@ -45,6 +43,7 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     RotationMatrix,
     Vector3,
+    Twist,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -234,15 +233,14 @@ class USDPhysicsJointType(StrEnum):
             USDPhysicsJointType.PRISMATIC: ScrewAxisConnectionSpecification,
         }[self]
 
-    @property
-    def normalized_twist(self) -> NormalizedTwist:
+    def create_screw_axis(self, *, direction: Vector3) -> Twist:
         """
-        :return: The motion of the connection this movable joint type becomes.
+        :param direction: The unit vector this movable joint moves along or about.
+        :return: The screw axis of the connection this movable joint type becomes.
         """
-        return {
-            USDPhysicsJointType.REVOLUTE: NormalizedTwist.create_revolute(),
-            USDPhysicsJointType.PRISMATIC: NormalizedTwist.create_prismatic(),
-        }[self]
+        if self is USDPhysicsJointType.PRISMATIC:
+            return ScrewAxisConnection.create_prismatic_screw_axis(axis=direction)
+        return ScrewAxisConnection.create_revolute_screw_axis(axis=direction)
 
 
 class USDAxis(StrEnum):
@@ -876,8 +874,7 @@ class USDStageParser(WorldModelParser, ABC):
         return ConnectionSpecificationWithEndpoints(
             connection_specification=specification_type(
                 connection_T_child=connection_T_child,
-                axis=axis,
-                normalized_twist=usd_joint_type.normalized_twist,
+                screw_axis=usd_joint_type.create_screw_axis(direction=axis),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=lower, upper_position=upper
                 ),

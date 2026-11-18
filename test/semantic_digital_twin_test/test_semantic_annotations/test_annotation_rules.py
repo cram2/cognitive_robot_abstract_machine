@@ -29,11 +29,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import Vector3
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
     FixedConnection,
     ScrewAxisConnection,
 )
@@ -105,8 +101,6 @@ class FurnitureUnderTest:
                 [Box(scale=Scale(0.1, 0.1, 0.1))], reference_frame=body
             )
         parent_body = self.bodies[parent]
-        if issubclass(connection_type, ActiveConnection):
-            connection_kwargs.setdefault("axis", Vector3.X(reference_frame=parent_body))
         with self.world.modify_world():
             self.world.add_kinematic_structure_entity(body)
             self.world.add_connection(
@@ -171,7 +165,9 @@ def drawer_with_a_grip() -> FurnitureUnderTest:
             "case",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         )
         .add("grip", "case", FixedConnection)
     )
@@ -263,7 +259,9 @@ def test_a_body_named_after_furniture_is_not_a_handle():
             "case",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         )
         .add("board", "case", FixedConnection)
     )
@@ -296,7 +294,9 @@ def test_a_case_with_nothing_to_pull_it_by_is_still_a_drawer():
             "case",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         )
     )
 
@@ -327,7 +327,7 @@ def test_a_leaf_a_hinge_swings_is_a_door_with_its_grip():
             "leaf",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add("grip", "leaf", FixedConnection)
         .apply(handles)
@@ -350,13 +350,13 @@ def test_a_leaf_another_follows_is_opened_by_that_leafs_handle():
             "upper_leaf",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add(
             "lower_leaf",
             "upper_leaf",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
             multiplier=1.2,
         )
         .add("grip", "lower_leaf", FixedConnection)
@@ -380,13 +380,13 @@ def test_a_container_is_not_opened_by_the_handle_on_its_own_door():
             "appliance",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add(
             "leaf",
             "appliance",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add("grip", "leaf", FixedConnection)
         .apply(handles)
@@ -409,13 +409,13 @@ def test_a_linkage_with_no_grip_anywhere_holds_no_door():
             "spout",
             "basin",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add(
             "lever",
             "spout",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .apply(handles)
     )
@@ -469,13 +469,15 @@ def test_a_container_holds_a_part_reached_through_a_shapeless_helper():
             "popout",
             "cabinet",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         )
         .add(
             "leaf",
             "popout",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add("grip", "leaf", FixedConnection)
         .apply(handles, doors_with_a_handle)
@@ -498,7 +500,9 @@ def test_a_container_takes_its_kind_from_the_part_that_names_it():
             "dishwasher_front",
             "unit",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         )
         .apply(handles, drawers_without_a_handle)
     )
@@ -521,7 +525,9 @@ def test_a_container_naming_no_kind_is_a_plain_cabinet():
             "case",
             "unit",
             ScrewAxisConnection,
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         )
         .apply(handles, drawers_without_a_handle)
     )

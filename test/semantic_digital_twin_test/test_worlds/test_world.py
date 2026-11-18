@@ -58,9 +58,6 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.testing import StateChangeCounter, world_setup  # noqa: F401
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import (
-    NormalizedTwist,
-)
 from semantic_digital_twin.world_description.connections import (
     ScrewAxisConnection,
     Connection6DoF,
@@ -1627,7 +1624,7 @@ def test_overwrite_dof_limits(world_setup):
     connection: ScrewAxisConnection = [
         connection
         for connection in world.get_connections_by_type(ScrewAxisConnection)
-        if connection.normalized_twist.behaves_like_a_prismatic_connection
+        if connection.behaves_like_a_prismatic_connection
     ][0]
     assert connection.dof.limits.lower.velocity == -1
     assert connection.dof.limits.upper.velocity == 1
@@ -1666,17 +1663,18 @@ def test_overwrite_dof_limits_mimic(world_setup):
     connection: ScrewAxisConnection = [
         connection
         for connection in world.get_connections_by_type(ScrewAxisConnection)
-        if connection.normalized_twist.behaves_like_a_prismatic_connection
+        if connection.behaves_like_a_prismatic_connection
     ][0]
     with world.modify_world():
         body = Body(name=PrefixedName("muh"))
         mimic_connection = ScrewAxisConnection(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3(0, 0, 1)
+            ),
             parent=bf,
             child=body,
             offset=23,
             multiplier=-2,
-            axis=Vector3(0, 0, 1),
             raw_dof=connection.raw_dof,
         )
         world.add_body(body)
@@ -1789,22 +1787,20 @@ def test_dof_removal_simple():
     body2 = Body(name=PrefixedName("body2"))
     with world.modify_world():
         c = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=body1,
             child=body2,
-            axis=Vector3.Z(),
         )
         world.add_connection(c)
     with world.modify_world():
         world.remove_connection(c)
 
         c2 = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=body1,
             child=body2,
-            axis=Vector3.Z(),
         )
         world.add_connection(c2)
 
@@ -1925,7 +1921,7 @@ def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup
 
     assert (
         isinstance(connection_copy, ScrewAxisConnection)
-        and connection_copy.normalized_twist.behaves_like_a_revolute_connection
+        and connection_copy.behaves_like_a_revolute_connection
     )
     assert connection_copy.parent is r1
     assert connection_copy.child is new_child
@@ -1933,11 +1929,10 @@ def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup
     assert (
         connection_copy.id
         == ScrewAxisConnection(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=connection.screw_axis,
             parent=r1,
             child=new_child,
             raw_dof=connection.raw_dof,
-            axis=connection.axis,
         ).id
     )
 
@@ -2062,7 +2057,7 @@ def test_reattach_child_to_new_parent(world_setup):
     # Initial state: l2 is child of l1 via a prismatic connection
     old_child_global_pose = l2.global_transform
     assert l2.parent_connection.parent == l1
-    assert l2.parent_connection.normalized_twist == NormalizedTwist.create_prismatic()
+    assert l2.parent_connection.behaves_like_a_prismatic_connection
 
     with world.modify_world():
         world.move_branch_with_fixed_connection(new_parent=bf, branch_root=l2)
@@ -2087,7 +2082,7 @@ def test_reattach_child_to_new_parent_offline(world_setup):
     """
     world, l1, l2, bf, r1, r2 = world_setup
     old_child_global_pose = l2.global_transform
-    assert l2.parent_connection.normalized_twist == NormalizedTwist.create_prismatic()
+    assert l2.parent_connection.behaves_like_a_prismatic_connection
 
     with world.modify_world():
         world.move_branch_with_fixed_connection(
@@ -2238,7 +2233,7 @@ def test_move_branch_preserves_active_connection(world_setup):
     """
     world, l1, l2, bf, r1, r2 = world_setup
     old_connection = r2.parent_connection
-    assert old_connection.normalized_twist == NormalizedTwist.create_revolute()
+    assert old_connection.behaves_like_a_revolute_connection
     old_dof_id = old_connection.dof.id
     old_pose = r2.global_transform
 
@@ -2246,7 +2241,7 @@ def test_move_branch_preserves_active_connection(world_setup):
         world.move_branch(r2, bf)
 
     assert r2.parent_kinematic_structure_entity == bf
-    assert r2.parent_connection.normalized_twist == NormalizedTwist.create_revolute()
+    assert r2.parent_connection.behaves_like_a_revolute_connection
     assert r2.parent_connection.dof.id == old_dof_id
     assert np.allclose(r2.global_transform, old_pose)
 
@@ -2629,19 +2624,21 @@ def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
             world.add_kinematic_structure_entity(b)
         world.add_connection(FixedConnection(parent=root, child=robot_base))
         robot_joint = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=robot_base)
+            ),
             world=world,
             parent=robot_base,
             child=robot_link,
-            axis=Vector3.Z(reference_frame=robot_base),
         )
         world.add_connection(robot_joint)
         drawer_joint = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_prismatic(),
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X(reference_frame=root)
+            ),
             world=world,
             parent=root,
             child=drawer_body,
-            axis=Vector3.X(reference_frame=root),
             dof_limits=env_limits,
         )
         world.add_connection(drawer_joint)
@@ -3199,11 +3196,10 @@ def test_replace_with_transfers_degrees_of_freedom_and_state():
     with other_world.modify_world():
         other_world.add_body(child_body)
         conn = ScrewAxisConnection.create_with_dofs(
-            normalized_twist=NormalizedTwist.create_revolute(),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=other_world,
             parent=other_world.root,
             child=child_body,
-            axis=Vector3.Z(),
         )
         other_world.add_connection(conn)
     other_world.state[conn.dof.id].position = 0.75

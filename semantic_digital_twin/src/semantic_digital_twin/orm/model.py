@@ -23,6 +23,7 @@ from krrood_spatial_math.spatial_types import (
     AxisAngle,
     SpatialType,
     Displacement,
+    Twist,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
@@ -204,6 +205,32 @@ class DisplacementMapping(AlternativeMapping[Displacement]):
         return Displacement(
             translation=self.translation,
             rotation_vector=self.rotation_vector,
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        return [Vector3]
+
+
+@dataclass(eq=False, kw_only=True)
+class TwistMapping(AlternativeMapping[Twist]):
+    angular_velocity: Vector3
+    linear_velocity: Vector3
+    reference_frame: KinematicStructureEntity | None
+
+    @classmethod
+    def from_domain_object(cls, *, obj: Twist):
+        return cls(
+            angular_velocity=obj.angular_velocity,
+            linear_velocity=obj.linear_velocity,
+            reference_frame=obj.reference_frame,
+        )
+
+    def to_domain_object(self) -> Twist:
+        return Twist(
+            angular_velocity=self.angular_velocity,
+            linear_velocity=self.linear_velocity,
             reference_frame=self.reference_frame,
         )
 

@@ -635,7 +635,7 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
                 connection.dof.limits.upper.position
                 if (
                     isinstance(connection, ScrewAxisConnection)
-                    and connection.normalized_twist.behaves_like_a_prismatic_connection
+                    and connection.behaves_like_a_prismatic_connection
                 )
                 else parent_pose.position.euclidean_distance(child_pose.position)
             )
