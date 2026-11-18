@@ -164,10 +164,8 @@ def get_definition_scope(
     :return: A merged namespace dict.
     """
     scope: dict[str, Any] = {}
-    # Read from ``__dict__`` rather than ``getattr``: an EQL variable's ``__getattr__``
-    # synthesises a symbolic attribute for *any* missing name, so ``getattr(.., None)``
-    # would never return ``None`` (it returns a bogus expression) for a variable that
-    # carries no attached scope — e.g. one rebuilt by ``load_rdr``.
+    # An EQL variable's ``__getattr__`` invents an attribute for any missing name, so
+    # only ``__dict__`` tells whether a scope was attached.
     attached = (
         getattr(obj, "__dict__", {}).get(_SCOPE_ATTRIBUTE) if obj is not None else None
     )

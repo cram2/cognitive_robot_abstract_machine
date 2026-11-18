@@ -44,6 +44,8 @@ def field_named(ormatic: ORMatic, name: str) -> WrappedField:
         ("span", FieldStorage.JSON),
         ("numbers", FieldStorage.JSON),
         ("days", FieldStorage.JSON),
+        ("record", FieldStorage.JSON),
+        ("records", FieldStorage.JSON),
         ("lookup", FieldStorage.NOT_STORED),
         ("anything", FieldStorage.NOT_STORED),
     ],

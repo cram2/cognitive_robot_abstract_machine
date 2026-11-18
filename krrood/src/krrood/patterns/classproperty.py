@@ -8,6 +8,8 @@ from typing_extensions import Any, Callable, Generic
 
 from krrood.utils import T
 
+# %% class property
+
 
 class classproperty(Generic[T]):
     """

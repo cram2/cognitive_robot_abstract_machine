@@ -16,10 +16,8 @@ from array_api_compat import array_namespace
 from scipy.special import logsumexp
 from typing_extensions import Any
 
-from probabilistic_model.learning.gradient_descent import (
-    AverageNegativeLogLikelihood,
-    JaxGradientDescent,
-)
+from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
+from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )

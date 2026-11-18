@@ -20,7 +20,10 @@ from types import NoneType
 
 from typing_extensions import TYPE_CHECKING, ClassVar
 
-from krrood.adapters.json_serializer import JSONSerializableTypeRegistry
+from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
+    JSONSerializableTypeRegistry,
+)
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.patterns.specificity_ranking import SpecificityRule
 
@@ -136,9 +139,12 @@ class FieldToStore:
 
     def has_json_serializer(self, *, clazz: type) -> bool:
         """
-        :return: True if a JSON serializer is registered for the class hierarchy.
+        :return: True if a JSON serializer is registered for the class hierarchy, or the
+            class is a dataclass, which :class:`DataclassJSONSerializer` writes.
         """
-        return JSONSerializableTypeRegistry().has_type_specific_serializer(clazz=clazz)
+        return JSONSerializableTypeRegistry().has_type_specific_serializer(
+            clazz=clazz
+        ) or DataclassJSONSerializer.matches_generic_type(clazz=clazz)
 
     def is_stored_as_a_value(self, *, clazz: type) -> bool:
         """
