@@ -17,7 +17,6 @@ from dataclasses import is_dataclass, dataclass
 import plotly.graph_objects as go
 import tqdm
 
-import coraplex.orm.ormatic_interface  # type: ignore
 from cramph.composites import StatementNode
 import semantic_digital_twin  # type: ignore
 from experiments.experiment_definitions import (
@@ -50,6 +49,8 @@ def build_cram_class_sets() -> tuple[set[type], list[type], dict]:
     :return: Tuple of (classes, alternative_mappings, type_mappings) ready to pass to
         :func:`run_scalability_experiment`.
     """
+    import coraplex.orm.ormatic_interface
+
     interface_info = get_classes_of_ormatic_interface(coraplex.orm.ormatic_interface)
     classes = set(interface_info.classes)
     alternative_mappings = interface_info.alternative_mappings

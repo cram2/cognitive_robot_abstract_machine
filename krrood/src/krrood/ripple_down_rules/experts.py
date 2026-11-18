@@ -45,7 +45,7 @@ from krrood.ripple_down_rules.utils import (
     get_class_file_path,
     row_to_dict,
 )
-from krrood.utils import get_scope_from_imports
+from krrood.source_analysis.import_scope import get_scope_from_imports
 
 from krrood.ripple_down_rules.user_interface.prompt import UserPrompt
 

@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.factories import deduced_variable, variable
 from krrood.entity_query_language.predicate import HasType

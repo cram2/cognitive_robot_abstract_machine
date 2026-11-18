@@ -9,7 +9,6 @@ from semantic_digital_twin.exceptions import (
     DuplicateRobotAssignmentsError,
     PartiallyAppliedWorldModificationError,
 )
-from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import (

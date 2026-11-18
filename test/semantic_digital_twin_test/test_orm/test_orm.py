@@ -1,3 +1,4 @@
+from typing_extensions import TYPE_CHECKING
 import dataclasses
 import os
 import time
@@ -36,7 +37,9 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
 from krrood.class_diagrams.class_diagram import WrappedClass
-from semantic_digital_twin.orm.ormatic_interface import *
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.orm.ormatic_interface import DegreeOfFreedomLimitsDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 
 
@@ -50,6 +53,8 @@ def engine():
 
 @pytest.fixture
 def session(engine):
+    from semantic_digital_twin.orm.ormatic_interface import Base
+
     session = Session(engine)
     Base.metadata.create_all(bind=session.bind)
     yield session
@@ -58,6 +63,11 @@ def session(engine):
 
 
 def test_table_world(session, table_world):
+    from semantic_digital_twin.orm.ormatic_interface import (
+        KinematicStructureEntityDAO,
+        WorldMappingDAO,
+    )
+
     revolute_connection = [
         connection
         for connection in table_world.get_connections_by_type(ScrewAxisConnection)
@@ -97,6 +107,8 @@ def test_table_world(session, table_world):
 
 
 def test_insert(session):
+    from semantic_digital_twin.orm.ormatic_interface import BodyDAO, BoxDAO, ShapeDAO
+
     origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
     scale = Scale(1.0, 1.0, 1.0)
     color = Color.from_rgba(red=0.0, green=1.0, blue=1.0)
@@ -143,6 +155,11 @@ def test_degree_of_freedom_limits(session):
 
 
 def test_pr2_world(pr2_world_state_reset, session):
+    from semantic_digital_twin.orm.ormatic_interface import (
+        ScrewAxisConnectionDAO,
+        WorldMappingDAO,
+    )
+
     dao: WorldMappingDAO = to_dao(pr2_world_state_reset)
     session.add(dao)
     session.commit()
@@ -247,6 +264,8 @@ def test_hsrb_world(hsr_world_state_reset, session):
     Verify that an HSRB world can be serialised, inserted into a database, queried back,
     and fully reconstructed — including the robot's mobile base.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     dao: WorldMappingDAO = to_dao(hsr_world_state_reset)
     session.add(dao)
     session.commit()
@@ -270,6 +289,8 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     type still carries the marker, the marked-field discovery must still find it, and
     the field *values* (handle, entry_way) must survive the round trip.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     world = World.create_with_root_body("root")
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
@@ -313,6 +334,8 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     A door whose origin sits away from its hinge must still swing about the hinge once
     reconstructed, so the offset of the door from its joint has to be persisted.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
     world = World.create_with_root_body("root")
     with world.modify_world():

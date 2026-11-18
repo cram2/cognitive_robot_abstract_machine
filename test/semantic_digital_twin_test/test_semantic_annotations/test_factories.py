@@ -23,7 +23,6 @@ from semantic_digital_twin.exceptions import (
     MissingSemanticAnnotationError,
     MismatchingWorld,
 )
-from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.semantic_annotations.mixins import (
     PartWholeRelationship,
     HasRootBody,

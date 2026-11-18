@@ -10,7 +10,6 @@ from sqlalchemy import select
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ormatic.data_access_objects.helper import to_dao
 from ..dataset.annotated_fields import AnnotatedFieldMember, AnnotatedFieldOwner
-from ..dataset.ormatic_interface import AnnotatedFieldOwnerDAO
 
 
 # %% type resolution
@@ -38,6 +37,8 @@ def test_annotated_fields_round_trip_through_the_database(session, database):
     """
     An annotated column and an annotated relationship are stored and restored.
     """
+    from ..dataset.ormatic_interface import AnnotatedFieldOwnerDAO
+
     original = AnnotatedFieldOwner(mass=2.5, member=AnnotatedFieldMember(label="a"))
     session.add(to_dao(original))
     session.commit()

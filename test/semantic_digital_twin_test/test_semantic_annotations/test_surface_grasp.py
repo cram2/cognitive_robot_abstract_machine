@@ -23,7 +23,6 @@ from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, and_, or_
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import GraspNotOnObjectError
-from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
 from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
     draw_grasps,

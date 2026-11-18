@@ -14,12 +14,13 @@ from semantic_digital_twin.adapters.procthor.procthor_parser import ProcTHORPars
 from semantic_digital_twin.adapters.procthor.procthor_resolver import (
     ProcthorResolver,
 )
-from semantic_digital_twin.orm.ormatic_interface import *
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
 def parse_procthor_worlds_and_calculate_containment_ratio():
+    import semantic_digital_twin.orm.ormatic_interface  # noqa: F401
+
     semantic_world_database_uri = os.environ.get("SEMANTIC_DIGITAL_TWIN_DATABASE_URI")
     semantic_world_engine = create_engine(semantic_world_database_uri, echo=False)
     semantic_world_session = Session(semantic_world_engine)

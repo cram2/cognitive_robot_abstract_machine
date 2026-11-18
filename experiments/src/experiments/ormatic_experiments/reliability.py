@@ -17,11 +17,9 @@ import tqdm
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
-import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from cramph.context import ContextExtension, StatechartContext
 from cramph.statechart import Statechart
-from coraplex.orm.ormatic_interface import Base  # type: ignore
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from experiments.experiment_definitions import (
@@ -47,7 +45,6 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from cramph.composites import Sequence, StatementNode
-from cramph.orm.ormatic_interface import SequenceDAO  # type: ignore
 
 _REPO_ROOT = pathlib.Path(__file__).parents[4]
 _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.urdf"
@@ -223,6 +220,9 @@ def reliability_experiment(
     :param world_building_duration: Pre-measured world building time (s).
     :return: Timing breakdown for this single run.
     """
+    from coraplex.orm.ormatic_interface import Base
+    from cramph.orm.ormatic_interface import SequenceDAO
+
     plan = create_plan(world, plan_size)
 
     t0 = time.perf_counter()

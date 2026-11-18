@@ -51,7 +51,6 @@ from semantic_digital_twin.exceptions import (
     WorldHasMultipleSynchronizersError,
     WorldHasNoSynchronizerError,
 )
-from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.robots.pr2 import PR2
 from test.semantic_digital_twin_test.test_part_finding.test_splitting import (
     BODY_OUTER_RADIUS,
@@ -97,7 +96,6 @@ from semantic_digital_twin.adapters.ros.messages import (
     LoadModel,
     WorldUpdate,
 )
-from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
 
 def create_dummy_world(w: World | None = None) -> World:
@@ -290,6 +288,8 @@ def test_state_synchronization_world_model_change_after_init(rclpy_node):
 
 
 def test_model_reload(rclpy_node, in_memory_session_maker):
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     session1 = in_memory_session_maker()
     session2 = in_memory_session_maker()
 

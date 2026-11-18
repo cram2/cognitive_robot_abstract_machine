@@ -31,7 +31,6 @@ from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.orm.ormatic_interface import *  # type: ignore
 
 
 def run_demo(demo: Sage10kAbstractDemoHSRB):

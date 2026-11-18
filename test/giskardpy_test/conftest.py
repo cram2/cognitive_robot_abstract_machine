@@ -417,3 +417,15 @@ def daisy_world_specification() -> WorldSpecification:
     DAiSy alone, as Giskard sets it up.
     """
     return WorldSpecification(robots=[RobotSpecification.specify_real_robot(DAiSy)])
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load giskardpy's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import giskardpy.orm.ormatic_interface  # noqa: F401
