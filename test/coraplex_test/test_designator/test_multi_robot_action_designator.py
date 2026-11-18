@@ -2,10 +2,9 @@
 Every action performed by each of the robots the plans are written for.
 """
 
+import json
 from copy import deepcopy
 from dataclasses import dataclass, field
-
-import json
 
 import numpy as np
 import pytest
@@ -16,21 +15,17 @@ from coraplex.datastructures.enums import DetectionTechnique
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.exceptions import NoFloorBelowRobot
 from coraplex.plans.plan_transformation import PlanRewriting
-from cramph.executor import StatechartExecutor
-from cramph.statechart import Statechart
-from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
-from cramph.threaded_nodes import FunctionCall
-from cramph.data_types import LifeCycleValues
-from coraplex.robot_plans.plan_transformations import (
-    OpenDrawerBeforeMoveAndPickUp,
-    ParkArmsBeforeFirstAction,
-)
+from coraplex.robot_plans.actions.base import Action
+from coraplex.robot_plans.actions.composite.carrying import CarryAction
+from coraplex.robot_plans.actions.composite.facing import FaceAndLookAtAction
 from coraplex.robot_plans.actions.composite.searching import (
     LookAtAndDetectAction,
     SearchAction,
 )
+from coraplex.robot_plans.actions.composite.transporting import MoveAndPlaceAction
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
 from coraplex.robot_plans.actions.core.container import OpenAction, CloseAction
+from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpening
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
     FaceAtAction,
@@ -55,51 +50,104 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveFingersToWidthAction,
     MoveManipulatorAction,
 )
-from coraplex.robot_plans.actions.base import Action
-from coraplex.robot_plans.actions.composite.carrying import CarryAction
-from coraplex.robot_plans.actions.composite.facing import FaceAndLookAtAction
-from coraplex.robot_plans.actions.composite.transporting import MoveAndPlaceAction
-from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpening
-from cramph.node import StatechartNode
-from cramph.world_modification_nodes import MoveBranch
-from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.tasks.collision_avoidance import (
-    UpdateTemporaryCollisionRules,
+from coraplex.robot_plans.plan_transformations import (
+    OpenDrawerBeforeMoveAndPickUp,
+    ParkArmsBeforeFirstAction,
 )
-from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
+from cramph.composites import Parallel, Sequence, TryInOrder
+from cramph.context import ContextExtension, StatechartContext
+from cramph.data_types import LifeCycleValues
+from cramph.executor import StatechartExecutor
+from cramph.node import StatechartNode
+from cramph.statechart import Statechart
+from cramph.world_modification_nodes import MoveBranch
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
-from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
+from giskardpy.motion_statechart.tasks.align_planes import KeepHeldBodyUpright
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPoseStraight,
     CartesianPose,
     CartesianPositionVelocityLimit,
     HoldPose,
 )
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
 from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
-from giskardpy.motion_statechart.tasks.align_planes import KeepHeldBodyUpright
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
     JointVelocityLimit,
 )
 from giskardpy.motion_statechart.tasks.pointing import Pointing
-from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
+from giskardpy.motion_statechart.weights import DefaultWeights
+from krrood.entity_query_language.factories import a
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Quaternion,
+    Vector3,
+)
+from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.testing.orientation_comparison import (
+    assert_same_axis_angle,
+    assert_same_orientation,
+)
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     GripperState,
     StaticJointState,
 )
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import MissingMovableJointError
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.reasoning.robot_predicates import get_visible_bodies
+from semantic_digital_twin.robots.garmi import Garmi
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_part_mixins import (
     HasMobileBase,
     HasTwoFingers,
 )
-from semantic_digital_twin.collision_checking.collision_rules import (
-    AllowCollisionForEndEffector,
-)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.robots.tiago import Tiago
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cup,
+    Milk,
+    Spoon,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Door,
+    Elevator,
+    FirstFloor,
+    Floor,
+    GroundFloor,
+    Handle,
+    Level,
+)
+from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+    DifferentialDrive,
+    FixedConnection,
+)
+from semantic_digital_twin.world_description.geometry import Cylinder, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 from ..conftest import (
     grasp_point_of,
     left_or_only_arm,
@@ -110,50 +158,6 @@ from ..conftest import (
     right_or_only_arm,
 )
 from ..world_snapshot import WorldSnapshot
-
-from semantic_digital_twin.robots.garmi import Garmi
-from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-)
-from semantic_digital_twin.exceptions import MissingMovableJointError
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Door,
-    Elevator,
-    FirstFloor,
-    Floor,
-    GroundFloor,
-    Handle,
-    Level,
-)
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Cup,
-    Milk,
-    Spoon,
-)
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Quaternion,
-    Vector3,
-)
-from krrood_spatial_math.spatial_types import Pose, Pose2D
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    ActiveConnection1DOF,
-    DifferentialDrive,
-    FixedConnection,
-)
-from semantic_digital_twin.world_description.geometry import Cylinder, Scale
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
-
-from ...conftest import SAMPLING_SEED
 from ...plan_running import (
     context_of,
     expand,
@@ -163,12 +167,6 @@ from ...plan_running import (
     simulated_executor,
     statechart_of,
 )
-from cramph.context import ContextExtension, StatechartContext
-from giskardpy.motion_control import MotionControl
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
-from krrood.entity_query_language.factories import a
 
 # %% standing a robot next to something
 
@@ -410,6 +408,9 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
 
 
 def test_park_arms_multi(multiple_robot_apartment_context):
+    """
+    Parking every arm of each robot moves each arm joint to its park position.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     description = ParkArmsAction(arms=robot.all_arms)
     plan = description
@@ -422,7 +423,7 @@ def test_park_arms_multi(multiple_robot_apartment_context):
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):
-        compare_axis_angle(
+        assert_same_axis_angle(
             connection.position,
             np.array([1, 0, 0]),
             value,
@@ -432,6 +433,10 @@ def test_park_arms_multi(multiple_robot_apartment_context):
 
 
 def test_reach_action_multi(multiple_robot_apartment_context):
+    """
+    Reaching for the milk moves the grasp point of the left arm onto the milk and its
+    tool frame into the orientation the grasp asks for.
+    """
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
@@ -464,7 +469,7 @@ def test_reach_action_multi(multiple_robot_apartment_context):
     target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
 
     assert grasp_point_of(left_arm) == pytest.approx([1, -2, 0.8], abs=0.01)
-    compare_orientations(
+    assert_same_orientation(
         end_effector_orientation, target_orientation.to_np(), decimal=2
     )
 

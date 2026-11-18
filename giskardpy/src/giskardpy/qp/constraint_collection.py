@@ -1,3 +1,8 @@
+"""
+Collection of the constraints of a motion task, grouped by how they enter the quadratic
+program.
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -6,7 +11,7 @@ from dataclasses import dataclass, field
 from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.data_types.exceptions import (
+from giskardpy.exceptions import (
     DuplicateNameException,
 )
 from cramph.data_types import LifeCycleValues

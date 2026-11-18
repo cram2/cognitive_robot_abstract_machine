@@ -18,7 +18,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from sqlalchemy.orm import sessionmaker
 
-from giskardpy.data_types.exceptions import NoControlledJointsError
+from giskardpy.exceptions import NoControlledJointsError
 from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.child_choices import (
@@ -305,6 +305,10 @@ class Giskard:
         )
 
     def setup_world_model_ros_interface(self):
+        """
+        Sets up reloading the world model from the database named by
+        ``SEMANTIC_DIGITAL_TWIN_DATABASE_URI``; without it, model reloads are disabled.
+        """
         try:
             semantic_digital_twin_database_uri = os.environ.get(
                 "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
