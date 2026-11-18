@@ -292,7 +292,7 @@ class MotionServer:
             )
             if divergence is not None:
                 raise RequiredWorldUpdateNotAppliedError(
-                    publisher_name=required_position.origin.node_name,
+                    publisher_name=required_position.origin.sender.node_name,
                     failed_sequence_number=divergence.position.sequence_number,
                     awaited_sequence_number=required_position.sequence_number,
                     raised_from=divergence,
@@ -302,7 +302,7 @@ class MotionServer:
             if time.monotonic() >= deadline:
                 raise RequiredWorldUpdateNotReceivedError(
                     current_sequence_number=self.outgoing_world_updates.world_synchronizer.published_sequence_number,
-                    publisher_name=required_position.origin.node_name,
+                    publisher_name=required_position.origin.sender.node_name,
                     awaited_sequence_number=required_position.sequence_number,
                     timeout=self.world_update_timeout,
                 )

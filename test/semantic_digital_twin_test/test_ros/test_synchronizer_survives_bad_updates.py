@@ -14,7 +14,7 @@ import std_msgs.msg
 from typing_extensions import Any
 
 from krrood.adapters.json_serializer import to_json
-from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.messages import (
     ModificationBlock,
     ReceivedMessage,
@@ -53,7 +53,7 @@ def stranger() -> MessageOrigin:
     """
     A publisher no receiver shares a model with.
     """
-    return MessageOrigin(node_name="stranger", process_id=0)
+    return MessageOrigin(sender=Sender(node_name="stranger", process_id=0))
 
 
 def state_update(
@@ -66,9 +66,10 @@ def state_update(
     :return: The serialized state update, as the first message of its publisher.
     """
     update = WorldUpdate(
-        origin=publisher,
-        state_update=WorldStateUpdate(origin=publisher, ids=ids, states=states),
-        sequence_number=1,
+        position=StreamPosition(origin=publisher, sequence_number=1),
+        state_update=WorldStateUpdate(
+            position=StreamPosition(origin=publisher), ids=ids, states=states
+        ),
     )
     return std_msgs.msg.String(data=json.dumps(to_json(update)))
 
@@ -277,9 +278,9 @@ def test_combined_update_with_unknown_state_leaves_the_model_untouched(
         node=rclpy_node, _world=world, topic_name=unique_topic("all_or_nothing")
     )
     combined = WorldUpdate(
-        origin=stranger,
+        position=StreamPosition(origin=stranger, sequence_number=1),
         modification_block=ModificationBlock(
-            origin=stranger,
+            position=StreamPosition(origin=stranger),
             modifications=WorldModelModificationBlock(
                 modifications=[
                     AddKinematicStructureEntityModification(
@@ -288,8 +289,9 @@ def test_combined_update_with_unknown_state_leaves_the_model_untouched(
                 ]
             ),
         ),
-        state_update=WorldStateUpdate(origin=stranger, ids=[uuid4()], states=[1.0]),
-        sequence_number=1,
+        state_update=WorldStateUpdate(
+            position=StreamPosition(origin=stranger), ids=[uuid4()], states=[1.0]
+        ),
     )
 
     synchronizer.subscription_callback(
@@ -375,7 +377,7 @@ def test_buffered_update_that_cannot_be_applied_keeps_the_rest_of_the_batch(
         topic_name=unique_topic("batch"),
         defer_incoming_updates=True,
     )
-    other_publisher = MessageOrigin(node_name="other", process_id=1)
+    other_publisher = MessageOrigin(sender=Sender(node_name="other", process_id=1))
     synchronizer.subscription_callback(
         state_update_of_unknown_degree_of_freedom(stranger)
     )
@@ -430,14 +432,13 @@ def test_own_echo_is_ignored_without_reading_it(rclpy_node):
         child=Body(name=PrefixedName("gone_child")),
     )
     echo = WorldUpdate(
-        origin=synchronizer.origin,
+        position=StreamPosition(origin=synchronizer.origin, sequence_number=1),
         modification_block=ModificationBlock(
-            origin=synchronizer.origin,
+            position=StreamPosition(origin=synchronizer.origin),
             modifications=WorldModelModificationBlock(
                 modifications=[AddConnectionModification(gone)]
             ),
         ),
-        sequence_number=1,
     )
 
     synchronizer.subscription_callback(

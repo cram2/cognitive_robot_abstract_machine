@@ -15,17 +15,17 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.context import StatechartContext
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
-from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.world import World
 
 # %% the payload a client sends
 
 
-def create_client() -> MessageOrigin:
+def create_client() -> Sender:
     """
     The identity a client names itself with.
     """
-    return MessageOrigin(node_name="client", process_id=3)
+    return Sender(node_name="client", process_id=3)
 
 
 def create_motion_statechart() -> Statechart:
@@ -77,7 +77,9 @@ class TestMotionGoalPayload:
         """
         A goal names the change of the client's world it was built on.
         """
-        position = StreamPosition(origin=create_client(), sequence_number=11)
+        position = StreamPosition(
+            origin=MessageOrigin(sender=create_client()), sequence_number=11
+        )
         goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(),
             client=create_client(),

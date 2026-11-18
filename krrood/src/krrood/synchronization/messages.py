@@ -1,5 +1,8 @@
 """
-The messages of a stream, where they come from and where they sit in it.
+The messages of a stream, who sends them and where they sit in it.
+
+A stream carries the changes of a model that several processes hold copies of, so that
+every copy can follow the one its publisher changes.
 """
 
 from __future__ import annotations
@@ -10,41 +13,81 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID
 
-# %% origin and position
+from typing_extensions import Any, Self
+
+from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
+    SubclassJSONSerializer,
+)
+from krrood.patterns.caching import memoize
+
+# %% sender, origin and position
 
 
 @dataclass(kw_only=True, frozen=True)
-class MessageOrigin:
+class Sender:
     """
-    The publisher of a stream of messages.
-
-    Two messages come from the same stream exactly if their origins are equal.
+    A node of a process that sends messages.
     """
 
     node_name: str
     """
-    The name of the node that published the message.
+    The name of the node that sends the messages.
     """
 
     process_id: int
     """
-    The id of the process that published the message.
+    The id of the process the node runs in.
+    """
+
+
+@dataclass(kw_only=True, frozen=True)
+class MessageOrigin(SubclassJSONSerializer):
+    """
+    The publisher of a stream of messages: a sender together with the copy of the model
+    whose changes it publishes.
+
+    Two messages come from the same stream exactly if their origins are equal.
+    """
+
+    sender: Sender
+    """
+    The node that publishes the stream.
     """
 
     model_id: UUID = field(default_factory=uuid.uuid4)
     """
-    The id of the copy of the model whose changes the stream carries.
+    The id of the model whose changes the stream carries.
 
-    Several publishers of one process may carry the changes of the same copy.
+    The copies of a model in different processes may share this id. Several publishers of
+    one process may carry the changes of the same copy.
     """
 
-    def shares_model_with(self, *, other: MessageOrigin) -> bool:
+    def publishes_same_model_copy_as(self, *, other: MessageOrigin) -> bool:
         """
         :param other: Another publisher.
-        :return: Whether both publish the changes of the same copy of a model, from the
-            same process.
+        :return: Whether both publish the changes of the same copy of a model, which is
+            the copy of that model in the process they both run in.
         """
-        return self.process_id == other.process_id and self.model_id == other.model_id
+        return (
+            self.sender.process_id == other.sender.process_id
+            and self.model_id == other.model_id
+        )
+
+    @memoize
+    def to_json(self, **kwargs) -> dict[str, Any]:
+        """
+        :meth:`SubclassJSONSerializer.to_json`, computed once, since every message of
+        the stream carries the same origin.
+        """
+        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
+
+    @classmethod
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        """
+        The inverse of :meth:`to_json`.
+        """
+        return DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -61,9 +104,12 @@ class StreamPosition:
     The publisher whose stream this position belongs to.
     """
 
-    sequence_number: int
+    sequence_number: int = 0
     """
     The position in the stream of that publisher.
+
+    Counts up by one per publication, starting at one. Zero is the start of the stream,
+    before the first message.
     """
 
 
@@ -76,25 +122,12 @@ class Message(ABC):
     A message of a stream.
     """
 
-    origin: MessageOrigin
+    position: StreamPosition
     """
-    The publisher of the message.
-    """
+    Where this message sits in the stream of its publisher.
 
-    sequence_number: int = 0
+    A message that was never published sits at the start of the stream.
     """
-    Position of this message in the stream of its publisher.
-
-    Counts up by one per publication, starting at one. A message that was never
-    published has the position zero.
-    """
-
-    @property
-    def position(self) -> StreamPosition:
-        """
-        Where this message sits in the stream of its publisher.
-        """
-        return StreamPosition(origin=self.origin, sequence_number=self.sequence_number)
 
 
 class MessageField(StrEnum):
@@ -102,12 +135,7 @@ class MessageField(StrEnum):
     The parts of a serialized message that are read without building it.
     """
 
-    ORIGIN = "origin"
+    POSITION = "position"
     """
-    The publisher of the message.
-    """
-
-    SEQUENCE_NUMBER = "sequence_number"
-    """
-    The position of the message in the stream of its publisher.
+    Where the message sits in the stream of its publisher.
     """

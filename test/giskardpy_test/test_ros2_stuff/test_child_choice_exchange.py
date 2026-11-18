@@ -44,7 +44,7 @@ from giskardpy.middleware.ros2.world_updates import (
     ClientWorldUpdates,
     OutgoingWorldUpdates,
 )
-from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock
@@ -388,7 +388,7 @@ class ClientAndRunningStatechart:
             child_chooser_access=ChildChooserAccess(choosers=[self.client_chooser]),
             world_updates=self.client_world_updates,
             required_position=StreamPosition(
-                origin=MessageOrigin(node_name="client", process_id=0),
+                origin=MessageOrigin(sender=Sender(node_name="client", process_id=0)),
                 sequence_number=1,
             ),
         )

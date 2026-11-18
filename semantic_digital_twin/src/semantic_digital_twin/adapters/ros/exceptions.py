@@ -114,7 +114,7 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
             else f"'{self.entity_id}'"
         )
         return (
-            f"The update of '{self.publisher.node_name}' refers to the entity "
+            f"The update of '{self.publisher.sender.node_name}' refers to the entity "
             f"{named_entity}, which this world never received."
         )
 

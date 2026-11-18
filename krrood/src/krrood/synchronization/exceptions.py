@@ -27,8 +27,8 @@ class DivergedFromPublisherError(DataclassException):
     def error_message(self) -> str:
         return (
             f"Message #{self.position.sequence_number} of "
-            f"'{self.position.origin.node_name}' could not be applied, so this copy may "
-            f"differ from the one of the publisher."
+            f"'{self.position.origin.sender.node_name}' could not be applied, so this copy "
+            f"may differ from the one of the publisher."
         )
 
     def suggest_correction(self) -> str:

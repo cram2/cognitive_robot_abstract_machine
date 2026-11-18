@@ -26,7 +26,7 @@ from giskardpy.middleware.ros2.client_presence import (
 )
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import to_json
-from krrood.synchronization.messages import MessageOrigin
+from krrood.synchronization.messages import Sender
 
 # %% helpers
 
@@ -64,14 +64,14 @@ def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> bool:
     return condition()
 
 
-def create_client(node_name: str = "some_client") -> MessageOrigin:
+def create_client(node_name: str = "some_client") -> Sender:
     """
     The identity a client names itself with.
     """
-    return MessageOrigin(node_name=node_name, process_id=1234)
+    return Sender(node_name=node_name, process_id=1234)
 
 
-def heartbeat_of(client: MessageOrigin) -> std_msgs.msg.String:
+def heartbeat_of(client: Sender) -> std_msgs.msg.String:
     """
     The message that client sends to announce itself.
     """
@@ -146,7 +146,7 @@ class TestClientHeartbeat:
         """
         presence = HeartbeatPresence(node=rclpy_node)
         client_node = rclpy.create_node("heartbeat_sender")
-        client = MessageOrigin(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         publisher = ClientHeartbeatPublisher(
             node=client_node,
             client=client,
@@ -171,7 +171,7 @@ class TestClientHeartbeat:
         client_node = rclpy.create_node("heartbeat_sender")
         publisher = ClientHeartbeatPublisher(
             node=client_node,
-            client=MessageOrigin(node_name=client_node.get_name(), process_id=7),
+            client=Sender(node_name=client_node.get_name(), process_id=7),
             giskard_node_name=rclpy_node.get_name(),
         )
 
@@ -188,7 +188,7 @@ class TestClientHeartbeat:
         client_node = rclpy.create_node("heartbeat_sender")
         publisher = ClientHeartbeatPublisher(
             node=client_node,
-            client=MessageOrigin(node_name=client_node.get_name(), process_id=7),
+            client=Sender(node_name=client_node.get_name(), process_id=7),
             giskard_node_name=rclpy_node.get_name(),
         )
         publisher.stop()
@@ -366,7 +366,7 @@ class TestHeartbeatWhileNodeIsBusy:
         presence = HeartbeatPresence(node=giskard_node)
         busy = BusyDefaultCallbackGroup(node=giskard_node)
         client_node = rclpy.create_node("heartbeat_sender")
-        client = MessageOrigin(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         sender = client_node.create_publisher(
             std_msgs.msg.String,
             ClientHeartbeatPublisher.topic_name(
@@ -397,7 +397,7 @@ class TestHeartbeatWhileNodeIsBusy:
         giskard_node = background_node.get_node()
         presence = HeartbeatPresence(node=giskard_node)
         client_node = rclpy.create_node("heartbeat_sender")
-        client = MessageOrigin(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         assert wait_until(lambda: background_node.executor is not None)
         background_node.executor.add_node(client_node)
         busy = BusyDefaultCallbackGroup(node=client_node)
@@ -459,7 +459,7 @@ class TestHeartbeatWithoutItsNodeBeingSpun:
         """
         presence = HeartbeatPresence(node=rclpy_node)
         client_node = rclpy.create_node("client_nothing_spins")
-        client = MessageOrigin(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         publisher = ClientHeartbeatPublisher(
             node=client_node,
             client=client,

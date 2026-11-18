@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import JSONAttributeDiff, to_json, from_json
-from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.messages import (
     WorldStateUpdate,
     LoadModel,
@@ -1294,39 +1294,37 @@ def test_world_state_update_serialization_round_trip():
     """
     Verify that WorldStateUpdate survives a to_json/from_json round trip.
     """
-    origin = MessageOrigin(node_name="test_node", process_id=42)
+    origin = MessageOrigin(sender=Sender(node_name="test_node", process_id=42))
     original = WorldStateUpdate(
-        origin=origin,
+        position=StreamPosition(origin=origin, sequence_number=3),
         ids=[uuid.uuid4(), uuid.uuid4()],
         states=[1.5, 2.5],
-        sequence_number=3,
     )
 
     serialized = to_json(original)
     restored = from_json(serialized)
 
     assert isinstance(restored, WorldStateUpdate)
-    assert restored.origin.node_name == original.origin.node_name
-    assert restored.origin.process_id == original.origin.process_id
+    assert restored.position == original.position
     assert restored.ids == original.ids
     assert restored.states == original.states
-    assert restored.sequence_number == 3
 
 
 def test_load_model_serialization_round_trip():
     """
     Verify that LoadModel survives a to_json/from_json round trip.
     """
-    origin = MessageOrigin(node_name="loader", process_id=99)
-    original = LoadModel(origin=origin, primary_key=7, sequence_number=5)
+    origin = MessageOrigin(sender=Sender(node_name="loader", process_id=99))
+    original = LoadModel(
+        position=StreamPosition(origin=origin, sequence_number=5), primary_key=7
+    )
 
     serialized = to_json(original)
     restored = from_json(serialized)
 
     assert isinstance(restored, LoadModel)
     assert restored.primary_key == 7
-    assert restored.origin.node_name == "loader"
-    assert restored.sequence_number == 5
+    assert restored.position == original.position
 
 
 def test_simultaneous_state_and_model_updates(rclpy_node):
@@ -1651,18 +1649,20 @@ def test_world_update_serialization_round_trip():
     import json
 
     w = create_dummy_world()
-    origin = MessageOrigin(node_name="test_node", process_id=1, model_id=w._id)
+    origin = MessageOrigin(
+        sender=Sender(node_name="test_node", process_id=1), model_id=w._id
+    )
     state_msg = WorldStateUpdate(
-        origin=origin,
+        position=StreamPosition(origin=origin),
         ids=list(w.state.keys())[:2],
         states=[0.1, 0.2],
     )
-    update = WorldUpdate(origin=origin, state_update=state_msg)
+    update = WorldUpdate(position=StreamPosition(origin=origin), state_update=state_msg)
 
     serialized = json.dumps(to_json(update))
     restored = from_json(json.loads(serialized))
 
-    assert restored.origin.node_name == update.origin.node_name
+    assert restored.position == update.position
     assert restored.modification_block is None
     assert restored.state_update is not None
     assert restored.state_update.states == [0.1, 0.2]
@@ -1921,7 +1921,7 @@ def test_apply_state_with_unknown_identifier_raises(rclpy_node):
     unknown_identifier = uuid4()
 
     partially_unknown_state_update = WorldStateUpdate(
-        origin=world_synchronizer.origin,
+        position=StreamPosition(origin=world_synchronizer.origin),
         ids=[known_identifier, unknown_identifier],
         states=[0.0, 9.9],
     )
@@ -1930,7 +1930,7 @@ def test_apply_state_with_unknown_identifier_raises(rclpy_node):
         world_synchronizer._apply_state(partially_unknown_state_update)
 
     all_unknown_state_update = WorldStateUpdate(
-        origin=world_synchronizer.origin,
+        position=StreamPosition(origin=world_synchronizer.origin),
         ids=[uuid4(), uuid4()],
         states=[1.0, 2.0],
     )
@@ -2144,12 +2144,12 @@ def test_state_change_during_a_modification_is_published_after_its_model_change(
         assert not announcing_thread.is_alive()
 
         model_update_positions = [
-            update.sequence_number
+            update.position.sequence_number
             for update in published_updates
             if update.modification_block is not None
         ]
         state_update_positions = [
-            update.sequence_number
+            update.position.sequence_number
             for update in published_updates
             if update.state_update is not None
         ]
@@ -2334,15 +2334,17 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
     new_dof_id = connection.dof.id
 
     source_origin = MessageOrigin(
-        node_name="atomic_src", process_id=0, model_id=uuid4()
+        sender=Sender(node_name="atomic_src", process_id=0), model_id=uuid4()
     )
     combined_update = WorldUpdate(
-        origin=source_origin,
+        position=StreamPosition(origin=source_origin),
         modification_block=ModificationBlock(
-            origin=source_origin, modifications=model_block
+            position=StreamPosition(origin=source_origin), modifications=model_block
         ),
         state_update=WorldStateUpdate(
-            origin=source_origin, ids=[new_dof_id], states=[0.73]
+            position=StreamPosition(origin=source_origin),
+            ids=[new_dof_id],
+            states=[0.73],
         ),
     )
 
@@ -2406,8 +2408,7 @@ class WorldUpdateSender:
         Name the sender after the world it announces, in this process.
         """
         self.origin = MessageOrigin(
-            node_name="world_update_sender",
-            process_id=os.getpid(),
+            sender=Sender(node_name="world_update_sender", process_id=os.getpid()),
             model_id=self.world._id,
         )
 
@@ -2430,9 +2431,10 @@ class WorldUpdateSender:
         self._deliver(
             receiver,
             WorldUpdate(
-                origin=self.origin,
+                position=StreamPosition(origin=self.origin),
                 modification_block=ModificationBlock(
-                    origin=self.origin, modifications=modifications
+                    position=StreamPosition(origin=self.origin),
+                    modifications=modifications,
                 ),
             ),
         )
@@ -2449,9 +2451,9 @@ class WorldUpdateSender:
         self._deliver(
             receiver,
             WorldUpdate(
-                origin=self.origin,
+                position=StreamPosition(origin=self.origin),
                 state_update=WorldStateUpdate(
-                    origin=self.origin,
+                    position=StreamPosition(origin=self.origin),
                     ids=list(positions.keys()),
                     states=list(positions.values()),
                 ),
@@ -2471,7 +2473,9 @@ class WorldUpdateSender:
         Serialize the update and give it to the receiver the way ros would.
         """
         self._sequence_number += 1
-        update.sequence_number = self._sequence_number
+        update.position = StreamPosition(
+            origin=self.origin, sequence_number=self._sequence_number
+        )
         receiver.subscription_callback(
             std_msgs.msg.String(data=json.dumps(to_json(update)))
         )
@@ -2792,10 +2796,13 @@ def test_message_arriving_during_a_drain_stays_buffered(rclpy_node):
     )
     try:
         empty_state_update = WorldStateUpdate(
-            origin=synchronizer.origin, ids=[], states=[]
+            position=StreamPosition(origin=synchronizer.origin), ids=[], states=[]
         )
         synchronizer.missed_messages.append(
-            WorldUpdate(origin=synchronizer.origin, state_update=empty_state_update)
+            WorldUpdate(
+                position=StreamPosition(origin=synchronizer.origin),
+                state_update=empty_state_update,
+            )
         )
         drain = threading.Thread(
             target=synchronizer.apply_missed_messages, name="drain-race"
@@ -2803,7 +2810,8 @@ def test_message_arriving_during_a_drain_stays_buffered(rclpy_node):
         drain.start()
         time.sleep(0.1)
         late_message = WorldUpdate(
-            origin=synchronizer.origin, state_update=empty_state_update
+            position=StreamPosition(origin=synchronizer.origin),
+            state_update=empty_state_update,
         )
         synchronizer._subscription_callback(late_message)
         drain.join(timeout=5.0)
@@ -2815,18 +2823,6 @@ def test_message_arriving_during_a_drain_stays_buffered(rclpy_node):
 
 
 # %% positions in the stream of a publisher
-
-
-def test_a_message_reports_where_it_sits_in_the_stream_of_its_publisher():
-    """
-    A message carries everything a reader needs to tell how far it caught up with the
-    publisher that sent it.
-    """
-    origin = MessageOrigin(node_name="publisher", process_id=1)
-
-    message = WorldUpdate(origin=origin, sequence_number=3)
-
-    assert message.position == StreamPosition(origin=origin, sequence_number=3)
 
 
 def test_every_publication_advances_the_stream_position(rclpy_node):
@@ -2844,9 +2840,11 @@ def test_every_publication_advances_the_stream_position(rclpy_node):
         for expected_position in (1, 2, 3):
             synchronizer.publish(
                 WorldUpdate(
-                    origin=synchronizer.origin,
+                    position=StreamPosition(origin=synchronizer.origin),
                     state_update=WorldStateUpdate(
-                        origin=synchronizer.origin, ids=[], states=[]
+                        position=StreamPosition(origin=synchronizer.origin),
+                        ids=[],
+                        states=[],
                     ),
                 )
             )
@@ -2905,7 +2903,7 @@ def test_a_publisher_that_was_never_heard_from_is_at_the_start_of_its_stream(
     synchronizer = WorldSynchronizer(
         node=rclpy_node, _world=world, topic_name=f"/unknown_publisher_{uuid4().hex}"
     )
-    stranger = MessageOrigin(node_name="stranger", process_id=1)
+    stranger = MessageOrigin(sender=Sender(node_name="stranger", process_id=1))
     try:
         assert synchronizer.has_applied(
             position=StreamPosition(origin=stranger, sequence_number=0)
@@ -3266,9 +3264,10 @@ class ReceivingSynchronizer:
         stream that changes nothing.
         """
         update = WorldUpdate(
-            origin=publisher,
-            sequence_number=sequence_number,
-            state_update=WorldStateUpdate(origin=publisher, ids=[], states=[]),
+            position=StreamPosition(origin=publisher, sequence_number=sequence_number),
+            state_update=WorldStateUpdate(
+                position=StreamPosition(origin=publisher), ids=[], states=[]
+            ),
         )
         self.synchronizer.subscription_callback(
             std_msgs.msg.String(data=json.dumps(to_json(update)))
@@ -3294,7 +3293,7 @@ def test_a_receiver_that_lost_updates_warns_about_it(
     """
     Its world may differ from the publisher's in what the lost updates carried.
     """
-    publisher = MessageOrigin(node_name="publisher", process_id=1)
+    publisher = MessageOrigin(sender=Sender(node_name="publisher", process_id=1))
     receiving.receive(publisher=publisher, sequence_number=1)
     receiving.receive(publisher=publisher, sequence_number=4)
 
@@ -3307,7 +3306,7 @@ def test_updates_received_in_sequence_are_not_lost(
     """
     Updates of a publisher that follow each other give no warning about lost updates.
     """
-    publisher = MessageOrigin(node_name="publisher", process_id=1)
+    publisher = MessageOrigin(sender=Sender(node_name="publisher", process_id=1))
     receiving.receive(publisher=publisher, sequence_number=1)
     receiving.receive(publisher=publisher, sequence_number=2)
 
@@ -3322,7 +3321,8 @@ def test_a_publisher_heard_from_for_the_first_time_has_lost_nothing(
     fetched what was published before.
     """
     receiving.receive(
-        publisher=MessageOrigin(node_name="publisher", process_id=1), sequence_number=7
+        publisher=MessageOrigin(sender=Sender(node_name="publisher", process_id=1)),
+        sequence_number=7,
     )
 
     assert receiving.logger.warnings == []

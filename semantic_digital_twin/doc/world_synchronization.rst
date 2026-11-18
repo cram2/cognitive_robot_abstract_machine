@@ -45,8 +45,10 @@ to force all worlds subscribed to it to do so.
 Message streams
 ---------------
 What does not depend on worlds lives in :mod:`krrood.synchronization`, so that other models can be synchronized the same way.
-Every message carries its :class:`~krrood.synchronization.messages.MessageOrigin` and its position in the stream of that
-publisher. A synchronizer is a :class:`~krrood.synchronization.stream_participants.StreamPublisher`, which numbers the
+Every message carries its :class:`~krrood.synchronization.messages.StreamPosition`: its
+:class:`~krrood.synchronization.messages.MessageOrigin`, which names the
+:class:`~krrood.synchronization.messages.Sender` and the world whose changes it publishes, and its sequence number in the
+stream of that publisher. A synchronizer is a :class:`~krrood.synchronization.stream_participants.StreamPublisher`, which numbers the
 messages it sends, and a :class:`~krrood.synchronization.stream_participants.StreamReceiver`, which remembers per publisher
 how far it received and applied that stream. With that, two processes can tell each other what to catch up with
 (:meth:`~krrood.synchronization.stream_participants.StreamReceiver.has_applied`), a gap in a stream reveals lost messages,

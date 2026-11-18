@@ -33,7 +33,7 @@ from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_statechart.graph_node import EndMotion
 from krrood.adapters.json_serializer import from_json
-from krrood.synchronization.messages import MessageOrigin
+from krrood.synchronization.messages import Sender
 from semantic_digital_twin.world import World
 
 from .test_world_updates import PublishingSynchronizerMimic
@@ -159,7 +159,7 @@ class ChoosingGoal:
         return json.dumps(
             MotionGoal.from_motion_statechart(
                 motion_statechart=self.statechart,
-                client=MessageOrigin(node_name="unwatched_client", process_id=0),
+                client=Sender(node_name="unwatched_client", process_id=0),
             ).to_json()
         )
 

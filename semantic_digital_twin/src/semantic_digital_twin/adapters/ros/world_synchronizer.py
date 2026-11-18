@@ -30,7 +30,12 @@ from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.synchronization.exceptions import DivergedFromPublisherError
-from krrood.synchronization.messages import Message, MessageOrigin
+from krrood.synchronization.messages import (
+    Message,
+    MessageOrigin,
+    Sender,
+    StreamPosition,
+)
 from krrood.synchronization.stream_participants import (
     LostMessages,
     StreamPublisher,
@@ -180,9 +185,8 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
     @cached_property
     def origin(self) -> MessageOrigin:
         return MessageOrigin(
+            sender=Sender(node_name=self.node.get_name(), process_id=os.getpid()),
             model_id=self._world._id,
-            node_name=self.node.get_name(),
-            process_id=os.getpid(),
         )
 
     def subscription_callback(self, message: std_msgs.msg.String) -> None:
@@ -248,7 +252,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
         """
         self.node.get_logger().warning(
             f"Updates #{lost.first_sequence_number} to #{lost.last_sequence_number} of "
-            f"'{lost.publisher.node_name}' were lost, so this world may differ from the "
+            f"'{lost.publisher.sender.node_name}' were lost, so this world may differ from the "
             f"one of the publisher.",
             throttle_duration_sec=warning_throttle_period,
         )
@@ -349,7 +353,9 @@ class ModelReloadSynchronizer(Synchronizer):
         dao = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()
-        message = LoadModel(primary_key=dao.database_id, origin=self.origin)
+        message = LoadModel(
+            primary_key=dao.database_id, position=StreamPosition(origin=self.origin)
+        )
         self.publish(message)
 
     def _subscription_callback(self, message: ReceivedMessage) -> None:
@@ -387,7 +393,9 @@ class ModelReloadSynchronizer(Synchronizer):
             self,
             *WorldSynchronizer.all_callbacks_of_this_type_from_world(self._world),
         ]:
-            synchronizer.forget_divergences_from_same_model(publisher=msg.origin)
+            synchronizer.forget_divergences_from_same_model(
+                publisher=msg.position.origin
+            )
 
 
 @dataclass(eq=False)
@@ -478,12 +486,14 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             return
 
         model_block = ModificationBlock(
-            origin=self.origin,
+            position=StreamPosition(origin=self.origin),
             modifications=self._world.get_world_model_manager().model_modification_blocks[
                 -1
             ],
         )
-        update = WorldUpdate(origin=self.origin, modification_block=model_block)
+        update = WorldUpdate(
+            position=StreamPosition(origin=self.origin), modification_block=model_block
+        )
         self._publish_or_defer(update)
 
     def on_state_change(
@@ -519,11 +529,13 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             return
 
         state_message = WorldStateUpdate(
-            origin=self.origin,
+            position=StreamPosition(origin=self.origin),
             ids=list(changes.keys()),
             states=list(changes.values()),
         )
-        update = WorldUpdate(origin=self.origin, state_update=state_message)
+        update = WorldUpdate(
+            position=StreamPosition(origin=self.origin), state_update=state_message
+        )
         self._publish_or_defer(update)
         self.update_previous_world_state()
 

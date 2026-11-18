@@ -7,15 +7,16 @@ from __future__ import annotations
 
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from krrood.synchronization.exceptions import DivergedFromPublisherError
 from krrood.synchronization.messages import Message, MessageOrigin, StreamPosition
+from krrood.patterns.interface import Interface
 
 # %% publishing
 
 
-class PublicationProgress(ABC):
+class PublicationProgress(Interface):
     """
     Reports how far its own changes were published to the other processes.
 
@@ -23,13 +24,10 @@ class PublicationProgress(ABC):
     have to catch up with before they may read the model it publishes.
     """
 
-    @property
-    @abstractmethod
-    def published_sequence_number(self) -> int:
-        """
-        Position of the message that was published last, zero before the first one.
-        """
-        raise NotImplementedError
+    published_sequence_number: int
+    """
+    Position of the message that was published last, zero before the first one.
+    """
 
     @property
     @abstractmethod
@@ -45,19 +43,20 @@ class StreamPublisher(PublicationProgress, ABC):
     """
     Publishes a stream of messages and numbers each message by its position in it.
 
-    Thread-safe: messages may be numbered while others read how far it published.
+    Thread-safe: messages may be numbered on several threads while others read how far it
+    published.
     """
 
-    _published_sequence_number: int = field(default=0, init=False, repr=False)
+    published_sequence_number: int = field(default=0, init=False)
     """
     Position of the message that was numbered last.
     """
 
-    _publication_lock: threading.Lock = field(
-        default_factory=threading.Lock, init=False, repr=False
+    _publication_lock: threading.RLock = field(
+        default_factory=threading.RLock, init=False, repr=False
     )
     """
-    Guards :attr:`_published_sequence_number`.
+    Keeps two messages from being given the same position.
     """
 
     @property
@@ -67,11 +66,6 @@ class StreamPublisher(PublicationProgress, ABC):
         The publisher every message of this stream comes from.
         """
         raise NotImplementedError
-
-    @property
-    def published_sequence_number(self) -> int:
-        with self._publication_lock:
-            return self._published_sequence_number
 
     @property
     def latest_published_position(self) -> StreamPosition:
@@ -86,8 +80,10 @@ class StreamPublisher(PublicationProgress, ABC):
         Call it right before ``message`` is sent, in the order the messages are sent.
         """
         with self._publication_lock:
-            self._published_sequence_number += 1
-            message.sequence_number = self._published_sequence_number
+            self.published_sequence_number += 1
+            message.position = replace(
+                message.position, sequence_number=self.published_sequence_number
+            )
 
 
 # %% receiving
@@ -147,8 +143,8 @@ class StreamReceiver:
     since.
     """
 
-    _reception_lock: threading.Lock = field(
-        default_factory=threading.Lock, init=False, repr=False
+    _reception_lock: threading.RLock = field(
+        default_factory=threading.RLock, init=False, repr=False
     )
     """
     Guards the received and applied positions and the divergences.
@@ -237,7 +233,7 @@ class StreamReceiver:
             caught_up = [
                 diverged
                 for diverged in self._divergences
-                if diverged.shares_model_with(other=publisher)
+                if diverged.publishes_same_model_copy_as(other=publisher)
             ]
             for diverged in caught_up:
                 del self._divergences[diverged]

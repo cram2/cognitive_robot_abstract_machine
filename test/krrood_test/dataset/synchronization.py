@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.synchronization.messages import Message, MessageOrigin
+from krrood.synchronization.messages import Message, MessageOrigin, StreamPosition
 from krrood.synchronization.stream_participants import StreamPublisher, StreamReceiver
 
 # %% messages
@@ -48,6 +48,8 @@ class CounterPeer(StreamPublisher, StreamReceiver):
         :param reading: The value the counter shows.
         :return: The reading, numbered as the next message of this process.
         """
-        message = CounterReading(origin=self.origin, reading=reading)
+        message = CounterReading(
+            position=StreamPosition(origin=self.origin), reading=reading
+        )
         self.assign_next_sequence_number(message=message)
         return message

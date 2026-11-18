@@ -124,10 +124,7 @@ class ReceivedMessage:
         """
         return cls(
             content=content,
-            position=StreamPosition(
-                origin=from_json(content[MessageField.ORIGIN]),
-                sequence_number=content[MessageField.SEQUENCE_NUMBER],
-            ),
+            position=from_json(content[MessageField.POSITION]),
         )
 
     @property

@@ -50,7 +50,7 @@ from krrood.adapters.json_serializer import from_json
 from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
 from krrood.synchronization.exceptions import DivergedFromPublisherError
-from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
@@ -252,7 +252,9 @@ class PublicationProgressMimic:
     """
 
     origin: MessageOrigin = field(
-        default_factory=lambda: MessageOrigin(node_name="mimic", process_id=0)
+        default_factory=lambda: MessageOrigin(
+            sender=Sender(node_name="mimic", process_id=0)
+        )
     )
     """
     The publisher the sequence numbers belong to.
@@ -477,7 +479,7 @@ class CycleWatchingLateClientDisconnector(CycleWatchingClientDisconnector):
     goal was accepted.
     """
 
-    client: MessageOrigin | None = None
+    client: Sender | None = None
     """
     The client that announces itself late.
     """
@@ -649,7 +651,7 @@ def feedback_data(message: Any) -> dict:
 def create_goal_json(
     seconds: float = 0.5,
     required_position: StreamPosition | None = None,
-    client: MessageOrigin | None = None,
+    client: Sender | None = None,
     debug_output: DebugOutput = DebugOutput(),
 ) -> str:
     """
@@ -664,7 +666,7 @@ def create_goal_json(
     )
     motion_statechart.add_node(node=EndMotion.when_true(node=counter))
     if client is None:
-        client = MessageOrigin(node_name="unwatched_client", process_id=0)
+        client = Sender(node_name="unwatched_client", process_id=0)
     goal = MotionGoal.from_motion_statechart(
         motion_statechart=motion_statechart,
         client=client,
@@ -686,7 +688,7 @@ class MotionServerFixture:
     publication_progress: PublicationProgressMimic
     motion_server: MotionServer
     control_loop: ControlLoop
-    client: MessageOrigin
+    client: Sender
     """
     The client the heartbeats of :attr:`client_presence` come from.
     """
@@ -729,7 +731,7 @@ def motion_server(init_background_node, tmp_path: Path) -> MotionServerFixture:
     command_publisher = RecordingCommandPublisher(world=world)
     control_input = RecordingInputSynchronizer(world=world, executor=executor)
     cycle_counter = CycleCounter()
-    client = MessageOrigin(node_name="watched_client", process_id=1)
+    client = Sender(node_name="watched_client", process_id=1)
     client_presence = HeartbeatPresence(
         node=background_node.get_node(), clock=SteppingClock()
     )
@@ -1181,7 +1183,7 @@ class TestTrajectoryPlot:
         motion_server.motion_server.world_update_timeout = 0.2
         motion_server.action_server.goal_json = create_goal_json(
             required_position=StreamPosition(
-                origin=MessageOrigin(node_name="client", process_id=1),
+                origin=MessageOrigin(sender=Sender(node_name="client", process_id=1)),
                 sequence_number=4,
             ),
             debug_output=DebugOutput(plots_trajectory=True),
@@ -1618,7 +1620,8 @@ class TestWaitingForTheWorldOfTheClient:
         applied.
         """
         position = StreamPosition(
-            origin=MessageOrigin(node_name="client", process_id=1), sequence_number=4
+            origin=MessageOrigin(sender=Sender(node_name="client", process_id=1)),
+            sequence_number=4,
         )
         motion_server.world_updates.drains_until_caught_up = 3
         motion_server.action_server.goal_json = create_goal_json(
@@ -1641,7 +1644,7 @@ class TestWaitingForTheWorldOfTheClient:
         motion_server.world_updates.drains_until_caught_up = 3
         motion_server.action_server.goal_json = create_goal_json(
             required_position=StreamPosition(
-                origin=MessageOrigin(node_name="client", process_id=1),
+                origin=MessageOrigin(sender=Sender(node_name="client", process_id=1)),
                 sequence_number=4,
             )
         )
@@ -1665,7 +1668,7 @@ class TestWaitingForTheWorldOfTheClient:
         motion_server.motion_server.world_update_timeout = 0.2
         motion_server.action_server.goal_json = create_goal_json(
             required_position=StreamPosition(
-                origin=MessageOrigin(node_name="client", process_id=1),
+                origin=MessageOrigin(sender=Sender(node_name="client", process_id=1)),
                 sequence_number=4,
             )
         )
@@ -1686,13 +1689,13 @@ class TestWaitingForTheWorldOfTheClient:
         A goal whose required change cannot be applied is aborted without waiting for
         the timeout.
         """
-        client = MessageOrigin(node_name="client", process_id=1)
-        motion_server.world_updates.divergences[client] = DivergedFromPublisherError(
-            position=StreamPosition(origin=client, sequence_number=2)
+        publisher = MessageOrigin(sender=Sender(node_name="client", process_id=1))
+        motion_server.world_updates.divergences[publisher] = DivergedFromPublisherError(
+            position=StreamPosition(origin=publisher, sequence_number=2)
         )
         motion_server.motion_server.world_update_timeout = 5.0
         motion_server.action_server.goal_json = create_goal_json(
-            required_position=StreamPosition(origin=client, sequence_number=4)
+            required_position=StreamPosition(origin=publisher, sequence_number=4)
         )
 
         motion_server.motion_server.run_idle_cycle()
@@ -1742,7 +1745,7 @@ class TestClientDisconnect:
         A client's first heartbeat can arrive after its goal was accepted, and that goal
         still has to be stopped once the client is gone.
         """
-        late_client = MessageOrigin(node_name="late_client", process_id=2)
+        late_client = Sender(node_name="late_client", process_id=2)
         motion_server.action_server.goal_json = create_goal_json(
             seconds=100.0, client=late_client
         )

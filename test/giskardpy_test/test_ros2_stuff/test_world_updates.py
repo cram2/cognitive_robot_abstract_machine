@@ -33,7 +33,7 @@ from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import to_json
-from krrood.synchronization.messages import MessageOrigin, StreamPosition
+from krrood.synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
@@ -118,7 +118,9 @@ class PublishingSynchronizerMimic:
     """
 
     origin: MessageOrigin = field(
-        default_factory=lambda: MessageOrigin(node_name="client", process_id=0)
+        default_factory=lambda: MessageOrigin(
+            sender=Sender(node_name="client", process_id=0)
+        )
     )
     """
     The publisher the positions of this world belong to.
@@ -242,7 +244,8 @@ class TestCatchingUp:
         world_synchronizer = BufferingSynchronizerMimic(caught_up=True)
         world_updates = IncomingWorldUpdates(world_synchronizer=world_synchronizer)
         position = StreamPosition(
-            origin=MessageOrigin(node_name="publisher", process_id=1), sequence_number=7
+            origin=MessageOrigin(sender=Sender(node_name="publisher", process_id=1)),
+            sequence_number=7,
         )
 
         assert world_updates.has_applied(position=position)
@@ -258,7 +261,9 @@ class TestCatchingUp:
 
         assert not world_updates.has_applied(
             position=StreamPosition(
-                origin=MessageOrigin(node_name="publisher", process_id=1),
+                origin=MessageOrigin(
+                    sender=Sender(node_name="publisher", process_id=1)
+                ),
                 sequence_number=7,
             )
         )
@@ -311,7 +316,9 @@ class TestClientWorldUpdates:
             result={
                 "published_position": to_json(
                     StreamPosition(
-                        origin=MessageOrigin(node_name="giskard", process_id=1),
+                        origin=MessageOrigin(
+                            sender=Sender(node_name="giskard", process_id=1)
+                        ),
                         sequence_number=9,
                     )
                 )
@@ -334,7 +341,9 @@ class TestClientWorldUpdates:
                 result={
                     "published_position": to_json(
                         StreamPosition(
-                            origin=MessageOrigin(node_name="giskard", process_id=1),
+                            origin=MessageOrigin(
+                                sender=Sender(node_name="giskard", process_id=1)
+                            ),
                             sequence_number=9,
                         )
                     )
