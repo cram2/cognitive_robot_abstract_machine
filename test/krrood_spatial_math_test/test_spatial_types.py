@@ -1,3 +1,7 @@
+"""
+Symbolic spatial types, checked against the numerical reference implementations.
+"""
+
 import dataclasses
 from copy import deepcopy
 
@@ -10,7 +14,6 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
     WrongDimensionsError,
 )
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.exceptions import (
     ReferenceFrameMismatchError,
     SpatialTypesError,
@@ -29,7 +32,12 @@ from krrood_spatial_math.spatial_types import (
     Pose2Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional, SymbolicSpatialType
-from semantic_digital_twin.world_description.world_entity import Body
+from krrood_spatial_math.testing.orientation_comparison import (
+    assert_same_axis_angle,
+    assert_same_orientation,
+)
+
+from .dataset.frames import NamedFrame
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
     axis_angle_from_rotation_matrix,
@@ -44,10 +52,6 @@ from .reference_implementations import (
     quaternion_from_rpy,
     quaternion_from_rotation_matrix,
 )
-from .utils_for_tests import (
-    compare_axis_angle,
-    compare_orientations,
-)
 
 bool_values = [True, False]
 numbers = [-69, 23]
@@ -57,6 +61,10 @@ quaternions = [np.array([1.0, 0, 0, 0]), np.array([0.0, 1, 0, 0])]
 
 
 class TestRotationMatrix:
+    """
+    Rotation matrices and their conversion into other rotation representations.
+    """
+
     def test_expression_with_structural_zeros_is_written_the_same_after_a_round_trip(
         self,
     ) -> None:
@@ -181,8 +189,8 @@ class TestRotationMatrix:
         ).all()
 
     def test_reference_frames(self):
-        reference_frame = Body(name=PrefixedName("muh"))
-        reference_frame2 = Body(name=PrefixedName("muh2"))
+        reference_frame = NamedFrame("muh")
+        reference_frame2 = NamedFrame("muh2")
         m1 = RotationMatrix(reference_frame=reference_frame)
         m2 = RotationMatrix(reference_frame=reference_frame2)
         q = Quaternion(reference_frame=reference_frame)
@@ -327,23 +335,35 @@ class TestRotationMatrix:
 
     @pytest.mark.parametrize("q", quaternions)
     def test_axis_angle_from_matrix(self, q):
+        """
+        The axis-angle pair of a rotation matrix is the one of the reference
+        implementation.
+        """
         m = rotation_matrix_from_quaternion(*q)
 
         actual_axis = RotationMatrix(data=m).axis_angle.axis
         actual_angle = RotationMatrix(data=m).axis_angle.angle
 
         expected_axis, expected_angle = axis_angle_from_rotation_matrix(m)
-        compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
+        assert_same_axis_angle(
+            actual_angle, actual_axis[:3], expected_angle, expected_axis
+        )
 
         assert actual_axis[-1].to_np() == 0
 
     @pytest.mark.parametrize("expected_axis", [np.array([1, 0, 0])])
     @pytest.mark.parametrize("expected_angle", numbers)
     def test_axis_angle_from_matrix2(self, expected_axis, expected_angle):
+        """
+        A rotation matrix built from an axis-angle pair, with an angle beyond a full
+        turn, yields an axis-angle pair that describes the same rotation.
+        """
         m = rotation_matrix_from_axis_angle(expected_axis, expected_angle)
         actual_axis = RotationMatrix(data=m).axis_angle.axis
         actual_angle = RotationMatrix(data=m).axis_angle.angle
-        compare_axis_angle(actual_angle, actual_axis[:3], expected_angle, expected_axis)
+        assert_same_axis_angle(
+            actual_angle, actual_axis[:3], expected_angle, expected_axis
+        )
         assert actual_axis[-1] == 0
 
     @pytest.mark.parametrize("q", quaternions)
@@ -722,7 +742,7 @@ class TestCartesianPoint3Dimensional:
         np.testing.assert_allclose(point.midpoint(point).to_np(), point.to_np())
 
     def test_the_midpoint_stays_in_the_frame_the_points_were_given_in(self):
-        reference_frame = Body(name=PrefixedName("muh"))
+        reference_frame = NamedFrame("muh")
         near = CartesianPoint3Dimensional(
             x=0, y=0, z=0, reference_frame=reference_frame
         )
@@ -1496,10 +1516,10 @@ class TestTransformationMatrix:
         assert np.allclose(t.to_np(), t_copy.to_np())
 
     def test_reference_frames(self):
-        reference_frame = Body(name=PrefixedName("muh"))
-        child_frame = Body(name=PrefixedName("kikariki"))
-        reference_frame2 = Body(name=PrefixedName("muh2"))
-        child_frame2 = Body(name=PrefixedName("kikariki2"))
+        reference_frame = NamedFrame("muh")
+        child_frame = NamedFrame("kikariki")
+        reference_frame2 = NamedFrame("muh2")
+        child_frame2 = NamedFrame("kikariki2")
         t1 = HomogeneousTransformationMatrix3Dimensional(
             reference_frame=reference_frame, child_frame=child_frame
         )
@@ -2302,6 +2322,11 @@ class TestTransformationMatrix:
 
 
 class TestQuaternion:
+    """
+    Quaternions, their arithmetic and their conversion into other rotation
+    representations.
+    """
+
     def test_from_iterable_copies_a_symbolic_math_type_input(self):
         """
         `from_iterable` must not alias a SymbolicMathType input's casadi_sx: the result
@@ -2324,9 +2349,13 @@ class TestQuaternion:
     @pytest.mark.parametrize("q2", quaternions)
     @pytest.mark.parametrize("t", numbers)
     def test_slerp(self, q1, q2, t):
+        """
+        Spherical linear interpolation between two quaternions matches the reference
+        implementation.
+        """
         r1 = Quaternion.from_iterable(q1).slerp(Quaternion.from_iterable(q2), t)
         r2 = quaternion_slerp(q1, q2, t)
-        compare_orientations(r1, r2)
+        assert_same_orientation(r1, r2)
 
     @pytest.mark.parametrize("axis", unit_vectors3)
     @pytest.mark.parametrize("angle", numbers)
@@ -2340,57 +2369,81 @@ class TestQuaternion:
     @pytest.mark.parametrize("q", quaternions)
     @pytest.mark.parametrize("p", quaternions)
     def test_quaternion_multiply(self, q, p):
+        """
+        The product of two quaternions matches the reference implementation.
+        """
         q_expr = Quaternion.from_iterable(q)
         p_expr = Quaternion.from_iterable(p)
         actual = q_expr.multiply(p_expr)
         expected = quaternion_multiply(q, p)
-        compare_orientations(actual, expected)
+        assert_same_orientation(actual, expected)
 
     @pytest.mark.parametrize("q", quaternions)
     def test_quaternion_conjugate(self, q):
+        """
+        The conjugate of a quaternion matches the reference implementation.
+        """
         actual = Quaternion.from_iterable(q).conjugate()
         expected = quaternion_conjugate(q)
-        compare_orientations(actual, expected)
+        assert_same_orientation(actual, expected)
 
     @pytest.mark.parametrize("q1", quaternions)
     @pytest.mark.parametrize("q2", quaternions)
     def test_quaternion_diff(self, q1, q2):
+        """
+        The rotation from one quaternion to another matches the reference
+        implementation.
+        """
         q1_expr = Quaternion.from_iterable(q1)
         q2_expr = Quaternion.from_iterable(q2)
         actual = q1_expr.diff(q2_expr)
         expected = quaternion_multiply(quaternion_conjugate(q1), q2)
-        compare_orientations(actual, expected)
+        assert_same_orientation(actual, expected)
 
     @pytest.mark.parametrize("q", quaternions)
     def test_axis_angle_from_quaternion(self, q):
+        """
+        The axis-angle pair of a quaternion is the one of the reference implementation.
+        """
         axis2, angle2 = axis_angle_from_quaternion(*q)
         axis = Quaternion.from_iterable(q).axis_angle.axis
         angle = Quaternion.from_iterable(q).axis_angle.angle
-        compare_axis_angle(angle, axis[:3], angle2, axis2)
+        assert_same_axis_angle(angle, axis[:3], angle2, axis2)
         assert axis[-1] == 0
 
     def test_axis_angle_from_quaternion2(self):
+        """
+        A quaternion whose norm is a hair above one still yields the axis-angle pair of
+        the reference implementation.
+        """
         q = (0, 0, 0, 1.0000001)
         axis2, angle2 = axis_angle_from_quaternion(*q)
         axis = Quaternion.from_iterable(q).axis_angle.axis
         angle = Quaternion.from_iterable(q).axis_angle.angle
-        compare_axis_angle(angle, axis[:3], angle2, axis2)
+        assert_same_axis_angle(angle, axis[:3], angle2, axis2)
         assert axis[-1] == 0
 
     @pytest.mark.parametrize("roll", numbers)
     @pytest.mark.parametrize("pitch", numbers)
     @pytest.mark.parametrize("yaw", numbers)
     def test_quaternion_from_rpy(self, roll, pitch, yaw):
+        """
+        A quaternion built from roll, pitch and yaw matches the reference
+        implementation.
+        """
         q = Quaternion.from_rpy(roll, pitch, yaw)
         q2 = quaternion_from_rpy(roll, pitch, yaw)
-        compare_orientations(q, q2)
+        assert_same_orientation(q, q2)
 
     @pytest.mark.parametrize("q", quaternions)
     def test_quaternion_from_matrix(self, q):
+        """
+        A quaternion built from a rotation matrix matches the reference implementation.
+        """
         matrix = rotation_matrix_from_quaternion(*q)
         q2 = quaternion_from_rotation_matrix(matrix)
         q1_2 = Quaternion.from_rotation_matrix(RotationMatrix(data=matrix))
-        compare_orientations(q2, q1_2)
+        assert_same_orientation(q2, q1_2)
 
     @pytest.mark.parametrize("q1", quaternions)
     @pytest.mark.parametrize("q2", quaternions)

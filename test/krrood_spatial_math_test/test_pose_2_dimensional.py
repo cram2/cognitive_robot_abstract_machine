@@ -1,10 +1,13 @@
+"""
+Planar poses: a position in the plane and a rotation about the z-axis.
+"""
+
 import math
 
 import numpy as np
 import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     CartesianPoint2Dimensional,
     Pose2Dimensional,
@@ -13,10 +16,10 @@ from krrood_spatial_math.spatial_types import (
     Quaternion,
 )
 from krrood_spatial_math.spatial_types import RotationMatrix
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
+from krrood_spatial_math.testing.orientation_comparison import assert_same_orientation
+
+from .dataset.frames import NamedFrame
 from .reference_implementations import quaternion_from_rpy
-from .utils_for_tests import compare_orientations
 
 
 class TestPose2DimensionalConstruction:
@@ -34,8 +37,8 @@ class TestPose2DimensionalConstruction:
 
     def test_has_no_height_or_tilt(self):
         """
-        A 2D pose has no height or tilt of its own, so :class:`Pose2Dimensional` does
-        not carry ``z``, ``roll`` or ``pitch`` at all.
+        A 2D pose has no height or tilt of its own, so :class:`Pose2Dimensional` does not carry
+        ``z``, ``roll`` or ``pitch`` at all.
         """
         p = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.5)
         with pytest.raises(AttributeError):
@@ -50,7 +53,7 @@ class TestPose2DimensionalConstruction:
         assert p.shape == (3, 1)
 
     def test_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         p = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0, reference_frame=frame)
         assert p.reference_frame is frame
 
@@ -65,6 +68,10 @@ class TestPose2DimensionalConstruction:
 
 
 class TestPose2DimensionalToPose:
+    """
+    Conversion of a planar pose into a full pose.
+    """
+
     def test_to_pose_position(self):
         p2 = Pose2Dimensional.from_xy_yaw(x=3.0, y=-1.5, yaw=0)
         pose = p2.pose
@@ -88,7 +95,7 @@ class TestPose2DimensionalToPose:
         assert pitch.to_np() == pytest.approx(0.0, abs=1e-6)
 
     def test_to_pose_reference_frame_propagated(self):
-        frame = Body(name=PrefixedName("map"))
+        frame = NamedFrame("map")
         p2 = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0, reference_frame=frame)
         assert p2.pose.reference_frame is frame
 
@@ -133,15 +140,18 @@ class TestPose2DimensionalToPose:
         assert pt.y.to_np() == pytest.approx(6.0)
 
     def test_position_property_reference_frame_propagated(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         p2 = Pose2Dimensional.from_xy_yaw(x=5, y=6, yaw=0, reference_frame=frame)
         assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
+        """
+        The orientation of a planar pose is the quaternion of its yaw.
+        """
         p2 = Pose2Dimensional.from_xy_yaw(x=0, y=0, yaw=0.3)
         q = p2.orientation
         assert isinstance(q, Quaternion)
-        compare_orientations(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
+        assert_same_orientation(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
 
 
 class TestPose2DimensionalFromPosition:
@@ -153,14 +163,14 @@ class TestPose2DimensionalFromPosition:
         assert p2.yaw.to_np() == pytest.approx(0.7)
 
     def test_inherits_position_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
+        frame = NamedFrame("world")
         position = CartesianPoint2Dimensional(x=1.0, y=2.0, reference_frame=frame)
         p2 = Pose2Dimensional(position, yaw=0.0)
         assert p2.reference_frame is frame
 
     def test_override_reference_frame(self):
-        frame = Body(name=PrefixedName("world"))
-        other_frame = Body(name=PrefixedName("other"))
+        frame = NamedFrame("world")
+        other_frame = NamedFrame("other")
         position = CartesianPoint2Dimensional(x=1.0, y=2.0, reference_frame=frame)
         p2 = Pose2Dimensional(position, yaw=0.0, reference_frame=other_frame)
         assert p2.reference_frame is other_frame
@@ -169,37 +179,17 @@ class TestPose2DimensionalFromPosition:
 class TestPose2DimensionalFromPose:
     def test_roundtrip(self):
         original = Pose2Dimensional.from_xy_yaw(x=1.5, y=-2.5, yaw=0.7)
-        pose_3_dimensional = original.pose
-        recovered = Pose2Dimensional.from_pose(pose_3_dimensional)
+        pose3d = original.pose
+        recovered = Pose2Dimensional.from_pose(pose3d)
         assert recovered.x.to_np() == pytest.approx(1.5, abs=1e-6)
         assert recovered.y.to_np() == pytest.approx(-2.5, abs=1e-6)
         assert recovered.yaw.to_np() == pytest.approx(0.7, abs=1e-6)
 
     def test_from_pose_inherits_reference_frame(self):
-        frame = Body(name=PrefixedName("base"))
+        frame = NamedFrame("base")
         pose = Pose3Dimensional.from_xyz_rpy(1, 2, 3, 0, 0, 0.5, reference_frame=frame)
         p2 = Pose2Dimensional.from_pose(pose)
         assert p2.reference_frame is frame
-
-    def test_from_pose_transforms_into_another_frame(self, mini_world: World):
-        """
-        Asking for another frame expresses the pose in that frame instead of attaching
-        the frame to the pose's own coordinates.
-        """
-        mini_world.connections[0].position = math.pi / 2
-        root, tip = mini_world.root, mini_world.bodies[1]
-        tip_pose = Pose3Dimensional.from_xyz_rpy(
-            1, 0, 2, 0, 0, 0.3, reference_frame=tip
-        )
-
-        p2 = Pose2Dimensional.from_pose(tip_pose, plane_frame=root)
-
-        assert p2.reference_frame is root
-        np.testing.assert_allclose(
-            p2.to_np(),
-            Pose2Dimensional.from_pose(mini_world.transform(tip_pose, root)).to_np(),
-            atol=1e-12,
-        )
 
 
 class TestPose2DimensionalSymbolic:

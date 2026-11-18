@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,
@@ -10,7 +9,7 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3Dimensional,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from .dataset.frames import NamedFrame
 from .reference_implementations import (
     quaternion_from_axis_angle,
     rotation_matrix_from_axis_angle,
@@ -65,7 +64,7 @@ def test_axis_angle_of_the_identity_rotation_has_angle_zero():
 
 
 def test_axis_angle_keeps_the_reference_frame_of_the_rotation():
-    reference_frame = Body(name=PrefixedName("reference"))
+    reference_frame = NamedFrame("reference")
 
     axis_angle = RotationMatrix(reference_frame=reference_frame).axis_angle
 

@@ -1,0 +1,44 @@
+@prefix : <http://example.org/class_expressions_extraction#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/class_expressions_extraction> a owl:Ontology .
+
+:Animal a owl:Class .
+:Pet a owl:Class .
+:Plant a owl:Class ; owl:disjointWith :Animal .
+:Creature a owl:Class ; owl:equivalentClass :Animal .
+:owns a owl:ObjectProperty .
+
+# A named class defined by an intersection.
+:Cat a owl:Class ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( :Animal :Pet ) ] .
+
+# A named class declared under one of the classes its definition intersects.
+:Kitten a owl:Class ;
+    rdfs:subClassOf :Animal ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( :Animal :Pet ) ] .
+
+# A named class under an anonymous union, which it is the only subclass of.
+:Tiger a owl:Class ;
+    rdfs:subClassOf [ a owl:Class ; owl:unionOf ( :Animal :Plant ) ] .
+
+# An anonymous intersection under one named class.
+:Hunter a owl:Class .
+[ a owl:Class ; owl:intersectionOf ( :Animal :Pet ) ; rdfs:subClassOf :Hunter ] .
+
+# An anonymous intersection that only fills a restriction.
+:Owner a owl:Class ;
+    rdfs:subClassOf [ a owl:Restriction ;
+        owl:onProperty :owns ;
+        owl:someValuesFrom [ a owl:Class ; owl:intersectionOf ( :Animal :Pet ) ] ] .
+
+# An anonymous intersection under two named classes.
+:Mammal a owl:Class .
+:Bird a owl:Class .
+[ a owl:Class ; owl:intersectionOf ( :Animal :Pet ) ; rdfs:subClassOf :Mammal, :Bird ] .
+
+# An anonymous union two named classes are declared under.
+:Lion a owl:Class ; rdfs:subClassOf _:predator .
+:Wolf a owl:Class ; rdfs:subClassOf _:predator .
+_:predator a owl:Class ; owl:unionOf ( :Animal :Plant ) .

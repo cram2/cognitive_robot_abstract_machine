@@ -1,7 +1,5 @@
 import numpy as np
 
-from semantic_digital_twin.datastructures.types import AnyMatrix4x4, NpMatrix4x4
-
 
 def quaternion_multiply(quaternion1: np.ndarray, quaternion0: np.ndarray) -> np.ndarray:
     x0, y0, z0, w0 = quaternion0
@@ -42,7 +40,7 @@ def quaternion_from_axis_angle(
 _EPS = np.finfo(float).eps * 4.0
 
 
-def rpy_from_matrix(rotation_matrix: NpMatrix4x4) -> tuple[float, float, float]:
+def rpy_from_matrix(rotation_matrix: np.ndarray) -> tuple[float, float, float]:
     """
     :param rotation_matrix: 4x4 Matrix
     :type rotation_matrix: Matrix
@@ -74,7 +72,7 @@ def rpy_from_quaternion(
     return rpy_from_matrix(rotation_matrix_from_quaternion(qx, qy, qz, qw))
 
 
-def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> NpMatrix4x4:
+def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     """
     Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
 
@@ -110,7 +108,7 @@ def rotation_matrix_from_rpy(roll: float, pitch: float, yaw: float) -> NpMatrix4
 
 def rotation_matrix_from_quaternion(
     x: float, y: float, z: float, w: float
-) -> NpMatrix4x4:
+) -> np.ndarray:
     """
     Unit quaternion to 4x4 rotation matrix according to:
     https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
@@ -133,7 +131,7 @@ def rotation_matrix_from_quaternion(
 
 def rotation_matrix_from_axis_angle(
     axis: list[float] | tuple[float, float, float] | np.ndarray, angle: float
-) -> NpMatrix4x4:
+) -> np.ndarray:
     return rotation_matrix_from_quaternion(*quaternion_from_axis_angle(axis, angle))
 
 
@@ -141,7 +139,7 @@ def quaternion_from_rpy(roll: float, pitch: float, yaw: float) -> np.ndarray:
     return quaternion_from_rotation_matrix(rotation_matrix_from_rpy(roll, pitch, yaw))
 
 
-def quaternion_from_rotation_matrix(matrix: AnyMatrix4x4) -> np.ndarray:
+def quaternion_from_rotation_matrix(matrix: np.ndarray) -> np.ndarray:
     """
     :param matrix: 4x4 Matrix
     :return: array length 4
@@ -190,7 +188,7 @@ def axis_angle_from_quaternion(
     return np.array([x, y, z]), angle
 
 
-def axis_angle_from_rotation_matrix(m: NpMatrix4x4) -> tuple[np.ndarray, float]:
+def axis_angle_from_rotation_matrix(m: np.ndarray) -> tuple[np.ndarray, float]:
     return axis_angle_from_quaternion(*quaternion_from_rotation_matrix(m))
 
 
