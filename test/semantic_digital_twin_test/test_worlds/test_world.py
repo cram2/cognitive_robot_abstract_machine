@@ -45,6 +45,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Drawer,
 )
+from krrood_spatial_math.cartesian_frame_3_dimensional import XYPlaneRelation
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import FramesOfDifferentSpacesError
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
 from krrood_spatial_math.spatial_types import Vector3Dimensional
@@ -609,6 +611,34 @@ def test_a_body_cannot_express_a_value_of_another_worlds_body(world_setup):
 
     with pytest.raises(FramesOfDifferentSpacesError):
         l1.express_in_own_frame(value=Vector3Dimensional.X(reference_frame=other_body))
+
+
+def test_two_bodies_sliding_along_their_x_axes_span_one_plane(world_setup):
+    """
+    A prismatic connection along the x-axis keeps both bodies on one x-y plane, wherever
+    it has moved the child.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: PrismaticConnection = world.get_connection(l1, l2)
+    world.state[connection.dof.id].position = 1.0
+    world.notify_state_change()
+
+    assert EmbeddedPlane(frame_3_dimensional=l1) == EmbeddedPlane(
+        frame_3_dimensional=l2
+    )
+
+
+def test_bodies_of_two_worlds_span_two_planes(world_setup):
+    """
+    Two worlds are two spaces, so the planes of their bodies have no point in common.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    other_world = World()
+    other_body = Body(name=PrefixedName("other"))
+    with other_world.modify_world():
+        other_world.add_kinematic_structure_entity(other_body)
+
+    assert l1.compare_xy_plane(frame=other_body) is XYPlaneRelation.DIFFERENT_PLANES
 
 
 def test_transform_a_pose_2d(world_setup):

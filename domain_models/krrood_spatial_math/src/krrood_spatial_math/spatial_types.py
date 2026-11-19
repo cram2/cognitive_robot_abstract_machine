@@ -28,6 +28,7 @@ from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dim
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     CartesianFrame3DimensionalReference,
+    XYPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import (
     CartesianFrameT,
@@ -867,6 +868,23 @@ class HomogeneousTransformationMatrix3Dimensional(
         :return: The rotation this transformation is composed of.
         """
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
+
+    @property
+    def xy_plane_relation(self) -> XYPlaneRelation:
+        """
+        How the x-y plane of the child frame lies relative to that of the reference
+        frame; :attr:`XYPlaneRelation.UNKNOWN` for a transformation that is not constant.
+        """
+        if not self.is_constant():
+            return XYPlaneRelation.UNKNOWN
+        child_z_axis = self.rotation_matrix.to_np()[:3, 2]
+        if not (
+            np.isclose(self.z.to_np(), 0).all() and np.allclose(child_z_axis[:2], 0)
+        ):
+            return XYPlaneRelation.DIFFERENT_PLANES
+        if child_z_axis[2] < 0:
+            return XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL
+        return XYPlaneRelation.SAME_PLANE_SAME_NORMAL
 
     @property
     def pose(self) -> Pose3Dimensional:
@@ -3657,7 +3675,17 @@ class HomogeneousTransformationMatrix2Dimensional(
         :param data: A rigid 3x3 homogeneous matrix. Defaults to the identity.
         :param reference_frame: The frame on whose plane the change ends.
         :param child_frame: The frame on whose plane the change starts.
+        :raises FramesOnDifferentPlanesError: If both frames are given and span
+            different planes.
+        :raises MirroredPlaneFramesError: If both frames are given and span one plane
+            with z-axes pointing in opposite directions.
         """
+        if reference_frame is not None and child_frame is not None:
+            self._ensure_rigid_change_on_one_plane(
+                relation=reference_frame.compare_xy_plane(frame=child_frame),
+                reference_frame=reference_frame,
+                child_frame=child_frame,
+            )
         self.reference_frame = reference_frame
         self.child_frame = child_frame
         if data is None:
@@ -3728,30 +3756,22 @@ class HomogeneousTransformationMatrix2Dimensional(
         :param transformation: A change between two frames that span one x-y plane and
             whose z-axes point the same way.
         :return: The same change, between the frames on that plane.
-        :raises FramesOnDifferentPlanesError: If the transformation is constant and its
-            frames span different planes.
-        :raises MirroredPlaneFramesError: If the transformation is constant and its
-            frames span one plane with z-axes pointing in opposite directions.
+        :raises FramesOnDifferentPlanesError: If the transformation is constant, or its
+            frames are known, and its frames span different planes.
+        :raises MirroredPlaneFramesError: If the transformation is constant, or its
+            frames are known, and its frames span one plane with z-axes pointing in
+            opposite directions.
 
         .. note::
-            A transformation that is not constant is taken to be planar unchecked.
+            A transformation that is not constant, between frames whose planes are not
+            known, is taken to be planar unchecked.
         """
+        cls._ensure_rigid_change_on_one_plane(
+            relation=transformation.xy_plane_relation,
+            reference_frame=transformation.reference_frame,
+            child_frame=transformation.child_frame,
+        )
         rotation = transformation.rotation_matrix
-        if transformation.is_constant():
-            child_z_axis = rotation.to_np()[:3, 2]
-            if not (
-                np.isclose(transformation.z.to_np(), 0).all()
-                and np.allclose(child_z_axis[:2], 0)
-            ):
-                raise FramesOnDifferentPlanesError(
-                    reference_frame=transformation.reference_frame,
-                    child_frame=transformation.child_frame,
-                )
-            if child_z_axis[2] < 0:
-                raise MirroredPlaneFramesError(
-                    reference_frame=transformation.reference_frame,
-                    child_frame=transformation.child_frame,
-                )
         return cls.from_xy_yaw(
             x=transformation.x,
             y=transformation.y,
@@ -3759,6 +3779,31 @@ class HomogeneousTransformationMatrix2Dimensional(
             reference_frame=transformation.reference_frame,
             child_frame=transformation.child_frame,
         )
+
+    @staticmethod
+    def _ensure_rigid_change_on_one_plane(
+        *,
+        relation: XYPlaneRelation,
+        reference_frame: CartesianFrame3Dimensional | None,
+        child_frame: CartesianFrame3Dimensional | None,
+    ) -> None:
+        """
+        :param relation: How the x-y plane of ``child_frame`` lies relative to that of
+            ``reference_frame``.
+        :param reference_frame: The frame on whose plane the change ends.
+        :param child_frame: The frame on whose plane the change starts.
+        :raises FramesOnDifferentPlanesError: If the frames span different planes.
+        :raises MirroredPlaneFramesError: If the frames span one plane with z-axes
+            pointing in opposite directions.
+        """
+        if relation is XYPlaneRelation.DIFFERENT_PLANES:
+            raise FramesOnDifferentPlanesError(
+                reference_frame=reference_frame, child_frame=child_frame
+            )
+        if relation is XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL:
+            raise MirroredPlaneFramesError(
+                reference_frame=reference_frame, child_frame=child_frame
+            )
 
     # %% motion
 

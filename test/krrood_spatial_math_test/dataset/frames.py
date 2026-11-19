@@ -12,6 +12,7 @@ from krrood.patterns.identifier_and_name import HasID, HasName
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     CartesianFrame3DimensionalResolver,
+    XYPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import CoordinateRepresentationT
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
@@ -60,6 +61,11 @@ class NamedFrame(CartesianFrame3Dimensional[str]):
                 expected_frame=self, actual_frame=value.reference_frame
             )
         return value
+
+    def compare_xy_plane_in_own_space(
+        self, *, frame: CartesianFrame3Dimensional
+    ) -> XYPlaneRelation:
+        return XYPlaneRelation.UNKNOWN
 
 
 # %% finding frames while deserializing

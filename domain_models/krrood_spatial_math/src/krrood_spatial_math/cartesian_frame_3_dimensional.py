@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from uuid import UUID
 
 from typing_extensions import Any
@@ -26,6 +27,50 @@ from krrood_spatial_math.exceptions import (
     MissingReferenceFrameError,
 )
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
+
+# %% how the x-y planes of two frames lie
+
+
+class XYPlaneRelation(Enum):
+    """
+    How the x-y plane of one Cartesian frame lies relative to that of another.
+    """
+
+    SAME_PLANE_SAME_NORMAL = "same plane, same normal"
+    """
+    Both frames span one plane and their z-axes point to the same side of it, so a rigid
+    change on that plane relates them.
+    """
+
+    SAME_PLANE_OPPOSITE_NORMAL = "same plane, opposite normal"
+    """
+    Both frames span one plane but their z-axes point to opposite sides of it, so the
+    frames on that plane are mirror images.
+    """
+
+    DIFFERENT_PLANES = "different planes"
+    """
+    The frames span two planes: their z-axes are not parallel, one origin lies off the
+    other's plane, or they chart two spaces.
+    """
+
+    UNKNOWN = "unknown"
+    """
+    Where the frames lie relative to each other is not known, such as when one charts no
+    known space.
+    """
+
+    @property
+    def is_same_plane(self) -> bool:
+        """
+        Whether both frames are known to span one plane, whichever side their z-axes
+        point to.
+        """
+        return self in (
+            XYPlaneRelation.SAME_PLANE_SAME_NORMAL,
+            XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL,
+        )
+
 
 # %% frames that positions and directions are expressed in
 
@@ -66,6 +111,29 @@ class CartesianFrame3Dimensional(
         """
         :param value: A value given in a frame of the same space as this frame.
         :return: The same value, given in this frame.
+        """
+
+    def compare_xy_plane(self, *, frame: CartesianFrame3Dimensional) -> XYPlaneRelation:
+        """
+        :param frame: Any Cartesian frame.
+        :return: How the x-y plane of ``frame`` lies relative to that of this frame;
+            :attr:`XYPlaneRelation.UNKNOWN` when either frame charts no known space.
+        """
+        if frame is self:
+            return XYPlaneRelation.SAME_PLANE_SAME_NORMAL
+        if self.space is None or frame.space is None:
+            return XYPlaneRelation.UNKNOWN
+        if frame.space is not self.space:
+            return XYPlaneRelation.DIFFERENT_PLANES
+        return self.compare_xy_plane_in_own_space(frame=frame)
+
+    @abstractmethod
+    def compare_xy_plane_in_own_space(
+        self, *, frame: CartesianFrame3Dimensional
+    ) -> XYPlaneRelation:
+        """
+        :param frame: Another Cartesian frame of the space this frame charts.
+        :return: How the x-y plane of ``frame`` lies relative to that of this frame.
         """
 
 

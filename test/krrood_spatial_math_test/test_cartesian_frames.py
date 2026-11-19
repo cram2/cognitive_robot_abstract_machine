@@ -38,12 +38,14 @@ def test_a_three_dimensional_cartesian_frame_charts_three_dimensional_euclidean_
     )
 
 
-def test_a_three_dimensional_cartesian_frame_declares_how_it_transforms_values_into_it():
+def test_a_three_dimensional_cartesian_frame_declares_what_it_computes_within_its_space():
     """
-    Checking the spaces is the frame interface's own; the change itself is the frame's.
+    Checking the spaces is the frame interface's own; changing a value and comparing x-y
+    planes within one space are the frame's.
     """
     assert CartesianFrame3Dimensional.__abstractmethods__ == {
-        CartesianFrame3Dimensional.transform_into_own_frame.__name__
+        CartesianFrame3Dimensional.transform_into_own_frame.__name__,
+        CartesianFrame3Dimensional.compare_xy_plane_in_own_space.__name__,
     }
 
 

@@ -31,7 +31,10 @@ from krrood.patterns.caching import memoize
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
 from krrood.patterns.identifier_and_name import HasID, HasName
-from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
+from krrood_spatial_math.cartesian_frame_3_dimensional import (
+    CartesianFrame3Dimensional,
+    XYPlaneRelation,
+)
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityReference,
     WorldEntityWithIDKwargsTracker,
@@ -420,6 +423,13 @@ class KinematicStructureEntity(
         self, *, value: GenericSpatialType
     ) -> GenericSpatialType:
         return self._world.transform(value, self)
+
+    def compare_xy_plane_in_own_space(
+        self, *, frame: CartesianFrame3Dimensional
+    ) -> XYPlaneRelation:
+        return self._world.transform(
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=frame), self
+        ).xy_plane_relation
 
     @property
     @abstractmethod

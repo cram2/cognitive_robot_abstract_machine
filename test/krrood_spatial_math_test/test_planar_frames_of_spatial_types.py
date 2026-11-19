@@ -8,6 +8,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.vector import VectorT, MetricVector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
+from krrood_spatial_math.cartesian_frame_3_dimensional import XYPlaneRelation
 from krrood_spatial_math.coordinate_system import (
     CartesianFrame,
     CoordinateSystemT,
@@ -34,18 +35,18 @@ from krrood_spatial_math.spatial_types import (
 )
 
 from .dataset.frames import KnownFrames, NamedFrame, Room
-from .dataset.mounted_frames import MountedFrame
+from .dataset.mounted_frames import MountedFrame, MountFrame
 
 # %% frames in one room
 
 
 @pytest.fixture
-def floor_frame(room) -> NamedFrame:
-    return NamedFrame("floor", space=room)
+def floor_frame(room) -> MountFrame:
+    return MountFrame("floor", space=room)
 
 
 def mounted_on(
-    floor_frame: NamedFrame, name: str, **pose_on_floor: float
+    floor_frame: MountFrame, name: str, **pose_on_floor: float
 ) -> MountedFrame:
     """
     :param floor_frame: The frame the new frame is fixed on.
@@ -71,6 +72,11 @@ def robot_base_frame(floor_frame) -> MountedFrame:
 @pytest.fixture
 def upside_down_frame(floor_frame) -> MountedFrame:
     return mounted_on(floor_frame, "upside down", x=3, roll=np.pi)
+
+
+@pytest.fixture
+def charger_frame(floor_frame) -> MountedFrame:
+    return mounted_on(floor_frame, "charger", x=3, y=1, yaw=1.0)
 
 
 @pytest.fixture
@@ -106,9 +112,70 @@ def test_the_planes_of_one_frame_are_one_plane(floor_frame):
     assert hash(plane) == hash(plane_copy)
 
 
-def test_the_planes_of_two_frames_are_two_planes(floor_frame, robot_base_frame):
-    assert EmbeddedPlane(frame_3_dimensional=robot_base_frame) != EmbeddedPlane(
+def test_the_planes_of_two_frames_on_one_floor_are_one_plane(
+    floor_frame, robot_base_frame
+):
+    floor_plane = EmbeddedPlane(frame_3_dimensional=floor_frame)
+    robot_base_plane = EmbeddedPlane(frame_3_dimensional=robot_base_frame)
+
+    assert (floor_plane == robot_base_plane, robot_base_plane == floor_plane) == (
+        True,
+        True,
+    )
+    assert hash(floor_plane) == hash(robot_base_plane)
+
+
+def test_a_frame_facing_the_other_side_of_a_plane_spans_that_plane(
+    floor_frame, upside_down_frame
+):
+    assert EmbeddedPlane(frame_3_dimensional=upside_down_frame) == EmbeddedPlane(
         frame_3_dimensional=floor_frame
+    )
+
+
+@pytest.mark.parametrize("frame_off_the_floor", ["shelf_frame", "wall_frame"])
+def test_a_frame_off_the_floor_spans_another_plane(
+    frame_off_the_floor, floor_frame, request
+):
+    floor_plane = EmbeddedPlane(frame_3_dimensional=floor_frame)
+    other_plane = EmbeddedPlane(
+        frame_3_dimensional=request.getfixturevalue(frame_off_the_floor)
+    )
+
+    assert (floor_plane != other_plane, other_plane != floor_plane) == (True, True)
+
+
+def test_the_planes_of_frames_in_two_rooms_are_two_planes(floor_frame):
+    floor_of_another_room = MountFrame("floor", space=Room())
+
+    assert EmbeddedPlane(frame_3_dimensional=floor_frame) != EmbeddedPlane(
+        frame_3_dimensional=floor_of_another_room
+    )
+
+
+@pytest.mark.parametrize(
+    "frame_on_the_floor, relation",
+    [
+        ("floor_frame", XYPlaneRelation.SAME_PLANE_SAME_NORMAL),
+        ("robot_base_frame", XYPlaneRelation.SAME_PLANE_SAME_NORMAL),
+        ("upside_down_frame", XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL),
+        ("shelf_frame", XYPlaneRelation.DIFFERENT_PLANES),
+        ("wall_frame", XYPlaneRelation.DIFFERENT_PLANES),
+    ],
+)
+def test_a_frame_compares_its_xy_plane_with_that_of_a_frame_on_the_floor(
+    frame_on_the_floor, relation, floor_frame, request
+):
+    assert (
+        floor_frame.compare_xy_plane(frame=request.getfixturevalue(frame_on_the_floor))
+        is relation
+    )
+
+
+def test_the_plane_of_a_frame_in_no_space_is_not_known_to_be_any_other(floor_frame):
+    assert (
+        floor_frame.compare_xy_plane(frame=NamedFrame("nowhere"))
+        is XYPlaneRelation.UNKNOWN
     )
 
 
@@ -359,6 +426,26 @@ def test_a_change_between_two_planes_has_no_planar_transformation(
         )
 
 
+@pytest.mark.parametrize("frame_off_the_floor", ["shelf_frame", "wall_frame"])
+def test_a_planar_transformation_refuses_frames_on_two_planes(
+    frame_off_the_floor, floor_frame, request
+):
+    with pytest.raises(FramesOnDifferentPlanesError):
+        HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
+            reference_frame=floor_frame,
+            child_frame=request.getfixturevalue(frame_off_the_floor),
+        )
+
+
+def test_a_planar_transformation_refuses_frames_facing_opposite_sides_of_a_plane(
+    floor_frame, upside_down_frame
+):
+    with pytest.raises(MirroredPlaneFramesError):
+        HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
+            reference_frame=floor_frame, child_frame=upside_down_frame
+        )
+
+
 def test_a_change_to_a_frame_facing_the_other_side_of_a_plane_has_no_planar_transformation(
     upside_down_frame,
 ):
@@ -461,19 +548,19 @@ def test_a_planar_transformation_moves_a_pose_into_its_reference_frame(
 
 
 def test_composed_planar_transformations_change_from_the_first_source_to_the_last_target(
-    floor_frame, robot_base_frame, upside_down_frame
+    floor_frame, robot_base_frame, charger_frame
 ):
     floor_T_robot_base = HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
         x=1, yaw=np.pi / 2, reference_frame=floor_frame, child_frame=robot_base_frame
     )
     robot_base_T_other = HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
-        x=1, reference_frame=robot_base_frame, child_frame=upside_down_frame
+        x=1, reference_frame=robot_base_frame, child_frame=charger_frame
     )
 
     floor_T_other = floor_T_robot_base @ robot_base_T_other
 
     assert floor_T_other.reference_frame is floor_frame
-    assert floor_T_other.child_frame is upside_down_frame
+    assert floor_T_other.child_frame is charger_frame
     assert np.allclose(
         coordinates(floor_T_other.x, floor_T_other.y, floor_T_other.yaw),
         [1, 1, np.pi / 2],
