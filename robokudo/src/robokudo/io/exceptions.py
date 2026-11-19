@@ -9,6 +9,64 @@ from dataclasses import dataclass, field
 from robokudo.exceptions import InvalidCameraObservation, RoboKudoError
 from robokudo.types.image import ImageRotation
 from semantic_digital_twin.datastructures.camera_model import CameraDistortionModel
+from robokudo.datastructures import ROSImageEncoding
+
+
+# %% Compressed depth
+
+
+@dataclass(kw_only=True)
+class UnsupportedDepthCompression(RoboKudoError, ValueError):
+    """
+    A depth message declares a transport other than compressed depth.
+    """
+
+    compression: str
+    """
+    Transport description supplied by the message.
+    """
+
+    def error_message(self) -> str:
+        return f"Unsupported depth compression: {self.compression!r}."
+
+    def suggest_correction(self) -> str:
+        return "Subscribe to a compressedDepth image topic."
+
+
+@dataclass(kw_only=True)
+class CompressedDepthDecodingFailed(RoboKudoError, ValueError):
+    """
+    A compressed-depth image payload cannot be decoded.
+    """
+
+    def error_message(self) -> str:
+        return "Could not decode the compressed depth image."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Provide a valid compressedDepth header followed by an encoded depth image."
+        )
+
+
+@dataclass(kw_only=True)
+class UnsupportedDepthEncoding(RoboKudoError, ValueError):
+    """
+    A compressed depth message declares an unsupported sample representation.
+    """
+
+    encoding: str
+    """
+    Depth representation declared by the message.
+    """
+
+    def error_message(self) -> str:
+        return f"Unsupported compressed depth encoding: {self.encoding!r}."
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Use {ROSImageEncoding.UINT16_SINGLE_CHANNEL} or "
+            f"{ROSImageEncoding.FLOAT32_SINGLE_CHANNEL} depth."
+        )
 
 
 # %% Stereo configuration

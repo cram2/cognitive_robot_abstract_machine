@@ -24,6 +24,7 @@ from sensor_msgs.msg import CameraInfo, Image as ROSImage
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.cas import CASViews
+from robokudo.datastructures import ROSImageEncoding
 from robokudo.io.camera_interface import ROSCameraInterface
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
@@ -62,15 +63,6 @@ class DepthFrameMismatch(StrEnum):
     IMAGE_REGION = "cropped or binned calibration is unsupported"
     FOCAL_LENGTH = "rectified focal lengths must be finite and positive"
     PROJECTION = "left projection is not a standard pinhole projection"
-
-
-class CameraEncoding(StrEnum):
-    """
-    Image and calibration encodings at the RK camera boundary.
-    """
-
-    METRIC_DEPTH = "32FC1"
-    COLOR = "bgr8"
 
 
 @dataclass(kw_only=True)
@@ -133,7 +125,7 @@ class RectifiedDepthFrame:
             )
         ):
             raise InvalidCameraObservation(reason=DepthFrameMismatch.DIMENSIONS)
-        if depth.encoding != CameraEncoding.METRIC_DEPTH:
+        if depth.encoding != ROSImageEncoding.FLOAT32_SINGLE_CHANNEL:
             raise InvalidCameraObservation(reason=DepthFrameMismatch.DEPTH_ENCODING)
         if (
             calibration.binning_x not in (0, 1)
@@ -170,7 +162,9 @@ class RectifiedDepthFrame:
         depth = np.empty(
             (self.images.depth.height, self.images.depth.width), dtype=np.float32
         )
-        depth[:] = bridge.imgmsg_to_cv2(self.images.depth, CameraEncoding.METRIC_DEPTH)
+        depth[:] = bridge.imgmsg_to_cv2(
+            self.images.depth, ROSImageEncoding.FLOAT32_SINGLE_CHANNEL
+        )
         depth[~np.isfinite(depth) | (depth <= 0) | (depth > max_depth)] = 0
         depth *= RayTracer.millimeters_per_meter
         return depth
@@ -382,7 +376,7 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         """
         calibration = frame.rectified_calibration()
         color = np.ascontiguousarray(
-            self.bridge.imgmsg_to_cv2(frame.images.color, CameraEncoding.COLOR)
+            self.bridge.imgmsg_to_cv2(frame.images.color, ROSImageEncoding.BGR8)
         )
         depth = frame.millimeter_depth(
             bridge=self.bridge, max_depth=self.camera_config.max_depth

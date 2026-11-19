@@ -42,13 +42,19 @@ from typing_extensions import Any, TYPE_CHECKING
 from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.classproperty import classproperty
 from robokudo.cas import CASViews, CAS
+from robokudo.datastructures import ROSImageEncoding
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import (
     CameraDataMissing,
     CameraPoseMissing,
     InvalidCameraObservation,
 )
-from robokudo.io.exceptions import CameraAnnotationAmbiguous
+from robokudo.io.exceptions import (
+    CameraAnnotationAmbiguous,
+    CompressedDepthDecodingFailed,
+    UnsupportedDepthCompression,
+    UnsupportedDepthEncoding,
+)
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 from robokudo.types.camera import CameraObservation
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
@@ -471,14 +477,13 @@ class ROSCameraInterface(CameraInterface):
 
 def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     """
-    Convert compressed depth image to proper depth format.
-
-    This is a workaround for handling compressed depth images in ROS.
-    Source: https://answers.ros.org/question/249775/display-compresseddepth-image-python-cv2/
+    Decode a compressed-depth acquisition into unsigned millimeter samples.
 
     :param msg: Compressed depth image message
     :return: Depth image as numpy array
-    :raises Exception: If compression type is wrong or decoding fails
+    :raises UnsupportedDepthCompression: If the message uses a different transport.
+    :raises CompressedDepthDecodingFailed: If the image payload cannot be decoded.
+    :raises UnsupportedDepthEncoding: If the depth representation is unsupported.
     """
     # 'msg' as type CompressedImage
     depth_fmt, compr_type = msg.format.split(";")
@@ -486,10 +491,7 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     depth_fmt = depth_fmt.strip()
     compr_type = compr_type.strip()
     if "compressedDepth" not in compr_type:
-        raise Exception(
-            "Compression type is not 'compressedDepth'."
-            "You probably subscribed to the wrong topic."
-        )
+        raise UnsupportedDepthCompression(compression=compr_type)
 
     # remove header from raw data
     depth_header_size = 12
@@ -500,16 +502,12 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     )
     # replaced np.fromstring with np.frombuffer because np.fromstring is deprecated in newer versions of numpy
     if depth_img_raw is None:
-        # probably wrong header size
-        raise Exception(
-            "Could not decode compressed depth image."
-            "You may need to change 'depth_header_size'!"
-        )
+        raise CompressedDepthDecodingFailed()
 
-    if depth_fmt == "16UC1":
+    if depth_fmt == ROSImageEncoding.UINT16_SINGLE_CHANNEL:
         # write raw image data
         return depth_img_raw
-    elif depth_fmt == "32FC1":
+    if depth_fmt == ROSImageEncoding.FLOAT32_SINGLE_CHANNEL:
         raw_header = msg.data[:depth_header_size]
         # header: int, float, float
         [compfmt, depthQuantA, depthQuantB] = struct.unpack("iff", raw_header)
@@ -520,11 +518,10 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
         depth_img_scaled[depth_img_raw == 0] = 0
 
         # depth_img_scaled provides distance in meters as f32
-        # for storing it as png, we need to convert it to 16UC1 again (depth in mm)
+        # PNG storage requires unsigned 16-bit depth in millimeters.
         depth_img_mm = (depth_img_scaled * 1000).astype(np.uint16)
         return depth_img_mm
-    else:
-        raise Exception("Decoding of '" + depth_fmt + "' is not implemented!")
+    raise UnsupportedDepthEncoding(encoding=depth_fmt)
 
 
 class KinectCameraInterface(ROSCameraInterface):
@@ -695,7 +692,7 @@ class KinectCameraInterface(ROSCameraInterface):
             color_arr = np.frombuffer(color_data.data, np.uint8)
             self.color = cv2.imdecode(color_arr, cv2.IMREAD_COLOR)
         else:
-            self.color = self.bridge.imgmsg_to_cv2(color_data, "bgr8")
+            self.color = self.bridge.imgmsg_to_cv2(color_data, ROSImageEncoding.BGR8)
 
         self.timestamp = color_data.header.stamp
 
@@ -712,11 +709,12 @@ class KinectCameraInterface(ROSCameraInterface):
                     data_name="Depth data",
                     context="uncompressed depth conversion",
                 )
-            self.depth = self.bridge.imgmsg_to_cv2(depth_data, "32FC1")
+            self.depth = self.bridge.imgmsg_to_cv2(
+                depth_data, ROSImageEncoding.FLOAT32_SINGLE_CHANNEL
+            )
 
         self.camera_info = camera_info
 
-        # self.rk_logger.info("Callback processing done - Final steps")
         if not self.lookup_transform():
             self._has_new_data = False
             self.lock.release()
