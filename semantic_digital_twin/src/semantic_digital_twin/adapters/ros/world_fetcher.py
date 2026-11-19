@@ -3,6 +3,8 @@ Serving a world to other processes, and fetching or joining a world another proc
 serves.
 """
 
+from __future__ import annotations
+
 import json
 from contextlib import ExitStack
 from dataclasses import dataclass, field

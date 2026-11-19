@@ -3,6 +3,8 @@ Tracy picks up gelatin boxes and places them, on the real robot through Giskard 
 simulated world.
 """
 
+from __future__ import annotations
+
 import os
 import signal
 import subprocess

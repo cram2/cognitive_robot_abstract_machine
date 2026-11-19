@@ -3,6 +3,8 @@ The messages synchronizers exchange about worlds, and the snapshot a world is fe
 as.
 """
 
+from __future__ import annotations
+
 import uuid
 from abc import ABC
 from dataclasses import dataclass, field, fields
