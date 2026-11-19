@@ -81,7 +81,7 @@ jobs:
           uv pip install drake
 
       - name: Install usd-core
-        if: ${{ inputs.lib == 'semantic_digital_twin' }}
+        if: ${{ contains(fromJSON(inputs.libs), 'semantic_digital_twin') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |

@@ -61,6 +61,26 @@ def name_tokens(name: str) -> tuple[str, ...]:
     return tuple(name.split("_"))
 
 
+@dataclass(kw_only=True, frozen=True)
+class FrozenSquaringOwner:
+    """
+    An owner of a memoized method that refuses every assignment to itself.
+    """
+
+    value: int
+    """
+    The number :meth:`square` squares.
+    """
+
+    @memoize
+    def square(self) -> list[int]:
+        """
+        :return: A new list on every computation, so a cached result is told apart from
+            a recomputed one by identity.
+        """
+        return [self.value * self.value]
+
+
 ElementType = TypeVar("ElementType")
 
 
@@ -199,3 +219,13 @@ def test_generic_alias_is_a_supported_owner():
 
     assert origin_name(ParametrizedContainer[int]) == "ParametrizedContainer"
     assert origin_name(ParametrizedContainer[float]) == "ParametrizedContainer"
+
+
+def test_frozen_dataclass_is_a_supported_owner():
+    """
+    A frozen dataclass keeps a cache although it refuses assignments to its fields,
+    since the cache is not one of them.
+    """
+    owner = FrozenSquaringOwner(value=3)
+
+    assert owner.square() is owner.square()
