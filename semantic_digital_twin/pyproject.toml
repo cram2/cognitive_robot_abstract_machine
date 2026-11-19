@@ -79,6 +79,7 @@ include = ["semantic_digital_twin*"]
 
 [tool.setuptools.package-data]
 "semantic_digital_twin.part_finding" = ["prompts/*.jinja"]
+"semantic_digital_twin.shape_sorting_toy" = ["resources/*.stl"]
 
 [project.scripts]
 semantic-digital-twin-part-finding-server = "semantic_digital_twin.adapters.part_finding.command_line:PartFindingCommandLine.run"

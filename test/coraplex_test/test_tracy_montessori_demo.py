@@ -14,7 +14,7 @@ import pytest
 
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
     ShapeSortingPiece,
 )
 

@@ -7,6 +7,7 @@ from functools import cached_property
 
 import numpy as np
 import numpy.typing as npt
+from scipy.spatial import ConvexHull
 from trimesh import Trimesh
 from trimesh.util import concatenate
 from typing_extensions import Any, Self, Iterable, Iterator, Generic, TypeVar
@@ -15,6 +16,7 @@ from typing_extensions import TYPE_CHECKING
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.product_algebra import Event, SimpleEvent
 from semantic_digital_twin.exceptions import MismatchingWorld
+from semantic_digital_twin.world_description.exceptions import NoShapesToProject
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world_description.geometry import (
     Shape,
@@ -22,6 +24,7 @@ from semantic_digital_twin.world_description.geometry import (
     PointT,
     VolumetricBoundingBox,
     Color,
+    Polygon2D,
 )
 
 BoxT = TypeVar("BoxT", bound=AxisAlignedBox)
@@ -194,6 +197,30 @@ class ShapeCollection(SubclassJSONSerializer):
         return self.as_bounding_box_collection_at_origin(
             HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
+
+    def convex_footprint_in_frame(
+        self, *, reference_frame: KinematicStructureEntity
+    ) -> Polygon2D:
+        """
+        The convex outline this collection's shapes cover on the x-y plane of a frame,
+        as seen from above.
+
+        For a convex body this is exactly its footprint; for any other it is the convex
+        hull of that footprint.
+
+        :param reference_frame: The frame whose x-y plane the shapes are projected onto.
+        :raises NoShapesToProject: If the collection holds no shapes.
+        :return: The outline, in that frame's x-y coordinates.
+        """
+        if not self.shapes:
+            raise NoShapesToProject(reference_frame=self.reference_frame)
+        points = np.vstack(
+            [
+                shape.mesh_in_frame(reference_frame).vertices[:, :2]
+                for shape in self.shapes
+            ]
+        )
+        return Polygon2D(vertices=points[ConvexHull(points).vertices])
 
     def to_json(self, **kwargs) -> dict[str, Any]:
         return {
