@@ -59,7 +59,7 @@ class NegativeMomentOfInertiaError(DataclassException, ValueError):
     An inertia tensor has a negative moment of inertia on its diagonal.
     """
 
-    moments: list[float]
+    moments: NDArray
     """
     The moments of inertia about the x, y and z axes.
     """

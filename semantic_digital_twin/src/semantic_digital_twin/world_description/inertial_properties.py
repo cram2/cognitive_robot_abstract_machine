@@ -156,7 +156,7 @@ class InertiaTensor(NPMatrix3x3):
         super().__post_init__()
         moments = np.diag(self.data)
         if np.any(moments < 0.0):
-            raise NegativeMomentOfInertiaError(moments=moments.tolist())
+            raise NegativeMomentOfInertiaError(moments=moments)
         if not np.allclose(self.data, self.data.T, atol=1e-10):
             raise AsymmetricInertiaTensorError(matrix=self.data)
 
