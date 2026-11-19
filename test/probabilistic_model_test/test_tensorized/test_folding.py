@@ -129,7 +129,7 @@ def test_folding_merges_the_leaf_layers_of_one_type(mixture_over_four_variables)
     separate = mixture_over_four_variables.separate
     folded = separate.folded()
     heights = LayerFolding(root=folded.root).heights
-    kinds = [(type(layer), heights[id(layer)]) for layer in folded.layers]
+    kinds = [(type(layer), heights[layer]) for layer in folded.layers]
     assert len(separate.layers) == 6
     assert len(folded.layers) == 4
     assert len(kinds) == len(set(kinds))

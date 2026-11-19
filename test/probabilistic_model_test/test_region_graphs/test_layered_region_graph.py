@@ -130,7 +130,7 @@ def test_the_circuit_of_a_region_graph_is_folded(region_graph):
     """
     circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
     heights = LayerFolding(root=circuit.root).heights
-    kinds = [(type(layer), heights[id(layer)]) for layer in circuit.layers]
+    kinds = [(type(layer), heights[layer]) for layer in circuit.layers]
     sum_layers = [layer for layer in circuit.layers if isinstance(layer, SumLayer)]
     assert len(kinds) == len(set(kinds))
     assert sum_layers

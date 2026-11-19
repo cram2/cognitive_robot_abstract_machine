@@ -38,21 +38,117 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base impor
 
 
 @dataclass(kw_only=True)
-class FoldedLayer:
+class FoldedNodes:
     """
-    The layer that layers of a circuit were folded into, and where their nodes went.
+    Where the nodes of one layer of a circuit went in the folded circuit.
     """
 
     layer: Layer
     """
-    The folded layer.
+    The folded layer that holds them.
     """
 
-    node_positions: dict[int, NodeIndices]
+    positions: NodeIndices
     """
-    The node of :attr:`layer` that every node of every folded layer became, keyed by the
-    :func:`id` of the folded layer.
+    The node of :attr:`layer` that every node of the original layer became.
     """
+
+
+@dataclass(kw_only=True)
+class FoldingGroup:
+    """
+    Layers at one height that fold into one layer: the univariate input layers of one
+    type, the product layers or the sum layers.
+
+    Any other layer is a group of its own.
+    """
+
+    height: int
+    """
+    The longest number of layers from the layers down to a leaf.
+    """
+
+    layers: list[Layer]
+    """
+    The layers, at least one.
+    """
+
+    @property
+    def is_foldable(self) -> bool:
+        """
+        :return: Whether layers other than the first may join the group.
+        """
+        return isinstance(
+            self.layers[0], (UnivariateInputLayer, SumLayer, ProductLayer)
+        )
+
+    def admits(self, *, layer: Layer, height: int) -> bool:
+        """
+        :param layer: A layer of the circuit.
+        :param height: The height of the layer.
+        :return: Whether the layer folds into the layers of this group.
+        """
+        return (
+            self.is_foldable
+            and height == self.height
+            and type(layer) is type(self.layers[0])
+        )
+
+
+@dataclass(kw_only=True)
+class FoldedChildLayers:
+    """
+    The folded layers that the children of the inner layers of one group became, each
+    once, in the order the inner layers first point to them.
+    """
+
+    folded_nodes: dict[Layer, FoldedNodes]
+    """
+    Where the nodes of every folded layer of the circuit went.
+    """
+
+    layers: list[Layer] = field(default_factory=list)
+    """
+    The folded child layers.
+    """
+
+    def index_of(self, *, folded_child: Layer) -> int:
+        """
+        :param folded_child: A folded layer, added to :attr:`layers` if it is not one.
+        :return: Its index in :attr:`layers`.
+        """
+        for index, layer in enumerate(self.layers):
+            if layer is folded_child:
+                return index
+        self.layers.append(folded_child)
+        return len(self.layers) - 1
+
+    def edges_of(self, *, layer: InnerLayer, first_node: int) -> InnerLayerEdges:
+        """
+        :param layer: An inner layer of the group, whose children are folded.
+        :param first_node: The node of the folded layer the first node of ``layer``
+            becomes.
+        :return: The edges of ``layer`` in the folded layer, into :attr:`layers`.
+        """
+        edges = layer.inner_layer_edges
+        child_layer_indices = np.empty_like(edges.child_layer_indices)
+        child_nodes = np.empty_like(edges.child_nodes)
+        for index, child in enumerate(layer.child_layers):
+            folded = self.folded_nodes[child]
+            of_child = edges.child_layer_indices == index
+            child_layer_indices[of_child] = self.index_of(folded_child=folded.layer)
+            child_nodes[of_child] = folded.positions[edges.child_nodes[of_child]]
+        return InnerLayerEdges(
+            edges.nodes + first_node, child_layer_indices, child_nodes
+        )
+
+    @property
+    def column_offsets(self) -> NodeIndices:
+        """
+        :return: The column of the first node of every layer of :attr:`layers` in the
+            edge matrix of a sum layer over them.
+        """
+        return np.cumsum([0] + [layer.number_of_nodes for layer in self.layers])
 
 
 # %% folding
@@ -61,12 +157,11 @@ class FoldedLayer:
 @dataclass(kw_only=True)
 class LayerFolding:
     """
-    Folds the layers of a circuit with host parameters: the univariate input layers of
-    one type, the product layers and the sum layers, each at one height, become one
-    layer each, the sums storing their edges as a :class:`BlockEdgeMatrix`.
+    Folds the layers of a circuit with host parameters: the layers of every
+    :class:`FoldingGroup` become one layer, the sums storing their edges as a
+    :class:`BlockEdgeMatrix`.
 
-    Any other layer keeps a layer of its own. The folded circuit computes what the
-    circuit computes.
+    The folded circuit computes what the circuit computes.
     """
 
     root: Layer
@@ -74,15 +169,14 @@ class LayerFolding:
     The root of the circuit to fold.
     """
 
-    heights: dict[int, int] = field(init=False, default_factory=dict)
+    heights: dict[Layer, int] = field(init=False, default_factory=dict)
     """
-    The longest number of layers from every layer down to a leaf, keyed by the
-    :func:`id` of the layer.
+    The longest number of layers from every layer down to a leaf.
     """
 
-    folded_by_layer: dict[int, FoldedLayer] = field(init=False, default_factory=dict)
+    folded_nodes: dict[Layer, FoldedNodes] = field(init=False, default_factory=dict)
     """
-    The folded layer of every layer, keyed by the :func:`id` of the layer.
+    Where the nodes of every layer folded so far went.
     """
 
     def __post_init__(self) -> None:
@@ -90,116 +184,111 @@ class LayerFolding:
         Compute the height of every layer, children first.
         """
         for layer in reversed(self.root.all_layers()):
-            self.heights[id(layer)] = 1 + max(
-                (self.heights[id(child)] for child in layer.child_layers), default=-1
+            self.heights[layer] = 1 + max(
+                (self.heights[child] for child in layer.child_layers), default=-1
             )
+
+    @property
+    def groups(self) -> list[FoldingGroup]:
+        """
+        :return: The groups of the layers of the circuit, lowest first, so that every
+            child is folded before its parents.
+        """
+        groups: list[FoldingGroup] = []
+        for layer in reversed(self.root.all_layers()):
+            height = self.heights[layer]
+            group = next(
+                (group for group in groups if group.admits(layer=layer, height=height)),
+                None,
+            )
+            if group is None:
+                groups.append(FoldingGroup(height=height, layers=[layer]))
+            else:
+                group.layers.append(layer)
+        return sorted(groups, key=lambda group: group.height)
 
     def folded_root(self) -> Layer:
         """
         :return: The root of the folded circuit, whose node ``i`` is node ``i`` of the
             root.
         """
-        groups: dict[tuple[int, type | int], list[Layer]] = {}
-        for layer in reversed(self.root.all_layers()):
-            foldable = isinstance(layer, (UnivariateInputLayer, SumLayer, ProductLayer))
-            kind = type(layer) if foldable else id(layer)
-            groups.setdefault((self.heights[id(layer)], kind), []).append(layer)
-        # every child is lower than its parents, so folding by height folds it first
-        for key in sorted(groups, key=lambda group_key: group_key[0]):
-            layers = groups[key]
-            folded = self.fold(layers=layers)
-            for layer in layers:
-                self.folded_by_layer[id(layer)] = folded
-        return self.folded_by_layer[id(self.root)].layer
+        for group in self.groups:
+            self.folded_nodes.update(self.fold(layers=group.layers))
+        return self.folded_nodes[self.root].layer
 
-    def fold(self, *, layers: list[Layer]) -> FoldedLayer:
+    def fold(self, *, layers: list[Layer]) -> dict[Layer, FoldedNodes]:
         """
-        :param layers: Layers of one type at one height, whose children are folded.
-        :return: The layers as one layer.
+        :param layers: The layers of a :class:`FoldingGroup`, whose children are folded.
+        :return: Where the nodes of every layer went in the one layer they fold into.
         """
         first = layers[0]
         if isinstance(first, UnivariateInputLayer):
             return self.fold_input_layers(layers=layers)
         if isinstance(first, InnerLayer):
             return self.fold_inner_layers(layers=layers)
-        return FoldedLayer(
-            layer=first, node_positions={id(first): np.arange(first.number_of_nodes)}
-        )
+        return {
+            first: FoldedNodes(layer=first, positions=np.arange(first.number_of_nodes))
+        }
 
     @staticmethod
-    def fold_input_layers(*, layers: list[UnivariateInputLayer]) -> FoldedLayer:
+    def fold_input_layers(
+        *, layers: list[UnivariateInputLayer]
+    ) -> dict[Layer, FoldedNodes]:
         """
         :param layers: Univariate input layers of one type.
-        :return: Their nodes as one layer, sorted by variable.
+        :return: Where their nodes went in one layer, sorted by variable.
         """
         joined = type(layers[0]).concatenate(layers)
         order = np.argsort(joined.node_variables, kind="stable")
-        position_of_joined = np.argsort(order)
+        folded = joined.select_nodes(order)
+        position_in_folded = np.argsort(order)
         offsets = np.cumsum([0] + [layer.number_of_nodes for layer in layers])
-        return FoldedLayer(
-            layer=joined.select_nodes(order),
-            node_positions={
-                id(layer): position_of_joined[offset : offset + layer.number_of_nodes]
-                for layer, offset in zip(layers, offsets)
-            },
-        )
+        return {
+            layer: FoldedNodes(
+                layer=folded,
+                positions=position_in_folded[offset : offset + layer.number_of_nodes],
+            )
+            for layer, offset in zip(layers, offsets)
+        }
 
-    def fold_inner_layers(self, *, layers: list[InnerLayer]) -> FoldedLayer:
+    def fold_inner_layers(
+        self, *, layers: list[InnerLayer]
+    ) -> dict[Layer, FoldedNodes]:
         """
         :param layers: Sum layers or product layers, whose children are folded.
-        :return: Their nodes as one layer, the nodes of ``layers[k]`` after those of the
-            layers before it.
+        :return: Where their nodes went in one layer, the nodes of ``layers[k]`` after
+            those of the layers before it.
         """
-        child_layers: list[Layer] = []
-        index_of_child_layer: dict[int, int] = {}
-        nodes, child_layer_indices, child_nodes, log_weights = [], [], [], []
-        offset = 0
-        node_positions = {}
-        for layer in layers:
-            edges = layer.inner_layer_edges
-            child_index_of_edge = np.empty(len(edges.nodes), dtype=np.int64)
-            child_node_of_edge = np.empty(len(edges.nodes), dtype=np.int64)
-            for index, child in enumerate(layer.child_layers):
-                folded_child = self.folded_by_layer[id(child)]
-                key = id(folded_child.layer)
-                if key not in index_of_child_layer:
-                    index_of_child_layer[key] = len(child_layers)
-                    child_layers.append(folded_child.layer)
-                of_child = edges.child_layer_indices == index
-                child_index_of_edge[of_child] = index_of_child_layer[key]
-                child_node_of_edge[of_child] = folded_child.node_positions[id(child)][
-                    edges.child_nodes[of_child]
-                ]
-            nodes.append(edges.nodes + offset)
-            child_layer_indices.append(child_index_of_edge)
-            child_nodes.append(child_node_of_edge)
-            if isinstance(layer, SumLayer):
-                log_weights.append(np.asarray(layer.edge_log_weights))
-            node_positions[id(layer)] = np.arange(layer.number_of_nodes) + offset
-            offset += layer.number_of_nodes
-
-        folded_edges = InnerLayerEdges(
-            np.concatenate(nodes),
-            np.concatenate(child_layer_indices),
-            np.concatenate(child_nodes),
+        children = FoldedChildLayers(folded_nodes=self.folded_nodes)
+        offsets = np.cumsum([0] + [layer.number_of_nodes for layer in layers])
+        number_of_nodes = int(offsets[-1])
+        edges = InnerLayerEdges.concatenate(
+            [
+                children.edges_of(layer=layer, first_node=int(offset))
+                for layer, offset in zip(layers, offsets)
+            ]
         )
         if isinstance(layers[0], ProductLayer):
-            layer = ProductLayer.from_edges(
-                child_layers, folded_edges, offset, SparseEdgeMatrix
+            folded = ProductLayer.from_edges(
+                children.layers, edges, number_of_nodes, SparseEdgeMatrix
             )
         else:
-            column_offsets = np.cumsum(
-                [0] + [child.number_of_nodes for child in child_layers]
-            )
-            layer = SumLayer.from_entries(
-                child_layers,
+            folded = SumLayer.from_entries(
+                children.layers,
                 SparseEntries(
-                    np.concatenate(log_weights),
-                    folded_edges.nodes,
-                    column_offsets[folded_edges.child_layer_indices]
-                    + folded_edges.child_nodes,
+                    np.concatenate(
+                        [np.asarray(layer.edge_log_weights) for layer in layers]
+                    ),
+                    edges.nodes,
+                    children.column_offsets[edges.child_layer_indices]
+                    + edges.child_nodes,
                 ),
-                offset,
+                number_of_nodes,
                 BlockEdgeMatrix,
             )
-        return FoldedLayer(layer=layer, node_positions=node_positions)
+        return {
+            layer: FoldedNodes(
+                layer=folded, positions=np.arange(layer.number_of_nodes) + offset
+            )
+            for layer, offset in zip(layers, offsets)
+        }
