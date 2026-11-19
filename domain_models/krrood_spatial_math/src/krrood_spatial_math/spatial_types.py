@@ -2655,29 +2655,33 @@ class Displacement(VectorPair):
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class RigidMotionRate(VectorPair, ABC):
     """
-    How a rigid body moves per unit of a parameter: how it turns, in the first vector,
-    and how the point of the body at the origin of the reference frame moves, in the
-    second, both along that frame's axes.
+    How a rigid body moves per unit of a parameter: how it turns, in the rotational
+    part, and how the point of the body at the origin of the reference frame moves, in
+    the translational part, both along that frame's axes.
     """
 
     @classproperty
     def _series_rotation_angle(cls) -> float:
         """
-        The angle, about 0.042 radians, below which the left Jacobian's coefficients
-        switch from their closed forms to three terms of their series (`Todesco and
-        Brüls <https://orbi.uliege.be/handle/2268/306081>`__, section 8): where the
-        truncation error ``2 φ⁶ / 8!`` equals the round-off error ``2 ε / φ²``.
+        The rotation angle below which the left Jacobian's coefficients are the first
+        three terms of their series, not their closed forms (`Todesco and Brüls
+        <https://orbi.uliege.be/handle/2268/306081>`__, section 8): where leaving out
+        the fourth term costs as much accuracy as the closed forms' round-off::
+
+            2 φ⁶ / 8! = 2 ε / φ²  ⇒  φ = (8! ε)^(1/8) ≈ 0.042 rad,  ε: machine epsilon
         """
         return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
 
     def _integrate(self, *, parameter_change: sm.ScalarData) -> Displacement:
         """
         The exponential of this rate times ``parameter_change`` (Solà, Deray and
-        Atchuthan, *A micro Lie theory*, equation (172)), for any axis and pitch, and
-        free of NaN where the body does not turn, also in its derivatives.
+        Atchuthan, *A micro Lie theory*, equation (172)): the body turns by the
+        rotational part times the change, and its origin moves by
+        :meth:`_apply_left_jacobian` of the translational part times the change.
 
         :param parameter_change: How much the parameter of the rate changed.
-        :return: The displacement of the body while it did, at this constant rate.
+        :return: The displacement of the body over that change, at this constant rate,
+            finite, also in its derivatives, where the body does not turn.
         """
         rotation = self._rotational_part * parameter_change
         translation = self._translational_part * parameter_change
@@ -2694,12 +2698,15 @@ class RigidMotionRate(VectorPair, ABC):
         cls, *, rotation: Vector3, translation: Vector3
     ) -> Vector3:
         """
-        :param rotation: The rotation vector the body turns by.
-        :param translation: How far the origin of the body would move without turning.
-        :return: Where the origin of the body ends up when it turns while moving: the
-            left Jacobian of ``rotation`` applied to ``translation`` (Eade, `Lie Groups
-            for 2D and 3D Transformations <https://www.ethaneade.com/lie.pdf>`__,
-            section 3.2, equation (83)).
+        :param rotation: The rotation vector ``r`` the body turns by.
+        :param translation: The vector ``t`` the origin of the body would move by
+            without turning.
+        :return: Where the origin of the body ends up when it turns while it moves:
+            ``t + a (r × t) + b (r × (r × t))``, with ``a`` from
+            :meth:`_first_order_coefficient` and ``b`` from
+            :meth:`_second_order_coefficient`. This is the left Jacobian of ``r``
+            applied to ``t`` (Eade, `Lie Groups for 2D and 3D Transformations
+            <https://www.ethaneade.com/lie.pdf>`__, section 3.2, equation (83)).
         """
         angle_squared = rotation.dot(rotation)
         first_order = rotation.cross(translation)
@@ -2713,10 +2720,12 @@ class RigidMotionRate(VectorPair, ABC):
     @classmethod
     def _first_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
         """
-        :param angle_squared: The square of the angle the body turns by.
-        :return: ``(1 − cos φ) / φ²`` for the angle ``φ``, by three terms of its series
-            below :attr:`_series_rotation_angle` (Eade, *Lie Groups for 2D and 3D
-            Transformations*, section 3.2, equations (75) and (76)).
+        The coefficient of ``r × t`` in :meth:`_apply_left_jacobian`, for the rotation
+        angle ``φ``. Above :attr:`_series_rotation_angle` it is the closed form
+        ``(1 − cos φ) / φ²``, below it the first three terms of its series,
+        ``1/2! − φ²/4! + φ⁴/6!`` (Eade, section 3.2, equations (76) and (75)).
+
+        :param angle_squared: ``φ²``, the square of the angle the body turns by.
         """
         angle = sm.sqrt(angle_squared)
         return sm.if_less(
@@ -2731,10 +2740,12 @@ class RigidMotionRate(VectorPair, ABC):
     @classmethod
     def _second_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
         """
-        :param angle_squared: The square of the angle the body turns by.
-        :return: ``(φ − sin φ) / φ³`` for the angle ``φ``, by three terms of its series
-            below :attr:`_series_rotation_angle` (Eade, *Lie Groups for 2D and 3D
-            Transformations*, section 3.2, equations (75) and (76)).
+        The coefficient of ``r × (r × t)`` in :meth:`_apply_left_jacobian`, for the
+        rotation angle ``φ``. Above :attr:`_series_rotation_angle` it is the closed form
+        ``(φ − sin φ) / φ³``, below it the first three terms of its series,
+        ``1/3! − φ²/5! + φ⁴/7!`` (Eade, section 3.2, equations (76) and (75)).
+
+        :param angle_squared: ``φ²``, the square of the angle the body turns by.
         """
         angle = sm.sqrt(angle_squared)
         return sm.if_less(
@@ -2805,9 +2816,7 @@ class Twist(RigidMotionRate):
         """
         :param duration: How long the body moved at this constant twist, in units of
             the parameter the twist is taken with respect to.
-        :return: The displacement of the body after moving that long: the exponential
-            of the twist times ``duration`` (Lynch and Park, *Modern Robotics*, section
-            3.3.3), free of NaN where the body does not turn.
+        :return: The displacement of the body after moving that long at this twist.
         """
         return self._integrate(parameter_change=duration)
 
@@ -2898,9 +2907,8 @@ class ScrewAxis(RigidMotionRate):
     def to_displacement(self, *, position: sm.ScalarData) -> Displacement:
         """
         :param position: How far the body moved along the screw axis, from zero.
-        :return: The displacement of the body after that move: the exponential of the
-            screw axis times ``position`` (Lynch and Park, *Modern Robotics*, section
-            3.3.3), free of NaN where the body does not turn.
+        :return: The displacement of the body after moving that far along this screw
+            axis.
         """
         return self._integrate(parameter_change=position)
 
