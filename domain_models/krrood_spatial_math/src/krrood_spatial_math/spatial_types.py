@@ -2664,9 +2664,9 @@ class RigidMotionRate(VectorPair, ABC):
     def _series_rotation_angle(cls) -> float:
         """
         The angle, about 0.042 radians, below which the left Jacobian's coefficients
-        use three terms of their series: where its truncation error ``2 φ⁶ / 8!`` equals
-        the closed forms' round-off error ``2 ε / φ²`` (`Todesco and Brüls
-        <https://orbi.uliege.be/handle/2268/306081>`__, section 5.1, equation (91)).
+        switch from their closed forms to three terms of their series (`Todesco and
+        Brüls <https://orbi.uliege.be/handle/2268/306081>`__, section 8): where the
+        truncation error ``2 φ⁶ / 8!`` equals the round-off error ``2 ε / φ²``.
         """
         return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
 
@@ -2697,9 +2697,9 @@ class RigidMotionRate(VectorPair, ABC):
         :param rotation: The rotation vector the body turns by.
         :param translation: How far the origin of the body would move without turning.
         :return: Where the origin of the body ends up when it turns while moving: the
-            left Jacobian of ``rotation`` applied to ``translation`` (Solà, Deray and
-            Atchuthan, `A micro Lie theory <https://arxiv.org/abs/1812.01537>`__,
-            equation (174), which equals the left Jacobian of equation (145)).
+            left Jacobian of ``rotation`` applied to ``translation`` (Eade, `Lie Groups
+            for 2D and 3D Transformations <https://www.ethaneade.com/lie.pdf>`__,
+            section 3.2, equation (83)).
         """
         angle_squared = rotation.dot(rotation)
         first_order = rotation.cross(translation)
@@ -2715,8 +2715,8 @@ class RigidMotionRate(VectorPair, ABC):
         """
         :param angle_squared: The square of the angle the body turns by.
         :return: ``(1 − cos φ) / φ²`` for the angle ``φ``, by three terms of its series
-            below :attr:`_series_rotation_angle` (Lynch and Park, *Modern Robotics*,
-            equation (3.87), divided by ``φ²``).
+            below :attr:`_series_rotation_angle` (Eade, *Lie Groups for 2D and 3D
+            Transformations*, section 3.2, equations (75) and (76)).
         """
         angle = sm.sqrt(angle_squared)
         return sm.if_less(
@@ -2733,8 +2733,8 @@ class RigidMotionRate(VectorPair, ABC):
         """
         :param angle_squared: The square of the angle the body turns by.
         :return: ``(φ − sin φ) / φ³`` for the angle ``φ``, by three terms of its series
-            below :attr:`_series_rotation_angle` (Lynch and Park, *Modern Robotics*,
-            equation (3.87), divided by ``φ³``).
+            below :attr:`_series_rotation_angle` (Eade, *Lie Groups for 2D and 3D
+            Transformations*, section 3.2, equations (75) and (76)).
         """
         angle = sm.sqrt(angle_squared)
         return sm.if_less(
