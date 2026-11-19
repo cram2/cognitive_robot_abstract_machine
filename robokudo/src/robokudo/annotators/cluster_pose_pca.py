@@ -42,7 +42,7 @@ from robokudo.utils.transform import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterPosePCAAnnotator(BaseAnnotator):
     """
     3D pose estimation using principal component analysis.

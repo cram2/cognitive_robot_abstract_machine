@@ -44,7 +44,7 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SlowAnnotator(ThreadedAnnotator):
     """A slow annotator that demonstrates long-running processing using ThreadedAnnotator.
 
@@ -105,7 +105,7 @@ class SlowAnnotator(ThreadedAnnotator):
         return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class EmptyAnnotator(BaseAnnotator):
     """
     Basic annotator that generates empty visual output.
@@ -134,7 +134,7 @@ class EmptyAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FailingAnnotator(ThreadedAnnotator):
     """
     Annotator that simulates failures for testing with a long-running annotator using the ThreadedAnnotator class.
@@ -183,7 +183,7 @@ class FailingAnnotator(ThreadedAnnotator):
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FakeCollectionReaderAnnotator(BaseAnnotator):
     """
     A simulated collection reader for testing pipeline behavior.
@@ -312,7 +312,7 @@ class ScopedDescriptor(AnnotatorDescriptor[ScopedParameters]):
 # %% Scoped annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
     """
     Demonstrates the usage of analysis scopes in annotators.

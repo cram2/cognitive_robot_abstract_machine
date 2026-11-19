@@ -1,3 +1,9 @@
+"""
+Verify annotation filtering honors configured predicates and their arguments.
+"""
+
+from __future__ import annotations
+
 from py_trees.common import Status
 
 from robokudo.annotators.filter import FilterAnnotator
@@ -25,6 +31,9 @@ def test_filter_annotator_keeps_annotations_when_no_function_is_configured():
 
 
 def test_filter_annotator_keeps_only_annotations_matching_configured_function():
+    """
+    Only annotations accepted by the configured predicate remain in the CAS.
+    """
     annotator = _filter_annotator_in_pipeline()
     classification = Classification(classname="cup")
     color = SemanticColor(color="red")
@@ -40,6 +49,9 @@ def test_filter_annotator_keeps_only_annotations_matching_configured_function():
 
 
 def test_filter_annotator_passes_configured_function_args_and_kwargs():
+    """
+    The filter forwards configured arguments to its predicate.
+    """
     annotator = _filter_annotator_in_pipeline()
     cup = Classification(classname="cup", confidence=0.8)
     low_confidence_cup = Classification(classname="cup", confidence=0.2)

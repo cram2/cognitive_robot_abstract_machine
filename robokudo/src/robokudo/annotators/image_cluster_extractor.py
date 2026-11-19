@@ -184,7 +184,7 @@ class ImageClusterExtractorDescriptor(
 # %% ImageClusterExtractor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
     """
     Extract object clusters from images using color segmentation.

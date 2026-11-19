@@ -49,7 +49,7 @@ class CollectionReaderDescriptor(AnnotatorDescriptor[CollectionReaderParameters]
 
 
 # %% Collection reader annotator
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     """
     Acquire sensor data and share it with other annotators.

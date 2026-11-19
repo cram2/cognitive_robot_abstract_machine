@@ -100,7 +100,7 @@ class TSDFDescriptor(AnnotatorDescriptor[TSDFParameters]):
 # %% TSDF annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
     """
     Annotator for per-object TSDF volume integration.

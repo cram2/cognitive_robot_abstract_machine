@@ -86,7 +86,7 @@ class ZeroShotClassificationDescriptor(
 # %% ZeroShotClassification annotator
 
 
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class ZeroShotClassificationAnnotator(
     ThreadedAnnotator[AnnotatorDescriptor[ClassificationParametersType]],
     Generic[ClassificationParametersType],

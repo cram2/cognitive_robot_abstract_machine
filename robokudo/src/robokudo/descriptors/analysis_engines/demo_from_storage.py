@@ -1,3 +1,9 @@
+"""
+Build an object perception pipeline that replays camera data from MongoDB.
+"""
+
+from __future__ import annotations
+
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
@@ -58,13 +64,12 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
                 ClusterPoseBoundingBoxAnnotator(),
-                # SlowAnnotator("SlowAnnotator",sleep_duration_seconds=0),
             ]
         )
         return seq

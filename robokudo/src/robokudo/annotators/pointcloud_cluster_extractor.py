@@ -188,7 +188,7 @@ class PointCloudClusterExtractorDescriptor(
 # %% PointCloudClusterExtractor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PointCloudClusterExtractor(
     ThreadedAnnotator[PointCloudClusterExtractorDescriptor]
 ):
@@ -521,7 +521,7 @@ class NaivePointCloudClusterExtractorDescriptor(
 # %% NaivePointCloudClusterExtractor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NaivePointCloudClusterExtractor(
     ThreadedAnnotator[NaivePointCloudClusterExtractorDescriptor]
 ):

@@ -1,3 +1,9 @@
+"""
+Dispatch query-driven perception tasks through a behavior-tree scheduler.
+"""
+
+from __future__ import annotations
+
 from py_trees.common import Status
 from py_trees.composites import Selector, Sequence
 from py_trees.decorators import Inverter
@@ -23,6 +29,10 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Select and execute perception pipelines from incoming queries.
+    """
+
     def name(self) -> str:
         return "query_complex"
 
@@ -38,7 +48,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         task_sequence.add_children(
             [
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

@@ -1,3 +1,7 @@
+"""
+Associate object hypotheses between frames using spatial and appearance similarity.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -17,7 +21,7 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ObjectAssociator(BaseAnnotator):
     """
     An annotator that associates the objects of the current iteration with the objects
@@ -59,6 +63,11 @@ class ObjectAssociator(BaseAnnotator):
         )
 
     def update(self) -> Status:
+        """
+        Associate current hypotheses with tracked objects.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
         new_ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
             ObjectHypothesis
         )

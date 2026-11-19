@@ -1,3 +1,7 @@
+"""
+Verify recorded RGB-D frames are loaded with their camera metadata.
+"""
+
 from __future__ import annotations
 
 # %% Imports

@@ -1,3 +1,7 @@
+"""
+Verify recorded camera observations survive storage and pipeline replay.
+"""
+
 from __future__ import annotations
 
 import json
@@ -36,6 +40,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pipeline:
+    """
+    Record file-backed camera observations into the selected database.
+    """
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
@@ -72,6 +79,9 @@ def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pip
 
 
 def _build_reader_pipeline(database_name: str) -> Pipeline:
+    """
+    Replay camera observations from the selected database.
+    """
     mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "mongo", loop=False, database_name=database_name
     )
@@ -86,6 +96,10 @@ def _build_reader_pipeline(database_name: str) -> Pipeline:
 
 
 class TestStorageRoundtripPipeline:
+    """
+    Exercise recording and replay through complete camera pipelines.
+    """
+
     def test_store_and_replay_sensor_data_roundtrip(
         self, cup_on_counter_directory: Path
     ) -> None:

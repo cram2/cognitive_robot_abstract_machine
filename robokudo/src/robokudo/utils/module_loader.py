@@ -23,6 +23,7 @@ The module handles:
 
 from __future__ import annotations
 
+# %% Imports
 import enum
 import importlib
 import importlib.resources
@@ -34,13 +35,12 @@ from pathlib import Path
 
 from typing_extensions import TYPE_CHECKING, Any
 
+from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+
 if TYPE_CHECKING:
     from types import ModuleType
     from robokudo.analysis_engine import AnalysisEngineInterface
     from robokudo.world_descriptor import BaseWorldDescriptor
-    from robokudo.descriptors.camera_configs.base_camera_config import (
-        BaseCameraConfig,
-    )
 
 
 class RobokudoModuleType(enum.Enum):
@@ -142,7 +142,7 @@ class ModuleLoader:
         return loaded_module
 
     def load_ae(
-        self, ros_package_name: str, module_name: str
+        self, *, ros_package_name: str, module_name: str
     ) -> AnalysisEngineInterface:
         """
         Load an Analysis Engine (AE).
@@ -162,7 +162,7 @@ class ModuleLoader:
         loaded_ae = loaded_module.AnalysisEngine()
         return loaded_ae
 
-    def load_annotator(self, ros_package_name: str, module_name: str) -> ModuleType:
+    def load_annotator(self, *, ros_package_name: str, module_name: str) -> ModuleType:
         """
         Load an annotator module.
 
@@ -177,7 +177,7 @@ class ModuleLoader:
         loaded_module = self._load_module(ros_package_name, module_type, module_name)
         return loaded_module
 
-    def load_camera_config(self, ros_package_name: str, module_name: str) -> Any:
+    def load_camera_config(self, *, ros_package_name: str, module_name: str) -> Any:
         """
         Load a camera config module.
 
@@ -186,10 +186,6 @@ class ModuleLoader:
         :param module_name: Name of camera config module
         :return: Loaded camera configuration
         """
-        from robokudo.descriptors.camera_configs.base_camera_config import (
-            BaseCameraConfig,
-        )
-
         module_type = RobokudoModuleType.CameraConfig
         loaded_module = self._load_module(ros_package_name, module_type, module_name)
         for name, obj in loaded_module.__dict__.items():
@@ -200,9 +196,8 @@ class ModuleLoader:
             ):
                 return obj()
         return None
-        # return loaded_module.CameraConfig()
 
-    def load_io(self, ros_package_name: str, module_name: str) -> ModuleType:
+    def load_io(self, *, ros_package_name: str, module_name: str) -> ModuleType:
         """
         Load an I/O module.
 
@@ -240,7 +235,7 @@ class ModuleLoader:
         return loaded_world_descriptor
 
     def load_tree_components(
-        self, ros_package_name: str, module_name: str
+        self, *, ros_package_name: str, module_name: str
     ) -> ModuleType:
         """
         Load tree components.
@@ -254,7 +249,7 @@ class ModuleLoader:
         loaded_module = self._load_module(ros_package_name, module_type, module_name)
         return loaded_module
 
-    def load_types(self, ros_package_name: str, module_name: str) -> ModuleType:
+    def load_types(self, *, ros_package_name: str, module_name: str) -> ModuleType:
         """
         Load a 'types' module, or a class if needed.
 
@@ -266,7 +261,7 @@ class ModuleLoader:
         loaded_module = self._load_module(ros_package_name, module_type, module_name)
         return loaded_module
 
-    def load_utils(self, ros_package_name: str, module_name: str) -> ModuleType:
+    def load_utils(self, *, ros_package_name: str, module_name: str) -> ModuleType:
         """
         Load a 'utils' module, or a class if needed.
 
@@ -286,24 +281,13 @@ class ModuleLoader:
         file_extension: str | None = None,
     ) -> list[str]:  # pragma: no cover
         """
-        Get paths to files in module directory.
+        Report that source-directory scanning is no longer supported.
 
-        If you previously used this to read data files from the 'source' folder, you can
-        either remove it or refactor to read from:
-          1) get_package_share_directory('robokudo'), or
-          2) standard Python package resources.
-
-        If you truly need to load data from the installed package, see:
-          - `ament_index_python` (to find share dir)
-          - or `importlib.resources`
-
-        For now, you might remove this method or keep it if you adapt the logic.
-
-        :param ros_package_name: Name of ROS package
-        :param module_type: Type of module to search
-        :param dir_name: Name of directory to search
-        :param file_extension: Optional file extension filter
-        :return: List of paths to matching files
+        :param ros_package_name: ROS package containing the resources.
+        :param module_type: Requested module category.
+        :param dir_name: Requested directory.
+        :param file_extension: Optional file suffix filter.
+        :return: An empty list.
         """
         warnings.warn(
             "`get_file_paths()` no longer scans source directories. "

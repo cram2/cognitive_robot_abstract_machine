@@ -64,7 +64,7 @@ DescriptorType = TypeVar("DescriptorType", bound=AnnotatorDescriptor)
 
 
 # %% Base annotator
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """
     Base class for all RoboKudo annotators.
@@ -114,7 +114,6 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
         if descriptor is None:
             descriptor = self.Descriptor()
 
-        # self.rk_logger = get_logger(ros_package_name)
         self.rk_logger = logging.getLogger(ros_package_name)
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
@@ -466,7 +465,7 @@ class Worker(object):
 
 
 # %% Threaded annotator
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     """
     Base class for annotators that perform long-running operations.

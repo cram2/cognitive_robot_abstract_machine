@@ -1,3 +1,7 @@
+"""
+Provide shared static camera placement fields for camera configurations.
+"""
+
 from __future__ import annotations
 
 # %% Imports

@@ -84,7 +84,7 @@ class PointcloudCropDescriptor(AnnotatorDescriptor[PointcloudCropParameters]):
 # %% PointcloudCrop annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
     """
     Point cloud cropping using axis-aligned bounding boxes.

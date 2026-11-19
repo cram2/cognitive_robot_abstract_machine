@@ -23,7 +23,7 @@ from robokudo.tree_components.task_scheduler import TaskSchedulerBase
 from robokudo.utils.tree import add_child_to_parent, setup_with_descendants_on_behavior
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryBasedScheduler(
     TaskSchedulerBase,
     BaseAnnotator,
@@ -75,14 +75,9 @@ class QueryBasedScheduler(
 
     def plan_new_job(self) -> Sequence | None:
         """
-        Plan the next job based on the current query.
+        Select a task from the current query and construct its execution sequence.
 
-        This method:
-        * Gets the current query from CAS
-        * Uses filter_function to determine which task to run
-        * Creates a new sequence with the selected task
-
-        :return: New job sequence containing selected task, or None if no task found
+        :return: The task sequence, or ``None`` if no task matches.
         """
         parent = self.parent
         assert isinstance(parent, Sequence)

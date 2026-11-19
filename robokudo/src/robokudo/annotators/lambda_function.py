@@ -63,7 +63,7 @@ class LambdaFunctionDescriptor(AnnotatorDescriptor[LambdaFunctionParameters]):
 # %% LambdaFunction annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     """
     Annotator for executing arbitrary functions.

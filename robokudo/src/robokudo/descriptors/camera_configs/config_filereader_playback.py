@@ -19,15 +19,11 @@ from robokudo.types.cv import ColorToDepthRatio
 @dataclass(slots=True)
 class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     """
-    Configuration class for file-based camera data playback.
-
-    This class defines the configuration parameters for reading camera data from files,
-    typically used for offline processing or testing. It supports reading from both
-    ROS package directories and regular filesystem paths.
+    Configure playback of recorded camera images and calibration.
 
     .. note::
-        If target_ros_package is None, target_directory is used as an absolute or relative
-        path. Otherwise, target_directory is appended to the ROS package path.
+        Without :attr:`target_ros_package`, :attr:`target_directory` is a filesystem
+        path; otherwise it is relative to that ROS package.
     """
 
     @classproperty

@@ -119,7 +119,7 @@ class DepthFrame:
         return 255
 
     def box_cloud(
-        self, box: Rect, depth_truncation: float
+        self, *, box: Rect, depth_truncation: float
     ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a box.
@@ -246,7 +246,7 @@ class HumanAndPoseDescriptor(AnnotatorDescriptor[HumanAndPoseParameters]):
 # %% HumanAndPose annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
     """
     Detects humans with a YOLO pose model and annotates them with their keypoints.
@@ -398,14 +398,14 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
             return hypothesis
 
         hypothesis.points = depth_frame.box_cloud(
-            hypothesis.roi.roi, parameters.depth_truncation
+            box=hypothesis.roi.roi, depth_truncation=parameters.depth_truncation
         )
         if parameters.shrink_bounding_box is not None and keeps_full_box:
             hypothesis.annotations.append(
                 CloudAnnotation(
                     source=self.name,
                     points=depth_frame.box_cloud(
-                        shrunk_box, parameters.depth_truncation
+                        box=shrunk_box, depth_truncation=parameters.depth_truncation
                     ),
                 )
             )

@@ -66,7 +66,7 @@ class CLIPDescriptor(AnnotatorDescriptor[CLIPParameters]):
 # %% CLIP annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
     """
     Zero-shot classification by the similarity of CLIP's image embedding to the CLIP

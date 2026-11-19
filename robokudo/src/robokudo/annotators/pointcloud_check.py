@@ -71,7 +71,7 @@ class PointcloudCheckDescriptor(AnnotatorDescriptor[PointcloudCheckParameters]):
 # %% PointcloudCheck annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
     """Check if the CASViews.Cloud contains more than X points.
 

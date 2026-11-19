@@ -33,8 +33,12 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PrintNumbers(BaseAnnotator):
+    """
+    Publish successive counter values as behavior-tree feedback.
+    """
+
     name: str = __qualname__
     """
     Name of this node in the behaviour tree.
@@ -92,7 +96,7 @@ class PrintNumbers(BaseAnnotator):
             return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CheckQueryType(BaseAnnotator):
     """
     Checks if the query type on the CAS is 'numbers'.

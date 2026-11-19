@@ -64,7 +64,7 @@ class ImagePreprocessorDescriptor(AnnotatorDescriptor[ImagePreprocessorParameter
 # %% ImagePreprocessor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
     """
     RGB-D image preprocessor and point cloud generator.

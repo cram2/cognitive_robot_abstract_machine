@@ -1,3 +1,9 @@
+"""
+Configure synchronized Kinect RGB-D input and its ROS camera frames.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar

@@ -103,7 +103,7 @@ class OutlierRemovalOnObjectHypothesisDescriptor(
 # %% OutlierRemovalOnObjectHypothesis annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class OutlierRemovalOnObjectHypothesisAnnotator(
     BaseAnnotator[OutlierRemovalOnObjectHypothesisDescriptor]
 ):

@@ -726,6 +726,9 @@ class KinectCameraInterface(ROSCameraInterface):
         self.lock.release()
 
     def set_data(self, cas: CAS) -> None:
+        """
+        Populate the CAS with synchronized camera images and calibration.
+        """
         if not self.has_new_data():
             return
 

@@ -80,7 +80,7 @@ class ObjectHypothesisVisualizerDescriptor(
 # %% ObjectHypothesisVisualizer annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescriptor]):
     """Annotator for visualizing object hypotheses in the CAS.
 

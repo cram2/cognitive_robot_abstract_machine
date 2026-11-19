@@ -126,7 +126,7 @@ class StaticObjectDetectorDescriptor(
 # %% StaticObjectDetector annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor]):
     """
     Find a cluster based on a preconfigured Bounding Box, Pose and Class name.

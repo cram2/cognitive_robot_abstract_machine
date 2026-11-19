@@ -202,40 +202,12 @@ class ShapeEstimatorDescriptor(AnnotatorDescriptor[ShapeEstimatorParameters]):
 # %% ShapeEstimator annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
-    """Estimate one primitive shape per object hypothesis point cloud.
-
-    Overview:
-    1. Validate input cloud (`minimum_point_count`) and optionally run
-       statistical outlier removal.
-    2. Fit enabled primitives (sphere/cylinder/cuboid) on the same filtered
-       points.
-    3. Apply post-fit stabilization:
-       - Cylinder: optional axis stabilization from principal/preferred axes.
-       - Cuboid: optional in-plane orientation stabilization for near-square faces.
-    4. Rank accepted candidates with `select_best_shape(...)`.
-    5. Convert the winning fit to a RoboKudo annotation (`Sphere`, `Cylinder`,
-       or `Cuboid`), keep inlier indices mapped to the original object cloud,
-       and publish visualization geometries.
-
-    Parameter groups:
-    - Global data quality: `minimum_point_count`, outlier removal settings.
-    - Shared fit behavior: `distance_threshold`, `robust_loss`.
-    - Shape gates:
-      sphere/cylinder/cuboid enable flags plus per-shape size and ratio limits.
-    - Candidate selection: `selection_score_tolerance` and cuboid preference
-      settings for close scores.
-    - Stabilization controls: cylinder axis and cuboid orientation stabilization.
-
-    Practical tuning order:
-    1. Set hard physical limits (max radii/heights/extents) for your scene.
-    2. Tune inlier thresholds (`distance_threshold`, per-shape min inlier ratio).
-    3. Tune selection preference parameters.
-    4. Only then tune stabilization triggers/tolerances.
-
-    This annotator intentionally favors robust, bounded fits for household-scale
-    objects.
+    """
+    Fit enabled sphere, cylinder, and cuboid models to each object point cloud.
+    Annotate the selected fit and display its geometry subject to configured size,
+    inlier, and stabilization constraints.
     """
 
     name: str = __qualname__

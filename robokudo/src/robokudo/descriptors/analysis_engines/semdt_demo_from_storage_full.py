@@ -1,3 +1,9 @@
+"""
+Build recorded-data perception with object geometry and semantic world updates.
+"""
+
+from __future__ import annotations
+
 from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
@@ -24,6 +30,10 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Perceive recorded objects with geometry and semantic world synchronization.
+    """
+
     def name(self) -> str:
         return "semdt_demo_from_storage"
 
@@ -45,7 +55,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

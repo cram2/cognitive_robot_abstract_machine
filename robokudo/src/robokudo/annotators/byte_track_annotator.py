@@ -1,3 +1,7 @@
+"""
+Assign persistent object identities across frames with ByteTrack.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -21,7 +25,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ByteTrackAnnotator(BaseAnnotator):
     """
     A ByteTrack annotator that tracks detected objects across pipeline ticks.

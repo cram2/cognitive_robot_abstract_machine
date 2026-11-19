@@ -101,7 +101,7 @@ class WorldDescriptorBootstrapDescriptor(
 # %% WorldDescriptorBootstrap annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class WorldDescriptorBootstrapAnnotator(
     BaseAnnotator[WorldDescriptorBootstrapDescriptor]
 ):

@@ -143,6 +143,9 @@ def model_loader(monkeypatch, scene: CupScene) -> MockModelLoader:
 
 
 def _depth_descriptor(scene: CupScene) -> YoloDescriptor:
+    """
+    Enable depth processing for the scene configuration.
+    """
     descriptor = scene.descriptor()
     descriptor.parameters.global_with_depth = True
     return descriptor
@@ -222,6 +225,9 @@ def test_annotator_without_model_raises(model_loader, scene):
 def test_custom_weights_and_class_names_are_read_from_ros_package(
     model_loader, scene, monkeypatch, tmp_path
 ):
+    """
+    Configured ROS package assets supply the detection model and its class labels.
+    """
     monkeypatch.setattr(
         FileLoader,
         "get_path_to_file_in_ros_package",
@@ -346,6 +352,9 @@ def test_mask_fills_bounding_box_without_precision_mode(model_loader, scene):
 
 
 def _precision_descriptor(scene: CupScene) -> YoloDescriptor:
+    """
+    Enable segmentation-based masks for detections in the scene.
+    """
     descriptor = scene.descriptor()
     descriptor.parameters.precision_mode = True
     return descriptor
@@ -459,6 +468,9 @@ def test_region_detected_on_smaller_depth_resolution_is_in_color_pixels(
 
 
 def _existing_hypothesis_descriptor(scene: CupScene) -> YoloDescriptor:
+    """
+    Enable classification of hypotheses already present in the CAS.
+    """
     descriptor = scene.descriptor()
     descriptor.parameters.classify_existing_hypotheses = True
     return descriptor
@@ -467,6 +479,9 @@ def _existing_hypothesis_descriptor(scene: CupScene) -> YoloDescriptor:
 def _annotator_with_existing_hypothesis(
     scene: CupScene, descriptor: YoloDescriptor, existing: ObjectHypothesis
 ) -> YoloAnnotator:
+    """
+    Construct a scene annotator whose CAS contains the supplied hypothesis.
+    """
     annotator = scene.annotator_in_pipeline(descriptor)
     annotator.get_cas().annotations.append(existing)
     return annotator

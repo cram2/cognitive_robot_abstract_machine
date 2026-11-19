@@ -1,3 +1,9 @@
+"""
+Build semantic world perception from previously recorded camera observations.
+"""
+
+from __future__ import annotations
+
 from robokudo.annotators.cluster_pose_bounding_box import (
     ClusterPoseBoundingBoxAnnotator,
 )
@@ -24,6 +30,10 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Synchronize objects perceived from recorded frames with the semantic world.
+    """
+
     def name(self) -> str:
         return "semdt_demo_from_storage"
 
@@ -42,7 +52,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

@@ -22,7 +22,7 @@ from py_trees.common import Status
 from robokudo.annotators.core import BaseAnnotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PipelineTrigger(BaseAnnotator):
     """
     Pipeline execution controller using triggers.

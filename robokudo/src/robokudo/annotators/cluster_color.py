@@ -117,7 +117,7 @@ class ClusterColorDescriptor(AnnotatorDescriptor[ClusterColorParameters]):
 # %% ClusterColor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     """
     Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB

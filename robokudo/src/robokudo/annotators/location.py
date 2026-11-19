@@ -78,7 +78,7 @@ class LocationDescriptor(AnnotatorDescriptor[LocationParameters]):
 # %% Location annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
     """Determine object locations within semantic regions.
 

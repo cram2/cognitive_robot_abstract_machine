@@ -67,7 +67,7 @@ class FileWriterDescriptor(AnnotatorDescriptor[FileWriterParameters]):
 # %% FileWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FileWriter(BaseAnnotator[FileWriterDescriptor]):
     """
     Sensor data storage to filesystem.

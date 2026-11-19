@@ -60,7 +60,7 @@ class BlurDescriptor(AnnotatorDescriptor[BlurParameters]):
 # %% Blur annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
     """Annotator for calculating and visualizing image blur metrics.
 

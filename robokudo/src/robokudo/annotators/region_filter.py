@@ -64,7 +64,7 @@ class RegionFilterDescriptor(AnnotatorDescriptor[RegionFilterParameters]):
 # %% RegionFilter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     """Point cloud filtering using world regions.
 

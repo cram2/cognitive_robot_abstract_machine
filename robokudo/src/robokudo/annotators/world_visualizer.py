@@ -57,7 +57,7 @@ class WorldVisualizerDescriptor(AnnotatorDescriptor[WorldVisualizerParameters]):
 # %% WorldVisualizer annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     """
     Visualize predefined objects and regions from the shared world.

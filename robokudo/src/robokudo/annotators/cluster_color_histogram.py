@@ -78,7 +78,7 @@ class ClusterColorHistogramDescriptor(
 # %% ClusterColorHistogram annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescriptor]):
     """Hue and saturation histogram analysis for object hypotheses with RGB ROI and Mask.
 

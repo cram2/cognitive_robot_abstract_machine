@@ -1,3 +1,7 @@
+"""
+Detect and display scale-invariant image features in the current camera frame.
+"""
+
 from __future__ import annotations
 
 import colorsys
@@ -25,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # %% Feature extraction
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SIFTAnnotator(ThreadedAnnotator):
     """
     Annotator for SIFT feature extraction and matching using OpenCV.

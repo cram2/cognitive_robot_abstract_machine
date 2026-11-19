@@ -98,7 +98,7 @@ class PlaneDescriptor(AnnotatorDescriptor[PlaneParameters]):
 # %% Plane annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
     """
     Plane detector and visualizer for point clouds.

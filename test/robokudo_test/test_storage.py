@@ -1,3 +1,9 @@
+"""
+Verify MongoDB persistence and restoration of CAS views and annotations.
+"""
+
+from __future__ import annotations
+
 # %% Imports
 
 import os
@@ -40,6 +46,9 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def storage_instance():
+    """
+    Provide a disposable database for checking CAS storage contracts.
+    """
     database_name = "ONLY_UNITTESTS_test_db"
     storage = Storage(database_name)
     yield storage
@@ -101,6 +110,10 @@ def create_camera_model() -> PinholeCameraModel:
 
 
 class TestStorage:
+    """
+    Exercise CAS persistence against a disposable MongoDB database.
+    """
+
     def test_drop_database(self, storage_instance):
         database_name = storage_instance.database_name
         storage_instance.drop_database()

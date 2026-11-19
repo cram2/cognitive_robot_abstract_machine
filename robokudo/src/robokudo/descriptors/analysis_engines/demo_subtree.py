@@ -1,3 +1,9 @@
+"""
+Demonstrate a perception pipeline composed from a reusable subtree.
+"""
+
+from __future__ import annotations
+
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
 from robokudo.annotators.cluster_position import ClusterPositionAnnotator
@@ -16,6 +22,10 @@ from robokudo.idioms import pipeline_init
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Compose a reusable perception subtree into an analysis engine.
+    """
+
     def name(self) -> str:
         return "demo_subtree"
 
@@ -32,7 +42,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 TTLocalizationSubtree().implementation(),
                 ClusterColorAnnotator(),

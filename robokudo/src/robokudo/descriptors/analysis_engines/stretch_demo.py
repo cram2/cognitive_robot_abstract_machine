@@ -18,6 +18,8 @@ grasping it.
     other change.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_pose_bounding_box import (
     ClusterPoseBoundingBoxAnnotator,
@@ -140,12 +142,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ColorRangeBound.UPPER
             ]
         )
-        # The depth hole leaves few valid 3D points under the color mask. Lowered to
-        # ClusterPoseBoundingBoxAnnotator's own floor (it needs more than 10 points to compute a
-        # pose, cluster_pose_bounding_box.py:161-165) rather than the class default of 62, so a
-        # sparse-but-real detection reaches pose estimation instead of being dropped here
-        # first. Outlier removal is skipped too: pruning an already-sparse, hole-riddled
-        # cloud for statistical outliers risks stripping the real points further.
+        # Keep sparse depth detections eligible for pose estimation.
         cluster_descriptor.parameters.minimum_points_threshold = 11
         cluster_descriptor.parameters.outlier_removal = True
 
@@ -160,7 +157,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=camera_descriptor),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=crop_descriptor),
                 ImageClusterExtractor(descriptor=cluster_descriptor),
                 ClusterPoseBoundingBoxAnnotator(),

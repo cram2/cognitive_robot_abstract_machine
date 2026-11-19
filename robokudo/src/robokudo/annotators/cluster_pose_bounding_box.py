@@ -1,21 +1,6 @@
-"""3D pose estimation using oriented bounding boxes.
-
-This module provides an annotator for:
-
-* Calculating 3D poses for object hypotheses
-* Using z-axis aligned oriented bounding boxes
-* Supporting world frame alignment
-* Generating visualization markers
-
-The module uses:
-
-* 2D projection for rotation estimation
-* Minimum area rectangles for orientation
-* Coordinate frame transformations
-* Open3D visualization tools
-
-.. note::
-   By default, z-axis is aligned with world frame up direction.
+"""
+Estimate object poses and oriented bounding boxes from point clusters.
+The default orientation aligns the vertical axis with the world frame.
 """
 
 from __future__ import annotations
@@ -85,20 +70,10 @@ class ClusterPoseBoundingBoxDescriptor(
 # %% ClusterPoseBoundingBox annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescriptor]):
-    """3D pose estimation using oriented bounding boxes.
-
-    This annotator:
-
-    * Calculates 3D poses for object point clusters
-    * Uses z-axis aligned oriented bounding boxes
-    * Projects points to 2D for rotation estimation
-    * Creates pose and bounding box annotations
-    * Supports axis alignment by box extents
-
-    .. note::
-       Default behavior aligns z-axis with world frame up direction.
+    """
+    Annotate object cluster poses and bounding boxes with configurable axis alignment.
     """
 
     name: str = __qualname__
@@ -115,19 +90,14 @@ class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescri
         return ClusterPoseBoundingBoxDescriptor
 
     def adjust_bb_orientation_by_bb_size(
-        self, pose_orientation: npt.NDArray, bounding_box_extents: list
+        self, *, pose_orientation: npt.NDArray, bounding_box_extents: list
     ) -> tuple[npt.NDArray, list]:
-        """Align bounding box axes with extent dimensions.
+        """
+        Align bounding box axes from longest to shortest extent.
 
-        Reorients the bounding box so that:
-
-        * X-axis aligns with longest dimension
-        * Y-axis aligns with second longest
-        * Z-axis aligns with shortest dimension
-
-        :param pose_orientation: Current orientation as 3x3 rotation matrix
-        :param bounding_box_extents: Current box dimensions [x,y,z]
-        :return: Tuple of (aligned orientation matrix, reordered extents)
+        :param pose_orientation: Current orientation matrix.
+        :param bounding_box_extents: Current box dimensions.
+        :return: Aligned orientation and reordered extents.
         """
 
         # We want to rearrange the axes of the BB by its extents.

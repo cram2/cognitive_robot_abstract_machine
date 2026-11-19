@@ -1,3 +1,9 @@
+"""
+Verify storage writers acquire resources at the intended lifecycle stage.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import robokudo.annotators.storage as storage_module

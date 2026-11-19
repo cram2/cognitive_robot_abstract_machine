@@ -55,7 +55,7 @@ class ROIAdjusterDescriptor(AnnotatorDescriptor[ROIAdjusterParameters]):
 # %% ROIAdjuster annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
     """Annotator for adjusting ROI sizes of object hypotheses.
 

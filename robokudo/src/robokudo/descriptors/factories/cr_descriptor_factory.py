@@ -48,7 +48,7 @@ from robokudo.io.storage_reader_interface import StorageReaderInterface
 
 
 # %% Camera descriptor construction
-@dataclass
+@dataclass(kw_only=True)
 class CollectionReaderDescriptorFactory:
     """
     Factory class for creating CollectionReader descriptors.

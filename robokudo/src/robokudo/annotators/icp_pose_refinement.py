@@ -77,7 +77,7 @@ class ICPPoseRefinementDescriptor(AnnotatorDescriptor[ICPPoseRefinementParameter
 # %% ICPPoseRefinement annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor]):
     """Pose refinement using iterative closest point (ICP).
 

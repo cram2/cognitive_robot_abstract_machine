@@ -67,7 +67,7 @@ class ClusterPositionDescriptor(AnnotatorDescriptor[ClusterPositionParameters]):
 # %% ClusterPosition annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
     """
     3D position estimation for object hypotheses.

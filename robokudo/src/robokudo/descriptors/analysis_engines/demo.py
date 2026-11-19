@@ -17,6 +17,8 @@ The pipeline implements the following functionality:
     for more complex object detection and segmentation tasks.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -91,10 +93,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
-                # SlowAnnotator(sleep_duration_seconds=3),
                 PointCloudClusterExtractor(),
                 # ClusterColorAnnotator(),
                 # ClusterColorHistogramAnnotator(),

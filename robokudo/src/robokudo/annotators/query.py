@@ -40,6 +40,7 @@ from robokudo_msgs.msg import ObjectDesignator
 from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.exceptions import QueryServerMissing
 from robokudo.cas import CASViews
 from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
 from robokudo.datastructures.annotator_parameters import AnnotatorParameters
@@ -86,7 +87,7 @@ if TYPE_CHECKING:
     from robokudo.utils.annotation_conversion import Annotation2ODConverter
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryAnnotator(BaseAnnotator):
     """
     Handle external queries through ROS action server.
@@ -150,9 +151,8 @@ class QueryAnnotator(BaseAnnotator):
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert self.action_server is not None, (
-            "Action server should be initialized by now."
-        )
+        if self.action_server is None:
+            raise QueryServerMissing()
         query = self.action_server.new_query
         self.rk_logger.debug(f"self.action_server.new_query: {query}")
 
@@ -168,7 +168,7 @@ class QueryAnnotator(BaseAnnotator):
         return Status.RUNNING
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryFeedback(BaseAnnotator):
     """
     A test class which simply generates a fixed-string feedback.
@@ -181,13 +181,18 @@ class QueryFeedback(BaseAnnotator):
     """Feedback text sent to the active query client."""
 
     def update(self) -> Status:
+        """
+        Send fixed query feedback and return success.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(self.feedback_text)
 
         return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryFeedbackAndCount(BaseAnnotator):
     """
     A test class which simply counts up until a fixed number.
@@ -208,6 +213,11 @@ class QueryFeedbackAndCount(BaseAnnotator):
     """The current count."""
 
     def update(self) -> Status:
+        """
+        Send counter feedback and return success once the configured count is exceeded.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(f"Count: {self.current_count}")
         self.current_count = self.current_count + 1
@@ -218,7 +228,7 @@ class QueryFeedbackAndCount(BaseAnnotator):
             return self.return_code
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryReply(BaseAnnotator):
     """
     A test class which simply generates an empty Query Answer to check if the Action
@@ -295,7 +305,7 @@ class GenerateQueryResultDescriptor(AnnotatorDescriptor[GenerateQueryResultParam
 # %% GenerateQueryResult annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
     """
     This class reads in the annotations done by the previous Annotators and generates

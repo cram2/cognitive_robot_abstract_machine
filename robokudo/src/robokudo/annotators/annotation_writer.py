@@ -55,7 +55,7 @@ class AnnotationStorageWriterDescriptor(
 # %% AnnotationStorageWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     """Annotator for writing annotations to storage in JSON format.
 
@@ -142,7 +142,7 @@ class AnnotationPublisherWriterDescriptor(
 # %% AnnotationPublisherWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescriptor]):
     """Annotator for publishing annotations via ROS topics.
 

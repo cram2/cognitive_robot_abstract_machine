@@ -20,6 +20,8 @@ The pipeline implements the following functionality:
     requiring direct robot access.
 """
 
+from __future__ import annotations
+
 from py_trees.composites import Sequence
 
 from robokudo.analysis_engine import AnalysisEngineInterface
@@ -103,7 +105,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         pre.add_children(
             [
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
             ]
         )
 

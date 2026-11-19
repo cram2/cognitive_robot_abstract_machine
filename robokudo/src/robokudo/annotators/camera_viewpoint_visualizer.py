@@ -18,7 +18,7 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CameraViewpointVisualizer(BaseAnnotator):
     """
     Annotator for visualizing camera viewpoints and reference frames.

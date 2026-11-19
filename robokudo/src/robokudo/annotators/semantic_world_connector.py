@@ -61,7 +61,7 @@ class SemanticDigitalTwinConnectorDescriptor(
 # %% SemanticDigitalTwinConnector annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SemanticDigitalTwinConnector(
     ThreadedAnnotator[SemanticDigitalTwinConnectorDescriptor]
 ):

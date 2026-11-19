@@ -18,6 +18,8 @@ The pipeline implements the following functionality:
     sleep durations to show asynchronous execution.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -90,8 +92,8 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 # py_trees.behaviours.Count(name="Annotator A", fail_until=-1, running_until=30, success_until=1000),
                 # py_trees.behaviours.Count(name="Annotator B", fail_until=-1, running_until=15, success_until=1000)
-                SlowAnnotator("Slow1Annotator", sleep_duration_seconds=4),
-                SlowAnnotator("Slow2Annotator", sleep_duration_seconds=2),
+                SlowAnnotator(name="Slow1Annotator", sleep_duration_seconds=4),
+                SlowAnnotator(name="Slow2Annotator", sleep_duration_seconds=2),
             ]
         )
 
@@ -99,10 +101,10 @@ class AnalysisEngine(AnalysisEngineInterface):
             PipelineTrigger(),
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-            SlowAnnotator("FastAnnotator", sleep_duration_seconds=1),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
+            SlowAnnotator(name="FastAnnotator", sleep_duration_seconds=1),
             parallel,
-            SlowAnnotator("Slow3Annotator", sleep_duration_seconds=2),
+            SlowAnnotator(name="Slow3Annotator", sleep_duration_seconds=2),
         ]:
             seq.add_child(annotator)
 

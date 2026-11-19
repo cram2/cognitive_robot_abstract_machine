@@ -53,7 +53,7 @@ class StaticCameraTransformDescriptor(
 # %% StaticCameraTransform annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StaticCameraTransformAnnotator(BaseAnnotator[StaticCameraTransformDescriptor]):
     """
     Write a fixed camera-to-world transform to the current CAS.

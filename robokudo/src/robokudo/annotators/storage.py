@@ -67,7 +67,7 @@ class StorageWriterDescriptor(AnnotatorDescriptor[StorageWriterParameters]):
 # %% StorageWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     """
     Annotator for storing sensor data in MongoDB.

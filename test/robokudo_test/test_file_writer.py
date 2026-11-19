@@ -1,3 +1,7 @@
+"""
+Verify recorded camera data and annotations can be exported to files.
+"""
+
 from __future__ import annotations
 
 # %% Imports

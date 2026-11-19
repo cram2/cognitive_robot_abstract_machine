@@ -16,6 +16,8 @@ The pipeline implements the following functionality:
     store some annotated data before running this pipeline.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
@@ -77,7 +79,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 ObjectHypothesisVisualizer(),
             ]
         )

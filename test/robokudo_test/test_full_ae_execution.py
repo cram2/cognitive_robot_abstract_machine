@@ -1,3 +1,7 @@
+"""
+Verify complete perception pipelines synchronize observations with world beliefs.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -52,6 +56,10 @@ def clean_semantic_world():
 
 
 class TestFullAEExecution(object):
+    """
+    Check complete perception pipelines update CAS contents and world beliefs.
+    """
+
     def test_run_simple_ae_successfully(
         self, node, cup_on_counter_directory: Path
     ) -> None:
@@ -79,7 +87,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
@@ -119,7 +127,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
@@ -131,6 +139,9 @@ class TestFullAEExecution(object):
         belief_uuids_after_each_successful_cas = []
 
         def assert_current_cas_updates_single_belief(cas):
+            """
+            Check that each successful frame updates the same single object belief.
+            """
             object_hypotheses = cas.filter_annotations_by_type(
                 robokudo.types.scene.ObjectHypothesis
             )
@@ -284,7 +295,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(descriptor=cluster_desc),
@@ -366,7 +377,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(descriptor=cluster_desc),

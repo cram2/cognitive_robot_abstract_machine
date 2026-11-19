@@ -31,10 +31,17 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Perceive objects from a rendered semantic world camera.
+    """
+
     def name(self) -> str:
         return "semdt_raytracer_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        Build the rendered camera perception pipeline.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
@@ -49,7 +56,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(),

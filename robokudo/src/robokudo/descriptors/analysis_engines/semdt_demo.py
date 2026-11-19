@@ -1,3 +1,9 @@
+"""
+Build a perception pipeline that synchronizes detected objects with the semantic world.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
@@ -21,6 +27,10 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Detect objects from a live camera and synchronize them with the semantic world.
+    """
+
     def name(self) -> str:
         return "semdt_demo"
 
@@ -36,7 +46,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

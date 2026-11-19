@@ -61,7 +61,7 @@ class FilterDescriptor(AnnotatorDescriptor[FilterParameters]):
 # %% Filter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     """
     Annotator for applying filter conditions to annotations.
