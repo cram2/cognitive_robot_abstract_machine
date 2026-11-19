@@ -2728,13 +2728,14 @@ class RigidMotionRate(VectorPair, ABC):
         :param angle_squared: ``φ²``, the square of the angle the body turns by.
         """
         angle = sm.sqrt(angle_squared)
-        return sm.if_less(
-            angle_squared,
-            cls._series_rotation_angle**2,
+        series = (
             1 / math.factorial(2)
             - angle_squared / math.factorial(4)
-            + angle_squared**2 / math.factorial(6),
-            (1 - sm.cos(angle)) / angle_squared,
+            + angle_squared**2 / math.factorial(6)
+        )
+        closed_form = (1 - sm.cos(angle)) / angle_squared
+        return sm.if_less(
+            angle_squared, cls._series_rotation_angle**2, series, closed_form
         )
 
     @classmethod
@@ -2748,13 +2749,14 @@ class RigidMotionRate(VectorPair, ABC):
         :param angle_squared: ``φ²``, the square of the angle the body turns by.
         """
         angle = sm.sqrt(angle_squared)
-        return sm.if_less(
-            angle_squared,
-            cls._series_rotation_angle**2,
+        series = (
             1 / math.factorial(3)
             - angle_squared / math.factorial(5)
-            + angle_squared**2 / math.factorial(7),
-            (angle - sm.sin(angle)) / (angle_squared * angle),
+            + angle_squared**2 / math.factorial(7)
+        )
+        closed_form = (angle - sm.sin(angle)) / (angle_squared * angle)
+        return sm.if_less(
+            angle_squared, cls._series_rotation_angle**2, series, closed_form
         )
 
 
