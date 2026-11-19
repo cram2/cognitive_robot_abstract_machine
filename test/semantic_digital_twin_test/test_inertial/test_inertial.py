@@ -1,3 +1,10 @@
+"""
+Tests of inertia tensors, their principal moments and axes, and the data they reject.
+"""
+
+from __future__ import annotations
+
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -134,21 +141,33 @@ def test_a_body_whose_inertia_nobody_described_has_no_inertial():
 
 
 def test_a_3x3_matrix_rejects_an_array_of_another_shape():
+    """
+    A 2x2 array is no 3x3 matrix.
+    """
     with pytest.raises(ArrayShapeError):
         NPMatrix3x3(data=np.eye(2))
 
 
 def test_a_vector_of_three_rejects_an_array_of_another_shape():
+    """
+    An array of four elements is no vector of three.
+    """
     with pytest.raises(ArrayShapeError):
         NPVector3(data=np.zeros(4))
 
 
 def test_an_inertia_tensor_rejects_a_negative_moment_of_inertia():
+    """
+    A body cannot have a negative moment of inertia about an axis.
+    """
     with pytest.raises(NegativeMomentOfInertiaError):
         InertiaTensor.from_values(ixx=-1.0, iyy=1.0, izz=1.0, ixy=0.0, ixz=0.0, iyz=0.0)
 
 
 def test_an_inertia_tensor_rejects_an_asymmetric_matrix():
+    """
+    The products of inertia above and below the diagonal of a tensor are equal.
+    """
     with pytest.raises(AsymmetricInertiaTensorError):
         InertiaTensor(
             data=np.array([[1.0, 0.5, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])

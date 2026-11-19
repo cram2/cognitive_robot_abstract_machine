@@ -1,3 +1,8 @@
+"""
+Changes to the structure of a world, recorded so they can be replayed, reverted and
+synchronized between worlds.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -509,6 +514,10 @@ class AddActuatorModification(WorldModificationWithWorldEntityReference):
     """
 
     def __post_init__(self) -> None:
+        """
+        Record the id of the actuator and, unless given, the ids of the degrees of
+        freedom it drives now.
+        """
         self.original_actuator_id = self.actuator.id
         if not self.degree_of_freedom_ids:
             self.degree_of_freedom_ids = [

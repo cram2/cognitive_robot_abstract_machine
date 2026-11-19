@@ -416,6 +416,9 @@ def load_after_storing(world: World, session: Session) -> World:
 
 
 def test_the_inertia_tensor_of_a_body_survives_a_round_trip(session, world_with_box):
+    """
+    A body read back from the database has the inertia tensor it was stored with.
+    """
     box = world_with_box.get_body_by_name("box")
 
     loaded = load_after_storing(world_with_box, session)
@@ -427,6 +430,9 @@ def test_the_inertia_tensor_of_a_body_survives_a_round_trip(session, world_with_
 def test_a_camera_keeps_the_body_it_is_attached_to_through_a_round_trip(
     session, world_with_box
 ):
+    """
+    A camera read back from the database is attached to the body read back with it.
+    """
     box = world_with_box.get_body_by_name("box")
     with world_with_box.modify_world():
         box.add_simulator_property(MujocoCamera(name="eye", body=box))
@@ -445,6 +451,10 @@ def test_a_camera_keeps_the_body_it_is_attached_to_through_a_round_trip(
 def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
     session, world_with_box
 ):
+    """
+    An actuator read back from the database drives the degree of freedom it drove when
+    it was stored.
+    """
     box = world_with_box.get_body_by_name("box")
     arm = Body(name=PrefixedName("arm"))
     actuator = Actuator(name=PrefixedName("servo"))

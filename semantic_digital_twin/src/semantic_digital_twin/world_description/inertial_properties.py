@@ -1,3 +1,8 @@
+"""
+Mass, center of mass and inertia tensor of a body, with the matrices and vectors they
+are built from.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing_extensions import Self, TypeVar, Any
@@ -26,6 +31,9 @@ class NPMatrix3x3(SubclassJSONSerializer):
     """
 
     def __post_init__(self) -> None:
+        """
+        :raises ArrayShapeError: If the data is not a 3x3 matrix.
+        """
         if self.data.shape != (3, 3):
             raise ArrayShapeError(expected_shape=(3, 3), shape=self.data.shape)
 
@@ -55,6 +63,9 @@ class NPVector3(SubclassJSONSerializer):
     """
 
     def __post_init__(self) -> None:
+        """
+        :raises ArrayShapeError: If the data is not a vector of three.
+        """
         if self.data.shape != (3,):
             raise ArrayShapeError(expected_shape=(3,), shape=self.data.shape)
 
@@ -153,6 +164,13 @@ class InertiaTensor(NPMatrix3x3):
     """
 
     def __post_init__(self) -> None:
+        """
+        :meth:`NPMatrix3x3.__post_init__`, which also rejects a matrix that is no
+        inertia tensor.
+
+        :raises NegativeMomentOfInertiaError: If a moment on the diagonal is negative.
+        :raises AsymmetricInertiaTensorError: If the matrix is not symmetric.
+        """
         super().__post_init__()
         moments = np.diag(self.data)
         if np.any(moments < 0.0):

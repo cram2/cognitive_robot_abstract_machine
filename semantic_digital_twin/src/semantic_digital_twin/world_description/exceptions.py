@@ -1,3 +1,7 @@
+"""
+Exceptions raised while describing the bodies of a world and their properties.
+"""
+
 from __future__ import annotations
 
 # %% Imports

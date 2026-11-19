@@ -1,3 +1,10 @@
+"""
+A dictionary keyed by types that finds the entry of a type's closest ancestor.
+"""
+
+from __future__ import annotations
+
+
 from dataclasses import dataclass, field
 from typing_extensions import Any, Iterator, get_origin
 

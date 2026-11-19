@@ -1,3 +1,10 @@
+"""
+Tests of the types ORMatic stores by default and of the type mappings a caller gives.
+"""
+
+from __future__ import annotations
+
+
 import datetime
 import decimal
 import fractions
@@ -175,6 +182,10 @@ def test_array_keeps_its_values_shape_and_dtype(array, session, database):
 
 
 def test_array_typed_with_its_element_type_survives_a_round_trip(session, database):
+    """
+    A field hinted with a parametrized :data:`numpy.typing.NDArray` is stored like one
+    hinted :class:`numpy.ndarray`.
+    """
     array = np.arange(6, dtype=np.float64).reshape(2, 3)
 
     reconstructed = store_and_load(StoredTypedArray(value=array), session)
