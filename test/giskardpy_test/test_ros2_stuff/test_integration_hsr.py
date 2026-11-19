@@ -26,6 +26,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @pytest.fixture()
@@ -88,8 +89,9 @@ def test_move_base(giskard: HSRTester) -> None:
                         ),
                     ),
                     CartesianPose(
-                        root_link=giskard.default_root,
-                        tip_link=giskard.base_footprint,
+                        kinematic_chain=KinematicChain(
+                            root=giskard.default_root, tip=giskard.base_footprint
+                        ),
                         goal_pose=Pose.from_xyz_axis_angle(
                             x=1.0,
                             axis=Vector3.Z(),
