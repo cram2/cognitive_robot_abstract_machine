@@ -6,8 +6,7 @@ statechart can repeat them without expanding any node again.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import IntEnum, StrEnum
 
 from typing_extensions import TYPE_CHECKING, Any, Self
@@ -19,6 +18,7 @@ from cramph.composites import CompositeNodeChoosingItsChild
 from cramph.data_types import TransitionKind
 from cramph.node import (
     CompositeNode,
+    DerivedConditionVariable,
     DeserializedNodeTracker,
     StatechartNode,
     TransitionCondition,
@@ -105,6 +105,53 @@ class ChangeApplicationOrder(IntEnum):
     """
 
 
+# %% structure counterparts
+
+
+@dataclass(kw_only=True)
+class StructureCounterparts:
+    """
+    One structure counterpart for every node the changes of a block name, see
+    :meth:`~cramph.node.StatechartNode.create_structure_counterpart`.
+    """
+
+    _counterparts_by_node_id: dict[str, StatechartNode] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The counterparts created so far, by the id they share with their node.
+    """
+
+    def get_counterpart(self, *, node: StatechartNode) -> StatechartNode:
+        """
+        :return: The structure counterpart of `node`, created on the first request.
+        """
+        if node._node_id not in self._counterparts_by_node_id:
+            self._counterparts_by_node_id[node._node_id] = (
+                node.create_structure_counterpart()
+            )
+        return self._counterparts_by_node_id[node._node_id]
+
+    def substitute_counterparts(self, *, value: Any) -> Any:
+        """
+        :param value: The value of a field of a change.
+        :return: `value` with every node it is or holds, and every node a condition it
+            is reads, replaced by its structure counterpart.
+        """
+        match value:
+            case StatechartNode():
+                return self.get_counterpart(node=value)
+            case list():
+                return [self.substitute_counterparts(value=item) for item in value]
+            case Scalar():
+                return DerivedConditionVariable.reading_counterparts(
+                    condition=value,
+                    counterpart_of=lambda node: self.get_counterpart(node=node),
+                )
+            case _:
+                return value
+
+
 # %% changes
 
 
@@ -124,11 +171,12 @@ class StatechartChange(SubclassJSONSerializer, ABC):
         """
 
     @classproperty
-    def is_part_of_structure(cls) -> bool:
+    def is_kept_in_structure_copies(cls) -> bool:
         """
         :return: Whether a structure copy of the statechart, see
             :meth:`~cramph.statechart.Statechart.create_structure_copy`, holds a change
-            of this kind.
+            of this kind. A structure copy holds the nodes, how they nest and the
+            conditions of their transitions, not what only running them needs.
         """
         return True
 
@@ -141,13 +189,22 @@ class StatechartChange(SubclassJSONSerializer, ABC):
             names, apart from the node a :class:`NodeAddition` adds.
         """
 
-    def create_structure_copy(self) -> Self:
+    def create_structure_copy(self, *, counterparts: StructureCounterparts) -> Self:
         """
-        :return: The same change made to a structure copy of the statechart, whose
-            nodes have the ids of the nodes they copy, see
-            :meth:`~cramph.node.StatechartNode.create_structure_counterpart`.
+        :param counterparts: The counterparts the changes of one block share.
+        :return: The same change made to the structure counterparts of the nodes it
+            names.
         """
-        return copy(self)
+        # a field known only by its name can only be read with getattr
+        return self.__class__(
+            **{
+                change_field.name: counterparts.substitute_counterparts(
+                    value=getattr(self, change_field.name)
+                )
+                for change_field in fields(self)
+                if change_field.init
+            }
+        )
 
 
 @dataclass(kw_only=True)
@@ -198,12 +255,6 @@ class NodeAddition(StatechartChange):
     def apply(self, *, statechart: Statechart) -> None:
         statechart._register_node(node=self.node)
 
-    def create_structure_copy(self) -> Self:
-        """
-        Adds the structure counterpart of the node instead.
-        """
-        return NodeAddition(node=self.node.create_structure_counterpart())
-
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
         Writes the whole node, so that a statechart that does not hold it can add it.
@@ -247,7 +298,7 @@ class ResetRequest(ChangeOfNode):
         return ChangeApplicationOrder.RESET_REQUEST
 
     @classproperty
-    def is_part_of_structure(cls) -> bool:
+    def is_kept_in_structure_copies(cls) -> bool:
         """
         A structure copy is never run.
         """
@@ -269,7 +320,7 @@ class RebuildRequest(ChangeOfNode):
         return ChangeApplicationOrder.REBUILD_REQUEST
 
     @classproperty
-    def is_part_of_structure(cls) -> bool:
+    def is_kept_in_structure_copies(cls) -> bool:
         """
         A structure copy is never run.
         """
@@ -354,7 +405,7 @@ class ChosenChildrenChange(ChangeNamingChildren):
         return ChangeApplicationOrder.CHOSEN_CHILDREN_CHANGE
 
     @classproperty
-    def is_part_of_structure(cls) -> bool:
+    def is_kept_in_structure_copies(cls) -> bool:
         """
         Structure copies of nodes do not choose their children.
         """
@@ -545,6 +596,15 @@ class StatechartChangeBlock(SubclassJSONSerializer):
     The changes, ordered by :attr:`StatechartChange.application_order`.
     """
 
+    _structure_counterparts: StructureCounterparts | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The nodes the changes of a structure copy name, None for a block of the statechart
+    itself. A condition refers to the variables of the nodes it reads only weakly, so
+    the copy keeps the counterparts it reads alive.
+    """
+
     def apply(self, *, statechart: Statechart) -> None:
         """
         Makes the same changes to `statechart`, in one
@@ -560,16 +620,19 @@ class StatechartChangeBlock(SubclassJSONSerializer):
     def create_structure_copy(self) -> StatechartChangeBlock:
         """
         :return: The changes of this block a structure copy of the statechart holds,
-            made to nodes with the ids of the nodes they copy, see
+            made to one structure counterpart per node, see
             :meth:`StatechartChange.create_structure_copy`.
         """
-        return StatechartChangeBlock(
+        counterparts = StructureCounterparts()
+        structure_copy = StatechartChangeBlock(
             changes=[
-                change.create_structure_copy()
+                change.create_structure_copy(counterparts=counterparts)
                 for change in self.changes
-                if change.is_part_of_structure
+                if change.is_kept_in_structure_copies
             ]
         )
+        structure_copy._structure_counterparts = counterparts
+        return structure_copy
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """

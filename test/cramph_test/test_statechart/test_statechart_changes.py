@@ -398,3 +398,36 @@ def test_a_structure_copy_of_a_block_leaves_out_the_requests(sender):
         sender.request_rebuild(node=sequence)
 
     assert sender.change_blocks[-1].create_structure_copy().changes == []
+
+
+def test_a_structure_copy_of_a_block_holds_together_without_serialization():
+    """
+    The changes of the copy share one structure counterpart per node and their
+    conditions read the counterparts, so applying the copy itself rebuilds the
+    structure.
+    """
+    sender = empty_statechart()
+    with sender.modify():
+        sender.add_node(
+            node=Sequence(
+                name="sequence",
+                nodes=[
+                    node_arriving_at_once(name="first"),
+                    node_arriving_at_once(name="second"),
+                ],
+            )
+        )
+    receiver = empty_statechart()
+
+    sender.change_blocks[-1].create_structure_copy().apply(statechart=receiver)
+
+    assert structure(statechart=receiver) == structure(statechart=sender)
+    read_nodes = [
+        variable.statechart_node
+        for node in receiver.nodes
+        for condition in node.conditions
+        for variable in condition.expression.free_variables()
+    ]
+    assert all(
+        any(read_node is node for node in receiver.nodes) for read_node in read_nodes
+    )
