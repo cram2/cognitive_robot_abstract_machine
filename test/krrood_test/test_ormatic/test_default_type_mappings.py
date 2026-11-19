@@ -174,6 +174,15 @@ def test_array_keeps_its_values_shape_and_dtype(array, session, database):
     assert reconstructed.value.dtype == array.dtype
 
 
+def test_array_typed_with_its_element_type_survives_a_round_trip(session, database):
+    array = np.arange(6, dtype=np.float64).reshape(2, 3)
+
+    reconstructed = store_and_load(StoredTypedArray(value=array), session)
+
+    np.testing.assert_array_equal(reconstructed.value, array)
+    assert reconstructed.value.dtype == array.dtype
+
+
 # %% values that cannot be stored
 
 

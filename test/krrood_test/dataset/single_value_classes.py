@@ -15,6 +15,7 @@ import zoneinfo
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 # %% standard library values with a native SQL type
 
@@ -262,6 +263,20 @@ class StoredArray:
     """
 
     value: np.ndarray
+    """
+    The stored array.
+    """
+
+
+@dataclass(kw_only=True)
+class StoredTypedArray:
+    """
+    Holds a numpy array whose type hint names the type of its elements.
+
+    ..note:: Arrays define ``==`` elementwise, so compare instances field by field.
+    """
+
+    value: NDArray[np.float64]
     """
     The stored array.
     """
