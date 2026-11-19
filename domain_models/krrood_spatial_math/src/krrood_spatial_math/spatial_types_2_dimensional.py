@@ -166,11 +166,6 @@ class Vector2Dimensional(
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": self.to_np().tolist(),
-        }
-
     def transform(
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
@@ -342,11 +337,6 @@ class Point2Dimensional(
         )
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
-
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": self.to_np().tolist(),
-        }
 
     def transform(
         self,
@@ -687,11 +677,6 @@ class Pose2Dimensional(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
         return cls.from_xy_yaw(*data["data"], reference_frame=reference_frame)
-
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": self.to_np().tolist(),
-        }
 
     def __hash__(self):
         if self.is_constant():

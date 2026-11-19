@@ -158,11 +158,14 @@ class SymbolicSpatialType(sm.SymbolicMathType, SubclassJSONSerializer, ABC):
                 subject=SpatialFrameKey.REFERENCE
             ).write(data=data, identified_object=self.reference_frame)
 
-    @abstractmethod
     def _constant_to_json(self) -> dict[str, Any]:
         """
-        :return: The json entries holding the numbers of this constant value.
+        :return: The json entries holding the numbers of this constant value: its
+            matrix entries.
         """
+        return {
+            "data": self.to_np().tolist(),
+        }
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
@@ -1358,11 +1361,6 @@ class Vector3Dimensional(
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": self.to_np().tolist(),
-        }
-
     @classmethod
     def from_iterable(
         cls,
@@ -1800,11 +1798,6 @@ class Point3Dimensional(
             z.resolve = lambda: resolver()[2]
         return result
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": self.to_np().tolist(),
-        }
-
     def norm(self) -> sm.Scalar:
         return sm.Scalar.from_casadi_sx(casadi_sx=ca.norm_2(self[:3].casadi_sx))
 
@@ -2075,11 +2068,6 @@ class Quaternion(
             data["data"],
             reference_frame=reference_frame,
         )
-
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": self.to_np().tolist(),
-        }
 
     @classmethod
     def from_iterable(
