@@ -1,21 +1,66 @@
+"""
+Plots how the degrees of freedom of a world moved over a recorded trajectory.
+"""
+
+import itertools
 import os
 from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
 from uuid import UUID
 
 import matplotlib
 import numpy as np
 
-from giskardpy.utils.utils import create_path
 
 # Force non-interactive backend to avoid GUI backend requirements in headless/test environments.
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 
+from semantic_digital_twin import logger
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
     WorldState,
 )
+
+# %% spacing of the time axis
+
+
+@dataclass(frozen=True)
+class TickSpacing:
+    """
+    Where the time axis of a trajectory plot puts its ticks and grid lines.
+    """
+
+    seconds_between_numbered_ticks: float
+    """
+    The time between two ticks that carry a number.
+    """
+
+    seconds_between_grid_lines: float
+    """
+    The time between two vertical grid lines; those between the numbered ticks carry no
+    number.
+    """
+
+
+class TimeAxisTickSpacing(TickSpacing, Enum):
+    """
+    The spacings a trajectory plot chooses its time axis from, finest first.
+    """
+
+    HALF_SECOND = 0.5, 0.1
+    ONE_SECOND = 1.0, 0.2
+    TWO_SECONDS = 2.0, 0.5
+    FIVE_SECONDS = 5.0, 1.0
+    TEN_SECONDS = 10.0, 2.0
+    TWENTY_SECONDS = 20.0, 5.0
+    THIRTY_SECONDS = 30.0, 10.0
+    ONE_MINUTE = 60.0, 10.0
+
+
+# %% plotting a trajectory
 
 
 @dataclass
@@ -59,9 +104,31 @@ class WorldStateTrajectoryPlotter:
     If True, the degrees of freedom will be sorted by name before plotting.
     """
 
-    second_width_in_cm: float = 2.0
+    second_width_in_cm: float = 0.5
     """
-    Width of a second in cm.
+    Width of a second in cm, unless the plot would be narrower than
+    :attr:`minimum_plot_width_in_cm`.
+    """
+
+    minimum_plot_width_in_cm: float = 10.0
+    """
+    The narrowest the subplots are drawn; a shorter trajectory gets wider seconds.
+    """
+
+    minimum_distance_between_numbered_ticks_in_cm: float = 2.5
+    """
+    How close two numbered ticks of the time axis may come; the axis takes the finest
+    :class:`TimeAxisTickSpacing` that keeps them this far apart.
+    """
+
+    unnumbered_grid_line_width: float = 0.4
+    """
+    The width, in points, of a vertical grid line without a numbered tick.
+    """
+
+    unnumbered_grid_line_opacity: float = 0.4
+    """
+    The opacity of a vertical grid line without a numbered tick, from 0 to 1.
     """
 
     y_label: dict[Derivatives, str] = field(
@@ -93,6 +160,12 @@ class WorldStateTrajectoryPlotter:
     For positions this suppresses lines that are always equal to the initial value.
     """
 
+    line_styles: list[str] = field(default_factory=lambda: ["-", "--", "-.", ":"])
+    """
+    The matplotlib line styles that tell lines of the same color apart, each used with
+    every color before the next.
+    """
+
     color_map: dict[UUID, str] | None = None
     """
     A color map to use for plotting the trajectory.
@@ -109,17 +182,34 @@ class WorldStateTrajectoryPlotter:
             state=initial_state, time=time
         )
 
-    def _seconds_to_inches(self, seconds: float) -> float:
+    def _widened_second_width_in_cm(self, *, duration: float) -> float:
         """
-        Converts seconds to inches.
+        :return: The width of a second in a plot of `duration` seconds:
+            :attr:`second_width_in_cm`, widened until the plot is
+            :attr:`minimum_plot_width_in_cm` wide.
+        """
+        return max(self.second_width_in_cm, self.minimum_plot_width_in_cm / duration)
 
-        :param seconds: Input duration in seconds.
-        :return: The drawable width in inches for a given duration.
+    def _tick_spacing(self, *, duration: float) -> TimeAxisTickSpacing:
         """
-        return max(0.0, float(seconds)) * (self.second_width_in_cm / 2.54)
+        :return: The finest spacing that keeps the numbered ticks of a plot of
+            `duration` seconds :attr:`minimum_distance_between_numbered_ticks_in_cm`
+            apart, or the coarsest one if none does.
+        """
+        second_width_in_cm = self._widened_second_width_in_cm(duration=duration)
+        spacings = list(TimeAxisTickSpacing)
+        return next(
+            (
+                spacing
+                for spacing in spacings
+                if spacing.seconds_between_numbered_ticks * second_width_in_cm
+                >= self.minimum_distance_between_numbered_ticks_in_cm
+            ),
+            spacings[-1],
+        )
 
     def _build_figure(
-        self, duration: float, number_of_subplots: int
+        self, *, duration: float, number_of_subplots: int
     ) -> tuple[plt.Figure, list[plt.Axes]]:
         """
         Create a stacked subplot figure sized so the inner axes width matches duration_s
@@ -129,8 +219,10 @@ class WorldStateTrajectoryPlotter:
         :param number_of_subplots: Number of subplots to create.
         :return: The figure and list of subplot axes.
         """
-        # Inner drawable width must equal seconds-to-inches. Add margins around it in inches
-        inner_w_in = max(0.0, self._seconds_to_inches(duration))
+        # Add margins in inches around the drawable width.
+        inner_w_in = (
+            duration * self._widened_second_width_in_cm(duration=duration) / 2.54
+        )
         # Margins tuned to avoid clipping of yticks, ylabel; right margin reserved for legend
         left_margin_in = 0.8
         right_margin_in = 2.0
@@ -171,23 +263,11 @@ class WorldStateTrajectoryPlotter:
         # (Already applied above via fig.subplots_adjust)
         return fig, axes
 
-    def _choose_ticks(self, duration: float) -> np.ndarray:
+    def _times_up_to(self, *, duration: float, step: float) -> np.ndarray:
         """
-        Choose semi-automatic tick spacing: either 0.5s or integer seconds with adaptive
-        spacing.
-
-        :param duration: Duration of the trajectory in seconds.
-        :return: x-ticks
+        :return: The times from 0 to `duration` seconds, `step` seconds apart, including
+            `duration` itself when it falls on a step.
         """
-        if duration <= 0:
-            return np.array([0.0])
-        # Prefer 0.5 if it does not create too many ticks; otherwise use integers with adaptive step
-        max_ticks = 12
-        if duration / 0.5 <= max_ticks:
-            step = 0.5
-        else:
-            # choose integer step so that count <= max_ticks
-            step = max(1, int(np.ceil(duration / max_ticks)))
         return np.arange(0.0, duration + 1e-9, step)
 
     def _sort_degrees_of_freedom(self, traj: WorldStateTrajectory) -> list[UUID]:
@@ -216,39 +296,42 @@ class WorldStateTrajectoryPlotter:
             return True
         return not np.all(series == float(series[0]))
 
+    def _is_drawn(
+        self, *, trajectory: WorldStateTrajectory, degree_of_freedom_id: UUID
+    ) -> bool:
+        """
+        :return: Whether any subplot draws the degree of freedom with
+            `degree_of_freedom_id`.
+        """
+        column = trajectory._index[degree_of_freedom_id]
+        return any(
+            self._should_plot_series(trajectory.data[:, derivative, column])
+            for derivative in self.derivatives_to_plot
+        )
+
     def _create_styles_for_degrees_of_freedom(
-        self, dof_ids: list[UUID]
+        self, *, degree_of_freedom_ids: list[UUID]
     ) -> dict[UUID, dict]:
         """
-        Assign styles to DOFs, respecting an optional color_map of matplotlib format
-        strings.
+        Give each degree of freedom the format :attr:`color_map` assigns it, or else the
+        next unused combination of a color and one of :attr:`line_styles`; the
+        combinations repeat only once all are taken.
 
-        :param dof_ids: DOF ids for which to create styles.
-        :return: Dict mapping DOF ids to matplotlib style dicts.
+        :return: The matplotlib style of each of `degree_of_freedom_ids`.
         """
-        styles: dict[UUID, dict] = {}
-        if self.color_map is not None:
-            for d in dof_ids:
-                s = self.color_map.get(d)
-                if s is not None:
-                    styles[d] = {"fmt": s}
-        # Default cycle without wrapping colors; then reuse with styles
-        if len(styles) >= len(dof_ids):
-            return styles
-        prop_cycle = plt.rcParams.get("axes.prop_cycle")
-        colors = list(prop_cycle.by_key().get("color", [])) if prop_cycle else []
-        line_styles = ["-", "--", "-.", ":"]
-        assigned = 0
-        for ls in line_styles:
-            for c in colors:
-                if assigned >= len(dof_ids):
-                    break
-                d = dof_ids[assigned]
-                if d not in styles:
-                    styles[d] = {"color": c, "linestyle": ls}
-                    assigned += 1
-            if assigned >= len(dof_ids):
-                break
+        color_map = self.color_map or {}
+        styles = {
+            degree_of_freedom_id: {"fmt": color_map[degree_of_freedom_id]}
+            for degree_of_freedom_id in degree_of_freedom_ids
+            if degree_of_freedom_id in color_map
+        }
+        colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+        combinations = itertools.cycle(itertools.product(self.line_styles, colors))
+        for degree_of_freedom_id in degree_of_freedom_ids:
+            if degree_of_freedom_id in styles:
+                continue
+            line_style, color = next(combinations)
+            styles[degree_of_freedom_id] = {"color": color, "linestyle": line_style}
         return styles
 
     def _create_legend(self, figure: plt.Figure, axes: list[plt.Axes]):
@@ -333,6 +416,13 @@ class WorldStateTrajectoryPlotter:
         """
         for axis, derivative in zip(axes, self.derivatives_to_plot):
             axis.grid(True, axis="x")
+            axis.grid(
+                True,
+                axis="x",
+                which="minor",
+                linewidth=self.unnumbered_grid_line_width,
+                alpha=self.unnumbered_grid_line_opacity,
+            )
             axis.grid(True, axis="y")
             # Collect series for all DOFs
             for dof_id in dof_ids:
@@ -353,31 +443,56 @@ class WorldStateTrajectoryPlotter:
             axis.set_title(str(derivative.name).capitalize())
             axis.set_ylabel(self.y_label.get(derivative, ""))
 
-    def plot_trajectory(self, file_name: str):
+    @property
+    def has_trajectory_to_plot(self) -> bool:
         """
-        Plots the trajectory and saves the resulting plot to the specified file.
+        Whether the recorded trajectory spans time, which a plot needs; a single state
+        does not.
+        """
+        return len(self.world_state_trajectory.times) > 1
 
-        :param file_name: The name of the file where the plot will be saved.
+    def plot_trajectory(self, *, file_name: Path) -> None:
         """
-        traj = self.world_state_trajectory
-        if len(traj.times) == 0:
+        Plot the recorded trajectory, one subplot per derivative in
+        :attr:`derivatives_to_plot`, save it to `file_name` and log where; nothing is
+        plotted unless :attr:`has_trajectory_to_plot`.
+
+        :param file_name: The path the plot is saved to.
+        """
+        if not self.has_trajectory_to_plot:
             return
-        t0 = float(traj.times[0])
-        t = traj.times - t0
-        duration_s = float(t[-1])
+        trajectory = self.world_state_trajectory
+        times = trajectory.times - float(trajectory.times[0])
+        duration = float(times[-1])
 
-        figure, axes = self._build_figure(duration_s, len(self.derivatives_to_plot))
+        figure, axes = self._build_figure(
+            duration=duration, number_of_subplots=len(self.derivatives_to_plot)
+        )
 
-        dof_ids = self._sort_degrees_of_freedom(traj)
-        styles = self._create_styles_for_degrees_of_freedom(dof_ids)
+        degree_of_freedom_ids = [
+            degree_of_freedom_id
+            for degree_of_freedom_id in self._sort_degrees_of_freedom(trajectory)
+            if self._is_drawn(
+                trajectory=trajectory, degree_of_freedom_id=degree_of_freedom_id
+            )
+        ]
+        styles = self._create_styles_for_degrees_of_freedom(
+            degree_of_freedom_ids=degree_of_freedom_ids
+        )
+        self._plot_derivatives(axes, styles, degree_of_freedom_ids, trajectory, times)
 
-        # Plot per derivative
-        self._plot_derivatives(axes, styles, dof_ids, traj, t)
-
-        # Shared x axis settings (apply to last axis)
-        ticks = self._choose_ticks(duration_s)
-        axes[-1].set_xlim(0.0, duration_s)
+        spacing = self._tick_spacing(duration=duration)
+        ticks = self._times_up_to(
+            duration=duration, step=spacing.seconds_between_numbered_ticks
+        )
+        axes[-1].set_xlim(0.0, duration)
         axes[-1].set_xticks(ticks)
+        axes[-1].set_xticks(
+            self._times_up_to(
+                duration=duration, step=spacing.seconds_between_grid_lines
+            ),
+            minor=True,
+        )
         axes[-1].set_xticklabels(
             [str(int(x)) if abs(x - int(x)) < 1e-9 else f"{x:.1f}" for x in ticks]
         )
@@ -387,6 +502,7 @@ class WorldStateTrajectoryPlotter:
 
         if self.legend:
             self._create_legend(figure, axes)
-        create_path(file_name)
+        file_name.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name)
         plt.close()
+        logger.info(f"Saved the trajectory plot to {file_name}.")

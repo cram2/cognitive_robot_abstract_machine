@@ -199,7 +199,9 @@ def _pick_up(world: World) -> PickUpAction:
 
 
 def _place(world: World) -> PlaceAction:
-    return PlaceAction(object_designator=_milk(world), target_location=_pose(world))
+    return PlaceAction(
+        arm=_arm(world), object_designator=_milk(world), target_location=_pose(world)
+    )
 
 
 def _move_and_pick_up(world: World) -> MoveAndPickUpAction:

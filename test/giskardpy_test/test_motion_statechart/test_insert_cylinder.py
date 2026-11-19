@@ -85,11 +85,11 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
             GripperState.CLOSE
         )
     )
-    statechart.add_node(sequence := Sequence(nodes=[close_gripper, goal]))
-    statechart.add_node(EndMotion.when_true(sequence))
+    statechart.add_node(node=(sequence := Sequence(nodes=[close_gripper, goal])))
+    statechart.add_node(node=EndMotion.when_true(node=sequence))
 
     executor.compile(statechart=statechart)
-    executor.tick_until_end(3000)
+    executor.tick_until_end(timeout=3000)
 
     root_T_cylinder = world.compute_forward_kinematics(world.root, cylinder)
     root_V_axis = root_T_cylinder.rotation_matrix.z_vector()

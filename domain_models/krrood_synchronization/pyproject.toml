@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood_synchronization"
+authors = [
+    { name = "Jonas Dech", email = "jdech@uni-bremen.de" },
+]
+description = "Streams of messages that keep copies of a model in different processes in step."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+keywords = ["robotics", "synchronization", "distributed"]
+license = "LGPL-3.0-only"
+dynamic = ["version"]
+dependencies = [
+    "krrood>=26.10.0",
+    "typing_extensions",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood_synchronization*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "krrood_synchronization._version.__version__" }

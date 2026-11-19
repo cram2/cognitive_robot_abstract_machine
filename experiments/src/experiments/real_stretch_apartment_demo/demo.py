@@ -146,7 +146,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
         Give the plan the Stretch in ``world``, detecting an object before grasping it.
         """
         return [
-            RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0]),
+            RobotAccess(
+                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+            ),
             PlanRewriting(transformations=[DetectBeforeGrasp()]),
         ]
 
@@ -155,7 +157,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         Carry the cereal box from its shelf to the bedside table and back again.
         """
         world = context.world
-        robot = context.require_extension(RobotAccess).robot
+        robot = context.require_extension(extension_type=RobotAccess).robot
 
         cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
         arm = robot.all_arms[0]
@@ -206,6 +208,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 PlaceAction(
+                    arm=arm,
                     object_designator=cereal,
                     target_location=Pose.from_xyz_rpy(
                         x=0.1,
@@ -258,6 +261,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(PlaceAction)(
+                        arm=arm,
                         object_designator=cereal,
                         target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                     )
@@ -272,7 +276,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         )
 
         statechart = Statechart(context=context)
-        statechart.add_node(plan)
+        statechart.add_node(node=plan)
         return statechart
 
 

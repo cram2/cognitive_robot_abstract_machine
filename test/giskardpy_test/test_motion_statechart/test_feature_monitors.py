@@ -1,6 +1,6 @@
 from math import radians
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.feature_monitors import (
     HeightMonitor,
@@ -68,12 +68,12 @@ def test_height_monitor(pr2_world_state_reset: World):
         lower_limit=lower_limit,
         upper_limit=upper_limit,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_distance_monitor(pr2_world_state_reset: World):
@@ -105,12 +105,12 @@ def test_distance_monitor(pr2_world_state_reset: World):
         lower_limit=lower_limit,
         upper_limit=upper_limit,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_angle_monitor(pr2_world_state_reset: World):
@@ -140,12 +140,12 @@ def test_angle_monitor(pr2_world_state_reset: World):
         lower_angle=lower_angle,
         upper_angle=upper_angle,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE
 
 
 def test_perpendicular_monitor(pr2_world_state_reset: World):
@@ -170,9 +170,9 @@ def test_perpendicular_monitor(pr2_world_state_reset: World):
         tip_normal=tip_normal,
         reference_normal=reference_normal,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
-    assert monitor.observation_state == ObservationStateValues.TRUE
+    assert monitor.observation_state == ObservationStateValue.TRUE

@@ -1,3 +1,8 @@
+"""
+Tasks that act on joints directly: moving them to goal positions and limiting their
+velocity.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -58,7 +63,7 @@ class JointPositionList(ConvergingTask):
         errors = []
         for connection, target in self.goal_state.items():
             current = connection.dof.variables.position
-            target = self.apply_limits_to_target(target, connection)
+            target = self.apply_limits_to_target(target=target, connection=connection)
             if (
                 isinstance(connection, RevoluteConnection)
                 and not connection.dof.has_position_limits()
@@ -81,7 +86,7 @@ class JointPositionList(ConvergingTask):
         return artifacts
 
     def apply_limits_to_target(
-        self, target: float, connection: ActiveConnection1DOF
+        self, *, target: float, connection: ActiveConnection1DOF
     ) -> sm.Scalar:
         ul_pos = connection.dof.limits.upper.position
         ll_pos = connection.dof.limits.lower.position
@@ -95,10 +100,8 @@ class JointVelocityLimit(Task):
     """
     Limits the velocity of a set of joints to a maximum value.
 
-    The joint-space equivalent of
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`:
-    enforcement is performed by adding a real inequality constraint to the optimizer
-    for each given joint, not by tuning a cruise velocity or a velocity scale.
+    Unlike a cruise velocity, which sets how fast a goal is approached, the limit holds
+    whatever moves the joints.
     """
 
     connections: list[ActiveConnection1DOF]
@@ -115,12 +118,8 @@ class JointVelocityLimit(Task):
     """
     Optimization weight determining how strongly the velocity limit is enforced.
 
-    Defaults to the same weight as its Cartesian equivalents
-    (:class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`,
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianRotationVelocityLimit`):
-    a velocity *limit* is a physical constraint like a joint limit, not a goal, so it
-    is weighted above collision avoidance rather than below it like goal tasks (e.g.
-    :class:`JointPositionList`).
+    A velocity limit is a physical constraint like a joint limit, so it is weighted
+    above collision avoidance, unlike goal tasks such as :class:`JointPositionList`.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:

@@ -18,7 +18,6 @@ from krrood.class_diagrams.method_classifier import (
 from krrood.class_diagrams.utils import classes_of_module, T
 from krrood.patterns.exceptions import DelegatedFactoryMethodError
 from krrood.patterns.role import Role
-from krrood.patterns.role_predicates import IsSameSemanticEntity
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes,
@@ -156,11 +155,13 @@ def test_roles_are_distinct_objects_but_share_same_entity():
     assert ceo != professor
     assert len({person, ceo, representative, professor}) == 4
 
-    # ...yet the IsSameEntity predicate sees through the role chain to the one root entity.
-    assert IsSameSemanticEntity(first_entity=ceo, second_entity=person)
-    assert IsSameSemanticEntity(first_entity=ceo, second_entity=representative)
-    assert IsSameSemanticEntity(first_entity=ceo, second_entity=professor)
-    assert IsSameSemanticEntity(first_entity=representative, second_entity=professor)
+    # ...yet Role.is_same_semantic_entity sees through the role chain to the one root entity.
+    assert Role.is_same_semantic_entity(first_entity=ceo, second_entity=person)
+    assert Role.is_same_semantic_entity(first_entity=ceo, second_entity=representative)
+    assert Role.is_same_semantic_entity(first_entity=ceo, second_entity=professor)
+    assert Role.is_same_semantic_entity(
+        first_entity=representative, second_entity=professor
+    )
 
 
 def test_multiple_roles_of_same_type_on_same_taker():
@@ -177,10 +178,10 @@ def test_multiple_roles_of_same_type_on_same_taker():
     assert first is not second
     assert first != second
     assert len({first, second}) == 2
-    assert IsSameSemanticEntity(first_entity=first, second_entity=second)
+    assert Role.is_same_semantic_entity(first_entity=first, second_entity=second)
 
 
-def test_is_same_entity_predicate():
+def test_is_same_semantic_entity():
     person = PersonInRoleAndOntology(name="Bass")
     ceo = CEOAsFirstRole(role_taker=person)
     professor = ProfessorAsFirstRole(role_taker=person)
@@ -189,15 +190,19 @@ def test_is_same_entity_predicate():
     other_person = PersonInRoleAndOntology(name="Other")
 
     # Two roles on one taker, and a role versus its taker, are the same entity.
-    assert IsSameSemanticEntity(first_entity=ceo, second_entity=professor)
-    assert IsSameSemanticEntity(first_entity=ceo, second_entity=person)
+    assert Role.is_same_semantic_entity(first_entity=ceo, second_entity=professor)
+    assert Role.is_same_semantic_entity(first_entity=ceo, second_entity=person)
     # A role chain resolves to its root entity, in either operand order.
-    assert IsSameSemanticEntity(first_entity=delegate, second_entity=person)
-    assert IsSameSemanticEntity(first_entity=person, second_entity=delegate)
+    assert Role.is_same_semantic_entity(first_entity=delegate, second_entity=person)
+    assert Role.is_same_semantic_entity(first_entity=person, second_entity=delegate)
     # Unrelated entities are not the same; a plain object is the same as itself.
-    assert not IsSameSemanticEntity(first_entity=ceo, second_entity=other_person)
-    assert not IsSameSemanticEntity(first_entity=person, second_entity=other_person)
-    assert IsSameSemanticEntity(first_entity=person, second_entity=person)
+    assert not Role.is_same_semantic_entity(
+        first_entity=ceo, second_entity=other_person
+    )
+    assert not Role.is_same_semantic_entity(
+        first_entity=person, second_entity=other_person
+    )
+    assert Role.is_same_semantic_entity(first_entity=person, second_entity=person)
 
 
 def test_mappings_between_roles_and_role_takers():
@@ -215,7 +220,8 @@ def test_mappings_between_roles_and_role_takers():
         any(role is retrieved for retrieved in roles_of_person) for role in roles
     )
     assert all(
-        IsSameSemanticEntity(first_entity=role, second_entity=person) for role in roles
+        Role.is_same_semantic_entity(first_entity=role, second_entity=person)
+        for role in roles
     )
 
     delegate_role_takers = [representative, ceo, person]

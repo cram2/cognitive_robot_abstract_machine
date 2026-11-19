@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Self
 
-from krrood.entity_query_language.factories import a, flat_variable, variable
+from krrood.entity_query_language.factories import a, variable_from, variable
 from coraplex.datastructures.enums import ReachFraction
 from coraplex.locations.locations import ReachabilityLocation
 from cramph.context import StatechartContext
@@ -103,7 +103,9 @@ class TransportAction(SequentialAction):
                     look_at=a(LookAtAction)(target=target_location),
                 ),
                 place=a(PlaceAction)(
-                    object_designator=graspable, target_location=target_location
+                    arm=arm,
+                    object_designator=graspable,
+                    target_location=target_location,
                 ),
             ),
         )
@@ -189,7 +191,9 @@ class MoveAndPlaceAction(SequentialAction):
                 look_at=LookAtAction(target=target_location),
             ),
             place=PlaceAction(
-                object_designator=object_designator, target_location=target_location
+                arm=arm,
+                object_designator=object_designator,
+                target_location=target_location,
             ),
         )
 
@@ -288,7 +292,7 @@ class MoveAndPickUpAction(SequentialAction):
                 look_at=a(LookAtAction)(target=object_pose),
             ),
             pick_up=a(PickUpAction)(
-                grasp=flat_variable(
+                grasp=variable_from(
                     GraspsByCloseness(
                         graspable=graspable,
                         standing_position=standing_position,
@@ -386,7 +390,7 @@ class MoveAndOpenAction(SequentialAction):
                 look_at=a(LookAtAction)(target=handle_pose),
             ),
             open_container=a(OpenAction)(
-                grasp=flat_variable(
+                grasp=variable_from(
                     GraspsByCloseness(
                         graspable=handle,
                         standing_position=standing_position,

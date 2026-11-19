@@ -6,8 +6,10 @@ from __future__ import annotations
 
 from enum import Enum, auto, StrEnum
 
+from krrood.patterns.float_enumeration import FloatEnum
 
-class ReachFraction(float, Enum):
+
+class ReachFraction(FloatEnum):
     """
     How far the robot stands off what it reaches for, as a fraction of the arm's length.
     """

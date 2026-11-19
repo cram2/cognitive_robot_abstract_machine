@@ -10,7 +10,7 @@ import threading
 import pytest
 from typing_extensions import Never
 
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart
 from cramph.statechart import Statechart
@@ -42,9 +42,9 @@ def run_until_end(
     Run a statechart holding only `function_call` until it ends.
     """
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(function_call)
-    statechart.add_node(EndStatechart.when_true(function_call))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=function_call)
+    statechart.add_node(node=EndStatechart.when_true(node=function_call))
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=10)
 
 
@@ -57,7 +57,7 @@ def test_a_function_that_returns_makes_the_node_succeed(
     run_until_end(statechart_executor, function_call)
 
     assert called.is_set()
-    assert function_call.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert function_call.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_the_function_runs_in_a_thread_of_its_own(
@@ -81,13 +81,13 @@ def test_an_expected_failure_makes_the_node_fail(
 
     statechart = Statechart(context=statechart_executor.context)
     function_call = FunctionCall(function=fail, failure_types=(ExpectedFailure,))
-    statechart.add_node(function_call)
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=function_call)
+    statechart_executor.compile(statechart=statechart)
 
     for _ in range(5):
         statechart_executor.tick()
 
-    assert function_call.life_cycle_state == LifeCycleValues.FAILED
+    assert function_call.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_an_unexpected_error_is_raised_out_of_the_tick(

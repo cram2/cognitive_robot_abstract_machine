@@ -215,7 +215,9 @@ def test_rectified_depth_waits_for_acquisition_transform(
     monkeypatch.setattr(interface, "lookup_transform", lookup)
     interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
     assert interface.set_data(CAS()) is False
-    lookup.assert_called_once_with(Time.from_msg(stereo_frame.images.header.stamp))
+    lookup.assert_called_once_with(
+        timestamp=Time.from_msg(stereo_frame.images.header.stamp)
+    )
     assert interface.statistics.missing_transforms == 1
 
 

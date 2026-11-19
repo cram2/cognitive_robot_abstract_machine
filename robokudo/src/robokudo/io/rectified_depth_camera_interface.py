@@ -369,7 +369,7 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         frame.validate(optical_frame=self.camera_config.tf_from)
         if (
             not self.camera_config.static_camera_transform_enabled
-            and not self.lookup_transform(timestamp)
+            and not self.lookup_transform(timestamp=timestamp)
         ):
             self.statistics.missing_transforms += 1
             return False

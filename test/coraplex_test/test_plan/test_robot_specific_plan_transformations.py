@@ -1,3 +1,8 @@
+"""
+Tests that a plan is adapted to the robot executing it, such as driving a differential
+drive, closing a container or moving the tool center point in a straight line.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -22,7 +27,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.tasks.drive_tasks import (
@@ -58,6 +63,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ...plan_running import (
@@ -71,7 +81,7 @@ from ...plan_running import (
 # %% recording a run
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OrientationWhileRunning(TickingExecutorExtension):
     """
     Records the orientation of a body after every tick in which a node is running.
@@ -92,8 +102,8 @@ class OrientationWhileRunning(TickingExecutorExtension):
     The rotation matrices of :attr:`body` relative to the world root, one per tick.
     """
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
-        if self.node.life_cycle_state != LifeCycleValues.RUNNING:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
+        if self.node.life_cycle_state != LifeCycleValue.RUNNING:
             return
         self.orientations.append(self.body.global_pose.to_np()[:3, :3])
 
@@ -122,6 +132,34 @@ def prepared(
     """
     executor.prepare(statechart_of(executor, plan))
     return plan
+
+
+def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidate:
+    """
+    :return: A grasp reaching down onto a new box added to the world of the robot in
+        `extensions`.
+    """
+    world = world_of(extensions)
+    box = Body(
+        name=PrefixedName("box"),
+        collision=ShapeCollection([Box(scale=Scale(0.05, 0.05, 0.1))]),
+    )
+    with world.modify_world():
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                world=world,
+                parent=world.root,
+                child=box,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    0.6, 1.0, 0.9
+                ),
+            )
+        )
+        graspable = HasGraspCandidates(root=box)
+        world.add_semantic_annotations([graspable])
+    return GraspCandidate(
+        graspable, Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box)
+    )
 
 
 def navigation_to(world: World, **parameters) -> NavigateAction:
@@ -289,7 +327,7 @@ def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
     world, robot, extensions = stretch_apartment_context
     executor = simulated_executor(extensions)
     action = navigation_to(world)
-    executor.compile(statechart_of(executor, action))
+    executor.compile(statechart=statechart_of(executor, action))
 
     executor.execute()
 
@@ -310,7 +348,7 @@ def test_a_simulated_stretch_drives_differentially_to_a_pose_chosen_while_runnin
             target_location=variable_from([navigation_to(world).target_location])
         )
     )
-    executor.compile(statechart_of(executor, navigation))
+    executor.compile(statechart=statechart_of(executor, navigation))
 
     executor.execute()
 
@@ -332,12 +370,12 @@ def test_a_drive_chosen_while_running_is_watched_for_stalling_as_it_is_driven(
             target_location=variable_from([navigation_to(world).target_location])
         )
     )
-    executor.compile(statechart_of(executor, navigation))
+    executor.compile(statechart=statechart_of(executor, navigation))
 
     executor.execute()
 
     [steps] = navigation.chosen_children
-    [stalled] = navigation.failure_monitors_of(steps)
+    [stalled] = navigation.failure_monitors_of(child=steps)
     [action] = navigation.grounded_nodes
     assert stalled.monitored_tasks == [
         node for node in action.descendants if isinstance(node, ConvergingTask)
@@ -491,6 +529,34 @@ def test_stretch_reaches_in_a_straight_line(
         assert goal.translation_threshold == default_goal.translation_threshold
         assert goal.orientation_threshold == default_goal.orientation_threshold
         assert goal.binding_policy == default_goal.binding_policy
+
+
+def test_stretch_reaches_in_a_straight_line_at_the_approach_speeds(
+    stretch_apartment_context,
+) -> None:
+    """
+    The straight line keeps the speeds the reach approaches at.
+    """
+    world, robot, extensions = stretch_apartment_context
+    action = prepared(
+        ReachAction(
+            grasp=handle_grasp(world),
+            arm=robot.all_arms[0],
+            pre_approach_linear_velocity=0.05,
+            final_approach_linear_velocity=0.02,
+        ),
+        simulated_executor(extensions),
+    )
+
+    goals = reaching_goals_of(action)
+
+    assert [goal.nodes[0].cruise_velocity for goal in goals] == [
+        action.pre_approach_linear_velocity,
+        action.final_approach_linear_velocity,
+    ]
+    assert [goal.nodes[1].cruise_velocity for goal in goals] == [
+        goal.cruise_angular_velocity for goal in goals
+    ]
 
 
 @pytest.mark.parametrize("build_executor", [simulated_executor, robot_executor])
@@ -647,13 +713,14 @@ def stretch_reaching_milk_from(
     drive.origin = world.transform(root_T_base, drive.parent).homogeneous_matrix
     recording = OrientationWhileRunning(body=robot.root)
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, extensions), extensions=[recording]
+        context=StatechartContext.with_extensions(world=world, extensions=extensions),
+        extensions=[recording],
     )
     action = ReachAction(
         grasp=GraspCandidate(milk, Pose(reference_frame=milk.root)),
         arm=robot.all_arms[0],
     )
-    executor.compile(statechart_of(executor, action))
+    executor.compile(statechart=statechart_of(executor, action))
     [recording.node] = held_orientations_of(action)
     return executor, action, recording
 
@@ -698,7 +765,7 @@ def test_a_simulated_stretch_reaches_without_turning_its_base(
 
     executor.execute()
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert_kept_its_heading(recording)
 
 

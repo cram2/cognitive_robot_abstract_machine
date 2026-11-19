@@ -27,7 +27,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     MoveTorsoAction,
 )
 from cramph.composites import Parallel, Sequence
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import (
     CompositeNodeWithoutChildrenError,
     NodesMissingContextExtensionsError,
@@ -122,7 +122,7 @@ def _succeeding(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that ends itself successfully as soon as it observes.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -131,7 +131,7 @@ def _failing(name: str) -> NodeFailingOnObservingFalse:
     :return: A node that declares itself failed as soon as it observes.
     """
     return NodeFailingOnObservingFalse(
-        name=name, observation=ObservationStateValues.FALSE
+        name=name, observation=ObservationStateValue.FALSE
     )
 
 
@@ -156,9 +156,9 @@ def _run_until(statechart: Statechart, end: EndStatechart) -> None:
     """
     Compiles `statechart` and ticks it until `end` ends it.
     """
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     executor = StatechartExecutor(context=statechart.context)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=100)
 
 
@@ -210,7 +210,7 @@ def test_an_action_needs_the_robot_performing_it(simple_pr2_context) -> None:
     action = ActionRunningHandedInSteps(steps=[_succeeding("only")])
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
-        statechart.add_node(action)
+        statechart.add_node(node=action)
 
     assert raised.value.nodes_by_missing_extension == {RobotAccess: [action]}
 
@@ -234,10 +234,10 @@ def test_an_action_reaching_a_goal_succeeds_once_the_goal_did(
     action = ActionRunningOneNode(node=step)
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_true(action))
+    _run_until(statechart, EndStatechart.when_true(node=action))
 
     assert action.goal is step
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_action_whose_body_its_owner_decides_succeeds_once_the_body_arrives(
@@ -247,17 +247,15 @@ def test_an_action_whose_body_its_owner_decides_succeeds_once_the_body_arrives(
     A single task never ends on its own, so the action ends it once it is at its goal.
     """
     _, _, extensions = simple_pr2_context
-    task = NodeObservingAFixedValue(
-        name="task", observation=ObservationStateValues.TRUE
-    )
+    task = NodeObservingAFixedValue(name="task", observation=ObservationStateValue.TRUE)
     action = ActionRunningOneNode(node=task)
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_true(action))
+    _run_until(statechart, EndStatechart.when_true(node=action))
 
     assert action.goal is task
-    assert task.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert task.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_action_whose_body_its_owner_decides_waits_while_the_body_is_away(
@@ -269,18 +267,18 @@ def test_an_action_whose_body_its_owner_decides_waits_while_the_body_is_away(
     """
     _, _, extensions = simple_pr2_context
     task = NodeObservingAFixedValue(
-        name="task", observation=ObservationStateValues.FALSE
+        name="task", observation=ObservationStateValue.FALSE
     )
     action = ActionRunningOneNode(node=task)
     statechart = _expanded(action, extensions)
-    statechart.add_node(EndStatechart.when_true(action))
+    statechart.add_node(node=EndStatechart.when_true(node=action))
     executor = StatechartExecutor(context=statechart.context)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     for _ in range(3):
         executor.tick()
 
-    assert action.life_cycle_state == LifeCycleValues.RUNNING
+    assert action.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_a_parallel_action_ends_itself_once_all_its_steps_are_at_their_goals(
@@ -292,16 +290,16 @@ def test_a_parallel_action_ends_itself_once_all_its_steps_are_at_their_goals(
     """
     _, _, extensions = simple_pr2_context
     steps = [
-        NodeObservingAFixedValue(name=name, observation=ObservationStateValues.TRUE)
+        NodeObservingAFixedValue(name=name, observation=ObservationStateValue.TRUE)
         for name in ("first", "second")
     ]
     action = ActionHoldingHandedInSteps(steps=steps)
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_true(action))
+    _run_until(statechart, EndStatechart.when_true(node=action))
 
     assert action.children == steps
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_parallel_action_waits_while_a_step_is_away(simple_pr2_context) -> None:
@@ -313,22 +311,22 @@ def test_a_parallel_action_waits_while_a_step_is_away(simple_pr2_context) -> Non
     action = ActionHoldingHandedInSteps(
         steps=[
             NodeObservingAFixedValue(
-                name="arrived", observation=ObservationStateValues.TRUE
+                name="arrived", observation=ObservationStateValue.TRUE
             ),
             NodeObservingAFixedValue(
-                name="away", observation=ObservationStateValues.FALSE
+                name="away", observation=ObservationStateValue.FALSE
             ),
         ]
     )
     statechart = _expanded(action, extensions)
-    statechart.add_node(EndStatechart.when_true(action))
+    statechart.add_node(node=EndStatechart.when_true(node=action))
     executor = StatechartExecutor(context=statechart.context)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     for _ in range(3):
         executor.tick()
 
-    assert action.life_cycle_state == LifeCycleValues.RUNNING
+    assert action.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_a_parallel_action_fails_once_a_step_can_no_longer_arrive(
@@ -338,16 +336,16 @@ def test_a_parallel_action_fails_once_a_step_can_no_longer_arrive(
     action = ActionHoldingHandedInSteps(
         steps=[
             NodeObservingAFixedValue(
-                name="arrived", observation=ObservationStateValues.TRUE
+                name="arrived", observation=ObservationStateValue.TRUE
             ),
             _failing("gives up"),
         ]
     )
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_failed(action))
+    _run_until(statechart, EndStatechart.when_failed(node=action))
 
-    assert action.life_cycle_state == LifeCycleValues.FAILED
+    assert action.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_parallel_action_takes_no_minimum_of_successes(simple_pr2_context) -> None:
@@ -366,9 +364,9 @@ def test_a_try_all_action_succeeds_once_one_of_its_steps_succeeded(
     )
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_true(action))
+    _run_until(statechart, EndStatechart.when_true(node=action))
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_action_succeeds_once_its_last_step_succeeded(simple_pr2_context) -> None:
@@ -379,9 +377,9 @@ def test_action_succeeds_once_its_last_step_succeeded(simple_pr2_context) -> Non
     action = ActionRunningHandedInSteps(steps=[_succeeding("only step")])
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_true(action))
+    _run_until(statechart, EndStatechart.when_true(node=action))
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_action_fails_once_a_step_ended_without_succeeding(simple_pr2_context) -> None:
@@ -392,9 +390,9 @@ def test_action_fails_once_a_step_ended_without_succeeding(simple_pr2_context) -
     action = ActionRunningHandedInSteps(steps=[_failing("step that gives up")])
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_failed(action))
+    _run_until(statechart, EndStatechart.when_failed(node=action))
 
-    assert action.life_cycle_state == LifeCycleValues.FAILED
+    assert action.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_action_without_steps_is_rejected(simple_pr2_context) -> None:
@@ -562,7 +560,7 @@ def _away(name: str) -> NodeObservingAFixedValue:
     """
     :return: A step that never arrives, so the action running it keeps running.
     """
-    return NodeObservingAFixedValue(name=name, observation=ObservationStateValues.FALSE)
+    return NodeObservingAFixedValue(name=name, observation=ObservationStateValue.FALSE)
 
 
 def test_an_action_keeps_its_collision_allowances_in_force_while_it_runs(
@@ -574,15 +572,15 @@ def test_an_action_keeps_its_collision_allowances_in_force_while_it_runs(
         steps=[_away("step")], end_effector=end_effector
     )
     statechart = _expanded(action, extensions)
-    statechart.add_node(EndStatechart.when_true(action))
+    statechart.add_node(node=EndStatechart.when_true(node=action))
     executor = StatechartExecutor(context=statechart.context)
 
     assert not _in_force(statechart, action)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     for _ in range(3):
         executor.tick()
 
-    assert action.life_cycle_state == LifeCycleValues.RUNNING
+    assert action.life_cycle_state == LifeCycleValue.RUNNING
     assert _in_force(statechart, action)
 
 
@@ -596,9 +594,9 @@ def test_an_action_takes_its_collision_allowances_out_once_it_ended(
     )
     statechart = _expanded(action, extensions)
 
-    _run_until(statechart, EndStatechart.when_true(action))
+    _run_until(statechart, EndStatechart.when_true(node=action))
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert not _in_force(statechart, action)
 
 
@@ -613,15 +611,15 @@ def test_a_reset_action_takes_its_collision_allowances_out(simple_pr2_context) -
     )
     action.reset_condition = action.is_running
     statechart = _expanded(action, extensions)
-    statechart.add_node(EndStatechart.when_true(action))
+    statechart.add_node(node=EndStatechart.when_true(node=action))
     executor = StatechartExecutor(context=statechart.context)
-    executor.compile(statechart)
-    assert action.life_cycle_state == LifeCycleValues.RUNNING
+    executor.compile(statechart=statechart)
+    assert action.life_cycle_state == LifeCycleValue.RUNNING
     assert _in_force(statechart, action)
 
     executor.tick()
 
-    assert action.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert action.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert not _in_force(statechart, action)
 
 
@@ -637,14 +635,14 @@ def test_an_aborted_run_takes_the_collision_allowances_of_a_running_action_out(
         steps=[_away("step")], end_effector=end_effector
     )
     statechart = _expanded(action, extensions)
-    statechart.add_node(EndStatechart.when_true(action))
+    statechart.add_node(node=EndStatechart.when_true(node=action))
     executor = StatechartExecutor(context=statechart.context)
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     with pytest.raises(TickLimitReachedError):
         executor.tick_until_end(timeout=2)
 
-    assert action.life_cycle_state == LifeCycleValues.RUNNING
+    assert action.life_cycle_state == LifeCycleValue.RUNNING
     assert not _in_force(statechart, action)
 
 
@@ -668,7 +666,7 @@ def test_an_action_is_sent_with_its_collision_allowances(simple_pr2_context) -> 
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
 
-    [rule] = received.get_node_by_index(action.index).temporary_collision_rules
+    [rule] = received.get_node_by_index(index=action.index).temporary_collision_rules
     assert isinstance(rule, AllowCollisionForEndEffector)
     assert rule.end_effector is end_effector
 
@@ -703,6 +701,7 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
+        arm=robot.left_arm,
         object_designator=milk,
         target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
@@ -802,6 +801,7 @@ def test_a_place_reattaches_and_retracts_as_its_own_steps(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
+        arm=robot.left_arm,
         object_designator=milk,
         target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )

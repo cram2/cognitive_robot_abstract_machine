@@ -84,10 +84,14 @@ class MujocoRunner(DemoRunner):
         try:
             simulation.step_simulation(self.settling_duration)
             executor = PhysicallySimulatedPlanExecutor(
-                StatechartContext.with_extensions(world, [RobotAccess(tracy)]),
+                context=StatechartContext.with_extensions(
+                    world=world, extensions=[RobotAccess(robot=tracy)]
+                ),
                 simulation=simulation,
             )
-            executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+            executor.compile(
+                statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+            )
             executor.execute()
             executor.close()
         finally:

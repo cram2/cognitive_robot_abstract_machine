@@ -1,3 +1,7 @@
+"""
+Grounding underspecified actions into executable ones.
+"""
+
 import threading
 from dataclasses import dataclass
 from enum import Enum
@@ -6,10 +10,8 @@ from uuid import UUID, uuid4
 import pytest
 from typing_extensions import Callable, ClassVar, Dict, Iterator, List
 
-from krrood.entity_query_language.backends import (
-    EntityQueryLanguageGenerativeBackend,
-    ProbabilisticBackend,
-)
+from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, variable, variable_from
 from cramph.composites import (
     ChildChooserAccess,
@@ -18,7 +20,7 @@ from cramph.composites import (
     StatementNode,
 )
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import MissingExecutorExtensionError
 from cramph.monitors import CountTicks
 from cramph.node import StatechartNode
@@ -359,7 +361,7 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert isinstance(plan.grounded_nodes[-1], NavigateAction)
 
 
@@ -385,7 +387,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert isinstance(plan.grounded_nodes[-1], NavigateAction)
 
 
@@ -446,7 +448,7 @@ def test_isolation_rejected_candidate_never_touches_real_world(
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert len(plan.chosen_children) == 1
     assert plan.grounded_nodes[0].fail_on_attempt_number is None
 
@@ -517,7 +519,7 @@ def test_real_failure_keeps_state_and_next_trial_reflects_it(
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     # Both the failed and the accepted candidate are attached to the tree - a real
     # failure is not undone, only worked around by trying the next candidate.
     assert [action.fail_on_attempt_number for action in plan.grounded_nodes] == [
@@ -579,7 +581,7 @@ def test_the_underspecified_steps_of_one_plan_are_tried_against_one_copy(
     assert second_trial.position_at_entry != first_trial.position_at_entry
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _FailsWhenThePlanEnds(StateHistoryObserver):
     """
     An observer that fails once the root of the plan it observes ends.
@@ -590,7 +592,7 @@ class _FailsWhenThePlanEnds(StateHistoryObserver):
     The root of the observed plan.
     """
 
-    def on_state_change(self, history: StateHistory) -> None:
+    def on_state_change(self, *, history: StateHistory) -> None:
         if self.plan in history.nodes_ended_in_latest_item():
             raise RuntimeError("observer failed at the end of the plan")
 
@@ -623,7 +625,7 @@ def _child_chooser_of(plan: StatechartNode) -> UnderspecifiedChildChooser:
     [chooser] = [
         chooser
         for chooser in plan.statechart.context.require_extension(
-            ChildChooserAccess
+            extension_type=ChildChooserAccess
         ).choosers
         if isinstance(chooser, UnderspecifiedChildChooser)
     ]
@@ -654,9 +656,9 @@ def test_a_plan_releases_its_trial_copy_even_when_an_observer_fails(
     plan = _plan_of_two_underspecified_steps(world)
     executor = simulated_executor(extensions)
     statechart = statechart_of(executor, plan)
-    statechart.state_history.add_observer(_FailsWhenThePlanEnds(plan=plan))
+    statechart.state_history.add_observer(observer=_FailsWhenThePlanEnds(plan=plan))
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     with pytest.raises(RuntimeError):
         executor.execute()
 
@@ -706,7 +708,7 @@ def test_a_step_gives_up_after_as_many_candidates_as_the_context_allows(
     executor = simulated_executor(extensions)
 
     with pytest.raises(CandidateLimitReached) as failure:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     assert (
@@ -737,10 +739,10 @@ def test_a_step_keeps_its_own_limit_over_the_contexts(
     )
     executor = simulated_executor(extensions)
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_step_that_runs_out_of_candidates_below_its_limit_says_it_is_empty(
@@ -757,7 +759,7 @@ def test_a_step_that_runs_out_of_candidates_below_its_limit_says_it_is_empty(
     executor = simulated_executor(extensions)
 
     with pytest.raises(EmptyUnderspecified) as failure:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     assert type(failure.value) is EmptyUnderspecified
@@ -788,7 +790,7 @@ def _compiled_trial_executor(
     candidate = RecordingAction(
         probe_key=register_probe(), dof_id=copied.degrees_of_freedom[0].id
     )
-    executor.compile(statechart_of(executor, Sequence(nodes=[candidate])))
+    executor.compile(statechart=statechart_of(executor, Sequence(nodes=[candidate])))
     return executor, copied
 
 
@@ -804,7 +806,7 @@ def test_a_trial_publishes_its_copy_while_debugging(debugging_executor) -> None:
 
     trial_executor, copied = _compiled_trial_executor(trial)
 
-    visualization = trial_executor.require_extension(RvizVisualization)
+    visualization = trial_executor.require_extension(extension_type=RvizVisualization)
     assert visualization.is_rendering
     assert visualization.publisher._world is copied
     trial_executor.execute()
@@ -825,7 +827,9 @@ def test_a_trial_publishes_its_copy_apart_from_the_world_it_copies(
 
     trial_executor, copied = _compiled_trial_executor(trial)
 
-    publisher = trial_executor.require_extension(RvizVisualization).publisher
+    publisher = trial_executor.require_extension(
+        extension_type=RvizVisualization
+    ).publisher
     assert (
         publisher.tf_publisher.frame_names.prefix
         == ActionTrialVisualization.FRAME_PREFIX
@@ -847,7 +851,9 @@ def test_a_trial_copy_is_drawn_see_through(debugging_executor) -> None:
 
     trial_executor, copied = _compiled_trial_executor(trial)
 
-    publisher = trial_executor.require_extension(RvizVisualization).publisher
+    publisher = trial_executor.require_extension(
+        extension_type=RvizVisualization
+    ).publisher
     assert publisher.alpha == trial.copy_marker_alpha
     trial_executor.execute()
     trial.discard()
@@ -869,7 +875,7 @@ def test_a_trial_publishes_nothing_without_debugging(
     trial_executor = trial._trial_executor(trial._copy())
 
     with pytest.raises(MissingExecutorExtensionError):
-        trial_executor.require_extension(RvizVisualization)
+        trial_executor.require_extension(extension_type=RvizVisualization)
     trial.discard()
 
 
@@ -976,7 +982,9 @@ def test_a_trial_stops_publishing_its_copy_once_the_candidate_has_run(
 
     trial_executor.execute()
 
-    assert not trial_executor.require_extension(RvizVisualization).is_rendering
+    assert not trial_executor.require_extension(
+        extension_type=RvizVisualization
+    ).is_rendering
     trial.discard()
 
 
@@ -1008,7 +1016,7 @@ def a_collision_that_could_not_be_avoided() -> MotionViolatedCollisionAvoidance:
         given.
     """
     return MotionViolatedCollisionAvoidance(
-        CollisionViolatedError(violated_collisions=[])
+        violation=CollisionViolatedError(violated_collisions=[])
     )
 
 
@@ -1033,7 +1041,7 @@ def test_a_candidate_that_cannot_keep_its_clearance_is_discarded(
     plan = StatementNode(statement=action)
     run_plan(plan, extensions)
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert plan.grounded_nodes[-1].fail_on_attempt_number is None
 
 
@@ -1230,7 +1238,7 @@ def test_a_statement_that_chose_is_grounded_alone_until_its_parallel_is_reset(
     _prepared(plan, extensions)
     for slot, statement in enumerate(side_by_side.nodes):
         statement.choose_child_with(
-            CandidateHandOver(
+            chooser=CandidateHandOver(
                 candidate=ClaimSlotAction(slot=slot, slot_dof_ids=slot_dof_ids)
             )
         )
@@ -1634,13 +1642,13 @@ def test_a_failed_statement_out_of_candidates_fails_its_parallel(
     executor = simulated_executor(extensions)
 
     with pytest.raises(EmptyUnderspecified) as failure:
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     assert type(failure.value) is EmptyUnderspecified
     assert failure.value.node.statement is failing
     [grounding] = plan.nodes
-    assert grounding.life_cycle_state == LifeCycleValues.FAILED
+    assert grounding.life_cycle_state == LifeCycleValue.FAILED
     assert len(_registered_probes[succeeding_probe].calls) == 2
 
 
@@ -1674,12 +1682,12 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
     executor = simulated_executor(extensions)
 
     with pytest.raises(MotionDidNotFinish):
-        executor.compile(statechart_of(executor, plan))
+        executor.compile(statechart=statechart_of(executor, plan))
         executor.execute()
 
     [parallel] = plan.nodes
     [statement] = _statements_of(plan)
-    assert parallel.life_cycle_state == LifeCycleValues.FAILED
+    assert parallel.life_cycle_state == LifeCycleValue.FAILED
     assert len(statement.chosen_children) == 1
     assert len(_registered_probes[statement_probe].calls) == 2
 
@@ -1706,5 +1714,5 @@ def test_a_trial_keeps_a_start_condition_wired_to_a_node_beside_it(
 
     run_plan(plan, extensions)
 
-    assert statement.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert statement.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert _registered_probes[fallback_probe].calls == []

@@ -12,7 +12,7 @@ from math import isfinite
 
 from rclpy.qos import ReliabilityPolicy
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import (
     StaticCameraTransformComponent,

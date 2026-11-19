@@ -5,7 +5,7 @@ This is the camera config for a openCV camera without depth information.
 from __future__ import annotations
 
 # %% Imports
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from dataclasses import dataclass, field
 
 import cv2

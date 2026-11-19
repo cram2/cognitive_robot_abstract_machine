@@ -68,9 +68,9 @@ from cramph.context import StatechartContext
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from cramph.statechart import Statechart
 
-extensions = [RobotAccess(pr2), StatementGrounding()]
+extensions = [RobotAccess(robot=pr2), StatementGrounding()]
 context = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, extensions)
+    context=StatechartContext.with_extensions(world=world, extensions=extensions)
 ).context
 
 
@@ -79,11 +79,11 @@ def run(plan):
     Run `plan` simulated in `world`, with the robot and settings in `extensions`.
     """
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, extensions)
+        context=StatechartContext.with_extensions(world=world, extensions=extensions)
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    executor.compile(statechart=statechart)
     executor.execute()
     return executor
 ```
@@ -193,6 +193,7 @@ run(Sequence(nodes=[ParkArmsAction(arms=pr2.all_arms),
          arm=arm,
      ),
      PlaceAction(
+         arm=arm,
          object_designator=milk,
          target_location=Pose.from_xyz_rpy(2.4, 2.2, 1, reference_frame=world.root),
      )]))

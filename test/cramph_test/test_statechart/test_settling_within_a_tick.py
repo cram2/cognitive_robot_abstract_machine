@@ -4,7 +4,7 @@ import pytest
 
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.composites import Parallel, Sequence
 from cramph.node import CancelStatechart
 from cramph.node import EndStatechart, StatechartNode
@@ -46,7 +46,7 @@ def _compile(statechart: Statechart) -> StatechartExecutor:
     :param statechart: The statechart to run.
     :return: An executor that compiled `statechart`, which already ticked once.
     """
-    executor = StatechartExecutor(statechart.context)
+    executor = StatechartExecutor(context=statechart.context)
     executor.compile(statechart=statechart)
     return executor
 
@@ -90,7 +90,7 @@ def _nested_sequence_chart() -> Statechart:
         so finishing it takes more than one pass through the statechart.
     """
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(Sequence(nodes=[Sequence(nodes=[ConstTrueNode()])]))
+    statechart.add_node(node=Sequence(nodes=[Sequence(nodes=[ConstTrueNode()])]))
     return statechart
 
 
@@ -122,22 +122,23 @@ class TestReactionTimeAcrossNesting:
         ids=["bare task", "task in a sequence", "task in nested sequences"],
     )
     def test_a_node_waiting_on_a_step_starts_on_the_tick_its_task_reaches_its_goal(
-        self, make_step: Callable[[ConstTrueNode], StatechartNode]
+        self, *, make_step: Callable[[ConstTrueNode], StatechartNode]
     ) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
         task = ConstTrueNode()
         step = make_step(task)
         waiting = ConstFalseNode()
-        statechart.add_nodes([step, waiting])
+        statechart.add_nodes(nodes=[step, waiting])
         waiting.start_condition = step.is_succeeded
         executor = _compile(statechart)
 
         goal_reached_tick, started_tick = _first_ticks(
             executor,
             [
-                lambda: statechart.observation_state[task]
-                == ObservationStateValues.TRUE,
-                lambda: waiting.life_cycle_state == LifeCycleValues.RUNNING,
+                lambda: (
+                    statechart.observation_state[task] == ObservationStateValue.TRUE
+                ),
+                lambda: waiting.life_cycle_state == LifeCycleValue.RUNNING,
             ],
         )
 
@@ -149,7 +150,7 @@ class TestReactionTimeAcrossNesting:
         ids=["bare task", "task in a sequence", "task in nested sequences"],
     )
     def test_the_statechart_ends_on_the_tick_after_a_step_reaches_its_goal(
-        self, make_step: Callable[[ConstTrueNode], StatechartNode]
+        self, *, make_step: Callable[[ConstTrueNode], StatechartNode]
     ) -> None:
         """
         The EndStatechart node starts on the tick the step's task reaches its goal and,
@@ -158,14 +159,15 @@ class TestReactionTimeAcrossNesting:
         statechart = Statechart(context=StatechartContext(world=World()))
         task = ConstTrueNode()
         step = make_step(task)
-        statechart.add_nodes([step, EndStatechart.when_true(step)])
+        statechart.add_nodes(nodes=[step, EndStatechart.when_true(node=step)])
         executor = _compile(statechart)
 
         goal_reached_tick, end_tick = _first_ticks(
             executor,
             [
-                lambda: statechart.observation_state[task]
-                == ObservationStateValues.TRUE,
+                lambda: (
+                    statechart.observation_state[task] == ObservationStateValue.TRUE
+                ),
                 statechart.is_ended,
             ],
         )
@@ -178,31 +180,31 @@ class TestReactionTimeAcrossNesting:
         statechart = Statechart(context=StatechartContext(world=World()))
         child = ConstTrueNode()
         parallel = Parallel(nodes=[child])
-        statechart.add_node(parallel)
+        statechart.add_node(node=parallel)
         child.success_condition = child.observes_true
         parallel.success_condition = child.is_succeeded
         executor = _compile(statechart)
 
         _tick_until(
-            executor, lambda: child.life_cycle_state == LifeCycleValues.SUCCEEDED
+            executor, lambda: child.life_cycle_state == LifeCycleValue.SUCCEEDED
         )
 
-        assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_a_parent_reads_what_its_child_observes_on_the_same_tick(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
         child = ConstTrueNode()
         parallel = Parallel(nodes=[child])
-        statechart.add_node(parallel)
+        statechart.add_node(node=parallel)
         parallel.success_condition = child.observes_true
         executor = _compile(statechart)
 
         _tick_until(
             executor,
-            lambda: statechart.observation_state[child] == ObservationStateValues.TRUE,
+            lambda: statechart.observation_state[child] == ObservationStateValue.TRUE,
         )
 
-        assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_an_observation_reads_the_outcome_another_node_reaches_on_the_same_tick(
         self,
@@ -210,15 +212,15 @@ class TestReactionTimeAcrossNesting:
         statechart = Statechart(context=StatechartContext(world=World()))
         watched = ConstTrueNode()
         observer = NodeObservingAPredicate(watched_node=watched)
-        statechart.add_nodes([watched, observer])
+        statechart.add_nodes(nodes=[watched, observer])
         watched.success_condition = watched.observes_true
         executor = _compile(statechart)
 
         _tick_until(
-            executor, lambda: watched.life_cycle_state == LifeCycleValues.SUCCEEDED
+            executor, lambda: watched.life_cycle_state == LifeCycleValue.SUCCEEDED
         )
 
-        assert statechart.observation_state[observer] == ObservationStateValues.TRUE
+        assert statechart.observation_state[observer] == ObservationStateValue.TRUE
 
 
 # %% what is decided once per tick
@@ -232,7 +234,7 @@ class TestOncePerTick:
 
     def test_on_tick_is_called_once_per_tick(self) -> None:
         statechart = _nested_sequence_chart()
-        statechart.add_node(ticked := NodeObservingTrueOnlyOnTick())
+        statechart.add_node(node=(ticked := NodeObservingTrueOnlyOnTick()))
         executor = _compile(statechart)
 
         for _ in range(TICKS_TO_WATCH):
@@ -244,7 +246,7 @@ class TestOncePerTick:
         self,
     ) -> None:
         statechart = _nested_sequence_chart()
-        statechart.add_node(ticked := NodeObservingTrueOnlyOnTick())
+        statechart.add_node(node=(ticked := NodeObservingTrueOnlyOnTick()))
         executor = _compile(statechart)
 
         observations = []
@@ -252,39 +254,39 @@ class TestOncePerTick:
             executor.tick()
             observations.append(statechart.observation_state[ticked])
 
-        assert observations == [ObservationStateValues.TRUE] * TICKS_TO_WATCH
+        assert observations == [ObservationStateValue.TRUE] * TICKS_TO_WATCH
 
     def test_a_node_started_this_tick_first_observes_on_the_next_one(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
         statechart.add_nodes(
-            [trigger := ConstTrueNode(), started_late := ConstTrueNode()]
+            nodes=[trigger := ConstTrueNode(), started_late := ConstTrueNode()]
         )
         started_late.start_condition = trigger.observes_true
         executor = _compile(statechart)
 
         executor.tick()
-        assert started_late.life_cycle_state == LifeCycleValues.RUNNING
+        assert started_late.life_cycle_state == LifeCycleValue.RUNNING
         assert (
-            statechart.observation_state[started_late] == ObservationStateValues.UNKNOWN
+            statechart.observation_state[started_late] == ObservationStateValue.UNKNOWN
         )
 
         executor.tick()
-        assert statechart.observation_state[started_late] == ObservationStateValues.TRUE
+        assert statechart.observation_state[started_late] == ObservationStateValue.TRUE
 
     def test_what_a_start_callback_writes_is_observed_from_the_next_tick(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
         writer = NodeWritingAVariableOnStart()
         reader = NodeObservingAWrittenVariable(writer=writer)
-        statechart.add_nodes([trigger := ConstTrueNode(), writer, reader])
+        statechart.add_nodes(nodes=[trigger := ConstTrueNode(), writer, reader])
         writer.start_condition = trigger.observes_true
         executor = _compile(statechart)
 
         executor.tick()
-        assert writer.life_cycle_state == LifeCycleValues.RUNNING
-        assert statechart.observation_state[reader] == ObservationStateValues.FALSE
+        assert writer.life_cycle_state == LifeCycleValue.RUNNING
+        assert statechart.observation_state[reader] == ObservationStateValue.FALSE
 
         executor.tick()
-        assert statechart.observation_state[reader] == ObservationStateValues.TRUE
+        assert statechart.observation_state[reader] == ObservationStateValue.TRUE
 
 
 # %% ticks that never settle
@@ -301,7 +303,7 @@ class TestUnsettledTick:
         first = NodeObservingTheOppositeOfAnObservationPredicate()
         second = NodeObservingTheOppositeOfAnObservationPredicate(watched_node=first)
         first.watched_node = second
-        statechart.add_nodes([first, second])
+        statechart.add_nodes(nodes=[first, second])
         executor = _compile(statechart)
 
         with pytest.raises(TickDoesNotSettleError) as error:
@@ -321,7 +323,7 @@ class TestUnsettledTick:
         first = NodeObservingTheOppositeOfAnObservationPredicate()
         second = NodeObservingTheOppositeOfAnObservationPredicate(watched_node=first)
         first.watched_node = second
-        statechart.add_nodes([first, second])
+        statechart.add_nodes(nodes=[first, second])
         executor = _compile(statechart)
 
         with pytest.raises(TickDoesNotSettleError) as error:
@@ -338,12 +340,10 @@ class TestUnsettledTick:
         plan = ConstTrueNode()
         for _ in range(DEEP_NESTING):
             plan = Sequence(nodes=[plan])
-        statechart.add_node(plan)
+        statechart.add_node(node=plan)
         executor = _compile(statechart)
 
-        _tick_until(
-            executor, lambda: plan.life_cycle_state == LifeCycleValues.SUCCEEDED
-        )
+        _tick_until(executor, lambda: plan.life_cycle_state == LifeCycleValue.SUCCEEDED)
 
     def test_a_pass_limit_given_to_a_statechart_still_applies_after_it_compiled_again(
         self,
@@ -352,9 +352,9 @@ class TestUnsettledTick:
         first = NodeObservingTheOppositeOfAnObservationPredicate()
         second = NodeObservingTheOppositeOfAnObservationPredicate(watched_node=first)
         first.watched_node = second
-        statechart.add_nodes([first, second])
+        statechart.add_nodes(nodes=[first, second])
         executor = _compile(statechart)
-        statechart.add_node(ConstTrueNode())
+        statechart.add_node(node=ConstTrueNode())
 
         with pytest.raises(TickDoesNotSettleError) as error:
             executor.tick()
@@ -374,12 +374,12 @@ class TestUnsettledTick:
         plan = ConstTrueNode()
         for _ in range(DEEP_NESTING):
             plan = Sequence(nodes=[plan])
-        statechart.add_node(plan)
+        statechart.add_node(node=plan)
         executor = _compile(statechart)
 
         with pytest.raises(TickDoesNotSettleError) as error:
             _tick_until(
-                executor, lambda: plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+                executor, lambda: plan.life_cycle_state == LifeCycleValue.SUCCEEDED
             )
 
         assert error.value.pass_limit == statechart.pass_limit
@@ -415,14 +415,16 @@ class TestLifeCycleCallbacks:
         self,
     ) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
-        statechart.add_node(composite := CompositeNodeObservingItsSecondChildRun())
+        statechart.add_node(
+            node=(composite := CompositeNodeObservingItsSecondChildRun())
+        )
         composite.success_condition = composite.observes_true
         executor = _compile(statechart)
 
         for _ in range(TICKS_TO_WATCH):
             executor.tick()
 
-        assert composite.second.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert composite.second.life_cycle_state == LifeCycleValue.INTERRUPTED
         assert composite.second.take_callbacks() == [
             LifeCycleCallback.START,
             LifeCycleCallback.END,
@@ -432,7 +434,9 @@ class TestLifeCycleCallbacks:
         self,
     ) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
-        statechart.add_node(composite := CompositeNodeObservingItsCancellingChildRun())
+        statechart.add_node(
+            node=(composite := CompositeNodeObservingItsCancellingChildRun())
+        )
         composite.success_condition = composite.observes_true
         executor = _compile(statechart)
 
@@ -453,7 +457,7 @@ class TestLifeCycleCallbacks:
             exception=NodeAssertionError(reason="cancelled on the first goal")
         )
         ended = NodeRecordingItsCallbacks()
-        statechart.add_nodes([trigger, cancel, ended])
+        statechart.add_nodes(nodes=[trigger, cancel, ended])
         cancel.start_condition = trigger.observes_true
         ended.interrupt_condition = trigger.observes_true
         executor = _compile(statechart)
@@ -468,7 +472,7 @@ class TestLifeCycleCallbacks:
         ]
         last_snapshot = statechart.state_history.latest_item
         assert last_snapshot.tick_count == executor.tick_count
-        assert last_snapshot.life_cycle_state[cancel] == LifeCycleValues.RUNNING
+        assert last_snapshot.life_cycle_state[cancel] == LifeCycleValue.RUNNING
 
     def test_a_node_starting_while_its_pause_condition_holds_starts_paused(
         self,
@@ -478,14 +482,14 @@ class TestLifeCycleCallbacks:
         it starts in, and still gets both callbacks in order.
         """
         statechart = Statechart(context=StatechartContext(world=World()))
-        statechart.add_node(paused := NodeRecordingItsCallbacks())
+        statechart.add_node(node=(paused := NodeRecordingItsCallbacks()))
         paused.pause_condition = Scalar.const_true()
         executor = _compile(statechart)
 
-        assert paused.life_cycle_state == LifeCycleValues.PAUSED
-        assert statechart.state_history.get_life_cycle_history_of_node(paused) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.PAUSED,
+        assert paused.life_cycle_state == LifeCycleValue.PAUSED
+        assert statechart.state_history.get_life_cycle_history_of_node(node=paused) == [
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.PAUSED,
         ]
         assert (
             _callbacks_per_tick(executor, paused)
@@ -496,7 +500,10 @@ class TestLifeCycleCallbacks:
     def test_a_node_that_restarts_after_failing_takes_one_step_per_tick(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
         statechart.add_nodes(
-            [trigger := ConstTrueNode(), restarting := NodeRecordingItsCallbacks()]
+            nodes=[
+                trigger := ConstTrueNode(),
+                restarting := NodeRecordingItsCallbacks(),
+            ]
         )
         restarting.fail_condition = trigger.observes_true
         restarting.reset_condition = restarting.is_failed
@@ -516,7 +523,7 @@ class TestLifeCycleCallbacks:
     ) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
         statechart.add_nodes(
-            [
+            nodes=[
                 pulse := Pulse(),
                 composite := CompositeNodeWithARecordingChild(),
             ]
@@ -546,7 +553,7 @@ class TestLifeCycleCallbacks:
         inner = Parallel(nodes=[trigger, child])
         middle = Parallel(nodes=[inner])
         outer = Parallel(nodes=[middle])
-        statechart.add_node(outer)
+        statechart.add_node(node=outer)
         inner.pause_condition = trigger.observes_true
         middle.success_condition = inner.is_paused
         outer.reset_condition = middle.is_succeeded
@@ -572,7 +579,7 @@ class TestLifeCycleCallbacks:
         """
         statechart = Statechart(context=StatechartContext(world=World()))
         statechart.add_nodes(
-            [
+            nodes=[
                 first := NodeRecordingItsCallbacks(),
                 second := NodeRecordingItsCallbacks(),
             ]

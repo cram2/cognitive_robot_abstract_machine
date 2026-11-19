@@ -89,7 +89,9 @@ class Segmind:
             extensions=[EpisodeSegmentation()],
         )
         self.executor.compile(
-            DetectorStatechartBuilder(self.detectors).build(self.executor.context)
+            statechart=DetectorStatechartBuilder(self.detectors).build(
+                self.executor.context
+            )
         )
 
     @classmethod
@@ -180,7 +182,9 @@ class Segmind:
         """
         The logger holding every event the detectors detected.
         """
-        return self.executor.context.require_extension(SegmindContext).logger
+        return self.executor.context.require_extension(
+            extension_type=SegmindContext
+        ).logger
 
     @property
     def ticks_to_see_the_world_at_rest(self) -> int:

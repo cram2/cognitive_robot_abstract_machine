@@ -35,7 +35,9 @@ def boxed_pr2_world(simple_pr2_context):
             name=PrefixedName("approach_box"),
             collision=ShapeCollection([Box(scale=BOX_SCALE)]),
         )
-        connection = Connection6DoF.create_with_dofs(world, world.root, box)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=world.root, child=box
+        )
         world.add_connection(connection)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 0, 1, reference_frame=world.root

@@ -1,3 +1,7 @@
+"""
+Resolution of the type hints of a class from the source files it is defined in.
+"""
+
 from __future__ import annotations
 
 import builtins
@@ -6,7 +10,7 @@ import os
 import sys
 import types
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from uuid import UUID
@@ -16,9 +20,13 @@ from typing_extensions import Any, Callable, TypeVar, TypeVarTuple, get_origin
 
 from krrood import logger
 from krrood.class_diagrams.exceptions import CouldNotResolveType
+from krrood.singleton import SingletonMeta
+from krrood.source_analysis.import_scope import (
+    DeferredImportScope,
+    get_scope_from_imports,
+)
 from krrood.utils import (
     ensure_hashable,
-    get_scope_from_imports,
     get_full_class_name,
     is_builtin_type,
 )
@@ -336,7 +344,7 @@ def get_type_hints_of_object(
 
 
 @lru_cache(maxsize=None)
-def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> dict[str, Any]:
+def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> DeferredImportScope:
     """
     Import scope for *source_path*, cached per ``(source_path, mtime)``.
 
@@ -348,23 +356,18 @@ def _scope_from_imports_by_mtime(source_path: str, mtime: float) -> dict[str, An
         cache key.
     :return: The import scope dictionary for *source_path*.
     """
-    return get_scope_from_imports(file_path=source_path)
+    return get_scope_from_imports(
+        file_path=source_path, defers_type_checking_imports=True
+    )
 
 
-def _cached_scope_from_imports(source_path: str) -> dict[str, Any]:
+def _cached_scope_from_imports(source_path: str) -> DeferredImportScope:
     """
-    Return the import scope of *source_path*, reusing a per-file cache.
+    Return the import scope of *source_path*, cached per ``(path, mtime)``.
 
-    The class-diagram type-hint fallback re-parses the same handful of library source
-    files thousands of times; caching by ``(path, mtime)`` collapses that to one parse
-    per file while self-invalidating if the file changes on disk. The returned
-    dictionary is shared between callers and must be treated as read-only, consistent
-    with the :func:`lru_cache`-d :func:`get_type_hints_of_object`.
-
-    This cache is intentionally local to the class-diagram resolution path and not
-    applied to :func:`~krrood.utils.get_scope_from_imports` itself, because other
-    callers (ripple-down-rules code generation) re-read regenerated files within a
-    single process and rely on the uncached behaviour.
+    The returned scope is shared between callers and must be treated as read-only. The
+    cache is not applied to :func:`~krrood.source_analysis.import_scope.get_scope_from_imports`
+    itself, because ripple-down-rules code generation re-reads regenerated files.
 
     :param source_path: Path to the source file whose import scope is needed.
     :return: The import scope dictionary for *source_path*.
@@ -372,48 +375,59 @@ def _cached_scope_from_imports(source_path: str) -> dict[str, Any]:
     try:
         mtime = os.path.getmtime(source_path)
     except OSError:
-        return get_scope_from_imports(file_path=source_path)
+        return get_scope_from_imports(
+            file_path=source_path, defers_type_checking_imports=True
+        )
     return _scope_from_imports_by_mtime(source_path, mtime)
 
 
-def _count_of_modules_that_finished_initializing() -> int:
+@dataclass(kw_only=True)
+class ModulesThatFinishedInitializing(metaclass=SingletonMeta):
     """
-    Count the modules in ``sys.modules`` that have finished executing.
+    The modules of ``sys.modules`` that have finished executing.
 
-    This only grows as modules complete loading, so two calls returning the same value
-    guarantee that nothing relevant to an in-progress circular import could have changed
-    in between.
-
-    :return: The current count of fully initialized modules in ``sys.modules``.
+    A module is looked at until it is seen finished and never again, so counting costs
+    what was loaded since the last count rather than everything that is loaded.
     """
-    return sum(
-        1
-        for module in tuple(sys.modules.values())
-        if not getattr(getattr(module, "__spec__", None), "_initializing", False)
-    )
+
+    finished_module_names: set[str] = field(default_factory=set, init=False)
+    """
+    Names of the modules seen finished so far.
+    """
+
+    def count_finished_modules(self) -> int:
+        """
+        Count the modules that have finished executing.
+
+        The count only grows as modules complete loading, so two calls returning the
+        same value guarantee that nothing relevant to an in-progress circular import
+        could have changed in between.
+        """
+        for name in set(sys.modules).difference(self.finished_module_names):
+            specification = getattr(sys.modules.get(name), "__spec__", None)
+            if not getattr(specification, "_initializing", False):
+                self.finished_module_names.add(name)
+        return len(self.finished_module_names)
 
 
 @lru_cache(maxsize=None)
 def _fallback_scope_for_import_generation(
     source_path: str, generation: int
-) -> dict[str, Any]:
+) -> DeferredImportScope:
     """
-    Recompute *source_path*'s import scope from scratch, memoized per import-system
-    generation.
+    Recompute *source_path*'s import scope, memoized per import-system generation.
 
-    A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every retry
-    until that module finishes loading. Keying this on *generation*
-    (:func:`_count_of_modules_that_finished_initializing`) means the expensive, uncached
-    :func:`~krrood.utils.get_scope_from_imports` recompute only actually runs again once something
-    has genuinely changed, instead of once per failed lookup: many dataclasses across a codebase can
-    independently need the same still-unavailable name while a dependency is mid-import, and without
-    this every one of those lookups would re-parse the file and re-import everything it references.
+    A ``TYPE_CHECKING`` name whose module is still mid-import fails identically on every
+    retry, so the recompute runs again only once *generation*
+    (:meth:`ModulesThatFinishedInitializing.count_finished_modules`) has advanced.
 
     :param source_path: The file whose import scope is recomputed.
     :param generation: The import-system generation the recompute is valid for.
     :return: The freshly computed import scope for *source_path*.
     """
-    return get_scope_from_imports(file_path=source_path)
+    return get_scope_from_imports(
+        file_path=source_path, defers_type_checking_imports=True
+    )
 
 
 def get_object_by_name_from_another_object_in_same_module(
@@ -454,10 +468,10 @@ def get_object_by_name_from_another_object_in_same_module(
     # instead of each re-parsing and re-importing the file from scratch. Merge the recovered names
     # into the memoized scope so later lookups reuse them instead of repeating this forever.
     fresh_scope = _fallback_scope_for_import_generation(
-        source_path, _count_of_modules_that_finished_initializing()
+        source_path, ModulesThatFinishedInitializing().count_finished_modules()
     )
     if name in fresh_scope:
-        scope.update(fresh_scope)
+        scope.absorb(other=fresh_scope)
         return fresh_scope[name]
     raise CouldNotResolveType(
         type_name=name,

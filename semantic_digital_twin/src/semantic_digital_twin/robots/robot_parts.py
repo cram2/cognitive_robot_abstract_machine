@@ -1,3 +1,7 @@
+"""
+The parts a robot is made of: kinematic chains, sensors, cameras, fingers and the like.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -27,7 +31,7 @@ from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
 from krrood.entity_query_language.factories import a, contains, entity, variable
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.camera_model import (
@@ -411,7 +415,9 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
         for robot_part in self._robot_parts:
             for connection in robot_part.active_connections:
-                connection.has_hardware_interface = True
+                self._world.set_dofs_has_hardware_interface(
+                    connection.active_dofs, True
+                )
 
     @property
     def active_connections(self) -> list[ActiveConnection]:
@@ -514,6 +520,22 @@ class ServoedRobotPart(AbstractRobotPart, ABC):
             self._declare_servo(connection, drive.servo_for(connection))
         if self.holds_its_own_weight:
             self._compensate_gravity()
+
+
+@dataclass(eq=False)
+class HasGripperActionServers(AbstractRobotPart, ABC):
+    """
+    A gripper whose real hardware moves through ROS actions its driver serves, rather
+    than through commands for its joints.
+    """
+
+    @abstractmethod
+    def action_topic_serving(self, state_type: JointStateType | None) -> str | None:
+        """
+        :param state_type: The state to bring the gripper into.
+        :return: The name the driver serves the action bringing the gripper into
+            `state_type` under, None if it serves none for that state.
+        """
 
 
 @dataclass(eq=False)
@@ -912,9 +934,20 @@ class EndEffector(AbstractRobotPart, ABC):
         body = self.held_body
         if body is None:
             raise NothingHeld(self)
+        return self.body_T_grasp(body=body, tool_P_grasp=tool_P_point)
+
+    def body_T_grasp(self, *, body: Body, tool_P_grasp: Point3) -> Pose:
+        """
+        The grasp this gripper has on `body` as both stand now, whether or not `body`
+        hangs off the tool frame.
+
+        :param body: The body the grasp is on.
+        :param tool_P_grasp: The point of the gripper the grasp sits at.
+        :return: The grasp frame, in the frame of `body`.
+        """
         body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=body_T_tool @ tool_P_point,
+            point=body_T_tool @ tool_P_grasp,
             rotation_matrix=body_T_tool.rotation_matrix @ self.tool_R_grasp,
             reference_frame=body,
         ).pose
