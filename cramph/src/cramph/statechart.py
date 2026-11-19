@@ -157,9 +157,9 @@ class StatechartModification:
     block.
     """
 
-    _node_count_at_start: int = field(init=False, default=0)
+    _nodes_at_start: list[StatechartNode] = field(init=False, default_factory=list)
     """
-    How many nodes the statechart held when this modification started.
+    The nodes the statechart held when this modification started.
     """
 
     _replaced_count_at_start: int = field(init=False, default=0)
@@ -174,7 +174,10 @@ class StatechartModification:
     """
 
     def __enter__(self) -> Self:
-        self._node_count_at_start = len(self.statechart.nodes)
+        """
+        Remembers how far the statechart got, so that a block that raises can go back there.
+        """
+        self._nodes_at_start = list(self.statechart.nodes)
         self._replaced_count_at_start = len(self.statechart._replaced_nodes)
         self._requested_reset_count_at_start = len(self.statechart._requested_resets)
         self.statechart._open_modifications += 1
@@ -188,6 +191,10 @@ class StatechartModification:
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """
+        Rolls back a block that raised; the outermost block that did not compiles a
+        compiled statechart that changed.
+        """
         statechart = self.statechart
         statechart._open_modifications -= 1
         if self.rewrites_compiled_nodes:
@@ -197,7 +204,7 @@ class StatechartModification:
             statechart._put_back_replaced_nodes_from(
                 first_put_back=self._replaced_count_at_start
             )
-            statechart._drop_nodes_from(first_dropped_index=self._node_count_at_start)
+            statechart._drop_nodes_added_since(nodes_at_start=self._nodes_at_start)
         if statechart._open_modifications == 0:
             statechart._replaced_nodes.clear()
         compiler = statechart.compiler
@@ -542,17 +549,20 @@ class Statechart(SubclassJSONSerializer):
             replaced.put_back()
         del self._replaced_nodes[first_put_back:]
 
-    def _drop_nodes_from(self, *, first_dropped_index: int) -> None:
+    def _drop_nodes_added_since(self, *, nodes_at_start: list[StatechartNode]) -> None:
         """
-        Drops every node from `first_dropped_index` on, which no compile covered yet.
+        Drops every node that joined after the statechart held `nodes_at_start`, which
+        no compile covered yet.
 
-        :param first_dropped_index: The index of the first node to drop.
+        :param nodes_at_start: The nodes the statechart held then, in index order.
         """
-        if first_dropped_index == len(self._nodes):
+        held_at_start = {id(node) for node in nodes_at_start}
+        kept_nodes = [node for node in self._nodes if id(node) in held_at_start]
+        dropped_nodes = [node for node in self._nodes if id(node) not in held_at_start]
+        if not dropped_nodes:
             return
         self.compiler.changed_since_compile = True
-        kept_nodes = self._nodes[:first_dropped_index]
-        for dropped_node in self._nodes[first_dropped_index:]:
+        for dropped_node in dropped_nodes:
             parent_node = dropped_node.parent_node
             if parent_node in kept_nodes and dropped_node in parent_node.nodes:
                 parent_node.nodes.remove(dropped_node)

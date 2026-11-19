@@ -1,3 +1,7 @@
+"""
+Tests adding nodes to a statechart that compiled already, and abandoning such changes.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -292,6 +296,29 @@ def test_an_abandoned_modification_compiles_nothing(
             raise ModificationDeliberatelyFailed()
 
     assert counting.compile_count == compiles_before
+
+
+def test_an_abandoned_modification_drops_the_node_it_added_after_a_removal(
+    statechart_context: StatechartContext,
+) -> None:
+    """
+    The added node leaves the statechart again, although the removal gave it an index
+    the statechart already had when the modification started.
+    """
+    statechart = Statechart(context=statechart_context)
+    removed = _node_arriving_at_once("removed")
+    kept = _node_arriving_at_once("kept")
+    statechart.add_nodes(nodes=[removed, kept])
+    added = _node_arriving_at_once("added")
+
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.remove_node(node=removed)
+            statechart.add_node(node=added)
+            raise ModificationDeliberatelyFailed()
+
+    assert statechart.nodes == [kept]
+    assert not added.belongs_to_statechart()
 
 
 def test_an_abandoned_inner_modification_keeps_the_outer_one_working(
