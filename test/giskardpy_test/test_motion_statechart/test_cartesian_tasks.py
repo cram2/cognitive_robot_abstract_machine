@@ -348,14 +348,66 @@ def peak_angle_per_tick_towards_roll_goal(world: World, angle: float) -> float:
     motion_statechart.add_node(node=EndMotion.when_true(node=orientation_goal))
     executor.compile(statechart=motion_statechart)
 
-    rotations = [world.compute_forward_kinematics_np(root, tip)[:3, :3].copy()]
-    while not executor.statechart.is_ended():
-        executor.tick()
-        rotations.append(world.compute_forward_kinematics_np(root, tip)[:3, :3].copy())
     return max(
-        np.arccos(np.clip((np.trace(before.T @ after) - 1) / 2, -1, 1))
-        for before, after in zip(rotations, rotations[1:])
+        TipMotion.record_until_end(
+            executor=executor, root_link=root, tip_link=tip
+        ).angles_per_tick()
     )
+
+
+@dataclass(kw_only=True)
+class TipMotion:
+    """
+    The poses a tip passed through, one per control cycle, from before the first tick
+    until the motion ended.
+    """
+
+    transforms: list[np.ndarray]
+    """
+    The 4x4 transforms of the tip relative to the root, one per control cycle.
+    """
+
+    @classmethod
+    def record_until_end(
+        cls,
+        *,
+        executor: StatechartExecutor,
+        root_link: KinematicStructureEntity,
+        tip_link: KinematicStructureEntity,
+    ) -> TipMotion:
+        """
+        Ticks a compiled executor until its statechart ends, recording the tip.
+        """
+        world = executor.context.world
+        transforms = [world.compute_forward_kinematics_np(root_link, tip_link).copy()]
+        while not executor.statechart.is_ended():
+            executor.tick()
+            transforms.append(
+                world.compute_forward_kinematics_np(root_link, tip_link).copy()
+            )
+        return cls(transforms=transforms)
+
+    def distances_per_tick(self) -> list[float]:
+        """
+        :return: How far the tip moved within each control cycle.
+        """
+        return [
+            float(np.linalg.norm(after[:3, 3] - before[:3, 3]))
+            for before, after in zip(self.transforms, self.transforms[1:])
+        ]
+
+    def angles_per_tick(self) -> list[float]:
+        """
+        :return: How far the tip turned within each control cycle.
+        """
+        return [
+            float(
+                np.arccos(
+                    np.clip((np.trace(before[:3, :3].T @ after[:3, :3]) - 1) / 2, -1, 1)
+                )
+            )
+            for before, after in zip(self.transforms, self.transforms[1:])
+        ]
 
 
 def record_tip_path(
@@ -2015,6 +2067,112 @@ class TestCartesianTasks:
         distance_error = np.linalg.norm(actual_position - target_position)
 
         assert distance_error <= goal.threshold
+
+
+# %% the cruise velocities of a pose goal
+
+
+def base_motion_towards_pose_goal(
+    *,
+    world: World,
+    forward_distance: float = 0.0,
+    turn_angle: float = 0.0,
+    cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION,
+    cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION,
+) -> TipMotion:
+    """
+    Moves the PR2's base to a :class:`CartesianPose` goal and records how it moved.
+
+    :param world: A PR2 world.
+    :param forward_distance: How far ahead of the base the goal is.
+    :param turn_angle: How far the goal is turned about the vertical axis of the base.
+    :param cruise_linear_velocity: The linear cruise velocity of the goal.
+    :param cruise_angular_velocity: The angular cruise velocity of the goal.
+    """
+    tip = world.get_kinematic_structure_entity_by_name("base_footprint")
+    root = world.get_kinematic_structure_entity_by_name("odom_combined")
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    motion_statechart = Statechart(context=executor.context)
+    pose_goal = CartesianPose(
+        root_link=root,
+        tip_link=tip,
+        goal_pose=Pose.from_xyz_rpy(
+            x=forward_distance, yaw=turn_angle, reference_frame=tip
+        ),
+        cruise_linear_velocity=cruise_linear_velocity,
+        cruise_angular_velocity=cruise_angular_velocity,
+    )
+    motion_statechart.add_node(node=pose_goal)
+    motion_statechart.add_node(node=EndMotion.when_true(node=pose_goal))
+    executor.compile(statechart=motion_statechart)
+    return TipMotion.record_until_end(executor=executor, root_link=root, tip_link=tip)
+
+
+class TestPoseGoalCruiseVelocity:
+    """
+    A :class:`CartesianPose` moves its tip no faster than its cruise velocities.
+    """
+
+    @pytest.mark.parametrize("cruise_linear_velocity", [0.05, 0.1])
+    def test_a_pose_goal_never_moves_faster_than_its_linear_cruise_velocity(
+        self, *, pr2_world_state_reset: World, cruise_linear_velocity: float
+    ):
+        """
+        The tip never moves faster than the linear cruise velocity asked for, which is
+        below the default.
+        """
+        motion = base_motion_towards_pose_goal(
+            world=pr2_world_state_reset,
+            forward_distance=1,
+            cruise_linear_velocity=cruise_linear_velocity,
+        )
+        time_step = MotionControl().qp_controller_config.control_time_step
+
+        assert (
+            max(motion.distances_per_tick()) / time_step.total_seconds()
+            <= cruise_linear_velocity
+        )
+
+    @pytest.mark.parametrize("cruise_linear_velocity", [0.05, 0.1])
+    def test_a_far_pose_goal_moves_at_its_linear_cruise_velocity(
+        self, *, pr2_world_state_reset: World, cruise_linear_velocity: float
+    ):
+        """
+        A goal far enough away to be cruised towards reaches its linear cruise velocity
+        up to how the jerk limit shapes the plan.
+        """
+        motion = base_motion_towards_pose_goal(
+            world=pr2_world_state_reset,
+            forward_distance=1,
+            cruise_linear_velocity=cruise_linear_velocity,
+        )
+        time_step = MotionControl().qp_controller_config.control_time_step
+
+        assert max(
+            motion.distances_per_tick()
+        ) / time_step.total_seconds() == pytest.approx(cruise_linear_velocity, rel=0.1)
+
+    @pytest.mark.parametrize("cruise_angular_velocity", [0.2, 0.4])
+    def test_a_pose_goal_never_turns_faster_than_its_angular_cruise_velocity(
+        self, *, pr2_world_state_reset: World, cruise_angular_velocity: float
+    ):
+        """
+        The tip never turns faster than the angular cruise velocity asked for, which is
+        below the default.
+        """
+        motion = base_motion_towards_pose_goal(
+            world=pr2_world_state_reset,
+            turn_angle=np.pi / 2,
+            cruise_angular_velocity=cruise_angular_velocity,
+        )
+        time_step = MotionControl().qp_controller_config.control_time_step
+
+        assert (
+            max(motion.angles_per_tick()) / time_step.total_seconds()
+            <= cruise_angular_velocity
+        )
 
 
 # %% driving a differential drive
