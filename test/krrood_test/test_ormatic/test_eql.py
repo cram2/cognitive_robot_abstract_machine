@@ -1726,12 +1726,58 @@ def nested_actions_at_two_heights(session, database) -> dict[float, NestedAction
     return actions
 
 
+def test_match_selects_only_objects_with_stated_values(
+    session, nested_actions_at_two_heights
+):
+    """
+    A match selects only the objects whose nested attributes have the values it states.
+    """
+    query = a(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=30.0)))
+
+    results = eql_to_sql(query, session).evaluate()
+
+    assert results == [nested_actions_at_two_heights[30.0]]
+
+
+def test_match_selects_nothing_for_unstored_values(
+    session, nested_actions_at_two_heights
+):
+    """
+    A match whose stated values no stored object has selects nothing.
+    """
+    query = a(NestedAction)(
+        obj=a(Body)(name="TestBody"),
+        pose=a(KRROODPose)(position=a(KRROODPosition)(z=4.0)),
+    )
+
+    assert eql_to_sql(query, session).evaluate() == []
+
+
+def test_match_keeps_its_quantifier(session, nested_actions_at_two_heights):
+    """
+    A match built with :func:`the` evaluates to its single object.
+    """
+    query = the(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=3.0)))
+
+    results = eql_to_sql(query, session).evaluate()
+
+    assert results == [nested_actions_at_two_heights[3.0]]
+
+
+def test_match_keeps_its_limit(session, nested_actions_at_two_heights):
+    """
+    A match keeps the limit stated on it.
+    """
+    query = a(NestedAction)(obj=a(Body)(name="TestBody")).limit(n=1)
+
+    assert len(eql_to_sql(query, session).evaluate()) == 1
+
+
 def test_match_wrapped_in_entity_keeps_its_conditions(
     session, nested_actions_at_two_heights
 ):
     """
-    A match wrapped in :func:`entity` selects only the objects whose nested attributes
-    have the values the match states.
+    A match wrapped in :func:`entity` selects what the match on its own selects.
     """
     query = an(
         entity(a(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=30.0))))
@@ -1740,37 +1786,6 @@ def test_match_wrapped_in_entity_keeps_its_conditions(
     results = eql_to_sql(query, session).evaluate()
 
     assert results == [nested_actions_at_two_heights[30.0]]
-
-
-def test_match_wrapped_in_entity_selects_nothing_for_unstored_values(
-    session, nested_actions_at_two_heights
-):
-    """
-    A match wrapped in :func:`entity` whose stated values no stored object has selects
-    nothing.
-    """
-    query = an(
-        entity(
-            a(NestedAction)(
-                obj=a(Body)(name="TestBody"),
-                pose=a(KRROODPose)(position=a(KRROODPosition)(z=4.0)),
-            )
-        )
-    )
-
-    assert eql_to_sql(query, session).evaluate() == []
-
-
-def test_match_on_its_own_translates(session, nested_actions_at_two_heights):
-    """
-    A match on its own translates like the same match wrapped in :func:`entity`, keeping
-    its quantifier.
-    """
-    query = the(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=3.0)))
-
-    results = eql_to_sql(query, session).evaluate()
-
-    assert results == [nested_actions_at_two_heights[3.0]]
 
 
 def test_match_with_limit_wrapped_in_entity_raises(
