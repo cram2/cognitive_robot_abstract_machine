@@ -323,3 +323,43 @@ def test_the_chosen_children_reach_the_receiver(
     assert [node._node_id for node in received_choosing_node.chosen_children] == [
         child._node_id
     ]
+
+
+# %% structure copies
+
+
+def test_a_structure_copy_follows_the_structure_copies_of_the_blocks(sender):
+    """
+    The nodes of a structure copy have the ids of the nodes they copy, so the structure
+    copies of the blocks closed after it was taken find them.
+    """
+    receiver = Statechart.from_json(
+        data=json.loads(json.dumps(sender.create_structure_copy().to_json())),
+        context=StatechartContext(world=World()),
+    )
+    block_count = len(sender.change_blocks)
+    sequence, first, second = sender.nodes[:3]
+
+    sequence.insert_before(reference=second, node=node_arriving_at_once(name="middle"))
+    replay(
+        blocks=[
+            block.create_structure_copy()
+            for block in sender.change_blocks[block_count:]
+        ],
+        receiver=receiver,
+    )
+
+    assert structure(statechart=receiver) == structure(statechart=sender)
+
+
+def test_a_structure_copy_of_a_block_leaves_out_the_requests(sender):
+    """
+    A structure copy is never run, so it has no use for resets and rebuilds.
+    """
+    sequence = sender.nodes[0]
+
+    with sender.modify():
+        sender.request_reset(node=sequence)
+        sender.request_rebuild(node=sequence)
+
+    assert sender.change_blocks[-1].create_structure_copy().changes == []

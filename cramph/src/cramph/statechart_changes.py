@@ -6,6 +6,7 @@ statechart can repeat them without expanding any node again.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import copy
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 
@@ -122,6 +123,15 @@ class StatechartChange(SubclassJSONSerializer, ABC):
             its block.
         """
 
+    @classproperty
+    def is_part_of_structure(cls) -> bool:
+        """
+        :return: Whether a structure copy of the statechart, see
+            :meth:`~cramph.statechart.Statechart.create_structure_copy`, holds a change
+            of this kind.
+        """
+        return True
+
     @abstractmethod
     def apply(self, *, statechart: Statechart) -> None:
         """
@@ -130,6 +140,14 @@ class StatechartChange(SubclassJSONSerializer, ABC):
         :param statechart: The statechart to change, which holds every node the change
             names, apart from the node a :class:`NodeAddition` adds.
         """
+
+    def create_structure_copy(self) -> Self:
+        """
+        :return: The same change made to a structure copy of the statechart, whose
+            nodes have the ids of the nodes they copy, see
+            :meth:`~cramph.node.StatechartNode.create_structure_counterpart`.
+        """
+        return copy(self)
 
 
 @dataclass(kw_only=True)
@@ -180,6 +198,12 @@ class NodeAddition(StatechartChange):
     def apply(self, *, statechart: Statechart) -> None:
         statechart._register_node(node=self.node)
 
+    def create_structure_copy(self) -> Self:
+        """
+        Adds the structure counterpart of the node instead.
+        """
+        return NodeAddition(node=self.node.create_structure_counterpart())
+
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
         Writes the whole node, so that a statechart that does not hold it can add it.
@@ -222,6 +246,13 @@ class ResetRequest(ChangeOfNode):
     def application_order(cls) -> ChangeApplicationOrder:
         return ChangeApplicationOrder.RESET_REQUEST
 
+    @classproperty
+    def is_part_of_structure(cls) -> bool:
+        """
+        A structure copy is never run.
+        """
+        return False
+
     def apply(self, *, statechart: Statechart) -> None:
         statechart.request_reset(node=self.node)
 
@@ -236,6 +267,13 @@ class RebuildRequest(ChangeOfNode):
     @classproperty
     def application_order(cls) -> ChangeApplicationOrder:
         return ChangeApplicationOrder.REBUILD_REQUEST
+
+    @classproperty
+    def is_part_of_structure(cls) -> bool:
+        """
+        A structure copy is never run.
+        """
+        return False
 
     def apply(self, *, statechart: Statechart) -> None:
         statechart.request_rebuild(node=self.node)
@@ -314,6 +352,13 @@ class ChosenChildrenChange(ChangeNamingChildren):
     @classproperty
     def application_order(cls) -> ChangeApplicationOrder:
         return ChangeApplicationOrder.CHOSEN_CHILDREN_CHANGE
+
+    @classproperty
+    def is_part_of_structure(cls) -> bool:
+        """
+        Structure copies of nodes do not choose their children.
+        """
+        return False
 
     def apply(self, *, statechart: Statechart) -> None:
         self.node.restore_chosen_children(children=self.children)
@@ -400,6 +445,20 @@ class StatechartChangeBlock(SubclassJSONSerializer):
         with statechart.modify():
             for change in self.changes:
                 change.apply(statechart=statechart)
+
+    def create_structure_copy(self) -> StatechartChangeBlock:
+        """
+        :return: The changes of this block a structure copy of the statechart holds,
+            made to nodes with the ids of the nodes they copy, see
+            :meth:`StatechartChange.create_structure_copy`.
+        """
+        return StatechartChangeBlock(
+            changes=[
+                change.create_structure_copy()
+                for change in self.changes
+                if change.is_part_of_structure
+            ]
+        )
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
