@@ -1,3 +1,7 @@
+"""
+Tests of the planes Cartesian frames span and of the planar values given on them.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -166,6 +170,10 @@ def test_the_planes_of_frames_in_two_rooms_are_two_planes(floor_frame):
 def test_a_frame_compares_its_embedded_plane_with_that_of_a_frame_on_the_floor(
     frame_on_the_floor, relation, floor_frame, request
 ):
+    """
+    A frame on the floor spans the floor's plane, facing either side of it; a frame off
+    the floor spans another plane.
+    """
     assert (
         floor_frame.compare_embedded_plane(
             frame=request.getfixturevalue(frame_on_the_floor)
@@ -175,6 +183,9 @@ def test_a_frame_compares_its_embedded_plane_with_that_of_a_frame_on_the_floor(
 
 
 def test_the_plane_of_a_frame_in_no_space_is_not_known_to_be_any_other(floor_frame):
+    """
+    A frame that charts no known space cannot be placed relative to any other frame.
+    """
     assert (
         floor_frame.compare_embedded_plane(frame=NamedFrame("nowhere"))
         is EmbeddedPlaneRelation.UNKNOWN
