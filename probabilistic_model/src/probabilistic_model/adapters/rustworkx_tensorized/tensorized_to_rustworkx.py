@@ -70,7 +70,6 @@ class RustworkxCircuitBuilder:
 class SumLayerToSumUnitsConverter(
     TensorizedToRustworkxConverter[SumLayer, List[SumUnit]]
 ):
-
     @classmethod
     def convert(cls, data: SumLayer, builder: RustworkxCircuitBuilder) -> list[SumUnit]:
         units = [
@@ -92,7 +91,6 @@ class SumLayerToSumUnitsConverter(
 class ProductLayerToProductUnitsConverter(
     TensorizedToRustworkxConverter[ProductLayer, List[ProductUnit]]
 ):
-
     @classmethod
     def convert(
         cls, data: ProductLayer, builder: RustworkxCircuitBuilder
@@ -115,8 +113,8 @@ class UnivariateInputLayerToLeavesConverter(
     TensorizedToRustworkxConverter[UnivariateInputLayer, List[Unit]]
 ):
     """
-    Convert any univariate input layer into one leaf per node, through the distributions of its
-    nodes.
+    Convert any univariate input layer into one leaf per node, through the distributions
+    of its nodes.
     """
 
     @classmethod
@@ -129,9 +127,7 @@ class UnivariateInputLayerToLeavesConverter(
     ) -> list[Unit]:
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(
-                builder.variables[data.variable]
-            )
+            for distribution in data.node_distributions(builder.variables)
         ]
 
 
@@ -160,7 +156,6 @@ class MultivariateGaussianLayerToLeavesConverter(
 class LayeredCircuitToRustworkxCircuitConverter(
     TensorizedToRustworkxConverter[LayeredProbabilisticCircuit, ProbabilisticCircuit]
 ):
-
     @classmethod
     def convert(cls, data: LayeredProbabilisticCircuit) -> ProbabilisticCircuit:
         builder = RustworkxCircuitBuilder(data.variables)

@@ -16,6 +16,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
     NodeStateValues,
     NodeValues,
+    SampleNodeStateIndices,
     SampleNodeValues,
     StateIndices,
     StateMask,
@@ -120,10 +121,13 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
     # %% queries
 
     @abstractmethod
-    def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
+    def log_probabilities_of_states(
+        self, indices: StateIndices | SampleNodeStateIndices
+    ) -> SampleNodeValues:
         """
-        :param indices: One state index per value, ``-1`` for a value that is not a
-            state.
+        :param indices: One state index per value for every node, shape (#values,), or
+            one per value and node, shape (#values, #nodes), ``-1`` for a value that is
+            not a state.
         :return: The log-probability of every value under every node, with shape
             (#values, #nodes).
         """
@@ -342,7 +346,9 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     def number_of_stored_entries(self) -> int:
         return int(self.log_probabilities.size)
 
-    def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
+    def log_probabilities_of_states(
+        self, indices: StateIndices | SampleNodeStateIndices
+    ) -> SampleNodeValues:
         # an unknown state reads the appended column of probability zero
         padded = self.namespace.concat(
             [
@@ -357,7 +363,19 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
             axis=1,
         )
         columns = self.namespace.where(indices >= 0, indices, self.number_of_states)
-        return self.namespace.take(padded, columns, axis=1).T
+        if columns.ndim == 1:
+            return self.namespace.take(padded, columns, axis=1).T
+        # the entry of node n and column c sits at n * (#states + 1) + c of the flat table
+        node_offsets = self.namespace.asarray(
+            np.arange(self.number_of_nodes) * (self.number_of_states + 1),
+            dtype=columns.dtype,
+            device=self.device,
+        )
+        flat = self.namespace.take(
+            self.namespace.reshape(padded, (-1,)),
+            self.namespace.reshape(columns + node_offsets, (-1,)),
+        )
+        return self.namespace.reshape(flat, columns.shape)
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
         columns = self.namespace.asarray(np.flatnonzero(selected), device=self.device)
@@ -515,7 +533,18 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
     def number_of_stored_entries(self) -> int:
         return int(self.log_probabilities.nnz)
 
-    def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
+    def log_probabilities_of_states(
+        self, indices: StateIndices | SampleNodeStateIndices
+    ) -> SampleNodeValues:
+        if indices.ndim == 2:
+            nodes = np.broadcast_to(np.arange(self.number_of_nodes), indices.shape)
+            known = indices >= 0
+            probabilities = np.zeros(indices.shape)
+            probabilities[known] = np.asarray(
+                self.probabilities[nodes[known], indices[known]]
+            ).ravel()
+            with np.errstate(divide="ignore"):
+                return np.log(probabilities)
         result = np.full((len(indices), self.number_of_nodes), -np.inf)
         known = indices >= 0
         if known.any():

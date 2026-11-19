@@ -94,6 +94,7 @@ class HasLocationAndScale:
         :raises ShapeMismatchError: If there is not one scale per location.
         :raises NonPositiveScaleError: If a scale is not positive.
         """
+        super().validate_own()
         if self.location.shape != self.scale.shape:
             raise ShapeMismatchError(self.location.shape, self.scale.shape)
         # the negated comparison also catches a scale that is nan
@@ -212,18 +213,20 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         cls, variable_index: int, distributions: list[GaussianDistribution]
     ) -> Self:
         return cls(
-            variable_index,
+            np.full(len(distributions), variable_index, dtype=np.int64),
             np.array([distribution.location for distribution in distributions]),
             np.array([distribution.scale for distribution in distributions]),
         )
 
     def select_nodes(self, mask: NodeMask) -> Self:
-        return self.__class__(self.variable, self.location[mask], self.scale[mask])
+        return self.__class__(
+            self.node_variables[mask], self.location[mask], self.scale[mask]
+        )
 
     @classmethod
     def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
-            layers[0].variable,
+            np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.location for layer in layers]),
             np.concatenate([layer.scale for layer in layers]),
         )
@@ -232,11 +235,12 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         return norm.rvs(loc=self.location[nodes], scale=self.scale[nodes])
 
     def apply_translation_own(self, translation: VariableValues):
-        self.location = self.location + translation[self.variable]
+        self.location = self.location + self.node_variable_values(values=translation)
 
     def apply_scaling_own(self, scaling: VariableValues):
-        self.location = self.location * scaling[self.variable]
-        self.scale = self.scale * scaling[self.variable]
+        node_scaling = self.node_variable_values(values=scaling)
+        self.location = self.location * node_scaling
+        self.scale = self.scale * node_scaling
 
     def type_of_layer_truncated_to_interval(
         self, interval: SimpleInterval
@@ -278,7 +282,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         )
         return LayerWithLogProbabilities(
             TruncatedGaussianLayer(
-                self.variable,
+                self.node_variables.copy(),
                 interval_of_nodes,
                 bounds_of_nodes,
                 self.location.copy(),
@@ -398,7 +402,7 @@ class TruncatedGaussianLayer(
         cls, variable_index: int, distributions: list[TruncatedGaussianDistribution]
     ) -> Self:
         return cls(
-            variable_index,
+            np.full(len(distributions), variable_index, dtype=np.int64),
             np.array(
                 [
                     [distribution.interval.lower, distribution.interval.upper]
@@ -419,7 +423,7 @@ class TruncatedGaussianLayer(
 
     def select_nodes(self, mask: NodeMask) -> Self:
         return self.__class__(
-            self.variable,
+            self.node_variables[mask],
             self.interval[mask],
             self.bounds[mask],
             self.location[mask],
@@ -429,7 +433,7 @@ class TruncatedGaussianLayer(
     @classmethod
     def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
-            layers[0].variable,
+            np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.interval for layer in layers]),
             np.concatenate([layer.bounds for layer in layers]),
             np.concatenate([layer.location for layer in layers]),
@@ -438,9 +442,10 @@ class TruncatedGaussianLayer(
 
     def apply_translation_own(self, translation: VariableValues):
         super().apply_translation_own(translation)
-        self.location = self.location + translation[self.variable]
+        self.location = self.location + self.node_variable_values(values=translation)
 
     def apply_scaling_own(self, scaling: VariableValues):
         super().apply_scaling_own(scaling)
-        self.location = self.location * scaling[self.variable]
-        self.scale = self.scale * scaling[self.variable]
+        node_scaling = self.node_variable_values(values=scaling)
+        self.location = self.location * node_scaling
+        self.scale = self.scale * node_scaling

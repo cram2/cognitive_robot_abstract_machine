@@ -185,6 +185,12 @@ StateIndices: TypeAlias = npt.NDArray[np.int64]
 Indices into the states of a discrete variable.
 """
 
+SampleNodeStateIndices: TypeAlias = BackendArray
+"""
+An index into the states of the variable of every node for every sample, shape
+(#samples, #nodes).
+"""
+
 StateMask: TypeAlias = npt.NDArray[np.bool_]
 """
 One flag per state of a discrete variable.

@@ -39,9 +39,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probabilit
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
-    SymbolicEncoding,
-)
 from probabilistic_model.learning.region_graph.exceptions import (
     MultipleRootsError,
     PredictedVariableInRegionGraphError,
@@ -390,7 +387,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         variable_index = variables.index(variable)
         if isinstance(variable, Continuous):
             return GaussianLayer(
-                variable_index,
+                np.full(input_units, variable_index, dtype=np.int64),
                 self.random_number_generator.uniform(
                     self.initial_location_range.lower,
                     self.initial_location_range.upper,
@@ -411,10 +408,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             )
             probabilities /= probabilities.sum(axis=1, keepdims=True)
             return SymbolicLayer(
-                variable_index,
+                np.full(input_units, variable_index, dtype=np.int64),
                 np.arange(number_of_states),
                 DenseProbabilityTable(np.log(probabilities)),
-                SymbolicEncoding(variable).hashes,
             )
         raise UnsupportedRegionVariableError(variable=variable)
 
@@ -436,10 +432,13 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         number_of_categories = len(predicted_variable.domain.simple_sets)
         with np.errstate(divide="ignore"):
             indicators = SymbolicLayer(
-                variables.index(predicted_variable),
+                np.full(
+                    number_of_categories,
+                    variables.index(predicted_variable),
+                    dtype=np.int64,
+                ),
                 np.arange(number_of_categories),
                 DenseProbabilityTable(np.log(np.eye(number_of_categories))),
-                SymbolicEncoding(predicted_variable).hashes,
             )
         products = ProductLayer.node_wise_product_of(
             [category_conditionals, indicators]

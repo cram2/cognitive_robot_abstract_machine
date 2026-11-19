@@ -398,7 +398,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
 
         point_masses = [
             DiracDeltaLayer(
-                int(self.scope[position]),
+                np.full(self.number_of_nodes, self.scope[position], dtype=np.int64),
                 np.full(self.number_of_nodes, value),
                 np.ones(self.number_of_nodes),
             )

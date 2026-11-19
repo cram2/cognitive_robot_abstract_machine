@@ -191,7 +191,9 @@ def test_projected_gaussian_scales_are_at_least_the_minimum_scale():
     Projecting the parameters of a Gaussian layer raises every scale below the minimum
     to the minimum and leaves the locations alone.
     """
-    layer = GaussianLayer(0, np.array([0.0, 1.0]), np.array([1.0, 2.0]))
+    layer = GaussianLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.0, 1.0]), np.array([1.0, 2.0])
+    )
     location, scale = layer.projected_parameters(
         [np.array([0.5, -0.5]), np.array([-1.0, 0.5])]
     )

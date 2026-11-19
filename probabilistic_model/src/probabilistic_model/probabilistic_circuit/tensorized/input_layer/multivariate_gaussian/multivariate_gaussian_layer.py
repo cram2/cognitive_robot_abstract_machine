@@ -175,7 +175,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             if not query.requested[index]:
                 continue
             marginal = GaussianLayer(
-                int(index),
+                np.full(self.number_of_nodes, index, dtype=np.int64),
                 self.mean[:, position],
                 np.sqrt(self.covariance.variances[:, position]),
             )

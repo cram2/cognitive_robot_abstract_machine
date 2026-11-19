@@ -25,6 +25,12 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleNodeValues,
     VariableIndices,
     VariableMask,
+    VariableValues,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
+    LayerOverSeveralVariablesError,
+    PartialMarginalOfLeafLayerError,
+    UnsortedNodeVariablesError,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
@@ -35,6 +41,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     Layer,
     LeafLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
+    SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
@@ -52,47 +61,106 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 @dataclass(eq=False, repr=False)
 class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     """
-    Abstract base class for the univariate input layers of a layered circuit.
+    Abstract base class for the input layers of a layered circuit whose nodes are
+    univariate distributions.
 
-    An input layer holds univariate distributions of one single type over one single
-    variable, so that the likelihood of all of its nodes is evaluated without any
-    branching. Its numeric queries compute with the array backend of its parameters.
+    An input layer holds univariate distributions of one single type, every node over
+    its own variable and the nodes sorted by variable, so that the likelihood of all of
+    its nodes is evaluated without any branching. Its numeric queries compute with the
+    array backend of its parameters.
     """
 
-    variable: int
+    node_variables: VariableIndices
     """
-    The index of the variable of this layer.
+    The index of the variable of every node, sorted ascending.
     """
 
     @property
     def variables(self) -> VariableIndices:
-        return np.array([self.variable], dtype=np.int64)
+        return np.unique(self.node_variables)
+
+    @property
+    def is_over_one_variable(self) -> bool:
+        """
+        :return: Whether every node of this layer is over the same variable.
+        """
+        return len(self.node_variables) == 0 or bool(
+            self.node_variables[0] == self.node_variables[-1]
+        )
+
+    @property
+    def variable(self) -> int:
+        """
+        :return: The index of the variable every node of this layer is over.
+        :raises LayerOverSeveralVariablesError: If the nodes are over several variables.
+        """
+        if not self.is_over_one_variable:
+            raise LayerOverSeveralVariablesError(variables=self.variables)
+        return int(self.node_variables[0])
+
+    def validate_own(self):
+        """
+        :raises UnsortedNodeVariablesError: If the nodes are not sorted by variable.
+        """
+        if np.any(np.diff(self.node_variables) < 0):
+            raise UnsortedNodeVariablesError(node_variables=self.node_variables)
+
+    def groups_of_one_variable(self) -> list[Self]:
+        """
+        :return: One layer per variable of this layer, with the nodes over it in their
+            order, the variables ascending; this layer itself if it is over one
+            variable.
+        """
+        if self.is_over_one_variable:
+            return [self]
+        return [
+            self.select_nodes(self.node_variables == variable)
+            for variable in self.variables
+        ]
 
     @memoized
     def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):
-        self.variable = int(remap[self.variable])
-
-    def column_of(self, events: SampleArray) -> SampleColumn:
         """
-        Select the column of the variable of this layer from an event array.
+        :raises UnsortedNodeVariablesError: If the remap reorders the variables of the
+            nodes.
+        """
+        self.node_variables = np.asarray(remap)[self.node_variables]
+        self.validate_own()
+
+    def column_of(self, events: SampleArray) -> SampleColumn | SampleNodeValues:
+        """
+        Select the values of the variables of the nodes from an event array.
 
         :param events: The events with shape (#events, #variables of the circuit).
-        :return: The column of this layer's variable.
+        :return: The column of the variable of a layer over one variable, shape
+            (#events,), else the value of the variable of every node, shape (#events,
+            #nodes).
         """
-        return events[:, self.variable]
+        if self.is_over_one_variable:
+            return events[:, self.variable]
+        return events[:, self.node_variables]
 
-    def float_column(self, *, values: SampleColumn) -> BackendArray:
+    def float_column(self, *, values: SampleColumn | SampleNodeValues) -> BackendArray:
         """
-        :param values: Values of the variable of this layer, shape (#events,).
+        :param values: Values for every node, shape (#events,), or a value per node,
+            shape (#events, #nodes).
         :return: The values as floats in an array of the backend of the parameters,
-            shape (#events, 1).
+            shape (#events, 1) or (#events, #nodes), so that they broadcast against the
+            nodes.
         """
-        return self.namespace.reshape(
-            self.namespace.asarray(
-                values, dtype=self.floating_point_type, device=self.device
-            ),
-            (-1, 1),
+        floats = self.namespace.asarray(
+            values, dtype=self.floating_point_type, device=self.device
         )
+        if floats.ndim == 2:
+            return floats
+        return self.namespace.reshape(floats, (-1, 1))
+
+    def node_variable_values(self, *, values: VariableValues) -> NodeValues:
+        """
+        :param values: One value per variable of the circuit.
+        :return: The value of the variable of every node.
+        """
+        return np.asarray(values)[self.node_variables]
 
     # %% per node view
 
@@ -104,7 +172,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         Materialize one node of this layer as a univariate distribution.
 
         :param index: The index of the node.
-        :param variable: The variable of this layer.
+        :param variable: The variable of the node.
         :return: The distribution of that node.
         """
         raise NotImplementedError
@@ -119,7 +187,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
 
         :param variable_index: The index of the variable of the distributions.
         :param distributions: The distributions.
-        :return: The layer.
+        :return: The layer, every node over that variable.
         """
         raise NotImplementedError
 
@@ -133,14 +201,15 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         """
         raise NotImplementedError
 
-    def node_distributions(self, variable: Variable) -> list[UnivariateDistribution]:
+    def node_distributions(self, variables: SortedSet) -> list[UnivariateDistribution]:
         """
-        :param variable: The variable of this layer.
-        :return: Every node of this layer as a univariate distribution.
+        :param variables: The variables of the circuit.
+        :return: Every node of this layer as a univariate distribution over its
+            variable.
         """
         return [
-            self.node_distribution(index, variable)
-            for index in range(self.number_of_nodes)
+            self.node_distribution(index, variables[int(variable)])
+            for index, variable in enumerate(self.node_variables)
         ]
 
     # %% queries
@@ -149,19 +218,17 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     def support_of_nodes(
         self, variables: SortedSet, cache: QueryCache | None = None
     ) -> list[Event]:
-        variable = variables[self.variable]
         return [
-            distribution.support for distribution in self.node_distributions(variable)
+            distribution.support for distribution in self.node_distributions(variables)
         ]
 
     @memoized
     def log_mode_of_nodes(
         self, variables: SortedSet, cache: QueryCache | None = None
     ) -> tuple[list[Event], NodeValues]:
-        variable = variables[self.variable]
         modes = [
             distribution.log_mode()
-            for distribution in self.node_distributions(variable)
+            for distribution in self.node_distributions(variables)
         ]
         return [mode.event for mode in modes], np.array(
             [mode.log_likelihood for mode in modes], dtype=float
@@ -174,6 +241,14 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeVariableValues:
+        if not self.is_over_one_variable:
+            return self.namespace.concat(
+                [
+                    group.moment_of_nodes(query, variables)
+                    for group in self.groups_of_one_variable()
+                ],
+                axis=0,
+            )
         if not query.requested[self.variable]:
             return self.namespace.zeros(
                 (self.number_of_nodes, query.number_of_variables),
@@ -194,7 +269,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         self, order: int, center: float, variable: Variable
     ) -> NodeValues:
         """
-        Calculate the moment of the variable of this layer for every node.
+        Calculate the moment of the variable of this layer for every node of a layer
+        over one variable.
 
         The fallback evaluates the nodes one by one through their distributions, on the
         host only. Layers whose moment has a closed form evaluate it for all nodes at
@@ -209,8 +285,10 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         center_map = VariableMap({variable: center})
         moments = np.array(
             [
-                distribution.moment(order_map, center_map)[variable]
-                for distribution in self.node_distributions(variable)
+                self.node_distribution(index, variable).moment(order_map, center_map)[
+                    variable
+                ]
+                for index in range(self.number_of_nodes)
             ],
             dtype=float,
         )
@@ -232,13 +310,24 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             nodes.append(np.full(len(rows_of_node.rows), node))
         if not rows:
             return
-        samples[np.concatenate(rows), self.variable] = self.sample_of_nodes(
-            np.concatenate(nodes), variables
-        )
+        rows, nodes = np.concatenate(rows), np.concatenate(nodes)
+        if self.is_over_one_variable:
+            samples[rows, self.variable] = self.sample_of_nodes(nodes, variables)
+            return
+        first_node = 0
+        for group in self.groups_of_one_variable():
+            of_group = (nodes >= first_node) & (
+                nodes < first_node + group.number_of_nodes
+            )
+            samples[rows[of_group], group.variable] = group.sample_of_nodes(
+                nodes[of_group] - first_node, variables
+            )
+            first_node += group.number_of_nodes
 
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         """
-        Draw one sample from the node of every entry of ``nodes``.
+        Draw one sample from the node of every entry of ``nodes``, for a layer over one
+        variable.
 
         The fallback draws from the nodes one by one through :meth:`sample_of_node`.
         Layers whose distributions numpy or scipy can sample for all nodes at once
@@ -267,19 +356,27 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         :param variables: The variables of the circuit.
         :return: The samples with shape (amount,).
         """
-        distribution = self.node_distribution(node, variables[self.variable])
+        distribution = self.node_distribution(
+            node, variables[int(self.node_variables[node])]
+        )
         return distribution.sample(amount)[:, 0]
 
     # %% structural
 
     @abstractmethod
     def log_truncated_of_assignment(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self,
+        *,
+        assignment: AbstractCompositeSet,
+        variable: Variable,
+        singleton_allowed: bool,
     ) -> LayerWithLogProbabilities:
         """
-        Truncate every node of this layer to the assignment of its variable at once.
+        Truncate every node of a layer over one variable to the assignment of its
+        variable at once.
 
         :param assignment: The assignment of the variable of this layer.
+        :param variable: The variable of this layer.
         :param singleton_allowed: Whether singletons are allowed.
         :return: The truncated layer, with as many nodes as this one, and the log-
             probabilities of its nodes.
@@ -306,8 +403,15 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         return query.log_probabilities.record(
-            self.log_truncated_of_assignment(
-                event[query.variables[self.variable]], query.singleton_allowed
+            SumLayer.concatenation_of_pieces(
+                [
+                    group.log_truncated_of_assignment(
+                        assignment=event[query.variables[group.variable]],
+                        variable=query.variables[group.variable],
+                        singleton_allowed=query.singleton_allowed,
+                    )
+                    for group in self.groups_of_one_variable()
+                ]
             )
         )
 
@@ -316,8 +420,10 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     ) -> bool:
         """
         The truncations to the events are joined with :meth:`concatenate`, which needs
-        them all to be input layers of one type.
+        them all to be input layers of one type, from a layer over one variable.
         """
+        if not self.is_over_one_variable:
+            return False
         variable = query.variables[self.variable]
         types = {
             self.type_of_truncated_layer(event[variable], query.singleton_allowed)
@@ -334,7 +440,11 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     ) -> LayerWithLogProbabilities:
         variable = query.variables[self.variable]
         truncated = [
-            self.log_truncated_of_assignment(event[variable], query.singleton_allowed)
+            self.log_truncated_of_assignment(
+                assignment=event[variable],
+                variable=variable,
+                singleton_allowed=query.singleton_allowed,
+            )
             for event in events
         ]
         layers = [piece.layer for piece in truncated]
@@ -348,7 +458,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     @abstractmethod
     def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
         """
-        Condition every node of this layer on a value of its variable at once.
+        Condition every node of a layer over one variable on a value of its variable at
+        once.
 
         :param value: The value.
         :return: The conditioned layer, with as many nodes as this one, and the log-
@@ -363,14 +474,16 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         query: StructuralQuery,
         cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
-        variable = query.variables[self.variable]
-        if variable not in point:
-            result = LayerWithLogProbabilities(
-                copy.deepcopy(self), np.zeros(self.number_of_nodes)
-            )
-        else:
-            result = self.log_conditional_of_value(point[variable])
-        return query.log_probabilities.record(result)
+        pieces = []
+        for group in self.groups_of_one_variable():
+            variable = query.variables[group.variable]
+            if variable not in point:
+                pieces.append(
+                    LayerWithLogProbabilities(group, np.zeros(group.number_of_nodes))
+                )
+            else:
+                pieces.append(group.log_conditional_of_value(point[variable]))
+        return query.log_probabilities.record(SumLayer.concatenation_of_pieces(pieces))
 
     def rebuild(
         self,
@@ -385,8 +498,18 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
     ) -> Layer | None:
-        if not kept[self.variable]:
+        """
+        :raises PartialMarginalOfLeafLayerError: If the marginal keeps some but not all
+            variables of the nodes.
+        """
+        kept_of_layer = np.asarray(kept)[self.variables]
+        if not kept_of_layer.any():
             return None
+        if not kept_of_layer.all():
+            raise PartialMarginalOfLeafLayerError(
+                kept_variables=self.variables[kept_of_layer],
+                removed_variables=self.variables[~kept_of_layer],
+            )
         return copy.deepcopy(self)
 
 
@@ -404,13 +527,14 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @abstractmethod
     def log_likelihood_of_nodes_from_column(
-        self, values: SampleColumn
+        self, values: SampleColumn | SampleNodeValues
     ) -> SampleNodeValues:
         """
-        Calculate the log-likelihood of every node for a column of values of the
-        variable of this layer.
+        Calculate the log-likelihood of every node for values of the variables of the
+        nodes.
 
-        :param values: The values with shape (#events,).
+        :param values: The values for every node, shape (#events,), or the value of
+            every node, shape (#events, #nodes).
         :return: The log-likelihoods with shape (#events, #nodes).
         """
         raise NotImplementedError
@@ -422,6 +546,14 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
+        if not self.is_over_one_variable:
+            return self.namespace.concat(
+                [
+                    group.probability_of_simple_event_of_nodes(event, variables)
+                    for group in self.groups_of_one_variable()
+                ],
+                axis=0,
+            )
         interval: Interval = event[variables[self.variable]]
         result = self.namespace.zeros(
             self.number_of_nodes, dtype=self.floating_point_type, device=self.device
@@ -445,13 +577,14 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @abstractmethod
     def cumulative_distribution_of_nodes_from_column(
-        self, values: SampleColumn
+        self, values: SampleColumn | SampleNodeValues
     ) -> SampleNodeValues:
         """
-        Calculate the cumulative distribution function of every node for a column of
-        values of the variable of this layer.
+        Calculate the cumulative distribution function of every node for values of the
+        variables of the nodes.
 
-        :param values: The values with shape (#events,).
+        :param values: The values for every node, shape (#events,), or the value of
+            every node, shape (#events, #nodes).
         :return: The values with shape (#events, #nodes).
         """
         raise NotImplementedError

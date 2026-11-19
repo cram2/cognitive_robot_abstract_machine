@@ -396,7 +396,9 @@ def test_uniform_layer_agrees_with_the_scalar_truncation(
     layer = UniformLayer.from_distributions(0, distributions)
     event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
     truncated = layer.log_truncated_of_assignment(
-        event_interval.as_composite_set(), False
+        assignment=event_interval.as_composite_set(),
+        variable=x,
+        singleton_allowed=False,
     )
 
     for node, distribution in enumerate(distributions):
@@ -418,7 +420,9 @@ def test_uniform_layer_agrees_with_the_scalar_truncation(
 def test_a_singleton_turns_every_uniform_node_into_a_dirac_delta(x):
     layer = uniform_layer_of(0, [(0, 2), (1, 5)])
     assignment = singleton(1.0)
-    truncated = layer.log_truncated_of_assignment(assignment, True)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=True
+    )
     assert isinstance(truncated.layer, DiracDeltaLayer)
     for node in range(layer.number_of_nodes):
         expected_truncation = layer.node_distribution(
@@ -436,7 +440,9 @@ def test_a_singleton_turns_every_uniform_node_into_a_dirac_delta(x):
 def test_a_composite_assignment_mixes_the_truncations_to_its_simple_intervals(x):
     layer = uniform_layer_of(0, [(0, 4), (0, 8)])
     assignment = closed(0, 1) | closed(3, 4)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=False
+    )
     assert isinstance(truncated.layer, SumLayer)
     assert truncated.layer.number_of_nodes == layer.number_of_nodes
     for node in range(layer.number_of_nodes):
@@ -453,7 +459,11 @@ def three_dirac_deltas() -> DiracDeltaLayer:
     """
     Dirac deltas at 0, 1 and 2.
     """
-    return DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))
+    return DiracDeltaLayer(
+        np.zeros(3, dtype=np.int64),
+        np.array([0.0, 1.0, 2.0]),
+        np.array([1.0, 1.0, 1.0]),
+    )
 
 
 @pytest.mark.parametrize(
@@ -492,7 +502,7 @@ def test_dirac_delta_layer_agrees_with_the_scalar_truncation(
     three_dirac_deltas, x, assignment
 ):
     log_probabilities = three_dirac_deltas.log_truncated_of_assignment(
-        assignment, False
+        assignment=assignment, variable=x, singleton_allowed=False
     ).log_probabilities
     for node in range(three_dirac_deltas.number_of_nodes):
         expected = (
@@ -511,7 +521,9 @@ def test_dirac_delta_layer_contains_a_location_an_interval_cannot_hold_exactly(x
     The layer still recognises it, or a circuit gives its own support probability zero.
     """
     location = 3.427709925174713
-    layer = DiracDeltaLayer(0, np.array([location]), np.array([1.0]))
+    layer = DiracDeltaLayer(
+        np.zeros(1, dtype=np.int64), np.array([location]), np.array([1.0])
+    )
     assert singleton(location).simple_sets[0].lower != location
     assert layer.probability_of_simple_event_of_nodes(
         SimpleEvent.from_data({x: singleton(location)}), SortedSet([x])
@@ -519,7 +531,9 @@ def test_dirac_delta_layer_contains_a_location_an_interval_cannot_hold_exactly(x
 
 
 def test_dirac_delta_layer_excludes_a_location_outside_its_tolerance(x):
-    layer = DiracDeltaLayer(0, np.array([1.0]), np.array([1.0]))
+    layer = DiracDeltaLayer(
+        np.zeros(1, dtype=np.int64), np.array([1.0]), np.array([1.0])
+    )
     assert layer.probability_of_simple_event_of_nodes(
         SimpleEvent.from_data({x: closed(1.0 + 1e-3, 2.0)}), SortedSet([x])
     ) == np.array([0.0])
@@ -536,7 +550,9 @@ def test_discrete_layer_agrees_with_the_scalar_truncation(count, assignment):
         IntegerDistribution(variable=count, probabilities=MissingDict(float, {0: 1.0})),
     ]
     layer = IntegerLayer.from_distributions(0, distributions)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=count, singleton_allowed=False
+    )
     for node, distribution in enumerate(distributions):
         expected_truncation = distribution.log_truncated(
             SimpleEvent.from_data({count: assignment}).as_composite_set()
@@ -565,7 +581,9 @@ def test_gaussian_layer_agrees_with_the_scalar_truncation(
     layer = GaussianLayer.from_distributions(0, distributions)
     event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
     truncated = layer.log_truncated_of_assignment(
-        event_interval.as_composite_set(), False
+        assignment=event_interval.as_composite_set(),
+        variable=x,
+        singleton_allowed=False,
     )
 
     for node, distribution in enumerate(distributions):
@@ -595,7 +613,9 @@ def test_gaussian_layer_truncated_to_the_real_line_stays_gaussian(x):
             GaussianDistribution(variable=x, location=5.0, scale=2.0),
         ],
     )
-    truncated = layer.log_truncated_of_assignment(reals(), False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=reals(), variable=x, singleton_allowed=False
+    )
     assert type(truncated.layer) is GaussianLayer
     np.testing.assert_allclose(truncated.log_probabilities, 0.0, atol=1e-9)
     np.testing.assert_array_equal(truncated.layer.location, layer.location)
@@ -611,7 +631,7 @@ def test_gaussian_layer_marks_a_node_with_no_probability_left_as_impossible(x):
         ],
     )
     log_probabilities = layer.log_truncated_of_assignment(
-        closed(99.0, 101.0), False
+        assignment=closed(99.0, 101.0), variable=x, singleton_allowed=False
     ).log_probabilities
     assert log_probabilities[0] == -np.inf
     assert log_probabilities[1] > -np.inf
@@ -621,7 +641,9 @@ def test_a_singleton_turns_every_gaussian_node_into_a_dirac_delta(x):
     layer = GaussianLayer.from_distributions(
         0, [GaussianDistribution(variable=x, location=0.0, scale=1.0)]
     )
-    truncated = layer.log_truncated_of_assignment(singleton(1.0), True)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=singleton(1.0), variable=x, singleton_allowed=True
+    )
     assert isinstance(truncated.layer, DiracDeltaLayer)
     assert float(truncated.log_probabilities[0]) == pytest.approx(
         float(layer.log_likelihood_of_nodes_from_column(np.array([1.0]))[0, 0])
@@ -632,7 +654,9 @@ def test_a_composite_assignment_mixes_the_truncated_gaussians(x):
     distribution = GaussianDistribution(variable=x, location=0.0, scale=1.0)
     layer = GaussianLayer.from_distributions(0, [distribution])
     assignment = closed(-1, 0) | closed(1, 2)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=False
+    )
     assert isinstance(truncated.layer, SumLayer)
     assert isinstance(truncated.layer.child_layers[0], TruncatedGaussianLayer)
     assert float(np.exp(truncated.log_probabilities[0])) == pytest.approx(
@@ -657,7 +681,9 @@ def test_truncated_gaussian_layer_agrees_with_the_scalar_truncation(x, assignmen
     ]
     layer = TruncatedGaussianLayer.from_distributions(0, distributions)
     points = np.linspace(-1.5, 3.5, 11).reshape(-1, 1)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=False
+    )
     assert isinstance(truncated.layer, TruncatedGaussianLayer)
     for node, distribution in enumerate(distributions):
         expected_truncation = distribution.log_truncated(
@@ -907,7 +933,9 @@ def gaussian_layer() -> GaussianLayer:
     """
     Gaussians at -1 and 2.
     """
-    return GaussianLayer(0, np.array([-1.0, 2.0]), np.array([0.5, 1.5]))
+    return GaussianLayer(
+        np.zeros(2, dtype=np.int64), np.array([-1.0, 2.0]), np.array([0.5, 1.5])
+    )
 
 
 @pytest.fixture
@@ -917,7 +945,7 @@ def truncated_gaussian_layer() -> TruncatedGaussianLayer:
     location.
     """
     return TruncatedGaussianLayer(
-        0,
+        np.zeros(3, dtype=np.int64),
         np.array([[-1.0, 0.5], [0.0, 3.0], [2.0, 10.0]]),
         np.full((3, 2), int(Bound.CLOSED), dtype=np.int64),
         np.array([0.0, 2.5, 0.0]),
@@ -938,7 +966,9 @@ def dirac_delta_layer() -> DiracDeltaLayer:
     """
     Dirac deltas at 0.5 and 3.
     """
-    return DiracDeltaLayer(0, np.array([0.5, 3.0]), np.ones(2))
+    return DiracDeltaLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.5, 3.0]), np.ones(2)
+    )
 
 
 @pytest.fixture(
@@ -998,9 +1028,9 @@ def gaussian_layer_with_scale(
     """
     location = np.zeros(2)
     if not truncated:
-        return GaussianLayer(0, location, scale)
+        return GaussianLayer(np.zeros(2, dtype=np.int64), location, scale)
     return TruncatedGaussianLayer(
-        0,
+        np.zeros(2, dtype=np.int64),
         np.tile([[-1.0, 1.0]], (number_of_intervals, 1)),
         np.full((number_of_intervals, 2), int(Bound.CLOSED), dtype=np.int64),
         location,
@@ -1078,7 +1108,9 @@ def test_samples_of_every_discrete_node_follow_its_distribution(
 
 
 def test_a_discrete_node_without_mass_samples_nothing(integer_layer, count):
-    truncated = integer_layer.log_truncated_of_assignment(closed(2, 2), False).layer
+    truncated = integer_layer.log_truncated_of_assignment(
+        assignment=closed(2, 2), variable=count, singleton_allowed=False
+    ).layer
     samples = truncated.sample_of_nodes(np.array([0, 1, 1]), SortedSet([count]))
     assert samples[0] == 2.0
     assert np.isnan(samples[1:]).all()

@@ -272,7 +272,7 @@ def gaussian_layer_with_scale(variables: Variables, scale: float) -> GaussianLay
     :param scale: The scale of the Gaussian.
     :return: A layer of one Gaussian over ``x`` with mean zero.
     """
-    return GaussianLayer(0, np.zeros(1), np.full(1, scale))
+    return GaussianLayer(np.zeros(1, dtype=np.int64), np.zeros(1), np.full(1, scale))
 
 
 def truncated_gaussian_layer_over(
@@ -285,7 +285,7 @@ def truncated_gaussian_layer_over(
         bound.
     """
     return TruncatedGaussianLayer(
-        0,
+        np.zeros(1, dtype=np.int64),
         np.array([[0.0, upper]]),
         np.full((1, 2), int(Bound.CLOSED), dtype=np.int64),
         np.zeros(1),

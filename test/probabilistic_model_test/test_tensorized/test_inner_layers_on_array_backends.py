@@ -88,10 +88,14 @@ class MixtureOfProductsCase:
         :return: The circuit with every parameter an array of that namespace.
         """
         leaf_x = GaussianLayer(
-            0, namespace.asarray([-1.0, 2.0]), namespace.asarray([0.5, 1.5])
+            np.zeros(2, dtype=np.int64),
+            namespace.asarray([-1.0, 2.0]),
+            namespace.asarray([0.5, 1.5]),
         )
         leaf_y = GaussianLayer(
-            1, namespace.asarray([0.0, 1.0]), namespace.asarray([1.0, 2.0])
+            np.full(2, 1, dtype=np.int64),
+            namespace.asarray([0.0, 1.0]),
+            namespace.asarray([1.0, 2.0]),
         )
         products = ProductLayer.node_wise_product_of([leaf_x, leaf_y])
         products.store_edges_as(edge_matrix_type)

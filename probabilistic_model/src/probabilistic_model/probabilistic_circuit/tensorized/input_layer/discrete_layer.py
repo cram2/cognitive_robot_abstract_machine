@@ -26,6 +26,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeValues,
     SampleArray,
     SampleColumn,
+    SampleNodeStateIndices,
     SampleNodeValues,
     StateIndices,
     StateMask,
@@ -116,6 +117,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         )
 
     def validate_own(self):
+        super().validate_own()
         if self.table.number_of_states != self.number_of_states:
             raise ShapeMismatchError(
                 (self.table.number_of_nodes, self.table.number_of_states),
@@ -123,29 +125,44 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             )
 
     @abstractmethod
-    def selected_states(self, assignment: AbstractCompositeSet) -> StateMask:
+    def selected_states(
+        self, *, assignment: AbstractCompositeSet, variable: Variable
+    ) -> StateMask:
         """
         :param assignment: The assignment of the variable of this layer.
+        :param variable: The variable of this layer.
         :return: The states the assignment contains.
         """
         raise NotImplementedError
 
-    def state_indices_of(self, values: SampleColumn) -> StateIndices:
+    def state_indices_of(
+        self, values: SampleColumn | SampleNodeValues
+    ) -> StateIndices | SampleNodeStateIndices:
         """
         Look up the index of every value in :attr:`states`.
 
-        :param values: The values of the variable as the layers read them: the value
+        :param values: The values of the variables as the layers read them: the value
             itself for an integer variable and the position of the domain element for a
-            symbolic variable, see :class:`SymbolicEncoding`.
-        :return: The index of every value, or ``-1`` for values that are not a state.
+            symbolic variable, see :class:`SymbolicEncoding`. One value for every node,
+            shape (#events,), or the value of every node, shape (#events, #nodes).
+        :return: The index of every value, in the shape of ``values``, or ``-1`` for
+            values that are not a state.
         """
-        values = self.float_column(values=values)[:, 0]
+        values = self.float_column(values=values)
+        if values.shape[1] == 1:
+            values = values[:, 0]
         states = self.float_states
         positions = self.namespace.minimum(
             self.namespace.searchsorted(states, values),
             max(self.number_of_states - 1, 0),
         )
-        found = self.namespace.take(states, positions) == values
+        found = (
+            self.namespace.reshape(
+                self.namespace.take(states, self.namespace.reshape(positions, (-1,))),
+                positions.shape,
+            )
+            == values
+        )
         return self.namespace.where(found, positions, -1)
 
     @memoized
@@ -169,8 +186,17 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
+        if not self.is_over_one_variable:
+            return self.namespace.concat(
+                [
+                    group.probability_of_simple_event_of_nodes(event, variables)
+                    for group in self.groups_of_one_variable()
+                ],
+                axis=0,
+            )
+        variable = variables[self.variable]
         return self.table.probability_of_states(
-            self.selected_states(event[variables[self.variable]])
+            self.selected_states(assignment=event[variable], variable=variable)
         )
 
     def type_of_truncated_layer(
@@ -179,10 +205,16 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         return self.__class__
 
     def log_truncated_of_assignment(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self,
+        *,
+        assignment: AbstractCompositeSet,
+        variable: Variable,
+        singleton_allowed: bool,
     ) -> LayerWithLogProbabilities:
         # a single state left is handled like any other set of states
-        return self.renormalized_to(self.selected_states(assignment))
+        return self.renormalized_to(
+            self.selected_states(assignment=assignment, variable=variable)
+        )
 
     def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
         # the value is read like the values of events, see state_indices_of
@@ -226,11 +258,13 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
 
     def with_table(self, table: ProbabilityTable) -> Self:
         """
-        :param table: The probability table of the new layer, over the states of this
-            one.
-        :return: A layer over the same variable and states as this one with this table.
+        :param table: The probability table of the new layer, over the nodes and the
+            states of this one.
+        :return: A layer over the same variables and states as this one with this table.
         """
-        return self.__class__(self.variable, self.states.copy(), table)
+        return dataclasses.replace(
+            self, node_variables=self.node_variables.copy(), table=table
+        )
 
     def stored_as(self, table_type: type[ProbabilityTable]) -> Self:
         """
@@ -249,7 +283,10 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         """
         :param table_type: The type of table to store the probabilities in.
         """
-        return cls(variable_index, *cls.parameters_of(distributions, table_type))
+        return cls(
+            np.full(len(distributions), variable_index, dtype=np.int64),
+            *cls.parameters_of(distributions, table_type),
+        )
 
     @classmethod
     def parameters_of(
@@ -318,15 +355,44 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         return dict(distribution.probabilities)
 
     def select_nodes(self, mask: NodeMask) -> Self:
-        return self.with_table(self.table.select_nodes(mask))
+        return dataclasses.replace(
+            self,
+            node_variables=self.node_variables[mask],
+            table=self.table.select_nodes(mask),
+        )
 
     @classmethod
     def concatenate(cls, layers: list[Self]) -> Self:
-        # truncating a discrete layer never changes its states, so the tables line up;
-        # the result is stored like the table of the first layer
+        """
+        Like :meth:`LeafLayer.concatenate`; the result is over the states of any of the
+        layers, a state a layer lacks having probability zero under its nodes, and is
+        stored like the table of the first layer.
+        """
         table_type = type(layers[0].table)
-        return layers[0].with_table(
-            table_type.concatenate([table_type.of(layer.table) for layer in layers])
+        states = np.unique(np.concatenate([layer.states for layer in layers]))
+        return dataclasses.replace(
+            layers[0],
+            node_variables=np.concatenate([layer.node_variables for layer in layers]),
+            states=states,
+            table=table_type.concatenate(
+                [table_type.of(layer.table_over(states=states)) for layer in layers]
+            ),
+        )
+
+    def table_over(self, *, states: States) -> ProbabilityTable:
+        """
+        :param states: Sorted states that include those of this layer.
+        :return: The table of this layer over these states, a state this layer lacks
+            having probability zero.
+        """
+        if np.array_equal(states, self.states):
+            return self.table
+        rows, columns, probabilities = self.table.entries()
+        return type(self.table).from_entries(
+            rows,
+            np.searchsorted(states, self.states[columns]),
+            probabilities,
+            (self.number_of_nodes, len(states)),
         )
 
     def has_equal_parameters(self, other: Self) -> bool:
@@ -358,29 +424,6 @@ class SymbolicLayer(DiscreteLayer):
     The states are the positions of the domain elements, see :class:`SymbolicEncoding`.
     """
 
-    domain_hashes: SampleColumn
-    """
-    The hash of every domain element of the variable, at the position of the element.
-    """
-
-    def with_table(self, table: ProbabilityTable) -> Self:
-        return self.__class__(
-            self.variable, self.states.copy(), table, self.domain_hashes
-        )
-
-    @classmethod
-    def from_distributions(
-        cls,
-        variable_index: int,
-        distributions: list[SymbolicDistribution],
-        table_type: type[ProbabilityTable] = DenseProbabilityTable,
-    ) -> Self:
-        return cls(
-            variable_index,
-            *cls.parameters_of(distributions, table_type),
-            SymbolicEncoding(distributions[0].variable).hashes,
-        )
-
     @classmethod
     def probabilities_by_state_of(
         cls, distribution: SymbolicDistribution
@@ -404,11 +447,19 @@ class SymbolicLayer(DiscreteLayer):
             ),
         )
 
-    def selected_states(self, assignment: Set) -> StateMask:
-        hashes = np.array(
+    def selected_states(self, *, assignment: Set, variable: Variable) -> StateMask:
+        """
+        Like :meth:`DiscreteLayer.selected_states`; a state past the domain of the
+        variable, which a layer over several variables pads, is never selected.
+        """
+        assigned = np.array(
             [hash(simple_set) for simple_set in assignment.simple_sets], dtype=float
         )
-        return np.isin(self.domain_hashes[self.states], hashes)
+        domain = SymbolicEncoding(variable).hashes
+        in_domain = self.states < len(domain)
+        selected = np.zeros(self.number_of_states, dtype=bool)
+        selected[in_domain] = np.isin(domain[self.states[in_domain]], assigned)
+        return selected
 
 
 @dataclass(eq=False, repr=False)
@@ -422,7 +473,7 @@ class IntegerLayer(DiscreteLayer):
             variable=variable, probabilities=self.probabilities_of_node(index)
         )
 
-    def selected_states(self, assignment: Interval) -> StateMask:
+    def selected_states(self, *, assignment: Interval, variable: Variable) -> StateMask:
         return np.array(
             [state in assignment for state in self.states.tolist()], dtype=bool
         )
@@ -435,6 +486,14 @@ class IntegerLayer(DiscreteLayer):
         Unlike :meth:`DiscreteLayer.cumulative_distribution_of_nodes`, integers are
         ordered: the result is the probability of the states up to every value.
         """
+        if not self.is_over_one_variable:
+            return self.namespace.concat(
+                [
+                    group.cumulative_distribution_of_nodes(events)
+                    for group in self.groups_of_one_variable()
+                ],
+                axis=1,
+            )
         reached = self.float_column(values=self.column_of(events)) >= self.float_states
         return self.table.dot(
             self.namespace.astype(reached, self.floating_point_type).T

@@ -38,6 +38,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,
     Layer,
+    LeafLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     EdgeMatrix,
@@ -214,6 +215,47 @@ class SumLayer(HasParameterArrays, InnerLayer):
         return LayerWithLogProbabilities(
             cls.from_entries(child_layers, log_weights, number_of_nodes),
             node_log_probabilities,
+        )
+
+    @classmethod
+    def concatenation_of_pieces(
+        cls, pieces: list[LayerWithLogProbabilities]
+    ) -> LayerWithLogProbabilities:
+        """
+        Join the pieces a query splits the nodes of a layer into, the nodes of
+        ``pieces[k]`` as one contiguous block after those of the pieces before it.
+
+        A single piece is returned as it is. Leaf pieces of one type become one layer of
+        that type. Any other pieces become a sum layer whose every node has the one node
+        of its piece as its only child, with weight one.
+
+        :param pieces: The pieces, in the order of their nodes, and the log-
+            probabilities of their nodes.
+        :return: The joined layer and the log-probabilities of its nodes.
+        """
+        if len(pieces) == 1:
+            return pieces[0]
+        log_probabilities = np.concatenate(
+            [piece.log_probabilities for piece in pieces]
+        )
+        layer_types = {type(piece.layer) for piece in pieces}
+        layer_type = next(iter(layer_types))
+        if len(layer_types) == 1 and issubclass(layer_type, LeafLayer):
+            return LayerWithLogProbabilities(
+                layer_type.concatenate([piece.layer for piece in pieces]),
+                log_probabilities,
+            )
+        number_of_nodes = len(log_probabilities)
+        log_weights = SparseEntries(
+            np.zeros(number_of_nodes),
+            np.arange(number_of_nodes),
+            np.arange(number_of_nodes),
+        )
+        return LayerWithLogProbabilities(
+            cls.from_entries(
+                [piece.layer for piece in pieces], log_weights, number_of_nodes
+            ),
+            log_probabilities,
         )
 
     @property
