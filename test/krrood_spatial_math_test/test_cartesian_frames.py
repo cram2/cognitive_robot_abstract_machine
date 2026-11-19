@@ -15,7 +15,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 from krrood_spatial_math.coordinate_system import CartesianFrame, GenericSpace
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import MissingCartesianFrame3DimensionalResolver
-from krrood_spatial_math.space import EuclideanSpace3Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 
 from .dataset.frames import KnownFrames, ThingFrame
 
@@ -31,10 +31,13 @@ def test_a_three_dimensional_cartesian_frame_is_a_cartesian_frame():
     assert issubclass(CartesianFrame3Dimensional, CartesianFrame)
 
 
-def test_a_three_dimensional_cartesian_frame_charts_three_dimensional_euclidean_space():
+def test_a_three_dimensional_cartesian_frame_charts_a_euclidean_space():
+    """
+    The kind of space a body's frame charts is read back from the frame class.
+    """
     assert (
         CartesianFrame3Dimensional.get_type_of_generic_parameter(parameter=GenericSpace)
-        is EuclideanSpace3Dimensional
+        is EuclideanSpace
     )
 
 

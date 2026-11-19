@@ -26,7 +26,7 @@ from krrood_spatial_math.exceptions import (
     MissingCartesianFrame3DimensionalResolver,
     MissingReferenceFrameError,
 )
-from krrood_spatial_math.space import EuclideanSpace3Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 
 if TYPE_CHECKING:
     from krrood_spatial_math.vector import Vector
@@ -79,9 +79,7 @@ class EmbeddedPlaneRelation(Enum):
 # %% frames that positions and directions are expressed in
 
 
-class CartesianFrame3Dimensional(
-    CartesianFrame[EuclideanSpace3Dimensional, NameT], Interface
-):
+class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interface):
     """
     A right-handed Cartesian frame on a three-dimensional Euclidean space, in metres,
     such as the frame of a robot's body.

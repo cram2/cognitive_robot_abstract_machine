@@ -41,7 +41,7 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     BulletCollisionDetector,
 )
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
-from krrood_spatial_math.space import EuclideanSpace3Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import (
@@ -606,7 +606,7 @@ _LRU_CACHE_SIZE: int = 2048
 
 
 @dataclass
-class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
+class World(HasSimulatorProperties, EuclideanSpace):
     """
     The three-dimensional space the frames of its kinematic structure entities chart.
 

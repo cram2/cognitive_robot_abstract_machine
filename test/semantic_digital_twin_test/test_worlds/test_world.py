@@ -48,7 +48,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import FramesOfDifferentSpacesError
-from krrood_spatial_math.space import EuclideanSpace3Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.derivatives import (
     Derivatives,
@@ -580,7 +580,7 @@ def test_a_world_is_a_three_dimensional_euclidean_space():
     """
     The world is the space the frames of its bodies chart.
     """
-    assert issubclass(World, EuclideanSpace3Dimensional)
+    assert issubclass(World, EuclideanSpace)
 
 
 def test_a_body_charts_the_space_of_its_world(world_setup):

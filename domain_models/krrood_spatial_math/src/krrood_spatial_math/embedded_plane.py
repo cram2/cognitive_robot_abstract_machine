@@ -11,7 +11,7 @@ from typing_extensions import TYPE_CHECKING
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
 )
-from krrood_spatial_math.space import EuclideanSpace2Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 
 if TYPE_CHECKING:
     from krrood_spatial_math.vector import Vector
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, kw_only=True, eq=False)
-class EmbeddedPlane(EuclideanSpace2Dimensional):
+class EmbeddedPlane(EuclideanSpace):
     """
     A plane lying in a known three-dimensional Euclidean space: the x-y plane of
     :attr:`frame_3_dimensional`, whose :attr:`normal` is that frame's z-axis.

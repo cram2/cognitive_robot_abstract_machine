@@ -6,10 +6,10 @@ coordinate systems on it, so that a value always says which coordinate system it
 coordinates are given in, and coordinates are only combined after changing them into one
 coordinate system. Its base depends on `krrood` alone.
 
-- `krrood_spatial_math.space`: `Space`, a set of points with a geometry;
-  `EuclideanSpace`, one with distances and angles, whose `dimension` each subclass
-  fixes; `EuclideanSpace2Dimensional`, such as the floor a robot drives on; and
-  `EuclideanSpace3Dimensional`, such as the physical space a robot's bodies are in.
+- `krrood_spatial_math.space`: `Space`, a set of points with a geometry, and
+  `EuclideanSpace`, one with distances and angles, such as the physical space a robot's
+  bodies are in or the plane of a frame. A value's dimension is the number of its
+  coordinates.
 - `krrood_spatial_math.coordinate_system`: `CoordinateSystem`, what coordinates on one
   space are given in; `AffineFrame`, one with an origin and straight axes, and
   `CartesianFrame`, an affine frame whose axes are perpendicular and of unit length,
@@ -63,8 +63,8 @@ coordinate system. Its base depends on `krrood` alone.
 
 | Space | Frame | Coordinate change | Kept by the change |
 |---|---|---|---|
-| `EuclideanSpace3Dimensional` | `CartesianFrame3Dimensional`, metres | `RigidCoordinateChange` | distances, angles |
-| `EuclideanSpace2Dimensional` | `CartesianFrame2Dimensional`, metres | `RigidCoordinateChange` | distances, angles |
+| `EuclideanSpace` | `CartesianFrame3Dimensional`, metres | `RigidCoordinateChange` | distances, angles |
+| `EmbeddedPlane` | `CartesianFrame2Dimensional`, metres | `RigidCoordinateChange` | distances, angles |
 
 Other domain models add their own spaces on these interfaces; `krrood_image`, for
 example, adds image planes, whose pixel frames are affine and related by affine changes.
@@ -83,11 +83,11 @@ from uuid import UUID, uuid4
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.coordinate_system import AffineFrame
 from krrood_spatial_math.point import Point
-from krrood_spatial_math.space import EuclideanSpace2Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.vector import Vector
 
 
-class ImagePlane(EuclideanSpace2Dimensional):
+class ImagePlane(EuclideanSpace):
     """The plane a camera's images lie on."""
 
 

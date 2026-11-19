@@ -26,7 +26,7 @@ from krrood_spatial_math.exceptions import (
     XAxisNormalToPlaneError,
 )
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
-from krrood_spatial_math.space import EuclideanSpace2Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import (
     SymbolicSpatialValue3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
@@ -107,8 +107,11 @@ def coordinates(*values: sm.Scalar) -> np.ndarray:
 # %% the plane a frame's x- and y-axes span
 
 
-def test_a_frames_xy_plane_is_a_two_dimensional_euclidean_space():
-    assert issubclass(EmbeddedPlane, EuclideanSpace2Dimensional)
+def test_a_frames_xy_plane_is_a_euclidean_space():
+    """
+    The x-y plane of a frame measures distances and angles.
+    """
+    assert issubclass(EmbeddedPlane, EuclideanSpace)
 
 
 def test_the_planes_of_one_frame_are_one_plane(floor_frame):

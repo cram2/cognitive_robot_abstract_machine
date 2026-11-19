@@ -16,14 +16,14 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 )
 from krrood_spatial_math.coordinate_system import GenericCoordinateRepresentation
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
-from krrood_spatial_math.space import EuclideanSpace3Dimensional
+from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import Vector3Dimensional
 
 # %% a space frames chart
 
 
 @dataclass(eq=False)
-class Room(EuclideanSpace3Dimensional):
+class Room(EuclideanSpace):
     """
     A three-dimensional Euclidean space, told apart from other rooms only by identity.
     """
@@ -44,7 +44,7 @@ class NamedFrame(CartesianFrame3Dimensional[str]):
     What the frame is called.
     """
 
-    space: EuclideanSpace3Dimensional | None = None
+    space: EuclideanSpace | None = None
     """
     The space the frame charts.
     """
@@ -118,7 +118,7 @@ class ThingFrame(IdentifiedNamedThing, CartesianFrame3Dimensional[str]):
     A Cartesian frame that extends an object named before it is identified.
     """
 
-    space: EuclideanSpace3Dimensional | None = None
+    space: EuclideanSpace | None = None
     """
     The space the frame charts.
     """
