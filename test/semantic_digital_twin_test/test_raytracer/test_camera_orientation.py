@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.camera_rendering import RayIntersections
@@ -200,7 +200,7 @@ def test_render_preserves_off_center_projection(
         image_resolution=CameraResolution(width=8, height=6),
         focal_length_x=10.0,
         focal_length_y=12.0,
-        principal_point=CartesianPoint2Dimensional(x=2.0, y=1.0),
+        principal_point=Point2Dimensional(x=2.0, y=1.0),
     )
     optical_camera.camera_model = model
     tracer = optical_camera.root._world.ray_tracer

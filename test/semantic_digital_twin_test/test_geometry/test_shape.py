@@ -16,7 +16,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -40,10 +40,10 @@ def test_recenter_origin_centers_bounding_box():
     # A non-planar point cloud whose bounding box is offset from the origin.
     mesh = Mesh.from_3d_points(
         points_3d=[
-            CartesianPoint3Dimensional(0, 0, 0),
-            CartesianPoint3Dimensional(2, 0, 0),
-            CartesianPoint3Dimensional(0, 4, 0),
-            CartesianPoint3Dimensional(0, 0, 6),
+            Point3Dimensional(0, 0, 0),
+            Point3Dimensional(2, 0, 0),
+            Point3Dimensional(0, 4, 0),
+            Point3Dimensional(0, 0, 6),
         ]
     )
     bounding_box = mesh.local_frame_bounding_box
@@ -65,10 +65,10 @@ def test_recenter_origin_preserves_existing_rotation():
     # survive so the shape is not silently re-oriented.
     mesh = Mesh.from_3d_points(
         points_3d=[
-            CartesianPoint3Dimensional(0, 0, 0),
-            CartesianPoint3Dimensional(2, 0, 0),
-            CartesianPoint3Dimensional(0, 4, 0),
-            CartesianPoint3Dimensional(0, 0, 6),
+            Point3Dimensional(0, 0, 0),
+            Point3Dimensional(2, 0, 0),
+            Point3Dimensional(0, 4, 0),
+            Point3Dimensional(0, 0, 6),
         ]
     )
     mesh.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(

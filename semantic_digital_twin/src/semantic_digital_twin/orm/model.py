@@ -17,12 +17,12 @@ from sqlalchemy import TypeDecorator, types
 from typing_extensions import Self
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-from krrood_spatial_math.point import CartesianPoint
+from krrood_spatial_math.point import Point
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
@@ -35,7 +35,7 @@ from krrood_spatial_math.spatial_types import (
     Twist,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -134,7 +134,7 @@ class Vector3DimensionalMapping(AlternativeMapping[Vector3Dimensional]):
 
 
 @dataclass(eq=False)
-class CartesianPointMapping(AlternativeMapping[CartesianPoint], ABC):
+class PointMapping(AlternativeMapping[Point], ABC):
     """
     What every stored point given in a Cartesian frame keeps, whatever its dimension.
     """
@@ -146,9 +146,7 @@ class CartesianPointMapping(AlternativeMapping[CartesianPoint], ABC):
 
 
 @dataclass(eq=False)
-class CartesianPoint3DimensionalMapping(
-    CartesianPointMapping, AlternativeMapping[CartesianPoint3Dimensional]
-):
+class Point3DimensionalMapping(PointMapping, AlternativeMapping[Point3Dimensional]):
     """
     A stored point given by three coordinates in its reference frame.
     """
@@ -169,7 +167,7 @@ class CartesianPoint3DimensionalMapping(
     """
 
     @classmethod
-    def from_domain_object(cls, *, obj: CartesianPoint3Dimensional) -> Self:
+    def from_domain_object(cls, *, obj: Point3Dimensional) -> Self:
         return cls(
             x=float(obj.x),
             y=float(obj.y),
@@ -177,8 +175,8 @@ class CartesianPoint3DimensionalMapping(
             reference_frame=obj.reference_frame,
         )
 
-    def to_domain_object(self) -> CartesianPoint3Dimensional:
-        return CartesianPoint3Dimensional(
+    def to_domain_object(self) -> Point3Dimensional:
+        return Point3Dimensional(
             x=self.x, y=self.y, z=self.z, reference_frame=self.reference_frame
         )
 
@@ -372,7 +370,7 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
 class HomogeneousTransformationMatrix3DimensionalMapping(
     AlternativeMapping[HomogeneousTransformationMatrix3Dimensional]
 ):
-    position: CartesianPoint3Dimensional
+    position: Point3Dimensional
     axis_angle: AxisAngle
 
     reference_frame: KinematicStructureEntity | None
@@ -397,12 +395,12 @@ class HomogeneousTransformationMatrix3DimensionalMapping(
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [CartesianPoint3Dimensional, AxisAngle]
+        return [Point3Dimensional, AxisAngle]
 
 
 @dataclass(eq=False)
 class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
-    position: CartesianPoint3Dimensional
+    position: Point3Dimensional
     axis_angle: AxisAngle
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
@@ -422,27 +420,27 @@ class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
     @classmethod
     def from_point_mapping_quaternion_mapping(
         cls,
-        position: CartesianPoint3DimensionalMapping,
+        position: Point3DimensionalMapping,
         orientation: QuaternionMapping,
         reference_frame: KinematicStructureEntity,
     ) -> Pose3Dimensional:
         """
-        Creates a Pose3Dimensional instance from a CartesianPoint3DimensionalMapping and
+        Creates a Pose3Dimensional instance from a Point3DimensionalMapping and
         a QuaternionMapping.
 
         This method constructs a Pose3Dimensional object by utilizing the provided
-        CartesianPoint3DimensionalMapping for the position and the QuaternionMapping for
+        Point3DimensionalMapping for the position and the QuaternionMapping for
         the orientation. The resulting Pose3Dimensional is associated with the specified
         reference frame.
 
-        :param position: A CartesianPoint3DimensionalMapping object that provides the
+        :param position: A Point3DimensionalMapping object that provides the
             position data for the Pose3Dimensional.
         :param orientation: A QuaternionMapping object that provides the orientation
             data for the Pose3Dimensional.
         :param reference_frame: The reference frame to which the Pose3Dimensional will
             be associated.
         :return: A Pose3Dimensional instance created from the given
-            CartesianPoint3DimensionalMapping and QuaternionMapping.
+            Point3DimensionalMapping and QuaternionMapping.
         """
         return Pose3Dimensional(
             position=position.to_domain_object(),
@@ -452,13 +450,11 @@ class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [CartesianPoint3Dimensional, AxisAngle]
+        return [Point3Dimensional, AxisAngle]
 
 
 @dataclass(eq=False)
-class CartesianPoint2DimensionalMapping(
-    CartesianPointMapping, AlternativeMapping[CartesianPoint2Dimensional]
-):
+class Point2DimensionalMapping(PointMapping, AlternativeMapping[Point2Dimensional]):
     """
     A stored point given by two coordinates on the x-y plane of its reference frame.
     """
@@ -474,18 +470,18 @@ class CartesianPoint2DimensionalMapping(
     """
 
     @classmethod
-    def from_domain_object(cls, *, obj: CartesianPoint2Dimensional) -> Self:
+    def from_domain_object(cls, *, obj: Point2Dimensional) -> Self:
         return cls(x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame)
 
-    def to_domain_object(self) -> CartesianPoint2Dimensional:
-        return CartesianPoint2Dimensional(
+    def to_domain_object(self) -> Point2Dimensional:
+        return Point2Dimensional(
             x=self.x, y=self.y, reference_frame=self.reference_frame
         )
 
 
 @dataclass(eq=False)
 class Pose2DimensionalMapping(AlternativeMapping[Pose2Dimensional]):
-    position: CartesianPoint2Dimensional
+    position: Point2Dimensional
     yaw: float
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
@@ -504,7 +500,7 @@ class Pose2DimensionalMapping(AlternativeMapping[Pose2Dimensional]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [CartesianPoint2Dimensional]
+        return [Point2Dimensional]
 
 
 class TrimeshType(TypeDecorator):

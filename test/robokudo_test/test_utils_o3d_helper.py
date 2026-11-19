@@ -21,7 +21,7 @@ from robokudo.utils.o3d_helper import (
     create_line_for_visualization,
     create_sphere_from_translation,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
@@ -39,7 +39,7 @@ class TestUtilsO3DHelper(object):
             ),
             focal_length_x=intrinsic_matrix[0, 0],
             focal_length_y=intrinsic_matrix[1, 1],
-            principal_point=CartesianPoint2Dimensional(
+            principal_point=Point2Dimensional(
                 x=intrinsic_matrix[0, 2], y=intrinsic_matrix[1, 2]
             ),
         )
@@ -816,7 +816,7 @@ def test_masked_cloud_projects_depth_with_semantic_camera_model() -> None:
         image_resolution=CameraResolution(width=3, height=2),
         focal_length_x=2.0,
         focal_length_y=4.0,
-        principal_point=CartesianPoint2Dimensional(x=0.5, y=0.25),
+        principal_point=Point2Dimensional(x=0.5, y=0.25),
     )
     depth_image = np.zeros((2, 3), dtype=np.uint16)
     depth_image[1, 2] = 1000

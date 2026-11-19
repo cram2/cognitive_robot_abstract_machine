@@ -21,7 +21,7 @@ from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from semantic_digital_twin.robots.tiago import TiagoMujoco
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -308,10 +308,10 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_turning_base_back(
             name="floor",
             world=world,
             floor_polytope=[
-                CartesianPoint3Dimensional(-3, -3, 0),
-                CartesianPoint3Dimensional(3, -3, 0),
-                CartesianPoint3Dimensional(3, 3, 0),
-                CartesianPoint3Dimensional(-3, 3, 0),
+                Point3Dimensional(-3, -3, 0),
+                Point3Dimensional(3, -3, 0),
+                Point3Dimensional(3, 3, 0),
+                Point3Dimensional(-3, 3, 0),
             ],
         )
     tiago_on_the_floor = RobotSpecification(TiagoMujoco).spawn(world)

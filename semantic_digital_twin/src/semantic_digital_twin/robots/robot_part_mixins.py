@@ -35,7 +35,7 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     Vector3Dimensional,
 )
@@ -192,7 +192,7 @@ class Fingertips:
     # %% where they meet
 
     @property
-    def tool_P_grasp(self) -> CartesianPoint3Dimensional:
+    def tool_P_grasp(self) -> Point3Dimensional:
         """
         Where the tips meet as the gripper stands, in :attr:`tool_frame`.
 
@@ -241,7 +241,7 @@ class Fingertips:
         return self.closing_axis
 
     @property
-    def thumb_P_facing_point(self) -> CartesianPoint3Dimensional:
+    def thumb_P_facing_point(self) -> Point3Dimensional:
         """
         The point of the thumb's tip that reaches furthest towards the finger's along
         :attr:`closing_axis`, in the thumb tip's own frame.
@@ -249,7 +249,7 @@ class Fingertips:
         return self._facing_point(self.thumb, -self.tool_V_finger_to_thumb)
 
     @property
-    def finger_P_facing_point(self) -> CartesianPoint3Dimensional:
+    def finger_P_facing_point(self) -> Point3Dimensional:
         """
         The point of the finger's tip that reaches furthest towards the thumb's along
         :attr:`closing_axis`, in the finger tip's own frame.
@@ -267,7 +267,7 @@ class Fingertips:
 
     def _facing_point(
         self, tip: Body, tool_V_towards_other_tip: Vector3Dimensional
-    ) -> CartesianPoint3Dimensional:
+    ) -> Point3Dimensional:
         """
         :param tip: One of the two tips.
         :param tool_V_towards_other_tip: The direction towards the other tip, in
@@ -278,7 +278,7 @@ class Fingertips:
         box = tip.collision.as_bounding_box_collection_in_frame(tip).bounding_box()
         tool_T_tip = self._world.compute_forward_kinematics(self.tool_frame, tip)
         corners = (
-            CartesianPoint3Dimensional(*corner, reference_frame=tip)
+            Point3Dimensional(*corner, reference_frame=tip)
             for corner in product(
                 (box.min_x, box.max_x), (box.min_y, box.max_y), (box.min_z, box.max_z)
             )
@@ -299,9 +299,7 @@ class Fingertips:
             self.tool_frame
         ).bounding_box()
 
-    def _closing_axis_coordinate(
-        self, tool_P_point: CartesianPoint3Dimensional
-    ) -> float:
+    def _closing_axis_coordinate(self, tool_P_point: Point3Dimensional) -> float:
         """
         :param tool_P_point: A point in :attr:`tool_frame`.
         :return: Where it lies along :attr:`closing_axis`.
@@ -398,7 +396,7 @@ class HasTwoFingers(
 
     def _meeting_point_in_state(
         self, fingertips: Fingertips, state_type: JointStateType
-    ) -> CartesianPoint3Dimensional:
+    ) -> Point3Dimensional:
         """
         :param fingertips: The tips to read.
         :param state_type: The state to stand the gripper in.
@@ -411,7 +409,7 @@ class HasTwoFingers(
         return fingertips.tool_P_grasp
 
     @cached_property
-    def tool_P_grasp_when_closed(self) -> CartesianPoint3Dimensional:
+    def tool_P_grasp_when_closed(self) -> Point3Dimensional:
         """
         Where the fingers meet once closed, in :attr:`tool_frame`.
 

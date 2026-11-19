@@ -18,7 +18,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from robokudo_foundation_pose_tensorrt import FoundationPose, ensure_engines
 from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,
@@ -174,9 +174,7 @@ class FoundationPoseEstimator(MeshBasedPoseEstimator):
                 image_resolution=resolution,
                 focal_length_x=focal_length,
                 focal_length_y=focal_length,
-                principal_point=CartesianPoint2Dimensional(
-                    x=float(center_x), y=float(center_y)
-                ),
+                principal_point=Point2Dimensional(x=float(center_x), y=float(center_y)),
             ),
         )
         return ObjectObservation(frame=frame, mask=mask)

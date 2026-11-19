@@ -35,13 +35,13 @@ from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from krrood_spatial_math.point import CartesianPoint
+from krrood_spatial_math.point import Point
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.exceptions import InvalidColorChannelCount
 from semantic_digital_twin.world_description.mesh_file_storage import (
     MeshFileSources,
@@ -531,8 +531,8 @@ class Scale:
         return simple_event
 
     def to_bounding_box(self) -> VolumetricBoundingBox:
-        min_point = CartesianPoint3Dimensional(-self.x / 2, -self.y / 2, -self.z / 2)
-        max_point = CartesianPoint3Dimensional(self.x / 2, self.y / 2, self.z / 2)
+        min_point = Point3Dimensional(-self.x / 2, -self.y / 2, -self.z / 2)
+        max_point = Point3Dimensional(self.x / 2, self.y / 2, self.z / 2)
         return VolumetricBoundingBox.from_min_max(min_point, max_point, None)
 
     def to_np(self) -> np.ndarray:
@@ -702,7 +702,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         center_z = (bounding_box.min_z + bounding_box.max_z) / 2
         self.origin = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                point=CartesianPoint3Dimensional(-center_x, -center_y, -center_z),
+                point=Point3Dimensional(-center_x, -center_y, -center_z),
                 rotation_matrix=self.origin.rotation_matrix,
                 reference_frame=self.origin.reference_frame,
             )
@@ -1144,7 +1144,7 @@ class Mesh(Shape):
     @classmethod
     def from_3d_points(
         cls,
-        points_3d: list[CartesianPoint3Dimensional],
+        points_3d: list[Point3Dimensional],
         reference_frame: KinematicStructureEntity | None = None,
         minimum_thickness: float = 0.005,
         singular_value_ratio_tolerance: float = 1e-7,
@@ -1408,9 +1408,9 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
         against this region, using the slab method.
 
         .. note::
-            ``start``/``direction`` are plain arrays rather than :class:`CartesianPoint3Dimensional`/
+            ``start``/``direction`` are plain arrays rather than :class:`Point3Dimensional`/
             :class:`Vector3Dimensional` on purpose: this runs once per graph node on every
-            collision check, and :class:`CartesianPoint3Dimensional`/:class:`Vector3Dimensional` arithmetic pays a
+            collision check, and :class:`Point3Dimensional`/:class:`Vector3Dimensional` arithmetic pays a
             symbolic (casadi) cost on every access. Callers should convert to arrays
             once before looping, not per call.
 
@@ -1438,11 +1438,11 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
         return SimpleInterval.from_data(t_min, t_max, Bound.CLOSED, Bound.CLOSED)
 
 
-PointT = TypeVar("PointT", bound=CartesianPoint)
+PointT = TypeVar("PointT", bound=Point)
 """
 The point type an :class:`AxisAlignedBox` subclass is asked about --
-:class:`~krrood_spatial_math.spatial_types.CartesianPoint3Dimensional` for a box expressed over
-three axes, :class:`~krrood_spatial_math.spatial_types_2_dimensional.CartesianPoint2Dimensional` for one
+:class:`~krrood_spatial_math.spatial_types.Point3Dimensional` for a box expressed over
+three axes, :class:`~krrood_spatial_math.spatial_types_2_dimensional.Point2Dimensional` for one
 expressed over a plane.
 """
 
@@ -1565,9 +1565,9 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         """
         Express this bounding box's lower and upper corners as plain-float vectors.
 
-        Array-based, not ``CartesianPoint3Dimensional``-based, for the same reason as
+        Array-based, not ``Point3Dimensional``-based, for the same reason as
         :meth:`from_array_bounds`: :meth:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes.calculate_connectivity`
-        reads these generically across dimensionality, and a 2D box has no ``CartesianPoint3Dimensional``
+        reads these generically across dimensionality, and a 2D box has no ``Point3Dimensional``
         corners of its own.
 
         :return: The corners, in the same frame as ``origin``.
@@ -1588,10 +1588,10 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         Rebuild a bounding box from the plain-float corners :meth:`to_array_bounds`
         returns.
 
-        Array-based rather than ``CartesianPoint3Dimensional``-based on purpose:
+        Array-based rather than ``Point3Dimensional``-based on purpose:
         :meth:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes.calculate_connectivity`
         uses this to rebuild a box generically across dimensionality, and a 2D box has
-        no ``CartesianPoint3Dimensional`` corners to build from.
+        no ``Point3Dimensional`` corners to build from.
 
         :param lower: The lower corner.
         :param upper: The upper corner.
@@ -1622,8 +1622,8 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
 
         list_self_T_corner = [
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                corner.to_cartesian_point_3_dimensional()
-                if isinstance(corner, CartesianPoint2Dimensional)
+                corner.to_point_3_dimensional()
+                if isinstance(corner, Point2Dimensional)
                 else corner
             ).to_np()
             for corner in self.get_points()
@@ -1663,7 +1663,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
 
 
 @dataclass(eq=False)
-class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
+class VolumetricBoundingBox(AxisAlignedBox[Point3Dimensional]):
     """
     An axis-aligned box in three-dimensional space.
     """
@@ -1772,11 +1772,11 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
         return [self.depth, self.width, self.height]
 
     @property
-    def center(self) -> CartesianPoint3Dimensional:
+    def center(self) -> Point3Dimensional:
         """
         :return: The center point of the bounding box, in the same frame as ``origin``.
         """
-        return CartesianPoint3Dimensional(
+        return Point3Dimensional(
             self.x_interval.center(),
             self.y_interval.center(),
             self.z_interval.center(),
@@ -1804,7 +1804,7 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
             self.origin,
         )
 
-    def contains(self, point: CartesianPoint3Dimensional) -> bool:
+    def contains(self, point: Point3Dimensional) -> bool:
         """
         Check if the bounding box contains a point.
         """
@@ -1897,14 +1897,14 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
             origin=origin,
         )
 
-    def get_points(self) -> list[CartesianPoint3Dimensional]:
+    def get_points(self) -> list[Point3Dimensional]:
         """
-        Get the 8 corners of the bounding box as CartesianPoint3Dimensional objects.
+        Get the 8 corners of the bounding box as Point3Dimensional objects.
 
-        :return: A list of CartesianPoint3Dimensional objects representing the corners of the bounding box.
+        :return: A list of Point3Dimensional objects representing the corners of the bounding box.
         """
         return [
-            CartesianPoint3Dimensional(x, y, z)
+            Point3Dimensional(x, y, z)
             for x in (self.min_x, self.max_x)
             for y in (self.min_y, self.max_y)
             for z in (self.min_z, self.max_z)
@@ -1913,8 +1913,8 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
     @classmethod
     def from_min_max(
         cls,
-        min_point: CartesianPoint3Dimensional,
-        max_point: CartesianPoint3Dimensional,
+        min_point: Point3Dimensional,
+        max_point: Point3Dimensional,
         origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
@@ -1955,7 +1955,7 @@ class VolumetricBoundingBox(AxisAlignedBox[CartesianPoint3Dimensional]):
 
 
 @dataclass(eq=False)
-class PlanarBoundingBox(AxisAlignedBox[CartesianPoint2Dimensional]):
+class PlanarBoundingBox(AxisAlignedBox[Point2Dimensional]):
     """
     An axis-aligned box in the x-y plane, with no z-extent.
 
@@ -2037,11 +2037,11 @@ class PlanarBoundingBox(AxisAlignedBox[CartesianPoint2Dimensional]):
         return self.depth * self.width
 
     @property
-    def center(self) -> CartesianPoint2Dimensional:
+    def center(self) -> Point2Dimensional:
         """
         :return: The center of the bounding box, in the same frame as ``origin``.
         """
-        return CartesianPoint2Dimensional(
+        return Point2Dimensional(
             self.x_interval.center(),
             self.y_interval.center(),
             reference_frame=self.origin.reference_frame,
@@ -2063,7 +2063,7 @@ class PlanarBoundingBox(AxisAlignedBox[CartesianPoint2Dimensional]):
             self.origin,
         )
 
-    def contains(self, point: CartesianPoint2Dimensional) -> bool:
+    def contains(self, point: Point2Dimensional) -> bool:
         """
         Check if the bounding box contains a point.
         """
@@ -2112,17 +2112,15 @@ class PlanarBoundingBox(AxisAlignedBox[CartesianPoint2Dimensional]):
             result.append(cls(x.lower, y.lower, x.upper, y.upper, origin))
         return result
 
-    def get_points(self) -> list[CartesianPoint2Dimensional]:
+    def get_points(self) -> list[Point2Dimensional]:
         """
-        Get the 4 corners of the bounding box as ``CartesianPoint2Dimensional`` objects, in the box's own
+        Get the 4 corners of the bounding box as ``Point2Dimensional`` objects, in the box's own
         local frame.
 
-        :return: A list of CartesianPoint2Dimensional objects representing the corners of the bounding box.
+        :return: A list of Point2Dimensional objects representing the corners of the bounding box.
         """
         return [
-            CartesianPoint2Dimensional(
-                x, y, reference_frame=self.origin.reference_frame
-            )
+            Point2Dimensional(x, y, reference_frame=self.origin.reference_frame)
             for x in (self.min_x, self.max_x)
             for y in (self.min_y, self.max_y)
         ]

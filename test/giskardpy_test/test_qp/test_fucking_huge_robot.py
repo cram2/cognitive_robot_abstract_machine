@@ -12,7 +12,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
@@ -202,7 +202,7 @@ def execute(link_length: float, vel_limit: float):
                     CartesianPosition(
                         root_link=fucking_huge_robot.root,
                         tip_link=eef,
-                        goal_point=CartesianPoint3Dimensional(
+                        goal_point=Point3Dimensional(
                             y=-link_length, reference_frame=eef
                         ),
                         cruise_velocity=0.2 * link_length,

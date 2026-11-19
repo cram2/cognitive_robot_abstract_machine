@@ -8,7 +8,7 @@ from semantic_digital_twin.datastructures.variables import SpatialVariables
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import PlanarBoundingBox
@@ -129,7 +129,7 @@ def test_planar_bounding_box_contains():
         HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
     )
 
-    point = CartesianPoint2Dimensional(0, 0, reference_frame=world.root)
+    point = Point2Dimensional(0, 0, reference_frame=world.root)
 
     assert bb.contains(point)
 
@@ -147,7 +147,7 @@ def test_planar_bounding_box_does_not_contain_a_point_outside():
         HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
     )
 
-    point = CartesianPoint2Dimensional(10, 10, reference_frame=world.root)
+    point = Point2Dimensional(10, 10, reference_frame=world.root)
 
     assert not bb.contains(point)
 
@@ -157,7 +157,7 @@ def test_planar_bounding_box_center():
 
     center = bb.center
 
-    assert isinstance(center, CartesianPoint2Dimensional)
+    assert isinstance(center, Point2Dimensional)
     assert float(center.x) == 1.0
     assert float(center.y) == 2.0
 
@@ -200,7 +200,7 @@ def test_planar_bounding_box_intersection_with_disjoint_box_is_none():
     assert a.intersection_with(b) is None
 
 
-# %% BoundingBoxCollection[PlanarBoundingBox, CartesianPoint2Dimensional]
+# %% BoundingBoxCollection[PlanarBoundingBox, Point2Dimensional]
 
 
 def test_planar_bounding_box_collection_merge():

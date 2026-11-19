@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.natural_language import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
 )
 from semantic_digital_twin.world import World
@@ -89,9 +89,7 @@ class GraspClutter6DCameraInfo:
         if rotation is not None and translation is not None:
             camera_T_world = (
                 HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                    point=CartesianPoint3Dimensional(
-                        *_millimeters_to_meters(translation)
-                    ),
+                    point=Point3Dimensional(*_millimeters_to_meters(translation)),
                     rotation_matrix=RotationMatrix(
                         data=np.array(rotation, dtype=float).reshape(3, 3)
                     ),
@@ -136,9 +134,7 @@ class GraspClutter6DObjectPose:
         return cls(
             object_id=int(data["obj_id"]),
             camera_T_object=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                point=CartesianPoint3Dimensional(
-                    *_millimeters_to_meters(data["cam_t_m2c"])
-                ),
+                point=Point3Dimensional(*_millimeters_to_meters(data["cam_t_m2c"])),
                 rotation_matrix=RotationMatrix(
                     data=np.array(data["cam_R_m2c"], dtype=float).reshape(3, 3)
                 ),

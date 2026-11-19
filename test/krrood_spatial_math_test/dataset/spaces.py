@@ -10,8 +10,8 @@ from uuid import UUID, uuid4
 
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import GenericPoint, StoredPoint
-from krrood_spatial_math.vector import GenericVector, StoredVector
+from krrood_spatial_math.point import GenericPoint, Point
+from krrood_spatial_math.vector import GenericVector, Vector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
@@ -61,13 +61,13 @@ class NamedScalablePlaneFrame(ScalablePlaneFrame):
     """
 
 
-# %% points and vectors that store their coordinates
+# %% points and vectors of a scalable plane
 
 
 @dataclass(kw_only=True)
-class StoredScalablePlaneVector(StoredVector[ScalablePlaneFrame]):
+class ScalablePlaneVector(Vector[ScalablePlaneFrame]):
     """
-    A vector on a scalable plane that stores its coordinates as given.
+    A vector on a scalable plane whose coordinates are its fields.
     """
 
     x: float
@@ -82,11 +82,9 @@ class StoredScalablePlaneVector(StoredVector[ScalablePlaneFrame]):
 
 
 @dataclass(kw_only=True)
-class StoredScalablePlanePoint(
-    StoredPoint[ScalablePlaneFrame, StoredScalablePlaneVector]
-):
+class ScalablePlanePoint(Point[ScalablePlaneFrame, ScalablePlaneVector]):
     """
-    A point on a scalable plane that stores its coordinates as given.
+    A point on a scalable plane whose coordinates are its fields.
     """
 
     x: float
@@ -121,9 +119,7 @@ class StoredLine(Line[GenericPoint, GenericVector]):
 
 
 @dataclass(kw_only=True)
-class StoredScalablePlaneLine(
-    StoredLine[StoredScalablePlanePoint, StoredScalablePlaneVector]
-):
+class StoredScalablePlaneLine(StoredLine[ScalablePlanePoint, ScalablePlaneVector]):
     """
     A line on a scalable plane that stores its point and direction as given.
     """
@@ -134,18 +130,18 @@ class StoredScalablePlaneLine(
 
 @dataclass(kw_only=True)
 class StoredScalablePlaneLineSegment(
-    LineSegment[StoredScalablePlanePoint, StoredScalablePlaneLine]
+    LineSegment[ScalablePlanePoint, StoredScalablePlaneLine]
 ):
     """
     A segment on a scalable plane that stores its ends as given.
     """
 
-    start: StoredScalablePlanePoint
+    start: ScalablePlanePoint
     """
     The point the segment runs from.
     """
 
-    end: StoredScalablePlanePoint
+    end: ScalablePlanePoint
     """
     The point the segment runs to.
     """

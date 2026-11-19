@@ -50,11 +50,11 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.robots.pr2 import PR2
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -235,9 +235,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         move_to_reach = a(MoveToReach)(
             reference_T_grasp=target_pose,
             target_pose_offset_robot=a(Pose2Dimensional)(
-                position=a(CartesianPoint2Dimensional)(
-                    x=..., y=..., reference_frame=None
-                ),
+                position=a(Point2Dimensional)(x=..., y=..., reference_frame=None),
                 yaw=...,
                 reference_frame=None,
             ),

@@ -7,8 +7,8 @@ from typing_extensions import get_args
 
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
     PointT,
@@ -26,8 +26,8 @@ from semantic_digital_twin.world_description.shape_collection import (
 @pytest.mark.parametrize(
     "box_type, point_type",
     [
-        (PlanarBoundingBox, CartesianPoint2Dimensional),
-        (VolumetricBoundingBox, CartesianPoint3Dimensional),
+        (PlanarBoundingBox, Point2Dimensional),
+        (VolumetricBoundingBox, Point3Dimensional),
     ],
 )
 def test_a_box_binds_the_point_type_it_is_asked_about(box_type, point_type):
@@ -50,8 +50,8 @@ def test_a_collection_is_generic_over_its_box_and_point_types():
 @pytest.mark.parametrize(
     "box_type, point_type",
     [
-        (PlanarBoundingBox, CartesianPoint2Dimensional),
-        (VolumetricBoundingBox, CartesianPoint3Dimensional),
+        (PlanarBoundingBox, Point2Dimensional),
+        (VolumetricBoundingBox, Point3Dimensional),
     ],
 )
 def test_a_collection_records_the_pair_it_was_given(box_type, point_type):
@@ -72,7 +72,7 @@ def test_a_box_must_implement_contains():
     """
 
     @dataclass(eq=False)
-    class BoxWithoutContains(AxisAlignedBox[CartesianPoint2Dimensional]):
+    class BoxWithoutContains(AxisAlignedBox[Point2Dimensional]):
         @classmethod
         def axes(cls) -> tuple[SpatialVariables, ...]:
             return SpatialVariables.x, SpatialVariables.y
@@ -81,7 +81,7 @@ def test_a_box_must_implement_contains():
         def _ordered_intervals(self) -> tuple[SimpleInterval, ...]:
             return ()
 
-        def get_points(self) -> list[CartesianPoint2Dimensional]:
+        def get_points(self) -> list[Point2Dimensional]:
             return []
 
         @classmethod

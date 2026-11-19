@@ -24,8 +24,8 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
 )
-from krrood_spatial_math.point import CartesianPoint
-from krrood_spatial_math.vector import CartesianVector
+from krrood_spatial_math.point import Point
+from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import (
     FramesOnDifferentPlanesError,
@@ -35,7 +35,7 @@ from krrood_spatial_math.exceptions import (
 )
 from krrood_spatial_math.space_map import OrthogonalProjection
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
     Line3Dimensional,
     Pose3Dimensional,
@@ -107,14 +107,14 @@ class SymbolicSpatialValue2Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
     SymbolicSpatialValue2Dimensional,
-    CartesianVector[CartesianFrame2Dimensional, sm.Scalar],
+    Vector[CartesianFrame2Dimensional, sm.Scalar],
     PlanarSpecialEuclideanGroupAction,
 ):
     """
     A translation within the x-y plane of its reference frame, given in the
     :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of that frame.
 
-    Stored as a bare 2×1 symbolic vector ``[x, y]``, like :class:`CartesianPoint2Dimensional`.
+    Stored as a bare 2×1 symbolic vector ``[x, y]``, like :class:`Point2Dimensional`.
     """
 
     def __init__(
@@ -233,9 +233,9 @@ class Vector2Dimensional(
 
 
 @dataclass(eq=False, init=False, repr=False)
-class CartesianPoint2Dimensional(
+class Point2Dimensional(
     SymbolicSpatialValue2Dimensional,
-    CartesianPoint[CartesianFrame2Dimensional, Vector2Dimensional, sm.Scalar],
+    Point[CartesianFrame2Dimensional, Vector2Dimensional, sm.Scalar],
     PlanarSpecialEuclideanGroupAction,
 ):
     """
@@ -244,8 +244,8 @@ class CartesianPoint2Dimensional(
     Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous augmentation --
     the same convention :class:`Pose2Dimensional` uses. The point lies on its reference frame's
     own x-y plane and has no height; it relates to 3D space only through an
-    :class:`EmbeddedPlaneProjection` onto that plane, which :meth:`from_cartesian_point_3_dimensional`,
-    :meth:`from_pose` and :meth:`to_cartesian_point_3_dimensional` apply.
+    :class:`EmbeddedPlaneProjection` onto that plane, which :meth:`from_point_3_dimensional`,
+    :meth:`from_pose` and :meth:`to_point_3_dimensional` apply.
     """
 
     def __init__(
@@ -290,11 +290,11 @@ class CartesianPoint2Dimensional(
             )
 
     @classmethod
-    def from_cartesian_point_3_dimensional(
+    def from_point_3_dimensional(
         cls,
-        point: CartesianPoint3Dimensional,
+        point: Point3Dimensional,
         plane_frame: CartesianFrame3Dimensional | None = None,
-    ) -> CartesianPoint2Dimensional:
+    ) -> Point2Dimensional:
         """
         The :meth:`EmbeddedPlaneProjection.project` of ``point`` onto the x-y plane of
         ``plane_frame``.
@@ -312,20 +312,18 @@ class CartesianPoint2Dimensional(
         cls,
         pose: Pose3Dimensional,
         plane_frame: CartesianFrame3Dimensional | None = None,
-    ) -> CartesianPoint2Dimensional:
+    ) -> Point2Dimensional:
         """
-        The :meth:`from_cartesian_point_3_dimensional` of ``pose``'s position.
+        The :meth:`from_point_3_dimensional` of ``pose``'s position.
 
         :param pose: The pose whose position to project.
         :param plane_frame: The frame whose x-y plane to project onto. Defaults to
             ``pose``'s reference frame.
         :return: The point on the plane directly below or above ``pose``.
         """
-        return cls.from_cartesian_point_3_dimensional(pose.position, plane_frame)
+        return cls.from_point_3_dimensional(pose.position, plane_frame)
 
-    def to_cartesian_point_3_dimensional(
-        self, height: sm.ScalarData = 0
-    ) -> CartesianPoint3Dimensional:
+    def to_point_3_dimensional(self, height: sm.ScalarData = 0) -> Point3Dimensional:
         """
         The :meth:`EmbeddedPlaneProjection.unproject` of this point into its own reference
         frame.
@@ -353,7 +351,7 @@ class CartesianPoint2Dimensional(
     def transform(
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
-    ) -> CartesianPoint2Dimensional:
+    ) -> Point2Dimensional:
         """
         This point re-expressed in ``target_frame_T_reference_frame``'s reference frame.
 
@@ -367,38 +365,36 @@ class CartesianPoint2Dimensional(
             reference frame to the frame it should be expressed in.
         :return: The point in the transformation's reference frame.
         """
-        return CartesianPoint2Dimensional.from_cartesian_point_3_dimensional(
-            target_frame_T_reference_frame @ self.to_cartesian_point_3_dimensional()
+        return Point2Dimensional.from_point_3_dimensional(
+            target_frame_T_reference_frame @ self.to_point_3_dimensional()
         )
 
     def apply_planar_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> CartesianPoint2Dimensional:
+    ) -> Point2Dimensional:
         moved = ca.mtimes(transformation.casadi_sx, ca.vertcat(self.casadi_sx, 1))
-        return CartesianPoint2Dimensional(
+        return Point2Dimensional(
             moved[0], moved[1], reference_frame=transformation.reference_frame
         )
 
-    def __add__(self, vector: Vector2Dimensional) -> CartesianPoint2Dimensional:
+    def __add__(self, vector: Vector2Dimensional) -> Point2Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``vector`` is given in another frame.
         """
         if not isinstance(vector, Vector2Dimensional):
             return NotImplemented
         self.ensure_same_reference_frame(vector, "the added Vector2Dimensional")
-        return CartesianPoint2Dimensional(
+        return Point2Dimensional(
             self.x + vector.x, self.y + vector.y, reference_frame=self.reference_frame
         )
 
-    def __sub__(self, other: CartesianPoint2Dimensional) -> Vector2Dimensional:
+    def __sub__(self, other: Point2Dimensional) -> Vector2Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
         """
-        if not isinstance(other, CartesianPoint2Dimensional):
+        if not isinstance(other, Point2Dimensional):
             return NotImplemented
-        self.ensure_same_reference_frame(
-            other, "the subtracted CartesianPoint2Dimensional"
-        )
+        self.ensure_same_reference_frame(other, "the subtracted Point2Dimensional")
         return Vector2Dimensional(
             self.x - other.x, self.y - other.y, reference_frame=self.reference_frame
         )
@@ -415,8 +411,8 @@ class CartesianPoint2Dimensional(
 @dataclass(kw_only=True)
 class EmbeddedPlaneProjection(
     OrthogonalProjection[
-        CartesianPoint3Dimensional,
-        CartesianPoint2Dimensional,
+        Point3Dimensional,
+        Point2Dimensional,
         Line3Dimensional,
         sm.ScalarData,
     ]
@@ -438,7 +434,7 @@ class EmbeddedPlaneProjection(
     reference frame to each other.
     """
 
-    def project(self, point: CartesianPoint3Dimensional) -> CartesianPoint2Dimensional:
+    def project(self, point: Point3Dimensional) -> Point2Dimensional:
         """
         :raises ReferenceFrameMismatchError: If exactly one of ``point`` and this
             projection has no reference frame.
@@ -448,12 +444,10 @@ class EmbeddedPlaneProjection(
                 raise ReferenceFrameMismatchError(
                     expected_frame=self.plane_frame,
                     actual_frame=point.reference_frame,
-                    context="the projected CartesianPoint3Dimensional",
+                    context="the projected Point3Dimensional",
                 )
             point = self.plane_frame.express_in_own_frame(value=point)
-        return CartesianPoint2Dimensional(
-            point.x, point.y, reference_frame=self.plane_frame
-        )
+        return Point2Dimensional(point.x, point.y, reference_frame=self.plane_frame)
 
     @property
     def plane_normal(self) -> Vector3Dimensional:
@@ -465,9 +459,7 @@ class EmbeddedPlaneProjection(
             return Vector3Dimensional.Z(reference_frame=None)
         return EmbeddedPlane(frame_3_dimensional=self.plane_frame).normal
 
-    def embed_planar_point(
-        self, *, point: CartesianPoint2Dimensional
-    ) -> CartesianPoint3Dimensional:
+    def embed_planar_point(self, *, point: Point2Dimensional) -> Point3Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``point`` lies on another frame's plane.
         """
@@ -475,11 +467,9 @@ class EmbeddedPlaneProjection(
             raise ReferenceFrameMismatchError(
                 expected_frame=self.plane_frame,
                 actual_frame=point.reference_frame,
-                context="the unprojected CartesianPoint2Dimensional",
+                context="the unprojected Point2Dimensional",
             )
-        return CartesianPoint3Dimensional(
-            point.x, point.y, 0, reference_frame=self.plane_frame
-        )
+        return Point3Dimensional(point.x, point.y, 0, reference_frame=self.plane_frame)
 
 
 # %% poses on a plane
@@ -501,7 +491,7 @@ class Pose2Dimensional(
 
     def __init__(
         self,
-        position: CartesianPoint2Dimensional | None = None,
+        position: Point2Dimensional | None = None,
         yaw: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> None:
@@ -511,7 +501,7 @@ class Pose2Dimensional(
         :param reference_frame: The reference frame. Defaults to *position*'s.
         """
         if position is None:
-            position = CartesianPoint2Dimensional()
+            position = Point2Dimensional()
         self.casadi_sx = sm.to_sx([position.x, position.y, yaw])
         self.reference_frame = (
             reference_frame if reference_frame is not None else position.reference_frame
@@ -570,13 +560,11 @@ class Pose2Dimensional(
     # %% Pose3Dimensional-like interface (delegates to pose)
 
     @property
-    def position(self) -> CartesianPoint2Dimensional:
+    def position(self) -> Point2Dimensional:
         """
         :return: The position this pose is composed of, dropping the bearing.
         """
-        return CartesianPoint2Dimensional(
-            self.x, self.y, reference_frame=self.reference_frame
-        )
+        return Point2Dimensional(self.x, self.y, reference_frame=self.reference_frame)
 
     @property
     def orientation(self) -> Quaternion:
@@ -686,7 +674,7 @@ class Pose2Dimensional(
         :return: The Pose2Dimensional instance.
         """
         return cls(
-            position=CartesianPoint2Dimensional(x=x, y=y),
+            position=Point2Dimensional(x=x, y=y),
             yaw=yaw,
             reference_frame=reference_frame,
         )

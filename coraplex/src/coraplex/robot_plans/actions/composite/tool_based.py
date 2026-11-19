@@ -23,7 +23,7 @@ from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.world_entity import (
@@ -140,14 +140,14 @@ class ToolMotionAction(
         """
 
     @cached_property
-    def _waypoints(self) -> list[CartesianPoint3Dimensional]:
+    def _waypoints(self) -> list[Point3Dimensional]:
         """
         :return: The sampled waypoints of the tool path in the world frame.
         """
         _, points, _ = self._build_tool_path().sample(frame=self._path_frame())
         stride = max(1, int(self.pointer_stride))
         waypoints = [
-            CartesianPoint3Dimensional(
+            Point3Dimensional(
                 x=point[0], y=point[1], z=point[2], reference_frame=self.world.root
             )
             for point in points

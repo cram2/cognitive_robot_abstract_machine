@@ -42,7 +42,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianOrientati
 from giskardpy.motion_statechart.tasks.feature_functions import AlignPerpendicular
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
@@ -123,7 +123,7 @@ def point_debug_expression(name: str, world: World) -> DebugExpression:
     """
     return DebugExpression(
         name=name,
-        expression=CartesianPoint3Dimensional(
+        expression=Point3Dimensional(
             x=world.active_degrees_of_freedom[0].variables.position,
             reference_frame=world.root,
         ),

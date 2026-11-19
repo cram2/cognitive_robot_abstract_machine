@@ -36,7 +36,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 
@@ -184,7 +184,7 @@ def scattered_poses_2d() -> list[Pose2Dimensional]:
     generator = random.Random(0)
     return [
         Pose2Dimensional(
-            position=CartesianPoint2Dimensional(
+            position=Point2Dimensional(
                 x=generator.uniform(0.0, 1.0), y=generator.uniform(10.0, 11.0)
             ),
             yaw=generator.uniform(-1.0, 1.0),
@@ -217,7 +217,7 @@ def test_a_pose_2d_built_by_a_query_takes_the_values_sampled_from_the_learned_mo
         number_of_samples=1,
     ).evaluate(
         expression=a(Pose2Dimensional)(
-            position=a(CartesianPoint2Dimensional)(x=..., y=...), yaw=...
+            position=a(Point2Dimensional)(x=..., y=...), yaw=...
         )
     )
 

@@ -18,12 +18,12 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Quaternion,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from krrood_spatial_math.spatial_types import RotationMatrix, SymbolicSpatialType
@@ -59,7 +59,7 @@ def render(spatial_type: SymbolicSpatialType, **kwargs) -> list[Marker]:
 
 def test_point_renders_single_sphere():
     frame = Body(name=PrefixedName("frame"))
-    point = CartesianPoint3Dimensional(1, 2, 3, reference_frame=frame)
+    point = Point3Dimensional(1, 2, 3, reference_frame=frame)
 
     markers = render(point)
 
@@ -76,7 +76,7 @@ def test_point_renders_single_sphere():
 
 
 def test_point_without_reference_frame_uses_root():
-    markers = render(CartesianPoint3Dimensional(0, 0, 0))
+    markers = render(Point3Dimensional(0, 0, 0))
 
     assert markers[0].header.frame_id == ROOT_FRAME_NAME
 
@@ -152,7 +152,7 @@ def test_pose_2d_renders_triad_at_its_position():
     """
     A 2D pose is drawn on the x-y plane of its reference frame.
     """
-    markers = render(Pose2Dimensional(CartesianPoint2Dimensional(1, 2)))
+    markers = render(Pose2Dimensional(Point2Dimensional(1, 2)))
 
     assert len(markers) == 3
     position = markers[0].pose.position
@@ -166,7 +166,7 @@ def test_unsupported_spatial_type_raises():
 
 def test_namespace_and_id_offset_propagate():
     markers = render(
-        CartesianPoint3Dimensional(0, 0, 0),
+        Point3Dimensional(0, 0, 0),
         namespace="debug/point",
         marker_id_offset=10,
     )
@@ -182,7 +182,7 @@ def test_point_renders_its_position():
     """
     A point is drawn from its three coordinates, without the homogeneous entry.
     """
-    assert rendered_value(CartesianPoint3Dimensional(1, 2, 3)).tolist() == [1, 2, 3]
+    assert rendered_value(Point3Dimensional(1, 2, 3)).tolist() == [1, 2, 3]
 
 
 def test_vector_renders_its_components():
@@ -218,7 +218,7 @@ def test_markers_are_drawn_from_the_given_value():
     Rendering takes the given value and never evaluates the spatial type.
     """
     unresolvable = FloatVariable(name="unresolvable")
-    point = CartesianPoint3Dimensional(x=unresolvable)
+    point = Point3Dimensional(x=unresolvable)
     spatial_type_markers = SpatialTypeMarkers.from_visualization(
         visualization=SpatialTypeVisualization(spatial_type=point),
         root_frame_name=ROOT_FRAME_NAME,
@@ -233,7 +233,7 @@ def test_markers_are_drawn_from_the_given_value():
 @pytest.mark.parametrize(
     "spatial_type",
     [
-        CartesianPoint3Dimensional(),
+        Point3Dimensional(),
         Vector3Dimensional(),
         HomogeneousTransformationMatrix3Dimensional(),
     ],

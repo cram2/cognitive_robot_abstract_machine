@@ -20,7 +20,7 @@ from semantic_digital_twin.exceptions import (
     MissingWorldError,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
     Quaternion,
     RotationMatrix,
@@ -31,7 +31,7 @@ from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -126,14 +126,14 @@ def test_transformation_matrix_json_serialization():
     assert np.allclose(transform.to_np(), transform_copy.to_np())
 
 
-def test_cartesian_point_3_dimensional_json_serialization():
+def test_point_3_dimensional_json_serialization():
     body = Body(name=PrefixedName("body"))
-    point = CartesianPoint3Dimensional(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
     tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
     tracker.add(key=body.id, tracked_object=body)
-    point_copy = CartesianPoint3Dimensional.from_json(data=json_data, **kwargs)
+    point_copy = Point3Dimensional.from_json(data=json_data, **kwargs)
     assert point.reference_frame == point_copy.reference_frame
     assert id(point.reference_frame) == id(point_copy.reference_frame)
     assert np.allclose(point.to_np(), point_copy.to_np())
@@ -141,20 +141,20 @@ def test_cartesian_point_3_dimensional_json_serialization():
 
 def test_KinematicStructureEntityNotInKwargs():
     body = Body(name=PrefixedName("body"))
-    point = CartesianPoint3Dimensional(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
     with pytest.raises(MissingCartesianFrame3DimensionalResolver):
-        CartesianPoint3Dimensional.from_json(data=json_data, **kwargs)
+        Point3Dimensional.from_json(data=json_data, **kwargs)
 
 
 def test_KinematicStructureEntityNotInKwargs2():
     body = Body(name=PrefixedName("body"))
-    point = CartesianPoint3Dimensional(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
     with pytest.raises(WorldEntityWithIDNotInKwargs) as raised:
-        CartesianPoint3Dimensional.from_json(data=json_data, **tracker.create_kwargs())
+        Point3Dimensional.from_json(data=json_data, **tracker.create_kwargs())
 
     assert raised.value.key == body.id
     assert raised.value.world_entity_name == body.name
@@ -271,11 +271,11 @@ def test_a_connection_written_as_a_reference_is_read_as_the_connection_of_the_wo
 
 def test_world_entity_missing_from_the_world_is_an_untracked_object():
     body = Body(name=PrefixedName("body"))
-    point = CartesianPoint3Dimensional(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
     with pytest.raises(UntrackedObjectError):
-        CartesianPoint3Dimensional.from_json(data=json_data, **tracker.create_kwargs())
+        Point3Dimensional.from_json(data=json_data, **tracker.create_kwargs())
 
 
 def test_vector3_json_serialization():
@@ -486,8 +486,8 @@ def test_joint_state_resolves_the_connection_it_was_built_from():
 @pytest.mark.parametrize(
     "spatial_type",
     [
-        CartesianPoint3Dimensional(1.0, 2.0, 3.0),
-        CartesianPoint2Dimensional(1.0, 2.0),
+        Point3Dimensional(1.0, 2.0, 3.0),
+        Point2Dimensional(1.0, 2.0),
         Vector3Dimensional(1.0, 2.0, 3.0),
         Quaternion(0.0, 0.0, 0.0, 1.0),
         RotationMatrix.from_rpy(0.1, 0.2, 0.3),
@@ -520,7 +520,7 @@ def test_a_spatial_type_carries_the_frame_it_is_expressed_in():
     travels with it and is resolved back to the entity of the reading world.
     """
     body = Body(name=PrefixedName("reference"))
-    point = CartesianPoint3Dimensional(1.0, 2.0, 3.0, reference_frame=body)
+    point = Point3Dimensional(1.0, 2.0, 3.0, reference_frame=body)
     payload = point.to_json()
 
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
@@ -554,16 +554,16 @@ def test_a_degree_of_freedom_survives_a_json_round_trip():
 # %% expressions over variables
 
 
-def symbolic_cartesian_point_3_dimensional(
+def symbolic_point_3_dimensional(
     variable: FloatVariable, frame: Body
-) -> CartesianPoint3Dimensional:
-    return CartesianPoint3Dimensional(variable, 2.0, 3.0, reference_frame=frame)
+) -> Point3Dimensional:
+    return Point3Dimensional(variable, 2.0, 3.0, reference_frame=frame)
 
 
-def symbolic_cartesian_point_2_dimensional(
+def symbolic_point_2_dimensional(
     variable: FloatVariable, frame: Body
-) -> CartesianPoint2Dimensional:
-    return CartesianPoint2Dimensional(variable, 2.0, reference_frame=frame)
+) -> Point2Dimensional:
+    return Point2Dimensional(variable, 2.0, reference_frame=frame)
 
 
 def symbolic_vector3(variable: FloatVariable, frame: Body) -> Vector3Dimensional:
@@ -599,8 +599,8 @@ def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2Dimensional:
 @pytest.mark.parametrize(
     "build_spatial_type",
     [
-        symbolic_cartesian_point_3_dimensional,
-        symbolic_cartesian_point_2_dimensional,
+        symbolic_point_3_dimensional,
+        symbolic_point_2_dimensional,
         symbolic_vector3,
         symbolic_quaternion,
         symbolic_rotation_matrix,

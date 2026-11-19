@@ -9,7 +9,7 @@ import trimesh
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 
@@ -21,7 +21,7 @@ class CorrectedPosition:
     provenance of that position.
     """
 
-    position: CartesianPoint2Dimensional
+    position: Point2Dimensional
     """
     The object's position in world coordinates.
     """
@@ -67,7 +67,7 @@ class MeshMeasurements:
         return sum(bounds is not None for bounds in self._bounds_by_source_id.values())
 
     def corrected_position(
-        self, source_id: str, position: CartesianPoint2Dimensional, yaw_degrees: float
+        self, source_id: str, position: Point2Dimensional, yaw_degrees: float
     ) -> CorrectedPosition:
         """
         Correct *position* onto the true centre of *source_id*'s mesh.
@@ -85,7 +85,7 @@ class MeshMeasurements:
         bounds = self.bounds(source_id)
         if bounds is None:
             return CorrectedPosition(position=position, is_mesh_corrected=False)
-        local_offset = CartesianPoint2Dimensional(
+        local_offset = Point2Dimensional(
             x=(bounds.min_x + bounds.max_x) / 2,
             y=(bounds.min_y + bounds.max_y) / 2,
         )
@@ -94,7 +94,7 @@ class MeshMeasurements:
         )
         world_offset = local_offset.transform(world_T_local)
         return CorrectedPosition(
-            position=CartesianPoint2Dimensional(
+            position=Point2Dimensional(
                 x=position.x + world_offset.x, y=position.y + world_offset.y
             ),
             is_mesh_corrected=True,

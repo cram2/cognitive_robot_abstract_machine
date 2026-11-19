@@ -42,7 +42,7 @@ from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     Vector3Dimensional,
 )
@@ -178,10 +178,8 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         )
 
     @property
-    def world_P_object_of_interest(self) -> CartesianPoint3Dimensional:
-        return CartesianPoint3Dimensional(
-            1.03, -0.716, 0.203, reference_frame=self.world.root
-        )
+    def world_P_object_of_interest(self) -> Point3Dimensional:
+        return Point3Dimensional(1.03, -0.716, 0.203, reference_frame=self.world.root)
 
     @property
     def pickup_navigation_pose(self) -> Pose3Dimensional:
@@ -444,7 +442,7 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
 
         @symbolic_function
         def planar_distance(
-            point1: CartesianPoint3Dimensional, point2: CartesianPoint3Dimensional
+            point1: Point3Dimensional, point2: Point3Dimensional
         ) -> Scalar:
             return point1.euclidean_distance(point2)
 
@@ -518,7 +516,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
 
         @symbolic_function
         def planar_distance(
-            point1: CartesianPoint3Dimensional, point2: CartesianPoint3Dimensional
+            point1: Point3Dimensional, point2: Point3Dimensional
         ) -> Scalar:
             return point1.euclidean_distance(point2)
 
@@ -595,7 +593,7 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
         @symbolic_function
         def planar_distance(
-            point1: CartesianPoint3Dimensional, point2: CartesianPoint3Dimensional
+            point1: Point3Dimensional, point2: Point3Dimensional
         ) -> Scalar:
             return point1.euclidean_distance(point2)
 
@@ -708,7 +706,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
     def object_of_interest(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
         def planar_distance(
-            point1: CartesianPoint3Dimensional, point2: CartesianPoint3Dimensional
+            point1: Point3Dimensional, point2: Point3Dimensional
         ) -> Scalar:
             return point1.euclidean_distance(point2)
 
@@ -831,7 +829,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
     def object_of_interest(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
         def planar_distance(
-            point1: CartesianPoint3Dimensional, point2: CartesianPoint3Dimensional
+            point1: Point3Dimensional, point2: Point3Dimensional
         ) -> Scalar:
             return point1.euclidean_distance(point2)
 
@@ -938,7 +936,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
     def object_of_interest(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
         def planar_distance(
-            point1: CartesianPoint3Dimensional, point2: CartesianPoint3Dimensional
+            point1: Point3Dimensional, point2: Point3Dimensional
         ) -> Scalar:
             return point1.euclidean_distance(point2)
 

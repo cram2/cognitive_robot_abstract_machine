@@ -49,7 +49,7 @@ from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
@@ -122,7 +122,7 @@ class TestHoldPose:
                 CartesianPosition(
                     root_link=cylinder_bot_world.root,
                     tip_link=bot,
-                    goal_point=CartesianPoint3Dimensional(
+                    goal_point=Point3Dimensional(
                         1, 0, 0, reference_frame=cylinder_bot_world.root
                     ),
                     weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
@@ -157,7 +157,7 @@ class TestHoldPose:
         goal = CartesianPosition(
             root_link=cylinder_bot_world.root,
             tip_link=bot,
-            goal_point=CartesianPoint3Dimensional(
+            goal_point=Point3Dimensional(
                 1, 0, 0, reference_frame=cylinder_bot_world.root
             ),
         )
@@ -212,7 +212,7 @@ class TestHoldPose:
                 CartesianPosition(
                     root_link=cylinder_bot_world.root,
                     tip_link=bot,
-                    goal_point=CartesianPoint3Dimensional(
+                    goal_point=Point3Dimensional(
                         1, 0, 0, reference_frame=cylinder_bot_world.root
                     ),
                     weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
@@ -238,7 +238,7 @@ class TestHoldPose:
         world = cylinder_bot_world
         bot = world.get_kinematic_structure_entity_by_name("bot")
         start = world.compute_forward_kinematics_np(world.root, bot).copy()
-        goal_point = CartesianPoint3Dimensional(1, 0, 0, reference_frame=world.root)
+        goal_point = Point3Dimensional(1, 0, 0, reference_frame=world.root)
         executor = self.executor_for(world=world)
         motion_statechart = Statechart(context=executor.context)
         motion_statechart.add_nodes(
@@ -458,10 +458,10 @@ class TestCartesianPositionTrajectory:
     """
 
     def _points_to_np(
-        self, *, positions: list[CartesianPoint3Dimensional] | np.ndarray
+        self, *, positions: list[Point3Dimensional] | np.ndarray
     ) -> np.ndarray:
         """
-        Convert a sequence of `CartesianPoint3Dimensional` or an `ndarray` of shape (N,
+        Convert a sequence of `Point3Dimensional` or an `ndarray` of shape (N,
         3) into an `ndarray` of shape (N, 3).
         """
         if isinstance(positions, np.ndarray):
@@ -470,7 +470,7 @@ class TestCartesianPositionTrajectory:
             return positions.astype(float)
         pts = [
             p.to_np()[:-1]
-            if isinstance(p, CartesianPoint3Dimensional)
+            if isinstance(p, Point3Dimensional)
             else np.asarray(p, dtype=float)
             for p in positions
         ]
@@ -482,7 +482,7 @@ class TestCartesianPositionTrajectory:
     def compare_trajectories(
         self,
         *,
-        positions: list[CartesianPoint3Dimensional] | np.ndarray,
+        positions: list[Point3Dimensional] | np.ndarray,
         world_state_trajectory: WorldStateTrajectory,
         root_link: KinematicStructureEntity,
         tip_link: KinematicStructureEntity,
@@ -496,7 +496,7 @@ class TestCartesianPositionTrajectory:
         recorded state. For each executed point, the minimum Euclidean distance to the
         reference path is computed and asserted to be within `tolerance`.
 
-        :param positions: Reference path as `CartesianPoint3Dimensional` iterable or an
+        :param positions: Reference path as `Point3Dimensional` iterable or an
             array of shape (N, 3). All points are with respect to root_link
         :param world_state_trajectory: Recorded joint-space trajectory with access to
             the world.
@@ -541,7 +541,7 @@ class TestCartesianPositionTrajectory:
             angle = step * np.pi / 5000.0
             radius = growth_factor * angle  # radius grows linearly with the angle
             points.append(
-                CartesianPoint3Dimensional(
+                Point3Dimensional(
                     radius * np.cos(angle),
                     radius * np.sin(angle),
                     0,
@@ -582,7 +582,7 @@ class TestCartesianPositionTrajectory:
         for step in range(5000):
             angle = step * np.pi / 500.0
             points.append(
-                CartesianPoint3Dimensional(
+                Point3Dimensional(
                     radius * np.cos(angle),
                     radius * np.sin(angle),
                     0,
@@ -628,7 +628,7 @@ class TestCartesianPositionTrajectory:
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         points = [
-            CartesianPoint3Dimensional(0, y, 0, reference_frame=tip)
+            Point3Dimensional(0, y, 0, reference_frame=tip)
             for y in np.linspace(0, 0.2, 21)
         ]
 
@@ -644,7 +644,7 @@ class TestCartesianPositionTrajectory:
         move_away = CartesianPosition(
             root_link=root,
             tip_link=tip,
-            goal_point=CartesianPoint3Dimensional(-0.5, 0, 0, reference_frame=root),
+            goal_point=Point3Dimensional(-0.5, 0, 0, reference_frame=root),
         )
         motion_statechart.add_node(node=move_away)
         move_away.success_condition = move_away.observes_true
@@ -669,7 +669,7 @@ class TestCartesianPositionTrajectory:
         """
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         points = [
-            CartesianPoint3Dimensional(0, y, 0, reference_frame=tip)
+            Point3Dimensional(0, y, 0, reference_frame=tip)
             for y in np.linspace(0, 0.2, 21)
         ]
 
@@ -715,7 +715,7 @@ class TestCartesianPositionTrajectory:
                 i * np.pi / 5000.0
             )  # angle parameter; adjust divisor for tighter/looser turns
             r = a * t  # radius grows linearly with t
-            point = CartesianPoint3Dimensional(
+            point = Point3Dimensional(
                 r * np.cos(t),
                 r * np.sin(t),
                 0,
@@ -1101,7 +1101,7 @@ class TestCartesianTasks:
         )
         goal_pose = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                point=CartesianPoint3Dimensional(0.2, 0.0, reference_frame=left_tip),
+                point=Point3Dimensional(0.2, 0.0, reference_frame=left_tip),
                 rotation_matrix=RotationMatrix(
                     [[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1.0]],
                     reference_frame=left_tip,
@@ -1477,8 +1477,8 @@ class TestCartesianTasks:
             "odom_combined"
         )
 
-        tip_goal1 = CartesianPoint3Dimensional(-0.2, 0, 0, reference_frame=tip)
-        tip_goal2 = CartesianPoint3Dimensional(0.2, 0, 0, reference_frame=tip)
+        tip_goal1 = Point3Dimensional(-0.2, 0, 0, reference_frame=tip)
+        tip_goal2 = Point3Dimensional(0.2, 0, 0, reference_frame=tip)
 
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1535,8 +1535,8 @@ class TestCartesianTasks:
             "odom_combined"
         )
 
-        tip_goal1 = CartesianPoint3Dimensional(-0.2, 0, 0, reference_frame=tip)
-        tip_goal2 = CartesianPoint3Dimensional(0.2, 0, 0, reference_frame=tip)
+        tip_goal1 = Point3Dimensional(-0.2, 0, 0, reference_frame=tip)
+        tip_goal2 = Point3Dimensional(0.2, 0, 0, reference_frame=tip)
 
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1588,8 +1588,8 @@ class TestCartesianTasks:
             "odom_combined"
         )
 
-        tip_goal1 = CartesianPoint3Dimensional(-0.2, 0, 0, reference_frame=tip)
-        tip_goal2 = CartesianPoint3Dimensional(0.2, 0, 0, reference_frame=tip)
+        tip_goal1 = Point3Dimensional(-0.2, 0, 0, reference_frame=tip)
+        tip_goal2 = Point3Dimensional(0.2, 0, 0, reference_frame=tip)
 
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1760,7 +1760,7 @@ class TestCartesianTasks:
             "odom_combined"
         )
 
-        goal_point = CartesianPoint3Dimensional(0.1, 0, 0, reference_frame=tip)
+        goal_point = Point3Dimensional(0.1, 0, 0, reference_frame=tip)
 
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1946,9 +1946,7 @@ class TestCartesianTasks:
         task = CartesianPositionStraight(
             root_link=cylinder_bot_world.root,
             tip_link=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
-            goal_point=CartesianPoint3Dimensional(
-                x=1, reference_frame=cylinder_bot_world.root
-            ),
+            goal_point=Point3Dimensional(x=1, reference_frame=cylinder_bot_world.root),
             weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             name="straight",
         )
@@ -1984,7 +1982,7 @@ class TestCartesianTasks:
             "odom_combined"
         )
         start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
-        goal_point = CartesianPoint3Dimensional(
+        goal_point = Point3Dimensional(
             start[0] + 0.25, start[1] + 0.15, start[2] + 0.1, reference_frame=root
         )
 
@@ -2021,7 +2019,7 @@ class TestCartesianTasks:
             "odom_combined"
         )
         start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
-        goal_point = CartesianPoint3Dimensional(
+        goal_point = Point3Dimensional(
             start[0] + 0.2, start[1], start[2], reference_frame=root
         )
 
@@ -2068,9 +2066,7 @@ class TestCartesianTasks:
         trunk = SoftTrunk.build_piecewise_constant_curvature(world, sections)
 
         # Define a reachable Cartesian target point relative to the base root
-        goal_point = CartesianPoint3Dimensional(
-            0.3, 0.0, 0.6, reference_frame=world.root
-        )
+        goal_point = Point3Dimensional(0.3, 0.0, 0.6, reference_frame=world.root)
 
         executor = StatechartExecutor(
             context=StatechartContext(world=world), extensions=[MotionControl()]
@@ -2548,9 +2544,7 @@ class TestDiffDriveBaseGoal:
                 halfway := PositionReached(
                     root_link=world.root,
                     tip_link=base,
-                    goal_point=CartesianPoint3Dimensional(
-                        x=0.5, reference_frame=world.root
-                    ),
+                    goal_point=Point3Dimensional(x=0.5, reference_frame=world.root),
                     threshold=0.1,
                 )
             )
@@ -2621,7 +2615,7 @@ class TestDebugExpressions:
         task = CartesianPosition(
             root_link=root,
             tip_link=tip,
-            goal_point=CartesianPoint3Dimensional(x=1, reference_frame=root),
+            goal_point=Point3Dimensional(x=1, reference_frame=root),
             name="cart_pos",
         )
 
@@ -2632,8 +2626,8 @@ class TestDebugExpressions:
         current = debug_expression_by_name(
             artifacts.debug_expressions, "cart_pos/current"
         )
-        assert isinstance(goal.expression, CartesianPoint3Dimensional)
-        assert isinstance(current.expression, CartesianPoint3Dimensional)
+        assert isinstance(goal.expression, Point3Dimensional)
+        assert isinstance(current.expression, Point3Dimensional)
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 
@@ -2643,7 +2637,7 @@ class TestDebugExpressions:
         task = CartesianPositionStraight(
             root_link=root,
             tip_link=tip,
-            goal_point=CartesianPoint3Dimensional(x=1, reference_frame=root),
+            goal_point=Point3Dimensional(x=1, reference_frame=root),
             name="straight",
         )
 
@@ -2654,8 +2648,8 @@ class TestDebugExpressions:
         current = debug_expression_by_name(
             artifacts.debug_expressions, "straight/current"
         )
-        assert isinstance(goal.expression, CartesianPoint3Dimensional)
-        assert isinstance(current.expression, CartesianPoint3Dimensional)
+        assert isinstance(goal.expression, Point3Dimensional)
+        assert isinstance(current.expression, Point3Dimensional)
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 
@@ -2692,8 +2686,8 @@ class TestDebugExpressions:
             root_link=root,
             tip_link=tip,
             goal_points=[
-                CartesianPoint3Dimensional(x=0, reference_frame=root),
-                CartesianPoint3Dimensional(x=1, reference_frame=root),
+                Point3Dimensional(x=0, reference_frame=root),
+                Point3Dimensional(x=1, reference_frame=root),
             ],
             name="traj",
         )
@@ -2703,8 +2697,8 @@ class TestDebugExpressions:
 
         goal = debug_expression_by_name(artifacts.debug_expressions, "traj/goal")
         current = debug_expression_by_name(artifacts.debug_expressions, "traj/current")
-        assert isinstance(goal.expression, CartesianPoint3Dimensional)
-        assert isinstance(current.expression, CartesianPoint3Dimensional)
+        assert isinstance(goal.expression, Point3Dimensional)
+        assert isinstance(current.expression, Point3Dimensional)
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 
@@ -2767,10 +2761,8 @@ class TestDistanceAlongAxis:
             node=(
                 goal := DistanceAlongAxis(
                     root_link=prismatic_bot2.root,
-                    reference_point=CartesianPoint3Dimensional(
-                        reference_frame=reference
-                    ),
-                    tip_point=CartesianPoint3Dimensional(z=0.1, reference_frame=tip),
+                    reference_point=Point3Dimensional(reference_frame=reference),
+                    tip_point=Point3Dimensional(z=0.1, reference_frame=tip),
                     axis=Vector3Dimensional.Z(reference_frame=prismatic_bot2.root),
                     distance=0.3,
                     threshold=0.001,

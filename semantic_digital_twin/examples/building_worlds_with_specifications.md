@@ -187,7 +187,7 @@ corresponding `Body` constructors:
 from importlib.resources import files
 from pathlib import Path
 
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 
 resources = Path(files("semantic_digital_twin")).parent.parent / "resources"
 
@@ -206,7 +206,7 @@ crate = BodySpecification.from_event("crate", outer - inner).spawn(world)
 # The convex hull of a point cloud.
 hull = BodySpecification.from_3d_points(
     "hull",
-    [CartesianPoint3Dimensional(0, 0, 0), CartesianPoint3Dimensional(0.2, 0, 0), CartesianPoint3Dimensional(0, 0.2, 0), CartesianPoint3Dimensional(0, 0, 0.2)],
+    [Point3Dimensional(0, 0, 0), Point3Dimensional(0.2, 0, 0), Point3Dimensional(0, 0.2, 0), Point3Dimensional(0, 0, 0.2)],
 ).spawn(world)
 
 assert len(milk_mesh.collision.shapes) == 1

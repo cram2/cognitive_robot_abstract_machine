@@ -5,16 +5,18 @@ coordinate systems of one space.
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields
 
 from typing_extensions import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
-from krrood.patterns.mixin import Mixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
+from krrood_spatial_math.exceptions import (
+    FrameMeasuresNoLengthsError,
+    ReferenceFrameMismatchError,
+)
 from krrood_spatial_math.space import EuclideanSpace, Space
 
 if TYPE_CHECKING:
@@ -168,16 +170,14 @@ The kind of value given in a coordinate system.
 """
 
 
-# %% values whose coordinates are the fields their class declares
+# %% values given by one coordinate per axis of a frame
 
 
-@dataclass(kw_only=True)
-class StoredCoordinateRepresentation(
-    CoordinateRepresentation[GenericCoordinateSystem], Mixin
-):
+@dataclass(kw_only=True, eq=False)
+class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
     """
-    A value whose coordinates are the fields its class declares besides
-    :attr:`coordinate_system`, in the order they are declared.
+    A value given by one coordinate per axis of its coordinate system, such as a point or
+    a vector. Its coordinates are the fields its class declares, in declaration order.
     """
 
     coordinate_system: GenericCoordinateSystem | None
@@ -188,7 +188,8 @@ class StoredCoordinateRepresentation(
     @property
     def coordinates(self) -> tuple[Any, ...]:
         """
-        The values of the coordinate fields, in the order they are declared.
+        The amounts along the axes of the coordinate system, one per axis, in the order
+        of the axes.
         """
         return tuple(getattr(self, name) for name in self._coordinate_field_names())
 
@@ -200,8 +201,7 @@ class StoredCoordinateRepresentation(
         coordinate_system: GenericCoordinateSystem | None,
     ) -> Self:
         """
-        :param coordinates: One value per coordinate field, in the order they are
-            declared.
+        :param coordinates: One amount per axis, in the order of the axes.
         :param coordinate_system: The coordinate system the coordinates are given in.
         :return: The value with these coordinates.
         """
@@ -215,14 +215,26 @@ class StoredCoordinateRepresentation(
         """
         :return: The names of the fields this class declares as coordinates, in order.
         """
-        own_field_names = {
-            own_field.name for own_field in fields(StoredCoordinateRepresentation)
-        }
+        own_field_names = {own_field.name for own_field in fields(AxisCoordinates)}
         return tuple(
             coordinate_field.name
             for coordinate_field in fields(cls)
             if coordinate_field.name not in own_field_names
         )
+
+    @classmethod
+    def cartesian_frame_kind(cls) -> type[CartesianFrame]:
+        """
+        :return: The kind of Cartesian frame this value is given in, which measures its
+            lengths and angles.
+        :raises FrameMeasuresNoLengthsError: If the kind of frame is not Cartesian.
+        """
+        frame_kind = cls.get_type_of_generic_parameter(
+            parameter=GenericCoordinateSystem
+        )
+        if not issubclass(frame_kind, CartesianFrame):
+            raise FrameMeasuresNoLengthsError(value_type=cls, frame_kind=frame_kind)
+        return frame_kind
 
 
 # %% changing coordinates within one space

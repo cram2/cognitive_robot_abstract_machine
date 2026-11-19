@@ -29,7 +29,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -55,7 +55,7 @@ class PlacementSamplerRegion:
     Name of the body, already present in the world, this region was resolved for.
     """
 
-    local_center: CartesianPoint3Dimensional
+    local_center: Point3Dimensional
     """
     Centre of the region in the sampler's own frame, before the reference rotation and
     translation are applied.
@@ -179,7 +179,7 @@ class PlacementSamplerRegionReader:
         return PlacementSamplerRegion(
             name=PrefixedName(object_name, prefix=name_prefix),
             body_name=body_name,
-            local_center=CartesianPoint3Dimensional(
+            local_center=Point3Dimensional(
                 (x_minimum + x_maximum) / 2.0,
                 (y_minimum + y_maximum) / 2.0,
             ),
@@ -217,7 +217,7 @@ class GripperExclusionZoneData:
     Name of the body, already present in the world, the gripper must stay away from.
     """
 
-    center: CartesianPoint3Dimensional
+    center: Point3Dimensional
     """
     World coordinates of the body at the moment the zone was resolved.
     """
@@ -276,6 +276,6 @@ class GripperExclusionZoneReader:
         return GripperExclusionZoneData(
             name=PrefixedName(object_name, prefix=name_prefix),
             body_name=environment.objects[object_name].root_body,
-            center=CartesianPoint3Dimensional(*(float(value) for value in position)),
+            center=Point3Dimensional(*(float(value) for value in position)),
             radius=radius,
         )

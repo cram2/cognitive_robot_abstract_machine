@@ -16,7 +16,7 @@ from giskardpy.motion_statechart.tasks.feature_functions import (
     AlignPerpendicular,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -49,8 +49,8 @@ def test_height_monitor(pr2_world_state_reset: World):
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "base_footprint"
     )
-    tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-    reference_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=root)
+    tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+    reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
     lower_limit, upper_limit = 0.3, 0.5
 
     executor = _create_executor(pr2_world_state_reset)
@@ -86,8 +86,8 @@ def test_distance_monitor(pr2_world_state_reset: World):
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "base_footprint"
     )
-    tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-    reference_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=root)
+    tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+    reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
     lower_limit, upper_limit = 0.4, 0.6
 
     executor = _create_executor(pr2_world_state_reset)

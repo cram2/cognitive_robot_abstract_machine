@@ -39,7 +39,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox

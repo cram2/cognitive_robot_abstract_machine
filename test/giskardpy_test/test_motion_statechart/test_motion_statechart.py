@@ -53,7 +53,7 @@ from krrood_spatial_math.spatial_types import (
     Quaternion,
     RotationMatrix,
     Vector3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
@@ -424,9 +424,7 @@ class TestTemplates:
         right_shift = -0.1
         # The knife's x axis points up in map, so its -x stroke cuts downwards.
         pre_cut_pose = Pose3Dimensional(
-            position=CartesianPoint3Dimensional(
-                x=0.85, y=0.2, z=0.75, reference_frame=map_link
-            ),
+            position=Point3Dimensional(x=0.85, y=0.2, z=0.75, reference_frame=map_link),
             orientation=Quaternion.from_rotation_matrix(
                 RotationMatrix.from_vectors(
                     x=Vector3Dimensional(z=1, reference_frame=map_link),
@@ -454,9 +452,7 @@ class TestTemplates:
                     root_link=map_link,
                     tip_link=knife,
                     goal_pose=Pose3Dimensional(
-                        position=CartesianPoint3Dimensional(
-                            x=-depth, reference_frame=knife
-                        ),
+                        position=Point3Dimensional(x=-depth, reference_frame=knife),
                         reference_frame=knife,
                     ),
                 ),
@@ -465,9 +461,7 @@ class TestTemplates:
                     root_link=map_link,
                     tip_link=knife,
                     goal_pose=Pose3Dimensional(
-                        position=CartesianPoint3Dimensional(
-                            x=depth, reference_frame=knife
-                        ),
+                        position=Point3Dimensional(x=depth, reference_frame=knife),
                         reference_frame=knife,
                     ),
                 ),
@@ -476,7 +470,7 @@ class TestTemplates:
                     root_link=map_link,
                     tip_link=knife,
                     goal_pose=Pose3Dimensional(
-                        position=CartesianPoint3Dimensional(
+                        position=Point3Dimensional(
                             y=right_shift, reference_frame=knife
                         ),
                         reference_frame=knife,
@@ -580,8 +574,8 @@ def test_constraint_collection(pr2_world_state_reset: World):
     )
 
     GeometricConstraintBuilder(collection=col).add_point_goal_constraints(
-        frame_P_current=CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip),
-        frame_P_goal=CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip),
+        frame_P_current=Point3Dimensional(0, 0, 0, reference_frame=tip),
+        frame_P_goal=Point3Dimensional(0, 0, 0, reference_frame=tip),
         cruise_velocity=0.1,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
     )

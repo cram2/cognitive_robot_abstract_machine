@@ -46,7 +46,7 @@ from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -295,7 +295,7 @@ def test_position_is_corrected_to_the_meshs_bounding_box_center(
 
     corrected = measurements.corrected_position(
         source_id="book_src",
-        position=CartesianPoint2Dimensional(x=1.0, y=2.0),
+        position=Point2Dimensional(x=1.0, y=2.0),
         yaw_degrees=0.0,
     )
 
@@ -335,7 +335,7 @@ def test_position_correction_is_rotated_by_the_objects_own_yaw(
 
     corrected = measurements.corrected_position(
         source_id="book_src",
-        position=CartesianPoint2Dimensional(x=0.0, y=0.0),
+        position=Point2Dimensional(x=0.0, y=0.0),
         yaw_degrees=90.0,
     )
 
@@ -353,7 +353,7 @@ def test_position_falls_back_to_the_recorded_one_without_a_cached_mesh() -> None
 
     corrected = measurements.corrected_position(
         source_id="missing_src",
-        position=CartesianPoint2Dimensional(x=0.3, y=0.1),
+        position=Point2Dimensional(x=0.3, y=0.1),
         yaw_degrees=0.0,
     )
 
@@ -373,7 +373,7 @@ def test_mesh_is_measured_once_per_source_id(tmp_path: Path) -> None:
     for _ in range(3):
         measurements.corrected_position(
             source_id="book_src",
-            position=CartesianPoint2Dimensional(x=0.0, y=0.0),
+            position=Point2Dimensional(x=0.0, y=0.0),
             yaw_degrees=0.0,
         )
 

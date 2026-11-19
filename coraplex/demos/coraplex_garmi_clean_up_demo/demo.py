@@ -74,7 +74,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.specifications.connections import (
@@ -519,12 +519,10 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                 name="Left hand near the handle",
                 root_link=handle_grasp.graspable.root,
                 tip_link=left_hand.tool_frame,
-                reference_point=CartesianPoint3Dimensional(
+                reference_point=Point3Dimensional(
                     reference_frame=handle_grasp.graspable.root
                 ),
-                tip_point=CartesianPoint3Dimensional(
-                    reference_frame=left_hand.tool_frame
-                ),
+                tip_point=Point3Dimensional(reference_frame=left_hand.tool_frame),
                 lower_limit=0.0,
                 upper_limit=HandDistance.HANDLE_CONTACT.value,
             ),

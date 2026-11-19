@@ -40,7 +40,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -147,7 +147,7 @@ class ProcthorDoor:
         # In unity, doors are defined as holes in the wall, so we express them as children of walls.
         # This means we just need to translate them, and can assume no rotation
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-            CartesianPoint3Dimensional(0, -width_origin_center, height_origin_center)
+            Point3Dimensional(0, -width_origin_center, height_origin_center)
         )
 
     def _add_double_door_to_world(self, world: World) -> DoubleDoor:
@@ -448,7 +448,7 @@ class ProcthorRoom:
     Name of the room, constructed from the room type and room ID.
     """
 
-    centered_polytope: list[CartesianPoint3Dimensional] = field(init=False)
+    centered_polytope: list[Point3Dimensional] = field(init=False)
     """
     Polytope representing the room's floor polygon, centered around its local 0, 0, 0 coordinate
     """
@@ -467,7 +467,7 @@ class ProcthorRoom:
         self.z_center = sum(z_coords) / polytope_length
 
         self.centered_polytope = [
-            CartesianPoint3Dimensional(
+            Point3Dimensional(
                 v["z"] - self.z_center,
                 -(v["x"] - self.x_center),
                 v["y"] - self.y_center,
@@ -484,9 +484,7 @@ class ProcthorRoom:
         Computes the room's world transform
         """
 
-        world_P_room = CartesianPoint3Dimensional(
-            self.z_center, -self.x_center, self.y_center
-        )
+        world_P_room = Point3Dimensional(self.z_center, -self.x_center, self.y_center)
 
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             world_P_room

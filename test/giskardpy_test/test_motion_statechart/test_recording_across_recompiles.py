@@ -18,7 +18,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -78,7 +78,7 @@ def _compile_a_recorded_drive(world: World) -> StatechartExecutor:
         node=CartesianPosition(
             root_link=world.root,
             tip_link=_robot(world),
-            goal_point=CartesianPoint3Dimensional(x=5, reference_frame=world.root),
+            goal_point=Point3Dimensional(x=5, reference_frame=world.root),
             name=str(_robot(world).name),
         )
     )

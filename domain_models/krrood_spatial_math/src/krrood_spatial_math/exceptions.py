@@ -102,6 +102,36 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 
 
 @dataclass(kw_only=True)
+class FrameMeasuresNoLengthsError(SpatialTypesError):
+    """
+    Raised when a length, an angle or a distance is asked of a value given in a kind of
+    frame that is not Cartesian, such as an affine pixel frame.
+    """
+
+    value_type: type
+    """
+    The type of the value that was measured.
+    """
+
+    frame_kind: type
+    """
+    The kind of frame the value type is given in.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.value_type.__name__} is given in a {self.frame_kind.__name__}, "
+            f"which measures no lengths or angles."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "change the value into a Cartesian frame first, or give its type a kind of "
+            "frame that subclasses CartesianFrame."
+        )
+
+
+@dataclass(kw_only=True)
 class PointAndVectorFramesDifferError(SpatialTypesError):
     """
     Raised when a point type is declared to be moved by a vector type given in another

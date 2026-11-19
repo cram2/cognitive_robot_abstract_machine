@@ -37,8 +37,8 @@ from krrood_spatial_math.coordinate_system import (
     RigidCoordinateChange,
 )
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import CartesianPoint
-from krrood_spatial_math.vector import CartesianVector
+from krrood_spatial_math.point import Point
+from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
     ReferenceFrameMismatchError,
@@ -565,7 +565,7 @@ class HomogeneousTransformationMatrix3Dimensional(
     @classmethod
     def from_point_rotation_matrix(
         cls,
-        point: CartesianPoint3Dimensional | None = None,
+        point: Point3Dimensional | None = None,
         rotation_matrix: RotationMatrix | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
@@ -630,7 +630,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         :return: A TransformationMatrix object created using the provided position and
             orientation values
         """
-        p = CartesianPoint3Dimensional(x=x, y=y, z=z)
+        p = Point3Dimensional(x=x, y=y, z=z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
         return cls.from_point_rotation_matrix(
             p, r, reference_frame=reference_frame, child_frame=child_frame
@@ -667,7 +667,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         :param child_frame: Optional child frame for the transformation matrix.
         :return: A `TransformationMatrix` object constructed from the given parameters.
         """
-        p = CartesianPoint3Dimensional(x=pos_x, y=pos_y, z=pos_z)
+        p = Point3Dimensional(x=pos_x, y=pos_y, z=pos_z)
         r = RotationMatrix.from_quaternion(
             quaternion=Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
         )
@@ -710,7 +710,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         rotation_matrix = RotationMatrix.from_axis_angle(
             AxisAngle(axis=axis, angle=angle)
         )
-        point = CartesianPoint3Dimensional(x=x, y=y, z=z)
+        point = Point3Dimensional(x=x, y=y, z=z)
         return cls.from_point_rotation_matrix(
             point=point,
             rotation_matrix=rotation_matrix,
@@ -811,13 +811,11 @@ class HomogeneousTransformationMatrix3Dimensional(
         return f2_T_f1
 
     @property
-    def position(self) -> CartesianPoint3Dimensional:
+    def position(self) -> Point3Dimensional:
         """
         :return: The translation this transformation is composed of.
         """
-        result = CartesianPoint3Dimensional.from_casadi_sx(
-            casadi_sx=self.casadi_sx[:4, 3]
-        )
+        result = Point3Dimensional.from_casadi_sx(casadi_sx=self.casadi_sx[:4, 3])
         result.reference_frame = self.reference_frame
         return result
 
@@ -1299,7 +1297,7 @@ class RotationMatrix(
 class Vector3Dimensional(
     SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
-    CartesianVector[CartesianFrame3Dimensional, sm.Scalar],
+    Vector[CartesianFrame3Dimensional, sm.Scalar],
 ):
     """
     Representation of a 3D vector with reference frame support for homogenous
@@ -1681,22 +1679,20 @@ class Vector3Dimensional(
         )
 
     @property
-    def cartesian_point_3_dimensional(self) -> CartesianPoint3Dimensional:
+    def point_3_dimensional(self) -> Point3Dimensional:
         """
         :return: The point this vector reaches from the origin of the reference frame.
         """
-        result = CartesianPoint3Dimensional.from_casadi_sx(
-            casadi_sx=copy(self.casadi_sx)
-        )
+        result = Point3Dimensional.from_casadi_sx(casadi_sx=copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
         return result
 
 
 @dataclass(eq=False, init=False, repr=False)
-class CartesianPoint3Dimensional(
+class Point3Dimensional(
     SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
-    CartesianPoint[CartesianFrame3Dimensional, Vector3Dimensional, sm.Scalar],
+    Point[CartesianFrame3Dimensional, Vector3Dimensional, sm.Scalar],
 ):
     """
     Represents a 3D point with reference frame handling.
@@ -1743,23 +1739,23 @@ class CartesianPoint3Dimensional(
         cls,
         data: sm.VectorData,
         reference_frame: CartesianFrame3Dimensional | None = None,
-    ) -> CartesianPoint3Dimensional:
+    ) -> Point3Dimensional:
         """
-        Creates an instance of CartesianPoint3Dimensional from provided iterable data.
+        Creates an instance of Point3Dimensional from provided iterable data.
 
-        This class method is used to construct a CartesianPoint3Dimensional object by processing the given
+        This class method is used to construct a Point3Dimensional object by processing the given
         data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a CartesianPoint3Dimensional
+        different array-like objects compatible with the desired format for a Point3Dimensional
         instance. The provided iterable or array should follow a 1D structure to avoid
         raised errors.
 
         :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the CartesianPoint3Dimensional instance.
+            used to initialize the Point3Dimensional instance.
         :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the CartesianPoint3Dimensional instance. If the data has
+            representing the frame of reference for the Point3Dimensional instance. If the data has
             a `reference_frame` attribute, and this parameter is not specified, it will
             be taken from the data.
-        :return: Returns an instance of CartesianPoint3Dimensional initialized with the processed data and
+        :return: Returns an instance of Point3Dimensional initialized with the processed data and
             an optional reference frame.
         """
         if isinstance(data, SymbolicSpatialType) and reference_frame is None:
@@ -1840,13 +1836,13 @@ class CartesianPoint3Dimensional(
     def coordinates(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
         return self.x, self.y, self.z
 
-    def __add__(self, other: Vector3Dimensional) -> CartesianPoint3Dimensional:
+    def __add__(self, other: Vector3Dimensional) -> Point3Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
         """
         if isinstance(other, Vector3Dimensional):
             self.ensure_same_reference_frame(other, "the added Vector3Dimensional")
-            result = CartesianPoint3Dimensional.from_casadi_sx(
+            result = Point3Dimensional.from_casadi_sx(
                 casadi_sx=ca.SX.binary(ca.OP_ADD, self.casadi_sx, other.casadi_sx)
             )
         else:
@@ -1855,25 +1851,23 @@ class CartesianPoint3Dimensional(
         return result
 
     @overload
-    def __sub__(self, other: CartesianPoint3Dimensional) -> Vector3Dimensional: ...
+    def __sub__(self, other: Point3Dimensional) -> Vector3Dimensional: ...
 
     @overload
-    def __sub__(self, other: Vector3Dimensional) -> CartesianPoint3Dimensional: ...
+    def __sub__(self, other: Vector3Dimensional) -> Point3Dimensional: ...
 
     def __sub__(self, other):
         """
         :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
         """
-        if isinstance(other, CartesianPoint3Dimensional):
-            self.ensure_same_reference_frame(
-                other, "the subtracted CartesianPoint3Dimensional"
-            )
+        if isinstance(other, Point3Dimensional):
+            self.ensure_same_reference_frame(other, "the subtracted Point3Dimensional")
             result = Vector3Dimensional.from_casadi_sx(
                 casadi_sx=ca.SX.binary(ca.OP_SUB, self.casadi_sx, other.casadi_sx)
             )
         elif isinstance(other, Vector3Dimensional):
             self.ensure_same_reference_frame(other, "the subtracted Vector3Dimensional")
-            result = CartesianPoint3Dimensional.from_casadi_sx(
+            result = Point3Dimensional.from_casadi_sx(
                 casadi_sx=ca.SX.binary(ca.OP_SUB, self.casadi_sx, other.casadi_sx)
             )
         else:
@@ -1881,8 +1875,8 @@ class CartesianPoint3Dimensional(
         result.reference_frame = self.reference_frame
         return result
 
-    def __neg__(self) -> CartesianPoint3Dimensional:
-        result = CartesianPoint3Dimensional.from_casadi_sx(
+    def __neg__(self) -> Point3Dimensional:
+        result = Point3Dimensional.from_casadi_sx(
             casadi_sx=ca.SX.unary(ca.OP_NEG, self.casadi_sx)
         )
         result.reference_frame = self.reference_frame
@@ -1892,7 +1886,7 @@ class CartesianPoint3Dimensional(
         self,
         frame_V_plane_vector1: Vector3Dimensional,
         frame_V_plane_vector2: Vector3Dimensional,
-    ) -> tuple[CartesianPoint3Dimensional, sm.Scalar]:
+    ) -> tuple[Point3Dimensional, sm.Scalar]:
         """
         Projects a point onto a plane defined by two vectors.
 
@@ -1913,8 +1907,8 @@ class CartesianPoint3Dimensional(
         return projection, d
 
     def project_to_line(
-        self, line_point: CartesianPoint3Dimensional, line_direction: Vector3Dimensional
-    ) -> tuple[CartesianPoint3Dimensional, sm.Scalar]:
+        self, line_point: Point3Dimensional, line_direction: Vector3Dimensional
+    ) -> tuple[Point3Dimensional, sm.Scalar]:
         """
         :param line_point: a point that the line intersects, must have the same reference frame as self
         :param line_direction: the direction of the line, must have the same reference frame as self
@@ -1932,9 +1926,9 @@ class CartesianPoint3Dimensional(
 
     def distance_to_line_segment(
         self,
-        line_start: CartesianPoint3Dimensional,
-        line_end: CartesianPoint3Dimensional,
-    ) -> tuple[sm.Scalar, CartesianPoint3Dimensional]:
+        line_start: Point3Dimensional,
+        line_end: Point3Dimensional,
+    ) -> tuple[sm.Scalar, Point3Dimensional]:
         """
         All parameters must have the same reference frame as self.
 
@@ -1957,7 +1951,7 @@ class CartesianPoint3Dimensional(
         frame_P_nearest = frame_P_line_start + frame_V_offset
         return dist, frame_P_nearest
 
-    def midpoint(self, other: CartesianPoint3Dimensional) -> CartesianPoint3Dimensional:
+    def midpoint(self, other: Point3Dimensional) -> Point3Dimensional:
         """
         :param other: The point to meet halfway.
         :return: The point midway between this one and ``other``.
@@ -1982,12 +1976,12 @@ class CartesianPoint3Dimensional(
 
 
 @dataclass(eq=False)
-class Line3Dimensional(Line[CartesianPoint3Dimensional, Vector3Dimensional]):
+class Line3Dimensional(Line[Point3Dimensional, Vector3Dimensional]):
     """
     An infinite straight line in 3D space.
     """
 
-    point: CartesianPoint3Dimensional
+    point: Point3Dimensional
     """
     A point the line passes through.
     """
@@ -1999,19 +1993,17 @@ class Line3Dimensional(Line[CartesianPoint3Dimensional, Vector3Dimensional]):
 
 
 @dataclass(eq=False, kw_only=True)
-class LineSegment3Dimensional(
-    LineSegment[CartesianPoint3Dimensional, Line3Dimensional]
-):
+class LineSegment3Dimensional(LineSegment[Point3Dimensional, Line3Dimensional]):
     """
     The part of a straight line in 3D space between two points.
     """
 
-    start: CartesianPoint3Dimensional
+    start: Point3Dimensional
     """
     The point the segment runs from.
     """
 
-    end: CartesianPoint3Dimensional
+    end: Point3Dimensional
     """
     The point the segment runs to, in the same reference frame as :attr:`start`.
     """
@@ -2867,7 +2859,7 @@ class Pose3Dimensional(
 
     def __init__(
         self,
-        position: CartesianPoint3Dimensional | None = None,
+        position: Point3Dimensional | None = None,
         orientation: Quaternion | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ):
@@ -2875,7 +2867,7 @@ class Pose3Dimensional(
         Initialize a 3D point with orientation and a reference frame in a kinematic
         structure.
 
-        :param position: The 3D position of the point, represented as a CartesianPoint3Dimensional object.
+        :param position: The 3D position of the point, represented as a Point3Dimensional object.
             If None, a default position is assumed.
         :param orientation: The orientation of the point in 3D space represented as a
             Quaternion. If None, default orientation is assumed.
@@ -2884,7 +2876,7 @@ class Pose3Dimensional(
             not tied to any specific reference frame.
         """
         if position is None:
-            position = CartesianPoint3Dimensional()
+            position = Point3Dimensional()
         if orientation is None:
             orientation = Quaternion()
         transformation_matrix = (
@@ -2946,7 +2938,7 @@ class Pose3Dimensional(
         :return: A Pose3Dimensional object created using the provided position and orientation
             values
         """
-        p = CartesianPoint3Dimensional(x=x, y=y, z=z)
+        p = Point3Dimensional(x=x, y=y, z=z)
         r = Quaternion.from_rpy(roll, pitch, yaw)
         return cls(p, r, reference_frame=reference_frame)
 
@@ -2979,7 +2971,7 @@ class Pose3Dimensional(
         :param reference_frame: Optional reference frame for the transformation matrix.
         :return: A `Pose3Dimensional` object constructed from the given parameters.
         """
-        p = CartesianPoint3Dimensional(x=pos_x, y=pos_y, z=pos_z)
+        p = Point3Dimensional(x=pos_x, y=pos_y, z=pos_z)
         r = Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
         return cls(p, r, reference_frame=reference_frame)
 
@@ -3014,7 +3006,7 @@ class Pose3Dimensional(
         elif not isinstance(axis, Vector3Dimensional):
             axis = Vector3Dimensional.from_iterable(axis)
         rotation_matrix = Quaternion.from_axis_angle(AxisAngle(axis=axis, angle=angle))
-        point = CartesianPoint3Dimensional(x=x, y=y, z=z)
+        point = Point3Dimensional(x=x, y=y, z=z)
         return cls(
             position=point,
             orientation=rotation_matrix,
@@ -3058,10 +3050,8 @@ class Pose3Dimensional(
         self[2, 3] = value
 
     @property
-    def position(self) -> CartesianPoint3Dimensional:
-        result = CartesianPoint3Dimensional.from_casadi_sx(
-            casadi_sx=self.casadi_sx[:4, 3]
-        )
+    def position(self) -> Point3Dimensional:
+        result = Point3Dimensional.from_casadi_sx(casadi_sx=self.casadi_sx[:4, 3])
         result.reference_frame = self.reference_frame
         return result
 

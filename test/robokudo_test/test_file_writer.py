@@ -17,7 +17,7 @@ from robokudo.descriptors.camera_configs.config_filereader_playback import (
 )
 from robokudo.io.file_reader_interface import RGBDFileReaderInterface
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -43,7 +43,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
         image_resolution=CameraResolution(width=4, height=3),
         focal_length_x=10.0,
         focal_length_y=11.0,
-        principal_point=CartesianPoint2Dimensional(x=2.0, y=1.0),
+        principal_point=Point2Dimensional(x=2.0, y=1.0),
     )
     camera_frame = Body(name=PrefixedName(name="camera_optical_frame"))
     camera = Camera(

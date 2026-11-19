@@ -17,7 +17,7 @@ from random_events.product_algebra import Event, SimpleEvent
 from semantic_digital_twin.exceptions import MismatchingWorld
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.world_description.geometry import (
     Shape,
@@ -218,14 +218,14 @@ class ShapeCollection(SubclassJSONSerializer):
         reference_frame = next(iter(frames.values())) if len(frames) == 1 else None
         return cls(shapes=shapes, reference_frame=reference_frame)
 
-    def center_of_mass_in_world(self) -> CartesianPoint3Dimensional:
+    def center_of_mass_in_world(self) -> Point3Dimensional:
         """
         :return: The center of mass of this shape collection in the world coordinate frame.
         """
         # Center of mass in the body's local frame (collision geometry)
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
-        com = CartesianPoint3Dimensional(
+        com = Point3Dimensional(
             x=com_local[0],
             y=com_local[1],
             z=com_local[2],
@@ -246,14 +246,14 @@ class ShapeCollection(SubclassJSONSerializer):
         )
 
     @property
-    def min_point(self) -> CartesianPoint3Dimensional:
-        return CartesianPoint3Dimensional.from_iterable(
+    def min_point(self) -> Point3Dimensional:
+        return Point3Dimensional.from_iterable(
             self.combined_mesh.bounds[0], reference_frame=self.reference_frame
         )
 
     @property
-    def max_point(self) -> CartesianPoint3Dimensional:
-        return CartesianPoint3Dimensional.from_iterable(
+    def max_point(self) -> Point3Dimensional:
+        return Point3Dimensional.from_iterable(
             self.combined_mesh.bounds[1], self.reference_frame
         )
 
@@ -378,7 +378,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
             )
             origin = (
                 HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                    point=CartesianPoint3Dimensional.from_iterable(
+                    point=Point3Dimensional.from_iterable(
                         _padded_to_3d(origin_coordinates)
                     ),
                     reference_frame=reference_frame,

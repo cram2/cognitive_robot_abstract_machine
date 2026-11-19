@@ -101,7 +101,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.connection_properties import JointServo
@@ -897,7 +897,7 @@ class EndEffector(AbstractRobotPart, ABC):
         )
 
     def tool_frame_goal_for_point(
-        self, tool_P_point: CartesianPoint3Dimensional, grasp_pose: Pose3Dimensional
+        self, tool_P_point: Point3Dimensional, grasp_pose: Pose3Dimensional
     ) -> Pose3Dimensional:
         """
         Express a grasp frame as the goal that puts a point of this gripper on it, where
@@ -931,9 +931,7 @@ class EndEffector(AbstractRobotPart, ABC):
             raise MoreThanOneBodyHeld(self, children)
         return children[0]
 
-    def held_body_T_grasp_at(
-        self, tool_P_point: CartesianPoint3Dimensional
-    ) -> Pose3Dimensional:
+    def held_body_T_grasp_at(self, tool_P_point: Point3Dimensional) -> Pose3Dimensional:
         """
         The grasp this gripper has on the body it holds, read off the transform between
         the tool frame and that body, with the grasp sitting at a given point of the
@@ -949,7 +947,7 @@ class EndEffector(AbstractRobotPart, ABC):
         return self.body_T_grasp(body=body, tool_P_grasp=tool_P_point)
 
     def body_T_grasp(
-        self, *, body: Body, tool_P_grasp: CartesianPoint3Dimensional
+        self, *, body: Body, tool_P_grasp: Point3Dimensional
     ) -> Pose3Dimensional:
         """
         The grasp this gripper has on `body` as both stand now, whether or not `body`

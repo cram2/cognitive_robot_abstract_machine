@@ -14,60 +14,39 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dim
 from krrood_spatial_math.coordinate_system import (
     AffineFrame,
     GenericAffineFrame,
-    CartesianFrame,
-    GenericCartesianFrame,
     CoordinateRepresentation,
     GenericCoordinate,
 )
-from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
+from krrood_spatial_math.exceptions import (
+    FrameMeasuresNoLengthsError,
+    ReferenceFrameMismatchError,
+)
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import CartesianPoint, Point, GenericPoint
+from krrood_spatial_math.point import Point, GenericPoint
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
-from krrood_spatial_math.vector import CartesianVector, Vector, GenericVector
+from krrood_spatial_math.vector import Vector, GenericVector
 
 from .dataset.frames import NamedFrame
 from .dataset.spaces import (
     ScalablePlaneFrame,
     StoredScalablePlaneLine,
     StoredScalablePlaneLineSegment,
-    StoredScalablePlanePoint,
-    StoredScalablePlaneVector,
+    ScalablePlanePoint,
+    ScalablePlaneVector,
 )
 
 # %% points and vectors given in an affine frame
 
 
 @pytest.mark.parametrize("affine_value", [Point, Vector])
-def test_a_point_or_vector_cannot_be_instantiated(affine_value):
-    with pytest.raises(InterfaceInstantiationError):
-        affine_value()
-
-
-@pytest.mark.parametrize(
-    "affine_value", [Point, CartesianPoint, Vector, CartesianVector]
-)
 def test_a_point_or_vector_is_a_coordinate_representation(affine_value):
     """
-    Every point and vector, Cartesian or not, is given in a coordinate system.
+    Every point and vector is given in a coordinate system.
     """
     assert issubclass(affine_value, CoordinateRepresentation)
-
-
-def test_a_cartesian_point_is_a_point():
-    """
-    A Cartesian point keeps everything a point does and adds distances.
-    """
-    assert issubclass(CartesianPoint, Point)
-
-
-def test_a_cartesian_vector_is_a_vector():
-    """
-    A Cartesian vector keeps everything a vector does and adds lengths and angles.
-    """
-    assert issubclass(CartesianVector, Vector)
 
 
 def test_a_point_is_not_a_vector():
@@ -78,12 +57,10 @@ def test_a_point_is_moved_by_a_vector():
     """
     Adding a vector shifts each coordinate of the point by the vector's.
     """
-    point = StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
-    vector = StoredScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
+    point = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+    vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
 
-    assert point + vector == StoredScalablePlanePoint(
-        x=4.0, y=6.0, coordinate_system=None
-    )
+    assert point + vector == ScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
 
 
 def test_a_point_is_given_in_an_affine_frame():
@@ -96,20 +73,32 @@ def test_a_point_is_given_in_an_affine_frame():
     assert vector_parameter.__bound__ is Vector
 
 
-def test_a_cartesian_point_is_given_in_a_cartesian_frame():
+def test_a_vector_of_a_frame_that_is_not_cartesian_has_no_length():
     """
-    Only a Cartesian frame measures the distances a Cartesian point has.
+    Only a Cartesian kind of frame measures lengths; an affine one is refused.
     """
-    frame_parameter, _, _ = CartesianPoint.__parameters__
+    vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
 
-    assert frame_parameter.__bound__ is CartesianFrame
+    with pytest.raises(FrameMeasuresNoLengthsError):
+        vector.norm()
+
+
+def test_points_of_a_frame_that_is_not_cartesian_have_no_distance():
+    """
+    Only a Cartesian kind of frame measures distances; an affine one is refused.
+    """
+    point = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+
+    with pytest.raises(FrameMeasuresNoLengthsError):
+        point.euclidean_distance(point)
 
 
 def test_a_point_reports_the_kind_of_frame_it_is_given_in():
+    """
+    The kind of frame a point type binds is read back from the class.
+    """
     assert (
-        StoredScalablePlanePoint.get_type_of_generic_parameter(
-            parameter=GenericAffineFrame
-        )
+        ScalablePlanePoint.get_type_of_generic_parameter(parameter=GenericAffineFrame)
         is ScalablePlaneFrame
     )
 
@@ -119,17 +108,18 @@ def test_a_point_reports_what_its_coordinates_are_stored_as():
     The coordinate type a point binds is read back from the class, without an instance.
     """
     assert (
-        StoredScalablePlanePoint.get_type_of_generic_parameter(
-            parameter=GenericCoordinate
-        )
+        ScalablePlanePoint.get_type_of_generic_parameter(parameter=GenericCoordinate)
         is float
     )
 
 
 def test_a_point_reports_the_kind_of_vector_it_is_moved_by():
+    """
+    The vector type a point type binds is read back from the class.
+    """
     assert (
-        StoredScalablePlanePoint.get_type_of_generic_parameter(parameter=GenericVector)
-        is StoredScalablePlaneVector
+        ScalablePlanePoint.get_type_of_generic_parameter(parameter=GenericVector)
+        is ScalablePlaneVector
     )
 
 
@@ -138,8 +128,7 @@ def test_a_points_frame_field_is_narrowed_to_the_bound_frame():
     The frame a point type binds becomes the type of its coordinate_system field.
     """
     point_types = {
-        point_field.name: point_field.type
-        for point_field in fields(StoredScalablePlanePoint)
+        point_field.name: point_field.type for point_field in fields(ScalablePlanePoint)
     }
 
     assert point_types["coordinate_system"] == ScalablePlaneFrame | None
@@ -152,20 +141,18 @@ def test_the_difference_of_two_points_is_the_vector_between_them():
     """
     Subtracting points gives the vector type the point binds, not another point.
     """
-    start = StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
-    end = StoredScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
+    start = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+    end = ScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
 
-    assert end - start == StoredScalablePlaneVector(
-        x=3.0, y=4.0, coordinate_system=None
-    )
+    assert end - start == ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
 
 
 def test_a_point_moved_by_the_difference_to_another_point_reaches_it():
     """
     Point subtraction and point-vector addition undo each other.
     """
-    start = StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
-    end = StoredScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
+    start = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+    end = ScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
 
     assert start + (end - start) == end
 
@@ -184,14 +171,17 @@ def test_a_line_runs_through_a_point_along_a_vector():
 
 
 def test_a_lines_fields_are_narrowed_to_the_bound_types():
+    """
+    A line type that binds its point and vector types gives its fields those types.
+    """
     line_types = {
         line_field.name: line_field.type
         for line_field in fields(StoredScalablePlaneLine)
     }
 
     assert line_types == {
-        "point": StoredScalablePlanePoint,
-        "direction": StoredScalablePlaneVector,
+        "point": ScalablePlanePoint,
+        "direction": ScalablePlaneVector,
     }
 
 
@@ -207,13 +197,13 @@ def test_a_line_reaches_the_point_at_a_position_along_it(
     behind it for a negative position.
     """
     line = StoredScalablePlaneLine(
-        point=StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None),
-        direction=StoredScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None),
+        point=ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None),
+        direction=ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None),
     )
 
     assert line.point_at_position(
         position_along_line=position_along_line
-    ) == StoredScalablePlanePoint(x=expected_x, y=expected_y, coordinate_system=None)
+    ) == ScalablePlanePoint(x=expected_x, y=expected_y, coordinate_system=None)
 
 
 # %% straight lines between two points
@@ -232,8 +222,8 @@ def test_a_line_segment_lies_on_the_line_from_its_start_to_its_end():
     A segment's line passes through its start along the vector to its end, reaching the
     end at position 1.
     """
-    start = StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
-    end = StoredScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
+    start = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+    end = ScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
 
     line = StoredScalablePlaneLineSegment(start=start, end=end).line
 
@@ -261,9 +251,12 @@ def test_a_cartesian_frame_kind_measures_the_angle_between_two_vectors():
 
 
 def test_a_cartesian_frame_kind_measures_the_distance_between_two_points():
+    """
+    A Cartesian kind of frame measures distances without a frame instance.
+    """
     distance = CartesianFrame3Dimensional.distance(
-        first=CartesianPoint3Dimensional(1, 2, 3),
-        second=CartesianPoint3Dimensional(4, 6, 3),
+        first=Point3Dimensional(1, 2, 3),
+        second=Point3Dimensional(4, 6, 3),
     )
     assert float(distance) == 5.0
 
@@ -281,9 +274,12 @@ def test_a_vectors_inner_product_is_the_one_its_frame_kind_measures():
 
 
 def test_a_points_distance_is_the_one_its_frame_kind_measures():
+    """
+    A point measures its distance with the metric of its kind of frame.
+    """
     first, second = (
-        CartesianPoint3Dimensional(0, 0, 0),
-        CartesianPoint3Dimensional(1, 2, 2),
+        Point3Dimensional(0, 0, 0),
+        Point3Dimensional(1, 2, 2),
     )
     assert float(first.euclidean_distance(second)) == float(
         CartesianFrame3Dimensional.distance(first=first, second=second)

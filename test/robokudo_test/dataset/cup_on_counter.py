@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from krrood.adapters.json_serializer import to_json
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from robokudo.cas import CASViews
 from semantic_digital_twin.datastructures.camera_model import (
     PinholeCameraModel,
@@ -58,7 +58,7 @@ class CupOnCounterRecording:
             image_resolution=CameraResolution(width=1280, height=960),
             focal_length_x=1050.0,
             focal_length_y=1050.0,
-            principal_point=CartesianPoint2Dimensional(x=639.5, y=479.5),
+            principal_point=Point2Dimensional(x=639.5, y=479.5),
             distortion=PlumbBobCameraDistortion(),
         )
     )

@@ -39,10 +39,10 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from typing_extensions import Iterable, Sequence, Self
 
-from krrood_spatial_math.point import CartesianPoint
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.point import Point
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     EmbeddedPlaneProjection,
 )
 from semantic_digital_twin.world_description.geometry import (
@@ -271,7 +271,7 @@ class NavigationPath:
     """
     A solved path through a graph of convex sets.
 
-    Kept as a class rather than a plain ``list[CartesianPoint]``: :attr:`length`,
+    Kept as a class rather than a plain ``list[Point]``: :attr:`length`,
     :attr:`vertical_travel` and :attr:`spatial_coordinates` are each read from panels
     in both this module and
     :mod:`~semantic_digital_twin.world_description.graph_of_convex_sets.volume_figure`,
@@ -279,7 +279,7 @@ class NavigationPath:
     instead of recomputing it from a bare list.
     """
 
-    waypoints: list[CartesianPoint]
+    waypoints: list[Point]
     """
     The points to navigate to, starting at the query's start and ending at its goal.
     """
@@ -290,7 +290,7 @@ class NavigationPath:
         :return: Whether these waypoints carry a z-coordinate, so the path is planned in
             3D rather than on a floor plan.
         """
-        return isinstance(self.waypoints[0], CartesianPoint3Dimensional)
+        return isinstance(self.waypoints[0], Point3Dimensional)
 
     @property
     def length(self) -> float:
@@ -335,23 +335,23 @@ class ConvexSetAdjacency:
     convex set, through the portal the two sets share, to the center of the other.
     """
 
-    source_center: CartesianPoint
+    source_center: Point
     """
     The center of the convex set the edge starts at.
     """
 
-    portal_center: CartesianPoint
+    portal_center: Point
     """
     The center of the region where the two convex sets overlap.
     """
 
-    target_center: CartesianPoint
+    target_center: Point
     """
     The center of the convex set the edge ends at.
     """
 
     @property
-    def points(self) -> tuple[CartesianPoint, CartesianPoint, CartesianPoint]:
+    def points(self) -> tuple[Point, Point, Point]:
         """
         :return: The points the edge is drawn through, from source through portal to
             target.
@@ -381,18 +381,16 @@ class FloorPlan:
     The projection of 3D points onto the plane.
     """
 
-    def project_onto_plane(
-        self, *, point: CartesianPoint
-    ) -> CartesianPoint2Dimensional:
+    def project_onto_plane(self, *, point: Point) -> Point2Dimensional:
         """
         :param point: A point on the plane, or a 3D point in any frame of its world.
         :return: The point on the plane, a 3D point projected onto it.
         """
-        if isinstance(point, CartesianPoint3Dimensional):
+        if isinstance(point, Point3Dimensional):
             return self.projection.project(point)
         return point
 
-    def coordinates(self, points: Iterable[CartesianPoint]) -> np.ndarray:
+    def coordinates(self, points: Iterable[Point]) -> np.ndarray:
         """
         :param points: Points on the plane, or 3D points in any frame of its world.
         :return: The points' coordinates on the plane as an array of x-y rows, in the
@@ -762,7 +760,7 @@ class EndpointsLayer(SceneLayer):
     def _draw_endpoint(
         self,
         axes: Axes,
-        endpoint: CartesianPoint2Dimensional,
+        endpoint: Point2Dimensional,
         label: str,
         marker: str,
         color: str,

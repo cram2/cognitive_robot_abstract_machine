@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import rustworkx as rx
 from typing_extensions import Generic
 
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from semantic_digital_twin.world_description.graph_of_convex_sets.base import PointT
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
     BoxT,
@@ -106,5 +106,5 @@ def _coordinates_of(
         coordinate reads as 0 for a planar graph, whose centers have no z.
     """
     center = graph.graph[index].center
-    z = float(center.z) if isinstance(center, CartesianPoint3Dimensional) else 0.0
+    z = float(center.z) if isinstance(center, Point3Dimensional) else 0.0
     return float(center.x), float(center.y), z

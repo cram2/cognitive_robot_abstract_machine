@@ -14,7 +14,7 @@ from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Quaternion,
     Vector3Dimensional,
     RotationMatrix,
@@ -55,8 +55,8 @@ class GeometricConstraintBuilder:
     def add_point_goal_constraints(
         self,
         *,
-        frame_P_current: CartesianPoint3Dimensional,
-        frame_P_goal: CartesianPoint3Dimensional,
+        frame_P_current: Point3Dimensional,
+        frame_P_goal: Point3Dimensional,
         cruise_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         name: str | None = None,

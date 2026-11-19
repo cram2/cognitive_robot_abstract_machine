@@ -56,7 +56,7 @@ from semantic_digital_twin.world_description.connection_properties import (
 from krrood_spatial_math.spatial_types import (
     GenericSpatialType,
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     SymbolicSpatialType,
     Vector3Dimensional,
@@ -449,14 +449,14 @@ class KinematicStructureEntity(
         """
 
     @property
-    def center_of_mass(self) -> CartesianPoint3Dimensional:
+    def center_of_mass(self) -> Point3Dimensional:
         """
         Computes the center of mass of this KinematicStructureEntity.
         """
         # Center of mass in the body's local frame (collision geometry)
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
-        com = CartesianPoint3Dimensional(
+        com = Point3Dimensional(
             x=com_local[0],
             y=com_local[1],
             z=com_local[2],
@@ -530,7 +530,7 @@ class KinematicStructureEntity(
     def from_3d_points(
         cls,
         name: PrefixedName,
-        points_3d: list[CartesianPoint3Dimensional],
+        points_3d: list[Point3Dimensional],
         minimum_thickness: float = 0.005,
         singular_value_ratio_tolerance: float = 1e-7,
     ) -> Self:

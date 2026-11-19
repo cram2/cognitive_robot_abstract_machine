@@ -17,7 +17,7 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -43,17 +43,17 @@ class StayOnLineTask(ConvergingTask):
     Tip link of the kinematic chain, which the controlled point is attached to.
     """
 
-    tip_P_tool: CartesianPoint3Dimensional
+    tip_P_tool: Point3Dimensional
     """
     The controlled point.
     """
 
-    root_P_start: CartesianPoint3Dimensional
+    root_P_start: Point3Dimensional
     """
     Start of the line segment.
     """
 
-    root_P_end: CartesianPoint3Dimensional
+    root_P_end: Point3Dimensional
     """
     End of the line segment.
     """
@@ -116,12 +116,12 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     Controlled tip of the kinematic chain; the grasped body to insert.
     """
 
-    tip_P_tool: CartesianPoint3Dimensional
+    tip_P_tool: Point3Dimensional
     """
     The point of the cylinder that leads the insertion.
     """
 
-    hole_point: CartesianPoint3Dimensional
+    hole_point: Point3Dimensional
     """
     Position of the hole to insert into.
     """

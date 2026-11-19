@@ -18,7 +18,7 @@ A `DebugExpression`
 (`giskardpy.motion_statechart.graph_node.DebugExpression`) wraps three things:
 
 - a `name`, used as the label in every debugging tool,
-- an `expression` — either a `Scalar` or a spatial type (`CartesianPoint3Dimensional`, `Vector3Dimensional`, `Quaternion`,
+- an `expression` — either a `Scalar` or a spatial type (`Point3Dimensional`, `Vector3Dimensional`, `Quaternion`,
   `RotationMatrix`, `HomogeneousTransformationMatrix3Dimensional`, or `Pose3Dimensional`), and
 - a `color`, used when the expression is rendered.
 
@@ -118,7 +118,7 @@ show the target and actual end-effector pose side by side.
 ---
 width: 600px
 ---
-A `CartesianPoint3Dimensional` is drawn as a sphere — `CartesianPosition/goal` (green) and
+A `Point3Dimensional` is drawn as a sphere — `CartesianPosition/goal` (green) and
 `CartesianPosition/current` (red).
 ```
 

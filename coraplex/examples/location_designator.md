@@ -160,10 +160,10 @@ location samples at most `number_of_samples` candidates. It draws them with the 
 `StatementGrounding` in its context, which is 0 unless set; a seed of `None` draws different candidates each time.
 
 ```python
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 
 location = VisibilityLocation(
-    Pose3Dimensional(CartesianPoint3Dimensional.from_iterable([-1, 0, 1.2]), reference_frame=world.root),
+    Pose3Dimensional(Point3Dimensional.from_iterable([-1, 0, 1.2]), reference_frame=world.root),
     context=context,
     number_of_samples=5,
 )

@@ -27,7 +27,7 @@ from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
@@ -471,10 +471,10 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_base_back(hsrb):
             name="floor",
             world=world,
             floor_polytope=[
-                CartesianPoint3Dimensional(-3, -3, 0),
-                CartesianPoint3Dimensional(3, -3, 0),
-                CartesianPoint3Dimensional(3, 3, 0),
-                CartesianPoint3Dimensional(-3, 3, 0),
+                Point3Dimensional(-3, -3, 0),
+                Point3Dimensional(3, -3, 0),
+                Point3Dimensional(3, 3, 0),
+                Point3Dimensional(-3, 3, 0),
             ],
         )
     hsrb_on_the_floor = RobotSpecification(HSRB).spawn(world)

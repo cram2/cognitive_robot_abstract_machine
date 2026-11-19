@@ -30,7 +30,7 @@ from robokudo.utils.annotator_helper import (
     resize_mask,
     generate_source_name,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
@@ -50,7 +50,7 @@ def _camera_observation(
         image_resolution=CameraResolution(width=1024, height=1280),
         focal_length_x=1050.0,
         focal_length_y=1050.0,
-        principal_point=CartesianPoint2Dimensional(x=639.5, y=479.5),
+        principal_point=Point2Dimensional(x=639.5, y=479.5),
     )
     camera_body = Body(name=PrefixedName(name="camera"))
     world_frame = Body(name=PrefixedName(name="world"))

@@ -10,11 +10,11 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Quaternion,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from krrood_spatial_math.spatial_types import RotationMatrix
@@ -104,7 +104,7 @@ class TestPose2DimensionalToPose:
     def test_position_of_its_pose(self):
         p2 = Pose2Dimensional.from_xy_yaw(x=2.0, y=-3.0, yaw=0)
         pt = p2.pose.position
-        assert isinstance(pt, CartesianPoint3Dimensional)
+        assert isinstance(pt, Point3Dimensional)
         assert pt.x.to_np() == pytest.approx(2.0)
         assert pt.y.to_np() == pytest.approx(-3.0)
         assert pt.z.to_np() == pytest.approx(0.0)
@@ -137,7 +137,7 @@ class TestPose2DimensionalToPose:
     def test_position_property(self):
         p2 = Pose2Dimensional.from_xy_yaw(x=5, y=6, yaw=0.3)
         pt = p2.position
-        assert isinstance(pt, CartesianPoint2Dimensional)
+        assert isinstance(pt, Point2Dimensional)
         assert pt.x.to_np() == pytest.approx(5.0)
         assert pt.y.to_np() == pytest.approx(6.0)
 
@@ -158,7 +158,7 @@ class TestPose2DimensionalToPose:
 
 class TestPose2DimensionalFromPosition:
     def test_composes_position_and_yaw(self):
-        position = CartesianPoint2Dimensional(x=1.5, y=-2.5)
+        position = Point2Dimensional(x=1.5, y=-2.5)
         p2 = Pose2Dimensional(position, yaw=0.7)
         assert p2.x.to_np() == pytest.approx(1.5)
         assert p2.y.to_np() == pytest.approx(-2.5)
@@ -166,14 +166,14 @@ class TestPose2DimensionalFromPosition:
 
     def test_inherits_position_reference_frame(self):
         frame = NamedFrame("world")
-        position = CartesianPoint2Dimensional(x=1.0, y=2.0, reference_frame=frame)
+        position = Point2Dimensional(x=1.0, y=2.0, reference_frame=frame)
         p2 = Pose2Dimensional(position, yaw=0.0)
         assert p2.reference_frame is frame
 
     def test_override_reference_frame(self):
         frame = NamedFrame("world")
         other_frame = NamedFrame("other")
-        position = CartesianPoint2Dimensional(x=1.0, y=2.0, reference_frame=frame)
+        position = Point2Dimensional(x=1.0, y=2.0, reference_frame=frame)
         p2 = Pose2Dimensional(position, yaw=0.0, reference_frame=other_frame)
         assert p2.reference_frame is other_frame
 

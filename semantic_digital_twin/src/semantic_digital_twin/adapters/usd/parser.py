@@ -40,7 +40,7 @@ from semantic_digital_twin.specifications.connections import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
@@ -978,9 +978,7 @@ class USDStageParser(WorldModelParser, ABC):
 
         return Inertial(
             mass=mass,
-            center_of_mass=CartesianPoint3Dimensional(
-                *center_of_mass, reference_frame=body
-            ),
+            center_of_mass=Point3Dimensional(*center_of_mass, reference_frame=body),
             inertia=inertia_tensor,
         )
 

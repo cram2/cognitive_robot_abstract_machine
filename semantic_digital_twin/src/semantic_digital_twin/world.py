@@ -74,7 +74,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import (
@@ -1541,7 +1541,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
         return self._get_world_entity_by_name_from_iterable(name, self.bodies)
 
     def get_bodies_by_global_position(
-        self, world_P_body: CartesianPoint3Dimensional, maximum_distance: float = 1e-6
+        self, world_P_body: Point3Dimensional, maximum_distance: float = 1e-6
     ) -> list[Body]:
         return [
             body

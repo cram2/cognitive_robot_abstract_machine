@@ -10,7 +10,7 @@ from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -24,7 +24,7 @@ class Pointing(CartesianTask):
     Will orient pointing_axis at goal_point.
     """
 
-    goal_point: CartesianPoint3Dimensional
+    goal_point: Point3Dimensional
     """
     Where to point pointing_axis at.
     """
@@ -96,7 +96,7 @@ class PointingCone(CartesianTask):
     Will orient pointing_axis at goal_point with a cone-shaped tolerance region.
     """
 
-    goal_point: CartesianPoint3Dimensional
+    goal_point: Point3Dimensional
     """
     Where to point pointing_axis at.
     """

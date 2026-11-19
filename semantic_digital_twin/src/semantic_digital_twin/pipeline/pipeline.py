@@ -8,7 +8,7 @@ from typing_extensions import Callable, TYPE_CHECKING
 
 import numpy as np
 
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
@@ -117,7 +117,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
 
             old_origin_T_new_origin = (
                 HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                    CartesianPoint3Dimensional(*center)
+                    Point3Dimensional(*center)
                 )
             )
 

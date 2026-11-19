@@ -30,7 +30,7 @@ from semantic_digital_twin.adapters.ros.visualization.exceptions import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     Quaternion,
     RotationMatrix,
@@ -223,15 +223,11 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
 
 
 @dataclass(kw_only=True)
-class CartesianPoint3DimensionalMarkerRenderer(
-    SpatialTypeMarkerRenderer[CartesianPoint3Dimensional]
-):
+class Point3DimensionalMarkerRenderer(SpatialTypeMarkerRenderer[Point3Dimensional]):
     """Renders a point, drawn from its position ``[x, y, z]``, as a single sphere."""
 
     @classmethod
-    def rendered_expression(
-        cls, *, spatial_type: CartesianPoint3Dimensional
-    ) -> SymbolicVector:
+    def rendered_expression(cls, *, spatial_type: Point3Dimensional) -> SymbolicVector:
         return spatial_type[:3]
 
     @classmethod

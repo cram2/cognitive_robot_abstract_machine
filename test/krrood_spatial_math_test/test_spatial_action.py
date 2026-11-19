@@ -13,13 +13,13 @@ import pytest
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     HomogeneousTransformationMatrix2Dimensional,
 )
 
@@ -36,11 +36,11 @@ def test_a_rotation_turns_a_point_about_the_origin(table_frame, camera_frame):
         yaw=math.pi / 2, reference_frame=table_frame
     )
 
-    turned = quarter_turn_about_z @ CartesianPoint3Dimensional(
+    turned = quarter_turn_about_z @ Point3Dimensional(
         1, 0, 0, reference_frame=camera_frame
     )
 
-    assert isinstance(turned, CartesianPoint3Dimensional)
+    assert isinstance(turned, Point3Dimensional)
     assert turned.reference_frame is table_frame
     np.testing.assert_allclose(turned.to_np()[:3], [0, 1, 0], atol=1e-12)
 
@@ -56,9 +56,7 @@ def test_a_transformation_turns_and_shifts_a_point(table_frame, camera_frame):
         x=1, yaw=math.pi / 2, reference_frame=table_frame, child_frame=camera_frame
     )
 
-    moved = table_T_camera @ CartesianPoint3Dimensional(
-        1, 0, 0, reference_frame=camera_frame
-    )
+    moved = table_T_camera @ Point3Dimensional(1, 0, 0, reference_frame=camera_frame)
 
     assert moved.reference_frame is table_frame
     np.testing.assert_allclose(moved.to_np()[:3], [1, 1, 0], atol=1e-12)
@@ -99,7 +97,7 @@ def test_a_transformation_refuses_a_value_outside_its_child_frame(
     )
 
     with pytest.raises(ReferenceFrameMismatchError):
-        table_T_camera @ CartesianPoint3Dimensional(reference_frame=gripper_frame)
+        table_T_camera @ Point3Dimensional(reference_frame=gripper_frame)
 
 
 def test_a_transformation_composes_only_with_a_change_into_its_child_frame(
@@ -142,7 +140,7 @@ def test_a_planar_transformation_refuses_a_point_on_another_plane(
     )
 
     with pytest.raises(ReferenceFrameMismatchError):
-        table_T_camera @ CartesianPoint2Dimensional(reference_frame=gripper_frame)
+        table_T_camera @ Point2Dimensional(reference_frame=gripper_frame)
 
 
 # %% arithmetic between values of two frames
@@ -151,8 +149,8 @@ def test_a_planar_transformation_refuses_a_point_on_another_plane(
 @pytest.mark.parametrize(
     "left_type, right_type",
     [
-        (CartesianPoint3Dimensional, CartesianPoint3Dimensional),
-        (CartesianPoint3Dimensional, Vector3Dimensional),
+        (Point3Dimensional, Point3Dimensional),
+        (Point3Dimensional, Vector3Dimensional),
         (Vector3Dimensional, Vector3Dimensional),
     ],
 )
@@ -168,7 +166,7 @@ def test_subtracting_a_value_of_another_frame_is_refused(
         )
 
 
-@pytest.mark.parametrize("left_type", [CartesianPoint3Dimensional, Vector3Dimensional])
+@pytest.mark.parametrize("left_type", [Point3Dimensional, Vector3Dimensional])
 def test_adding_a_vector_of_another_frame_is_refused(
     table_frame, camera_frame, left_type
 ):
@@ -185,7 +183,7 @@ def test_a_value_without_a_frame_combines_with_one_in_a_frame(table_frame):
     """
     A value given in no frame, such as a constant, combines with a value in any frame.
     """
-    point = CartesianPoint3Dimensional(1, 2, 3, reference_frame=table_frame)
+    point = Point3Dimensional(1, 2, 3, reference_frame=table_frame)
 
     shifted = point + Vector3Dimensional.X()
 

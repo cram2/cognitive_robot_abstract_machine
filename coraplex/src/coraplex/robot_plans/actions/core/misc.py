@@ -28,7 +28,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -214,7 +214,7 @@ class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPose
 
         target_T_robot = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                point=CartesianPoint3Dimensional(
+                point=Point3Dimensional(
                     x=self.target_pose_offset_robot.x,
                     y=self.target_pose_offset_robot.y,
                 ),

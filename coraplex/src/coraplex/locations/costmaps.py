@@ -25,7 +25,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -200,9 +200,7 @@ class Costmap(Location):
             np.random.default_rng(seed),
         )
 
-    def _orientation_facing_origin(
-        self, position: CartesianPoint3Dimensional
-    ) -> Quaternion:
+    def _orientation_facing_origin(self, position: Point3Dimensional) -> Quaternion:
         """
         The orientation a candidate sampled at the given position is offered with.
 

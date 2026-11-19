@@ -7,7 +7,7 @@ from __future__ import annotations
 import numpy as np
 
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Line3Dimensional,
     LineSegment3Dimensional,
 )
@@ -17,8 +17,8 @@ from krrood_spatial_math.spatial_types import (
 
 def test_a_segment_runs_from_its_start_to_its_end_as_a_unit_vector():
     segment = LineSegment3Dimensional(
-        start=CartesianPoint3Dimensional(1.0, 2.0, 3.0),
-        end=CartesianPoint3Dimensional(1.0, 5.0, 7.0),
+        start=Point3Dimensional(1.0, 2.0, 3.0),
+        end=Point3Dimensional(1.0, 5.0, 7.0),
     )
 
     np.testing.assert_allclose(segment.direction.to_np()[:3], [0.0, 0.6, 0.8])
@@ -33,8 +33,8 @@ def test_a_segment_lies_on_a_3d_line_from_its_start_to_its_end():
     segment's midpoint.
     """
     segment = LineSegment3Dimensional(
-        start=CartesianPoint3Dimensional(1.0, 2.0, 3.0),
-        end=CartesianPoint3Dimensional(1.0, 5.0, 7.0),
+        start=Point3Dimensional(1.0, 2.0, 3.0),
+        end=Point3Dimensional(1.0, 5.0, 7.0),
     )
 
     line = segment.line

@@ -32,15 +32,13 @@ coordinate system. Its base depends on `krrood` alone.
   right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
   with that frame's origin, x-axis and y-axis, that values on the plane are given in.
 - `krrood_spatial_math.point`: `Point[frame, vector]`, a point of an affine space given
-  by its coordinates in an affine frame, and `CartesianPoint`, one given in a Cartesian
-  frame, whose distance to another point its frame kind measures. A third parameter
-  names the coordinate type when it is not `float`. `StoredPoint` is a point whose
-  coordinates are the fields its class declares.
-- `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space, and
-  `CartesianVector`, one given in a Cartesian frame, whose length and inner product its
-  frame kind measures. `StoredVector` is a vector whose coordinates are the fields its
-  class declares. The difference of two points is a vector, and a point moved by a
-  vector is a point.
+  by its coordinates in an affine frame, which are the fields a subclass declares. Its
+  `euclidean_distance` needs a Cartesian kind of frame and raises
+  `FrameMeasuresNoLengthsError` for any other. A third parameter names the coordinate
+  type when it is not `float`.
+- `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space, whose
+  `norm` and `dot` need a Cartesian kind of frame in the same way. The difference of
+  two points is a vector, and a point moved by a vector is a point.
 - `krrood_spatial_math.line`: `Line`, the points `point + direction * t` for every
   number `t`.
 - `krrood_spatial_math.space_map`: `SpaceMap`, a map from the points of one space to
@@ -48,14 +46,14 @@ coordinate system. Its base depends on `krrood` alone.
   its unit normal, which derives its projection lines and `unproject` from that normal
   and from where a point of the plane lies in the source space.
 - `krrood_spatial_math.spatial_types`, with the extra `krrood_spatial_math[casadi]`:
-  `CartesianPoint3Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
+  `Point3Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
   `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`,
   `Pose3Dimensional`, `Displacement`, `Twist` and `ScrewAxis`, as symbolic expressions
   that can also hold plain numbers. Values derive from `SymbolicSpatialValue3Dimensional`
   and changes from `SymbolicSpatialChange`; a value names the group that acts on it:
   `SpecialEuclideanGroupAction` (SE(3)) or `SpecialOrthogonalGroupAction` (SO(3)).
 - `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
-  counterparts on a plane, `CartesianPoint2Dimensional`, `Vector2Dimensional` and
+  counterparts on a plane, `Point2Dimensional`, `Vector2Dimensional` and
   `Pose2Dimensional`, which lie on the x-y plane of their reference frame, an
   `EmbeddedPlane`, and are given in its `CartesianFrame2Dimensional`.
   `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two frames
@@ -74,8 +72,9 @@ example, adds image planes, whose pixel frames are affine and related by affine 
 ## Adding a space
 
 A new space needs a space, a kind of frame on it with a frame of that kind, and a
-point and vector type given in that kind of frame. `StoredPoint` and `StoredVector` do the arithmetic and refuse values
-of two frames, so the point and vector only declare their coordinates:
+point and vector type given in that kind of frame. `Point` and `Vector` declare the
+frame field, do the arithmetic and refuse values of two frames, so the point and vector
+only declare their coordinates:
 
 ```python
 from dataclasses import dataclass, field
@@ -83,9 +82,9 @@ from uuid import UUID, uuid4
 
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.coordinate_system import AffineFrame
-from krrood_spatial_math.point import StoredPoint
+from krrood_spatial_math.point import Point
 from krrood_spatial_math.space import EuclideanSpace2Dimensional
-from krrood_spatial_math.vector import StoredVector
+from krrood_spatial_math.vector import Vector
 
 
 class ImagePlane(EuclideanSpace2Dimensional):
@@ -106,13 +105,13 @@ class CameraPixels(PixelFrame):
 
 
 @dataclass(kw_only=True)
-class PixelVector(StoredVector[PixelFrame]):
+class PixelVector(Vector[PixelFrame]):
     u: float
     v: float
 
 
 @dataclass(kw_only=True)
-class PixelPoint(StoredPoint[PixelFrame, PixelVector]):
+class PixelPoint(Point[PixelFrame, PixelVector]):
     u: float
     v: float
 ```

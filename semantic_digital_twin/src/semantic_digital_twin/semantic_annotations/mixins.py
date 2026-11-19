@@ -71,7 +71,7 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
 )
 from krrood_spatial_math.spatial_types import (
     LineSegment3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
@@ -194,13 +194,9 @@ class HasRootKinematicStructureEntity(
     @property
     def min_max_points(
         self,
-    ) -> tuple[CartesianPoint3Dimensional, CartesianPoint3Dimensional]:
-        min = CartesianPoint3Dimensional.from_iterable(
-            self.root.combined_mesh.bounds[0]
-        )
-        max = CartesianPoint3Dimensional.from_iterable(
-            self.root.combined_mesh.bounds[1]
-        )
+    ) -> tuple[Point3Dimensional, Point3Dimensional]:
+        min = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[0])
+        max = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[1])
         return min, max
 
     def __hash__(self):
@@ -533,12 +529,8 @@ class HasGraspCandidates(HasRootBody, Mixin):
         start, end = (lowest + highest) / 2, (lowest + highest) / 2
         start[axis_index], end[axis_index] = lowest[axis_index], highest[axis_index]
         return LineSegment3Dimensional(
-            start=CartesianPoint3Dimensional.from_iterable(
-                start, reference_frame=self.root
-            ),
-            end=CartesianPoint3Dimensional.from_iterable(
-                end, reference_frame=self.root
-            ),
+            start=Point3Dimensional.from_iterable(start, reference_frame=self.root),
+            end=Point3Dimensional.from_iterable(end, reference_frame=self.root),
         )
 
     def grasped_part(self) -> HasGraspCandidates:
@@ -1092,7 +1084,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         vertices = candidates_filtered.vertices
         self_P_supporting_surface = vertices.mean(axis=0)
         points_3d = [
-            CartesianPoint3Dimensional(
+            Point3Dimensional(
                 x,
                 y,
                 z,
@@ -1160,7 +1152,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         body_to_sample_for: HasRootBody | None = None,
         category_of_interest: type[SemanticAnnotation] | None = None,
         amount: int = 100,
-    ) -> list[CartesianPoint3Dimensional]:
+    ) -> list[Point3Dimensional]:
         """
         Samples points from a surface around the semantic annotation.
 
@@ -1210,13 +1202,11 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
         if category_of_interest:
             return [
-                CartesianPoint3Dimensional(
-                    *s[1:], reference_frame=self.supporting_surface
-                )
+                Point3Dimensional(*s[1:], reference_frame=self.supporting_surface)
                 for s in samples
             ]
         return [
-            CartesianPoint3Dimensional(*s, reference_frame=self.supporting_surface)
+            Point3Dimensional(*s, reference_frame=self.supporting_surface)
             for s in samples
         ]
 
@@ -1351,7 +1341,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def spawn_bounding_boxes_as_region(
         self,
-        boxes: BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional],
+        boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         name: PrefixedName | None = None,
         color: Color | None = None,
     ) -> Region:

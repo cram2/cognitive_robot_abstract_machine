@@ -10,13 +10,13 @@ import numpy as np
 import pytest
 
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
     EmbeddedPlaneProjection,
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -57,14 +57,12 @@ def tilted_world() -> World:
 # %% projecting into the plane of another frame
 
 
-class TestCartesianPoint2DimensionalFromPoint3InWorld:
+class TestPoint2DimensionalFromPoint3InWorld:
     def test_transforms_into_another_plane_frame(self, rotated_mini_world: World):
         root, tip = rotated_mini_world.root, rotated_mini_world.bodies[1]
-        point = CartesianPoint3Dimensional(1.0, 0.0, 2.0, reference_frame=tip)
+        point = Point3Dimensional(1.0, 0.0, 2.0, reference_frame=tip)
 
-        projected = CartesianPoint2Dimensional.from_cartesian_point_3_dimensional(
-            point, plane_frame=root
-        )
+        projected = Point2Dimensional.from_point_3_dimensional(point, plane_frame=root)
 
         assert projected.reference_frame is root
         np.testing.assert_allclose(
@@ -74,12 +72,12 @@ class TestCartesianPoint2DimensionalFromPoint3InWorld:
         )
 
 
-class TestCartesianPoint2DimensionalFromPoseInWorld:
+class TestPoint2DimensionalFromPoseInWorld:
     def test_transforms_into_another_plane_frame(self, rotated_mini_world: World):
         root, tip = rotated_mini_world.root, rotated_mini_world.bodies[1]
         pose = Pose3Dimensional.from_xyz_rpy(x=1.0, z=2.0, yaw=0.3, reference_frame=tip)
 
-        projected = CartesianPoint2Dimensional.from_pose(pose, plane_frame=root)
+        projected = Point2Dimensional.from_pose(pose, plane_frame=root)
 
         assert projected.reference_frame is root
         np.testing.assert_allclose(
@@ -116,7 +114,7 @@ class TestOrthogonalProjectionInWorld:
         self, tilted_world: World
     ):
         root, tip = tilted_world.root, tilted_world.bodies[1]
-        tip_P_point = CartesianPoint3Dimensional(1, 0, 2, reference_frame=tip)
+        tip_P_point = Point3Dimensional(1, 0, 2, reference_frame=tip)
         root_P_point = tilted_world.transform(tip_P_point, root)
 
         projected = EmbeddedPlaneProjection(plane_frame=root).project(tip_P_point)

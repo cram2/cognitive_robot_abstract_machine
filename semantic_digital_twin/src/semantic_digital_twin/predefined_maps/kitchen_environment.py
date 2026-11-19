@@ -51,7 +51,7 @@ from semantic_digital_twin.specifications.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.utils import create_cache_dir
@@ -2582,31 +2582,31 @@ class KitchenEnvironment(WorldSource):
 
         with world.modify_world():
             kitchen_floor_polytope = [
-                CartesianPoint3Dimensional(0, 0, 0),
-                CartesianPoint3Dimensional(0, 3.334, 0),
-                CartesianPoint3Dimensional(5.214, 3.334, 0),
-                CartesianPoint3Dimensional(5.214, 0, 0),
+                Point3Dimensional(0, 0, 0),
+                Point3Dimensional(0, 3.334, 0),
+                Point3Dimensional(5.214, 3.334, 0),
+                Point3Dimensional(5.214, 0, 0),
             ]
 
             living_room_floor_polytope = [
-                CartesianPoint3Dimensional(0, 0, 0),
-                CartesianPoint3Dimensional(0, 2.801, 0),
-                CartesianPoint3Dimensional(5.214, 2.801, 0),
-                CartesianPoint3Dimensional(5.214, 0, 0),
+                Point3Dimensional(0, 0, 0),
+                Point3Dimensional(0, 2.801, 0),
+                Point3Dimensional(5.214, 2.801, 0),
+                Point3Dimensional(5.214, 0, 0),
             ]
 
             bed_room_floor_polytope = [
-                CartesianPoint3Dimensional(0, 0, 0),
-                CartesianPoint3Dimensional(0, 2.67, 0.0),
-                CartesianPoint3Dimensional(2.50, 2.67, 0.0),
-                CartesianPoint3Dimensional(2.50, 0, 0.0),
+                Point3Dimensional(0, 0, 0),
+                Point3Dimensional(0, 2.67, 0.0),
+                Point3Dimensional(2.50, 2.67, 0.0),
+                Point3Dimensional(2.50, 0, 0.0),
             ]
 
             office_floor_polytope = [
-                CartesianPoint3Dimensional(0, 0, 0),
-                CartesianPoint3Dimensional(0, 2.67, 0),
-                CartesianPoint3Dimensional(2.705, 2.67, 0),
-                CartesianPoint3Dimensional(2.705, 0, 0),
+                Point3Dimensional(0, 0, 0),
+                Point3Dimensional(0, 2.67, 0),
+                Point3Dimensional(2.705, 2.67, 0),
+                Point3Dimensional(2.705, 0, 0),
             ]
 
             kitchen_floor = Floor.create_with_new_body_from_polytope_in_world(

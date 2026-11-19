@@ -68,7 +68,7 @@ from semantic_digital_twin.world_description.geometry import Scale
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world import World
@@ -129,8 +129,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-        reference_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         lower_limit = 0.3
         upper_limit = 0.5
@@ -180,8 +180,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-        reference_point = CartesianPoint3Dimensional(0, 0, 1.0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 1.0, reference_frame=root)
 
         lower_limit = -0.5
         upper_limit = -0.2
@@ -233,7 +233,7 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0.0, 0.0, 0.1, reference_frame=tip)
+        tip_point = Point3Dimensional(0.0, 0.0, 0.1, reference_frame=tip)
         root_P_tip_start = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=tip_point
         )
@@ -280,8 +280,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-        reference_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         lower_limit = 0.5
         upper_limit = 0.7
@@ -334,9 +334,9 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
         # Reference point at same x-y but different z
-        reference_point = CartesianPoint3Dimensional(0, 0, 0.5, reference_frame=root)
+        reference_point = Point3Dimensional(0, 0, 0.5, reference_frame=root)
 
         lower_limit = 0.0
         upper_limit = 0.1
@@ -389,11 +389,9 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
         # Reference point at specific x-y position but very different z
-        reference_point = CartesianPoint3Dimensional(
-            0.3, 0.4, 2.0, reference_frame=root
-        )
+        reference_point = Point3Dimensional(0.3, 0.4, 2.0, reference_frame=root)
 
         lower_limit = 0.45
         upper_limit = 0.55
@@ -446,8 +444,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-        reference_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         height_lower = 0.3
         height_upper = 0.5
@@ -522,8 +520,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip)
-        reference_point = CartesianPoint3Dimensional(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         tip_normal = Vector3Dimensional(1, 0, 0, reference_frame=tip)
         reference_normal = Vector3Dimensional(1, 0, 0, reference_frame=root)
@@ -634,7 +632,7 @@ def test_pointing(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_point = CartesianPoint3Dimensional(2, 0, 0, reference_frame=root)
+    goal_point = Point3Dimensional(2, 0, 0, reference_frame=root)
     pointing_axis = Vector3Dimensional.X(reference_frame=tip)
 
     pointing = Pointing(
@@ -676,7 +674,7 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     world_P_head = head.global_pose.to_np()[:3, 3]
     steepest_tilt_at_full_height = head_tilt.dof.limits.upper.position + 0.03
     distance = world_P_head[2] / np.tan(steepest_tilt_at_full_height)
-    goal_point = CartesianPoint3Dimensional(
+    goal_point = Point3Dimensional(
         world_P_head[0] + distance, world_P_head[1], 0.0, reference_frame=world.root
     )
 
@@ -778,7 +776,7 @@ def test_pointing_cone(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_point = CartesianPoint3Dimensional(-1, 0, 5, reference_frame=root)
+    goal_point = Point3Dimensional(-1, 0, 5, reference_frame=root)
     pointing_axis = Vector3Dimensional.X(tip)
     cone_theta = radians(20)
     pointing_cone = PointingCone(
@@ -808,7 +806,7 @@ def test_pointing_cone(pr2_world_state_reset: World):
     )
     tip_origin_in_root = pr2_world_state_reset.transform(
         target_frame=root,
-        spatial_object=CartesianPoint3Dimensional(0, 0, 0, reference_frame=tip),
+        spatial_object=Point3Dimensional(0, 0, 0, reference_frame=tip),
     )
     root_V_goal_axis = root_P_goal - tip_origin_in_root
     root_V_goal_axis.scale(1)

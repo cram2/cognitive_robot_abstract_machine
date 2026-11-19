@@ -85,7 +85,7 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing
 from giskardpy.motion_statechart.weights import DefaultWeights
 from krrood.entity_query_language.factories import a
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
     Pose3Dimensional,
     Quaternion,
@@ -370,7 +370,7 @@ def test_navigate_multi(multiple_robot_apartment_context, rclpy_node):
 
     plan = NavigateAction(
         target_location=Pose3Dimensional(
-            CartesianPoint3Dimensional.from_iterable(target_position),
+            Point3Dimensional.from_iterable(target_position),
             reference_frame=world.root,
         )
     )
@@ -639,7 +639,7 @@ def test_place_multi(multiple_robot_apartment_context):
                 arm=left_or_only_arm(view),
                 object_designator=world.get_semantic_annotations_by_type(Milk)[0],
                 target_location=Pose3Dimensional(
-                    CartesianPoint3Dimensional.from_iterable([1, -2.2, 0.6]),
+                    Point3Dimensional.from_iterable([1, -2.2, 0.6]),
                     reference_frame=world.root,
                 ),
             ),
@@ -662,14 +662,14 @@ def test_look_at(multiple_robot_apartment_context):
     world, robot_view, extensions = multiple_robot_apartment_context
     description = LookAtAction(
         target=Pose3Dimensional(
-            CartesianPoint3Dimensional.from_iterable([3, 0, 1]),
+            Point3Dimensional.from_iterable([3, 0, 1]),
             reference_frame=world.root,
         )
     )
     assert np.allclose(
         description.target.to_np(),
         Pose3Dimensional(
-            CartesianPoint3Dimensional.from_iterable([3, 0, 1]),
+            Point3Dimensional.from_iterable([3, 0, 1]),
             reference_frame=world.root,
         ).to_np(),
         atol=1e-3,
@@ -724,7 +724,7 @@ def test_open(multiple_robot_apartment_context):
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
                 target_location=Pose3Dimensional(
-                    CartesianPoint3Dimensional.from_iterable([1.6, 1.9, 0]),
+                    Point3Dimensional.from_iterable([1.6, 1.9, 0]),
                     Quaternion.from_iterable([0, 0, 0.3, 1]),
                     reference_frame=world.root,
                 )
@@ -799,7 +799,7 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
     description = TransportAction.from_graspable_by_closest_grasps(
         world.get_semantic_annotations_by_type(Milk)[0],
         Pose3Dimensional(
-            CartesianPoint3Dimensional.from_iterable([3.1, 2.2, 0.95]),
+            Point3Dimensional.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
             reference_frame=world.root,
         ),

@@ -46,7 +46,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     RotationMatrix,
 )
@@ -345,7 +345,7 @@ def _raised(grasp: GraspCandidate, height: float) -> GraspCandidate:
     return GraspCandidate(
         grasp.graspable,
         Pose3Dimensional(
-            position=CartesianPoint3Dimensional.from_iterable(root_P_grasp),
+            position=Point3Dimensional.from_iterable(root_P_grasp),
             orientation=grasp.grasp_pose.quaternion,
             reference_frame=grasp.graspable.root,
         ),
@@ -363,7 +363,7 @@ def _turned_around(grasp: GraspCandidate, nearer_by: float = 0.0) -> GraspCandid
     return GraspCandidate(
         grasp.graspable,
         Pose3Dimensional(
-            position=CartesianPoint3Dimensional.from_iterable(root_P_grasp),
+            position=Point3Dimensional.from_iterable(root_P_grasp),
             orientation=(
                 grasp_pose.rotation_matrix @ RotationMatrix.from_rpy(yaw=np.pi)
             ).quaternion,
@@ -1001,7 +1001,7 @@ def test_a_move_and_act_step_only_ever_stands_where_it_was_sent(
         )
 
 
-def _assert_base_faces(robot: AbstractRobot, target: CartesianPoint3Dimensional):
+def _assert_base_faces(robot: AbstractRobot, target: Point3Dimensional):
     """
     Assert that the robot's base front points horizontally at `target`.
     """

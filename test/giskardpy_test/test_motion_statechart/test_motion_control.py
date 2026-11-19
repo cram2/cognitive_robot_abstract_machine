@@ -22,7 +22,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.exceptions import EmptyProblemException
 from semantic_digital_twin.datastructures.joint_state import JointState
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -104,7 +104,7 @@ def test_motion_nodes_and_nodes_of_other_modules_run_in_one_statechart(
     goal = CartesianPosition(
         root_link=root,
         tip_link=tip,
-        goal_point=CartesianPoint3Dimensional(x=0.1, reference_frame=root),
+        goal_point=Point3Dimensional(x=0.1, reference_frame=root),
     )
     other_node = ConstTrueNode()
     tick_counter = ExtensionCountingTicks()
@@ -246,7 +246,7 @@ def test_a_goal_that_depends_on_no_degree_of_freedom_is_an_empty_problem(
     reach = CartesianPosition(
         root_link=slider.child,
         tip_link=slider.child,
-        goal_point=CartesianPoint3Dimensional(1, 0, 0, reference_frame=slider.child),
+        goal_point=Point3Dimensional(1, 0, 0, reference_frame=slider.child),
     )
     statechart.add_node(node=reach)
     statechart.add_node(node=EndMotion.when_true(node=reach))

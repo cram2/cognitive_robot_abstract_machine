@@ -15,7 +15,7 @@ from coraplex.locations.costmaps import (
 from krrood.entity_query_language.exceptions import NonPositiveLimitValue
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
@@ -662,7 +662,7 @@ def test_a_sampled_candidate_faces_the_maps_origin(pr2_apartment_context):
 def test_a_candidate_faces_the_maps_origin_from_every_side(pr2_apartment_context, x, y):
     world, _, _ = pr2_apartment_context
     ring = _ring_map(world)
-    position = CartesianPoint3Dimensional(x, y, 0, reference_frame=world.root)
+    position = Point3Dimensional(x, y, 0, reference_frame=world.root)
 
     facing = (
         RotationMatrix.from_quaternion(ring._orientation_facing_origin(position))

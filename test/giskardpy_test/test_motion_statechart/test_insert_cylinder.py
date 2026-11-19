@@ -17,7 +17,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -35,7 +35,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
     world = deepcopy(tracy_world)
     robot = world.get_semantic_annotations_by_type(Tracy)[0]
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
-    hole_point = CartesianPoint3Dimensional(0.8, -0.3, 0.88, reference_frame=world.root)
+    hole_point = Point3Dimensional(0.8, -0.3, 0.88, reference_frame=world.root)
     cylinder_height = 0.1
 
     with world.modify_world():
@@ -74,7 +74,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
     statechart = Statechart(context=executor.context)
     goal = InsertCylinder(
         tip_link=cylinder,
-        tip_P_tool=CartesianPoint3Dimensional(
+        tip_P_tool=Point3Dimensional(
             0.0, 0.0, cylinder_height / 2, reference_frame=cylinder
         ),
         tip_V_axis=Vector3Dimensional(0.0, 0.0, -1.0, reference_frame=cylinder),

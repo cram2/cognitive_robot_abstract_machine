@@ -40,11 +40,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 # %% driving the base
@@ -118,7 +118,7 @@ class LookAtAction(ParallelAction):
         )
         return [pointing, *self.keep_base_still()]
 
-    def _world_P_target(self) -> CartesianPoint3Dimensional:
+    def _world_P_target(self) -> Point3Dimensional:
         """
         :return: Where :attr:`target` is in the world frame, as an expression of where
             the body it is given relative to stands while the look runs.
@@ -160,11 +160,11 @@ class FaceAtAction(ParallelAction):
             CartesianPosition(
                 root_link=self.world.root,
                 tip_link=self.robot.root,
-                goal_point=CartesianPoint3Dimensional(reference_frame=self.robot.root),
+                goal_point=Point3Dimensional(reference_frame=self.robot.root),
             ),
         ]
 
-    def _target_at_base_height(self) -> CartesianPoint3Dimensional:
+    def _target_at_base_height(self) -> Point3Dimensional:
         """
         :return: :attr:`target` moved vertically to the height of the base, which can
             only turn about the vertical and so can only point level.
@@ -265,7 +265,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
         ).z
         poses = [
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                CartesianPoint3Dimensional(
+                Point3Dimensional(
                     waypoint.x, waypoint.y, base_height, waypoint.reference_frame
                 ),
                 RotationMatrix.from_vectors(
@@ -284,7 +284,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
         ]
         return poses + [self.target]
 
-    def _waypoints(self) -> list[CartesianPoint2Dimensional]:
+    def _waypoints(self) -> list[Point2Dimensional]:
         """
         The points the robot travels through to get from where it stands to the target.
 
@@ -294,8 +294,8 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
         base_pose = self.robot.root.global_pose
         free_space = self._floor.navigable_space(robot=self.robot, margin=0.0)
         return free_space.path_from_to(
-            CartesianPoint2Dimensional.from_pose(base_pose),
-            CartesianPoint2Dimensional.from_pose(self.target),
+            Point2Dimensional.from_pose(base_pose),
+            Point2Dimensional.from_pose(self.target),
         )
 
 

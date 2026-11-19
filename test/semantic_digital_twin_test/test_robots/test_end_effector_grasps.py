@@ -25,7 +25,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -327,9 +327,7 @@ def test_the_held_grasp_can_be_read_at_any_point_of_the_gripper(pr2_gripper):
     hold_body(pr2_gripper)
 
     body_T_grasp = pr2_gripper.held_body_T_grasp_at(
-        CartesianPoint3Dimensional(
-            0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame
-        )
+        Point3Dimensional(0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame)
     )
 
     np.testing.assert_allclose(

@@ -64,7 +64,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types import (
     LineSegment3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
     RotationMatrix,
     Vector3Dimensional,
@@ -909,8 +909,8 @@ class HandleWithDiagonalBar(Handle):
 
     def grasp_axis(self) -> LineSegment3Dimensional:
         return LineSegment3Dimensional(
-            start=CartesianPoint3Dimensional(0.0, 0.0, 0.0, reference_frame=self.root),
-            end=CartesianPoint3Dimensional(0.1, 0.1, 0.1, reference_frame=self.root),
+            start=Point3Dimensional(0.0, 0.0, 0.0, reference_frame=self.root),
+            end=Point3Dimensional(0.1, 0.1, 0.1, reference_frame=self.root),
         )
 
 

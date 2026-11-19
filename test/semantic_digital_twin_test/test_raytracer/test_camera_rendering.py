@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from PIL import Image, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,
     PlumbBobCameraDistortion,
@@ -529,7 +529,7 @@ def test_textured_render_rejects_incompatible_projection(
         focal_length_y=(
             original.focal_length_x if off_center else original.focal_length_x * 2
         ),
-        principal_point=CartesianPoint2Dimensional(
+        principal_point=Point2Dimensional(
             x=float(original.principal_point.x) + (0.25 if off_center else 0.0),
             y=original.principal_point.y,
         ),

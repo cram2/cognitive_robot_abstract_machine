@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 from krrood.patterns.classproperty import classproperty
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 from robokudo.annotators.core import BaseAnnotator
@@ -105,7 +105,7 @@ class BlackWallScene:
             image_resolution=self.resolution,
             focal_length_x=100.0,
             focal_length_y=100.0,
-            principal_point=CartesianPoint2Dimensional(
+            principal_point=Point2Dimensional(
                 x=color_width / 2.0, y=color_height / 2.0
             ),
         )

@@ -88,7 +88,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -447,10 +447,10 @@ def test_from_event_constructor_spawns(empty_world):
         lambda pose: BodySpecification.from_3d_points(
             "shape",
             [
-                CartesianPoint3Dimensional(0, 0, 0),
-                CartesianPoint3Dimensional(1, 0, 0),
-                CartesianPoint3Dimensional(0, 1, 0),
-                CartesianPoint3Dimensional(1, 1, 1),
+                Point3Dimensional(0, 0, 0),
+                Point3Dimensional(1, 0, 0),
+                Point3Dimensional(0, 1, 0),
+                Point3Dimensional(1, 1, 1),
             ],
             parent_T_self=pose,
         ),
@@ -471,10 +471,10 @@ def test_body_specification_from_3d_points_matches_direct_construction():
     ``from_3d_points`` mirrors :meth:`Body.from_3d_points`.
     """
     points = [
-        CartesianPoint3Dimensional(0, 0, 0),
-        CartesianPoint3Dimensional(1, 0, 0),
-        CartesianPoint3Dimensional(0, 1, 0),
-        CartesianPoint3Dimensional(1, 1, 1),
+        Point3Dimensional(0, 0, 0),
+        Point3Dimensional(1, 0, 0),
+        Point3Dimensional(0, 1, 0),
+        Point3Dimensional(1, 1, 1),
     ]
     name = "polytope"
 
@@ -2180,9 +2180,7 @@ def test_factories_have_no_shared_mutable_spatial_defaults():
         f"{owner.__name__}.{method_name}({parameter.name})"
         for owner, method_name, signature in _factory_overrides()
         for parameter in signature.parameters.values()
-        if isinstance(
-            parameter.default, (Vector3Dimensional, CartesianPoint3Dimensional, Scale)
-        )
+        if isinstance(parameter.default, (Vector3Dimensional, Point3Dimensional, Scale))
     ]
     assert not offenders, f"shared mutable defaults: {offenders}"
 

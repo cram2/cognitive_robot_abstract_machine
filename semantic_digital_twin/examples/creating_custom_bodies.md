@@ -47,7 +47,7 @@ Finally, in our kinematic structure, each entity has a name. For this we can use
 
 ```{code-cell} ipython3
 import os
-from krrood_spatial_math.spatial_types import AxisAngle, CartesianPoint3Dimensional, Vector3Dimensional
+from krrood_spatial_math.spatial_types import AxisAngle, Point3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 
@@ -58,7 +58,7 @@ sphere_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                                                    quat_w=1.)
 sphere = Sphere(origin=sphere_origin, radius=0.4)
 
-cylinder_origin = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(point=CartesianPoint3Dimensional.from_iterable([1, -1, 2]),
+cylinder_origin = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(point=Point3Dimensional.from_iterable([1, -1, 2]),
                                                                   rotation_matrix=RotationMatrix.from_axis_angle(AxisAngle(Vector3Dimensional.from_iterable([1., 0., 0.]), 0.8)),)
 cylinder = Cylinder(origin=cylinder_origin, width=0.05, height=0.5)
 

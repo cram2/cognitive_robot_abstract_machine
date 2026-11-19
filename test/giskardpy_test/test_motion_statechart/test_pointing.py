@@ -1,6 +1,6 @@
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -24,7 +24,7 @@ class TestPointingDebugExpressions:
         task = Pointing(
             root_link=root,
             tip_link=tip,
-            goal_point=CartesianPoint3Dimensional(x=1, reference_frame=root),
+            goal_point=Point3Dimensional(x=1, reference_frame=root),
             pointing_axis=Vector3Dimensional(x=1, reference_frame=tip),
             name="point",
         )
@@ -45,7 +45,7 @@ class TestPointingDebugExpressions:
         task = PointingCone(
             root_link=root,
             tip_link=tip,
-            goal_point=CartesianPoint3Dimensional(x=1, reference_frame=root),
+            goal_point=Point3Dimensional(x=1, reference_frame=root),
             pointing_axis=Vector3Dimensional(x=1, reference_frame=tip),
             cone_theta=0.1,
             name="cone",

@@ -27,7 +27,7 @@ from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.pipeline import Pipeline
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -49,7 +49,7 @@ def camera_model() -> PinholeCameraModel:
         image_resolution=CameraResolution(width=200, height=200),
         focal_length_x=100.0,
         focal_length_y=100.0,
-        principal_point=CartesianPoint2Dimensional(x=100.0, y=100.0),
+        principal_point=Point2Dimensional(x=100.0, y=100.0),
     )
 
 

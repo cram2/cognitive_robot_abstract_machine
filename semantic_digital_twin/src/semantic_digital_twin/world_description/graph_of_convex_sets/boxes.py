@@ -35,9 +35,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -452,7 +452,7 @@ class GraphOfBoundingBoxes(
         without needing the query's own rerooting machinery to intervene.
 
         :param variable: The eql variable to constrain, e.g. a Pose2Dimensional- or
-            CartesianPoint3Dimensional-typed attribute of a query, or the query itself.
+            Point3Dimensional-typed attribute of a query, or the query itself.
         :return: The condition that was added.
         :raises NotNumberLikeFieldError: If ``variable`` has no number-like field for
             one of this graph's spatial coordinates.
@@ -548,7 +548,7 @@ class GraphOfBoundingBoxes(
 
 @dataclass
 class VolumetricGraphOfBoundingBoxes(
-    GraphOfBoundingBoxes[VolumetricBoundingBox, CartesianPoint3Dimensional]
+    GraphOfBoundingBoxes[VolumetricBoundingBox, Point3Dimensional]
 ):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes, partitioning
@@ -557,7 +557,7 @@ class VolumetricGraphOfBoundingBoxes(
 
     def _default_search_space(
         self,
-    ) -> BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional]:
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional]:
         """
         :return: A search space spanning the entire three-dimensional space around
             ``self.world.root``.
@@ -582,9 +582,7 @@ class VolumetricGraphOfBoundingBoxes(
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
-        bounding_boxes: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         search_space_event: Event,
     ) -> Event:
         """
@@ -616,9 +614,7 @@ class VolumetricGraphOfBoundingBoxes(
     def free_space_from_semantic_annotation(
         cls,
         *,
-        search_space: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
         semantic_wall_annotation: Wall | None = None,
         tolerance=0.001,
@@ -693,9 +689,7 @@ class VolumetricGraphOfBoundingBoxes(
         cls,
         *,
         world: World,
-        search_space: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         tolerance=0.001,
         bloat_obstacles: float = 0.0,
         obstacle_height_clearance: float = 0.01,
@@ -732,7 +726,7 @@ class VolumetricGraphOfBoundingBoxes(
 
 @dataclass
 class PlanarGraphOfBoundingBoxes(
-    GraphOfBoundingBoxes[PlanarBoundingBox, CartesianPoint2Dimensional]
+    GraphOfBoundingBoxes[PlanarBoundingBox, Point2Dimensional]
 ):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes, partitioning
@@ -746,7 +740,7 @@ class PlanarGraphOfBoundingBoxes(
 
     def _default_search_space(
         self,
-    ) -> BoundingBoxCollection[PlanarBoundingBox, CartesianPoint2Dimensional]:
+    ) -> BoundingBoxCollection[PlanarBoundingBox, Point2Dimensional]:
         """
         :return: A search space spanning the entire two-dimensional plane around
             ``self.world.root``.
@@ -769,9 +763,7 @@ class PlanarGraphOfBoundingBoxes(
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
-        bounding_boxes: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         search_space_event: Event,
     ) -> Event:
         """
@@ -813,9 +805,7 @@ class PlanarGraphOfBoundingBoxes(
     def free_space_from_semantic_annotation(
         cls,
         *,
-        search_space: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
         semantic_wall_annotation: Wall | None = None,
         tolerance=0.001,
@@ -889,8 +879,7 @@ class PlanarGraphOfBoundingBoxes(
         world: World,
         tolerance=0.001,
         search_space: (
-            BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional]
-            | None
+            BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional] | None
         ) = None,
         bloat_obstacles: float = 0.0,
     ) -> Self:

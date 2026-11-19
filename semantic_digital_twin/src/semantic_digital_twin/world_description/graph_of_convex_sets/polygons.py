@@ -17,7 +17,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
@@ -186,8 +186,8 @@ class IrisSeedingSettings:
     """
 
     def coverage_grid_seeds(
-        self, lower: CartesianPoint3Dimensional, upper: CartesianPoint3Dimensional
-    ) -> list[CartesianPoint3Dimensional]:
+        self, lower: Point3Dimensional, upper: Point3Dimensional
+    ) -> list[Point3Dimensional]:
         """
         Build a regular grid of candidate seed points strictly inside the axis-aligned
         box spanned by ``lower`` and ``upper``.
@@ -208,15 +208,13 @@ class IrisSeedingSettings:
         ]
         grid = np.meshgrid(*axes, indexing="ij")
         return [
-            CartesianPoint3Dimensional(*point, reference_frame=reference_frame)
+            Point3Dimensional(*point, reference_frame=reference_frame)
             for point in np.stack(grid, axis=-1).reshape(-1, 3)
         ]
 
 
 def _validate_and_convert_domain(
-    search_space: BoundingBoxCollection[
-        VolumetricBoundingBox, CartesianPoint3Dimensional
-    ],
+    search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
 ) -> HPolyhedron:
     """
     Convert a search space into the single, finite ``HPolyhedron`` domain IRIS grows
@@ -293,8 +291,8 @@ def _shape_to_convex_set(
 @dataclass
 class GraphOfConvexPolygons(
     GraphOfConvexSets[
-        CartesianPoint3Dimensional,
-        BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional],
+        Point3Dimensional,
+        BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
     ]
 ):
     """
@@ -359,12 +357,10 @@ class GraphOfConvexPolygons(
     def from_world(
         cls,
         world: World,
-        search_space: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         bloat_obstacles: float = 0.0,
         seeding_settings: IrisSeedingSettings | None = None,
-        extra_seed_points: Sequence[CartesianPoint3Dimensional] = (),
+        extra_seed_points: Sequence[Point3Dimensional] = (),
     ) -> GraphOfConvexPolygons:
         """
         Grow IRIS regions covering the free space of *world* within *search_space*.
@@ -422,8 +418,8 @@ class GraphOfConvexPolygons(
         return result
 
     def path_from_to(
-        self, start: CartesianPoint3Dimensional, goal: CartesianPoint3Dimensional
-    ) -> list[CartesianPoint3Dimensional] | None:
+        self, start: Point3Dimensional, goal: Point3Dimensional
+    ) -> list[Point3Dimensional] | None:
         """
         Calculate a connected path from a start pose to a goal pose.
 
@@ -460,7 +456,7 @@ class GraphOfConvexPolygons(
 
         breakpoints = trajectory.get_segment_times()
         interior_waypoints = [
-            CartesianPoint3Dimensional(
+            Point3Dimensional(
                 *trajectory.value(t).flatten(), reference_frame=self.world.root
             )
             for t in breakpoints[1:-1]

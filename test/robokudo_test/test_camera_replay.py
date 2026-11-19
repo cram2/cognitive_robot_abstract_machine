@@ -23,7 +23,7 @@ from robokudo.io.storage import Storage, StorageDocumentField
 from robokudo.io.exceptions import RecordedViewMissing
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -97,7 +97,7 @@ def _recorded_scene(
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=525.0,
         focal_length_y=526.0,
-        principal_point=CartesianPoint2Dimensional(x=319.5, y=239.5),
+        principal_point=Point2Dimensional(x=319.5, y=239.5),
     )
     camera = Camera(
         name=PrefixedName(name="recorded_camera"),

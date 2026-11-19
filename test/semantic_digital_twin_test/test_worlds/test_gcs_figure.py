@@ -16,9 +16,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     EmbeddedPlaneProjection,
 )
 from krrood_spatial_math.spatial_types import (
@@ -253,9 +253,9 @@ def test_navigation_path_length_sums_its_segments():
 
     corner_path = NavigationPath(
         [
-            CartesianPoint3Dimensional(0.0, 0.0, 0.0, reference_frame=world.root),
-            CartesianPoint3Dimensional(3.0, 0.0, 0.0, reference_frame=world.root),
-            CartesianPoint3Dimensional(3.0, 4.0, 0.0, reference_frame=world.root),
+            Point3Dimensional(0.0, 0.0, 0.0, reference_frame=world.root),
+            Point3Dimensional(3.0, 0.0, 0.0, reference_frame=world.root),
+            Point3Dimensional(3.0, 4.0, 0.0, reference_frame=world.root),
         ]
     )
 
@@ -273,15 +273,15 @@ def test_navigation_path_reports_how_much_of_it_is_vertical():
 
     climbing_path = NavigationPath(
         [
-            CartesianPoint3Dimensional(0.0, 0.0, 0.0, reference_frame=world.root),
-            CartesianPoint3Dimensional(0.0, 0.0, 2.0, reference_frame=world.root),
-            CartesianPoint3Dimensional(1.0, 0.0, 1.5, reference_frame=world.root),
+            Point3Dimensional(0.0, 0.0, 0.0, reference_frame=world.root),
+            Point3Dimensional(0.0, 0.0, 2.0, reference_frame=world.root),
+            Point3Dimensional(1.0, 0.0, 1.5, reference_frame=world.root),
         ]
     )
     level_path = NavigationPath(
         [
-            CartesianPoint3Dimensional(0.0, 0.0, 1.0, reference_frame=world.root),
-            CartesianPoint3Dimensional(5.0, 0.0, 1.0, reference_frame=world.root),
+            Point3Dimensional(0.0, 0.0, 1.0, reference_frame=world.root),
+            Point3Dimensional(5.0, 0.0, 1.0, reference_frame=world.root),
         ]
     )
 
@@ -349,8 +349,8 @@ def test_the_floor_plan_projects_3d_points_and_keeps_points_on_it():
 
     coordinates = floor_plan.coordinates(
         [
-            CartesianPoint3Dimensional(1.0, 2.0, 3.0, reference_frame=world.root),
-            CartesianPoint2Dimensional(4.0, 5.0, reference_frame=world.root),
+            Point3Dimensional(1.0, 2.0, 3.0, reference_frame=world.root),
+            Point2Dimensional(4.0, 5.0, reference_frame=world.root),
         ]
     )
 
@@ -367,10 +367,10 @@ def test_the_floor_plan_projects_a_3d_point_onto_a_point_on_it():
     floor_plan = FloorPlan(EmbeddedPlaneProjection(plane_frame=world.root))
 
     point_on_plane = floor_plan.project_onto_plane(
-        point=CartesianPoint3Dimensional(1.0, 2.0, 3.0, reference_frame=world.root)
+        point=Point3Dimensional(1.0, 2.0, 3.0, reference_frame=world.root)
     )
 
-    assert isinstance(point_on_plane, CartesianPoint2Dimensional)
+    assert isinstance(point_on_plane, Point2Dimensional)
     assert point_on_plane.reference_frame is world.root
     assert (float(point_on_plane.x), float(point_on_plane.y)) == (1.0, 2.0)
 

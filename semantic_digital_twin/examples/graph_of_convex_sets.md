@@ -90,10 +90,10 @@ graph_of_bounding_boxes.draw()
 Let's use graph theory to find a path!
 
 ```{code-cell} ipython3
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 
-start = CartesianPoint3Dimensional(-0.75, 0, 0.15, reference_frame=box_world.root)
-goal = CartesianPoint3Dimensional(0.75, 0, 0.15, reference_frame=box_world.root)
+start = Point3Dimensional(-0.75, 0, 0.15, reference_frame=box_world.root)
+goal = Point3Dimensional(0.75, 0, 0.15, reference_frame=box_world.root)
 path = graph_of_bounding_boxes.path_from_to(start, goal)
 print("A potential path is", [(point.x, point.y) for point in path])
 ```
@@ -144,8 +144,8 @@ This allows the accessing of locations using a sequence of local problems put to
 Finally, let's find a way from here to there:
 
 ```{code-cell} ipython3
-start = CartesianPoint3Dimensional(-0.75, 0, 1.15, reference_frame=world.root)
-goal = CartesianPoint3Dimensional(0.75, 0, 1.15, reference_frame=world.root)
+start = Point3Dimensional(-0.75, 0, 1.15, reference_frame=world.root)
+goal = Point3Dimensional(0.75, 0, 1.15, reference_frame=world.root)
 path = graph_of_bounding_boxes.path_from_to(start, goal)
 print("A potential path is", [(point.x, point.y, point.z) for point in path])
 ```

@@ -9,8 +9,8 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood_spatial_math.point import CartesianPoint
-from krrood_spatial_math.vector import GenericVector, CartesianVector
+from krrood_spatial_math.point import Point
+from krrood_spatial_math.vector import GenericVector, Vector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.coordinate_system import (
@@ -30,13 +30,13 @@ from krrood_spatial_math.space import EuclideanSpace2Dimensional
 from krrood_spatial_math.spatial_types import (
     SymbolicSpatialValue3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
     EmbeddedPlaneProjection,
     HomogeneousTransformationMatrix2Dimensional,
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
     Vector2Dimensional,
 )
@@ -276,7 +276,7 @@ def test_a_plane_frame_is_told_apart_from_its_frame(floor_frame):
 
 # %% values on a frame's plane
 
-planar_values = [CartesianPoint2Dimensional, Vector2Dimensional, Pose2Dimensional]
+planar_values = [Point2Dimensional, Vector2Dimensional, Pose2Dimensional]
 
 
 @pytest.mark.parametrize("planar_value", planar_values)
@@ -309,41 +309,37 @@ def test_a_planar_value_is_no_value_given_in_a_three_dimensional_frame(planar_va
 
 def test_a_two_dimensional_point_is_given_in_a_two_dimensional_cartesian_frame():
     assert (
-        CartesianPoint2Dimensional.get_type_of_generic_parameter(
+        Point2Dimensional.get_type_of_generic_parameter(
             parameter=GenericCoordinateSystem
         )
         is CartesianFrame2Dimensional
     )
 
 
-def test_a_two_dimensional_point_is_a_cartesian_point():
+def test_a_two_dimensional_point_is_a_point():
     """
     A point on a plane measures distances, since its frame on the plane is Cartesian.
     """
-    assert issubclass(CartesianPoint2Dimensional, CartesianPoint)
+    assert issubclass(Point2Dimensional, Point)
 
 
 def test_the_euclidean_distance_between_two_dimensional_points_is_measured_on_their_plane():
-    origin = CartesianPoint2Dimensional(1, 2)
-    other = CartesianPoint2Dimensional(4, 6)
+    origin = Point2Dimensional(1, 2)
+    other = Point2Dimensional(4, 6)
 
     assert float(origin.euclidean_distance(other)) == 5.0
 
 
 def test_a_two_dimensional_point_stores_its_coordinates_as_symbolic_scalars():
     assert (
-        CartesianPoint2Dimensional.get_type_of_generic_parameter(
-            parameter=GenericCoordinate
-        )
+        Point2Dimensional.get_type_of_generic_parameter(parameter=GenericCoordinate)
         is sm.Scalar
     )
 
 
 def test_a_two_dimensional_point_is_moved_by_a_two_dimensional_vector():
     assert (
-        CartesianPoint2Dimensional.get_type_of_generic_parameter(
-            parameter=GenericVector
-        )
+        Point2Dimensional.get_type_of_generic_parameter(parameter=GenericVector)
         is Vector2Dimensional
     )
 
@@ -351,11 +347,11 @@ def test_a_two_dimensional_point_is_moved_by_a_two_dimensional_vector():
 # %% vectors on a frame's plane
 
 
-def test_a_two_dimensional_vector_is_a_cartesian_vector_of_a_two_dimensional_frame():
+def test_a_two_dimensional_vector_is_a_vector_of_a_two_dimensional_frame():
     """
     A vector on a plane measures lengths and is given in a 2D Cartesian frame.
     """
-    assert issubclass(Vector2Dimensional, CartesianVector)
+    assert issubclass(Vector2Dimensional, Vector)
     assert (
         Vector2Dimensional.get_type_of_generic_parameter(
             parameter=GenericCoordinateSystem
@@ -367,8 +363,8 @@ def test_a_two_dimensional_vector_is_a_cartesian_vector_of_a_two_dimensional_fra
 def test_the_difference_of_two_points_on_a_plane_is_the_vector_between_them(
     floor_frame,
 ):
-    start = CartesianPoint2Dimensional(1, 2, reference_frame=floor_frame)
-    end = CartesianPoint2Dimensional(4, 6, reference_frame=floor_frame)
+    start = Point2Dimensional(1, 2, reference_frame=floor_frame)
+    end = Point2Dimensional(4, 6, reference_frame=floor_frame)
 
     difference = end - start
 
@@ -378,8 +374,8 @@ def test_the_difference_of_two_points_on_a_plane_is_the_vector_between_them(
 
 
 def test_a_point_moved_by_the_difference_to_another_point_reaches_it(floor_frame):
-    start = CartesianPoint2Dimensional(1, 2, reference_frame=floor_frame)
-    end = CartesianPoint2Dimensional(4, 6, reference_frame=floor_frame)
+    start = Point2Dimensional(1, 2, reference_frame=floor_frame)
+    end = Point2Dimensional(4, 6, reference_frame=floor_frame)
 
     moved = start + (end - start)
 
@@ -391,16 +387,16 @@ def test_points_on_the_planes_of_two_frames_have_no_difference(
     floor_frame, robot_base_frame
 ):
     with pytest.raises(ReferenceFrameMismatchError):
-        CartesianPoint2Dimensional(
-            1, 2, reference_frame=floor_frame
-        ) - CartesianPoint2Dimensional(reference_frame=robot_base_frame)
+        Point2Dimensional(1, 2, reference_frame=floor_frame) - Point2Dimensional(
+            reference_frame=robot_base_frame
+        )
 
 
 def test_a_point_is_not_moved_by_a_vector_on_another_frames_plane(
     floor_frame, robot_base_frame
 ):
     with pytest.raises(ReferenceFrameMismatchError):
-        CartesianPoint2Dimensional(reference_frame=floor_frame) + Vector2Dimensional(
+        Point2Dimensional(reference_frame=floor_frame) + Vector2Dimensional(
             1, 0, reference_frame=robot_base_frame
         )
 
@@ -541,7 +537,7 @@ def test_a_planar_transformation_moves_a_point_into_its_reference_frame(
         child_frame=robot_base_frame,
     )
 
-    point_on_floor = floor_T_robot_base @ CartesianPoint2Dimensional(
+    point_on_floor = floor_T_robot_base @ Point2Dimensional(
         1, 0, reference_frame=robot_base_frame
     )
 
@@ -635,7 +631,7 @@ def test_a_point_changed_there_and_back_on_a_plane_keeps_its_coordinates(
     floor_T_robot_base = HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
         x=1, y=2, yaw=0.5, reference_frame=floor_frame, child_frame=robot_base_frame
     )
-    point = CartesianPoint2Dimensional(3, 4, reference_frame=robot_base_frame)
+    point = Point2Dimensional(3, 4, reference_frame=robot_base_frame)
 
     point_copy = floor_T_robot_base.inverse() @ (floor_T_robot_base @ point)
 
@@ -647,7 +643,7 @@ def test_a_planar_transformation_moves_a_point_as_its_change_does(
     floor_frame, robot_base_frame
 ):
     floor_T_robot_base = robot_base_frame.mount_T_self
-    point = CartesianPoint2Dimensional(3, 4, reference_frame=robot_base_frame)
+    point = Point2Dimensional(3, 4, reference_frame=robot_base_frame)
 
     point_on_floor = (
         HomogeneousTransformationMatrix2Dimensional.from_transformation(
@@ -656,8 +652,8 @@ def test_a_planar_transformation_moves_a_point_as_its_change_does(
         @ point
     )
 
-    expected = CartesianPoint2Dimensional.from_cartesian_point_3_dimensional(
-        floor_T_robot_base @ point.to_cartesian_point_3_dimensional()
+    expected = Point2Dimensional.from_point_3_dimensional(
+        floor_T_robot_base @ point.to_point_3_dimensional()
     )
     assert np.allclose(point_on_floor.to_np(), expected.to_np())
 

@@ -42,7 +42,7 @@ from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
@@ -318,12 +318,12 @@ def test_pick_up_multi(stationary_block_context):
 
 
 @pytest.fixture
-def place_position(robot_setup) -> CartesianPoint3Dimensional:
+def place_position(robot_setup) -> Point3Dimensional:
     world, robot_class = robot_setup
     if robot_class == Tracy:
-        return CartesianPoint3Dimensional(0.9, 0.0, 0.93, reference_frame=world.root)
+        return Point3Dimensional(0.9, 0.0, 0.93, reference_frame=world.root)
     elif robot_class == DAiSy:
-        return CartesianPoint3Dimensional(0.6, 1.2, 0.9, reference_frame=world.root)
+        return Point3Dimensional(0.6, 1.2, 0.9, reference_frame=world.root)
     else:
         raise ValueError(f"Unsupported robot class: {robot_class}")
 
@@ -363,16 +363,12 @@ def test_place_multi(stationary_block_context, place_position):
 
 
 @pytest.fixture
-def anchor_position(robot_setup) -> CartesianPoint3Dimensional:
+def anchor_position(robot_setup) -> Point3Dimensional:
     world, robot_class = robot_setup
     if robot_class == Tracy:
-        return CartesianPoint3Dimensional(
-            x=0.85, y=-0.25, z=0.95, reference_frame=world.root
-        )
+        return Point3Dimensional(x=0.85, y=-0.25, z=0.95, reference_frame=world.root)
     elif robot_class == DAiSy:
-        return CartesianPoint3Dimensional(
-            x=0.0, y=0.0, z=0.95, reference_frame=world.root
-        )
+        return Point3Dimensional(x=0.0, y=0.0, z=0.95, reference_frame=world.root)
     else:
         raise ValueError(f"Unsupported robot class: {robot_class}")
 
@@ -508,7 +504,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
     arm = left_or_only_arm(view)
     stood_on = box.parent_connection.parent
     resting_height = box.global_pose.position.to_np().flatten()[2]
-    target = CartesianPoint3Dimensional(
+    target = Point3Dimensional(
         *place_position.to_np().flatten()[:2],
         resting_height,
         reference_frame=world.root,

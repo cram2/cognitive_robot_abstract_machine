@@ -33,7 +33,7 @@ from krrood.inheritance_path_length import inheritance_path_length
 from krrood.symbolic_math.symbolic_math import Scalar
 from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
@@ -405,12 +405,12 @@ class PointSpatialRelation(Predicate, ABC):
     Check if the point is spatially related to the other point.
     """
 
-    point: CartesianPoint3Dimensional
+    point: Point3Dimensional
     """
     The point for which the check should be done.
     """
 
-    other: CartesianPoint3Dimensional
+    other: Point3Dimensional
     """
     The other point.
     """

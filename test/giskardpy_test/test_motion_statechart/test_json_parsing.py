@@ -42,7 +42,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
@@ -97,7 +97,7 @@ def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
     node = CartesianPositionStraight(
         root_link=root,
         tip_link=tip,
-        goal_point=CartesianPoint3Dimensional(1, 0, 0, reference_frame=root),
+        goal_point=Point3Dimensional(1, 0, 0, reference_frame=root),
     )
     new_json_data = json.loads(json.dumps(to_json(node)))
     tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)

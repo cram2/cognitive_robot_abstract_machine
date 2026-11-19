@@ -63,7 +63,7 @@ from semantic_digital_twin.grasping.grasp_strategies import (
     PinchARim,
 )
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
     Vector3Dimensional,
 )
@@ -199,9 +199,7 @@ class Handle(HasGraspCandidates):
             GraspCandidate(
                 self,
                 Pose3Dimensional(
-                    position=CartesianPoint3Dimensional.from_iterable(
-                        mesh.bounds.mean(axis=0)
-                    ),
+                    position=Point3Dimensional.from_iterable(mesh.bounds.mean(axis=0)),
                     orientation=RotationMatrix.from_vectors(
                         x=approach, y=bar_direction.cross(approach)
                     ).quaternion,
@@ -745,12 +743,12 @@ class Floor(HasSupportingSurface):
         cls,
         name: str,
         world: World,
-        floor_polytope: list[CartesianPoint3Dimensional],
+        floor_polytope: list[Point3Dimensional],
         world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Self:
         """
         Create a Floor semantic annotation with a new body defined by the given list of
-        CartesianPoint3Dimensional.
+        Point3Dimensional.
 
         :param name: The name of the floor body.
         :param floor_polytope: A list of 3D points defining the floor poly
@@ -823,7 +821,7 @@ class Level(HasRootRegion):
     @property
     def floor_plane(
         self,
-    ) -> tuple[CartesianPoint3Dimensional, CartesianPoint3Dimensional]:
+    ) -> tuple[Point3Dimensional, Point3Dimensional]:
         """
         The floor plane of a level, expressed as two points
 
@@ -836,7 +834,7 @@ class Level(HasRootRegion):
             self.root.area.max_point, self._world.root
         )
         min_z = min_point_global.z
-        return min_point_global, CartesianPoint3Dimensional(
+        return min_point_global, Point3Dimensional(
             max_point_global.x,
             max_point_global.y,
             min_z,
@@ -930,7 +928,7 @@ class Wall(HasApertures):
         origin: HomogeneousTransformationMatrix3Dimensional,
         bloat_amount: float,
         obstacle_height_clearance: float = 0.01,
-    ) -> BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional]:
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional]:
         """
         Bloat this wall's bounding boxes along their thinner dimension only -- the
         side that faces the room -- rather than symmetrically in x and y.
@@ -1552,7 +1550,7 @@ class ShapeSortingPiece(HasGraspCandidates):
             GraspCandidate(
                 self,
                 Pose3Dimensional(
-                    position=CartesianPoint3Dimensional(
+                    position=Point3Dimensional(
                         0.0,
                         0.0,
                         bottom_face + self.grasp_height,
@@ -1632,9 +1630,7 @@ class SemanticEnvironmentAnnotation(HasRootBody):
     def obstacle_entities(
         self,
         *,
-        search_space: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         excluded_bodies: Iterable[Body] = (),
     ) -> list[Body]:
         """
@@ -1656,15 +1652,13 @@ class SemanticEnvironmentAnnotation(HasRootBody):
     def build_bloated_obstacle_collection(
         self,
         *,
-        search_space: BoundingBoxCollection[
-            VolumetricBoundingBox, CartesianPoint3Dimensional
-        ],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         semantic_wall_annotation: Wall | None = None,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
         obstacle_height_clearance: float = 0.01,
         excluded_bodies: Iterable[Body] = (),
-    ) -> BoundingBoxCollection[VolumetricBoundingBox, CartesianPoint3Dimensional]:
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional]:
         """
         Collect and bloat this annotation's obstacle bounding boxes.
 

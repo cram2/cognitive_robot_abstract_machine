@@ -13,7 +13,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from krrood_spatial_math.spatial_types_2_dimensional import (
-    CartesianPoint2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
@@ -59,9 +59,7 @@ class Sage10kOpenDoor(SequentialAction):
 
         # Find a node in free space that is near the pre-grasp pose. gcs is planar, so
         # the query point is its floor-plane projection, not the full 3D position.
-        target_node = gcs.node_of_point(
-            CartesianPoint2Dimensional.from_pose(pre_grasp_pose)
-        )
+        target_node = gcs.node_of_point(Point2Dimensional.from_pose(pre_grasp_pose))
 
         gcs = gcs.create_subgraph(
             list(
@@ -73,9 +71,7 @@ class Sage10kOpenDoor(SequentialAction):
 
         reach_query = a(MoveToReach)(
             target_pose_offset_robot=a(Pose2Dimensional)(
-                position=a(CartesianPoint2Dimensional)(
-                    x=..., y=..., reference_frame=None
-                ),
+                position=a(Point2Dimensional)(x=..., y=..., reference_frame=None),
                 yaw=...,
                 reference_frame=None,
             ),

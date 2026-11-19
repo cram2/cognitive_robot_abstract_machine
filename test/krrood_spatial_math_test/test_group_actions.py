@@ -14,7 +14,7 @@ from krrood_spatial_math.coordinate_system import (
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     HomogeneousCoordinates,
     HomogeneousTransformationMatrix3Dimensional,
     Orientation,
@@ -40,7 +40,7 @@ def test_whatever_rigid_motions_act_on_rotations_act_on_too():
 
 @pytest.mark.parametrize(
     "spatial_type",
-    [CartesianPoint3Dimensional, Vector3Dimensional, RotationMatrix, Pose3Dimensional],
+    [Point3Dimensional, Vector3Dimensional, RotationMatrix, Pose3Dimensional],
 )
 def test_values_stored_as_homogeneous_coordinates_are_moved_by_rigid_motions(
     spatial_type,
@@ -73,7 +73,7 @@ def test_a_transformation_turns_an_orientation_by_its_rotation_only():
 @pytest.mark.parametrize(
     "value_type",
     [
-        CartesianPoint3Dimensional,
+        Point3Dimensional,
         Vector3Dimensional,
         Quaternion,
         AxisAngle,

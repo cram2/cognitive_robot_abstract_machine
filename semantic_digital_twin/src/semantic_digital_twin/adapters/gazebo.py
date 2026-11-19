@@ -37,7 +37,7 @@ from semantic_digital_twin.specifications.connections import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint3Dimensional,
+    Point3Dimensional,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -620,7 +620,7 @@ class GazeboParser(WorldModelParser):
 
         return Inertial(
             mass=self.parse_float(element, "mass", 1.0),
-            center_of_mass=CartesianPoint3Dimensional(
+            center_of_mass=Point3Dimensional(
                 *link_T_inertial[:3, 3], reference_frame=body
             ),
             inertia=InertiaTensor(data=inertia),

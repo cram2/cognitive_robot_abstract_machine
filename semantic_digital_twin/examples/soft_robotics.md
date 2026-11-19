@@ -63,7 +63,7 @@ from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
-from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types import Point3Dimensional
 
 executor_pcc = StatechartExecutor(
     context=StatechartContext(world=world_pcc),
@@ -77,17 +77,17 @@ msc_pcc.add_node(
             CartesianPosition(
                 root_link=world_pcc.root,
                 tip_link=trunk_pcc.arms[0].tip,
-                goal_point=CartesianPoint3Dimensional(x=0.4, y=0.0, z=0.5, reference_frame=world_pcc.root),
+                goal_point=Point3Dimensional(x=0.4, y=0.0, z=0.5, reference_frame=world_pcc.root),
             ),
             CartesianPosition(
                 root_link=world_pcc.root,
                 tip_link=trunk_pcc.arms[0].tip,
-                goal_point=CartesianPoint3Dimensional(x=0.0, y=0.4, z=0.5, reference_frame=world_pcc.root),
+                goal_point=Point3Dimensional(x=0.0, y=0.4, z=0.5, reference_frame=world_pcc.root),
             ),
             CartesianPosition(
                 root_link=world_pcc.root,
                 tip_link=trunk_pcc.arms[0].tip,
-                goal_point=CartesianPoint3Dimensional(x=0.0, y=0.0, z=0.9, reference_frame=world_pcc.root),
+                goal_point=Point3Dimensional(x=0.0, y=0.0, z=0.9, reference_frame=world_pcc.root),
             )
         ]
     ))
@@ -134,18 +134,18 @@ msc_cos.add_node(
             CartesianPosition(
                 root_link=world_cosserat.root,
                 tip_link=trunk_cos.arms[0].tip,
-                goal_point=CartesianPoint3Dimensional(x=0.4, y=0.0, z=0.5, reference_frame=world_cosserat.root),
+                goal_point=Point3Dimensional(x=0.4, y=0.0, z=0.5, reference_frame=world_cosserat.root),
             ),
             CartesianPosition(
                 root_link=world_cosserat.root,
                 tip_link=trunk_cos.arms[0].tip,
-                goal_point=CartesianPoint3Dimensional(x=0.0, y=0.7, z=0.4, reference_frame=world_cosserat.root),
+                goal_point=Point3Dimensional(x=0.0, y=0.7, z=0.4, reference_frame=world_cosserat.root),
             ),
             # Distal target (stretching)
             CartesianPosition(
                 root_link=world_cosserat.root,
                 tip_link=trunk_cos.arms[0].tip,
-                goal_point=CartesianPoint3Dimensional(x=0.4, y=0.5, z=1.2, reference_frame=world_cosserat.root),
+                goal_point=Point3Dimensional(x=0.4, y=0.5, z=1.2, reference_frame=world_cosserat.root),
             )
         ]
     ))
