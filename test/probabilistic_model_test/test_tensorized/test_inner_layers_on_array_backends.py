@@ -147,14 +147,6 @@ class MixtureOfProductsCase:
         )
 
 
-@pytest.fixture
-def mixture_of_products_case() -> MixtureOfProductsCase:
-    """
-    The circuit whose queries are compared across backends.
-    """
-    return MixtureOfProductsCase(Continuous("x"), Continuous("y"))
-
-
 # %% numeric queries agree with numpy on every backend
 
 
