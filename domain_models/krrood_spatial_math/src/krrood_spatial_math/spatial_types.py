@@ -2773,8 +2773,7 @@ class Twist(RigidMotionRate):
 class ScrewAxis(RigidMotionRate):
     """
     How a rigid body's pose changes per unit of a position that moves it along a screw
-    axis: the axis's line, the pitch along it and the unit of the position. It need not
-    be normalized as in Lynch and Park, *Modern Robotics*, Definition 3.24. Unlike a
+    axis: the axis's line, the pitch along it and the unit of the position. Unlike a
     :class:`Twist`, it is not a velocity: it holds whatever the speed of the position.
     """
 
