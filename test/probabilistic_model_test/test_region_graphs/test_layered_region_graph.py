@@ -23,8 +23,9 @@ from probabilistic_model.learning.region_graph.exceptions import (
     PredictedVariableInRegionGraphError,
 )
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
-    DenseEdgeMatrix,
+    BlockEdgeMatrix,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
@@ -122,17 +123,18 @@ def test_the_initial_parameters_of_a_region_graph_circuit_lie_in_its_ranges():
     assert np.all((weights >= 2.0) & (weights < 3.0))
 
 
-def test_the_sum_layers_of_a_region_graph_are_fully_connected_and_dense(region_graph):
+def test_the_circuit_of_a_region_graph_is_folded(region_graph):
     """
-    Every sum layer connects every unit to every unit of its children and stores its
-    edges densely.
+    A region graph builds its circuit folded: one layer per type of layer and height,
+    every sum layer storing its edges as full blocks.
     """
     circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
+    heights = LayerFolding(root=circuit.root).heights
+    kinds = [(type(layer), heights[id(layer)]) for layer in circuit.layers]
     sum_layers = [layer for layer in circuit.layers if isinstance(layer, SumLayer)]
+    assert len(kinds) == len(set(kinds))
     assert sum_layers
-    for layer in sum_layers:
-        assert isinstance(layer.edges, DenseEdgeMatrix)
-        assert bool(layer.edges.is_edge.all())
+    assert all(isinstance(layer.edges, BlockEdgeMatrix) for layer in sum_layers)
 
 
 # %% learning

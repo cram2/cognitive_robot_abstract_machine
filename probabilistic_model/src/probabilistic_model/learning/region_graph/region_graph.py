@@ -17,6 +17,7 @@ from typing_extensions import Iterable, Self
 
 from probabilistic_model.graph import DirectedAcyclicGraph
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     DenseEdgeMatrix,
     SparseEntries,
@@ -263,8 +264,8 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         predicted_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a randomly initialized RAT-SPN with numpy parameters.
-        With a predicted variable, the root region has one sum unit per category of it
+        Convert the region graph to a randomly initialized RAT-SPN with numpy
+        parameters, folded by :class:`LayerFolding`. With a predicted variable, the root region has one sum unit per category of it
         and the root mixes them, each multiplied by the indicator of its category, so
         that the circuit classifies; without one, the root region has a single sum unit.
 
@@ -321,7 +322,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                 predicted_variable=predicted_variable,
                 variables=variables,
             )
-        return LayeredProbabilisticCircuit(variables, root)
+        return LayeredProbabilisticCircuit(
+            variables, LayerFolding(root=root).folded_root()
+        )
 
     def fully_connected_sum_layer(
         self, *, children: list[RegionGraphNode], number_of_nodes: int

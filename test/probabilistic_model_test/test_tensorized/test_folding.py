@@ -62,13 +62,11 @@ def random_network(variables: SortedSet) -> LayeredProbabilisticCircuit:
     )
 
 
-@pytest.fixture(params=["random_network", "mixture_over_four_variables"])
-def circuit(request) -> LayeredProbabilisticCircuit:
+@pytest.fixture
+def mixture_over_four_variables() -> MixtureOverFourVariables:
     """
-    :return: A RAT-SPN, or a mixture whose leaf layers mix variables.
+    :return: The mixture over two continuous and two symbolic variables.
     """
-    if request.param == "random_network":
-        return request.getfixturevalue("random_network")
     return MixtureOverFourVariables(
         variables=SortedSet(
             [
@@ -78,7 +76,20 @@ def circuit(request) -> LayeredProbabilisticCircuit:
                 Symbolic(name="z_mark", domain=Set.from_iterable(["off", "on"])),
             ]
         )
-    ).mixed
+    )
+
+
+@pytest.fixture(params=["random_network", "separate_leaves", "mixed_leaves"])
+def circuit(request, mixture_over_four_variables) -> LayeredProbabilisticCircuit:
+    """
+    :return: A RAT-SPN, which a region graph builds folded, or the mixture with one
+        variable per leaf layer or with leaf layers that mix variables.
+    """
+    if request.param == "random_network":
+        return request.getfixturevalue("random_network")
+    if request.param == "separate_leaves":
+        return mixture_over_four_variables.separate
+    return mixture_over_four_variables.mixed
 
 
 @pytest.fixture
@@ -110,15 +121,17 @@ def event(circuit: LayeredProbabilisticCircuit) -> SimpleEvent:
 # %% structure
 
 
-def test_a_folded_random_network_has_one_layer_per_type_and_height(random_network):
+def test_folding_merges_the_leaf_layers_of_one_type(mixture_over_four_variables):
     """
-    The 3 repetitions of a RAT-SPN fold into one layer per type of layer and height, the
-    sums storing their edges as stacked blocks.
+    The leaf layers of one type of a circuit with one variable per leaf layer fold into
+    one layer, and the folded circuit has one layer per type and height.
     """
-    folded = random_network.folded()
+    separate = mixture_over_four_variables.separate
+    folded = separate.folded()
     heights = LayerFolding(root=folded.root).heights
     kinds = [(type(layer), heights[id(layer)]) for layer in folded.layers]
-    assert len(folded.layers) < len(random_network.layers)
+    assert len(separate.layers) == 6
+    assert len(folded.layers) == 4
     assert len(kinds) == len(set(kinds))
     assert all(
         isinstance(layer.edges, BlockEdgeMatrix)
