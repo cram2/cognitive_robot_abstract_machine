@@ -40,7 +40,7 @@ from action_msgs.msg import GoalStatus
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
 from krrood_synchronization.messages import Sender
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
+from semantic_digital_twin.adapters.ros.world_fetcher import join_shared_world
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -104,6 +104,10 @@ class GiskardClientExecutor(Executor):
     """
 
     def __post_init__(self):
+        """
+        Take the world of :attr:`context`, or else join the world Giskard serves, and
+        connect to the command action of Giskard.
+        """
         super().__post_init__()
         if self.context is not None:
             self.world = self.context.world
@@ -111,9 +115,8 @@ class GiskardClientExecutor(Executor):
             self.node_handle.get_logger().info(
                 "No world provided, fetching from service"
             )
-            self.world = fetch_world_from_service(self.node_handle, timeout_seconds=300)
+            self.world = join_shared_world(self.node_handle, timeout_seconds=300)
             self.node_handle.get_logger().info("world synced")
-            WorldSynchronizer(_world=self.world, node=self.node_handle)
         if self.context is None:
             self.context = StatechartContext(world=self.world)
             MotionControl().extend_context(context=self.context)
