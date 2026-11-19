@@ -1,0 +1,75 @@
+name: krrood distributions install alone
+
+# Each krrood-* distribution is installed on its own, with only what it declares, and
+# every one of its modules is imported, on Linux and on Windows.
+on:
+  pull_request:
+    paths:
+      - 'krrood/**'
+      - 'scripts/import_distribution_modules.py'
+      - '.github/workflows/krrood-distributions.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'krrood/**'
+  workflow_dispatch:
+
+jobs:
+  install-alone:
+    name: ${{ matrix.distribution }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        distribution:
+          - krrood-core
+          - krrood-serialization
+          - krrood-code-generation
+          - krrood-symbolic-math
+          - krrood-rustworkx-utils
+          - krrood-eql
+          - krrood-planning
+          - krrood-ormatic
+          - krrood-probabilistic
+          - krrood-rdr
+          - krrood-ontomatic
+          - krrood-development-tools
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # The krrood-* distributions pin each other to this release, which is not on PyPI
+      # until it is published, so every workspace package is built first.
+      - name: Build the workspace's wheels
+        run: |
+          pip install build
+          for directory in krrood/krrood-*/ random_events probabilistic_model domain_models/*/; do
+            python -m build --wheel "$directory" --outdir wheels/
+          done
+
+      - name: Install ${{ matrix.distribution }} alone
+        run: |
+          python -m venv alone
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            interpreter=alone/Scripts/python
+          else
+            interpreter=alone/bin/python
+          fi
+          echo "INTERPRETER=$interpreter" >> "$GITHUB_ENV"
+          "$interpreter" -m pip install --find-links wheels/ "./krrood/${{ matrix.distribution }}"
+
+      - name: Import every module of ${{ matrix.distribution }}
+        run: |
+          "$INTERPRETER" scripts/import_distribution_modules.py "krrood/${{ matrix.distribution }}/src"

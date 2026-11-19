@@ -85,12 +85,15 @@ def test_every_version_module_in_the_repository_is_found():
             "*/_version.py",
             "*/src/*/_version.py",
             "*/*/src/*/_version.py",
+            "*/*/src/*/*/_version.py",
         )
         for path in repository.root.glob(pattern)
     }
 
     assert {
-        package.version_file for package in repository.versioned_packages()
+        package.version_file
+        for package in repository.versioned_packages()
+        if package.has_version_module
     } == on_disk
 
 
@@ -366,11 +369,22 @@ def test_every_dependency_on_another_package_of_this_repository_requires_its_ver
     Read back from the files with a TOML parser, independent of how the script writes
     them.
     """
-    packages = repository.versioned_packages()
-    siblings = {package.distribution_name for package in packages}
-    expected = SpecifierSet(f">={repository.version}")
+    packages = {
+        package.distribution_name: package
+        for package in repository.versioned_packages()
+    }
 
-    for package in packages:
+    for package in packages.values():
         for name, requirement in dependencies_of(package.pyproject_file).items():
-            if name in siblings and name != package.distribution_name:
-                assert requirement.specifier == expected, (package.directory, name)
+            if name not in packages or name == package.distribution_name:
+                continue
+            released_together = repository.release_directory(
+                package=packages[name]
+            ) == repository.release_directory(package=package)
+            operator = (
+                sync_version.VersionOperator.EXACTLY
+                if released_together
+                else sync_version.VersionOperator.AT_LEAST
+            )
+            expected = SpecifierSet(f"{operator}{repository.version}")
+            assert requirement.specifier == expected, (package.directory, name)

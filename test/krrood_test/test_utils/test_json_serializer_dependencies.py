@@ -61,3 +61,36 @@ def test_serializer_loads_without_a_heavy_library(library: HeavyLibrary) -> None
     )
 
     assert loading.returncode == 0, loading.stderr
+
+
+# %% finding the serializer of a subclass
+
+
+def test_finding_the_serializer_of_a_subclass_loads_no_query_language() -> None:
+    """
+    The serializer of the nearest serialized superclass is found without the entity
+    query language, which ships in a distribution of its own.
+    """
+    program = "\n".join(
+        [
+            "import pathlib, sys",
+            "from krrood.adapters.json_serializer import (",
+            "    JSONSerializableTypeRegistry, PurePathJSONSerializer,",
+            ")",
+            "serializer = JSONSerializableTypeRegistry().get_external_serializer(",
+            "    clazz=pathlib.PurePosixPath",
+            ")",
+            "assert serializer is PurePathJSONSerializer, serializer",
+            "print('\\n'.join(sys.modules))",
+        ]
+    )
+    loaded = subprocess.run(
+        [sys.executable, "-I", "-c", program],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+
+    assert [
+        module for module in loaded if module.startswith("krrood.entity_query_language")
+    ] == []

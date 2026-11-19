@@ -48,7 +48,11 @@ dependencies = [
     "PySide6",
     "qt-material",
     "superqt",
-    "krrood>=26.10.0",
+    "krrood-core>=26.10.0",
+    "krrood-serialization>=26.10.0",
+    "krrood-eql>=26.10.0",
+    "krrood-ormatic>=26.10.0",
+    "krrood-probabilistic>=26.10.0",
     "causal-learn",
     "array-api-compat>=1.15",
     "array-api-extra>=0.11",
@@ -142,7 +146,11 @@ dependencies = [
     "pyside6",
     "qt-material",
     "superqt",
-    "krrood",
+    "krrood-core",
+    "krrood-serialization",
+    "krrood-eql",
+    "krrood-ormatic",
+    "krrood-probabilistic",
     "causal-learn",
     "array-api-compat",
     "array-api-extra",
@@ -150,6 +158,10 @@ dependencies = [
 
 [dependency-groups]
 workspace = [
-    "krrood",
+    "krrood-core",
+    "krrood-serialization",
+    "krrood-eql",
+    "krrood-ormatic",
+    "krrood-probabilistic",
     "krrood_compute_resources",
 ]

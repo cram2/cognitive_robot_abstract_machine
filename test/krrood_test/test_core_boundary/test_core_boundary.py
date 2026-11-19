@@ -5,7 +5,6 @@ interpreter loads no distribution the static import graph does not predict.
 
 from __future__ import annotations
 
-import importlib.metadata
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -133,7 +132,7 @@ def test_loading_core_loads_only_the_distributions_its_import_graph_predicts(
         for imported in packages_imported_while_running(source)
         if imported.importer in (None, krrood.__name__)
     } - startup_packages
-    distributions_by_package = importlib.metadata.packages_distributions()
+    distributions_by_package = boundary.distributions_by_package
     loaded_distributions = {
         canonicalize_name(distribution)
         for package in loaded_by_core
