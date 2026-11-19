@@ -2603,44 +2603,44 @@ class Displacement(VectorPair):
     def __init__(
         self,
         *,
-        translation: Vector3 | None = None,
         rotation_vector: Vector3 | None = None,
+        translation: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
     ) -> None:
         """
-        :param translation: Where the body's origin ended up, relative to where it
-            started, in meters. Defaults to no translation.
         :param rotation_vector: The axis the body turned around, scaled by the angle it
             turned by in radians. Defaults to no rotation.
+        :param translation: Where the body's origin ended up, relative to where it
+            started, in meters. Defaults to no translation.
         :param reference_frame: The frame along whose axes the body moved.
         """
         super().__init__(
-            first_vector=translation,
-            second_vector=rotation_vector,
+            first_vector=rotation_vector,
+            second_vector=translation,
             reference_frame=reference_frame,
         )
 
     @classproperty
     def _first_vector_name(cls) -> str:
-        return "translation"
+        return "rotation_vector"
 
     @classproperty
     def _second_vector_name(cls) -> str:
-        return "rotation_vector"
-
-    @property
-    def translation(self) -> Vector3:
-        """
-        :return: Where the body's origin ended up, relative to where it started, in
-            meters.
-        """
-        return self._first_vector
+        return "translation"
 
     @property
     def rotation_vector(self) -> Vector3:
         """
         :return: The axis the body turned around, scaled by the angle it turned by in
             radians.
+        """
+        return self._first_vector
+
+    @property
+    def translation(self) -> Vector3:
+        """
+        :return: Where the body's origin ended up, relative to where it started, in
+            meters.
         """
         return self._second_vector
 
