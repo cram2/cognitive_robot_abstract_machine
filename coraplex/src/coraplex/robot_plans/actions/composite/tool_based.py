@@ -1,3 +1,7 @@
+"""
+Actions that use a held tool on something: mixing, cutting, wiping and pouring.
+"""
+
 from __future__ import annotations
 
 import math
@@ -616,12 +620,6 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
         """
         pre_pour_pose, pour_pose = self._pour_poses()
         return [
-            self.tool_center_point_goal(
-                pre_pour_pose,
-                self.arm,
-            ),
-            self.tool_center_point_goal(
-                pour_pose,
-                self.arm,
-            ),
+            self.tool_center_point_goal(target=pre_pour_pose, arm=self.arm),
+            self.tool_center_point_goal(target=pour_pose, arm=self.arm),
         ]

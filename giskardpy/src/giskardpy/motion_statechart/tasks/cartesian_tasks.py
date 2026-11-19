@@ -22,10 +22,6 @@ from giskardpy.motion_statechart.binding_policy import (
 )
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
-from giskardpy.motion_statechart.error_signals import (
-    joint_position_and_velocity_variables,
-    time_derivative_from_joint_motion,
-)
 from giskardpy.motion_statechart.exceptions import GoalPointsReferenceFrameMismatchError
 from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
@@ -749,10 +745,10 @@ class CartesianPose(Parallel):
     """The goal pose."""
 
     cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """Sets how fast the goal position is approached, in m/s; for a strict limit use :class:`CartesianPositionVelocityLimit`."""
+    """Sets how fast the goal position is approached, in m/s."""
 
     cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION
-    """Sets how fast the goal orientation is approached, in rad/s; for a strict limit use :class:`CartesianRotationVelocityLimit`."""
+    """Sets how fast the goal orientation is approached, in rad/s."""
 
     translation_threshold: float = 0.01
     """If the position error falls below this threshold (in meters), that half of the goal is achieved."""
@@ -1011,183 +1007,6 @@ class RigidCoupling(Task):
                 velocity_scale=velocity_scale,
                 name=f"{name}/{index}",
             )
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPositionVelocityLimit(Task):
-    """
-    Limit the Cartesian (translational) velocity of a tip link relative to a root link.
-
-    This goal enforces a strict cap on the linear speed of the frame defined by
-    the kinematic transform from `root_link` to `tip_link`. Enforcement is performed
-    by adding constraints to the optimizer and by providing an observation expression
-    that evaluates whether the current translational speed is within the limit.
-
-    .. warning::
-       Strict Cartesian velocity limits require as many constraints as the prediction
-       horizon size, making the optimization problem more complex. This can impact
-       solve time especially at high control frequencies. If computation time is critical,
-       consider using larger limits or reducing the prediction horizon.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain. 
-    Defines the reference frame from which the tip's motion is measured.
-    """
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain. 
-    The translational velocity of this link (expressed in the root link frame) is constrained.
-    """
-    max_linear_velocity: float = 0.1
-    """
-    Maximum allowed linear speed of the tip in meters per second (m/s).
-    Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
-    tip-frame translational velocity does not exceed this value.
-    """
-    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
-    """
-    Optimization weight determining how strongly the linear velocity
-    limit is enforced. Higher weights give this constraint soft priority
-    over lower weighted constraints when conflicts occur.
-    """
-
-    def build_artifacts(self) -> MotionNodeArtifacts:
-        artifacts = MotionNodeArtifacts()
-        root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        ).position
-        artifacts.geometry.add_translational_velocity_limit(
-            frame_P_current=root_P_tip,
-            max_velocity=self.max_linear_velocity,
-            quadratic_weight=self.weight,
-        )
-
-        position_variables, velocity_variables = joint_position_and_velocity_variables(
-            root_P_tip
-        )
-        root_P_tip_dot = root_P_tip.total_derivative(
-            variables=position_variables, variables_dot=velocity_variables
-        )
-
-        artifacts.observation = root_P_tip_dot.norm() <= self.max_linear_velocity
-
-        return artifacts
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class CartesianRotationVelocityLimit(Task):
-    """
-    Represents a Cartesian rotational velocity limit task within a kinematic chain.
-
-    This task constrains the angular velocity of a specified tip link relative
-    to a root link to not exceed a maximum allowed angular velocity. It uses
-    optimization weights to prioritize its enforcement in solving problems
-    involving kinematic motion. The task calculates and enforces constraints
-    based on the rotation matrix between the root and tip links, ensuring
-    compliance with the defined angular velocity limits.
-
-    .. warning::
-       Strict Cartesian velocity limits require as many constraints as the prediction
-       horizon size, making the optimization problem more complex. This can impact
-       solve time especially at high control frequencies. If computation time is critical,
-       consider using larger limits or reducing the prediction horizon.
-    """
-
-    root_link: KinematicStructureEntity
-    """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
-    tip_link: KinematicStructureEntity
-    """Tip link of the kinematic chain. The translational velocity of this link (expressed in the root link frame) is constrained."""
-    max_angular_velocity: float = 0.4
-    """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
-    The enforcement ensures the magnitude of the instantaneous
-    rotation rate does not exceed this threshold."""
-    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
-    """Optimization weight determining how strongly the rotational velocity
-    limit is enforced. Higher weights give this constraint soft priority
-    over lower weighted constraints when conflicts occur."""
-
-    def build_artifacts(self) -> MotionNodeArtifacts:
-        artifacts = MotionNodeArtifacts()
-
-        root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        ).rotation_matrix
-
-        artifacts.geometry.add_rotational_velocity_limit(
-            frame_R_current=root_R_tip,
-            max_velocity=self.max_angular_velocity,
-            quadratic_weight=self.weight,
-        )
-
-        angle = root_R_tip.axis_angle.angle
-        angle_dot = time_derivative_from_joint_motion(angle)
-
-        artifacts.observation = sm.abs(angle_dot) <= self.max_angular_velocity
-
-        return artifacts
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class CartesianVelocityLimit(Parallel):
-    """
-    Combines both linear and angular velocity limits for a kinematic chain.
-
-    This task enforces strict caps on both the linear and angular velocities of
-    a tip link relative to a root link by combining CartesianPositionVelocityLimit
-    and CartesianRotationVelocityLimit tasks in parallel.
-
-    .. warning::
-       Strict Cartesian velocity limits require as many constraints as the prediction
-       horizon size, making the optimization problem more complex. This can impact
-       solve time especially at high control frequencies. If computation time is critical,
-       consider using larger limits or reducing the prediction horizon.
-    """
-
-    root_link: KinematicStructureEntity
-    """Root link of the kinematic chain. Defines the reference frame from which the tip's motion is measured."""
-    tip_link: KinematicStructureEntity
-    """Tip link of the kinematic chain. Both translational and rotational velocities of this link (expressed in the root link frame) are constrained."""
-    max_linear_velocity: float = 0.1
-    """Maximum allowed linear speed of the tip in meters per second (m/s).
-    Default: 0.1 m/s. The enforcement ensures the Euclidean norm of the
-    tip-frame translational velocity does not exceed this value."""
-    max_angular_velocity: float = 0.4
-    """Maximum allowed angular speed. Interpreted in radians per second (rad/s).
-    Default: 0.5 rad/s. The enforcement ensures the magnitude of the instantaneous
-    rotation rate does not exceed this threshold."""
-    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
-    """Optimization weight determining how strongly both velocity
-    limits are enforced. Higher weights give these constraints soft priority
-    over lower weighted constraints when conflicts occur."""
-
-    nodes: list[StatechartNode] = field(default_factory=list, init=False)
-    """
-    The linear and the angular velocity limit.
-    """
-
-    def expand(self) -> None:
-        """
-        Create the linear and the angular velocity limit, before the nodes this goal
-        was handed.
-        """
-        limits = [
-            CartesianPositionVelocityLimit(
-                root_link=self.root_link,
-                tip_link=self.tip_link,
-                max_linear_velocity=self.max_linear_velocity,
-                weight=self.weight,
-            ),
-            CartesianRotationVelocityLimit(
-                root_link=self.root_link,
-                tip_link=self.tip_link,
-                max_angular_velocity=self.max_angular_velocity,
-                weight=self.weight,
-            ),
-        ]
-        for position, limit in enumerate(limits):
-            self._insert_at(position=position, node=limit)
 
 
 # %% reaching a Cartesian pose along a straight line

@@ -1,3 +1,7 @@
+"""
+The action that puts a held object down at a target pose.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -110,14 +114,14 @@ class PlaceAction(
         # along the way the grasp was approached.
         return [
             self.tool_center_point_goal(
-                retreat,
-                self.arm,
-                max_linear_velocity=self.transport_linear_velocity,
+                target=retreat,
+                arm=self.arm,
+                cruise_linear_velocity=self.transport_linear_velocity,
             ),
             self.tool_center_point_goal(
-                grasp,
-                self.arm,
-                max_linear_velocity=self.placing_linear_velocity,
+                target=grasp,
+                arm=self.arm,
+                cruise_linear_velocity=self.placing_linear_velocity,
             ),
             Parallel(
                 nodes=[
@@ -129,7 +133,7 @@ class PlaceAction(
                     ),
                     # Keeps the gripper in place while it opens, whatever else
                     # moves the robot meanwhile.
-                    self.tool_center_point_goal(grasp, self.arm),
+                    self.tool_center_point_goal(target=grasp, arm=self.arm),
                 ]
             ),
             *self.reattach(
@@ -138,9 +142,9 @@ class PlaceAction(
             ),
             # The gripper starts out around the object it has just let go of.
             self.tool_center_point_goal(
-                pre_grasp,
-                self.arm,
-                max_linear_velocity=self.retract_linear_velocity,
+                target=pre_grasp,
+                arm=self.arm,
+                cruise_linear_velocity=self.retract_linear_velocity,
             ),
         ]
 
