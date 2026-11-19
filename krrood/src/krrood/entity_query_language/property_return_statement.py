@@ -2,6 +2,8 @@
 Reading the attribute a property returns from the property's source code.
 """
 
+from __future__ import annotations
+
 import ast
 import inspect
 from functools import lru_cache

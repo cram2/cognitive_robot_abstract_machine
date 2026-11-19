@@ -51,7 +51,7 @@ from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.entity_query_language.exceptions import ResultTypeCannotBeDetermined
-from krrood.source_analysis.property_return_statement import (
+from krrood.entity_query_language.property_return_statement import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
 from krrood.patterns.classproperty import classproperty
