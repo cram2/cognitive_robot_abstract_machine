@@ -4,7 +4,7 @@ import pytest
 
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.composites import Parallel, Sequence
 from cramph.node import CancelStatechart
 from cramph.node import EndStatechart, StatechartNode
@@ -136,9 +136,9 @@ class TestReactionTimeAcrossNesting:
             executor,
             [
                 lambda: (
-                    statechart.observation_state[task] == ObservationStateValues.TRUE
+                    statechart.observation_state[task] == ObservationStateValue.TRUE
                 ),
-                lambda: waiting.life_cycle_state == LifeCycleValues.RUNNING,
+                lambda: waiting.life_cycle_state == LifeCycleValue.RUNNING,
             ],
         )
 
@@ -166,7 +166,7 @@ class TestReactionTimeAcrossNesting:
             executor,
             [
                 lambda: (
-                    statechart.observation_state[task] == ObservationStateValues.TRUE
+                    statechart.observation_state[task] == ObservationStateValue.TRUE
                 ),
                 statechart.is_ended,
             ],
@@ -186,10 +186,10 @@ class TestReactionTimeAcrossNesting:
         executor = _compile(statechart)
 
         _tick_until(
-            executor, lambda: child.life_cycle_state == LifeCycleValues.SUCCEEDED
+            executor, lambda: child.life_cycle_state == LifeCycleValue.SUCCEEDED
         )
 
-        assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_a_parent_reads_what_its_child_observes_on_the_same_tick(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
@@ -201,10 +201,10 @@ class TestReactionTimeAcrossNesting:
 
         _tick_until(
             executor,
-            lambda: statechart.observation_state[child] == ObservationStateValues.TRUE,
+            lambda: statechart.observation_state[child] == ObservationStateValue.TRUE,
         )
 
-        assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_an_observation_reads_the_outcome_another_node_reaches_on_the_same_tick(
         self,
@@ -217,10 +217,10 @@ class TestReactionTimeAcrossNesting:
         executor = _compile(statechart)
 
         _tick_until(
-            executor, lambda: watched.life_cycle_state == LifeCycleValues.SUCCEEDED
+            executor, lambda: watched.life_cycle_state == LifeCycleValue.SUCCEEDED
         )
 
-        assert statechart.observation_state[observer] == ObservationStateValues.TRUE
+        assert statechart.observation_state[observer] == ObservationStateValue.TRUE
 
 
 # %% what is decided once per tick
@@ -254,7 +254,7 @@ class TestOncePerTick:
             executor.tick()
             observations.append(statechart.observation_state[ticked])
 
-        assert observations == [ObservationStateValues.TRUE] * TICKS_TO_WATCH
+        assert observations == [ObservationStateValue.TRUE] * TICKS_TO_WATCH
 
     def test_a_node_started_this_tick_first_observes_on_the_next_one(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
@@ -265,13 +265,13 @@ class TestOncePerTick:
         executor = _compile(statechart)
 
         executor.tick()
-        assert started_late.life_cycle_state == LifeCycleValues.RUNNING
+        assert started_late.life_cycle_state == LifeCycleValue.RUNNING
         assert (
-            statechart.observation_state[started_late] == ObservationStateValues.UNKNOWN
+            statechart.observation_state[started_late] == ObservationStateValue.UNKNOWN
         )
 
         executor.tick()
-        assert statechart.observation_state[started_late] == ObservationStateValues.TRUE
+        assert statechart.observation_state[started_late] == ObservationStateValue.TRUE
 
     def test_what_a_start_callback_writes_is_observed_from_the_next_tick(self) -> None:
         statechart = Statechart(context=StatechartContext(world=World()))
@@ -282,11 +282,11 @@ class TestOncePerTick:
         executor = _compile(statechart)
 
         executor.tick()
-        assert writer.life_cycle_state == LifeCycleValues.RUNNING
-        assert statechart.observation_state[reader] == ObservationStateValues.FALSE
+        assert writer.life_cycle_state == LifeCycleValue.RUNNING
+        assert statechart.observation_state[reader] == ObservationStateValue.FALSE
 
         executor.tick()
-        assert statechart.observation_state[reader] == ObservationStateValues.TRUE
+        assert statechart.observation_state[reader] == ObservationStateValue.TRUE
 
 
 # %% ticks that never settle
@@ -343,9 +343,7 @@ class TestUnsettledTick:
         statechart.add_node(node=plan)
         executor = _compile(statechart)
 
-        _tick_until(
-            executor, lambda: plan.life_cycle_state == LifeCycleValues.SUCCEEDED
-        )
+        _tick_until(executor, lambda: plan.life_cycle_state == LifeCycleValue.SUCCEEDED)
 
     def test_a_pass_limit_given_to_a_statechart_still_applies_after_it_compiled_again(
         self,
@@ -381,7 +379,7 @@ class TestUnsettledTick:
 
         with pytest.raises(TickDoesNotSettleError) as error:
             _tick_until(
-                executor, lambda: plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+                executor, lambda: plan.life_cycle_state == LifeCycleValue.SUCCEEDED
             )
 
         assert error.value.pass_limit == statechart.pass_limit
@@ -426,7 +424,7 @@ class TestLifeCycleCallbacks:
         for _ in range(TICKS_TO_WATCH):
             executor.tick()
 
-        assert composite.second.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert composite.second.life_cycle_state == LifeCycleValue.INTERRUPTED
         assert composite.second.take_callbacks() == [
             LifeCycleCallback.START,
             LifeCycleCallback.END,
@@ -474,7 +472,7 @@ class TestLifeCycleCallbacks:
         ]
         last_snapshot = statechart.state_history.latest_item
         assert last_snapshot.tick_count == executor.tick_count
-        assert last_snapshot.life_cycle_state[cancel] == LifeCycleValues.RUNNING
+        assert last_snapshot.life_cycle_state[cancel] == LifeCycleValue.RUNNING
 
     def test_a_node_starting_while_its_pause_condition_holds_starts_paused(
         self,
@@ -488,10 +486,10 @@ class TestLifeCycleCallbacks:
         paused.pause_condition = Scalar.const_true()
         executor = _compile(statechart)
 
-        assert paused.life_cycle_state == LifeCycleValues.PAUSED
+        assert paused.life_cycle_state == LifeCycleValue.PAUSED
         assert statechart.state_history.get_life_cycle_history_of_node(node=paused) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.PAUSED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.PAUSED,
         ]
         assert (
             _callbacks_per_tick(executor, paused)

@@ -146,6 +146,7 @@ plan = Sequence(
             target_location=Pose.from_xyz_rpy(4.0, 4.0, 0.0, reference_frame=world.root)
         ),
         PlaceAction(
+            arm=pr2.right_arm,
             object_designator=milk,
             target_location=Pose.from_xyz_rpy(
                 4.2, 4.0, 1.0, reference_frame=world.root

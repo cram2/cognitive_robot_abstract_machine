@@ -17,7 +17,7 @@ from semantic_digital_twin.world_description.geometry import Color
 # %% life cycle states
 
 
-class LifeCycleValues(IntEnum):
+class LifeCycleValue(IntEnum):
     """
     Where a node is in its own execution, see
     :class:`~cramph.statechart.Statechart`.
@@ -73,7 +73,7 @@ class LifeCycleValues(IntEnum):
     None of these is a judgement of the node itself.
     """
 
-    def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValues:
+    def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValue:
         """
         :param value: The number this state is stored as.
         :param color: The color a visualization draws a node in this state in.
@@ -88,7 +88,7 @@ class LifeCycleValues(IntEnum):
 
     @classmethod
     @cache
-    def terminal_states(cls) -> frozenset[LifeCycleValues]:
+    def terminal_states(cls) -> frozenset[LifeCycleValue]:
         """
         :return: The states a node can only leave by being reset, which are the outcomes
             of the transitions that end a node.
@@ -106,7 +106,7 @@ class LifeCycleValues(IntEnum):
 # %% observation states
 
 
-class ObservationStateValues(FloatEnum):
+class ObservationStateValue(FloatEnum):
     """
     The trinary truth values used throughout the statechart.
     """
@@ -125,7 +125,7 @@ class ObservationStateValues(FloatEnum):
     UNKNOWN = float(Scalar.const_trinary_unknown()), Color.from_hex("#8F959E"), "?"
     TRUE = float(Scalar.const_true()), Color.from_hex("#B6E5A0"), "True"
 
-    def __new__(cls, value: float, color: Color, badge: str) -> ObservationStateValues:
+    def __new__(cls, value: float, color: Color, badge: str) -> ObservationStateValue:
         """
         :param value: The number this truth value is stored as.
         :param color: The color a visualization draws a node observing this in.
@@ -181,21 +181,21 @@ class TransitionKind(Enum):
     """
 
     @property
-    def source_states(self) -> frozenset[LifeCycleValues]:
+    def source_states(self) -> frozenset[LifeCycleValue]:
         """
         :return: The lifecycle states from which this transition kind can trigger.
         """
         match self:
             case TransitionKind.START:
-                return frozenset({LifeCycleValues.NOT_STARTED})
+                return frozenset({LifeCycleValue.NOT_STARTED})
             case TransitionKind.PAUSE:
-                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+                return frozenset({LifeCycleValue.RUNNING, LifeCycleValue.PAUSED})
             case TransitionKind.RESET:
-                return frozenset(LifeCycleValues)
+                return frozenset(LifeCycleValue)
             case (
                 TransitionKind.SUCCEED | TransitionKind.FAIL | TransitionKind.INTERRUPT
             ):
-                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+                return frozenset({LifeCycleValue.RUNNING, LifeCycleValue.PAUSED})
 
     @property
     def default_condition(self) -> Scalar:
@@ -226,21 +226,21 @@ class TransitionKind(Enum):
         return cls.SUCCEED, cls.FAIL, cls.INTERRUPT
 
     @property
-    def outcome(self) -> LifeCycleValues:
+    def outcome(self) -> LifeCycleValue:
         """
         :return: The terminal state this transition ends a node in.
         :raises TransitionHasNoOutcomeError: If this transition does not end a node.
         """
         match self:
             case TransitionKind.SUCCEED:
-                return LifeCycleValues.SUCCEEDED
+                return LifeCycleValue.SUCCEEDED
             case TransitionKind.FAIL:
-                return LifeCycleValues.FAILED
+                return LifeCycleValue.FAILED
             case TransitionKind.INTERRUPT:
-                return LifeCycleValues.INTERRUPTED
+                return LifeCycleValue.INTERRUPTED
         raise TransitionHasNoOutcomeError(transition_kind=self)
 
-    def can_trigger_from(self, *, life_cycle: LifeCycleValues) -> bool:
+    def can_trigger_from(self, *, life_cycle: LifeCycleValue) -> bool:
         """
         :param life_cycle: The lifecycle state to check.
         :return: Whether this transition can trigger from the given lifecycle state.
@@ -257,21 +257,19 @@ class LifeCyclePredicateDefinition:
     The truth table of a test on a node's life cycle state.
     """
 
-    true_states: frozenset[LifeCycleValues]
+    true_states: frozenset[LifeCycleValue]
     """
     The states in which the predicate is true; every other state makes it false.
     """
 
-    def truth_value(
-        self, *, life_cycle_value: LifeCycleValues
-    ) -> ObservationStateValues:
+    def truth_value(self, *, life_cycle_value: LifeCycleValue) -> ObservationStateValue:
         """
         :param life_cycle_value: The state to evaluate the predicate in.
         :return: True if the predicate holds in that state, false otherwise.
         """
         if life_cycle_value in self.true_states:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
     def expression(self, *, life_cycle: Scalar) -> Scalar:
         """
@@ -295,13 +293,13 @@ class LifeCyclePredicate(LifeCyclePredicateDefinition, Enum):
     end the way an outcome predicate asks about.
     """
 
-    IS_NOT_STARTED = frozenset({LifeCycleValues.NOT_STARTED})
-    IS_RUNNING = frozenset({LifeCycleValues.RUNNING})
-    IS_PAUSED = frozenset({LifeCycleValues.PAUSED})
-    IS_TERMINATED = LifeCycleValues.terminal_states()
-    IS_SUCCEEDED = frozenset({LifeCycleValues.SUCCEEDED})
-    IS_FAILED = frozenset({LifeCycleValues.FAILED})
-    IS_INTERRUPTED = frozenset({LifeCycleValues.INTERRUPTED})
+    IS_NOT_STARTED = frozenset({LifeCycleValue.NOT_STARTED})
+    IS_RUNNING = frozenset({LifeCycleValue.RUNNING})
+    IS_PAUSED = frozenset({LifeCycleValue.PAUSED})
+    IS_TERMINATED = LifeCycleValue.terminal_states()
+    IS_SUCCEEDED = frozenset({LifeCycleValue.SUCCEEDED})
+    IS_FAILED = frozenset({LifeCycleValue.FAILED})
+    IS_INTERRUPTED = frozenset({LifeCycleValue.INTERRUPTED})
 
     @property
     def attribute_name(self) -> str:
@@ -342,21 +340,21 @@ class ObservationPredicateDefinition:
     The observation the test reads.
     """
 
-    observed_value: ObservationStateValues
+    observed_value: ObservationStateValue
     """
     The value the test is true for; every other value, unknown included, makes it false.
     """
 
     def truth_value(
-        self, *, observation: ObservationStateValues
-    ) -> ObservationStateValues:
+        self, *, observation: ObservationStateValue
+    ) -> ObservationStateValue:
         """
         :param observation: The observation to evaluate the test on.
         :return: True if `observation` is :attr:`observed_value`, false otherwise.
         """
         if observation == self.observed_value:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
     def expression(self, *, observation: Scalar) -> Scalar:
         """
@@ -374,9 +372,9 @@ class ObservationPredicate(ObservationPredicateDefinition, Enum):
     and observation expressions alike.
     """
 
-    OBSERVES_TRUE = ObservationReading.CURRENT, ObservationStateValues.TRUE
-    OBSERVES_FALSE = ObservationReading.CURRENT, ObservationStateValues.FALSE
-    LAST_OBSERVED_TRUE = ObservationReading.LAST, ObservationStateValues.TRUE
+    OBSERVES_TRUE = ObservationReading.CURRENT, ObservationStateValue.TRUE
+    OBSERVES_FALSE = ObservationReading.CURRENT, ObservationStateValue.FALSE
+    LAST_OBSERVED_TRUE = ObservationReading.LAST, ObservationStateValue.TRUE
 
     @property
     def attribute_name(self) -> str:

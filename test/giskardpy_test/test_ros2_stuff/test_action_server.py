@@ -1,3 +1,7 @@
+"""
+Tests for handing action goals between the rclpy threads and the motion server.
+"""
+
 import asyncio
 from dataclasses import dataclass, field
 from threading import Thread
@@ -6,7 +10,7 @@ from typing_extensions import Any
 
 import pytest
 
-from giskardpy.data_types.exceptions import (
+from giskardpy.exceptions import (
     MissingActionResultError,
     MissingGoalOutcomeError,
 )

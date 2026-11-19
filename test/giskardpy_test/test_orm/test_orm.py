@@ -1,3 +1,9 @@
+"""
+Tests of storing giskardpy's QP data in a database.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 import scipy.sparse as sp
@@ -6,7 +12,6 @@ from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from giskardpy.orm.ormatic_interface import Base, QPDataExplicitDAO
 from giskardpy.qp.qp_data import QPDataExplicit
 
 # %% fixtures
@@ -14,6 +19,12 @@ from giskardpy.qp.qp_data import QPDataExplicit
 
 @pytest.fixture
 def session():
+    """
+    :return: A session on an in-memory database holding giskardpy's tables, which are
+        dropped again after the test.
+    """
+    from giskardpy.orm.ormatic_interface import Base
+
     session = Session(create_engine("sqlite:///:memory:"))
     Base.metadata.create_all(bind=session.bind)
     yield session
@@ -51,6 +62,8 @@ class TestNumpyColumnsSurviveRoundTrip:
     """
 
     def test_arrays_are_read_back_unchanged(self, *, session, qp_data):
+        from giskardpy.orm.ormatic_interface import QPDataExplicitDAO
+
         session.add(to_dao(qp_data))
         session.commit()
         session.expunge_all()
@@ -76,6 +89,8 @@ class TestNumpyColumnsSurviveRoundTrip:
         )
 
     def test_scalar_fields_are_read_back_unchanged(self, *, session, qp_data):
+        from giskardpy.orm.ormatic_interface import QPDataExplicitDAO
+
         session.add(to_dao(qp_data))
         session.commit()
         session.expunge_all()

@@ -4,7 +4,7 @@ Tests of the endpoints of causal relations between the variables of a class.
 
 import pytest
 
-from krrood.entity_query_language.causal_relation import AttributeEndpoint
+from krrood.parametrization.causal_relation import AttributeEndpoint
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.exceptions import FieldIsUnMappedInClassDiagram
 from krrood.entity_query_language.factories import variable

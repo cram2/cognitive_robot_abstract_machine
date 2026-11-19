@@ -18,7 +18,7 @@ default**: `an(Type)(...).from_(domain)` selects from the given domain, and a do
 `an(Type)` selects from the SymbolGraph (for `Symbol` types). To instead **construct new
 instances** from an
 underspecified match, evaluate it with an explicit *generative backend* — either
-{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (samples a probabilistic
+{py:class}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` (samples a probabilistic
 model) or {py:class}`~krrood.entity_query_language.backends.EntityQueryLanguageGenerativeBackend`
 (deterministically enumerates discrete domains and constructs an instance per combination).
 
@@ -28,7 +28,7 @@ This page explains:
 2. What each type of field specification means.
 3. The crucial difference between specifying something in the **factory kwargs** versus in a
    **`.where()` condition**.
-4. How to run the query with the {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend`.
+4. How to run the query with the {py:class}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend`.
 
 ---
 
@@ -55,7 +55,7 @@ expected.
 
 Every keyword argument passed to the factory call carries a distinct meaning for a *generative*
 backend. The semantics below describe the
-{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend` (conditioning, truncation,
+{py:class}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` (conditioning, truncation,
 sampling).
 
 ```{note}
@@ -170,7 +170,7 @@ Once the query is built, pass it to a backend to obtain instances:
 
 from dataclasses import dataclass
 from krrood.entity_query_language.factories import an, variable
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 
 @dataclass
 class Position:
@@ -267,7 +267,7 @@ class to its own model:
 ```python
 import json
 from krrood.adapters.json_serializer import from_json
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import an
 from krrood.parametrization.model_registries import DictRegistry
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit
@@ -305,7 +305,7 @@ query itself.
 - {py:func}`~krrood.entity_query_language.factories.an`
 - {py:func}`~krrood.entity_query_language.factories.the`
 - {py:class}`~krrood.entity_query_language.query.match.Match`
-- {py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend`
+- {py:class}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend`
 - {py:class}`~krrood.parametrization.parameterizer.UnderspecifiedParameters`
 - {py:class}`~krrood.parametrization.model_registries.ModelRegistry`
 - {py:class}`~krrood.parametrization.model_registries.DictRegistry`

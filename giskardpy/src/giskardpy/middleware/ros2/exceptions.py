@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from giskardpy.data_types.exceptions import (
+from giskardpy.exceptions import (
     GiskardException,
     SetupException,
 )

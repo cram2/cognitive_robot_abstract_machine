@@ -24,7 +24,6 @@ from krrood.entity_query_language.factories import a
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
-from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import GraspAttempt, PickingRobot
 
 ATTEMPTS_PER_ROBOT = 4

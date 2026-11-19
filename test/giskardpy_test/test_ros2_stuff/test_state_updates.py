@@ -10,7 +10,7 @@ import pytest
 
 from cramph.composites import ChildChooserAccess
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import NoPacing, StatechartExecutor
 from cramph.monitors import CountSimulationTimeSeconds, CountTicks
 from cramph.node import StatechartNode
@@ -75,7 +75,7 @@ class ObserverRecordingLifeCycles(StateHistoryObserver):
     The node whose life cycle state is recorded.
     """
 
-    life_cycle_states: list[LifeCycleValues] = field(default_factory=list)
+    life_cycle_states: list[LifeCycleValue] = field(default_factory=list)
     """
     The life cycle state of :attr:`node` in every snapshot, in the order they were
     recorded.
@@ -228,7 +228,7 @@ def test_a_node_giskard_has_not_added_yet_keeps_its_state(
         payload=payload, statechart=client_statechart
     ).apply()
 
-    assert chosen.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert chosen.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 def test_states_of_more_nodes_than_the_client_holds_are_rejected() -> None:
@@ -308,7 +308,7 @@ def test_the_client_sees_a_node_run_before_the_goal_ends(
     motion_server.motion_server.run_idle_cycle()
     following.apply()
 
-    assert (LifeCycleValues.RUNNING, False) in zip(
+    assert (LifeCycleValue.RUNNING, False) in zip(
         observer.life_cycle_states, observer.statechart_ended
     )
     assert observer.statechart_ended[-1]

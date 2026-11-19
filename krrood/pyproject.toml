@@ -156,6 +156,7 @@ core = [
     "krrood.exceptions",
     "krrood.patterns",
     "krrood.singleton",
+    "krrood.source_analysis.import_scope",
     "krrood.symbol_graph",
     "krrood.utils",
 ]

@@ -7,6 +7,7 @@ PACKAGES = [
     "experiments",
     "giskardpy",
     "krrood",
+    "krrood_compute_resources",
     "krrood_spatial_math",
     "krrood_synchronization",
     "physics_simulators",

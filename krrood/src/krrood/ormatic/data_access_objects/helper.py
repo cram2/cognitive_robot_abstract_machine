@@ -1,3 +1,7 @@
+"""
+Looks up the data access object class and alternative mapping of a class.
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -5,7 +9,8 @@ from functools import lru_cache
 from typing_extensions import get_origin, Any, TYPE_CHECKING
 
 
-from krrood.ormatic.exceptions import NoGenericError, NoDAOFoundError
+from krrood.ormatic.exceptions import NoDAOFoundError
+from krrood.patterns.exceptions import NoGenericError
 from krrood.utils import recursive_subclasses
 
 if TYPE_CHECKING:

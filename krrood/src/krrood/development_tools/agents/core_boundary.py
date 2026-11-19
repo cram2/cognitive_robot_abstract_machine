@@ -87,6 +87,16 @@ class PyprojectKey(StrEnum):
     may load.
     """
 
+    CHECK = "check"
+    """
+    The table in ``[tool.krrood]`` configuring ``krrood check``.
+    """
+
+    EXCLUDE = "exclude"
+    """
+    The optional key in ``[tool.krrood.check]`` listing the files left unchecked.
+    """
+
 
 # %% the boundary
 

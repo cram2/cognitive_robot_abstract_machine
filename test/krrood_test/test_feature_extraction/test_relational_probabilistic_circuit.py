@@ -58,7 +58,6 @@ from probabilistic_model.utils import MissingDict
 from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous, Integer, Symbolic
-from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,

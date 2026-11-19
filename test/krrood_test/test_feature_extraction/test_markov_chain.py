@@ -21,7 +21,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from probabilistic_model.utils import MissingDict
-from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,

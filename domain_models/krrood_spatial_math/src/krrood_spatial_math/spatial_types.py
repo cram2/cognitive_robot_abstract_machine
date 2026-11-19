@@ -644,6 +644,7 @@ class HomogeneousTransformationMatrix(
         """
         result = Pose.from_casadi_sx(casadi_sx=copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
+        result.pinned_free_variables = list(self.pinned_free_variables)
         return result
 
     def _copy_with_data(self, data: ca.SX) -> HomogeneousTransformationMatrix:
@@ -2481,10 +2482,12 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
 
 @dataclass(eq=False, init=False, repr=False)
-class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
-    How a rigid body moved: a translation and a rotation vector, both along the axes of
-    its reference frame.
+    A rigid-body displacement: the transformation that rotates a body by
+    :attr:`rotation_vector` about its origin and moves that origin by
+    :attr:`translation`, both along the axes of the reference frame. Unlike a
+    :class:`Twist`, it is not a velocity.
     """
 
     def __init__(
@@ -2494,8 +2497,8 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         reference_frame: CartesianFrame3D | None = None,
     ):
         """
-        :param translation: How far and in which direction the body moved, in meters.
-            Defaults to no translation.
+        :param translation: Where the body's origin ended up, relative to where it
+            started, in meters. Defaults to no translation.
         :param rotation_vector: The axis the body turned around, scaled by the angle it
             turned by in radians. Defaults to no rotation.
         :param reference_frame: The frame along whose axes the body moved.
@@ -2540,24 +2543,11 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             "rotation_vector": self.rotation_vector.to_np()[:3].tolist(),
         }
 
-    @classmethod
-    def from_transformation(cls, start_T_end: HomogeneousTransformationMatrix) -> Twist:
-        """
-        :param start_T_end: Where the body ended up, relative to where it started.
-        :return: The motion from the start to the end, in the reference frame of
-            ``start_T_end``, turning by an angle in [0, pi].
-        """
-        rotation = start_T_end.axis_angle
-        return cls(
-            translation=Vector3.from_iterable(start_T_end.position),
-            rotation_vector=rotation.axis * rotation.angle,
-            reference_frame=start_T_end.reference_frame,
-        )
-
     @property
     def translation(self) -> Vector3:
         """
-        :return: How far and in which direction the body moved, in meters.
+        :return: Where the body's origin ended up, relative to where it started, in
+            meters.
         """
         return Vector3(
             x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
@@ -2568,6 +2558,90 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :return: The axis the body turned around, scaled by the angle it turned by in
             radians.
+        """
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
+
+
+@dataclass(eq=False, init=False, repr=False)
+class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
+    at the origin of the reference frame moves, both along that frame's axes and per
+    unit of the parameter they are taken with respect to, usually time. Unlike a
+    :class:`Displacement`, it is a velocity (Lynch and Park, *Modern Robotics*, §3.3.2).
+    """
+
+    def __init__(
+        self,
+        angular_velocity: Vector3 | None = None,
+        linear_velocity: Vector3 | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+    ):
+        """
+        :param angular_velocity: The axis the body turns around, scaled by how fast it
+            turns, in radians per unit of the parameter. Defaults to no turning.
+        :param linear_velocity: How fast the point of the body at the origin of the
+            reference frame moves, in meters per unit of the parameter. Defaults to
+            standing still.
+        :param reference_frame: The frame along whose axes both velocities are given.
+        """
+        if angular_velocity is None:
+            angular_velocity = Vector3()
+        if linear_velocity is None:
+            linear_velocity = Vector3()
+        self.casadi_sx = sm.to_sx(
+            [
+                angular_velocity.x,
+                angular_velocity.y,
+                angular_velocity.z,
+                linear_velocity.x,
+                linear_velocity.y,
+                linear_velocity.z,
+            ]
+        )
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (6, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            angular_velocity=Vector3(*data["angular_velocity"]),
+            linear_velocity=Vector3(*data["linear_velocity"]),
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            "angular_velocity": self.angular_velocity.to_np()[:3].tolist(),
+            "linear_velocity": self.linear_velocity.to_np()[:3].tolist(),
+        }
+
+    @property
+    def angular_velocity(self) -> Vector3:
+        """
+        :return: The axis the body turns around, scaled by how fast it turns, in radians
+            per unit of the parameter.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def linear_velocity(self) -> Vector3:
+        """
+        :return: How fast the point of the body at the origin of the reference frame
+            moves, in meters per unit of the parameter.
         """
         return Vector3(
             x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame

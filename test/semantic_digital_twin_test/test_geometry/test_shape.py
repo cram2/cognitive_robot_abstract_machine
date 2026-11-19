@@ -560,7 +560,9 @@ def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
         root = Body(name=PrefixedName("map"))
         world.add_kinematic_structure_entity(root)
         obstacle = Body(name=PrefixedName("obstacle"))
-        world.add_connection(FixedConnection.create_with_dofs(world, root, obstacle))
+        world.add_connection(
+            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+        )
         shape = Box(scale=Scale(1.0, 1.0, 1.0))
         obstacle.collision.append(shape)
 
