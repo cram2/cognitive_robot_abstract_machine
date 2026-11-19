@@ -6,7 +6,7 @@ objects.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Callable, Any
+from typing_extensions import Callable, Any, Iterable
 import operator
 
 import sqlalchemy.inspection
@@ -21,7 +21,7 @@ from sqlalchemy import (
     not_ as sa_not,
     exists as sqlalchemy_exists,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from krrood.entity_query_language.query.query import (
     Query,
@@ -29,6 +29,7 @@ from krrood.entity_query_language.query.query import (
     SetOf,
     UnificationDict,
 )
+from krrood.entity_query_language.backends import SelectiveBackend
 from krrood.entity_query_language.query.operations import Where
 from krrood.entity_query_language.query.quantifiers import ResultQuantifier, An, The
 from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
@@ -1536,3 +1537,23 @@ def eql_to_sql(
         return result.sql_query.cte(as_common_table_expression)
 
     return result
+
+
+# %% the query backend that answers through SQL
+
+
+@dataclass(kw_only=True)
+class SQLAlchemyBackend(SelectiveBackend):
+    """
+    A backend that selects elements from a database that is available via SQLAlchemy.
+    """
+
+    session_maker: sessionmaker
+    """
+    The session maker used for the database interactions.
+    """
+
+    def _evaluate(self, *, expression: Query) -> Iterable:
+        session = self.session_maker()
+        translator = eql_to_sql(expression, session)
+        yield from translator.evaluate()

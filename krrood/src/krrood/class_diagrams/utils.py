@@ -5,8 +5,10 @@ Resolution of the type hints of a class from the source files it is defined in.
 from __future__ import annotations
 
 import builtins
+import importlib
 import inspect
 import os
+import pkgutil
 import sys
 import types
 import typing
@@ -45,6 +47,43 @@ def classes_of_module(module) -> list[type]:
     for name, obj in inspect.getmembers(sys.modules[module.__name__]):
         if inspect.isclass(obj) and obj.__module__ == module.__name__:
             result.append(obj)
+    return result
+
+
+def classes_of_package(package: types.ModuleType, recursive: bool = True) -> list[type]:
+    """
+    Get all classes that are defined in a given python package.
+
+    This does not include classes that are imported from other packages.
+
+    :param package: The package to inspect.
+    :param recursive: Whether to include classes from sub-packages.
+    :return: All classes of the given package.
+    """
+    result = classes_of_module(package)
+
+    if not hasattr(package, "__path__"):
+        return result
+
+    for loader, modname, ispkg in pkgutil.walk_packages(
+        package.__path__, package.__name__ + "."
+    ):
+        if not recursive and modname.count(".") > package.__name__.count(".") + 1:
+            continue
+
+        try:
+            module = importlib.import_module(modname)
+        except Exception:
+            logging.warning(f"Module {modname} cannot be parsed")
+            continue
+        result.extend(classes_of_module(module))
+
+        if not recursive and ispkg:
+            # If not recursive, we don't want to descend into sub-packages
+            # walk_packages with path restricted usually handles this,
+            # but if we only want the immediate next level:
+            pass
+
     return result
 
 

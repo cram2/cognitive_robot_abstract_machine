@@ -17,7 +17,7 @@ from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.factories import variable
 from krrood.entity_query_language.predicate import SymbolicCallable, Verbalizable
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
-from krrood.ormatic.utils import classes_of_package
+from krrood.class_diagrams.utils import classes_of_package
 from krrood.utils import module_and_class_name
 
 

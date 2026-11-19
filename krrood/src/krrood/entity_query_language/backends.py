@@ -1,6 +1,6 @@
 """
-The backends that answer entity queries: by evaluating them in this process, through
-SQL, or by generating the instances they describe.
+The backends that answer entity queries: by evaluating them in this process or by
+generating the instances they describe.
 """
 
 import enum
@@ -8,8 +8,6 @@ import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from typing_extensions import ClassVar, Iterable, Iterator, TypeVar
-
-from sqlalchemy.orm import sessionmaker
 
 import logging
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
@@ -31,8 +29,6 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
-from krrood.entity_query_language.query.query import Query
-from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.patterns.classproperty import classproperty
 
 logger = logging.getLogger(__name__)
@@ -148,23 +144,6 @@ class GenerativeBackend(QueryBackend, ABC):
 
     @abstractmethod
     def _evaluate(self, *, expression: Match[T]) -> Iterable[T]: ...
-
-
-@dataclass(kw_only=True)
-class SQLAlchemyBackend(SelectiveBackend):
-    """
-    A backend that selects elements from a database that is available via SQLAlchemy.
-    """
-
-    session_maker: sessionmaker
-    """
-    The session maker used for the database interactions.
-    """
-
-    def _evaluate(self, *, expression: Query) -> Iterable:
-        session = self.session_maker()
-        translator = eql_to_sql(expression, session)
-        yield from translator.evaluate()
 
 
 @dataclass(kw_only=True)

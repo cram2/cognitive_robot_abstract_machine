@@ -1,3 +1,7 @@
+"""
+Generate an SQLAlchemy interface, a data access object per class, from a class diagram.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +30,7 @@ from krrood.ormatic.data_access_objects.dao import DataAccessObject
 
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
-from krrood.ormatic.utils import classes_of_package
+from krrood.class_diagrams.utils import classes_of_package
 from krrood.code_generation.object_to_source import extract_types
 from krrood.utils import module_and_class_name, recursive_subclasses, get_module_of_type
 from krrood.ormatic.wrapped_table import (
