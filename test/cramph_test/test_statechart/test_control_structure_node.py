@@ -1,3 +1,7 @@
+"""
+Tests the control structure nodes and replacing the nodes they hold.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -18,6 +22,7 @@ from cramph.exceptions import (
     NotHeldByControlStructureNodeError,
     NoControlStructureNodeAboveError,
     StatechartAlreadyCompiledError,
+    StatechartBrokenByFailedModificationError,
 )
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart, StatechartNode
@@ -489,40 +494,23 @@ def test_without_a_language_node_above_the_top_level_node_holds_a_node(
 # %% a failed replacement
 
 
-def test_a_failed_replacement_by_a_node_holding_the_step_leaves_it_where_it_was(
+def test_a_failed_replacement_breaks_the_statechart(
     statechart_executor: StatechartExecutor,
 ) -> None:
+    """
+    The replacement fails while it joins, after the replacement block changed the
+    statechart.
+    """
     statechart = Statechart(context=statechart_executor.context)
     first, second = _succeeding("1"), _succeeding("2")
-    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
-    replacement = Sequence(nodes=[first, second])
+    statechart.add_node(node=Sequence(nodes=[first, second]))
 
-    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
-        statechart.replace(node=second, replacement=replacement)
-    _run(statechart_executor, statechart, sequence)
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError) as raised:
+        statechart.replace(node=second, replacement=Sequence(nodes=[first]))
 
-    assert not replacement.belongs_to_statechart()
-    assert sequence.nodes == [first, second]
-    assert second.parent_node is sequence
-    assert _start_order(statechart, [second, first]) == [first, second]
-
-
-def test_a_failed_replacement_by_another_node_leaves_the_step_where_it_was(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    statechart = Statechart(context=statechart_executor.context)
-    first, second = _succeeding("1"), _succeeding("2")
-    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
-    replacement = Sequence(nodes=[first])
-
-    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
-        statechart.replace(node=second, replacement=replacement)
-    _run(statechart_executor, statechart, sequence)
-
-    assert not replacement.belongs_to_statechart()
-    assert sequence.nodes == [first, second]
-    assert second.parent_node is sequence
-    assert _start_order(statechart, [second, first]) == [first, second]
+    with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
+        statechart.check_not_broken()
+    assert broken.value.modification_error is raised.value
 
 
 def test_only_a_node_a_language_node_or_the_top_level_holds_can_be_replaced(

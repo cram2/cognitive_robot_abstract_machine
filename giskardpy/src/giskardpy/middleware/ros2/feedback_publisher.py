@@ -102,7 +102,9 @@ class ActionFeedbackPublisher:
         )
         data[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         self.last_history_length = len(self.executor.statechart.state_history)
-        self.sent_change_block_count = len(self.executor.statechart.change_blocks)
+        self.sent_change_block_count = len(
+            self.executor.statechart.structure_change_recorder.change_blocks
+        )
         self.send(data=data)
 
     def publish_if_changed(self) -> None:
@@ -150,13 +152,17 @@ class ActionFeedbackPublisher:
             return
         data = self.create_states()
         data[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
-        unsent_change_blocks = statechart.change_blocks[self.sent_change_block_count :]
+        unsent_change_blocks = statechart.structure_change_recorder.change_blocks[
+            self.sent_change_block_count :
+        ]
         if unsent_change_blocks:
             data[StatechartPayloadKey.CHANGE_BLOCKS] = [
                 change_block.create_structure_copy().to_json()
                 for change_block in unsent_change_blocks
             ]
-            self.sent_change_block_count = len(statechart.change_blocks)
+            self.sent_change_block_count = len(
+                statechart.structure_change_recorder.change_blocks
+            )
         self.send(data=data)
 
     def create_states(self) -> dict[str, Any]:

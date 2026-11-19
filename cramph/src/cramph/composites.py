@@ -1245,7 +1245,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         self._add_child_to_statechart(node=child)
         self._chosen_children.append(child)
-        self.statechart._record_changed_chosen_children(node=self)
+        self._structure_change_recorder._record_changed_chosen_children(node=self)
         self.success_condition = logic_or(self.success_condition, child.is_succeeded)
         self.statechart.request_rebuild(node=self)
 

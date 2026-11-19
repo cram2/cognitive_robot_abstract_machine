@@ -1546,12 +1546,12 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
     @property
     def _structure_change_recorder(self) -> StructureChangeRecorder:
         """
-        :return: The statechart this node belongs to, or a recorder that records
-            nothing if it belongs to none.
+        :return: The recorder of the statechart this node belongs to, or a recorder
+            that records nothing if it belongs to none.
         """
         if self._statechart is None:
             return StructureChangeRecorderOutsideStatechart()
-        return self._statechart
+        return self._statechart.structure_change_recorder
 
     @property
     def context(self) -> StatechartContext:

@@ -113,7 +113,7 @@ def choice_reported_while_running(
             ),
         }
     )
-    reported_block_count = len(statechart.change_blocks)
+    reported_block_count = len(statechart.structure_change_recorder.change_blocks)
 
     for _ in range(4):
         statechart_executor.tick()
@@ -124,7 +124,9 @@ def choice_reported_while_running(
                 json.dumps(
                     [
                         block.create_structure_copy().to_json()
-                        for block in statechart.change_blocks[reported_block_count:]
+                        for block in statechart.structure_change_recorder.change_blocks[
+                            reported_block_count:
+                        ]
                     ]
                 )
             ),

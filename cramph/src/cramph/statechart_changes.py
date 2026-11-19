@@ -1,6 +1,6 @@
 """
-The changes to the structure of a statechart, recorded so that another copy of the
-statechart can repeat them without expanding any node again.
+The changes to the structure of a statechart and their recording, so that another copy
+of the statechart can repeat them without expanding any node again.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from cramph.node import (
     StatechartNode,
     TransitionCondition,
 )
+from cramph.structure_change_recorder import StructureChangeRecorder
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityReferenceWriter,
 )
@@ -66,7 +67,8 @@ class ChangeApplicationOrder(IntEnum):
     The order in which the kinds of change of one block are applied.
 
     Nodes join first, so that children and conditions can name them, and leave only once
-    nothing names them any more.
+    nothing names them any more. Changes of the same order keep the order they were
+    recorded in.
     """
 
     NODE_ADDITION = 0
@@ -89,19 +91,10 @@ class ChangeApplicationOrder(IntEnum):
     A node choosing its child gets the children it chose.
     """
 
-    NODE_REMOVAL = 4
+    NODE_REMOVAL_OR_REQUEST = 4
     """
-    A node leaves the statechart.
-    """
-
-    RESET_REQUEST = 5
-    """
-    A node is to be reset on the next settled tick.
-    """
-
-    REBUILD_REQUEST = 6
-    """
-    A node is to be built again on the next compile.
+    A node leaves the statechart, or is to be reset on the next settled tick or built
+    again on the next compile.
     """
 
 
@@ -280,7 +273,7 @@ class NodeRemoval(ChangeOfNode):
 
     @classproperty
     def application_order(cls) -> ChangeApplicationOrder:
-        return ChangeApplicationOrder.NODE_REMOVAL
+        return ChangeApplicationOrder.NODE_REMOVAL_OR_REQUEST
 
     def apply(self, *, statechart: Statechart) -> None:
         statechart.remove_node(node=self.node)
@@ -295,7 +288,7 @@ class ResetRequest(ChangeOfNode):
 
     @classproperty
     def application_order(cls) -> ChangeApplicationOrder:
-        return ChangeApplicationOrder.RESET_REQUEST
+        return ChangeApplicationOrder.NODE_REMOVAL_OR_REQUEST
 
     @classproperty
     def is_kept_in_structure_copies(cls) -> bool:
@@ -317,7 +310,7 @@ class RebuildRequest(ChangeOfNode):
 
     @classproperty
     def application_order(cls) -> ChangeApplicationOrder:
-        return ChangeApplicationOrder.REBUILD_REQUEST
+        return ChangeApplicationOrder.NODE_REMOVAL_OR_REQUEST
 
     @classproperty
     def is_kept_in_structure_copies(cls) -> bool:
@@ -593,7 +586,8 @@ class StatechartChangeBlock(SubclassJSONSerializer):
 
     changes: list[StatechartChange] = field(default_factory=list)
     """
-    The changes, ordered by :attr:`StatechartChange.application_order`.
+    The changes, ordered by :attr:`StatechartChange.application_order` and then by the
+    order they were recorded in.
     """
 
     _structure_counterparts: StructureCounterparts | None = field(
@@ -661,3 +655,143 @@ class StatechartChangeBlock(SubclassJSONSerializer):
                 for change in data[StatechartChangeJSONKey.CHANGES]
             ]
         )
+
+
+# %% recording the changes of a statechart
+
+
+@dataclass(kw_only=True, eq=False)
+class StructureChangeRecorderInStatechart(StructureChangeRecorder):
+    """
+    Records the changes to the structure of a statechart and closes them into a
+    :class:`StatechartChangeBlock` when the outermost
+    :meth:`~cramph.statechart.Statechart.modify` block ends, or right away outside one.
+    """
+
+    statechart: Statechart = field(repr=False)
+    """
+    The statechart whose changes are recorded.
+    """
+
+    change_blocks: list[StatechartChangeBlock] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    The changes made to the structure of :attr:`statechart`, one block per outermost
+    :meth:`~cramph.statechart.Statechart.modify` block, oldest first. Applying them in
+    order to an empty statechart gives a statechart of the same structure.
+    """
+
+    recorded_changes: list[StatechartChange] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    The nodes added and removed and the resets and rebuilds requested since the latest
+    block closed, in order.
+    """
+
+    _pending_changes: list[PendingChange] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    The changes to children, chosen children and conditions recorded but not written
+    into a block yet, in the order they were first recorded.
+    """
+
+    def record_change(self, *, change: StatechartChange) -> None:
+        """
+        Records `change` for the next block.
+        """
+        self.recorded_changes.append(change)
+        self._close_change_block_outside_modify()
+
+    def record_joined_node(self, *, node: StatechartNode) -> None:
+        """
+        Records that the children, the chosen children and every condition of `node`,
+        which just joined, are to be written into a block once the nodes they name
+        joined too.
+        """
+        if isinstance(node, CompositeNode):
+            self._record_changed_children(node=node)
+        if isinstance(node, CompositeNodeChoosingItsChild):
+            self._record_changed_chosen_children(node=node)
+        for transition_kind in TransitionKind:
+            self._record_changed_condition(node=node, transition_kind=transition_kind)
+
+    def _record_changed_children(self, *, node: CompositeNode) -> None:
+        self._record_pending_change(pending=PendingChildrenChange(node=node))
+
+    def _record_changed_chosen_children(
+        self, *, node: CompositeNodeChoosingItsChild
+    ) -> None:
+        self._record_pending_change(pending=PendingChosenChildrenChange(node=node))
+
+    def _record_changed_condition(
+        self, *, node: StatechartNode, transition_kind: TransitionKind
+    ) -> None:
+        self._record_pending_change(
+            pending=PendingConditionChange(node=node, transition_kind=transition_kind)
+        )
+
+    def _record_pending_change(self, *, pending: PendingChange) -> None:
+        """
+        Records `pending`, to be written into a block with the value it has once every
+        node it names joined :attr:`statechart`. A pending change that is the same
+        change, see :meth:`PendingChange.is_same_change_as`, stays the only one.
+        """
+        if not any(
+            recorded.is_same_change_as(other=pending)
+            for recorded in self._pending_changes
+        ):
+            self._pending_changes.append(pending)
+        self._close_change_block_outside_modify()
+
+    def _close_change_block_outside_modify(self) -> None:
+        """
+        Closes the changes made so far into a block, unless a
+        :meth:`~cramph.statechart.Statechart.modify` block is open, which closes them
+        once the outermost one ends.
+        """
+        if self.statechart._open_modifications == 0:
+            self.close_change_block()
+
+    def close_change_block(self) -> None:
+        """
+        Appends the changes made since the latest block to :attr:`change_blocks`, as one
+        block, unless there are none.
+
+        Children and conditions are written as they are now, once every node they name
+        belongs to :attr:`statechart`; until then they wait for a later block.
+
+        :raises StatechartBrokenByFailedModificationError: If a
+            :meth:`~cramph.statechart.Statechart.modify` block of :attr:`statechart`
+            raised.
+        """
+        self.statechart.check_not_broken()
+        changes = [*self.recorded_changes, *self._take_ready_changes()]
+        self.recorded_changes = []
+        if not changes:
+            return
+        changes.sort(key=lambda change: change.application_order)
+        self.change_blocks.append(StatechartChangeBlock(changes=changes))
+
+    def _take_ready_changes(self) -> list[StatechartChange]:
+        """
+        Forgets the pending changes about nodes that left :attr:`statechart`.
+
+        :return: The pending changes whose nodes all joined :attr:`statechart`, with the
+            value they have now, which no longer wait then.
+        """
+        ready_changes = []
+        still_pending = []
+        for pending in self._pending_changes:
+            if pending.node._statechart is not self.statechart:
+                continue
+            if all(
+                named._statechart is self.statechart for named in pending.named_nodes
+            ):
+                ready_changes.append(pending.create_change())
+            else:
+                still_pending.append(pending)
+        self._pending_changes = still_pending
+        return ready_changes

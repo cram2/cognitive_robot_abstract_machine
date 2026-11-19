@@ -18,6 +18,7 @@ from cramph.composites import (
 )
 from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValue, TransitionKind
+from cramph.exceptions import StatechartBrokenByFailedModificationError
 from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode, EndStatechart, StatechartNode
 from cramph.nodes_for_testing import (
@@ -151,7 +152,10 @@ def test_replaying_every_block_rebuilds_the_structure(sender):
     The receiver holds the same nodes in the same order, with the same parents, children
     and conditions, so no composite node expanded a second time.
     """
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
 
     assert structure(statechart=receiver) == structure(statechart=sender)
 
@@ -161,29 +165,45 @@ def test_the_changes_of_one_modification_form_one_block(sender):
     Nested modifications close their changes into a block only once the outermost one
     ends.
     """
-    block_count = len(sender.change_blocks)
+    block_count = len(sender.structure_change_recorder.change_blocks)
 
     with sender.modify():
         with sender.modify():
             sender.add_node(node=ConstTrueNode(name="inner"))
         sender.add_node(node=ConstTrueNode(name="outer"))
 
-    assert len(sender.change_blocks) == block_count + 1
+    assert len(sender.structure_change_recorder.change_blocks) == block_count + 1
 
 
 def test_a_failed_modification_records_no_change(sender):
     """
-    A modification that raises leaves the statechart as it was, so there is nothing to
-    repeat.
+    A modification that raises breaks the statechart, so its changes never reach a
+    receiver.
     """
-    block_count = len(sender.change_blocks)
+    block_count = len(sender.structure_change_recorder.change_blocks)
 
     with pytest.raises(ZeroDivisionError):
         with sender.modify():
-            sender.add_node(node=ConstTrueNode(name="dropped"))
+            sender.add_node(node=ConstTrueNode(name="kept"))
             1 / 0
 
-    assert len(sender.change_blocks) == block_count
+    assert len(sender.structure_change_recorder.change_blocks) == block_count
+
+
+def test_a_change_outside_a_modification_after_a_failed_one_closes_no_block(sender):
+    """
+    A broken statechart refuses to close the change into a block of its own.
+    """
+    first, second = sender.nodes[1:3]
+    with pytest.raises(ZeroDivisionError):
+        with sender.modify():
+            1 / 0
+    block_count = len(sender.structure_change_recorder.change_blocks)
+
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        second.pause_condition = first.is_running
+
+    assert len(sender.structure_change_recorder.change_blocks) == block_count
 
 
 def test_a_condition_set_outside_a_modification_closes_a_block_of_its_own(sender):
@@ -194,7 +214,7 @@ def test_a_condition_set_outside_a_modification_closes_a_block_of_its_own(sender
 
     second.pause_condition = first.is_running
 
-    [change] = sender.change_blocks[-1].changes
+    [change] = sender.structure_change_recorder.change_blocks[-1].changes
     assert isinstance(change, ConditionChange)
     assert (change.owner, change.kind) == (second, TransitionKind.PAUSE)
 
@@ -208,7 +228,10 @@ def test_equal_nodes_are_recorded_one_by_one(sender):
 
     sender.add_nodes(nodes=[first, second])
     second.start_condition = first.is_succeeded
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
 
     assert structure(statechart=receiver) == structure(statechart=sender)
 
@@ -221,12 +244,18 @@ def test_a_receiver_reads_the_rewired_condition_of_the_step_after_an_insertion(s
     Inserting a step into a sequence makes the step after it wait for the new step, so
     the receiver has to rewire that step too.
     """
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
-    block_count = len(sender.change_blocks)
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
     sequence, first, second = sender.nodes[:3]
 
     sequence.insert_before(reference=second, node=node_arriving_at_once(name="middle"))
-    replay(blocks=sender.change_blocks[block_count:], receiver=receiver)
+    replay(
+        blocks=sender.structure_change_recorder.change_blocks[block_count:],
+        receiver=receiver,
+    )
 
     assert structure(statechart=receiver) == structure(statechart=sender)
 
@@ -235,11 +264,17 @@ def test_a_removed_node_leaves_the_receiver(sender):
     """
     The removed node takes everything below it along, in both statecharts.
     """
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
-    block_count = len(sender.change_blocks)
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
 
     sender.remove_node(node=sender.get_nodes_by_type(node_type=CompositeNode)[-1])
-    replay(blocks=sender.change_blocks[block_count:], receiver=receiver)
+    replay(
+        blocks=sender.structure_change_recorder.change_blocks[block_count:],
+        receiver=receiver,
+    )
 
     assert structure(statechart=receiver) == structure(statechart=sender)
 
@@ -254,7 +289,10 @@ def test_a_condition_reading_a_node_that_did_not_join_yet_waits_for_it(sender):
 
     first.pause_condition = late.is_running
     sender.add_node(node=late)
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
 
     assert structure(statechart=receiver) == structure(statechart=sender)
 
@@ -270,9 +308,9 @@ def test_removing_and_inserting_a_child_records_the_children_as_they_are_then(se
     sequence, first, second = sender.nodes[:3]
 
     sequence.remove_child(child=second)
-    [removal] = sender.change_blocks[-1].changes
+    [removal] = sender.structure_change_recorder.change_blocks[-1].changes
     sequence.insert_child(position=0, node=second)
-    [insertion] = sender.change_blocks[-1].changes
+    [insertion] = sender.structure_change_recorder.change_blocks[-1].changes
 
     assert isinstance(removal, ChildrenChange)
     assert (removal.node, removal.children) == (sequence, [first])
@@ -301,12 +339,18 @@ def test_a_requested_reset_reaches_the_receiver(sender):
     """
     The receiver resets the same node on its next settled tick.
     """
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
-    block_count = len(sender.change_blocks)
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
     sequence = sender.nodes[0]
 
     sender.request_reset(node=sequence)
-    replay(blocks=sender.change_blocks[block_count:], receiver=receiver)
+    replay(
+        blocks=sender.structure_change_recorder.change_blocks[block_count:],
+        receiver=receiver,
+    )
 
     assert [node._node_id for node in receiver.take_requested_resets()] == [
         sequence._node_id
@@ -317,15 +361,73 @@ def test_a_requested_rebuild_reaches_the_receiver(sender):
     """
     The receiver builds the same node again on its next compile.
     """
-    receiver = replay(blocks=sender.change_blocks, receiver=empty_statechart())
-    block_count = len(sender.change_blocks)
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
     sequence = sender.nodes[0]
 
     sender.request_rebuild(node=sequence)
-    replay(blocks=sender.change_blocks[block_count:], receiver=receiver)
+    replay(
+        blocks=sender.structure_change_recorder.change_blocks[block_count:],
+        receiver=receiver,
+    )
 
     assert [node._node_id for node in receiver.compiler.nodes_to_rebuild] == [
         sequence._node_id
+    ]
+
+
+def test_a_reset_requested_before_removing_the_node_in_one_block_reaches_the_receiver(
+    sender,
+):
+    """
+    The receiver resets the node before it removes it, as the sender did.
+    """
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
+    extra = ConstTrueNode(name="extra")
+    sender.add_node(node=extra)
+
+    with sender.modify():
+        sender.request_reset(node=extra)
+        sender.remove_node(node=extra)
+    replay(
+        blocks=sender.structure_change_recorder.change_blocks[block_count:],
+        receiver=receiver,
+    )
+
+    assert structure(statechart=receiver) == structure(statechart=sender)
+
+
+def test_a_rebuild_requested_before_removing_the_node_in_one_block_reaches_the_receiver(
+    sender,
+):
+    """
+    The receiver forgets the rebuild of the removed node, as the sender did.
+    """
+    receiver = replay(
+        blocks=sender.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
+    extra = ConstTrueNode(name="extra")
+    sender.add_node(node=extra)
+
+    with sender.modify():
+        sender.request_rebuild(node=extra)
+        sender.remove_node(node=extra)
+    replay(
+        blocks=sender.structure_change_recorder.change_blocks[block_count:],
+        receiver=receiver,
+    )
+
+    assert [node._node_id for node in receiver.compiler.nodes_to_rebuild] == [
+        node._node_id for node in sender.compiler.nodes_to_rebuild
     ]
 
 
@@ -352,7 +454,10 @@ def test_the_chosen_children_reach_the_receiver(
     statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=30)
 
-    receiver = replay(blocks=statechart.change_blocks, receiver=empty_statechart())
+    receiver = replay(
+        blocks=statechart.structure_change_recorder.change_blocks,
+        receiver=empty_statechart(),
+    )
 
     received_choosing_node = receiver.get_node_by_index(index=choosing_node.index)
     assert [node._node_id for node in received_choosing_node.chosen_children] == [
@@ -372,14 +477,14 @@ def test_a_structure_copy_follows_the_structure_copies_of_the_blocks(sender):
         data=json.loads(json.dumps(sender.create_structure_copy().to_json())),
         context=StatechartContext(world=World()),
     )
-    block_count = len(sender.change_blocks)
+    block_count = len(sender.structure_change_recorder.change_blocks)
     sequence, first, second = sender.nodes[:3]
 
     sequence.insert_before(reference=second, node=node_arriving_at_once(name="middle"))
     replay(
         blocks=[
             block.create_structure_copy()
-            for block in sender.change_blocks[block_count:]
+            for block in sender.structure_change_recorder.change_blocks[block_count:]
         ],
         receiver=receiver,
     )
@@ -397,7 +502,12 @@ def test_a_structure_copy_of_a_block_leaves_out_the_requests(sender):
         sender.request_reset(node=sequence)
         sender.request_rebuild(node=sequence)
 
-    assert sender.change_blocks[-1].create_structure_copy().changes == []
+    assert (
+        sender.structure_change_recorder.change_blocks[-1]
+        .create_structure_copy()
+        .changes
+        == []
+    )
 
 
 def test_a_structure_copy_of_a_block_holds_together_without_serialization():
@@ -419,7 +529,9 @@ def test_a_structure_copy_of_a_block_holds_together_without_serialization():
         )
     receiver = empty_statechart()
 
-    sender.change_blocks[-1].create_structure_copy().apply(statechart=receiver)
+    sender.structure_change_recorder.change_blocks[-1].create_structure_copy().apply(
+        statechart=receiver
+    )
 
     assert structure(statechart=receiver) == structure(statechart=sender)
     read_nodes = [
