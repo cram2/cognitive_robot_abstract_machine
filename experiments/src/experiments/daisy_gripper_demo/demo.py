@@ -181,7 +181,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
             configuration of `state`, and waiting :attr:`pause_after_motion` after it.
         """
         moves = [
-            SetGripperAction(configuration=gripper.default_configuration(state))
+            SetGripperAction(gripper_configuration=gripper.default_configuration(state))
             for gripper in grippers
         ]
         return [
