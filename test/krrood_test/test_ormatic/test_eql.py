@@ -1373,9 +1373,7 @@ def test_cte_from_eql(session, database):
 
     b = variable(type_=Body, domain=[])
     inner_query = an(entity(b).where(b.size > 5))
-    large_bodies = eql_to_sql(
-        inner_query, session, as_common_table_expression="large_bodies"
-    )
+    large_bodies = eql_to_sql(inner_query, session).sql_query.cte("large_bodies")
 
     c = variable(type_=Container, domain=[])
     outer_translator = eql_to_sql(an(entity(c)), session)

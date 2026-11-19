@@ -22,7 +22,6 @@ from sqlalchemy import (
     exists as sqlalchemy_exists,
 )
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.selectable import CTE
 
 from krrood.entity_query_language.query.query import (
     Query,
@@ -1561,21 +1560,16 @@ class EQLTranslator:
         return []
 
 
-def eql_to_sql(
-    query: HasExpression,
-    session: Session,
-    as_common_table_expression: str | None = None,
-) -> EQLTranslator | CTE:
+def eql_to_sql(query: HasExpression, session: Session) -> EQLTranslator:
     """
     Translate an EQL query, or an object standing for one such as a match, to SQL.
 
     .. code-block:: python
 
-        # Normal translation:
         translator = eql_to_sql(query, session)
 
-        # As common table expression:
-        large_bodies = eql_to_sql(inner_query, session, as_common_table_expression="large_bodies")
+        # Joined into another query as common table expression:
+        large_bodies = eql_to_sql(inner_query, session).sql_query.cte("large_bodies")
         outer_translator = eql_to_sql(outer_query, session)
         outer_translator.sql_query = (
             outer_translator.sql_query
@@ -1584,10 +1578,7 @@ def eql_to_sql(
 
     :param query: The EQL query, or the object standing for it
     :param session: The SQLAlchemy session
-    :param as_common_table_expression: If provided, returns a SQLAlchemy common table expression with this name.
-    The name is required because SQL common table expressions must have an explicit alias
-    (e.g. WITH large_bodies AS (SELECT ...))
-    :return: EQLTranslator or SQLAlchemy common table expression
+    :return: The translator holding the translated query
     :raises UnsupportedQueryTypeError: When *query* stands for an expression that is not
         a query.
     """
@@ -1597,8 +1588,4 @@ def eql_to_sql(
     expression.build()
     result = EQLTranslator(eql_query=expression, session=session)
     result.translate()
-
-    if as_common_table_expression is not None:
-        return result.sql_query.cte(as_common_table_expression)
-
     return result
