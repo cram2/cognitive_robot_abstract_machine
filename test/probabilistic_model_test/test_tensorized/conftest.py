@@ -14,6 +14,9 @@ import pytest
 from array_api_compat import array_namespace
 from random_events.variable import Continuous
 
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
@@ -62,7 +65,9 @@ def uneven_rows() -> SparseEdgeMatrix:
     Four rows holding two, one, three and no stored entries, stored out of row order.
     """
     return SparseEdgeMatrix(
-        np.array([2, 0, 2, 1, 2, 0]), np.array([0, 1, 2, 3, 4, 5]), (4, 6)
+        np.array([2, 0, 2, 1, 2, 0]),
+        np.array([0, 1, 2, 3, 4, 5]),
+        MatrixShape2D(number_of_rows=4, number_of_columns=6),
     )
 
 

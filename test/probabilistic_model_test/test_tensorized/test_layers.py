@@ -20,6 +20,9 @@ from random_events.product_algebra import SimpleEvent
 from sortedcontainers import SortedSet
 
 from krrood.adapters.json_serializer import from_json, to_json
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
@@ -143,7 +146,7 @@ def test_reduce_by_row_with_logaddexp_is_the_logsumexp_of_every_row(uneven_rows)
     expected = np.stack(
         [
             scipy.special.logsumexp(values[..., uneven_rows.rows == row], axis=-1)
-            for row in range(uneven_rows.shape[0])
+            for row in range(uneven_rows.shape.number_of_rows)
         ],
         axis=-1,
     )
@@ -157,7 +160,7 @@ def test_reduce_by_row_with_add_is_the_sum_of_every_row(uneven_rows):
     expected = np.stack(
         [
             values[..., uneven_rows.rows == row].sum(axis=-1)
-            for row in range(uneven_rows.shape[0])
+            for row in range(uneven_rows.shape.number_of_rows)
         ],
         axis=-1,
     )
@@ -172,7 +175,9 @@ def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
     values = np.full((3, uneven_rows.number_of_edges), -np.inf)
     with np.errstate(all="raise"):
         result = uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP)
-    np.testing.assert_array_equal(result, np.full((3, uneven_rows.shape[0]), -np.inf))
+    np.testing.assert_array_equal(
+        result, np.full((3, uneven_rows.shape.number_of_rows), -np.inf)
+    )
 
 
 @pytest.mark.parametrize("reduction", [RowReduction.SUM, RowReduction.LOG_SUM_EXP])
@@ -207,8 +212,16 @@ def test_decomposability_is_decided_per_node():
 
 
 def test_sparsity_stores_every_column_once_in_order_only_for_identity_columns():
-    identity = SparseEdgeMatrix(np.array([0, 0, 1]), np.array([0, 1, 2]), (2, 3))
-    permuted = SparseEdgeMatrix(np.array([0, 0, 1]), np.array([1, 0, 2]), (2, 3))
+    identity = SparseEdgeMatrix(
+        np.array([0, 0, 1]),
+        np.array([0, 1, 2]),
+        MatrixShape2D(number_of_rows=2, number_of_columns=3),
+    )
+    permuted = SparseEdgeMatrix(
+        np.array([0, 0, 1]),
+        np.array([1, 0, 2]),
+        MatrixShape2D(number_of_rows=2, number_of_columns=3),
+    )
     assert identity.stores_every_column_once_in_order
     assert not permuted.stores_every_column_once_in_order
 

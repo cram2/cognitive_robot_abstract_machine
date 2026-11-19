@@ -15,6 +15,9 @@ from typing_extensions import Iterable, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     EdgeMask,
@@ -105,7 +108,9 @@ class SumLayer(HasParameterArrays, InnerLayer):
         edges = edge_matrix_type.from_edge_positions(
             log_weights.rows,
             log_weights.columns,
-            (number_of_nodes, number_of_child_nodes),
+            MatrixShape2D(
+                number_of_rows=number_of_nodes, number_of_columns=number_of_child_nodes
+            ),
         )
         return cls(child_layers, edges, edges.stored_values(log_weights, -np.inf))
 
@@ -903,7 +908,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
         """
         if len(self.child_layers) != 1:
             return False
-        if self.edges.shape[0] != self.edges.shape[1]:
+        if self.edges.shape.number_of_rows != self.edges.shape.number_of_columns:
             return False
         if self.edges.number_of_edges != self.number_of_nodes:
             return False

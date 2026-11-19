@@ -18,6 +18,9 @@ import array_api_compat
 from array_api_compat import array_namespace
 from typing_extensions import Self
 
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     EdgeValues,
@@ -165,7 +168,7 @@ class EdgeMatrix(ABC):
 
     @property
     @abstractmethod
-    def shape(self) -> tuple[int, int]:
+    def shape(self) -> MatrixShape2D:
         """
         :return: The number of nodes and the total number of nodes of the child layers.
         """
@@ -202,7 +205,7 @@ class EdgeMatrix(ABC):
         cls,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
         """
         :param rows: The node of every edge.
@@ -277,10 +280,12 @@ class EdgeMatrix(ABC):
         Nodes with fewer edges are padded with the position one past the last edge,
         which :meth:`pad` fills with a neutral value.
         """
-        counts = np.bincount(self.rows, minlength=self.shape[0])
+        counts = np.bincount(self.rows, minlength=self.shape.number_of_rows)
         width = max(int(counts.max()) if len(counts) else 0, 1)
 
-        result = np.full((self.shape[0], width), self.number_of_edges, dtype=np.int64)
+        result = np.full(
+            (self.shape.number_of_rows, width), self.number_of_edges, dtype=np.int64
+        )
         # the position of every edge among the edges of its node
         order = np.argsort(self.rows, kind="stable")
         offsets = np.arange(self.number_of_edges) - np.repeat(
@@ -320,7 +325,7 @@ class SparseEdgeMatrix(EdgeMatrix):
     The column of the child node of every edge.
     """
 
-    matrix_shape: tuple[int, int]
+    matrix_shape: MatrixShape2D
     """
     The number of nodes and of child nodes.
     """
@@ -358,9 +363,8 @@ class SparseEdgeMatrix(EdgeMatrix):
     def __post_init__(self):
         self.edge_rows = np.asarray(self.edge_rows, dtype=np.int64)
         self.edge_columns = np.asarray(self.edge_columns, dtype=np.int64)
-        self.matrix_shape = (int(self.matrix_shape[0]), int(self.matrix_shape[1]))
 
-        counts = np.bincount(self.edge_rows, minlength=self.matrix_shape[0])
+        counts = np.bincount(self.edge_rows, minlength=self.matrix_shape.number_of_rows)
         self.rows_by_entry_count = np.argsort(-counts, kind="stable")
         self.entry_count_ranks = np.argsort(self.rows_by_entry_count)
 
@@ -373,12 +377,12 @@ class SparseEdgeMatrix(EdgeMatrix):
         ]
         self.stores_every_column_once_in_order = len(
             self.edge_columns
-        ) == self.matrix_shape[1] and np.array_equal(
+        ) == self.matrix_shape.number_of_columns and np.array_equal(
             self.edge_columns, np.arange(len(self.edge_columns))
         )
 
     @property
-    def shape(self) -> tuple[int, int]:
+    def shape(self) -> MatrixShape2D:
         return self.matrix_shape
 
     @property
@@ -398,7 +402,7 @@ class SparseEdgeMatrix(EdgeMatrix):
         cls,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
         return cls(rows, columns, shape)
 
@@ -442,7 +446,7 @@ class SparseEdgeMatrix(EdgeMatrix):
                 axis=-1,
             )
         rows_without_edges = namespace.full(
-            batch_shape + (self.matrix_shape[0] - result.shape[-1],),
+            batch_shape + (self.matrix_shape.number_of_rows - result.shape[-1],),
             reduction.identity,
             dtype=values.dtype,
             device=array_api_compat.device(values),
@@ -466,8 +470,11 @@ class DenseEdgeMatrix(EdgeMatrix):
     """
 
     @property
-    def shape(self) -> tuple[int, int]:
-        return (int(self.is_edge.shape[0]), int(self.is_edge.shape[1]))
+    def shape(self) -> MatrixShape2D:
+        return MatrixShape2D(
+            number_of_rows=self.is_edge.shape[0],
+            number_of_columns=self.is_edge.shape[1],
+        )
 
     @functools.cached_property
     def edge_positions(self) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
@@ -487,23 +494,23 @@ class DenseEdgeMatrix(EdgeMatrix):
 
     @property
     def stored_shape(self) -> tuple[int, ...]:
-        return self.shape
+        return self.shape.to_tuple()
 
     @classmethod
     def from_edge_positions(
         cls,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
-        is_edge = np.zeros((int(shape[0]), int(shape[1])), dtype=bool)
+        is_edge = np.zeros(shape.to_tuple(), dtype=bool)
         is_edge[
             np.asarray(rows, dtype=np.int64), np.asarray(columns, dtype=np.int64)
         ] = True
         return cls(is_edge)
 
     def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
-        result = np.full(self.shape, padding)
+        result = np.full(self.shape.to_tuple(), padding)
         result[
             np.asarray(entries.rows, dtype=np.int64),
             np.asarray(entries.columns, dtype=np.int64),
@@ -604,13 +611,13 @@ class BlockEdgeMatrix(EdgeMatrix):
     The blocks of every shape, their edges in this order.
     """
 
-    matrix_shape: tuple[int, int]
+    matrix_shape: MatrixShape2D
     """
     The number of nodes and of child nodes.
     """
 
     @property
-    def shape(self) -> tuple[int, int]:
+    def shape(self) -> MatrixShape2D:
         return self.matrix_shape
 
     @functools.cached_property
@@ -648,7 +655,7 @@ class BlockEdgeMatrix(EdgeMatrix):
             np.concatenate(reduced_rows) if reduced_rows else np.zeros(0, np.int64)
         )
         nodes_without_edges = np.setdiff1d(
-            np.arange(self.matrix_shape[0]), nodes_with_edges
+            np.arange(self.matrix_shape.number_of_rows), nodes_with_edges
         )
         order = np.concatenate([nodes_with_edges, nodes_without_edges])
         return np.argsort(order).astype(np.int64)
@@ -658,12 +665,12 @@ class BlockEdgeMatrix(EdgeMatrix):
         cls,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
         rows = np.asarray(rows, dtype=np.int64)
         columns = np.asarray(columns, dtype=np.int64)
         order = np.lexsort((columns, rows))
-        counts = np.bincount(rows, minlength=int(shape[0]))
+        counts = np.bincount(rows, minlength=shape.number_of_rows)
         columns_of_rows = np.split(columns[order], np.cumsum(counts)[:-1])
 
         rows_by_columns: dict[tuple[int, ...], list[int]] = {}
@@ -671,12 +678,16 @@ class BlockEdgeMatrix(EdgeMatrix):
             if len(row_columns):
                 rows_by_columns.setdefault(tuple(row_columns.tolist()), []).append(row)
 
-        blocks_by_shape: dict[tuple[int, int], list[tuple[list[int], tuple[int, ...]]]]
-        blocks_by_shape = {}
+        blocks_by_shape: dict[
+            MatrixShape2D, list[tuple[list[int], tuple[int, ...]]]
+        ] = {}
         for block_columns, block_rows in rows_by_columns.items():
-            blocks_by_shape.setdefault(
-                (len(block_rows), len(block_columns)), []
-            ).append((block_rows, block_columns))
+            block_shape = MatrixShape2D(
+                number_of_rows=len(block_rows), number_of_columns=len(block_columns)
+            )
+            blocks_by_shape.setdefault(block_shape, []).append(
+                (block_rows, block_columns)
+            )
 
         stacks = []
         first_position = 0
@@ -688,11 +699,11 @@ class BlockEdgeMatrix(EdgeMatrix):
             )
             stacks.append(stack)
             first_position += stack.number_of_edges
-        return cls(stacks, (int(shape[0]), int(shape[1])))
+        return cls(stacks, shape)
 
     def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
         # the value of an edge is found by its key row * #columns + column
-        width = self.matrix_shape[1]
+        width = self.matrix_shape.number_of_columns
         entry_keys = np.asarray(entries.rows, dtype=np.int64) * width + np.asarray(
             entries.columns, dtype=np.int64
         )
@@ -739,7 +750,7 @@ class BlockEdgeMatrix(EdgeMatrix):
         number_of_reduced = sum(part.shape[-1] for part in reduced)
         reduced.append(
             namespace.full(
-                batch_shape + (self.matrix_shape[0] - number_of_reduced,),
+                batch_shape + (self.matrix_shape.number_of_rows - number_of_reduced,),
                 reduction.identity,
                 dtype=values.dtype,
                 device=array_api_compat.device(values),

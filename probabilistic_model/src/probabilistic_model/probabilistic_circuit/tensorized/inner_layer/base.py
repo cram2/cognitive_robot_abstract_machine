@@ -20,6 +20,9 @@ from typing_extensions import Any, Iterator, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeMask,
@@ -815,10 +818,13 @@ class InnerLayer(Layer, ABC):
 
     @property
     def number_of_nodes(self) -> int:
-        return self.edges.shape[0]
+        return self.edges.shape.number_of_rows
 
     def validate_own(self):
-        expected_shape = (self.number_of_nodes, int(self.column_offsets[-1]))
+        expected_shape = MatrixShape2D(
+            number_of_rows=self.number_of_nodes,
+            number_of_columns=self.column_offsets[-1],
+        )
         if self.edges.shape != expected_shape:
             raise ShapeMismatchError(expected_shape, self.edges.shape)
 

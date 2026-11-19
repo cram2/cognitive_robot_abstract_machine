@@ -19,16 +19,19 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.exceptions import ShapeMismatchError
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    LeafValues,
     BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
     SampleArray,
     SampleColumn,
-    SampleNodeStateIndices,
+    LeafStateIndices,
     SampleNodeValues,
-    StateIndices,
     StateMask,
     States,
 )
@@ -135,9 +138,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         """
         raise NotImplementedError
 
-    def state_indices_of(
-        self, values: SampleColumn | SampleNodeValues
-    ) -> StateIndices | SampleNodeStateIndices:
+    def state_indices_of(self, values: LeafValues) -> LeafStateIndices:
         """
         Look up the index of every value in :attr:`states`.
 
@@ -340,7 +341,12 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             dtype=float,
         )
         return states, table_type.from_entries(
-            rows, columns, values, (len(distributions), len(states))
+            rows,
+            columns,
+            values,
+            MatrixShape2D(
+                number_of_rows=len(distributions), number_of_columns=len(states)
+            ),
         )
 
     @classmethod
@@ -392,7 +398,9 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             rows,
             np.searchsorted(states, self.states[columns]),
             probabilities,
-            (self.number_of_nodes, len(states)),
+            MatrixShape2D(
+                number_of_rows=self.number_of_nodes, number_of_columns=len(states)
+            ),
         )
 
     def has_equal_parameters(self, other: Self) -> bool:

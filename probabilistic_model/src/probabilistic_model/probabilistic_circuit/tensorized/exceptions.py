@@ -6,6 +6,9 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING
 
 from probabilistic_model.exceptions import ProbabilisticModelException
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    VariableIndices,
+)
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
@@ -173,7 +176,7 @@ class LayerOverSeveralVariablesError(ProbabilisticModelException, ValueError):
     nodes are over several variables.
     """
 
-    variables: np.ndarray
+    variables: VariableIndices
     """
     The indices of the variables of the nodes of the layer.
     """
@@ -194,7 +197,7 @@ class UnsortedNodeVariablesError(ProbabilisticModelException, ValueError):
     Exception raised when the nodes of a leaf layer are not sorted by their variable.
     """
 
-    node_variables: np.ndarray
+    node_variables: VariableIndices
     """
     The index of the variable of every node of the layer.
     """

@@ -15,13 +15,16 @@ from scipy.sparse import csc_array, csr_array, vstack
 from typing_extensions import Generic, Self, TypeVar
 
 import krrood.adapters.sparse_array_json_serializer  # noqa: F401 registers the serializer of the stored csr_array
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeIndices,
     NodeMask,
     NodeStateValues,
     NodeValues,
-    SampleNodeStateIndices,
+    LeafStateIndices,
     SampleNodeValues,
     StateIndices,
     StateMask,
@@ -67,7 +70,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         rows: NodeIndices,
         columns: StateIndices,
         probabilities: TableEntryValues,
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
         """
         :param rows: The node of every entry.
@@ -93,9 +96,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         :param table: A table of any type.
         :return: A table of this type with the same probabilities.
         """
-        return cls.from_entries(
-            *table.entries(), (table.number_of_nodes, table.number_of_states)
-        )
+        return cls.from_entries(*table.entries(), table.shape)
 
     # %% shape
 
@@ -116,6 +117,15 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         raise NotImplementedError
 
     @property
+    def shape(self) -> MatrixShape2D:
+        """
+        :return: The number of nodes and of states.
+        """
+        return MatrixShape2D(
+            number_of_rows=self.number_of_nodes, number_of_columns=self.number_of_states
+        )
+
+    @property
     @abstractmethod
     def number_of_stored_entries(self) -> int:
         """
@@ -127,7 +137,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
 
     @abstractmethod
     def log_probabilities_of_states(
-        self, indices: StateIndices | SampleNodeStateIndices
+        self, indices: LeafStateIndices
     ) -> SampleNodeValues:
         """
         :param indices: One state index per value for every node, shape (#values,), or
@@ -328,9 +338,9 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         rows: NodeIndices,
         columns: StateIndices,
         probabilities: TableEntryValues,
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
-        dense = np.zeros(shape)
+        dense = np.zeros(shape.to_tuple())
         dense[rows, columns] = probabilities
         with np.errstate(divide="ignore"):
             return cls(np.log(dense))
@@ -352,7 +362,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return int(self.log_probabilities.size)
 
     def log_probabilities_of_states(
-        self, indices: StateIndices | SampleNodeStateIndices
+        self, indices: LeafStateIndices
     ) -> SampleNodeValues:
         """
         :meth:`ProbabilityTable.log_probabilities_of_states` read from the log-
@@ -485,15 +495,20 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
         rows: NodeIndices,
         columns: StateIndices,
         probabilities: TableEntryValues,
-        shape: tuple[int, int],
+        shape: MatrixShape2D,
     ) -> Self:
         stored = probabilities > 0
         table = csr_array(
-            (probabilities[stored], (rows[stored], columns[stored])), shape=shape
+            (probabilities[stored], (rows[stored], columns[stored])),
+            shape=shape.to_tuple(),
         )
         table.sum_duplicates()
         table.sort_indices()
-        return cls(csr_array((np.log(table.data), table.indices, table.indptr), shape))
+        return cls(
+            csr_array(
+                (np.log(table.data), table.indices, table.indptr), shape.to_tuple()
+            )
+        )
 
     def entries(self) -> tuple[NodeIndices, StateIndices, TableEntryValues]:
         return (
@@ -545,7 +560,7 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
         return int(self.log_probabilities.nnz)
 
     def log_probabilities_of_states(
-        self, indices: StateIndices | SampleNodeStateIndices
+        self, indices: LeafStateIndices
     ) -> SampleNodeValues:
         if indices.ndim == 2:
             nodes = np.broadcast_to(np.arange(self.number_of_nodes), indices.shape)
@@ -591,7 +606,7 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
         rows, columns, probabilities = self.entries()
         kept = selected[columns]
         return self.from_entries(
-            rows[kept], columns[kept], probabilities[kept], self.log_probabilities.shape
+            rows[kept], columns[kept], probabilities[kept], self.shape
         )
 
     def normalized(self) -> Self:
@@ -600,7 +615,7 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
             rows, weights=probabilities, minlength=self.number_of_nodes
         )
         return self.from_entries(
-            rows, columns, probabilities / totals[rows], self.log_probabilities.shape
+            rows, columns, probabilities / totals[rows], self.shape
         )
 
     def select_nodes(self, mask: NodeMask) -> Self:

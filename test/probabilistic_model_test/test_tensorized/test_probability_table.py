@@ -12,6 +12,9 @@ import pytest
 
 from krrood.adapters import json_serializer
 from krrood.adapters.json_field import JSONField
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
     DenseProbabilityTable,
     ProbabilityTable,
@@ -57,7 +60,13 @@ def table_of(
     """
     rows, columns = np.nonzero(probabilities)
     return table_type.from_entries(
-        rows, columns, probabilities[rows, columns], probabilities.shape
+        rows,
+        columns,
+        probabilities[rows, columns],
+        MatrixShape2D(
+            number_of_rows=probabilities.shape[0],
+            number_of_columns=probabilities.shape[1],
+        ),
     )
 
 

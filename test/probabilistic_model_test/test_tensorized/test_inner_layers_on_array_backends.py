@@ -344,7 +344,7 @@ def reduced_by_definition(
     return np.stack(
         [
             combine(values[..., edges.columns[edges.rows == row]], axis=-1)
-            for row in range(edges.shape[0])
+            for row in range(edges.shape.number_of_rows)
         ],
         axis=-1,
     )

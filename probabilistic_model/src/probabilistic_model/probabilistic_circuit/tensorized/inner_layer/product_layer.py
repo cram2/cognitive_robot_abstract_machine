@@ -13,6 +13,9 @@ from sortedcontainers import SortedSet
 from typing_extensions import Self
 
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeIndices,
@@ -138,7 +141,9 @@ class ProductLayer(InnerLayer):
                 np.asarray(edges.nodes, dtype=np.int64),
                 offsets[np.asarray(edges.child_layer_indices, dtype=np.int64)]
                 + np.asarray(edges.child_nodes, dtype=np.int64),
-                (number_of_nodes, int(offsets[-1])),
+                MatrixShape2D(
+                    number_of_rows=number_of_nodes, number_of_columns=offsets[-1]
+                ),
             ),
         )
 

@@ -8,6 +8,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
     RowReduction,
@@ -36,7 +39,11 @@ def test_rows_with_the_same_columns_form_one_block(
     The rows that mix the same columns are stacked into one block per set of columns.
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
-    matrix = BlockEdgeMatrix.from_edge_positions(entries.rows, entries.columns, (5, 5))
+    matrix = BlockEdgeMatrix.from_edge_positions(
+        entries.rows,
+        entries.columns,
+        MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
     shapes = sorted(
         stack.block_rows.shape + stack.block_columns.shape[1:]
         for stack in matrix.stacks
@@ -56,7 +63,11 @@ def test_block_reduction_is_the_sparse_reduction(
     values = np.random.default_rng(0).normal(size=(3, 5))
     results = []
     for matrix_type in (SparseEdgeMatrix, BlockEdgeMatrix):
-        matrix = matrix_type.from_edge_positions(entries.rows, entries.columns, (5, 5))
+        matrix = matrix_type.from_edge_positions(
+            entries.rows,
+            entries.columns,
+            MatrixShape2D(number_of_rows=5, number_of_columns=5),
+        )
         stored = matrix.stored_values(entries, 0.0)
         results.append(
             matrix.reduce_by_row(matrix.values_of_columns(values) + stored, reduction)
@@ -72,7 +83,11 @@ def test_stored_values_follow_their_edges(
     entries were given in.
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
-    matrix = BlockEdgeMatrix.from_edge_positions(entries.rows, entries.columns, (5, 5))
+    matrix = BlockEdgeMatrix.from_edge_positions(
+        entries.rows,
+        entries.columns,
+        MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
     edge_values = matrix.edge_values(matrix.stored_values(entries, 0.0))
     expected = {
         (int(row), int(column)): value
@@ -97,7 +112,12 @@ def test_sums_of_one_shape_are_one_stack():
         np.arange(products_per_region), regions * sums_per_region
     )
     matrix = BlockEdgeMatrix.from_edge_positions(
-        rows, columns, (regions * sums_per_region, regions * products_per_region)
+        rows,
+        columns,
+        MatrixShape2D(
+            number_of_rows=regions * sums_per_region,
+            number_of_columns=regions * products_per_region,
+        ),
     )
     [stack] = matrix.stacks
     assert stack.block_rows.shape == (regions, sums_per_region)

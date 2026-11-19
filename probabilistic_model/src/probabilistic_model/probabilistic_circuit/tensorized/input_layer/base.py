@@ -15,6 +15,7 @@ from typing_extensions import Any, Self
 from probabilistic_model.distributions.distributions import UnivariateDistribution
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    LeafValues,
     BackendArray,
     NodeIndices,
     NodeMask,
@@ -127,7 +128,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         self.node_variables = np.asarray(remap)[self.node_variables]
         self.validate_own()
 
-    def column_of(self, events: SampleArray) -> SampleColumn | SampleNodeValues:
+    def column_of(self, events: SampleArray) -> LeafValues:
         """
         Select the values of the variables of the nodes from an event array.
 
@@ -140,7 +141,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             return events[:, self.variable]
         return events[:, self.node_variables]
 
-    def float_column(self, *, values: SampleColumn | SampleNodeValues) -> BackendArray:
+    def float_column(self, *, values: LeafValues) -> BackendArray:
         """
         :param values: Values for every node, shape (#events,), or a value per node,
             shape (#events, #nodes).
@@ -528,7 +529,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @abstractmethod
     def log_likelihood_of_nodes_from_column(
-        self, values: SampleColumn | SampleNodeValues
+        self, values: LeafValues
     ) -> SampleNodeValues:
         """
         Calculate the log-likelihood of every node for values of the variables of the
@@ -578,7 +579,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @abstractmethod
     def cumulative_distribution_of_nodes_from_column(
-        self, values: SampleColumn | SampleNodeValues
+        self, values: LeafValues
     ) -> SampleNodeValues:
         """
         Calculate the cumulative distribution function of every node for values of the
