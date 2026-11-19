@@ -947,7 +947,7 @@ def gaussian_layer() -> GaussianLayer:
     Gaussians at -1 and 2.
     """
     return GaussianLayer(
-        np.zeros(2, dtype=np.int64), np.array([-1.0, 2.0]), np.array([0.5, 1.5])
+        np.zeros(2, dtype=np.int64), np.array([-1.0, 2.0]), np.log([0.5, 1.5])
     )
 
 
@@ -962,7 +962,7 @@ def truncated_gaussian_layer() -> TruncatedGaussianLayer:
         np.array([[-1.0, 0.5], [0.0, 3.0], [2.0, 10.0]]),
         np.full((3, 2), int(Bound.CLOSED), dtype=np.int64),
         np.array([0.0, 2.5, 0.0]),
-        np.array([1.0, 0.5, 2.0]),
+        np.log([1.0, 0.5, 2.0]),
     )
 
 
@@ -1040,14 +1040,16 @@ def gaussian_layer_with_scale(
     :return: The layer.
     """
     location = np.zeros(2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_scale = np.log(scale)
     if not truncated:
-        return GaussianLayer(np.zeros(2, dtype=np.int64), location, scale)
+        return GaussianLayer(np.zeros(2, dtype=np.int64), location, log_scale)
     return TruncatedGaussianLayer(
         np.zeros(2, dtype=np.int64),
         np.tile([[-1.0, 1.0]], (number_of_intervals, 1)),
         np.full((number_of_intervals, 2), int(Bound.CLOSED), dtype=np.int64),
         location,
-        scale,
+        log_scale,
     )
 
 

@@ -177,7 +177,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             marginal = GaussianLayer(
                 np.full(self.number_of_nodes, index, dtype=np.int64),
                 self.mean[:, position],
-                np.sqrt(self.covariance.variances[:, position]),
+                0.5 * np.log(self.covariance.variances[:, position]),
             )
             result[:, index] = marginal.moment_of_nodes_own(
                 int(query.order[index]), float(query.center[index]), variables[index]

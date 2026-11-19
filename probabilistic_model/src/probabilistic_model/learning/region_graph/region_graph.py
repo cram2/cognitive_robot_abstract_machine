@@ -396,10 +396,12 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                     self.initial_location_range.upper,
                     input_units,
                 ),
-                self.random_number_generator.uniform(
-                    self.initial_scale_range.lower,
-                    self.initial_scale_range.upper,
-                    input_units,
+                np.log(
+                    self.random_number_generator.uniform(
+                        self.initial_scale_range.lower,
+                        self.initial_scale_range.upper,
+                        input_units,
+                    )
                 ),
             )
         if isinstance(variable, Symbolic):

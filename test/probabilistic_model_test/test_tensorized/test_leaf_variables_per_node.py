@@ -67,10 +67,10 @@ class MixtureOverFourVariables:
         """
         return [
             GaussianLayer(
-                np.zeros(2, dtype=np.int64), np.array([-1.0, 2.0]), np.array([0.5, 1.5])
+                np.zeros(2, dtype=np.int64), np.array([-1.0, 2.0]), np.log([0.5, 1.5])
             ),
             GaussianLayer(
-                np.ones(2, dtype=np.int64), np.array([0.0, 1.0]), np.array([1.0, 2.0])
+                np.ones(2, dtype=np.int64), np.array([0.0, 1.0]), np.log([1.0, 2.0])
             ),
         ]
 
@@ -195,7 +195,7 @@ def test_a_layer_with_unsorted_node_variables_is_invalid():
     """
     A leaf layer whose nodes are not sorted by variable fails validation.
     """
-    layer = GaussianLayer(np.array([1, 0]), np.zeros(2), np.ones(2))
+    layer = GaussianLayer(np.array([1, 0]), np.zeros(2), np.zeros(2))
     with pytest.raises(UnsortedNodeVariablesError):
         layer.validate()
 

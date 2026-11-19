@@ -1448,7 +1448,7 @@ def test_validate_detects_a_shape_mismatch():
 
 def test_gaussian_layer_likelihood(x):
     layer = GaussianLayer(
-        np.zeros(2, dtype=np.int64), np.array([0.0, 2.0]), np.array([1.0, 0.5])
+        np.zeros(2, dtype=np.int64), np.array([0.0, 2.0]), np.log([1.0, 0.5])
     )
     points = np.array([[0.0], [2.0]])
     result = layer.log_likelihood_of_nodes(points)

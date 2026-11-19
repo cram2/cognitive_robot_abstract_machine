@@ -137,7 +137,7 @@ def gaussian_case() -> InputLayerQueryCase:
         build=lambda namespace: GaussianLayer(
             np.zeros(2, dtype=np.int64),
             namespace.asarray([-1.0, 2.0]),
-            namespace.asarray([0.5, 1.5]),
+            namespace.asarray(np.log([0.5, 1.5])),
         ),
         variable=Continuous("x"),
         values=[-3.0, -1.0, 0.0, 0.5, 2.0, 7.0],
@@ -163,7 +163,7 @@ def truncated_gaussian_case() -> InputLayerQueryCase:
                 dtype=np.int64,
             ),
             namespace.asarray([0.0, 2.5, 0.0]),
-            namespace.asarray([1.0, 0.5, 2.0]),
+            namespace.asarray(np.log([1.0, 0.5, 2.0])),
         ),
         variable=Continuous("x"),
         values=[-2.0, -1.0, 0.0, 0.5, 2.0, 3.0, 11.0],
