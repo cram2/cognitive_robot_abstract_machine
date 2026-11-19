@@ -7,12 +7,14 @@ from __future__ import annotations
 import json
 
 import numpy as np
+import pytest
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
-from krrood_spatial_math.spatial_types import Twist, Vector3
+from krrood_spatial_math.spatial_types import RigidMotionRate, Twist, Vector3
 
 from .dataset.frames import KnownFrames
+from .reference_implementations import matrix_exponential, rigid_motion_rate_matrix
 
 # %% the parts of a twist
 
@@ -90,3 +92,44 @@ def test_a_deserialized_twist_refers_to_the_readers_frame(table_frame):
 
     assert twist_copy.reference_frame is table_frame
     np.testing.assert_allclose(twist_copy.to_np(), twist.to_np())
+
+
+# %% the displacement after moving at a twist
+
+
+def test_a_twist_is_a_rate_of_rigid_motion():
+    """
+    A twist shares the exponential of every rate of rigid motion.
+    """
+    assert issubclass(Twist, RigidMotionRate)
+
+
+@pytest.mark.parametrize("duration", [0.0, 1e-6, 0.5, 2.0])
+def test_the_displacement_of_a_twist_agrees_with_the_matrix_exponential(
+    duration: float,
+):
+    """
+    Moving at a constant twist for a duration displaces the body by the exponential of
+    the twist's matrix times that duration.
+    """
+    twist = Twist(
+        angular_velocity=Vector3(0.2, -0.4, 0.9),
+        linear_velocity=Vector3(0.5, 0.1, -0.3),
+    )
+    expected = matrix_exponential(
+        rigid_motion_rate_matrix(
+            rotation=twist.angular_velocity.to_np()[:3],
+            translation=twist.linear_velocity.to_np()[:3],
+        )
+        * duration
+    )
+
+    displacement = twist.to_displacement(duration=duration)
+
+    np.testing.assert_allclose(
+        displacement.translation.to_np()[:3], expected[:3, 3], rtol=1e-12, atol=1e-15
+    )
+    np.testing.assert_allclose(
+        displacement.rotation_vector.to_np()[:3],
+        twist.angular_velocity.to_np()[:3] * duration,
+    )

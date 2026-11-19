@@ -11,6 +11,9 @@ from copy import deepcopy, copy
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 
+import math
+import sys
+
 import casadi as ca
 import numpy as np
 from typing_extensions import Any, overload, Self, Callable, TypeVar
@@ -2650,7 +2653,102 @@ class Displacement(VectorPair):
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
-class Twist(VectorPair):
+class RigidMotionRate(VectorPair, ABC):
+    """
+    How a rigid body moves per unit of a parameter: how it turns, in the first vector,
+    and how the point of the body at the origin of the reference frame moves, in the
+    second, both along that frame's axes.
+    """
+
+    @classproperty
+    def _series_rotation_angle(cls) -> float:
+        """
+        The angle, about 0.042 radians, below which the left Jacobian's coefficients
+        switch from their closed forms to three terms of their series (`Todesco and
+        Brüls <https://orbi.uliege.be/handle/2268/306081>`__, section 8): where the
+        truncation error ``2 φ⁶ / 8!`` equals the round-off error ``2 ε / φ²``.
+        """
+        return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
+
+    def _integrate(self, *, parameter_change: sm.ScalarData) -> Displacement:
+        """
+        The exponential of this rate times ``parameter_change`` (Solà, Deray and
+        Atchuthan, *A micro Lie theory*, equation (172)), for any axis and pitch, and
+        free of NaN where the body does not turn, also in its derivatives.
+
+        :param parameter_change: How much the parameter of the rate changed.
+        :return: The displacement of the body while it did, at this constant rate.
+        """
+        rotation = self._rotational_part * parameter_change
+        translation = self._translational_part * parameter_change
+        return Displacement(
+            rotation_vector=rotation,
+            translation=self._apply_left_jacobian(
+                rotation=rotation, translation=translation
+            ),
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def _apply_left_jacobian(
+        cls, *, rotation: Vector3, translation: Vector3
+    ) -> Vector3:
+        """
+        :param rotation: The rotation vector the body turns by.
+        :param translation: How far the origin of the body would move without turning.
+        :return: Where the origin of the body ends up when it turns while moving: the
+            left Jacobian of ``rotation`` applied to ``translation`` (Eade, `Lie Groups
+            for 2D and 3D Transformations <https://www.ethaneade.com/lie.pdf>`__,
+            section 3.2, equation (83)).
+        """
+        angle_squared = rotation.dot(rotation)
+        first_order = rotation.cross(translation)
+        second_order = rotation.cross(first_order)
+        return (
+            translation
+            + first_order * cls._first_order_coefficient(angle_squared=angle_squared)
+            + second_order * cls._second_order_coefficient(angle_squared=angle_squared)
+        )
+
+    @classmethod
+    def _first_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
+        """
+        :param angle_squared: The square of the angle the body turns by.
+        :return: ``(1 − cos φ) / φ²`` for the angle ``φ``, by three terms of its series
+            below :attr:`_series_rotation_angle` (Eade, *Lie Groups for 2D and 3D
+            Transformations*, section 3.2, equations (75) and (76)).
+        """
+        angle = sm.sqrt(angle_squared)
+        return sm.if_less(
+            angle_squared,
+            cls._series_rotation_angle**2,
+            1 / math.factorial(2)
+            - angle_squared / math.factorial(4)
+            + angle_squared**2 / math.factorial(6),
+            (1 - sm.cos(angle)) / angle_squared,
+        )
+
+    @classmethod
+    def _second_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
+        """
+        :param angle_squared: The square of the angle the body turns by.
+        :return: ``(φ − sin φ) / φ³`` for the angle ``φ``, by three terms of its series
+            below :attr:`_series_rotation_angle` (Eade, *Lie Groups for 2D and 3D
+            Transformations*, section 3.2, equations (75) and (76)).
+        """
+        angle = sm.sqrt(angle_squared)
+        return sm.if_less(
+            angle_squared,
+            cls._series_rotation_angle**2,
+            1 / math.factorial(3)
+            - angle_squared / math.factorial(5)
+            + angle_squared**2 / math.factorial(7),
+            (angle - sm.sin(angle)) / (angle_squared * angle),
+        )
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class Twist(RigidMotionRate):
     """
     A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
     at the origin of the reference frame moves, both along that frame's axes and per
@@ -2704,9 +2802,39 @@ class Twist(VectorPair):
         """
         return self._translational_part
 
+    def to_displacement(self, *, duration: sm.ScalarData) -> Displacement:
+        """
+        :param duration: How long the body moved at this constant twist, in units of
+            the parameter the twist is taken with respect to.
+        :return: The displacement of the body after moving that long: the exponential
+            of the twist times ``duration`` (Lynch and Park, *Modern Robotics*, section
+            3.3.3), free of NaN where the body does not turn.
+        """
+        return self._integrate(parameter_change=duration)
+
+    @property
+    def screw_axis_direction(self) -> Vector3:
+        """
+        :return: The unit direction of the twist's screw axis: that of the angular
+            velocity, or of the linear velocity for a twist that does not turn (Lynch
+            and Park, `Modern Robotics, section 3.3.2.2
+            <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=121>`__). The
+            zero vector for a zero twist.
+        """
+        angular_velocity = self.angular_velocity
+        linear_velocity = self.linear_velocity
+        angular_speed = angular_velocity.norm()
+        result = sm.if_greater_zero(
+            angular_speed,
+            angular_velocity.safe_division(other=angular_speed),
+            linear_velocity.safe_division(other=linear_velocity.norm()),
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
-class ScrewAxis(VectorPair):
+class ScrewAxis(RigidMotionRate):
     """
     How a rigid body's pose changes per unit of a position that moves it along a screw
     axis: the axis's line, the pitch along it and the unit of the position. Unlike a
@@ -2788,25 +2916,14 @@ class ScrewAxis(VectorPair):
             reference_frame=self.reference_frame,
         )
 
-    @property
-    def screw_axis_direction(self) -> Vector3:
+    def to_displacement(self, *, position: sm.ScalarData) -> Displacement:
         """
-        :return: The unit direction of the twist's screw axis: that of the angular
-            velocity, or of the linear velocity for a twist that does not turn (Lynch
-            and Park, `Modern Robotics, section 3.3.2.2
-            <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=121>`__). The
-            zero vector for a zero twist.
+        :param position: How far the body moved along the screw axis, from zero.
+        :return: The displacement of the body after that move: the exponential of the
+            screw axis times ``position`` (Lynch and Park, *Modern Robotics*, section
+            3.3.3), free of NaN where the body does not turn.
         """
-        angular_velocity = self.angular_velocity
-        linear_velocity = self.linear_velocity
-        angular_speed = angular_velocity.norm()
-        result = sm.if_greater_zero(
-            angular_speed,
-            angular_velocity.safe_division(other=angular_speed),
-            linear_velocity.safe_division(other=linear_velocity.norm()),
-        )
-        result.reference_frame = self.reference_frame
-        return result
+        return self._integrate(parameter_change=position)
 
 
 @dataclass(eq=False, init=False, repr=False)
