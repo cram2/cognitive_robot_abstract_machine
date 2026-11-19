@@ -13,15 +13,13 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 from krrood.patterns.classproperty import classproperty
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from scipy.optimize import linear_sum_assignment
-from semantic_digital_twin.reasoning.queries import annotation_class_by_label
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     IsPerceivable,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Human,
     PerceivedObject,
 )
 from semantic_digital_twin.world import World
@@ -38,7 +36,7 @@ from robokudo.types.annotation import (
     Classification,
     SemanticColor,
 )
-from robokudo.types.scene import HumanHypothesis, ObjectHypothesis
+from robokudo.types.scene import ObjectHypothesis
 
 # %% beliefs
 
@@ -55,16 +53,16 @@ class PerceptionBelief:
     The hypothesis the object was found as.
     """
 
-    annotation: IsPerceivable
+    body: Body
     """
-    The semantic annotation the object is believed to be, rooted at a body of no world
-    yet that shows and collides with the shape the object was seen with.
+    The body, of no world yet, that shows and collides with the shape the object was
+    seen with.
     """
 
     pose: HomogeneousTransformationMatrix
     """
     The pose of the geometry the object was seen with, relative to the world frame of
-    the pass; the pose its body is placed at.
+    the pass; the pose :attr:`body` is placed at.
     """
 
     scale: geometry.Scale
@@ -72,11 +70,9 @@ class PerceptionBelief:
     The lengths of the geometry the object was seen with along the axes of its pose.
     """
 
-    semantic_class: type[IsPerceivable] | None
+    believed_class: type[IsPerceivable]
     """
-    The semantic annotation the object is named as, however confident its
-    classification is: :class:`Human` for a human, else the one its class label names;
-    None if the label names none or the object is unclassified.
+    The semantic annotation the object is believed to be.
     """
 
     @classproperty
@@ -95,13 +91,10 @@ class PerceptionBelief:
         minimum_class_confidence: float,
     ) -> PerceptionBelief | None:
         """
-        A human becomes a :class:`Human`; any other object becomes the semantic
-        annotation its classification names if that classification is at least
-        ``minimum_class_confidence`` confident, else a :class:`PerceivedObject`.
-
         :param hypothesis: The hypothesis a finished pass found.
         :param world_T_camera: The pose of the camera of that pass in the world.
-        :param minimum_class_confidence: How confident a classification has to be.
+        :param minimum_class_confidence: How confident a classification has to be for
+            the object to be believed of the class it names.
         :return: The belief about ``hypothesis``, seen with the latest shape fitted to
             it or else the box :meth:`_compute_belief_bounding_box` computes; None, with
             a warning logged, if it has neither.
@@ -127,35 +120,14 @@ class PerceptionBelief:
         if color is not None:
             shape.color = color
         visual = ShapeCollection(shapes=[shape])
-        body = Body(visual=visual, collision=visual.copy_without_reference_frame())
-
-        if isinstance(hypothesis, HumanHypothesis):
-            semantic_class = Human
-            believed_class = Human
-        else:
-            semantic_class = (
-                annotation_class_by_label(hypothesis.class_label)
-                if hypothesis.class_label is not None
-                else None
-            )
-            classification = hypothesis.latest_annotation_of_type(
-                annotation_type=Classification
-            )
-            is_confidently_classified = (
-                classification is not None
-                and classification.confidence >= minimum_class_confidence
-            )
-            believed_class = (
-                semantic_class
-                if semantic_class is not None and is_confidently_classified
-                else PerceivedObject
-            )
         return cls(
             hypothesis=hypothesis,
-            annotation=believed_class(root=body, class_label=hypothesis.class_label),
+            body=Body(visual=visual, collision=visual.copy_without_reference_frame()),
             pose=world_T_camera @ seen_geometry.origin,
             scale=seen_geometry.local_frame_bounding_box.scale,
-            semantic_class=semantic_class,
+            believed_class=hypothesis.believed_semantic_class(
+                minimum_class_confidence=minimum_class_confidence
+            ),
         )
 
     @classmethod
@@ -225,45 +197,54 @@ class PerceptionBelief:
         )
 
     @property
-    def center(self) -> np.ndarray:
+    def center(self) -> Point3:
         """
         The position of the center of the object, relative to the root of the world.
         """
-        root_T_object = (
-            self.pose.reference_frame.global_transform.to_np() @ self.pose.to_np()
-        )
-        return root_T_object[:3, 3]
+        return (self.pose.reference_frame.global_transform @ self.pose).position
 
     # %% changing the world
 
     def add_to_world(self, *, world: World) -> None:
         """
-        Add :attr:`annotation` and its body to ``world``, the body at the box the object
-        was seen in, below the world frame of its pass.
+        Add :attr:`body` to ``world`` at the box the object was seen in, below the world
+        frame of its pass, as an annotation of :attr:`believed_class`.
 
         :param world: The world the belief is about.
         """
-        body = self.annotation.root
         with world.modify_world():
             world.add_connection(
                 Connection6DoF.create_with_dofs(
-                    world=world, parent=self.pose.reference_frame, child=body
+                    world=world, parent=self.pose.reference_frame, child=self.body
                 )
             )
-            world.add_semantic_annotation(self.annotation)
-            body.parent_connection.origin = self.pose
+            world.add_semantic_annotation(
+                self.believed_class(
+                    root=self.body, class_label=self.hypothesis.class_label
+                )
+            )
+            self.body.parent_connection.origin = self.pose
 
     def update_known_object(self, *, known_object: IsPerceivable, world: World) -> None:
         """
         Move ``known_object`` to where the object was seen, keeping its orientation and
-        shape, and turn it into the semantic annotation of :attr:`annotation` if it is a
-        :class:`PerceivedObject`. Any other semantic annotation keeps its class.
+        shape. A :class:`PerceivedObject` becomes an annotation of
+        :attr:`believed_class`; any other semantic annotation keeps its class.
 
         :param known_object: The object of ``world`` the belief was matched to.
         :param world: The world ``known_object`` belongs to.
         """
         self._move(body=known_object.root, world=world)
-        self._classify(known_object=known_object, world=world)
+        if isinstance(known_object, PerceivedObject):
+            self._replace_perceived_object(perceived_object=known_object, world=world)
+            return
+        if self.believed_class is not PerceivedObject and not isinstance(
+            known_object, self.believed_class
+        ):
+            logging.getLogger(PACKAGE_NAME).info(
+                f"Keeping {type(known_object).__name__} {known_object.root.name} "
+                f"although it was classified as {self.believed_class.__name__}."
+            )
 
     def _move(self, *, body: Body, world: World) -> None:
         """
@@ -275,37 +256,33 @@ class PerceptionBelief:
         """
         if not isinstance(body.parent_connection, Connection6DoF):
             return
-        root_T_body = body.global_transform.to_np().copy()
-        root_T_body[:3, 3] += self.center - ObjectMatcher.visual_center(body=body)
-        body.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=root_T_body, reference_frame=world.root
+        root_T_body = body.global_transform
+        body.parent_connection.origin = (
+            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=root_T_body.position
+                + (self.center - ObjectMatcher.visual_center(body=body)),
+                rotation_matrix=root_T_body.rotation_matrix,
+                reference_frame=world.root,
+            )
         )
 
-    def _classify(self, *, known_object: IsPerceivable, world: World) -> None:
+    def _replace_perceived_object(
+        self, *, perceived_object: PerceivedObject, world: World
+    ) -> None:
         """
-        Replace ``known_object`` by an annotation of the class of :attr:`annotation`
-        rooted at its body, if ``known_object`` is a :class:`PerceivedObject` and
-        :attr:`annotation` is not.
+        Replace ``perceived_object`` by an annotation of :attr:`believed_class` rooted
+        at its body, unless the object is believed to be a :class:`PerceivedObject`.
 
-        :param known_object: The object of ``world`` the belief was matched to.
-        :param world: The world ``known_object`` belongs to.
+        :param perceived_object: The object of ``world`` the belief was matched to.
+        :param world: The world ``perceived_object`` belongs to.
         """
-        believed_class = type(self.annotation)
-        if believed_class is PerceivedObject or isinstance(
-            known_object, believed_class
-        ):
-            return
-        if not isinstance(known_object, PerceivedObject):
-            logging.getLogger(PACKAGE_NAME).info(
-                f"Keeping {type(known_object).__name__} {known_object.root.name} "
-                f"although it was classified as {believed_class.__name__}."
-            )
+        if self.believed_class is PerceivedObject:
             return
         with world.modify_world():
-            world.remove_semantic_annotation(known_object)
+            world.remove_semantic_annotation(perceived_object)
             world.add_semantic_annotation(
-                believed_class(
-                    root=known_object.root, class_label=self.annotation.class_label
+                self.believed_class(
+                    root=perceived_object.root, class_label=self.hypothesis.class_label
                 )
             )
 
@@ -359,7 +336,7 @@ class ObjectMatcher:
         centers = [self.visual_center(body=known.root) for known in known_objects]
         distances = np.array(
             [
-                [np.linalg.norm(belief.center - center) for center in centers]
+                [float(belief.center.euclidean_distance(center)) for center in centers]
                 for belief in beliefs
             ]
         )
@@ -402,19 +379,19 @@ class ObjectMatcher:
         }
 
     @staticmethod
-    def visual_center(*, body: Body) -> np.ndarray:
+    def visual_center(*, body: Body) -> Point3:
         """
         :param body: The body of an object.
         :return: The position of the center of the visual shapes of ``body``, or of
             ``body`` itself if it has none, relative to the root of the world.
         """
-        root_T_body = body.global_transform.to_np()
+        root_T_body = body.global_transform
         if not body.visual.shapes:
-            return root_T_body[:3, 3]
+            return root_T_body.position
         bounding_box = body.visual.as_bounding_box_collection_in_frame(
             body
         ).bounding_box()
-        return (root_T_body @ bounding_box.center.to_np())[:3]
+        return root_T_body @ bounding_box.center
 
     @staticmethod
     def _perceivable_objects(*, world: World) -> list[IsPerceivable]:
@@ -458,7 +435,7 @@ class ObjectMatcher:
             ``known_object`` is not: another semantic annotation, or, for a
             :class:`PerceivedObject`, another class label.
         """
-        class_label = belief.annotation.class_label
+        class_label = belief.hypothesis.class_label
         if class_label is None:
             return False
         if isinstance(known_object, PerceivedObject):
@@ -466,6 +443,5 @@ class ObjectMatcher:
                 known_object.class_label is not None
                 and known_object.class_label != class_label
             )
-        return belief.semantic_class is None or not isinstance(
-            known_object, belief.semantic_class
-        )
+        semantic_class = belief.hypothesis.semantic_class
+        return semantic_class is None or not isinstance(known_object, semantic_class)

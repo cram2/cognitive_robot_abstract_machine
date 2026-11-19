@@ -101,6 +101,62 @@ class UnsupportedCameraDistortionModel(InvalidCameraObservation):
         return f"Supply calibration using one of the supported distortion models: {choices}."
 
 
+# %% Camera frames
+
+
+@dataclass(kw_only=True)
+class CameraFrameIsWorldFrame(InvalidCameraObservation):
+    """
+    A camera pose is measured against the frame of the camera itself.
+    """
+
+    reason: str = field(init=False)
+    """
+    Description of the frame measured against itself.
+    """
+
+    frame: str
+    """
+    The name of the camera frame and of the frame its pose is measured against.
+    """
+
+    def __post_init__(self) -> None:
+        self.reason = (
+            f"the camera pose is measured against its own frame '{self.frame}'"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Measure the camera pose against a frame of the world, such as its root."
+
+
+@dataclass(kw_only=True)
+class FrameNamesSeveralBodies(InvalidCameraObservation):
+    """
+    A frame of a camera pose names more than one body of the world.
+    """
+
+    reason: str = field(init=False)
+    """
+    Description of the ambiguous frame.
+    """
+
+    frame: str
+    """
+    The name of the frame.
+    """
+
+    body_names: tuple[str, ...]
+    """
+    The names of the bodies the frame names.
+    """
+
+    def __post_init__(self) -> None:
+        self.reason = f"the frame '{self.frame}' names the bodies {self.body_names}"
+
+    def suggest_correction(self) -> str:
+        return "Give the bodies of the world unique names, or use their full names."
+
+
 # %% Semantic robot selection
 
 

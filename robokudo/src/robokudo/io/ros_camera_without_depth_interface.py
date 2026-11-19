@@ -36,11 +36,7 @@ from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.image import ImageRotation
 from robokudo.io.camera_interface import CameraFrame, ROSCameraInterface
 from robokudo.io.exceptions import UnsupportedImageRotation
-from robokudo.io.camera_model_adapters import RosCameraModelAdapter
-from semantic_digital_twin.datastructures.camera_model import (
-    CameraDistortionModel,
-    CameraModality,
-)
+from semantic_digital_twin.datastructures.camera_model import CameraDistortionModel
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -254,10 +250,44 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
             )
         )
 
+    def rotate_color_image_and_calibration(
+        self,
+        *,
+        color_image: npt.NDArray,
+        camera_info: CameraInfo,
+        rotation: ImageRotation,
+    ) -> npt.NDArray:
+        """
+        Rotate ``color_image`` and adapt the image size, intrinsics and distortion of
+        ``camera_info`` to the rotated image.
+
+        :param color_image: The color image ``camera_info`` calibrates.
+        :param camera_info: The calibration, changed in place.
+        :param rotation: Rotation applied to the image.
+        :return: The rotated color image.
+        :raises UnsupportedImageRotation: If the image rotation is unsupported.
+        """
+        rotated_image, rotated_intrinsics, (width, height) = (
+            self.rotate_image_and_intrinsics(
+                color_image,
+                intrinsic_matrix=np.array(camera_info.k).reshape(3, 3),
+                rotation=rotation,
+            )
+        )
+        camera_info.width = width
+        camera_info.height = height
+        camera_info.k = rotated_intrinsics.flatten()
+        camera_info.d = self.rotate_camera_distortion(
+            coefficients=camera_info.d,
+            distortion_model=camera_info.distortion_model,
+            rotation=rotation,
+        )
+        return rotated_image
+
     def set_data(self, *, cas: CAS, world: World) -> None:
         """
         Put the latest color image and camera observation into the CAS, rotating the
-        image and adapting the camera intrinsics if a rotation is configured.
+        image and adapting its calibration if a rotation is configured.
 
         :param cas: Common Analysis Structure to update
         :param world: The world perception perceives into
@@ -266,76 +296,17 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
             if not self._has_new_data:
                 return
             frame = self.latest_frame
-            camera_info = frame.camera_info
-            color = frame.color
-
-            width = camera_info.width
-            height = camera_info.height
-
-            focal_length_x = camera_info.k[0]
-            principal_point_x = camera_info.k[2]
-            focal_length_y = camera_info.k[4]
-            principal_point_y = camera_info.k[5]
+            color_image = frame.color_image
             if self.camera_config.rotate_image is not None:
-                intrinsic_matrix = np.array(
-                    [
-                        [focal_length_x, 0, principal_point_x],
-                        [0, focal_length_y, principal_point_y],
-                        [0, 0, 1],
-                    ]
-                )
-                rotated_image, rotated_intrinsics, new_size = (
-                    self.rotate_image_and_intrinsics(
-                        color,
-                        intrinsic_matrix=intrinsic_matrix,
-                        rotation=self.camera_config.rotate_image,
-                    )
-                )
-                color = rotated_image
-                flattened_intrinsics = rotated_intrinsics.flatten()
-                focal_length_x = flattened_intrinsics[0]
-                principal_point_x = flattened_intrinsics[2]
-                focal_length_y = flattened_intrinsics[4]
-                principal_point_y = flattened_intrinsics[5]
-                width, height = new_size
-                camera_info.k = (
-                    focal_length_x,
-                    0,
-                    principal_point_x,
-                    0,
-                    focal_length_y,
-                    principal_point_y,
-                    0,
-                    0,
-                    1,
-                )
-                camera_info.d = self.rotate_camera_distortion(
-                    coefficients=camera_info.d,
-                    distortion_model=camera_info.distortion_model,
+                color_image = self.rotate_color_image_and_calibration(
+                    color_image=color_image,
+                    camera_info=frame.camera_info,
                     rotation=self.camera_config.rotate_image,
                 )
 
-            camera_info.width = width
-            camera_info.height = height
-
-            cas.set(CASViews.COLOR_IMAGE, color)
+            cas.set(CASViews.COLOR_IMAGE, color_image)
             cas.set(CASViews.DEPTH_IMAGE, None)
             cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
-            camera_frame = camera_info.header.frame_id or self.camera_config.tf_from
-            self.validate_camera_frame_for_tf(camera_frame)
-            world_T_camera = self.world_T_camera_from_tf(
-                world=world, timestamp=frame.timestamp
-            )
-            self.store_camera_observation(
-                cas=cas,
-                world=world,
-                camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
-                camera_frame=camera_frame,
-                timestamp_nanoseconds=(
-                    frame.timestamp.sec * 1_000_000_000 + frame.timestamp.nanosec
-                ),
-                modalities=(CameraModality.COLOR,),
-                world_T_camera=world_T_camera,
-            )
+            self.store_latest_frame_observation(cas=cas, world=world)
 
             self._has_new_data = False

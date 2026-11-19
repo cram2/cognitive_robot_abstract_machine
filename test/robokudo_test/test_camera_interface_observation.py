@@ -515,8 +515,10 @@ def test_live_reader_rejects_tf_source_for_a_different_optical_frame(
     interface.lookup_viewpoint = True
     interface.tf_from = "another_optical_frame"
     interface.latest_frame = CameraFrame(
-        color=np.zeros((camera_info.height, camera_info.width, 3), dtype=np.uint8),
-        depth=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
         camera_info=camera_info,
         timestamp=Time(sec=10, nanosec=20),
     )
@@ -545,8 +547,10 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
     interface.latest_frame = CameraFrame(
-        color=np.zeros((camera_info.height, camera_info.width, 3), dtype=np.uint8),
-        depth=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
         camera_info=camera_info,
         timestamp=Time(sec=10, nanosec=20),
     )
@@ -584,8 +588,10 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
     interface.latest_frame = CameraFrame(
-        color=np.zeros((camera_info.height, camera_info.width, 3), dtype=np.uint8),
-        depth=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
         camera_info=camera_info,
         timestamp=Time(sec=10, nanosec=20),
     )
@@ -620,8 +626,10 @@ def test_rgbd_reader_stores_camera_observation(
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.latest_frame = CameraFrame(
-        color=np.zeros((camera_info.height, camera_info.width, 3), dtype=np.uint8),
-        depth=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
         camera_info=camera_info,
         timestamp=Time(sec=10, nanosec=20),
     )
@@ -656,7 +664,9 @@ def test_rgb_only_reader_stores_camera_observation(
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.latest_frame = CameraFrame(
-        color=np.zeros((camera_info.height, camera_info.width, 3), dtype=np.uint8),
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
         camera_info=camera_info,
         timestamp=Time(sec=30, nanosec=40),
     )
@@ -697,7 +707,9 @@ def test_rgb_only_rotation_updates_effective_calibration(
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.latest_frame = CameraFrame(
-        color=np.zeros((camera_info.height, camera_info.width, 3), dtype=np.uint8),
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
         camera_info=camera_info,
         timestamp=Time(sec=50, nanosec=60),
     )
@@ -758,8 +770,8 @@ def test_rgbd_high_resolution_crop_updates_effective_resolution(
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.latest_frame = CameraFrame(
-        color=np.zeros((1024, 1280, 3), dtype=np.uint8),
-        depth=np.zeros((480, 640), dtype=np.uint16),
+        color_image=np.zeros((1024, 1280, 3), dtype=np.uint8),
+        depth_image=np.zeros((480, 640), dtype=np.uint16),
         camera_info=camera_info,
         timestamp=Time(sec=70, nanosec=80),
     )
@@ -1134,8 +1146,8 @@ class TestCameraFrameFromMessages:
             camera_info=camera_info,
         )
 
-        np.testing.assert_array_equal(frame.color, color)
-        np.testing.assert_array_equal(frame.depth, depth)
+        np.testing.assert_array_equal(frame.color_image, color)
+        np.testing.assert_array_equal(frame.depth_image, depth)
         assert frame.camera_info is camera_info
         assert frame.timestamp == color_data.header.stamp
 
@@ -1147,4 +1159,4 @@ class TestCameraFrameFromMessages:
             np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"
         )
 
-        assert CameraFrame.from_messages(color_data=color_data).depth is None
+        assert CameraFrame.from_messages(color_data=color_data).depth_image is None

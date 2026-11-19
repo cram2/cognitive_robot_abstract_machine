@@ -4,8 +4,14 @@ Tests of the object hypothesis of :mod:`robokudo.types.scene`.
 
 from __future__ import annotations
 
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cup,
+    Human,
+    PerceivedObject,
+)
+
 from robokudo.types.annotation import Classification, PoseAnnotation
-from robokudo.types.scene import ObjectHypothesis
+from robokudo.types.scene import HumanHypothesis, ObjectHypothesis
 
 # %% latest annotation of a type
 
@@ -62,3 +68,85 @@ class TestClassLabel:
         hypothesis = ObjectHypothesis(annotations=[Classification()])
 
         assert hypothesis.class_label is None
+
+
+# %% semantic class
+
+
+class TestSemanticClass:
+    """
+    The semantic annotation a hypothesis names, however confident its classification.
+    """
+
+    def test_is_the_semantic_annotation_the_class_label_names(self) -> None:
+        hypothesis = ObjectHypothesis(
+            annotations=[Classification(classname="cup", confidence=0.0)]
+        )
+
+        assert hypothesis.semantic_class is Cup
+
+    def test_is_none_for_a_class_label_naming_no_semantic_annotation(self) -> None:
+        hypothesis = ObjectHypothesis(annotations=[Classification(classname="fork")])
+
+        assert hypothesis.semantic_class is None
+
+    def test_is_none_without_a_classification(self) -> None:
+        assert ObjectHypothesis().semantic_class is None
+
+    def test_is_human_for_a_human_whatever_its_class_label(self) -> None:
+        hypothesis = HumanHypothesis(annotations=[Classification(classname="cup")])
+
+        assert hypothesis.semantic_class is Human
+
+
+# %% believed semantic class
+
+
+class TestBelievedSemanticClass:
+    """
+    The semantic annotation a hypothesis is believed to be, given how confident a
+    classification has to be.
+    """
+
+    def test_is_the_semantic_class_of_a_confident_classification(self) -> None:
+        minimum_class_confidence = 0.5
+        hypothesis = ObjectHypothesis(
+            annotations=[
+                Classification(classname="cup", confidence=minimum_class_confidence)
+            ]
+        )
+
+        assert (
+            hypothesis.believed_semantic_class(
+                minimum_class_confidence=minimum_class_confidence
+            )
+            is Cup
+        )
+
+    def test_is_a_perceived_object_below_the_minimum_confidence(self) -> None:
+        hypothesis = ObjectHypothesis(
+            annotations=[Classification(classname="cup", confidence=0.4)]
+        )
+
+        assert (
+            hypothesis.believed_semantic_class(minimum_class_confidence=0.5)
+            is PerceivedObject
+        )
+
+    def test_is_a_perceived_object_for_a_label_naming_no_semantic_annotation(
+        self,
+    ) -> None:
+        hypothesis = ObjectHypothesis(
+            annotations=[Classification(classname="fork", confidence=1.0)]
+        )
+
+        assert (
+            hypothesis.believed_semantic_class(minimum_class_confidence=0.5)
+            is PerceivedObject
+        )
+
+    def test_is_human_for_an_unclassified_human(self) -> None:
+        assert (
+            HumanHypothesis().believed_semantic_class(minimum_class_confidence=0.5)
+            is Human
+        )

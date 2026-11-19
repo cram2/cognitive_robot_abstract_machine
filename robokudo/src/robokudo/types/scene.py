@@ -1,4 +1,5 @@
-"""Scene representation types for Robokudo.
+"""
+Scene representation types for Robokudo.
 
 This module provides types for representing and analyzing elements in a scene.
 It includes types for:
@@ -17,6 +18,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import open3d as o3d
+from semantic_digital_twin.reasoning.queries import annotation_class_by_label
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Human,
+    PerceivedObject,
+)
 from typing_extensions import TYPE_CHECKING, Any, TypeVar
 
 from robokudo.types.annotation import Classification
@@ -42,27 +49,27 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
 
     annotations: list = field(default_factory=list)
     """
-    List of associated annotations
+    List of associated annotations.
     """
 
     points: o3d.geometry.PointCloud = None
     """
-    Point cloud data
+    Point cloud data.
     """
 
     point_indices: list = field(default_factory=list)
     """
-    Indices into point cloud
+    Indices into point cloud.
     """
 
     object_knowledge: Body | None = None
     """
-    A reference to an SDT Body, if present
+    A reference to an SDT Body, if present.
     """
 
     roi: ImageROI = field(default_factory=ImageROI)
     """
-    Image region of interest
+    Image region of interest.
     """
 
     def latest_annotation_of_type(
@@ -81,10 +88,11 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
 
 @dataclass
 class ObjectHypothesis(AnalyzableAnnotation):
-    """Hypothesis about an object in the scene.
+    """
+    Hypothesis about an object in the scene.
 
-    Basic object hypothesis without additional specialization.
-    Inherits all capabilities from AnalyzableAnnotation.
+    Basic object hypothesis without additional specialization. Inherits all capabilities
+    from AnalyzableAnnotation.
     """
 
     @property
@@ -98,10 +106,39 @@ class ObjectHypothesis(AnalyzableAnnotation):
             return None
         return classification.classname
 
+    @property
+    def semantic_class(self) -> type[IsPerceivable] | None:
+        """
+        The semantic annotation :attr:`class_label` names, however confident its
+        classification is; None if it names none or the hypothesis was not classified.
+        """
+        if self.class_label is None:
+            return None
+        return annotation_class_by_label(self.class_label)
+
+    def believed_semantic_class(
+        self, *, minimum_class_confidence: float
+    ) -> type[IsPerceivable]:
+        """
+        :param minimum_class_confidence: How confident a classification has to be.
+        :return: :attr:`semantic_class` if the latest classification is at least
+            ``minimum_class_confidence`` confident, else :class:`PerceivedObject`.
+        """
+        classification = self.latest_annotation_of_type(annotation_type=Classification)
+        semantic_class = self.semantic_class
+        if (
+            semantic_class is None
+            or classification is None
+            or classification.confidence < minimum_class_confidence
+        ):
+            return PerceivedObject
+        return semantic_class
+
 
 @dataclass
 class HumanHypothesis(ObjectHypothesis):
-    """Hypothesis about a human in the scene.
+    """
+    Hypothesis about a human in the scene.
 
     In contrast to ObjectHypothesis, we have many different aspects on a Object to annotate.
     Therefore, the semantics of self.points, self.centroid and self.roi on this Hypothesis are a bit different.
@@ -117,22 +154,41 @@ class HumanHypothesis(ObjectHypothesis):
 
     goal: Any = None
     """
-    Goal associated with the human
+    Goal associated with the human.
     """
 
     result: Any = None
     """
-    Result of human-related processing
+    Result of human-related processing.
     """
+
+    @property
+    def semantic_class(self) -> type[IsPerceivable]:
+        """
+        Unlike :attr:`ObjectHypothesis.semantic_class`, :class:`Human` whatever the
+        class label names.
+        """
+        return Human
+
+    def believed_semantic_class(
+        self, *, minimum_class_confidence: float
+    ) -> type[IsPerceivable]:
+        """
+        Unlike :meth:`ObjectHypothesis.believed_semantic_class`, :class:`Human` however
+        confident the classification is.
+        """
+        return Human
 
 
 @dataclass
 class RegionHypothesis(AnalyzableAnnotation, Nameable):
-    """Hypothesis about a region in the scene.
+    """
+    Hypothesis about a region in the scene.
 
-    A region in the scene. It doesn't necessarily focus on one specific object, but is rather used as a data structure
-    to analyze a specific part of the 3d space. Examples: A region above a sofa for free seat estimation,
-    the space of a sink to check if it is filled with water, etc.
+    A region in the scene. It doesn't necessarily focus on one specific object, but is
+    rather used as a data structure to analyze a specific part of the 3d space.
+    Examples: A region above a sofa for free seat estimation, the space of a sink to
+    check if it is filled with water, etc.
     """
 
     ...
@@ -140,16 +196,17 @@ class RegionHypothesis(AnalyzableAnnotation, Nameable):
 
 @dataclass
 class ParthoodHypothesis(AnalyzableAnnotation, Nameable):
-    """Base class for part-whole relationships in objects.
+    """
+    Base class for part-whole relationships in objects.
 
-    This annotation can be used to represent parts of an object.
-    We mainly refer to 'features' and 'components'.
-    A logo at a specific place on an object would be a feature, while a control unit on an electrical device is
-    a component.
+    This annotation can be used to represent parts of an object. We mainly refer to
+    'features' and 'components'. A logo at a specific place on an object would be a
+    feature, while a control unit on an electrical device is a component.
 
-    Parthood Annotations are still a Hypothesis, because due to bad pose estimation we might actually not
-    refer to the correct region of the parthood. Example: Pose estimation is off by 180 degrees around the up-axis
-    and you are referring to a feature on the front face of an object.
+    Parthood Annotations are still a Hypothesis, because due to bad pose estimation we
+    might actually not refer to the correct region of the parthood. Example: Pose
+    estimation is off by 180 degrees around the up-axis and you are referring to a
+    feature on the front face of an object.
     """
 
 
@@ -159,7 +216,8 @@ class ParthoodComponentHypothesis(ParthoodHypothesis): ...
 
 @dataclass
 class ParthoodFeatureHypothesis(ParthoodHypothesis):
-    """Hypothesis about a feature part of an object.
+    """
+    Hypothesis about a feature part of an object.
 
     Represents surface or visual features like:
 
@@ -174,7 +232,8 @@ class ParthoodFeatureHypothesis(ParthoodHypothesis):
 
 @dataclass
 class OccupiedAnnotation(Annotation):
-    """Annotation indicating region occupancy.
+    """
+    Annotation indicating region occupancy.
 
     This annotation can be used to indicate that a region is occupied.
     """

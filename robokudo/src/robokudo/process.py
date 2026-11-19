@@ -48,7 +48,7 @@ from robokudo.identifier import BBIdentifier
 from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.pipeline import Pipeline
 from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.tree import setup_with_descendants_rk
+from robokudo.utils.tree import setup_with_descendants_on_behavior
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
@@ -213,7 +213,7 @@ class RoboKudo:
             include_gui=include_gui,
             visualizer_types=visualizer_types,
         )
-        setup_with_descendants_rk(self.tree)
+        setup_with_descendants_on_behavior(self.tree.root)
 
     def run(self, *, tick_rate: float = 5.0) -> None:
         """
@@ -225,7 +225,9 @@ class RoboKudo:
         :param tick_rate: How often to tick per second.
         """
         logger = logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
-        logger.info(f"Running AE named '{self.analysis_engine.name()}'...")
+        logger.info(
+            f"Running the analysis engine named '{self.analysis_engine.name()}'..."
+        )
         Blackboard().set("CAS", None)
 
         interval = 1.0 / tick_rate
