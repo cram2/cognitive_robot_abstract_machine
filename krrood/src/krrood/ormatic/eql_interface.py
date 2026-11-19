@@ -6,7 +6,7 @@ objects.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Callable, Any, TYPE_CHECKING
+from typing_extensions import Callable, Any
 import operator
 
 import sqlalchemy.inspection
@@ -36,7 +36,10 @@ from krrood.entity_query_language.operators.core_logical_operators import AND, O
 from krrood.entity_query_language.operators.logical_quantifiers import (
     Exists as EQLExists,
 )
-from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.core.base_expressions import (
+    HasExpression,
+    SymbolicExpression,
+)
 from krrood.entity_query_language.core.variable import Variable, Literal
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.operators.comparator import Comparator
@@ -57,9 +60,6 @@ from krrood.ormatic.exceptions import (
     NoDAOFoundForTypeError,
     NoDAOFoundForSelectionError,
 )
-
-if TYPE_CHECKING:
-    from krrood.entity_query_language.query.match import Match
 
 
 @dataclass(kw_only=True)
@@ -1562,13 +1562,12 @@ class EQLTranslator:
 
 
 def eql_to_sql(
-    query: Query | Match,
+    query: HasExpression,
     session: Session,
     as_common_table_expression: str | None = None,
 ) -> EQLTranslator | CTE:
     """
-    Translate an EQL query, or a match, which translates as the query it stands for, to
-    SQL.
+    Translate an EQL query, or an object standing for one such as a match, to SQL.
 
     .. code-block:: python
 
@@ -1583,16 +1582,20 @@ def eql_to_sql(
             .join(large_bodies, large_bodies.c.database_id == ContainerDAO.database_id)
         )
 
-    :param query: The EQL query
+    :param query: The EQL query, or the object standing for it
     :param session: The SQLAlchemy session
     :param as_common_table_expression: If provided, returns a SQLAlchemy common table expression with this name.
     The name is required because SQL common table expressions must have an explicit alias
     (e.g. WITH large_bodies AS (SELECT ...))
     :return: EQLTranslator or SQLAlchemy common table expression
+    :raises UnsupportedQueryTypeError: When *query* stands for an expression that is not
+        a query.
     """
-    query = query._get_expression_()
-    query.build()
-    result = EQLTranslator(eql_query=query, session=session)
+    expression = query._get_expression_()
+    if not isinstance(expression, Query):
+        raise UnsupportedQueryTypeError(query=expression)
+    expression.build()
+    result = EQLTranslator(eql_query=expression, session=session)
     result.translate()
 
     if as_common_table_expression is not None:

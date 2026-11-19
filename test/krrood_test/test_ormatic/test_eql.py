@@ -46,7 +46,11 @@ from krrood.entity_query_language.factories import (
     exists,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
-from krrood.ormatic.eql_interface import eql_to_sql, UnsupportedNestedQueryError
+from krrood.ormatic.eql_interface import (
+    eql_to_sql,
+    UnsupportedNestedQueryError,
+    UnsupportedQueryTypeError,
+)
 from krrood.entity_query_language.query.query import UnificationDict
 
 if TYPE_CHECKING:
@@ -1799,3 +1803,12 @@ def test_match_with_limit_wrapped_in_entity_raises(
 
     with pytest.raises(UnsupportedNestedQueryError):
         eql_to_sql(query, session)
+
+
+def test_expression_that_is_not_a_query_raises(session):
+    """
+    An expression that is not a query, such as a variable on its own, has no
+    translation.
+    """
+    with pytest.raises(UnsupportedQueryTypeError):
+        eql_to_sql(variable(NestedAction, domain=[]), session)
