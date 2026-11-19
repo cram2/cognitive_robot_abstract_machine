@@ -345,7 +345,7 @@ class TestStorage:
         sem_world = World()
         camera_interface().bind_world_T_camera(
             world=sem_world,
-            world_frame=world_frame,
+            reference_frame=world_frame,
             camera_frame=camera_frame,
             world_T_camera=HomogeneousTransformationMatrix(),
         )

@@ -40,7 +40,7 @@ class TestWorldDescriptorBootstrapAnnotator:
         runtime_world = World()
         camera_interface().bind_world_T_camera(
             world=runtime_world,
-            world_frame="map",
+            reference_frame="map",
             camera_frame="camera",
             world_T_camera=HomogeneousTransformationMatrix(),
         )

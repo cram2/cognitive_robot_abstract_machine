@@ -105,7 +105,7 @@ class UnsupportedCameraDistortionModel(InvalidCameraObservation):
 
 
 @dataclass(kw_only=True)
-class CameraFrameIsWorldFrame(InvalidCameraObservation):
+class CameraFrameIsReferenceFrame(InvalidCameraObservation):
     """
     A camera pose is measured against the frame of the camera itself.
     """

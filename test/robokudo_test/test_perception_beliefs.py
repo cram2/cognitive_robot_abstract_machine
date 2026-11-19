@@ -476,7 +476,7 @@ class TestNewObjects:
         world_body = Body(name=PrefixedName(FrameName.WORLD, prefix="robot"))
         with world.modify_world():
             world.add_body(world_body)
-        cas = cas_seen_from(world, camera_pose(), world_frame=str(world_body.name))
+        cas = cas_seen_from(world, camera_pose(), reference_frame=str(world_body.name))
 
         put_pass_into_world(robokudo, cas, make_object_hypothesis())
 

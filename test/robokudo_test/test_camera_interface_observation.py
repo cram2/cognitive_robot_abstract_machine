@@ -315,7 +315,7 @@ def test_tf_binding_places_robot_camera_where_tf_located_it(
 
     pose = CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
-        world_frame="map",
+        reference_frame="map",
         camera_frame="/color_optical_frame",
         world_T_camera=numeric_pose,
     )
@@ -348,7 +348,7 @@ def test_tf_binding_keeps_robot_camera_attached_to_the_world_frame(
 
     CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
-        world_frame="map",
+        reference_frame="map",
         camera_frame="color_optical_frame",
         world_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.4),
     )
@@ -851,7 +851,7 @@ def test_tf_binding_attaches_existing_camera_root_to_new_reference(
 
     pose = CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
-        world_frame="map",
+        reference_frame="map",
         camera_frame=str(camera_body.name),
         world_T_camera=numeric_pose,
     )
@@ -985,7 +985,7 @@ def warnings_after_comparing_with_tf(
     camera.tf_wrapper.lookup_transform.return_value = latest_tf_sample
     world_T_camera = camera.bind_world_T_camera(
         world=world,
-        world_frame=camera.tf_to,
+        reference_frame=camera.tf_to,
         camera_frame=camera.tf_from,
         world_T_camera=TransformToSemDTConverter.convert(
             data=latest_tf_sample.transform, world=world

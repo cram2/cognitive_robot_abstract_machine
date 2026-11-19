@@ -55,7 +55,7 @@ from robokudo.exceptions import (
 )
 from robokudo.io.exceptions import (
     CameraAnnotationAmbiguous,
-    CameraFrameIsWorldFrame,
+    CameraFrameIsReferenceFrame,
     FrameNamesSeveralBodies,
 )
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
@@ -143,7 +143,7 @@ class CameraInterface(object):
         self,
         *,
         world: World,
-        world_frame: str,
+        reference_frame: str,
         camera_frame: str,
         world_T_camera: HomogeneousTransformationMatrix,
     ) -> HomogeneousTransformationMatrix:
@@ -151,48 +151,50 @@ class CameraInterface(object):
         Bind a sampled camera pose to the bodies of ``world``.
 
         A camera another process attached, such as a robot's camera, keeps that
-        attachment. Any other camera hangs below ``world_frame`` at the sampled pose,
-        unless ``world`` lacks it and :meth:`adds_missing_camera` is false.
+        attachment. Any other camera hangs below ``reference_frame`` at the sampled
+        pose, unless ``world`` lacks it and :meth:`adds_missing_camera` is false.
 
         :param world: The world perception perceives into.
-        :param world_frame: Name of the frame the pose is measured against, such as the
-            target frame of a TF lookup; any body of ``world``, not only its root.
+        :param reference_frame: Name of the frame the pose is measured against, such as
+            the target frame of a TF lookup; any body of ``world``, not only its root.
         :param camera_frame: Name of the camera frame.
         :param world_T_camera: Sampled numeric camera pose.
         :return: Camera pose bound to the bodies of ``world``, without a child frame for
             a camera that has no body there.
-        :raises CameraFrameIsWorldFrame: If both frames are the same.
+        :raises CameraFrameIsReferenceFrame: If both frames are the same.
         :raises FrameNamesSeveralBodies: If a frame names several bodies.
         :raises UnknownWorldFrameError: If ``world`` has a root but no body for
-            ``world_frame``.
+            ``reference_frame``.
         """
-        world_frame = normalize_ros_frame_id(world_frame)
+        reference_frame = normalize_ros_frame_id(reference_frame)
         camera_frame = normalize_ros_frame_id(camera_frame)
-        if world_frame == camera_frame:
-            raise CameraFrameIsWorldFrame(frame=camera_frame)
-        world_body = self._find_body_of_frame(world=world, frame=world_frame)
+        if reference_frame == camera_frame:
+            raise CameraFrameIsReferenceFrame(frame=camera_frame)
+        reference_body = self._find_body_of_frame(world=world, frame=reference_frame)
         camera_body = self._find_body_of_frame(world=world, frame=camera_frame)
         if (
-            world_body is None
+            reference_body is None
             and world.root is not None
             and world.root is not camera_body
         ):
-            raise UnknownWorldFrameError(world_frame=world_frame)
+            raise UnknownWorldFrameError(world_frame=reference_frame)
         if camera_body is None and not self.adds_missing_camera(world=world):
             return HomogeneousTransformationMatrix(
-                data=world_T_camera, reference_frame=world_body
+                data=world_T_camera, reference_frame=reference_body
             )
 
         mount = self._standalone_mount(
             world=world,
-            world_frame=world_frame,
+            reference_frame=reference_frame,
             camera_frame=camera_frame,
-            world_body=world_body,
+            reference_body=reference_body,
             camera_body=camera_body,
         )
         if mount is None:
             return HomogeneousTransformationMatrix(
-                data=world_T_camera, reference_frame=world_body, child_frame=camera_body
+                data=world_T_camera,
+                reference_frame=reference_body,
+                child_frame=camera_body,
             )
         bound_world_T_camera = HomogeneousTransformationMatrix(
             data=world_T_camera, reference_frame=mount.parent, child_frame=mount.child
@@ -220,41 +222,41 @@ class CameraInterface(object):
         self,
         *,
         world: World,
-        world_frame: str,
+        reference_frame: str,
         camera_frame: str,
-        world_body: Body | None,
+        reference_body: Body | None,
         camera_body: Body | None,
     ) -> Connection6DoF | None:
         """
         :param world: The world perception perceives into.
-        :param world_frame: Name of the frame the camera pose is measured against.
+        :param reference_frame: Name of the frame the camera pose is measured against.
         :param camera_frame: Name of the camera frame.
-        :param world_body: The body of ``world_frame``, or None if ``world`` lacks it.
+        :param reference_body: The body of ``reference_frame``, or None if ``world`` lacks it.
         :param camera_body: The body of ``camera_frame``, or None if ``world`` lacks it.
         :return: The adjustable mount perception places the camera with below the
-            world frame: the one it created earlier, or a new one, adding the bodies
+            reference frame: the one it created earlier, or a new one, adding the bodies
             ``world`` lacks; None if another process attached the camera.
         """
         if (
-            world_body is not None
+            reference_body is not None
             and camera_body is not None
             and camera_body.parent_connection is not None
         ):
             if (
                 self.is_mounted_standalone(camera_body=camera_body)
-                and camera_body.parent_connection.parent is world_body
+                and camera_body.parent_connection.parent is reference_body
             ):
                 return camera_body.parent_connection
             return None
         with world.modify_world():
-            if world_body is None:
-                world_body = Body(name=PrefixedName(name=world_frame))
-                world.add_body(world_body)
+            if reference_body is None:
+                reference_body = Body(name=PrefixedName(name=reference_frame))
+                world.add_body(reference_body)
             if camera_body is None:
                 camera_body = Body(name=PrefixedName(name=camera_frame))
                 world.add_body(camera_body)
             mount = Connection6DoF.create_with_dofs(
-                parent=world_body,
+                parent=reference_body,
                 child=camera_body,
                 world=world,
                 name=self._standalone_mount_name(camera_body),
@@ -298,7 +300,7 @@ class CameraInterface(object):
 
         return self.bind_world_T_camera(
             world=world,
-            world_frame=self.camera_config.static_world_frame,
+            reference_frame=self.camera_config.static_world_frame,
             camera_frame=camera_frame,
             world_T_camera=self.camera_config.static_world_T_camera,
         )
@@ -580,7 +582,7 @@ class ROSCameraInterface(CameraInterface):
             raise CameraPoseMissing()
         world_T_camera = self.bind_world_T_camera(
             world=world,
-            world_frame=self.tf_to,
+            reference_frame=self.tf_to,
             camera_frame=self.tf_from,
             world_T_camera=TransformToSemDTConverter.convert(
                 data=self._world_T_camera.transform, world=world
