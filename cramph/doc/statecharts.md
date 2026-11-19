@@ -659,8 +659,10 @@ cramph ships these nodes besides the templates:
 
 A compiled statechart can take new nodes. Adding a node compiles the statechart again; the
 nodes it already held keep their state and history. Changes made inside a
-`with statechart.modify():` block compile only once, when the outermost block ends; the
-nodes added in a block that raises are dropped again. A node the latest compile covered
+`with statechart.modify():` block compile only once, when the outermost block ends. A block
+that raises shows that the statechart was built wrongly: nothing it changed is undone, and
+every later use of the statechart raises `StatechartBrokenByFailedModificationError`, even
+if the error of the block was caught. A node the latest compile covered
 cannot be removed, and a composite node it covered takes no new children, unless its class
 accepts children after compiling, as a [node choosing its child](#choosing-a-child-while-running)
 does, or the change happens in a `with statechart.modify(rewrites_compiled_nodes=True):` block,

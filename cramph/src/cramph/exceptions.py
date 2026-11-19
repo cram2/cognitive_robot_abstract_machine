@@ -895,6 +895,34 @@ class RemovedNodeStillReferencedError(StatechartError):
 
 
 @dataclass(kw_only=True)
+class StatechartBrokenByFailedModificationError(StatechartError):
+    """
+    Raised when a statechart is used after a
+    :meth:`~cramph.statechart.Statechart.modify` block of it raised, which left it
+    half changed.
+    """
+
+    modification_error: BaseException
+    """
+    The error the block raised.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A modify() block of this statechart raised "
+            f"{type(self.modification_error).__name__}, see the error this one was "
+            f"raised from. The statechart stays half changed, as that block left it, "
+            f"and cannot be used any more."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Fix what made the block raise, which shows that the statechart was built "
+            "wrongly, and build the statechart anew instead of catching the error."
+        )
+
+
+@dataclass(kw_only=True)
 class NodeStateVariableNotSerializableError(JSONSerializationError):
     """
     Raised when a node state variable is serialized to JSON, which has no way to refer

@@ -640,7 +640,12 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
 
         Children and conditions are written as they are now, once every node they name
         belongs to :attr:`statechart`; until then they wait for a later block.
+
+        :raises StatechartBrokenByFailedModificationError: If a
+            :meth:`~cramph.statechart.Statechart.modify` block of :attr:`statechart`
+            raised.
         """
+        self.statechart.check_not_broken()
         changes = [*self.recorded_changes, *self._take_ready_changes()]
         self.recorded_changes = []
         if not changes:

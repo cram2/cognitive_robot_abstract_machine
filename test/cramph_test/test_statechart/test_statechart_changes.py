@@ -18,6 +18,7 @@ from cramph.composites import (
 )
 from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValue, TransitionKind
+from cramph.exceptions import StatechartBrokenByFailedModificationError
 from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode, EndStatechart, StatechartNode
 from cramph.nodes_for_testing import (
@@ -176,100 +177,33 @@ def test_the_changes_of_one_modification_form_one_block(sender):
 
 def test_a_failed_modification_records_no_change(sender):
     """
-    A modification that raises leaves the statechart as it was, so there is nothing to
-    repeat.
+    A modification that raises breaks the statechart, so its changes never reach a
+    receiver.
     """
     block_count = len(sender.structure_change_recorder.change_blocks)
 
     with pytest.raises(ZeroDivisionError):
         with sender.modify():
-            sender.add_node(node=ConstTrueNode(name="dropped"))
+            sender.add_node(node=ConstTrueNode(name="kept"))
             1 / 0
 
     assert len(sender.structure_change_recorder.change_blocks) == block_count
 
 
-def test_a_removal_in_a_failed_modification_is_undone_in_both_statecharts(sender):
+def test_a_change_outside_a_modification_after_a_failed_one_closes_no_block(sender):
     """
-    The removed node is back in the sender, so the receiver, which never learnt of the
-    removal, holds the same nodes.
+    A broken statechart refuses to close the change into a block of its own.
     """
-    extra = ConstTrueNode(name="extra")
-    sender.add_node(node=extra)
-    structure_before = structure(statechart=sender)
-
+    first, second = sender.nodes[1:3]
     with pytest.raises(ZeroDivisionError):
         with sender.modify():
-            sender.remove_node(node=extra)
             1 / 0
-    receiver = replay(
-        blocks=sender.structure_change_recorder.change_blocks,
-        receiver=empty_statechart(),
-    )
+    block_count = len(sender.structure_change_recorder.change_blocks)
 
-    assert structure(statechart=sender) == structure_before
-    assert structure(statechart=receiver) == structure_before
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        second.pause_condition = first.is_running
 
-
-def test_a_failed_modification_puts_back_a_removed_node_before_dropping_an_added_one(
-    sender,
-):
-    """
-    The node removed with everything below it gets its place back, and the node added
-    after the removal leaves again.
-    """
-    outer = sender.get_nodes_by_type(node_type=CompositeNode)[-1]
-    added = ConstTrueNode(name="added")
-    structure_before = structure(statechart=sender)
-
-    with pytest.raises(ZeroDivisionError):
-        with sender.modify():
-            sender.remove_node(node=outer)
-            sender.add_node(node=added)
-            1 / 0
-
-    assert structure(statechart=sender) == structure_before
-    assert not added.belongs_to_statechart()
-
-
-def test_a_failed_modification_keeps_the_reset_requested_for_a_node_it_removed(sender):
-    """
-    The reset requested before the modification still holds for the node put back.
-    """
-    extra = ConstTrueNode(name="extra")
-    sender.add_node(node=extra)
-    sender.request_reset(node=extra)
-
-    with pytest.raises(ZeroDivisionError):
-        with sender.modify():
-            sender.remove_node(node=extra)
-            1 / 0
-
-    assert sender.take_requested_resets() == [extra]
-
-
-def test_a_rebuild_requested_in_a_failed_modification_is_forgotten_in_both_statecharts(
-    sender,
-):
-    """
-    Neither statechart builds the node again on its next compile.
-    """
-    sequence = sender.nodes[0]
-    rebuilds_before = list(sender.compiler.nodes_to_rebuild)
-
-    with pytest.raises(ZeroDivisionError):
-        with sender.modify():
-            sender.request_rebuild(node=sequence)
-            1 / 0
-    receiver = replay(
-        blocks=sender.structure_change_recorder.change_blocks,
-        receiver=empty_statechart(),
-    )
-
-    assert sender.compiler.nodes_to_rebuild == rebuilds_before
-    assert [node._node_id for node in receiver.compiler.nodes_to_rebuild] == [
-        node._node_id for node in rebuilds_before
-    ]
+    assert len(sender.structure_change_recorder.change_blocks) == block_count
 
 
 def test_a_condition_set_outside_a_modification_closes_a_block_of_its_own(sender):

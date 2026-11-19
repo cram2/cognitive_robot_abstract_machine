@@ -70,16 +70,6 @@ class State(MutableMapping[StatechartNode, float], SubclassJSONSerializer, ABC):
         """
         self.data = np.append(self.data, self.default_value)
 
-    def insert_value(self, *, index: int, value: float) -> None:
-        """
-        Inserts `value` into :attr:`data` at `index`, for a node that takes that index
-        and moves every node from there on one index up.
-
-        :param index: The index the node takes.
-        :param value: The value of the node.
-        """
-        self.data = np.insert(self.data, index, value)
-
     def life_cycle_symbols(self) -> list[LifeCycleVariable]:
         """
         :return: The life cycle variable of every node, in node order.

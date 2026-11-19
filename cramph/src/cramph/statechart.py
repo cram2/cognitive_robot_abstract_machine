@@ -18,7 +18,6 @@ from typing_extensions import (
     Self,
 )
 
-import krrood.symbolic_math.symbolic_math as sm
 from cramph.plotters.gantt_chart_plotter import HistoryGanttChartPlotter
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from krrood.rustworkx_utils.graph_visualizer_base import (
@@ -41,6 +40,7 @@ from cramph.exceptions import (
     NotHeldByControlStructureNodeError,
     NotInStatechartError,
     RemovedNodeStillReferencedError,
+    StatechartBrokenByFailedModificationError,
 )
 from cramph.node import (
     CancelStatechart,
@@ -81,185 +81,13 @@ logger = logging.getLogger(__name__)
 # %% modifying a statechart
 
 
-@dataclass(kw_only=True, eq=False)
-class ReplacedNode:
-    """
-    A node another node was put in the place of, with what it had before, so that a
-    modification that fails afterwards can put it back.
-    """
-
-    node: StatechartNode
-    """
-    The node that was replaced.
-    """
-
-    replacement: StatechartNode
-    """
-    The node put in its place.
-    """
-
-    former_parent: CompositeNode | None
-    """
-    The parent the node had, or None for a top-level node.
-    """
-
-    former_conditions: dict[TransitionKind, sm.Scalar]
-    """
-    The transitions the former parent decided for the node, as they were.
-    """
-
-    @classmethod
-    def before_replacing(
-        cls, *, node: StatechartNode, replacement: StatechartNode
-    ) -> ReplacedNode:
-        """
-        :param node: The node about to be replaced.
-        :param replacement: The node about to be put in its place.
-        :return: The node as it is now.
-        """
-        return cls(
-            node=node,
-            replacement=replacement,
-            former_parent=node.parent_node,
-            former_conditions={
-                transition_kind: node.get_condition(transition_kind=transition_kind)
-                for transition_kind in TransitionKind.owner_wired_kinds()
-            },
-        )
-
-    def put_back(self) -> None:
-        """
-        Gives the node its former parent, its place among that parent's nodes, and the
-        transitions that parent decided for it.
-        """
-        self.node.parent_node = self.former_parent
-        for transition_kind, condition in self.former_conditions.items():
-            self.node.set_condition(
-                transition_kind=transition_kind, expression=condition
-            )
-        if self.former_parent is not None:
-            self.former_parent.list_in_place_of(
-                child=self.replacement, substitute=self.node
-            )
-
-
-@dataclass(kw_only=True, eq=False)
-class RemovedNodePlace:
-    """
-    Where a node removed from a statechart was in it, and the state it had there.
-    """
-
-    node: StatechartNode
-    """
-    The removed node.
-    """
-
-    index: int
-    """
-    The index the node had.
-    """
-
-    parent_node_index: int | None
-    """
-    The index its parent had, or None for a top-level node.
-    """
-
-    life_cycle: float
-    """
-    The life cycle state the node had.
-    """
-
-    observation: float
-    """
-    The observation state the node had.
-    """
-
-    last_observation: float
-    """
-    The last observation state the node had.
-    """
-
-
-@dataclass(kw_only=True, eq=False)
-class RemovedNode:
-    """
-    A node removed from a statechart together with everything below it, with what the
-    statechart held about them, so that a modification that fails afterwards can put
-    them back.
-    """
-
-    node: StatechartNode
-    """
-    The node that was removed.
-    """
-
-    places: list[RemovedNodePlace]
-    """
-    Where the node and every node below it were, in index order.
-    """
-
-    former_children_of_parent: list[StatechartNode] | None
-    """
-    The children the parent of the node listed, the node among them, or None if no
-    parent listed it.
-    """
-
-    former_requested_resets: list[StatechartNode]
-    """
-    The nodes the statechart was to reset, as they were.
-    """
-
-    former_nodes_to_rebuild: list[StatechartNode]
-    """
-    The nodes the statechart was to build again on its next compile, as they were.
-    """
-
-    @classmethod
-    def before_removing(
-        cls,
-        *,
-        statechart: Statechart,
-        node: StatechartNode,
-        removed_nodes: list[StatechartNode],
-    ) -> RemovedNode:
-        """
-        :param statechart: The statechart `node` is about to be removed from.
-        :param node: The node about to be removed.
-        :param removed_nodes: `node` and every node below it.
-        :return: The removed nodes as they are now.
-        """
-        parent_node = node.parent_node
-        lists_node = parent_node is not None and any(
-            child is node for child in parent_node.nodes
-        )
-        return cls(
-            node=node,
-            places=[
-                RemovedNodePlace(
-                    node=removed_node,
-                    index=removed_node.index,
-                    parent_node_index=removed_node.parent_node_index,
-                    life_cycle=statechart.life_cycle_state[removed_node],
-                    observation=statechart.observation_state[removed_node],
-                    last_observation=statechart.last_observation_state[removed_node],
-                )
-                for removed_node in sorted(
-                    removed_nodes, key=lambda removed_node: removed_node.index
-                )
-            ],
-            former_children_of_parent=list(parent_node.nodes) if lists_node else None,
-            former_requested_resets=list(statechart._requested_resets),
-            former_nodes_to_rebuild=list(statechart.compiler.nodes_to_rebuild),
-        )
-
-
 @dataclass(kw_only=True)
 class StatechartModification:
     """
     Batches changes to a statechart, which the outermost of any nested modifications
     closes into a :class:`~cramph.statechart_changes.StatechartChangeBlock` and a
-    compiled statechart compiles once. A block that raises undoes the additions,
-    removals, replacements, resets and rebuilds made in it and compiles nothing.
+    compiled statechart compiles once. A block that raises breaks the statechart, which
+    stays as the block left it, see :meth:`Statechart.check_not_broken`.
     """
 
     statechart: Statechart
@@ -273,77 +101,16 @@ class StatechartModification:
     block.
     """
 
-    _node_count_at_start: int = field(init=False, default=0)
-    """
-    How many nodes the statechart held when this modification started.
-    """
-
-    _replaced_count_at_start: int = field(init=False, default=0)
-    """
-    How many nodes were replaced in the open modifications when this one started.
-    """
-
-    _removed_count_at_start: int = field(init=False, default=0)
-    """
-    How many nodes were removed in the open modifications when this one started.
-    """
-
-    _requested_reset_count_at_start: int = field(init=False, default=0)
-    """
-    How many resets were requested and not carried out yet when this modification
-    started.
-    """
-
-    _requested_rebuild_count_at_start: int = field(init=False, default=0)
-    """
-    How many nodes were to be built again on the next compile when this modification
-    started.
-    """
-
-    _recorded_change_count_at_start: int = field(init=False, default=0)
-    """
-    How many changes the open modifications had recorded when this one started.
-    """
-
     def __enter__(self) -> Self:
         """
-        Remembers how far the statechart got, so that a block that raises can go back there.
+        :raises StatechartBrokenByFailedModificationError: If a block of the statechart
+            raised before.
         """
-        self._recorded_change_count_at_start = len(
-            self.statechart.structure_change_recorder.recorded_changes
-        )
-        self._node_count_at_start = len(self.statechart.nodes)
-        self._replaced_count_at_start = len(self.statechart._replaced_nodes)
-        self._removed_count_at_start = len(self.statechart._removed_nodes)
-        self._requested_reset_count_at_start = len(self.statechart._requested_resets)
-        self._requested_rebuild_count_at_start = len(
-            self.statechart.compiler.nodes_to_rebuild
-        )
+        self.statechart.check_not_broken()
         self.statechart._open_modifications += 1
         if self.rewrites_compiled_nodes:
             self.statechart._open_rewriting_modifications += 1
         return self
-
-    def _roll_back(self) -> None:
-        """
-        Puts the statechart back the way it was when this modification started, while
-        this modification still counts as open, so no change block closes meanwhile.
-        """
-        statechart = self.statechart
-        statechart._put_back_removed_nodes_from(
-            first_put_back=self._removed_count_at_start
-        )
-        statechart._put_back_replaced_nodes_from(
-            first_put_back=self._replaced_count_at_start
-        )
-        statechart._drop_nodes_from(first_dropped_index=self._node_count_at_start)
-        del statechart._requested_resets[self._requested_reset_count_at_start :]
-        del statechart.compiler.nodes_to_rebuild[
-            self._requested_rebuild_count_at_start :
-        ]
-        del statechart.structure_change_recorder.recorded_changes[
-            self._recorded_change_count_at_start :
-        ]
 
     def __exit__(
         self,
@@ -352,28 +119,26 @@ class StatechartModification:
         traceback: TracebackType | None,
     ) -> None:
         """
-        Rolls back a block that raised; the outermost block that did not closes its
-        changes into a block and compiles a compiled statechart that changed.
+        Breaks the statechart if the block raised. Otherwise the outermost block closes
+        its changes into a block and compiles a compiled statechart that changed.
+
+        :raises StatechartBrokenByFailedModificationError: If a block nested in this one
+            raised and this one did not.
         """
         statechart = self.statechart
-        if exception is not None:
-            self._roll_back()
         statechart._open_modifications -= 1
         if self.rewrites_compiled_nodes:
             statechart._open_rewriting_modifications -= 1
-        if statechart._open_modifications == 0:
-            statechart._replaced_nodes.clear()
-            statechart._removed_nodes.clear()
-            if exception is None:
-                statechart.structure_change_recorder.close_change_block()
-        compiler = statechart.compiler
-        if (
-            exception is not None
-            or statechart._open_modifications > 0
-            or not compiler.is_compiled
-        ):
+        if exception is not None:
+            if statechart._modification_error is None:
+                statechart._modification_error = exception
             return
-        if not compiler.changed_since_compile:
+        statechart.check_not_broken()
+        if statechart._open_modifications > 0:
+            return
+        statechart.structure_change_recorder.close_change_block()
+        compiler = statechart.compiler
+        if not compiler.is_compiled or not compiler.changed_since_compile:
             return
         compiler.compile()
 
@@ -496,18 +261,12 @@ class Statechart(SubclassJSONSerializer):
     order.
     """
 
-    _replaced_nodes: list[ReplacedNode] = field(
-        default_factory=list, init=False, repr=False
+    _modification_error: BaseException | None = field(
+        default=None, init=False, repr=False
     )
     """
-    The nodes replaced in the open modifications, in order.
-    """
-
-    _removed_nodes: list[RemovedNode] = field(
-        default_factory=list, init=False, repr=False
-    )
-    """
-    The nodes removed in the open modifications, in order.
+    The error with which a :meth:`modify` block broke this statechart, or None while no
+    block raised.
     """
 
     _nodes: list[StatechartNode] = field(default_factory=list, init=False, repr=False)
@@ -660,6 +419,17 @@ class Statechart(SubclassJSONSerializer):
             statechart=self, rewrites_compiled_nodes=rewrites_compiled_nodes
         )
 
+    def check_not_broken(self) -> None:
+        """
+        :raises StatechartBrokenByFailedModificationError: If a :meth:`modify` block
+            raised, so the statechart stays as that block left it, half changed.
+        """
+        if self._modification_error is None:
+            return
+        raise StatechartBrokenByFailedModificationError(
+            modification_error=self._modification_error
+        ) from self._modification_error
+
     @property
     def may_rewrite_compiled_nodes(self) -> bool:
         """
@@ -727,86 +497,6 @@ class Statechart(SubclassJSONSerializer):
             self._register_node(node=node)
             if isinstance(node, CompositeNode):
                 self._expand(node=node)
-
-    def _put_back_removed_nodes_from(self, *, first_put_back: int) -> None:
-        """
-        Puts back every node removed from `first_put_back` on, the latest first.
-
-        :param first_put_back: The position of the first record to undo in
-            :attr:`_removed_nodes`.
-        """
-        for removed in reversed(self._removed_nodes[first_put_back:]):
-            self._put_back_removed_node(removed=removed)
-        del self._removed_nodes[first_put_back:]
-
-    def _put_back_removed_node(self, *, removed: RemovedNode) -> None:
-        """
-        Gives the removed nodes their former indices, states and parents, and puts back
-        the children of their parent and the resets and rebuilds as they were.
-
-        :param removed: The latest removal not undone yet, so every change made after
-            it has been undone.
-        """
-        nodes = list(self._nodes)
-        for place in removed.places:
-            nodes.insert(place.index, place.node)
-            self.life_cycle_state.insert_value(
-                index=place.index, value=place.life_cycle
-            )
-            self.observation_state.insert_value(
-                index=place.index, value=place.observation
-            )
-            self.last_observation_state.insert_value(
-                index=place.index, value=place.last_observation
-            )
-        new_index_of = {
-            kept_node.index: new_index
-            for new_index, kept_node in enumerate(nodes)
-            if kept_node._statechart is self
-        }
-        for kept_node in self._nodes:
-            if kept_node.parent_node_index is not None:
-                kept_node.parent_node_index = new_index_of[kept_node.parent_node_index]
-        for place in removed.places:
-            place.node.statechart = self
-            place.node.parent_node_index = place.parent_node_index
-        self._number_nodes(nodes=nodes)
-        self._requested_resets = removed.former_requested_resets
-        self.compiler.nodes_to_rebuild = removed.former_nodes_to_rebuild
-        if removed.former_children_of_parent is not None:
-            removed.node.parent_node.set_children(
-                children=removed.former_children_of_parent
-            )
-
-    def _put_back_replaced_nodes_from(self, *, first_put_back: int) -> None:
-        """
-        Puts back every node replaced from `first_put_back` on, the latest first.
-
-        :param first_put_back: The position of the first record to undo in
-            :attr:`_replaced_nodes`.
-        """
-        for replaced in reversed(self._replaced_nodes[first_put_back:]):
-            replaced.put_back()
-        del self._replaced_nodes[first_put_back:]
-
-    def _drop_nodes_from(self, *, first_dropped_index: int) -> None:
-        """
-        Drops every node from `first_dropped_index` on, which no compile covered yet.
-
-        :param first_dropped_index: The index of the first node to drop.
-        """
-        if first_dropped_index == len(self._nodes):
-            return
-        self.compiler.changed_since_compile = True
-        kept_nodes = self._nodes[:first_dropped_index]
-        for dropped_node in self._nodes[first_dropped_index:]:
-            parent_node = dropped_node.parent_node
-            if parent_node in kept_nodes and dropped_node in parent_node.nodes:
-                parent_node.remove_child(child=dropped_node)
-            dropped_node._statechart = None
-            dropped_node.index = None
-            dropped_node.parent_node_index = None
-        self._renumber(kept_nodes=kept_nodes)
 
     def _expand(self, *, node: CompositeNode) -> None:
         """
@@ -881,8 +571,7 @@ class Statechart(SubclassJSONSerializer):
         Removes a node and everything below it from the statechart, and from the node it
         is a child of.
 
-        The nodes that stay keep their order and are numbered anew without gaps. A
-        :meth:`modify` block that raises afterwards puts the removed nodes back.
+        The nodes that stay keep their order and are numbered anew without gaps.
 
         :param node: The node to remove.
         :raises NotInStatechartError: If `node` does not belong to this statechart.
@@ -898,11 +587,6 @@ class Statechart(SubclassJSONSerializer):
         kept_nodes = [kept for kept in self._nodes if kept not in removed_nodes]
         self._check_not_referenced(removed_nodes=removed_nodes, kept_nodes=kept_nodes)
         with self.modify():
-            self._removed_nodes.append(
-                RemovedNode.before_removing(
-                    statechart=self, node=node, removed_nodes=removed_nodes
-                )
-            )
             parent_node = node.parent_node
             if parent_node is not None and node in parent_node.nodes:
                 parent_node.remove_child(child=node)
@@ -925,7 +609,7 @@ class Statechart(SubclassJSONSerializer):
         Puts `replacement` where `node` is among the children of the control structure
         node holding it, or on the top level. A composite `replacement` holding `node`
         keeps it as its child and decides its transitions anew; otherwise `node` leaves
-        with everything below it, until a :meth:`modify` block that raises puts it back.
+        with everything below it.
 
         :param node: A node of this statechart, on the top level or a child of a control
             structure node.
@@ -950,9 +634,7 @@ class Statechart(SubclassJSONSerializer):
         holds_node = isinstance(replacement, CompositeNode) and any(
             child is node for child in replacement.nodes
         )
-        record = ReplacedNode.before_replacing(node=node, replacement=replacement)
         with self.modify():
-            self._replaced_nodes.append(record)
             self._register_node(node=replacement)
             replacement.parent_node = holder
             if holder is not None:
@@ -1104,7 +786,11 @@ class Statechart(SubclassJSONSerializer):
         callback of this tick is picked up by the next one. While a change of the
         statechart waits for that, no node changes its state, so nothing runs on the
         tick compiled before the change.
+
+        :raises StatechartBrokenByFailedModificationError: If a :meth:`modify` block of
+            this statechart raised.
         """
+        self.check_not_broken()
         self.compiler.compile_if_changed()
         if not self.compiler.changed_since_compile:
             changes = self.compiler.compiled_tick.settle()
