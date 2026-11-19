@@ -2656,10 +2656,10 @@ class RigidMotionRate(VectorPair, ABC):
     @classproperty
     def _series_rotation_angle(cls) -> float:
         """
-        The rotation angle in radians, about 0.042, below which :meth:`_integrate`
-        evaluates its coefficients by three terms of their series: where the series'
-        truncation error, ``2 φ⁶ / 8!`` relative, equals the closed forms' cancellation
-        error in double precision, ``2 ε / φ²``, both about ``2e-13``.
+        The rotation angle in radians, about 0.042, below which the coefficients of the
+        left Jacobian use three terms of their series: where the series' truncation
+        error, ``2 φ⁶ / 8!`` relative, equals the closed forms' cancellation error in
+        double precision, ``2 ε / φ²``, both about ``2e-13``.
         """
         return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
 
@@ -2674,33 +2674,66 @@ class RigidMotionRate(VectorPair, ABC):
         """
         rotation = self._first_vector * parameter_change
         translation = self._second_vector * parameter_change
+        return Displacement(
+            rotation_vector=rotation,
+            translation=self._apply_left_jacobian(
+                rotation=rotation, translation=translation
+            ),
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def _apply_left_jacobian(
+        cls, *, rotation: Vector3, translation: Vector3
+    ) -> Vector3:
+        """
+        :param rotation: The rotation vector the body turns by.
+        :param translation: How far the origin of the body would move without turning.
+        :return: Where the origin of the body ends up when it turns while moving: the
+            left Jacobian of ``rotation`` applied to ``translation`` (Solà, Deray and
+            Atchuthan, `A micro Lie theory <https://arxiv.org/abs/1812.01537>`__).
+        """
         angle_squared = rotation.dot(rotation)
-        series_angle_squared = self._series_rotation_angle**2
+        first_order = rotation.cross(translation)
+        second_order = rotation.cross(first_order)
+        return (
+            translation
+            + first_order * cls._first_order_coefficient(angle_squared=angle_squared)
+            + second_order * cls._second_order_coefficient(angle_squared=angle_squared)
+        )
+
+    @classmethod
+    def _first_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
+        """
+        :param angle_squared: The square of the angle the body turns by.
+        :return: ``(1 − cos φ) / φ²`` for the angle ``φ``, by three terms of its series
+            below :attr:`_series_rotation_angle`.
+        """
         angle = sm.sqrt(angle_squared)
-        first_order_coefficient = sm.if_less(
+        return sm.if_less(
             angle_squared,
-            series_angle_squared,
+            cls._series_rotation_angle**2,
             1 / math.factorial(2)
             - angle_squared / math.factorial(4)
             + angle_squared**2 / math.factorial(6),
             (1 - sm.cos(angle)) / angle_squared,
         )
-        second_order_coefficient = sm.if_less(
+
+    @classmethod
+    def _second_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
+        """
+        :param angle_squared: The square of the angle the body turns by.
+        :return: ``(φ − sin φ) / φ³`` for the angle ``φ``, by three terms of its series
+            below :attr:`_series_rotation_angle`.
+        """
+        angle = sm.sqrt(angle_squared)
+        return sm.if_less(
             angle_squared,
-            series_angle_squared,
+            cls._series_rotation_angle**2,
             1 / math.factorial(3)
             - angle_squared / math.factorial(5)
             + angle_squared**2 / math.factorial(7),
             (angle - sm.sin(angle)) / (angle_squared * angle),
-        )
-        first_order = rotation.cross(translation)
-        second_order = rotation.cross(first_order)
-        return Displacement(
-            translation=translation
-            + first_order * first_order_coefficient
-            + second_order * second_order_coefficient,
-            rotation_vector=rotation,
-            reference_frame=self.reference_frame,
         )
 
 
