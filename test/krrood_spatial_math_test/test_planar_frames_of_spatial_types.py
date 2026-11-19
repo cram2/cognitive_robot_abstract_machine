@@ -8,7 +8,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.vector import VectorT, MetricVector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
-from krrood_spatial_math.cartesian_frame_3_dimensional import XYPlaneRelation
+from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.coordinate_system import (
     CartesianFrame,
     CoordinateSystemT,
@@ -156,26 +156,28 @@ def test_the_planes_of_frames_in_two_rooms_are_two_planes(floor_frame):
 @pytest.mark.parametrize(
     "frame_on_the_floor, relation",
     [
-        ("floor_frame", XYPlaneRelation.SAME_PLANE_SAME_NORMAL),
-        ("robot_base_frame", XYPlaneRelation.SAME_PLANE_SAME_NORMAL),
-        ("upside_down_frame", XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL),
-        ("shelf_frame", XYPlaneRelation.DIFFERENT_PLANES),
-        ("wall_frame", XYPlaneRelation.DIFFERENT_PLANES),
+        ("floor_frame", EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL),
+        ("robot_base_frame", EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL),
+        ("upside_down_frame", EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL),
+        ("shelf_frame", EmbeddedPlaneRelation.DIFFERENT_PLANES),
+        ("wall_frame", EmbeddedPlaneRelation.DIFFERENT_PLANES),
     ],
 )
-def test_a_frame_compares_its_xy_plane_with_that_of_a_frame_on_the_floor(
+def test_a_frame_compares_its_embedded_plane_with_that_of_a_frame_on_the_floor(
     frame_on_the_floor, relation, floor_frame, request
 ):
     assert (
-        floor_frame.compare_xy_plane(frame=request.getfixturevalue(frame_on_the_floor))
+        floor_frame.compare_embedded_plane(
+            frame=request.getfixturevalue(frame_on_the_floor)
+        )
         is relation
     )
 
 
 def test_the_plane_of_a_frame_in_no_space_is_not_known_to_be_any_other(floor_frame):
     assert (
-        floor_frame.compare_xy_plane(frame=NamedFrame("nowhere"))
-        is XYPlaneRelation.UNKNOWN
+        floor_frame.compare_embedded_plane(frame=NamedFrame("nowhere"))
+        is EmbeddedPlaneRelation.UNKNOWN
     )
 
 

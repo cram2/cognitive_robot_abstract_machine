@@ -1,6 +1,4 @@
-"""
-Tests of the world: its kinematic structure, its state and their changes.
-"""
+"""Tests of the world: its kinematic structure, its state and their changes."""
 
 from __future__ import annotations
 
@@ -45,7 +43,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Drawer,
 )
-from krrood_spatial_math.cartesian_frame_3_dimensional import XYPlaneRelation
+from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import FramesOfDifferentSpacesError
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
@@ -444,10 +442,9 @@ def test_compute_fk_expression(world_setup):
 
 
 def test_a_state_change_inside_a_modification_is_announced_when_it_ends(world_setup):
-    """
-    State callbacks hear about a change made inside a modification only once, when the
-    modification ends, never while the world is still being modified.
-    """
+    """State callbacks hear about a change made inside a modification only
+    once, when the modification ends, never while the world is still being
+    modified."""
     world, l1, l2, _, _, _ = world_setup
     prismatic_connection = world.get_connection(l1, l2)
     counter = StateChangeCounter(_world=world)
@@ -464,10 +461,8 @@ def test_a_state_change_inside_a_modification_is_announced_when_it_ends(world_se
 
 
 def test_compose_forward_kinematics_expression_returns_an_independent_copy(world_setup):
-    """
-    Callers get their own expression, so mutating it cannot corrupt the manager's
-    internal cache or what a later caller receives.
-    """
+    """Callers get their own expression, so mutating it cannot corrupt the
+    manager's internal cache or what a later caller receives."""
     world, l1, l2, bf, r1, r2 = world_setup
     original = world.compose_forward_kinematics_expression(world.root, r2)
     original_pose = original.evaluate()
@@ -481,10 +476,9 @@ def test_compose_forward_kinematics_expression_returns_an_independent_copy(world
 
 
 def test_compose_forward_kinematics_expression_reports_its_free_variables(world_setup):
-    """
-    The copy handed to callers keeps its degrees of freedom resolvable, even once the
-    caller drops every other reference to the expression it came from.
-    """
+    """The copy handed to callers keeps its degrees of freedom resolvable, even
+    once the caller drops every other reference to the expression it came
+    from."""
     world, l1, l2, bf, r1, r2 = world_setup
     connection = world.get_connection(r1, r2)
 
@@ -495,8 +489,8 @@ def test_compose_forward_kinematics_expression_reports_its_free_variables(world_
 
 
 def test_move_branch_compiles_forward_kinematics_once(world_setup):
-    """
-    Re-parenting rebuilds the forward kinematics for the resulting structure only.
+    """Re-parenting rebuilds the forward kinematics for the resulting structure
+    only.
 
     It used to compile twice: once defensively before computing the preserved pose, and
     once when the modification block closed. The first is redundant whenever the
@@ -521,11 +515,9 @@ def test_move_branch_compiles_forward_kinematics_once(world_setup):
 
 
 def test_update_forward_kinematics_refreshes_values_without_a_model_change(world_setup):
-    """
-    Only the recompilation is skipped when the structure is unchanged; the computed
-    poses are refreshed either way, because degree-of-freedom state can move without any
-    model change.
-    """
+    """Only the recompilation is skipped when the structure is unchanged; the
+    computed poses are refreshed either way, because degree-of-freedom state
+    can move without any model change."""
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connection(r1, r2)
 
@@ -577,32 +569,24 @@ def test_compute_relative_pose(world_setup):
 
 
 def test_a_world_is_a_three_dimensional_euclidean_space():
-    """
-    The world is the space the frames of its bodies chart.
-    """
+    """The world is the space the frames of its bodies chart."""
     assert issubclass(World, EuclideanSpace3Dimensional)
 
 
 def test_a_body_charts_the_space_of_its_world(world_setup):
-    """
-    A body added to a world is a frame on that world's space.
-    """
+    """A body added to a world is a frame on that world's space."""
     world, l1, l2, bf, r1, r2 = world_setup
 
     assert l1.space is world
 
 
 def test_a_body_in_no_world_charts_no_known_space():
-    """
-    A body belongs to a space only once it is added to a world.
-    """
+    """A body belongs to a space only once it is added to a world."""
     assert Body(name=PrefixedName("loose")).space is None
 
 
 def test_a_body_cannot_express_a_value_of_another_worlds_body(world_setup):
-    """
-    Two worlds are two spaces, so no change relates their bodies.
-    """
+    """Two worlds are two spaces, so no change relates their bodies."""
     world, l1, l2, bf, r1, r2 = world_setup
     other_world = World()
     other_body = Body(name=PrefixedName("other"))
@@ -614,10 +598,8 @@ def test_a_body_cannot_express_a_value_of_another_worlds_body(world_setup):
 
 
 def test_two_bodies_sliding_along_their_x_axes_span_one_plane(world_setup):
-    """
-    A prismatic connection along the x-axis keeps both bodies on one x-y plane, wherever
-    it has moved the child.
-    """
+    """A prismatic connection along the x-axis keeps both bodies on one x-y
+    plane, wherever it has moved the child."""
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connection(l1, l2)
     world.state[connection.dof.id].position = 1.0
@@ -629,23 +611,24 @@ def test_two_bodies_sliding_along_their_x_axes_span_one_plane(world_setup):
 
 
 def test_bodies_of_two_worlds_span_two_planes(world_setup):
-    """
-    Two worlds are two spaces, so the planes of their bodies have no point in common.
-    """
+    """Two worlds are two spaces, so the planes of their bodies have no point
+    in common."""
     world, l1, l2, bf, r1, r2 = world_setup
     other_world = World()
     other_body = Body(name=PrefixedName("other"))
     with other_world.modify_world():
         other_world.add_kinematic_structure_entity(other_body)
 
-    assert l1.compare_xy_plane(frame=other_body) is XYPlaneRelation.DIFFERENT_PLANES
+    assert (
+        l1.compare_embedded_plane(frame=other_body)
+        is EmbeddedPlaneRelation.DIFFERENT_PLANES
+    )
 
 
 def test_transform_a_pose_2d(world_setup):
-    """
-    A Pose2Dimensional carries no z, roll or pitch, so transforming one answers with the
-    transformed 3D pose flattened back onto the target frame's plane.
-    """
+    """A Pose2Dimensional carries no z, roll or pitch, so transforming one
+    answers with the transformed 3D pose flattened back onto the target frame's
+    plane."""
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connection(l1, l2)
     world.state[connection.dof.id].position = 1.0
@@ -1151,10 +1134,9 @@ def test_world_state_equality_is_order_independent():
 
 
 def test_world_str_contains_class_name():
-    """
-    world.py:486 uses self.__class__.name (the dataclass field default, None) instead of
-    the class name, so every world stringifies as 'None v...'.
-    """
+    """world.py:486 uses self.__class__.name (the dataclass field default,
+    None) instead of the class name, so every world stringifies as 'None
+    v...'."""
     world = World()
     assert "World" in str(world)
 
@@ -1293,10 +1275,8 @@ def test_omnidrive_translation_dofs_get_translation_limits():
 
 
 def test_bug_05_has_collision_respects_volume_threshold():
-    """
-    world_entity.py:487-497: Body.has_collision documents and accepts volume/ surface
-    thresholds but ignores them entirely.
-    """
+    """world_entity.py:487-497: Body.has_collision documents and accepts
+    volume/ surface thresholds but ignores them entirely."""
     tiny_body = Body(name=PrefixedName("tiny", prefix="review"))
     collision = Box(
         scale=Scale(0.001, 0.001, 0.001),
@@ -1310,9 +1290,7 @@ def test_bug_05_has_collision_respects_volume_threshold():
 
 
 def create_body_with_box(name: str, scale: Scale) -> Body:
-    """
-    A body whose only collision shape is a box of the given scale.
-    """
+    """A body whose only collision shape is a box of the given scale."""
     body = Body(name=PrefixedName(name, prefix="review"))
     collision = Box(
         scale=scale,
@@ -1325,10 +1303,8 @@ def create_body_with_box(name: str, scale: Scale) -> Body:
 
 
 def test_shape_of_sufficient_volume_needs_no_mesh(monkeypatch):
-    """
-    A shape big enough to be checked is recognised from its own volume, without building
-    the mesh that only stands in for it.
-    """
+    """A shape big enough to be checked is recognised from its own volume,
+    without building the mesh that only stands in for it."""
     body = create_body_with_box("chunky", Scale(0.1, 0.1, 0.1))
 
     def refuse_to_build_mesh(self):
@@ -1340,10 +1316,8 @@ def test_shape_of_sufficient_volume_needs_no_mesh(monkeypatch):
 
 
 def test_flat_shape_is_recognised_by_its_surface():
-    """
-    A shape without volume still counts as collision geometry if its surface is large
-    enough, which is the case the surface threshold exists for.
-    """
+    """A shape without volume still counts as collision geometry if its surface
+    is large enough, which is the case the surface threshold exists for."""
     flat_body = create_body_with_box("flat", Scale(1.0, 1.0, 0.0))
 
     assert flat_body.collision[0].volume == 0
@@ -1379,20 +1353,16 @@ def test_copy_id(pr2_world_state_reset):
 
 
 def test_rebind_body(world_setup):
-    """
-    A directly-held body reference is rebound onto the target world's own body, found by
-    id rather than by identity or name.
-    """
+    """A directly-held body reference is rebound onto the target world's own
+    body, found by id rather than by identity or name."""
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
     assert world_copy.rebind_world_entities(l1) is world_copy.get_body_by_name(l1.name)
 
 
 def test_rebind_connection(world_setup):
-    """
-    A connection is rebound to the connection of the other world between the same parent
-    and child.
-    """
+    """A connection is rebound to the connection of the other world between the
+    same parent and child."""
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
     connection = world.get_connection(l1, l2)
@@ -1402,10 +1372,8 @@ def test_rebind_connection(world_setup):
 
 
 def test_rebind_nested_dataclass(world_setup):
-    """
-    A world entity nested in a dataclass field is rebound, and sibling fields keep their
-    values.
-    """
+    """A world entity nested in a dataclass field is rebound, and sibling
+    fields keep their values."""
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
 
@@ -1420,9 +1388,8 @@ def test_rebind_nested_dataclass(world_setup):
 
 
 def test_rebind_list_and_plain_value(world_setup):
-    """
-    A list rebinds elementwise, and a value holding no world entity keeps its value.
-    """
+    """A list rebinds elementwise, and a value holding no world entity keeps
+    its value."""
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
 
@@ -1435,21 +1402,20 @@ def test_rebind_list_and_plain_value(world_setup):
 
 
 def test_rebind_leaves_an_entity_this_world_does_not_contain(world_setup):
-    """
-    An entity the target world does not contain is left as it is, since it is not that
-    world's state to rebind.
-    """
+    """An entity the target world does not contain is left as it is, since it
+    is not that world's state to rebind."""
     world, l1, l2, bf, r1, r2 = world_setup
     assert World().rebind_world_entities(l1) is l1
 
 
 def test_lookup_by_id_finds_an_annotation_sharing_a_hash_table_key(world_setup):
-    """
-    An annotation stays findable by its id after a later annotation of the same type
-    over the same entities takes over its key in the world's hash table.
+    """An annotation stays findable by its id after a later annotation of the
+    same type over the same entities takes over its key in the world's hash
+    table.
 
-    A semantic annotation hashes by its content, so both annotations land on one key and
-    only the last one added remains in the table, while both remain part of the world.
+    A semantic annotation hashes by its content, so both annotations
+    land on one key and only the last one added remains in the table,
+    while both remain part of the world.
     """
     world, l1, l2, bf, r1, r2 = world_setup
     first, second = Handle(root=l1), Handle(root=l1)
@@ -1464,11 +1430,9 @@ def test_lookup_by_id_finds_an_annotation_sharing_a_hash_table_key(world_setup):
 
 
 def test_rebind_annotation_sharing_a_hash_table_key(world_setup):
-    """
-    An annotation whose hash table key a later same-content annotation took over is
-    still rebound onto the target world's own instance, rather than left pointing at the
-    world it came from.
-    """
+    """An annotation whose hash table key a later same-content annotation took
+    over is still rebound onto the target world's own instance, rather than
+    left pointing at the world it came from."""
     world, l1, l2, bf, r1, r2 = world_setup
     first, second = Handle(root=l1), Handle(root=l1)
     with world.modify_world():
@@ -1482,12 +1446,12 @@ def test_rebind_annotation_sharing_a_hash_table_key(world_setup):
 
 
 def test_rebound_annotation_sharing_a_hash_table_key_can_modify_the_copy(world_setup):
-    """
-    A rebound annotation whose hash table key a same-content annotation took over is
-    usable for modifying the world it was rebound into.
+    """A rebound annotation whose hash table key a same-content annotation took
+    over is usable for modifying the world it was rebound into.
 
-    Model modification is what a rebound reference is needed for, and what a reference
-    left pointing at the world it came from fails at, with a `MismatchingWorld`.
+    Model modification is what a rebound reference is needed for, and
+    what a reference left pointing at the world it came from fails at,
+    with a `MismatchingWorld`.
     """
     world, l1, l2, bf, r1, r2 = world_setup
     first, second = Handle(root=l1), Handle(root=l1)
@@ -1504,11 +1468,9 @@ def test_rebound_annotation_sharing_a_hash_table_key_can_modify_the_copy(world_s
 
 
 def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
-    """
-    An entity cannot be registered with a second world while it still belongs to the
-    first, which would leave it in that world's lookup table under a world it no longer
-    reports.
-    """
+    """An entity cannot be registered with a second world while it still
+    belongs to the first, which would leave it in that world's lookup table
+    under a world it no longer reports."""
     world, l1, l2, bf, r1, r2 = world_setup
 
     with pytest.raises(AlreadyBelongsToAWorldError):
@@ -1519,10 +1481,8 @@ def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
 
 
 def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup):
-    """
-    Registering an entity with the world it already belongs to stays allowed, since it
-    only refreshes the entry that world already holds.
-    """
+    """Registering an entity with the world it already belongs to stays
+    allowed, since it only refreshes the entry that world already holds."""
     world, l1, l2, bf, r1, r2 = world_setup
 
     l1.add_to_world(world=world)
@@ -1532,12 +1492,12 @@ def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup
 
 
 def test_rebind_rejects_an_entity_registered_here_but_owned_elsewhere(world_setup):
-    """
-    An entity left registered in this world while reporting another one is reported,
-    rather than handed back to fail later wherever it is used.
+    """An entity left registered in this world while reporting another one is
+    reported, rather than handed back to fail later wherever it is used.
 
-    :meth:`WorldEntity.add_to_world` refuses to create this state, so the test writes
-    the inconsistent lookup table entry the guard exists for directly.
+    :meth:`WorldEntity.add_to_world` refuses to create this state, so
+    the test writes the inconsistent lookup table entry the guard exists
+    for directly.
     """
     world, l1, l2, bf, r1, r2 = world_setup
     other_world = World()
@@ -1549,12 +1509,11 @@ def test_rebind_rejects_an_entity_registered_here_but_owned_elsewhere(world_setu
 
 
 def test_rebind_copies_mutable_leaf_values(world_setup):
-    """
-    A mutable value that is neither a world entity nor a recognized container is copied,
-    not shared.
+    """A mutable value that is neither a world entity nor a recognized
+    container is copied, not shared.
 
-    Mutating the rebound copy must not affect the original, the way sharing a
-    `Pose3Dimensional`'s underlying `casadi_sx` matrix would.
+    Mutating the rebound copy must not affect the original, the way
+    sharing a `Pose3Dimensional`'s underlying `casadi_sx` matrix would.
     """
 
     class MutableLeaf:
@@ -1573,10 +1532,9 @@ def test_rebind_copies_mutable_leaf_values(world_setup):
 
 
 def test_rebind_a_cycle_keeps_its_shape(world_setup):
-    """
-    Objects that refer to each other are rebound once each, so the rebound objects refer
-    to each other the same way instead of being walked without end.
-    """
+    """Objects that refer to each other are rebound once each, so the rebound
+    objects refer to each other the same way instead of being walked without
+    end."""
 
     @dataclass(eq=False)
     class Link:
@@ -1615,10 +1573,9 @@ def test_rebind_keeps_an_object_reached_twice_one_object(world_setup):
 
 
 def test_rebind_copies_a_type_that_says_how_it_is_copied_its_own_way(world_setup):
-    """
-    A type defining how it is deep-copied, for example to share a resource that cannot
-    be copied, is copied that way rather than having its fields walked.
-    """
+    """A type defining how it is deep-copied, for example to share a resource
+    that cannot be copied, is copied that way rather than having its fields
+    walked."""
 
     @dataclass(eq=False)
     class SharedResource:
@@ -2013,9 +1970,8 @@ def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup
 
 
 def test_world_state_trajectory(world_setup, tmp_path):
-    """
-    A world state trajectory records every appended state, and plots them.
-    """
+    """A world state trajectory records every appended state, and plots
+    them."""
     world, l1, l2, bf, r1, r2 = world_setup
 
     time = 1337.0
@@ -2147,13 +2103,12 @@ def test_reattach_child_to_new_parent(world_setup):
 
 
 def test_reattach_child_to_new_parent_offline(world_setup):
-    """
-    The offline path of move_branch_with_fixed_connection re-parents and preserves the
-    global pose, like the online path does.
+    """The offline path of move_branch_with_fixed_connection re-parents and
+    preserves the global pose, like the online path does.
 
-    Mount strategies take this path, because they run inside an already-open
-    modification block where recompiling forward kinematics would work against a half-
-    edited structure.
+    Mount strategies take this path, because they run inside an already-
+    open modification block where recompiling forward kinematics would
+    work against a half- edited structure.
     """
     world, l1, l2, bf, r1, r2 = world_setup
     old_child_global_pose = l2.global_transform
@@ -2170,11 +2125,11 @@ def test_reattach_child_to_new_parent_offline(world_setup):
 
 
 def test_move_branch_preserves_connection_type_and_pose():
-    """
-    move_branch re-parents a branch keeping its connection type and global pose.
+    """move_branch re-parents a branch keeping its connection type and global
+    pose.
 
-    Covers both the FixedConnection branch (which silently passed an invalid ``_world``
-    kwarg before) and the Connection6DoF branch.
+    Covers both the FixedConnection branch (which silently passed an
+    invalid ``_world`` kwarg before) and the Connection6DoF branch.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -2246,13 +2201,12 @@ def test_memoization_clears_only_last_modification_block():
 
 
 def test_move_branch_offline_preserves_connection_type_and_pose():
-    """
-    The offline (enable_unsafe_inside_world_block) path of move_branch must, like the
-    online path, preserve a FixedConnection and a Connection6DoF and keep the global
-    pose.
+    """The offline (enable_unsafe_inside_world_block) path of move_branch must,
+    like the online path, preserve a FixedConnection and a Connection6DoF and
+    keep the global pose.
 
-    The offline path is what the semantic-annotation mounts use, and it runs inside an
-    already-open modification block.
+    The offline path is what the semantic-annotation mounts use, and it
+    runs inside an already-open modification block.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -2335,11 +2289,11 @@ def test_move_branch_keeps_connection_findable_by_name(world_setup):
 
 
 def create_world_with_free_floating_child() -> tuple[World, Body, Body]:
-    """
-    Builds a world where ``free_child`` hangs off the root by a :class:`Connection6DoF`
-    and ``new_parent`` sits elsewhere under the root.
+    """Builds a world where ``free_child`` hangs off the root by a
+    :class:`Connection6DoF` and ``new_parent`` sits elsewhere under the root.
 
-    :return: The world, the free-floating child and the body to re-parent it onto.
+    :return: The world, the free-floating child and the body to re-
+        parent it onto.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -2369,12 +2323,11 @@ def create_world_with_free_floating_child() -> tuple[World, Body, Body]:
 
 
 def test_move_branch_preserves_free_connection_degrees_of_freedom():
-    """
-    move_branch keeps a Connection6DoF's degrees of freedom instead of replacing them
-    with fresh ones, while preserving the branch's global pose.
+    """move_branch keeps a Connection6DoF's degrees of freedom instead of
+    replacing them with fresh ones, while preserving the branch's global pose.
 
-    Re-using the degrees of freedom is what keeps the world state layout stable across
-    the move.
+    Re-using the degrees of freedom is what keeps the world state layout
+    stable across the move.
     """
     world, free_child, new_parent = create_world_with_free_floating_child()
     old_dof_ids = [dof.id for dof in free_child.parent_connection.passive_dofs]
@@ -2390,11 +2343,11 @@ def test_move_branch_preserves_free_connection_degrees_of_freedom():
 
 
 def test_move_branch_keeps_world_state_array_identity():
-    """
-    move_branch of a Connection6DoF branch must not reallocate the world state array.
+    """move_branch of a Connection6DoF branch must not reallocate the world
+    state array.
 
-    Compiled functions bind memory views of that array, so replacing it silently
-    detaches them from the live state.
+    Compiled functions bind memory views of that array, so replacing it
+    silently detaches them from the live state.
     """
     world, free_child, new_parent = create_world_with_free_floating_child()
     state_data_before_move = world.state._data
@@ -2406,11 +2359,12 @@ def test_move_branch_keeps_world_state_array_identity():
 
 
 def test_move_branch_resets_free_connection_derivatives():
-    """
-    move_branch leaves the re-used degrees of freedom without any residual motion.
+    """move_branch leaves the re-used degrees of freedom without any residual
+    motion.
 
-    The world integrates every degree of freedom, including passive ones, so a leftover
-    velocity would make the re-parented branch drift away from its new parent.
+    The world integrates every degree of freedom, including passive
+    ones, so a leftover velocity would make the re-parented branch drift
+    away from its new parent.
     """
     world, free_child, new_parent = create_world_with_free_floating_child()
     for dof in free_child.parent_connection.passive_dofs:
@@ -2433,12 +2387,12 @@ def test_move_branch_resets_free_connection_derivatives():
 def create_world_with_driven_child(
     drive_type: type[WheeledDrive],
 ) -> tuple[World, Body, Body]:
-    """
-    Builds a world where ``driven_child`` hangs off the root by ``drive_type`` and
-    ``new_parent`` sits elsewhere under the root.
+    """Builds a world where ``driven_child`` hangs off the root by
+    ``drive_type`` and ``new_parent`` sits elsewhere under the root.
 
     :param drive_type: The drive connecting the child to the root.
-    :return: The world, the driven child and the body to re-parent it onto.
+    :return: The world, the driven child and the body to re-parent it
+        onto.
     """
     world = World()
     root = Body(name=PrefixedName("root"))
@@ -2750,9 +2704,8 @@ def test_hash_table_lookup_survives_annotation_mutation():
 
     @dataclass(eq=False)
     class ReviewAnnotation(SemanticAnnotation):
-        """
-        Semantic annotation with a mutable entity list, for hash-stability tests.
-        """
+        """Semantic annotation with a mutable entity list, for hash-stability
+        tests."""
 
         parts: list[Body] = field(default_factory=list)
 
@@ -2846,11 +2799,12 @@ def test_reset_state_context_restores_state_on_exception(world_setup):
 
 
 def test_exception_after_a_modification_raises_partially_applied_world_modification_error():
-    """
-    When an exception escapes a modify_world block, the current modification block is
-    discarded but the already-applied modifications are not rolled back.
+    """When an exception escapes a modify_world block, the current modification
+    block is discarded but the already-applied modifications are not rolled
+    back.
 
-    The error names those modifications and is caused by the exception that escaped.
+    The error names those modifications and is caused by the exception
+    that escaped.
     """
     world = World()
     body_1 = Body(name=PrefixedName("body_1", prefix="review"))
@@ -2941,10 +2895,10 @@ def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
 
 
 def world_with_branch(branch_length: int) -> tuple[World, Body]:
-    """
-    Build a world whose root carries one branch of the requested length.
+    """Build a world whose root carries one branch of the requested length.
 
-    :param branch_length: Number of bodies hanging below the branch root.
+    :param branch_length: Number of bodies hanging below the branch
+        root.
     :return: The world and the root of its branch.
     """
     world = World(name="source")
@@ -2962,15 +2916,16 @@ def world_with_branch(branch_length: int) -> tuple[World, Body]:
 
 
 def assert_rebuilds_to_same_structure(world: World, other_world: World) -> None:
-    """
-    Assert that replaying a world's own history onto an empty world reproduces it.
+    """Assert that replaying a world's own history onto an empty world
+    reproduces it.
 
-    Both worlds release their entities first, because a world loaded from the database
-    replays a history whose entities belong to no world yet, and an entity can belong to
-    at most one world.
+    Both worlds release their entities first, because a world loaded
+    from the database replays a history whose entities belong to no
+    world yet, and an entity can belong to at most one world.
 
     :param world: The world whose recorded history is replayed.
-    :param other_world: The other side of the move, which must let its entities go.
+    :param other_world: The other side of the move, which must let its
+        entities go.
     """
     entity_names = {entity.name.name for entity in world.kinematic_structure_entities}
     connection_count = len(world.connections)
@@ -2992,12 +2947,13 @@ def assert_rebuilds_to_same_structure(world: World, other_world: World) -> None:
 
 
 def test_world_a_multi_body_branch_moved_into_replays_from_its_own_history():
-    """
-    The world a branch is moved into records a history that starts from nothing.
+    """The world a branch is moved into records a history that starts from
+    nothing.
 
-    Every connection has to leave the world that holds it. Cleaning it up in the new
-    world instead opens that world's history with the removal of a connection it never
-    added, and the history no longer rebuilds it.
+    Every connection has to leave the world that holds it. Cleaning it
+    up in the new world instead opens that world's history with the
+    removal of a connection it never added, and the history no longer
+    rebuilds it.
     """
     world, branch_root = world_with_branch(branch_length=2)
     new_world = world.move_branch_to_new_world(branch_root)
@@ -3006,11 +2962,12 @@ def test_world_a_multi_body_branch_moved_into_replays_from_its_own_history():
 
 
 def test_world_a_multi_body_branch_moved_out_of_replays_from_its_own_history():
-    """
-    The world a branch is moved out of keeps a history that still rebuilds it.
+    """The world a branch is moved out of keeps a history that still rebuilds
+    it.
 
-    Entities may only leave after the connections naming them, otherwise the recorded
-    removal of a connection refers to entities the replay has dropped.
+    Entities may only leave after the connections naming them, otherwise
+    the recorded removal of a connection refers to entities the replay
+    has dropped.
     """
     world, branch_root = world_with_branch(branch_length=2)
     new_world = world.move_branch_to_new_world(branch_root)
@@ -3019,10 +2976,8 @@ def test_world_a_multi_body_branch_moved_out_of_replays_from_its_own_history():
 
 
 def test_world_a_single_body_branch_moved_into_replays_from_its_own_history():
-    """
-    A branch of a single body detaches its connection before its body, and the world it
-    moves into stays replayable.
-    """
+    """A branch of a single body detaches its connection before its body, and
+    the world it moves into stays replayable."""
     world, branch_root = world_with_branch(branch_length=0)
     new_world = world.move_branch_to_new_world(branch_root)
 
@@ -3030,9 +2985,8 @@ def test_world_a_single_body_branch_moved_into_replays_from_its_own_history():
 
 
 def test_world_a_single_body_branch_moved_out_of_replays_from_its_own_history():
-    """
-    A branch of a single body leaves behind a world that stays replayable.
-    """
+    """A branch of a single body leaves behind a world that stays
+    replayable."""
     world, branch_root = world_with_branch(branch_length=0)
     new_world = world.move_branch_to_new_world(branch_root)
 
@@ -3040,11 +2994,10 @@ def test_world_a_single_body_branch_moved_out_of_replays_from_its_own_history():
 
 
 def test_world_does_not_record_removing_a_connection_it_does_not_hold():
-    """
-    A world only records the removal of a connection it actually holds.
+    """A world only records the removal of a connection it actually holds.
 
-    Recording it regardless is what lets a history open with the removal of something
-    nothing ever added, which no replay can reproduce.
+    Recording it regardless is what lets a history open with the removal
+    of something nothing ever added, which no replay can reproduce.
     """
     world, branch_root = world_with_branch(branch_length=1)
     connection = branch_root.parent_connection
@@ -3063,11 +3016,11 @@ def test_world_does_not_record_removing_a_connection_it_does_not_hold():
 
 
 def recorded_modifications(world: World) -> list:
-    """
-    Flatten every modification recorded so far by a world's model manager.
+    """Flatten every modification recorded so far by a world's model manager.
 
     :param world: The world whose recorded history is inspected.
-    :return: The modifications recorded across all of the world's modification blocks.
+    :return: The modifications recorded across all of the world's
+        modification blocks.
     """
     return [
         modification
@@ -3077,9 +3030,8 @@ def recorded_modifications(world: World) -> list:
 
 
 def test_world_does_not_record_removing_a_kinematic_structure_entity_it_does_not_hold():
-    """
-    A world only records the removal of a kinematic_structure_entity it actually holds.
-    """
+    """A world only records the removal of a kinematic_structure_entity it
+    actually holds."""
     world = World(name="source")
     body = Body(name=PrefixedName("body"))
     with world.modify_world():
@@ -3094,10 +3046,9 @@ def test_world_does_not_record_removing_a_kinematic_structure_entity_it_does_not
 
 
 def test_world_removing_a_connection_after_its_child_records_it_once():
-    """
-    A connection that left the world with its child is not removed a second time, so the
-    order of the two removals leaves a history that still rebuilds the world.
-    """
+    """A connection that left the world with its child is not removed a second
+    time, so the order of the two removals leaves a history that still rebuilds
+    the world."""
     world, branch_root = world_with_branch(branch_length=1)
     leaf = branch_root.child_kinematic_structure_entities[0]
     leaf_connection = leaf.parent_connection
@@ -3117,9 +3068,8 @@ def test_world_removing_a_connection_after_its_child_records_it_once():
 def test_world_does_not_record_removing_a_degree_of_freedom_it_does_not_hold(
     world_setup,
 ):
-    """
-    A world only records the removal of a degree of freedom it actually holds.
-    """
+    """A world only records the removal of a degree of freedom it actually
+    holds."""
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connection(r1, r2)
     dof = connection.dof
@@ -3133,9 +3083,8 @@ def test_world_does_not_record_removing_a_degree_of_freedom_it_does_not_hold(
 
 
 def test_world_does_not_record_removing_a_semantic_annotation_it_does_not_hold():
-    """
-    A world only records the removal of a semantic annotation it actually holds.
-    """
+    """A world only records the removal of a semantic annotation it actually
+    holds."""
     world = World(name="source")
     annotation = SemanticAnnotation(name=PrefixedName("annotation"))
     with world.modify_world():
@@ -3150,10 +3099,8 @@ def test_world_does_not_record_removing_a_semantic_annotation_it_does_not_hold()
 
 
 def test_removing_a_semantic_annotation_keeps_an_equal_one():
-    """
-    Removing one of two equal semantic annotations removes that instance and keeps the
-    other one in the world.
-    """
+    """Removing one of two equal semantic annotations removes that instance and
+    keeps the other one in the world."""
     world = World()
     body = Body(name=PrefixedName("milk"))
     kept = Milk(root=body)
@@ -3173,9 +3120,7 @@ def test_removing_a_semantic_annotation_keeps_an_equal_one():
 
 
 def test_world_does_not_record_removing_an_actuator_it_does_not_hold():
-    """
-    A world only records the removal of an actuator it actually holds.
-    """
+    """A world only records the removal of an actuator it actually holds."""
     world = World(name="source")
     actuator = Actuator(name=PrefixedName("actuator"))
     with world.modify_world():
@@ -3333,8 +3278,7 @@ def test_replace_with_clears_other_world():
 
 
 def create_chain_world(length: int) -> tuple[World, list[Body]]:
-    """
-    Builds a world whose bodies hang off each other in a single chain.
+    """Builds a world whose bodies hang off each other in a single chain.
 
     :param length: The number of bodies in the chain.
     :return: The world and its bodies from the root down.

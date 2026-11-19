@@ -1,7 +1,5 @@
-"""
-Cartesian frames on a three-dimensional Euclidean space, and how serialized values refer
-to them.
-"""
+"""Cartesian frames on a three-dimensional Euclidean space, and how serialized
+values refer to them."""
 
 from __future__ import annotations
 
@@ -28,47 +26,36 @@ from krrood_spatial_math.exceptions import (
 )
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
 
-# %% how the x-y planes of two frames lie
+# %% how the embedded planes of two frames lie
 
 
-class XYPlaneRelation(Enum):
-    """
-    How the x-y plane of one Cartesian frame lies relative to that of another.
-    """
+class EmbeddedPlaneRelation(Enum):
+    """How the :class:`~krrood_spatial_math.embedded_plane.EmbeddedPlane` of
+    one Cartesian frame, its x-y plane, lies relative to that of another."""
 
     SAME_PLANE_SAME_NORMAL = "same plane, same normal"
-    """
-    Both frames span one plane and their z-axes point to the same side of it, so a rigid
-    change on that plane relates them.
-    """
+    """Both frames span one plane and their z-axes point to the same side of
+    it, so a rigid change on that plane relates them."""
 
     SAME_PLANE_OPPOSITE_NORMAL = "same plane, opposite normal"
-    """
-    Both frames span one plane but their z-axes point to opposite sides of it, so the
-    frames on that plane are mirror images.
-    """
+    """Both frames span one plane but their z-axes point to opposite sides of
+    it, so the frames on that plane are mirror images."""
 
     DIFFERENT_PLANES = "different planes"
-    """
-    The frames span two planes: their z-axes are not parallel, one origin lies off the
-    other's plane, or they chart two spaces.
-    """
+    """The frames span two planes: their z-axes are not parallel, one origin
+    lies off the other's plane, or they chart two spaces."""
 
     UNKNOWN = "unknown"
-    """
-    Where the frames lie relative to each other is not known, such as when one charts no
-    known space.
-    """
+    """Where the frames lie relative to each other is not known, such as when
+    one charts no known space."""
 
     @property
     def is_same_plane(self) -> bool:
-        """
-        Whether both frames are known to span one plane, whichever side their z-axes
-        point to.
-        """
+        """Whether both frames are known to span one plane, whichever side
+        their z-axes point to."""
         return self in (
-            XYPlaneRelation.SAME_PLANE_SAME_NORMAL,
-            XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL,
+            EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL,
+            EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL,
         )
 
 
@@ -78,10 +65,8 @@ class XYPlaneRelation(Enum):
 class CartesianFrame3Dimensional(
     CartesianFrame[EuclideanSpace3Dimensional, NameT], Interface
 ):
-    """
-    A right-handed Cartesian frame on a three-dimensional Euclidean space, in metres,
-    such as the frame of a robot's body.
-    """
+    """A right-handed Cartesian frame on a three-dimensional Euclidean space,
+    in metres, such as the frame of a robot's body."""
 
     def express_in_own_frame(
         self, *, value: CoordinateRepresentationT
@@ -113,36 +98,38 @@ class CartesianFrame3Dimensional(
         :return: The same value, given in this frame.
         """
 
-    def compare_xy_plane(self, *, frame: CartesianFrame3Dimensional) -> XYPlaneRelation:
+    def compare_embedded_plane(
+        self, *, frame: CartesianFrame3Dimensional
+    ) -> EmbeddedPlaneRelation:
         """
         :param frame: Any Cartesian frame.
-        :return: How the x-y plane of ``frame`` lies relative to that of this frame;
-            :attr:`XYPlaneRelation.UNKNOWN` when either frame charts no known space.
+        :return: How the embedded plane of ``frame`` lies relative to that of this frame;
+            :attr:`EmbeddedPlaneRelation.UNKNOWN` when either frame charts no known space.
         """
         if frame is self:
-            return XYPlaneRelation.SAME_PLANE_SAME_NORMAL
+            return EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL
         if self.space is None or frame.space is None:
-            return XYPlaneRelation.UNKNOWN
+            return EmbeddedPlaneRelation.UNKNOWN
         if frame.space is not self.space:
-            return XYPlaneRelation.DIFFERENT_PLANES
-        return self.compare_xy_plane_in_own_space(frame=frame)
+            return EmbeddedPlaneRelation.DIFFERENT_PLANES
+        return self.compare_embedded_plane_in_own_space(frame=frame)
 
     @abstractmethod
-    def compare_xy_plane_in_own_space(
+    def compare_embedded_plane_in_own_space(
         self, *, frame: CartesianFrame3Dimensional
-    ) -> XYPlaneRelation:
+    ) -> EmbeddedPlaneRelation:
         """
         :param frame: Another Cartesian frame of the space this frame charts.
-        :return: How the x-y plane of ``frame`` lies relative to that of this frame.
+        :return: How the embedded plane of ``frame`` lies relative to that of this frame.
         """
 
 
 class CartesianFrame3DimensionalResolver(Interface):
-    """
-    Finds the Cartesian frames serialized coordinate representations refer to, while one
-    JSON document is deserialized.
+    """Finds the Cartesian frames serialized coordinate representations refer
+    to, while one JSON document is deserialized.
 
-    It travels through nested ``from_json`` calls in their keyword arguments.
+    It travels through nested ``from_json`` calls in their keyword
+    arguments.
     """
 
     @abstractmethod

@@ -1,6 +1,5 @@
-"""
-Cartesian frames fixed on another frame, which express the values of both.
-"""
+"""Cartesian frames fixed on another frame, which express the values of
+both."""
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ from dataclasses import dataclass, field
 
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
-    XYPlaneRelation,
+    EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import CoordinateRepresentationT
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
@@ -24,17 +23,15 @@ from .frames import NamedFrame
 
 @dataclass(eq=False)
 class ExpressingFrame(NamedFrame):
-    """
-    A Cartesian frame that compares its x-y plane with that of another frame by
-    expressing where that frame lies.
-    """
+    """A Cartesian frame that compares its x-y plane with that of another frame
+    by expressing where that frame lies."""
 
-    def compare_xy_plane_in_own_space(
+    def compare_embedded_plane_in_own_space(
         self, *, frame: CartesianFrame3Dimensional
-    ) -> XYPlaneRelation:
+    ) -> EmbeddedPlaneRelation:
         return self.express_in_own_frame(
             value=Pose3Dimensional(reference_frame=frame)
-        ).homogeneous_matrix.xy_plane_relation
+        ).homogeneous_matrix.embedded_plane_relation
 
 
 # %% frames other frames are fixed on
@@ -42,10 +39,8 @@ class ExpressingFrame(NamedFrame):
 
 @dataclass(eq=False)
 class MountFrame(ExpressingFrame):
-    """
-    A Cartesian frame that other frames are fixed on, so it expresses values given in
-    itself or in any :class:`MountedFrame` fixed on it.
-    """
+    """A Cartesian frame that other frames are fixed on, so it expresses values
+    given in itself or in any :class:`MountedFrame` fixed on it."""
 
     def transform_into_own_frame(
         self, *, value: CoordinateRepresentationT
@@ -68,16 +63,12 @@ class MountFrame(ExpressingFrame):
 
 @dataclass(eq=False)
 class MountedFrame(ExpressingFrame):
-    """
-    A Cartesian frame fixed on another frame, so it expresses values given in itself, in
-    that frame, or in another frame fixed on that frame.
-    """
+    """A Cartesian frame fixed on another frame, so it expresses values given
+    in itself, in that frame, or in another frame fixed on that frame."""
 
     mount_T_self: HomogeneousTransformationMatrix3Dimensional = field(kw_only=True)
-    """
-    The change from this frame to the frame it is fixed on, which is its reference
-    frame; its child frame becomes this frame.
-    """
+    """The change from this frame to the frame it is fixed on, which is its
+    reference frame; its child frame becomes this frame."""
 
     def __post_init__(self):
         self.mount_T_self = self.mount_T_self.copy_with_new_reference_frames(

@@ -1,7 +1,5 @@
-"""
-The symbolic casadi spatial types: values given in a frame or on its x-y plane, the
-changes between frames, and how each change acts on a value.
-"""
+"""The symbolic casadi spatial types: values given in a frame or on its x-y
+plane, the changes between frames, and how each change acts on a value."""
 
 from __future__ import annotations
 
@@ -28,7 +26,7 @@ from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dim
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     CartesianFrame3DimensionalReference,
-    XYPlaneRelation,
+    EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import (
     CartesianFrameT,
@@ -50,31 +48,27 @@ from krrood_spatial_math.space_map import OrthogonalProjection
 
 
 class _ConstantMatrixParts(ca.SX, Enum):
-    """
-    The entries a homogeneous matrix always holds, whatever it represents.
+    """The entries a homogeneous matrix always holds, whatever it represents.
 
-    Assigned as whole rows and columns rather than element by element, because
-    :meth:`SymbolicSpatialType._verify_type` runs on every intermediate product and each casadi
-    element write costs about as much as the whole slice.
+    Assigned as whole rows and columns rather than element by element,
+    because :meth:`SymbolicSpatialType._verify_type` runs on every
+    intermediate product and each casadi element write costs about as
+    much as the whole slice.
     """
 
     HOMOGENEOUS_BOTTOM_ROW = [[0.0, 0.0, 0.0, 1.0]]
-    """
-    The last row every 4x4 homogeneous matrix ends in.
-    """
+    """The last row every 4x4 homogeneous matrix ends in."""
 
     ZERO_TRANSLATION = [[0.0], [0.0], [0.0]]
-    """
-    The translation column of a matrix that carries rotation only.
-    """
+    """The translation column of a matrix that carries rotation only."""
 
 
 class SpatialFrameKey(StrEnum):
-    """
-    The entities a spatial type is expressed against.
+    """The entities a spatial type is expressed against.
 
-    Both halves of the serialization name the entity the same way, so the name lives
-    here rather than at every place that reads or writes one.
+    Both halves of the serialization name the entity the same way, so
+    the name lives here rather than at every place that reads or writes
+    one.
     """
 
     REFERENCE = "reference_frame"
@@ -83,25 +77,19 @@ class SpatialFrameKey(StrEnum):
     CHILD = "child_frame"
     """The entity a transformation points at."""
 
-
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialType(ABC):
-    """
-    A symbolic matrix of spatial mathematics, given relative to a
-    :class:`~krrood_spatial_math.cartesian_frame_3_dimensional.CartesianFrame3Dimensional`: a value given in
-    that frame, or a change into it.
-    """
+    """A symbolic matrix of spatial mathematics, given relative to a :class:`~k
+    rrood_spatial_math.cartesian_frame_3_dimensional.CartesianFrame3Dimensional
+    `: a value given in that frame, or a change into it."""
 
     casadi_sx: ca.SX
-    """
-    Implement Symbolic Math protocol.
-    """
+    """Implement Symbolic Math protocol."""
 
     reference_frame: CartesianFrame3Dimensional | None = field(
         kw_only=True, default=None
     )
-    """
-    The reference frame associated with the object.
+    """The reference frame associated with the object.
 
     Can be None if no reference frame is required or applicable.
     """
@@ -110,12 +98,12 @@ class SymbolicSpatialType(ABC):
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
-        """
-        This object re-expressed in ``target_frame_T_reference_frame``'s reference
-        frame.
+        """This object re-expressed in ``target_frame_T_reference_frame``'s
+        reference frame.
 
-        :param target_frame_T_reference_frame: The transformation from this object's
-            reference frame to the frame it should be expressed in.
+        :param target_frame_T_reference_frame: The transformation from
+            this object's reference frame to the frame it should be
+            expressed in.
         :return: The object in the transformation's reference frame.
         """
         return target_frame_T_reference_frame @ self
@@ -142,10 +130,9 @@ class SymbolicSpatialType(ABC):
             )
 
     def to_json(self, **kwargs) -> dict[str, Any]:
-        """
-        The json of a spatial type: the frames it is expressed in, and its value, as
-        numbers if it is constant and as the expression computing it otherwise.
-        """
+        """The json of a spatial type: the frames it is expressed in, and its
+        value, as numbers if it is constant and as the expression computing it
+        otherwise."""
         result = super().to_json(**kwargs)
         self._frames_to_json(result)
         if self.is_constant():
@@ -157,8 +144,8 @@ class SymbolicSpatialType(ABC):
         return result
 
     def _frames_to_json(self, data: dict[str, Any]) -> None:
-        """
-        Put references to the frames this value is expressed in into its json.
+        """Put references to the frames this value is expressed in into its
+        json.
 
         :param data: The json of this value.
         """
@@ -184,11 +171,12 @@ class SymbolicSpatialType(ABC):
         return result
 
     def _frames_from_json(self, data: dict[str, Any], **kwargs) -> None:
-        """
-        Set the frames this value is expressed in from references in its json.
+        """Set the frames this value is expressed in from references in its
+        json.
 
         :param data: The json of this value.
-        :param kwargs: The kwargs of the ``_from_json`` that is reading it.
+        :param kwargs: The kwargs of the ``_from_json`` that is reading
+            it.
         """
         self.reference_frame = self._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
@@ -207,8 +195,8 @@ class SymbolicSpatialType(ABC):
     def _parse_optional_frame_from_json(
         cls, data: dict[str, Any], frame: SpatialFrameKey, **kwargs
     ) -> CartesianFrame3Dimensional | None:
-        """
-        Resolve a kinematic structure entity a serialized spatial type refers to.
+        """Resolve a kinematic structure entity a serialized spatial type
+        refers to.
 
         :param data: parsed JSON data
         :param frame: which of its frames the spatial type is asked for
@@ -224,22 +212,23 @@ class SymbolicSpatialType(ABC):
     def _ensure_consistent_frame(
         spatial_objects: list[SymbolicSpatialType | None],
     ) -> CartesianFrame3Dimensional | None:
-        """
-        Ensures that all provided spatial objects have a consistent reference frame.
+        """Ensures that all provided spatial objects have a consistent
+        reference frame.
 
-        If a mismatch in the reference frames is detected among the non-null spatial
-        objects, an exception is raised. If the list contains only null objects, None is
-        returned.
+        If a mismatch in the reference frames is detected among the non-
+        null spatial objects, an exception is raised. If the list
+        contains only null objects, None is returned.
 
-        This method is primarily used to validate the reference frames of spatial
-        objects before proceeding with further operations.
+        This method is primarily used to validate the reference frames
+        of spatial objects before proceeding with further operations.
 
-        :param spatial_objects: A list containing zero or more spatial objects, which
-            can either be instances of ReferenceFrameMixin or None.
-        :return: The common reference frame of the spatial objects if consistent, or
-            None if no valid reference frame exists.
-        :raises SpatialTypesError: Raised when the reference frames of provided input
-            spatial objects are inconsistent.
+        :param spatial_objects: A list containing zero or more spatial
+            objects, which can either be instances of
+            ReferenceFrameMixin or None.
+        :return: The common reference frame of the spatial objects if
+            consistent, or None if no valid reference frame exists.
+        :raises SpatialTypesError: Raised when the reference frames of
+            provided input spatial objects are inconsistent.
         """
         reference_frame = None
         for spatial_object in spatial_objects:
@@ -259,8 +248,8 @@ class SymbolicSpatialType(ABC):
         return reference_frame
 
     def _copy_with_data(self, data: ca.SX) -> Self:
-        """
-        Build a copy of this spatial object around already-copied matrix data.
+        """Build a copy of this spatial object around already-copied matrix
+        data.
 
         Bypasses the constructor: `data` comes from an object of this very type, so it
         already satisfies :meth:`_verify_type`, and it contains the same free variables,
@@ -276,11 +265,11 @@ class SymbolicSpatialType(ABC):
         return result
 
     def __deepcopy__(self, memo) -> Self:
-        """
-        Copy the matrix, but share the frames.
+        """Copy the matrix, but share the frames.
 
-        Frames are references to kinematic structure entities, which belong to the world
-        rather than to this object, so a deep copy must not duplicate them.
+        Frames are references to kinematic structure entities, which
+        belong to the world rather than to this object, so a deep copy
+        must not duplicate them.
         """
         if id(self) in memo:
             return memo[id(self)]
@@ -291,26 +280,20 @@ class SymbolicSpatialType(ABC):
 
 
 GenericSpatialType = TypeVar("GenericSpatialType", bound=SymbolicSpatialType)
-"""
-The kind of symbolic spatial value or change a method returns unchanged in type, such as
-the value a frame expresses in its own coordinates.
-"""
+"""The kind of symbolic spatial value or change a method returns unchanged in
+type, such as the value a frame expresses in its own coordinates."""
 
 
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialChange(
     SymbolicSpatialType, RigidCoordinateChange[CartesianFrameT], ABC
 ):
-    """
-    A rigid change, as a symbolic matrix, of coordinates given in a frame derived from
-    its :attr:`child_frame` into the same kind of frame derived from its
-    :attr:`~SymbolicSpatialType.reference_frame`.
-    """
+    """A rigid change, as a symbolic matrix, of coordinates given in a frame
+    derived from its :attr:`child_frame` into the same kind of frame derived
+    from its :attr:`~SymbolicSpatialType.reference_frame`."""
 
     child_frame: CartesianFrame3Dimensional | None = field(kw_only=True, default=None)
-    """
-    The frame the coordinates this change acts on are given in.
-    """
+    """The frame the coordinates this change acts on are given in."""
 
     def _frames_to_json(self, data: dict[str, Any]) -> None:
         super()._frames_to_json(data)
@@ -352,10 +335,8 @@ class SymbolicSpatialChange(
 class SymbolicSpatialValue3Dimensional(
     SymbolicSpatialType, CoordinateRepresentation[CartesianFrame3Dimensional], ABC
 ):
-    """
-    A value, as a symbolic matrix, such as a point or a pose, given in its
-    :attr:`~SymbolicSpatialType.reference_frame`, its coordinate system.
-    """
+    """A value, as a symbolic matrix, such as a point or a pose, given in its
+    :attr:`~SymbolicSpatialType.reference_frame`, its coordinate system."""
 
     @property
     def coordinate_system(self) -> CartesianFrame3Dimensional | None:
@@ -366,10 +347,9 @@ class SymbolicSpatialValue3Dimensional(
 
 
 class SpecialOrthogonalGroupAction(Interface):
-    """
-    A value or change the rotation group SO(3) acts on: a :class:`RotationMatrix` turns
-    it about the origin of its reference frame, giving one of the same type.
-    """
+    """A value or change the rotation group SO(3) acts on: a
+    :class:`RotationMatrix` turns it about the origin of its reference frame,
+    giving one of the same type."""
 
     @abstractmethod
     def apply_rotation(self, *, rotation: RotationMatrix) -> Self:
@@ -380,21 +360,19 @@ class SpecialOrthogonalGroupAction(Interface):
             ``rotation``.
         """
 
-
 SpecialOrthogonalGroupActionT = TypeVar(
     "SpecialOrthogonalGroupActionT", bound=SpecialOrthogonalGroupAction
 )
-"""
-The kind of value or change a rotation is applied to.
-"""
+"""The kind of value or change a rotation is applied to."""
 
 
 class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
-    """
-    A value or change the rigid motion group SE(3) acts on: a
-    :class:`HomogeneousTransformationMatrix3Dimensional` moves it, giving one of the same type.
+    """A value or change the rigid motion group SE(3) acts on: a
+    :class:`HomogeneousTransformationMatrix3Dimensional` moves it, giving one
+    of the same type.
 
-    SO(3) is the subgroup of SE(3) that keeps the origin, so it acts on it too.
+    SO(3) is the subgroup of SE(3) that keeps the origin, so it acts on
+    it too.
     """
 
     @abstractmethod
@@ -407,21 +385,15 @@ class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
         :return: This value, given in the reference frame of ``transformation``.
         """
 
-
 SpecialEuclideanGroupActionT = TypeVar(
     "SpecialEuclideanGroupActionT", bound=SpecialEuclideanGroupAction
 )
-"""
-The kind of value or change a transformation is applied to.
-"""
-
+"""The kind of value or change a transformation is applied to."""
 
 class PlanarSpecialEuclideanGroupAction(Interface):
-    """
-    A value or change on a plane the planar rigid motion group SE(2) acts on: a
-    :class:`HomogeneousTransformationMatrix2Dimensional` moves it, giving one of the same type.
-    """
-
+    """A value or change on a plane the planar rigid motion group SE(2) acts
+    on: a :class:`HomogeneousTransformationMatrix2Dimensional` moves it, giving
+    one of the same type."""
     @abstractmethod
     def apply_planar_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
@@ -432,21 +404,14 @@ class PlanarSpecialEuclideanGroupAction(Interface):
         :return: This value, on the x-y plane of the reference frame of
             ``transformation``.
         """
-
-
 PlanarSpecialEuclideanGroupActionT = TypeVar(
     "PlanarSpecialEuclideanGroupActionT", bound=PlanarSpecialEuclideanGroupAction
 )
-"""
-The kind of value or change on a plane a planar transformation is applied to.
-"""
-
-
+"""The kind of value or change on a plane a planar transformation is applied
+to."""
 class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
-    """
-    A value stored as homogeneous coordinates, which a transformation or a rotation acts
-    on by multiplying them from the left.
-    """
+    """A value stored as homogeneous coordinates, which a transformation or a
+    rotation acts on by multiplying them from the left."""
 
     def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix3Dimensional
@@ -472,10 +437,8 @@ class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
 
 
 class Orientation(SpecialEuclideanGroupAction, Mixin):
-    """
-    An orientation, which a transformation turns by its rotation and never shifts, since
-    an orientation has no position.
-    """
+    """An orientation, which a transformation turns by its rotation and never
+    shifts, since an orientation has no position."""
 
     def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix3Dimensional
@@ -490,8 +453,8 @@ class HomogeneousTransformationMatrix3Dimensional(
     SubclassJSONSerializer,
     SpecialEuclideanGroupAction,
 ):
-    """
-    Represents a 4x4 transformation matrix used in kinematics and transformations.
+    """Represents a 4x4 transformation matrix used in kinematics and
+    transformations.
 
     A `TransformationMatrix` encapsulates relationships between a parent coordinate
     system (reference frame) and a child coordinate system through rotation and
@@ -562,13 +525,12 @@ class HomogeneousTransformationMatrix3Dimensional(
     def create_with_variables(
         cls, name: str, resolver: Callable[[], np.ndarray] | None = None
     ) -> Self:
-        """
-        Creates a TransformationMatrix object with float variables variables in all
-        relevant entries.
+        """Creates a TransformationMatrix object with float variables variables
+        in all relevant entries.
 
         :param name: Name for the variables.
-        :param resolver: Callable that returns the actual transformation matrix when
-            called.
+        :param resolver: Callable that returns the actual transformation
+            matrix when called.
         :return: TransformationMatrix object with float variables.
         """
         transformation_matrix = []
@@ -599,20 +561,22 @@ class HomogeneousTransformationMatrix3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
     ) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        Constructs a TransformationMatrix object from a given point, a rotation matrix,
-        a reference frame, and a child frame.
+        """Constructs a TransformationMatrix object from a given point, a
+        rotation matrix, a reference frame, and a child frame.
 
-        :param point: The 3D point used to set the translation part of the
-            transformation matrix. If None, no translation is applied.
-        :param rotation_matrix: The rotation matrix defines the rotational component of
-            the transformation. If None, the identity matrix is assumed.
-        :param reference_frame: The reference frame for the transformation matrix. It
-            specifies the parent coordinate system.
-        :param child_frame: The child or target frame for the transformation. It
-            specifies the target coordinate system.
-        :return: A `TransformationMatrix` instance initialized with the provided
-            parameters or default values.
+        :param point: The 3D point used to set the translation part of
+            the transformation matrix. If None, no translation is
+            applied.
+        :param rotation_matrix: The rotation matrix defines the
+            rotational component of the transformation. If None, the
+            identity matrix is assumed.
+        :param reference_frame: The reference frame for the
+            transformation matrix. It specifies the parent coordinate
+            system.
+        :param child_frame: The child or target frame for the
+            transformation. It specifies the target coordinate system.
+        :return: A `TransformationMatrix` instance initialized with the
+            provided parameters or default values.
         """
         if reference_frame is None:
             reference_frame = cls._ensure_consistent_frame([point, rotation_matrix])
@@ -643,10 +607,9 @@ class HomogeneousTransformationMatrix3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
     ) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        Creates a TransformationMatrix object from position (x, y, z) and Euler angles
-        (roll, pitch, yaw) values. The function also accepts optional reference and
-        child frame parameters.
+        """Creates a TransformationMatrix object from position (x, y, z) and
+        Euler angles (roll, pitch, yaw) values. The function also accepts
+        optional reference and child frame parameters.
 
         :param x: The x-coordinate of the position
         :param y: The y-coordinate of the position
@@ -654,10 +617,12 @@ class HomogeneousTransformationMatrix3Dimensional(
         :param roll: The rotation around the x-axis
         :param pitch: The rotation around the y-axis
         :param yaw: The rotation around the z-axis
-        :param reference_frame: The reference frame for the transformation
-        :param child_frame: The child frame associated with the transformation
-        :return: A TransformationMatrix object created using the provided position and
-            orientation values
+        :param reference_frame: The reference frame for the
+            transformation
+        :param child_frame: The child frame associated with the
+            transformation
+        :return: A TransformationMatrix object created using the
+            provided position and orientation values
         """
         p = CartesianPoint3Dimensional(x=x, y=y, z=z)
         r = RotationMatrix.from_rpy(roll, pitch, yaw)
@@ -678,23 +643,29 @@ class HomogeneousTransformationMatrix3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
     ) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        Creates a `TransformationMatrix` instance from the provided position coordinates
-        and quaternion values representing rotation. This method constructs a 3D point
-        for the position and a rotation matrix derived from the quaternion, and
-        initializes the transformation matrix with these along with optional reference
-        and child frame entities.
+        """Creates a `TransformationMatrix` instance from the provided position
+        coordinates and quaternion values representing rotation. This method
+        constructs a 3D point for the position and a rotation matrix derived
+        from the quaternion, and initializes the transformation matrix with
+        these along with optional reference and child frame entities.
 
         :param pos_x: X coordinate of the position in space.
         :param pos_y: Y coordinate of the position in space.
         :param pos_z: Z coordinate of the position in space.
-        :param quat_w: W component of the quaternion representing rotation.
-        :param quat_x: X component of the quaternion representing rotation.
-        :param quat_y: Y component of the quaternion representing rotation.
-        :param quat_z: Z component of the quaternion representing rotation.
-        :param reference_frame: Optional reference frame for the transformation matrix.
-        :param child_frame: Optional child frame for the transformation matrix.
-        :return: A `TransformationMatrix` object constructed from the given parameters.
+        :param quat_w: W component of the quaternion representing
+            rotation.
+        :param quat_x: X component of the quaternion representing
+            rotation.
+        :param quat_y: Y component of the quaternion representing
+            rotation.
+        :param quat_z: Z component of the quaternion representing
+            rotation.
+        :param reference_frame: Optional reference frame for the
+            transformation matrix.
+        :param child_frame: Optional child frame for the transformation
+            matrix.
+        :return: A `TransformationMatrix` object constructed from the
+            given parameters.
         """
         p = CartesianPoint3Dimensional(x=pos_x, y=pos_y, z=pos_z)
         r = RotationMatrix.from_quaternion(
@@ -715,22 +686,27 @@ class HomogeneousTransformationMatrix3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
     ) -> Self:
-        """
-        Creates an instance of the class from x, y, z coordinates, axis and angle.
+        """Creates an instance of the class from x, y, z coordinates, axis and
+        angle.
 
-        This class method generates an object using provided spatial coordinates and a
-        rotation defined by an axis and angle. The resulting object is defined with a
-        specified reference frame and child frame.
+        This class method generates an object using provided spatial
+        coordinates and a rotation defined by an axis and angle. The
+        resulting object is defined with a specified reference frame and
+        child frame.
 
         :param x: Initial x-coordinate.
         :param y: Initial y-coordinate.
         :param z: Initial z-coordinate.
-        :param axis: Vector defining the axis of rotation. Defaults to Vector3Dimensional(0, 0, 1)
-            if not specified.
-        :param angle: Angle of rotation around the specified axis, in radians.
-        :param reference_frame: Reference frame entity to be associated with the object.
-        :param child_frame: Child frame entity associated with the object.
-        :return: An instance of the class with the specified transformations applied.
+        :param axis: Vector defining the axis of rotation. Defaults to
+            Vector3Dimensional(0, 0, 1) if not specified.
+        :param angle: Angle of rotation around the specified axis, in
+            radians.
+        :param reference_frame: Reference frame entity to be associated
+            with the object.
+        :param child_frame: Child frame entity associated with the
+            object.
+        :return: An instance of the class with the specified
+            transformations applied.
         """
         if axis is None:
             axis = Vector3Dimensional(0, 0, 1)
@@ -772,16 +748,17 @@ class HomogeneousTransformationMatrix3Dimensional(
         self[2, 3] = value
 
     def dot(self, other: SpecialEuclideanGroupActionT) -> SpecialEuclideanGroupActionT:
-        """
-        This transformation applied to ``other``, a value given in its child frame or a
-        change into it.
+        """This transformation applied to ``other``, a value given in its child
+        frame or a change into it.
 
-        :param other: The value or change this transformation is applied to.
-        :return: ``other``, given in this transformation's reference frame.
-        :raises UnsupportedOperationError: If this transformation does not act on
-            ``other``.
-        :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
-            this transformation's child frame.
+        :param other: The value or change this transformation is applied
+            to.
+        :return:``other``, given in this transformation's reference
+            frame.
+        :raises UnsupportedOperationError: If this transformation does
+            not act on ``other``.
+        :raises ReferenceFrameMismatchError: If ``other`` is given in a
+            frame other than this transformation's child frame.
         """
         if not isinstance(other, SpecialEuclideanGroupAction):
             raise UnsupportedOperationError(operation="dot", left=self, right=other)
@@ -821,11 +798,11 @@ class HomogeneousTransformationMatrix3Dimensional(
 
     @staticmethod
     def invert_numeric_matrix(f1_T_f2: np.ndarray) -> np.ndarray:
-        """
-        Invert a numeric rigid homogeneous transformation without building a symbolic
-        expression.
+        """Invert a numeric rigid homogeneous transformation without building a
+        symbolic expression.
 
-        :param f1_T_f2: A 4x4 rigid homogeneous transformation from frame f2 to f1.
+        :param f1_T_f2: A 4x4 rigid homogeneous transformation from
+            frame f2 to f1.
         :return: f2_T_f1, a new 4x4 array of the same dtype.
         """
         R = f1_T_f2[:3, :3]
@@ -870,21 +847,20 @@ class HomogeneousTransformationMatrix3Dimensional(
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
     @property
-    def xy_plane_relation(self) -> XYPlaneRelation:
-        """
-        How the x-y plane of the child frame lies relative to that of the reference
-        frame; :attr:`XYPlaneRelation.UNKNOWN` for a transformation that is not constant.
-        """
+    def embedded_plane_relation(self) -> EmbeddedPlaneRelation:
+        """How the x-y plane of the child frame lies relative to that of the
+        reference frame; :attr:`EmbeddedPlaneRelation.UNKNOWN` for a
+        transformation that is not constant."""
         if not self.is_constant():
-            return XYPlaneRelation.UNKNOWN
+            return EmbeddedPlaneRelation.UNKNOWN
         child_z_axis = self.rotation_matrix.to_np()[:3, 2]
         if not (
             np.isclose(self.z.to_np(), 0).all() and np.allclose(child_z_axis[:2], 0)
         ):
-            return XYPlaneRelation.DIFFERENT_PLANES
+            return EmbeddedPlaneRelation.DIFFERENT_PLANES
         if child_z_axis[2] < 0:
-            return XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL
-        return XYPlaneRelation.SAME_PLANE_SAME_NORMAL
+            return EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL
+        return EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL
 
     @property
     def pose(self) -> Pose3Dimensional:
@@ -901,9 +877,8 @@ class HomogeneousTransformationMatrix3Dimensional(
         new_reference_frame: CartesianFrame3Dimensional,
         new_child_frame: CartesianFrame3Dimensional | None,
     ) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        Copies the transformation matrix and changes the reference and child frames.
-        """
+        """Copies the transformation matrix and changes the reference and child
+        frames."""
         return HomogeneousTransformationMatrix3Dimensional(
             data=deepcopy(self.casadi_sx),
             reference_frame=new_reference_frame,
@@ -929,15 +904,16 @@ class RotationMatrix(
     HomogeneousCoordinates,
     SubclassJSONSerializer,
 ):
-    """
-    Class to represent a 4x4 symbolic rotation matrix tied to kinematic references.
+    """Class to represent a 4x4 symbolic rotation matrix tied to kinematic
+    references.
 
-    This class provides methods for creating and manipulating rotation matrices within
-    the context of kinematic structures. It supports initialization using data such as
-    quaternions, axis-angle, other matrices, or directly through vector definitions. The
-    primary purpose is to facilitate rotational transformations and computations in a
-    symbolic context, particularly for applications like robotic kinematics or
-    mechanical engineering.
+    This class provides methods for creating and manipulating rotation
+    matrices within the context of kinematic structures. It supports
+    initialization using data such as quaternions, axis-angle, other
+    matrices, or directly through vector definitions. The primary
+    purpose is to facilitate rotational transformations and computations
+    in a symbolic context, particularly for applications like robotic
+    kinematics or mechanical engineering.
     """
 
     def __init__(
@@ -1015,16 +991,16 @@ class RotationMatrix(
 
     @classmethod
     def _from_constant_quaternion(cls, quaternion: Quaternion) -> RotationMatrix:
-        """
-        Build a rotation matrix from a constant (fully numeric) quaternion.
+        """Build a rotation matrix from a constant (fully numeric) quaternion.
 
-        Uses numpy arithmetic instead of the symbolic CasADi path.  The symbolic path in
-        :meth:`from_quaternion` constructs ~36 CasADi sub-expressions even for constant
-        inputs; evaluating them in numpy is an order of magnitude faster and covers the
-        common case for values loaded from a database.
+        Uses numpy arithmetic instead of the symbolic CasADi path.  The
+        symbolic path in :meth:`from_quaternion` constructs ~36 CasADi
+        sub-expressions even for constant inputs; evaluating them in
+        numpy is an order of magnitude faster and covers the common case
+        for values loaded from a database.
 
-        :param quaternion: Quaternion whose underlying CasADi expression satisfies
-            ``quaternion.is_constant()``.
+        :param quaternion: Quaternion whose underlying CasADi expression
+            satisfies ``quaternion.is_constant()``.
         :return: The corresponding rotation matrix.
         """
         x, y, z, w = quaternion.to_np().ravel()
@@ -1107,13 +1083,13 @@ class RotationMatrix(
     def dot(
         self, other: SpecialOrthogonalGroupActionT
     ) -> SpecialOrthogonalGroupActionT:
-        """
-        This rotation applied to ``other``, turning it about the origin of its reference
-        frame.
+        """This rotation applied to ``other``, turning it about the origin of
+        its reference frame.
 
         :param other: The value or change this rotation is applied to.
-        :return: ``other`` turned, in this rotation's reference frame.
-        :raises UnsupportedOperationError: If this rotation does not act on ``other``.
+        :return:``other`` turned, in this rotation's reference frame.
+        :raises UnsupportedOperationError: If this rotation does not act
+            on ``other``.
         """
         if not isinstance(other, SpecialOrthogonalGroupAction):
             raise UnsupportedOperationError(operation="dot", left=self, right=other)
@@ -1122,9 +1098,7 @@ class RotationMatrix(
     def __matmul__(
         self, other: SpecialOrthogonalGroupActionT
     ) -> SpecialOrthogonalGroupActionT:
-        """
-        :meth:`dot`, as the ``@`` operator.
-        """
+        """:meth:`dot`, as the ``@`` operator."""
         return self.dot(other)
 
     @property
@@ -1195,13 +1169,14 @@ class RotationMatrix(
         x_vector: Vector3Dimensional,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> RotationMatrix:
-        """
-        Create a rotation matrix from the direction its x-axis points along.
+        """Create a rotation matrix from the direction its x-axis points along.
 
-        The y- and z-axis only complete the frame and are otherwise arbitrary.
+        The y- and z-axis only complete the frame and are otherwise
+        arbitrary.
 
         :param x_vector: the direction the x-axis should point along
-        :param reference_frame: the frame the resulting rotation matrix is expressed in
+        :param reference_frame: the frame the resulting rotation matrix
+            is expressed in
         :return: a rotation matrix whose x-axis points along ``x``
         """
         # Crossing a direction with a world axis degenerates when the two are parallel, so
@@ -1230,8 +1205,7 @@ class RotationMatrix(
         yaw: sm.ScalarData | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> RotationMatrix:
-        """
-        Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
+        """Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
 
         https://github.com/orocos/orocos_kinematics_dynamics/blob/master/orocos_kdl/src/frames.cpp#L167
         """
@@ -1297,9 +1271,7 @@ class RotationMatrix(
         return Quaternion.from_rotation_matrix(self)
 
     def normalize(self) -> None:
-        """
-        Scales each of the axes to the length of one.
-        """
+        """Scales each of the axes to the length of one."""
         scale_v = 1.0
         self[:3, 0] = self[:3, 0].scale(a=scale_v)
         self[:3, 1] = self[:3, 1].scale(a=scale_v)
@@ -1310,15 +1282,16 @@ class RotationMatrix(
         return RotationMatrix(self.casadi_sx.T, reference_frame=self.reference_frame)
 
     def rotational_distance(self, other: RotationMatrix) -> sm.Scalar:
-        """
-        Calculate the rotational error between two rotation matrices.
+        """Calculate the rotational error between two rotation matrices.
 
-        This function computes the angular difference between two rotation matrices by
-        computing the dot product of the first matrix and the inverse of the second.
-        Subsequently, it generates the angle of the resulting rotation matrix.
+        This function computes the angular difference between two
+        rotation matrices by computing the dot product of the first
+        matrix and the inverse of the second. Subsequently, it generates
+        the angle of the resulting rotation matrix.
 
         :param other: The second rotation matrix.
-        :return: The angular error between the two rotation matrices as an expression.
+        :return: The angular error between the two rotation matrices as
+            an expression.
         """
         r_distance = self.dot(other.inverse())
         return r_distance.angle
@@ -1328,19 +1301,15 @@ class RotationMatrix(
 class SymbolicSpatialValue2Dimensional(
     SymbolicSpatialType, CoordinateRepresentation[CartesianFrame2Dimensional], ABC
 ):
-    """
-    A value, as a symbolic matrix, such as a point or a pose, on the x-y plane of its
-    :attr:`~SymbolicSpatialType.reference_frame`, given in the
-    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional`
-    on that plane.
-    """
-
+    """A value, as a symbolic matrix, such as a point or a pose, on the x-y
+    plane of its :attr:`~SymbolicSpatialType.reference_frame`, given in the :cl
+    ass:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dime
+    nsional` on that plane."""
     @property
     def coordinate_system(self) -> CartesianFrame2Dimensional | None:
-        """
-        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
-        ``None`` for a value without a reference frame.
-        """
+        """The frame on the x-y plane of
+        :attr:`~SymbolicSpatialType.reference_frame`; ``None`` for a value
+        without a reference frame."""
         if self.reference_frame is None:
             return None
         return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
@@ -1354,9 +1323,8 @@ class Vector3Dimensional(
     SubclassJSONSerializer,
     MetricVector[CartesianFrame3Dimensional, sm.Scalar],
 ):
-    """
-    Representation of a 3D vector with reference frame support for homogenous
-    transformations.
+    """Representation of a 3D vector with reference frame support for
+    homogenous transformations.
 
     This class provides a structured representation of 3D vectors. It includes
     support for operations such as addition, subtraction, scaling, dot product,
@@ -1367,7 +1335,6 @@ class Vector3Dimensional(
 
     .. note:: this is represented as a 4d vector, where the last entry is always a 0.
     """
-
     visualisation_frame: CartesianFrame3Dimensional = field(default=None)
 
     def __init__(
@@ -1424,23 +1391,26 @@ class Vector3Dimensional(
         data: sm.VectorData,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Vector3Dimensional:
-        """
-        Creates an instance of Vector3Dimensional from provided iterable data.
+        """Creates an instance of Vector3Dimensional from provided iterable
+        data.
 
-        This class method is used to construct a Vector3Dimensional object by processing the given
-        data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a Vector3Dimensional
-        instance. The provided iterable or array should follow a 1D structure to avoid
-        raised errors.
+        This class method is used to construct a Vector3Dimensional
+        object by processing the given data and optionally assigning a
+        reference frame. The data can represent different array-like
+        objects compatible with the desired format for a
+        Vector3Dimensional instance. The provided iterable or array
+        should follow a 1D structure to avoid raised errors.
 
-        :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the Vector3Dimensional instance.
-        :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the Vector3Dimensional instance. If the data
-            has a `reference_frame` attribute, and this parameter is not specified, it
-            will be taken from the data.
-        :return: Returns an instance of Vector3Dimensional initialized with the processed data and
-            an optional reference frame.
+        :param data: The array-like data or object such as a list,
+            tuple, or numpy array used to initialize the
+            Vector3Dimensional instance.
+        :param reference_frame: A reference to a
+            `CartesianFrame3Dimensional` object, representing the frame
+            of reference for the Vector3Dimensional instance. If the
+            data has a `reference_frame` attribute, and this parameter
+            is not specified, it will be taken from the data.
+        :return: Returns an instance of Vector3Dimensional initialized
+            with the processed data and an optional reference frame.
         """
         if isinstance(data, SymbolicSpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
@@ -1505,11 +1475,12 @@ class Vector3Dimensional(
     def create_with_variables(
         cls, name: str, resolver: Callable[[], list[float] | np.ndarray] | None = None
     ) -> Self:
-        """
-        Creates a Vector3Dimensional object with float variables in all relevant entries.
+        """Creates a Vector3Dimensional object with float variables in all
+        relevant entries.
 
         :param name: Name for the variables.
-        :param resolver: Callable that returns the actual vector when called.
+        :param resolver: Callable that returns the actual vector when
+            called.
         :return: Vector3Dimensional object with float variables.
         """
         x = sm.FloatVariable(name=f"{name}.x")
@@ -1619,13 +1590,13 @@ class Vector3Dimensional(
         other: sm.ScalarData,
         if_nan: Vector3Dimensional | None = None,
     ) -> sm.GenericSymbolicType:
-        """
-        A version of division where no sub-expression is ever NaN.
+        """A version of division where no sub-expression is ever NaN.
 
-        The expression would evaluate to 'if_nan', but you should probably never work
-        with the 'if_nan' result. However, if one sub-expressions is NaN, the whole
-        expression evaluates to NaN, even if it is only in a branch of an if-else, that
-        is not returned. This method is a workaround for such cases.
+        The expression would evaluate to 'if_nan', but you should
+        probably never work with the 'if_nan' result. However, if one
+        sub-expressions is NaN, the whole expression evaluates to NaN,
+        even if it is only in a branch of an if-else, that is not
+        returned. This method is a workaround for such cases.
         """
         if if_nan is None:
             if_nan = Vector3Dimensional()
@@ -1663,19 +1634,20 @@ class Vector3Dimensional(
         frame_V_cone_axis: Vector3Dimensional,
         cone_theta: sm.ScalarData,
     ) -> Vector3Dimensional:
-        """
-        Projects a given vector onto the boundary of a cone defined by its axis and
-        angle.
+        """Projects a given vector onto the boundary of a cone defined by its
+        axis and angle.
 
-        This function computes the projection of a vector onto the boundary of a cone
-        specified by its axis and half-angle. It handles special cases where the input
-        vector is collinear with the cone's axis. The projection ensures the resulting
-        vector lies within the cone's boundary.
+        This function computes the projection of a vector onto the
+        boundary of a cone specified by its axis and half-angle. It
+        handles special cases where the input vector is collinear with
+        the cone's axis. The projection ensures the resulting vector
+        lies within the cone's boundary.
 
         :param frame_V_cone_axis: The axis of the cone.
-        :param cone_theta: The half-angle of the cone in radians. Can be a symbolic
-            value or a float.
-        :return: The projection of the input vector onto the cone's boundary.
+        :param cone_theta: The half-angle of the cone in radians. Can be
+            a symbolic value or a float.
+        :return: The projection of the input vector onto the cone's
+            boundary.
         """
         frame_V_current = self
         frame_V_cone_axis_normed = copy(frame_V_cone_axis)
@@ -1753,8 +1725,7 @@ class CartesianPoint3Dimensional(
     SubclassJSONSerializer,
     MetricPoint[CartesianFrame3Dimensional, sm.Scalar, Vector3Dimensional],
 ):
-    """
-    Represents a 3D point with reference frame handling.
+    """Represents a 3D point with reference frame handling.
 
     This class provides a representation of a point in 3D space, including support
     for operations such as addition, subtraction, projection onto planes/lines, and
@@ -1799,23 +1770,28 @@ class CartesianPoint3Dimensional(
         data: sm.VectorData,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> CartesianPoint3Dimensional:
-        """
-        Creates an instance of CartesianPoint3Dimensional from provided iterable data.
+        """Creates an instance of CartesianPoint3Dimensional from provided
+        iterable data.
 
-        This class method is used to construct a CartesianPoint3Dimensional object by processing the given
-        data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a CartesianPoint3Dimensional
-        instance. The provided iterable or array should follow a 1D structure to avoid
+        This class method is used to construct a
+        CartesianPoint3Dimensional object by processing the given data
+        and optionally assigning a reference frame. The data can
+        represent different array-like objects compatible with the
+        desired format for a CartesianPoint3Dimensional instance. The
+        provided iterable or array should follow a 1D structure to avoid
         raised errors.
 
-        :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the CartesianPoint3Dimensional instance.
-        :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the CartesianPoint3Dimensional instance. If the data has
-            a `reference_frame` attribute, and this parameter is not specified, it will
-            be taken from the data.
-        :return: Returns an instance of CartesianPoint3Dimensional initialized with the processed data and
-            an optional reference frame.
+        :param data: The array-like data or object such as a list,
+            tuple, or numpy array used to initialize the
+            CartesianPoint3Dimensional instance.
+        :param reference_frame: A reference to a
+            `CartesianFrame3Dimensional` object, representing the frame
+            of reference for the CartesianPoint3Dimensional instance. If
+            the data has a `reference_frame` attribute, and this
+            parameter is not specified, it will be taken from the data.
+        :return: Returns an instance of CartesianPoint3Dimensional
+            initialized with the processed data and an optional
+            reference frame.
         """
         if isinstance(data, SymbolicSpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
@@ -1837,11 +1813,12 @@ class CartesianPoint3Dimensional(
     def create_with_variables(
         cls, name: str, resolver: Callable[[], list[float] | np.ndarray] | None = None
     ) -> Self:
-        """
-        Creates a Vector3Dimensional object with float variables in all relevant entries.
+        """Creates a Vector3Dimensional object with float variables in all
+        relevant entries.
 
         :param name: Name for the variables.
-        :param resolver: Callable that returns the actual vector when called.
+        :param resolver: Callable that returns the actual vector when
+            called.
         :return: Vector3Dimensional object with float variables.
         """
         x = sm.FloatVariable(name=f"{name}.x")
@@ -1948,16 +1925,15 @@ class CartesianPoint3Dimensional(
         frame_V_plane_vector1: Vector3Dimensional,
         frame_V_plane_vector2: Vector3Dimensional,
     ) -> tuple[CartesianPoint3Dimensional, sm.Scalar]:
-        """
-        Projects a point onto a plane defined by two vectors.
+        """Projects a point onto a plane defined by two vectors.
 
-        This function assumes that all parameters are defined with respect to the same
-        reference frame.
+        This function assumes that all parameters are defined with
+        respect to the same reference frame.
 
         :param frame_V_plane_vector1: First vector defining the plane
         :param frame_V_plane_vector2: Second vector defining the plane
-        :return: Tuple of (projected point on the plane, signed distance from point to
-            plane)
+        :return: Tuple of (projected point on the plane, signed distance
+            from point to plane)
         """
         normal = frame_V_plane_vector1.cross(frame_V_plane_vector2)
         normal.scale(1)
@@ -1990,8 +1966,7 @@ class CartesianPoint3Dimensional(
         line_start: CartesianPoint3Dimensional,
         line_end: CartesianPoint3Dimensional,
     ) -> tuple[sm.Scalar, CartesianPoint3Dimensional]:
-        """
-        All parameters must have the same reference frame as self.
+        """All parameters must have the same reference frame as self.
 
         :param line_start: start of the approached line
         :param line_end: end of the approached line
@@ -2044,11 +2019,12 @@ class Vector2Dimensional(
     MetricVector[CartesianFrame2Dimensional, sm.Scalar],
     PlanarSpecialEuclideanGroupAction,
 ):
-    """
-    A translation within the x-y plane of its reference frame, given in the
-    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of that frame.
+    """A translation within the x-y plane of its reference frame, given in the 
+    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2D
+    imensional` of that frame.
 
-    Stored as a bare 2×1 symbolic vector ``[x, y]``, like :class:`CartesianPoint2Dimensional`.
+    Stored as a bare 2×1 symbolic vector ``[x, y]``, like
+    :class:`CartesianPoint2Dimensional`.
     """
 
     def __init__(
@@ -2109,8 +2085,8 @@ class Vector2Dimensional(
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Vector2Dimensional:
-        """
-        This vector re-expressed in ``target_frame_T_reference_frame``'s reference frame.
+        """This vector re-expressed in ``target_frame_T_reference_frame``'s
+        reference frame.
 
         .. warning::
             Between frames whose x-y planes are not parallel this is not a change of
@@ -2174,14 +2150,15 @@ class CartesianPoint2Dimensional(
     MetricPoint[CartesianFrame2Dimensional, sm.Scalar, Vector2Dimensional],
     PlanarSpecialEuclideanGroupAction,
 ):
-    """
-    Represents a 2D point with reference frame handling.
+    """Represents a 2D point with reference frame handling.
 
-    Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous augmentation --
-    the same convention :class:`Pose2Dimensional` uses. The point lies on its reference frame's
-    own x-y plane and has no height; it relates to 3D space only through an
-    :class:`EmbeddedPlaneProjection` onto that plane, which :meth:`from_cartesian_point_3_dimensional`,
-    :meth:`from_pose` and :meth:`to_cartesian_point_3_dimensional` apply.
+    Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous
+    augmentation -- the same convention :class:`Pose2Dimensional` uses.
+    The point lies on its reference frame's own x-y plane and has no
+    height; it relates to 3D space only through an
+    :class:`EmbeddedPlaneProjection` onto that plane, which
+    :meth:`from_cartesian_point_3_dimensional`, :meth:`from_pose` and
+    :meth:`to_cartesian_point_3_dimensional` apply.
     """
 
     def __init__(
@@ -2231,14 +2208,14 @@ class CartesianPoint2Dimensional(
         point: CartesianPoint3Dimensional,
         plane_frame: CartesianFrame3Dimensional | None = None,
     ) -> CartesianPoint2Dimensional:
-        """
-        The :meth:`EmbeddedPlaneProjection.project` of ``point`` onto the x-y plane of
-        ``plane_frame``.
+        """The :meth:`EmbeddedPlaneProjection.project` of ``point`` onto the
+        x-y plane of ``plane_frame``.
 
         :param point: The point to project.
-        :param plane_frame: The frame whose x-y plane to project onto. Defaults to
-            ``point``'s reference frame.
-        :return: The point on the plane directly below or above ``point``.
+        :param plane_frame: The frame whose x-y plane to project onto.
+            Defaults to ``point``'s reference frame.
+        :return: The point on the plane directly below or above
+            ``point``.
         """
         frame = plane_frame if plane_frame is not None else point.reference_frame
         return EmbeddedPlaneProjection(plane_frame=frame).project(point)
@@ -2249,22 +2226,22 @@ class CartesianPoint2Dimensional(
         pose: Pose3Dimensional,
         plane_frame: CartesianFrame3Dimensional | None = None,
     ) -> CartesianPoint2Dimensional:
-        """
-        The :meth:`from_cartesian_point_3_dimensional` of ``pose``'s position.
+        """The :meth:`from_cartesian_point_3_dimensional` of ``pose``'s
+        position.
 
         :param pose: The pose whose position to project.
-        :param plane_frame: The frame whose x-y plane to project onto. Defaults to
-            ``pose``'s reference frame.
-        :return: The point on the plane directly below or above ``pose``.
+        :param plane_frame: The frame whose x-y plane to project onto.
+            Defaults to ``pose``'s reference frame.
+        :return: The point on the plane directly below or above
+            ``pose``.
         """
         return cls.from_cartesian_point_3_dimensional(pose.position, plane_frame)
 
     def to_cartesian_point_3_dimensional(
         self, height: sm.ScalarData = 0
     ) -> CartesianPoint3Dimensional:
-        """
-        The :meth:`EmbeddedPlaneProjection.unproject` of this point into its own reference
-        frame.
+        """The :meth:`EmbeddedPlaneProjection.unproject` of this point into its
+        own reference frame.
 
         :param height: The z-coordinate the point is placed at.
         :return: The 3D point at ``height`` above this point.
@@ -2290,8 +2267,8 @@ class CartesianPoint2Dimensional(
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> CartesianPoint2Dimensional:
-        """
-        This point re-expressed in ``target_frame_T_reference_frame``'s reference frame.
+        """This point re-expressed in ``target_frame_T_reference_frame``'s
+        reference frame.
 
         .. warning::
             Between frames whose x-y planes are not parallel this is not a change of
@@ -2347,37 +2324,20 @@ class CartesianPoint2Dimensional(
 
 @dataclass(eq=False)
 class Line3Dimensional(Line[CartesianPoint3Dimensional, Vector3Dimensional]):
-    """
-    An infinite straight line in 3D space.
-    """
-
+    """An infinite straight line in 3D space."""
     point: CartesianPoint3Dimensional
-    """
-    A point the line passes through.
-    """
-
+    """A point the line passes through."""
     direction: Vector3Dimensional
-    """
-    The direction the line runs in, in the same reference frame as :attr:`point`.
-    """
-
-
+    """The direction the line runs in, in the same reference frame as
+    :attr:`point`."""
 @dataclass(eq=False)
 class LineSegment3Dimensional:
-    """
-    A straight line in 3D space between two points.
-    """
-
+    """A straight line in 3D space between two points."""
     start: CartesianPoint3Dimensional
-    """
-    The point the segment runs from.
-    """
-
+    """The point the segment runs from."""
     end: CartesianPoint3Dimensional
-    """
-    The point the segment runs to, in the same reference frame as :attr:`start`.
-    """
-
+    """The point the segment runs to, in the same reference frame as
+    :attr:`start`."""
     @property
     def direction(self) -> Vector3Dimensional:
         """
@@ -2404,14 +2364,12 @@ class EmbeddedPlaneProjection(
     A point's :meth:`projection_line` is the vertical line through it, and its
     position along that line is its height above the plane.
     """
-
     plane_frame: CartesianFrame3Dimensional | None
-    """
-    The frame whose x-y plane points are projected onto.
+    """The frame whose x-y plane points are projected onto.
 
-    ``None`` is the plane of points that have no reference frame. Their coordinates
-    are taken as they are, so such a projection only relates points without a
-    reference frame to each other.
+    ``None`` is the plane of points that have no reference frame. Their
+    coordinates are taken as they are, so such a projection only relates
+    points without a reference frame to each other.
     """
 
     def project(self, point: CartesianPoint3Dimensional) -> CartesianPoint2Dimensional:
@@ -2459,14 +2417,14 @@ class Quaternion(
     SubclassJSONSerializer,
     Orientation,
 ):
-    """
-    Represents a quaternion, which is a mathematical entity used to encode rotations in
-    three-dimensional space.
+    """Represents a quaternion, which is a mathematical entity used to encode
+    rotations in three-dimensional space.
 
-    The Quaternion class provides methods for creating quaternion objects from various
-    representations, such as axis-angle, roll-pitch-yaw, and rotation matrices. It
-    supports operations to define and manipulate rotations in 3D space efficiently.
-    Quaternions are used extensively in physics, computer graphics, robotics, and
+    The Quaternion class provides methods for creating quaternion
+    objects from various representations, such as axis-angle, roll-
+    pitch-yaw, and rotation matrices. It supports operations to define
+    and manipulate rotations in 3D space efficiently. Quaternions are
+    used extensively in physics, computer graphics, robotics, and
     aerospace engineering to represent orientations and rotations.
     """
 
@@ -2523,23 +2481,25 @@ class Quaternion(
         data: sm.VectorData,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Quaternion:
-        """
-        Creates an instance of Quaternion from provided iterable data.
+        """Creates an instance of Quaternion from provided iterable data.
 
-        This class method is used to construct a Quaternion object by processing the
-        given data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a Quaternion
-        instance. The provided iterable or array should follow a 1D structure to avoid
-        raised errors.
+        This class method is used to construct a Quaternion object by
+        processing the given data and optionally assigning a reference
+        frame. The data can represent different array-like objects
+        compatible with the desired format for a Quaternion instance.
+        The provided iterable or array should follow a 1D structure to
+        avoid raised errors.
 
-        :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the Quaternion instance.
-        :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the Quaternion instance. If the data
-            has a `reference_frame` attribute, and this parameter is not specified, it
-            will be taken from the data.
-        :return: Returns an instance of Quaternion initialized with the processed data
-            and an optional reference frame.
+        :param data: The array-like data or object such as a list,
+            tuple, or numpy array used to initialize the Quaternion
+            instance.
+        :param reference_frame: A reference to a
+            `CartesianFrame3Dimensional` object, representing the frame
+            of reference for the Quaternion instance. If the data has a
+            `reference_frame` attribute, and this parameter is not
+            specified, it will be taken from the data.
+        :return: Returns an instance of Quaternion initialized with the
+            processed data and an optional reference frame.
         """
         if hasattr(data, "shape") and len(data.shape) > 1 and data.shape[1] != 1:
             raise ValueError("The iterable must be a 1d list, tuple or array")
@@ -2585,12 +2545,12 @@ class Quaternion(
 
     @classmethod
     def from_axis_angle(cls, axis_angle: AxisAngle) -> Quaternion:
-        """
-        Creates a quaternion from an axis-angle representation.
+        """Creates a quaternion from an axis-angle representation.
 
         :param axis_angle: The rotation to convert.
-        :return: A quaternion representing the rotation defined by the given axis and
-            angle, expressed in the frame of the axis angle.
+        :return: A quaternion representing the rotation defined by the
+            given axis and angle, expressed in the frame of the axis
+            angle.
         """
         axis = axis_angle.axis
         half_angle = axis_angle.angle / 2
@@ -2610,20 +2570,20 @@ class Quaternion(
         yaw: sm.ScalarData,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Quaternion:
-        """
-        Creates a Quaternion instance from specified roll, pitch, and yaw angles.
+        """Creates a Quaternion instance from specified roll, pitch, and yaw
+        angles.
 
-        The method computes the quaternion representation of the given roll, pitch, and
-        yaw angles using trigonometric transformations based on their half-angle values
-        for efficient calculations.
+        The method computes the quaternion representation of the given
+        roll, pitch, and yaw angles using trigonometric transformations
+        based on their half-angle values for efficient calculations.
 
         :param roll: The roll angle in radians.
         :param pitch: The pitch angle in radians.
         :param yaw: The yaw angle in radians.
-        :param reference_frame: Optional reference frame entity associated with the
-            quaternion.
-        :return: A Quaternion instance representing the rotation defined by the
-            specified roll, pitch, and yaw angles.
+        :param reference_frame: Optional reference frame entity
+            associated with the quaternion.
+        :return: A Quaternion instance representing the rotation defined
+            by the specified roll, pitch, and yaw angles.
         """
         roll = sm.to_sx(roll)
         pitch = sm.to_sx(pitch)
@@ -2655,20 +2615,22 @@ class Quaternion(
     def from_rotation_matrix(
         cls, r: RotationMatrix | HomogeneousTransformationMatrix3Dimensional
     ) -> Quaternion:
-        """
-        Creates a Quaternion object initialized from a given rotation matrix.
+        """Creates a Quaternion object initialized from a given rotation
+        matrix.
 
-        This method constructs a quaternion representation of the provided rotation
-        matrix. It is designed to handle different cases of rotation matrix
-        configurations to ensure numerical stability during computation. The resultant
-        quaternion adheres to the expected mathematical relationship with the given
+        This method constructs a quaternion representation of the
+        provided rotation matrix. It is designed to handle different
+        cases of rotation matrix configurations to ensure numerical
+        stability during computation. The resultant quaternion adheres
+        to the expected mathematical relationship with the given
         rotation matrix.
 
-        :param r: The input matrix representing a rotation. It can be either a
-            `RotationMatrix` or `TransformationMatrix`. This matrix is expected to have
-            a valid mathematical structure typical for rotation matrices.
-        :return: A new instance of `Quaternion` corresponding to the given rotation
-            matrix `r`.
+        :param r: The input matrix representing a rotation. It can be
+            either a `RotationMatrix` or `TransformationMatrix`. This
+            matrix is expected to have a valid mathematical structure
+            typical for rotation matrices.
+        :return: A new instance of `Quaternion` corresponding to the
+            given rotation matrix `r`.
         """
         q = rotation_matrix_to_quaternion(r.generic_matrix)
         return cls.from_iterable(q, reference_frame=r.reference_frame)
@@ -2703,12 +2665,11 @@ class Quaternion(
         return self.conjugate().multiply(q)
 
     def _normalize_numerically(self) -> None:
-        """
-        Normalize this quaternion in-place using numpy arithmetic.
+        """Normalize this quaternion in-place using numpy arithmetic.
 
-        Called by :meth:`normalize` when the quaternion is constant.  Using numpy avoids
-        constructing symbolic CasADi expressions, which is substantially faster for
-        values loaded from a database.
+        Called by :meth:`normalize` when the quaternion is constant.
+        Using numpy avoids constructing symbolic CasADi expressions,
+        which is substantially faster for values loaded from a database.
         """
         values = self.to_np().ravel()
         self._casadi_sx = ca.SX(ca.DM(values / np.linalg.norm(values)))
@@ -2757,27 +2718,26 @@ class Quaternion(
         return NotImplemented
 
     def rotational_distance(self, other: Quaternion) -> sm.Scalar:
-        """
-        Calculate the rotational error between two orientations.
+        """Calculate the rotational error between two orientations.
 
-        The dot product is taken as an absolute value, so the two quaternions that
-        describe every rotation count as the same orientation.
+        The dot product is taken as an absolute value, so the two
+        quaternions that describe every rotation count as the same
+        orientation.
 
         :param other: The second orientation.
-        :return: The angle between the two orientations, 0 when they describe the same
-            rotation.
+        :return: The angle between the two orientations, 0 when they
+            describe the same rotation.
         """
         return 2 * sm.safe_acos(abs(self.dot(other)))
 
     def slerp(self, other: Quaternion, t: sm.ScalarData) -> Quaternion:
-        """
-        Spherical linear interpolation that takes into account that q == -q t=0 will
-        return self and t=1 will return other.
+        """Spherical linear interpolation that takes into account that q == -q
+        t=0 will return self and t=1 will return other.
 
         :param other: the other quaternion
         :param t: float, 0-1
-        :return: 4x1 Matrix; Return spherical linear interpolation between two
-            quaternions.
+        :return: 4x1 Matrix; Return spherical linear interpolation
+            between two quaternions.
         """
         cos_half_theta = self.dot(other)
 
@@ -2818,9 +2778,7 @@ class AxisAngle(
     SubclassJSONSerializer,
     Orientation,
 ):
-    """
-    A rotation by an angle around a unit axis.
-    """
+    """A rotation by an angle around a unit axis."""
 
     def __init__(
         self,
@@ -2864,12 +2822,13 @@ class AxisAngle(
 
     @classmethod
     def from_quaternion(cls, quaternion: Quaternion) -> AxisAngle:
-        """
-        The identity rotation has no axis of its own and is read as a rotation by zero
-        around the z-axis.
+        """The identity rotation has no axis of its own and is read as a
+        rotation by zero around the z-axis.
 
-        :param quaternion: The rotation to describe, normalized in place.
-        :return: The rotation the quaternion describes, with an angle in [0, 2 pi].
+        :param quaternion: The rotation to describe, normalized in
+            place.
+        :return: The rotation the quaternion describes, with an angle in
+            [0, 2 pi].
         """
         quaternion.normalize()
         sine_of_half_angle = sm.sqrt(1 - quaternion.w**2)
@@ -2890,12 +2849,12 @@ class AxisAngle(
 
     @classmethod
     def from_rotation_matrix(cls, rotation_matrix: RotationMatrix) -> AxisAngle:
-        """
-        The identity rotation has no axis of its own and is read as a rotation by zero
-        around the z-axis.
+        """The identity rotation has no axis of its own and is read as a
+        rotation by zero around the z-axis.
 
         :param rotation_matrix: The rotation to describe.
-        :return: The rotation the matrix describes, with an angle in [0, pi].
+        :return: The rotation the matrix describes, with an angle in [0,
+            pi].
         """
         rotation = rotation_matrix.generic_matrix[:3, :3]
         cosine = (rotation.trace() - 1) / 2
@@ -2991,10 +2950,11 @@ class Displacement(
     SymbolicSpatialValue3Dimensional,
     SubclassJSONSerializer,
 ):
-    """
-    A rigid-body displacement: the transformation that rotates a body by
+    """A rigid-body displacement: the transformation that rotates a body by
     :attr:`rotation_vector` about its origin and moves that origin by
-    :attr:`translation`, both along the axes of the reference frame. Unlike a
+    :attr:`translation`, both along the axes of the reference frame.
+
+    Unlike a
     :class:`Twist`, it is not a velocity.
     """
 
@@ -3078,10 +3038,12 @@ class Twist(
     SymbolicSpatialValue3Dimensional,
     SubclassJSONSerializer,
 ):
-    """
-    A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
-    at the origin of the reference frame moves, both along that frame's axes and per
-    unit of the parameter they are taken with respect to, usually time. Unlike a
+    """A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point
+    of the body at the origin of the reference frame moves, both along that
+    frame's axes and per unit of the parameter they are taken with respect to,
+    usually time.
+
+    Unlike a
     :class:`Displacement`, it is a velocity (Lynch and Park, *Modern Robotics*, §3.3.2).
     """
 
@@ -3167,9 +3129,7 @@ class Pose3Dimensional(
     HomogeneousCoordinates,
     SubclassJSONSerializer,
 ):
-    """
-    A position and an orientation, both given in one reference frame.
-    """
+    """A position and an orientation, both given in one reference frame."""
 
     def __init__(
         self,
@@ -3177,17 +3137,19 @@ class Pose3Dimensional(
         orientation: Quaternion | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ):
-        """
-        Initialize a 3D point with orientation and a reference frame in a kinematic
-        structure.
+        """Initialize a 3D point with orientation and a reference frame in a
+        kinematic structure.
 
-        :param position: The 3D position of the point, represented as a CartesianPoint3Dimensional object.
-            If None, a default position is assumed.
-        :param orientation: The orientation of the point in 3D space represented as a
-            Quaternion. If None, default orientation is assumed.
-        :param reference_frame: The reference frame (kinematic structure entity)
-            relative to which this point is defined. This may be None if the point is
-            not tied to any specific reference frame.
+        :param position: The 3D position of the point, represented as a
+            CartesianPoint3Dimensional object. If None, a default
+            position is assumed.
+        :param orientation: The orientation of the point in 3D space
+            represented as a Quaternion. If None, default orientation is
+            assumed.
+        :param reference_frame: The reference frame (kinematic structure
+            entity) relative to which this point is defined. This may be
+            None if the point is not tied to any specific reference
+            frame.
         """
         if position is None:
             position = CartesianPoint3Dimensional()
@@ -3237,10 +3199,9 @@ class Pose3Dimensional(
         yaw: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Self:
-        """
-        Creates a Pose3Dimensional object from position (x, y, z) and Euler angles (roll, pitch,
-        yaw) values. The function also accepts optional reference and child frame
-        parameters.
+        """Creates a Pose3Dimensional object from position (x, y, z) and Euler
+        angles (roll, pitch, yaw) values. The function also accepts optional
+        reference and child frame parameters.
 
         :param x: The x-coordinate of the position
         :param y: The y-coordinate of the position
@@ -3248,9 +3209,10 @@ class Pose3Dimensional(
         :param roll: The rotation around the x-axis
         :param pitch: The rotation around the y-axis
         :param yaw: The rotation around the z-axis
-        :param reference_frame: The reference frame for the transformation
-        :return: A Pose3Dimensional object created using the provided position and orientation
-            values
+        :param reference_frame: The reference frame for the
+            transformation
+        :return: A Pose3Dimensional object created using the provided
+            position and orientation values
         """
         p = CartesianPoint3Dimensional(x=x, y=y, z=z)
         r = Quaternion.from_rpy(roll, pitch, yaw)
@@ -3268,22 +3230,27 @@ class Pose3Dimensional(
         quat_w: sm.ScalarData = 1,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Self:
-        """
-        Creates a `Pose3Dimensional` instance from the provided position coordinates and quaternion
-        values representing rotation. This method constructs a 3D point for the position
-        and a rotation matrix derived from the quaternion, and initializes the
-        transformation matrix with these along with optional reference and child frame
-        entities.
+        """Creates a `Pose3Dimensional` instance from the provided position
+        coordinates and quaternion values representing rotation. This method
+        constructs a 3D point for the position and a rotation matrix derived
+        from the quaternion, and initializes the transformation matrix with
+        these along with optional reference and child frame entities.
 
         :param pos_x: X coordinate of the position in space.
         :param pos_y: Y coordinate of the position in space.
         :param pos_z: Z coordinate of the position in space.
-        :param quat_w: W component of the quaternion representing rotation.
-        :param quat_x: X component of the quaternion representing rotation.
-        :param quat_y: Y component of the quaternion representing rotation.
-        :param quat_z: Z component of the quaternion representing rotation.
-        :param reference_frame: Optional reference frame for the transformation matrix.
-        :return: A `Pose3Dimensional` object constructed from the given parameters.
+        :param quat_w: W component of the quaternion representing
+            rotation.
+        :param quat_x: X component of the quaternion representing
+            rotation.
+        :param quat_y: Y component of the quaternion representing
+            rotation.
+        :param quat_z: Z component of the quaternion representing
+            rotation.
+        :param reference_frame: Optional reference frame for the
+            transformation matrix.
+        :return: A `Pose3Dimensional` object constructed from the given
+            parameters.
         """
         p = CartesianPoint3Dimensional(x=pos_x, y=pos_y, z=pos_z)
         r = Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)
@@ -3299,21 +3266,25 @@ class Pose3Dimensional(
         angle: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Self:
-        """
-        Creates an instance of the class from x, y, z coordinates, axis and angle.
+        """Creates an instance of the class from x, y, z coordinates, axis and
+        angle.
 
-        This class method generates an object using provided spatial coordinates and a
-        rotation defined by an axis and angle. The resulting object is defined with a
-        specified reference frame and child frame.
+        This class method generates an object using provided spatial
+        coordinates and a rotation defined by an axis and angle. The
+        resulting object is defined with a specified reference frame and
+        child frame.
 
         :param x: Initial x-coordinate.
         :param y: Initial y-coordinate.
         :param z: Initial z-coordinate.
-        :param axis: Vector defining the axis of rotation. Defaults to Vector3Dimensional(0, 0, 1)
-            if not specified.
-        :param angle: Angle of rotation around the specified axis, in radians.
-        :param reference_frame: Reference frame entity to be associated with the object.
-        :return: An instance of the class with the specified transformations applied.
+        :param axis: Vector defining the axis of rotation. Defaults to
+            Vector3Dimensional(0, 0, 1) if not specified.
+        :param angle: Angle of rotation around the specified axis, in
+            radians.
+        :param reference_frame: Reference frame entity to be associated
+            with the object.
+        :return: An instance of the class with the specified
+            transformations applied.
         """
         if axis is None:
             axis = Vector3Dimensional(0, 0, 1)
@@ -3421,13 +3392,14 @@ class Pose2Dimensional(
     SubclassJSONSerializer,
     PlanarSpecialEuclideanGroupAction,
 ):
-    """
-    Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
+    """Represents a 2D pose consisting of an x coordinate, a y coordinate, and
+    a yaw angle.
 
-    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``. It lies on its reference
-    frame's x-y plane and has no height or tilt of its own, so it carries no ``z``,
-    ``roll`` or ``pitch``. Whenever 3D calculations are required, use :attr:`pose` to
-    obtain the equivalent 3D :class:`Pose3Dimensional`.
+    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``. It lies
+    on its reference frame's x-y plane and has no height or tilt of its
+    own, so it carries no ``z``, ``roll`` or ``pitch``. Whenever 3D
+    calculations are required, use :attr:`pose` to obtain the equivalent
+    3D :class:`Pose3Dimensional`.
     """
 
     def __init__(
@@ -3485,9 +3457,8 @@ class Pose2Dimensional(
 
     @property
     def pose(self) -> Pose3Dimensional:
-        """
-        Convert to a 3D :class:`Pose3Dimensional` with z=0, roll=0, pitch=0.
-        """
+        """Convert to a 3D :class:`Pose3Dimensional` with z=0, roll=0,
+        pitch=0."""
         return Pose3Dimensional.from_xyz_rpy(
             x=self.x,
             y=self.y,
@@ -3539,20 +3510,21 @@ class Pose2Dimensional(
         pose: Pose3Dimensional,
         plane_frame: CartesianFrame3Dimensional | None = None,
     ) -> Pose2Dimensional:
-        """
-        Flatten a 3D Pose3Dimensional onto the x-y plane of a frame: its position is projected onto
-        the plane, and it faces the way its x-axis, projected onto the plane, points.
+        """Flatten a 3D Pose3Dimensional onto the x-y plane of a frame: its
+        position is projected onto the plane, and it faces the way its x-axis,
+        projected onto the plane, points.
 
-        That heading, ``atan2(r21, r11)`` of the pose's rotation matrix, equals the yaw
-        of its ZYX Euler angles.
+        That heading, ``atan2(r21, r11)`` of the pose's rotation matrix,
+        equals the yaw of its ZYX Euler angles.
 
         :param pose: The pose to flatten.
-        :param plane_frame: The frame whose x-y plane to flatten the pose onto.
-            Defaults to ``pose``'s reference frame; any other frame must belong to the
-            same world as ``pose``'s.
-        :return: The Pose2Dimensional on the x-y plane of ``plane_frame``.
-        :raises XAxisNormalToPlaneError: If the pose's x-axis is constant and normal to
-            the plane.
+        :param plane_frame: The frame whose x-y plane to flatten the
+            pose onto. Defaults to ``pose``'s reference frame; any other
+            frame must belong to the same world as ``pose``'s.
+        :return: The Pose2Dimensional on the x-y plane of
+            ``plane_frame``.
+        :raises XAxisNormalToPlaneError: If the pose's x-axis is
+            constant and normal to the plane.
         """
         frame = plane_frame if plane_frame is not None else pose.reference_frame
         if frame is not pose.reference_frame:
@@ -3576,8 +3548,8 @@ class Pose2Dimensional(
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Pose2Dimensional:
-        """
-        This pose re-expressed in ``target_frame_T_reference_frame``'s reference frame.
+        """This pose re-expressed in ``target_frame_T_reference_frame``'s
+        reference frame.
 
         .. warning::
             A Pose2Dimensional carries no z, roll or pitch, so it is transformed as the pose flat
@@ -3607,8 +3579,7 @@ class Pose2Dimensional(
         yaw: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Pose2Dimensional:
-        """
-        Create a Pose2Dimensional from its coordinates and bearing.
+        """Create a Pose2Dimensional from its coordinates and bearing.
 
         :param x: The x-coordinate of the position.
         :param y: The y-coordinate of the position.
@@ -3652,9 +3623,9 @@ class HomogeneousTransformationMatrix2Dimensional(
     SubclassJSONSerializer,
     PlanarSpecialEuclideanGroupAction,
 ):
-    """
-    A 3x3 homogeneous matrix of SE(2): the rigid change from the
-    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of its :attr:`~SymbolicSpatialChange.child_frame` into that of its
+    """A 3x3 homogeneous matrix of SE(2): the rigid change from the :class:`~kr
+    rood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional`
+    of its :attr:`~SymbolicSpatialChange.child_frame` into that of its
     :attr:`~SymbolicSpatialType.reference_frame`, two frames on one plane.
 
     It is only a change of coordinates, never a value given in a frame: the value it
@@ -3682,7 +3653,7 @@ class HomogeneousTransformationMatrix2Dimensional(
         """
         if reference_frame is not None and child_frame is not None:
             self._ensure_rigid_change_on_one_plane(
-                relation=reference_frame.compare_xy_plane(frame=child_frame),
+                relation=reference_frame.compare_embedded_plane(frame=child_frame),
                 reference_frame=reference_frame,
                 child_frame=child_frame,
             )
@@ -3703,20 +3674,18 @@ class HomogeneousTransformationMatrix2Dimensional(
 
     @property
     def source_coordinate_system(self) -> CartesianFrame2Dimensional | None:
-        """
-        The frame on the x-y plane of :attr:`~SymbolicSpatialChange.child_frame`;
-        ``None`` for a change without a child frame.
-        """
+        """The frame on the x-y plane of
+        :attr:`~SymbolicSpatialChange.child_frame`; ``None`` for a change
+        without a child frame."""
         if self.child_frame is None:
             return None
         return CartesianFrame2Dimensional(frame_3_dimensional=self.child_frame)
 
     @property
     def target_coordinate_system(self) -> CartesianFrame2Dimensional | None:
-        """
-        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
-        ``None`` for a change without a reference frame.
-        """
+        """The frame on the x-y plane of
+        :attr:`~SymbolicSpatialType.reference_frame`; ``None`` for a change
+        without a reference frame."""
         if self.reference_frame is None:
             return None
         return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
@@ -3767,7 +3736,7 @@ class HomogeneousTransformationMatrix2Dimensional(
             known, is taken to be planar unchecked.
         """
         cls._ensure_rigid_change_on_one_plane(
-            relation=transformation.xy_plane_relation,
+            relation=transformation.embedded_plane_relation,
             reference_frame=transformation.reference_frame,
             child_frame=transformation.child_frame,
         )
@@ -3783,7 +3752,7 @@ class HomogeneousTransformationMatrix2Dimensional(
     @staticmethod
     def _ensure_rigid_change_on_one_plane(
         *,
-        relation: XYPlaneRelation,
+        relation: EmbeddedPlaneRelation,
         reference_frame: CartesianFrame3Dimensional | None,
         child_frame: CartesianFrame3Dimensional | None,
     ) -> None:
@@ -3796,11 +3765,11 @@ class HomogeneousTransformationMatrix2Dimensional(
         :raises MirroredPlaneFramesError: If the frames span one plane with z-axes
             pointing in opposite directions.
         """
-        if relation is XYPlaneRelation.DIFFERENT_PLANES:
+        if relation is EmbeddedPlaneRelation.DIFFERENT_PLANES:
             raise FramesOnDifferentPlanesError(
                 reference_frame=reference_frame, child_frame=child_frame
             )
-        if relation is XYPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL:
+        if relation is EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL:
             raise MirroredPlaneFramesError(
                 reference_frame=reference_frame, child_frame=child_frame
             )
@@ -3809,24 +3778,20 @@ class HomogeneousTransformationMatrix2Dimensional(
 
     @property
     def x(self) -> sm.Scalar:
-        """
-        The x-coordinate of the child frame's origin in the reference frame.
-        """
+        """The x-coordinate of the child frame's origin in the reference
+        frame."""
         return self[0, 2]
 
     @property
     def y(self) -> sm.Scalar:
-        """
-        The y-coordinate of the child frame's origin in the reference frame.
-        """
+        """The y-coordinate of the child frame's origin in the reference
+        frame."""
         return self[1, 2]
 
     @property
     def yaw(self) -> sm.Scalar:
-        """
-        The angle from the reference frame's x-axis to the child frame's,
-        counterclockwise.
-        """
+        """The angle from the reference frame's x-axis to the child frame's,
+        counterclockwise."""
         return sm.atan2(self[1, 0], self[0, 0])
 
     @property
@@ -3911,8 +3876,8 @@ class HomogeneousTransformationMatrix2Dimensional(
 
 @sm.substitution_cache
 def rotation_matrix_to_quaternion(r: Matrix):
-    """
-    This method constructs a quaternion representation of the provided rotation matrix.
+    """This method constructs a quaternion representation of the provided
+    rotation matrix.
 
     It is designed to handle different cases of rotation matrix configurations to ensure numerical stability during computation. The resultant
     quaternion adheres to the expected mathematical relationship with the given rotation matrix.
