@@ -1,3 +1,10 @@
+"""
+The alternative mappings and column types semantic_digital_twin stores its
+non-dataclass types, such as the world and the spatial types, with.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from io import BytesIO
 from uuid import UUID
@@ -6,6 +13,7 @@ import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from sqlalchemy import TypeDecorator, types
+from typing_extensions import Self
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from semantic_digital_twin.mixin import HasSimulatorProperties
@@ -23,6 +31,8 @@ from krrood_spatial_math.spatial_types import (
     AxisAngle,
     SpatialType,
     Displacement,
+    ScrewAxis,
+    Twist,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
@@ -209,6 +219,98 @@ class DisplacementMapping(AlternativeMapping[Displacement]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
+        return [Vector3]
+
+
+@dataclass(eq=False, kw_only=True)
+class TwistMapping(AlternativeMapping[Twist]):
+    """
+    A :class:`Twist` stored as its two velocities and its reference frame.
+    """
+
+    angular_velocity: Vector3
+    """
+    The axis the body turns around, scaled by how fast it turns.
+    """
+
+    linear_velocity: Vector3
+    """
+    How fast the point of the body at the origin of the reference frame moves.
+    """
+
+    reference_frame: KinematicStructureEntity | None
+    """
+    The frame along whose axes both velocities are given.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: Twist) -> Self:
+        return cls(
+            angular_velocity=obj.angular_velocity,
+            linear_velocity=obj.linear_velocity,
+            reference_frame=obj.reference_frame,
+        )
+
+    def to_domain_object(self) -> Twist:
+        return Twist(
+            angular_velocity=self.angular_velocity,
+            linear_velocity=self.linear_velocity,
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        """
+        Extends :meth:`AlternativeMapping.required_pre_build_classes` by the
+        :class:`Vector3` both vectors are stored as.
+        """
+        return [Vector3]
+
+
+@dataclass(eq=False, kw_only=True)
+class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
+    """
+    A :class:`ScrewAxis` stored as its rotation and translation per unit of position and
+    its reference frame.
+    """
+
+    rotation_per_unit_position: Vector3
+    """
+    The axis the body turns around, scaled by the angle it turns by per unit of position.
+    """
+
+    translation_per_unit_position: Vector3
+    """
+    How far the point of the body at the origin of the reference frame moves per unit of
+    position.
+    """
+
+    reference_frame: KinematicStructureEntity | None
+    """
+    The frame along whose axes both parts are given.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: ScrewAxis) -> Self:
+        return cls(
+            rotation_per_unit_position=obj.rotation_per_unit_position,
+            translation_per_unit_position=obj.translation_per_unit_position,
+            reference_frame=obj.reference_frame,
+        )
+
+    def to_domain_object(self) -> ScrewAxis:
+        return ScrewAxis(
+            rotation_per_unit_position=self.rotation_per_unit_position,
+            translation_per_unit_position=self.translation_per_unit_position,
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        """
+        Extends :meth:`AlternativeMapping.required_pre_build_classes` by the
+        :class:`Vector3` both vectors are stored as.
+        """
         return [Vector3]
 
 
