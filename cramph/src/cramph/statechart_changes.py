@@ -576,10 +576,17 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
     into a block yet, in the order they were first recorded.
     """
 
+    recorded_change_count: int = field(default=0, init=False, repr=False)
+    """
+    How often a change to the structure of :attr:`statechart` was recorded, which grows
+    with every change, also with one that repeats a pending change.
+    """
+
     def record_change(self, *, change: StatechartChange) -> None:
         """
         Records `change` for the next block.
         """
+        self.recorded_change_count += 1
         self.recorded_changes.append(change)
         self._close_change_block_outside_modify()
 
@@ -617,6 +624,7 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
         node it names joined :attr:`statechart`. A pending change that is the same
         change, see :meth:`PendingChange.is_same_change_as`, stays the only one.
         """
+        self.recorded_change_count += 1
         if not any(
             recorded.is_same_change_as(other=pending)
             for recorded in self._pending_changes

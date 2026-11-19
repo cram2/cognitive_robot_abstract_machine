@@ -2460,6 +2460,18 @@ class CompositeNode(StatechartNode):
         """
         return None
 
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects the children this node was handed that it cannot adopt, see
+        :meth:`adopt_handed_children`. Rejects none unless overridden.
+
+        :param taken_over: A handed child this node takes over before it adopts its
+            children, see :meth:`take_over`, which it can adopt then.
+        """
+        return None
+
     def expand(self) -> None:
         """
         Instantiate child nodes, add them to this node, and wire their life cycle transition conditions.

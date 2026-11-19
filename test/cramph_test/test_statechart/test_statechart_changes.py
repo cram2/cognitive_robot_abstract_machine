@@ -197,6 +197,7 @@ def test_a_change_outside_a_modification_after_a_failed_one_closes_no_block(send
     first, second = sender.nodes[1:3]
     with pytest.raises(ZeroDivisionError):
         with sender.modify():
+            sender.add_node(node=ConstTrueNode(name="kept"))
             1 / 0
     block_count = len(sender.structure_change_recorder.change_blocks)
 

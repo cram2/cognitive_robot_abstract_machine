@@ -494,19 +494,74 @@ def test_without_a_language_node_above_the_top_level_node_holds_a_node(
 # %% a failed replacement
 
 
-def test_a_failed_replacement_breaks_the_statechart(
+def test_a_failed_replacement_by_a_node_holding_the_step_leaves_it_where_it_was(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    first, second = _succeeding("1"), _succeeding("2")
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
+    replacement = Sequence(nodes=[first, second])
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+        statechart.replace(node=second, replacement=replacement)
+    _run(statechart_executor, statechart, sequence)
+
+    assert not replacement.belongs_to_statechart()
+    assert sequence.nodes == [first, second]
+    assert second.parent_node is sequence
+    assert _start_order(statechart, [second, first]) == [first, second]
+
+
+def test_a_failed_replacement_by_another_node_leaves_the_step_where_it_was(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    first, second = _succeeding("1"), _succeeding("2")
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
+    replacement = Sequence(nodes=[first])
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+        statechart.replace(node=second, replacement=replacement)
+    _run(statechart_executor, statechart, sequence)
+
+    assert not replacement.belongs_to_statechart()
+    assert sequence.nodes == [first, second]
+    assert second.parent_node is sequence
+    assert _start_order(statechart, [second, first]) == [first, second]
+
+
+def test_a_node_rejected_before_a_modification_changed_anything_leaves_the_statechart_usable(
     statechart_executor: StatechartExecutor,
 ) -> None:
     """
-    The replacement fails while it joins, after the replacement block changed the
-    statechart.
+    The handed child is rejected before the sequence holding it joins.
     """
     statechart = Statechart(context=statechart_executor.context)
-    first, second = _succeeding("1"), _succeeding("2")
-    statechart.add_node(node=Sequence(nodes=[first, second]))
+    first = _succeeding("1")
+    statechart.add_node(node=(sequence := Sequence(nodes=[first])))
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+        with statechart.modify():
+            statechart.add_node(node=Sequence(nodes=[first]))
+    _run(statechart_executor, statechart, sequence)
+
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
+
+
+def test_a_node_rejected_after_its_modification_changed_the_statechart_breaks_it(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The node added before the rejected one stays, so the statechart is half changed.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    first = _succeeding("1")
+    statechart.add_node(node=Sequence(nodes=[first]))
 
     with pytest.raises(NodeAlreadyBelongsToDifferentNodeError) as raised:
-        statechart.replace(node=second, replacement=Sequence(nodes=[first]))
+        with statechart.modify():
+            statechart.add_node(node=_succeeding("2"))
+            statechart.add_node(node=Sequence(nodes=[first]))
 
     with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
         statechart.check_not_broken()

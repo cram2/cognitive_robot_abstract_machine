@@ -304,6 +304,23 @@ def test_an_abandoned_modification_compiles_nothing(
     assert counting.compile_count == compiles_before
 
 
+def test_a_modification_raising_before_it_changed_anything_leaves_the_statechart_usable(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    Nothing is half changed, so the statechart grows and runs as before.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            raise ModificationDeliberatelyFailed()
+
+    statechart.add_node(node=(second := _node_arriving_at_once("second")))
+
+    _tick_until_succeeded(statechart_executor, second)
+
+
 def test_a_statechart_whose_modification_raised_refuses_to_tick(
     statechart_executor: StatechartExecutor,
 ) -> None:
@@ -314,6 +331,7 @@ def test_a_statechart_whose_modification_raised_refuses_to_tick(
     statechart = statechart_executor.statechart
     with pytest.raises(ModificationDeliberatelyFailed) as raised:
         with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
             raise ModificationDeliberatelyFailed()
 
     with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
@@ -330,9 +348,9 @@ def test_a_statechart_whose_modification_raised_refuses_to_compile(
     A statechart that a block broke before its first compile never compiles.
     """
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(node=_node_arriving_at_once("first"))
     with pytest.raises(ModificationDeliberatelyFailed):
         with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
             raise ModificationDeliberatelyFailed()
 
     with pytest.raises(StatechartBrokenByFailedModificationError):
@@ -349,6 +367,7 @@ def test_a_statechart_whose_modification_raised_refuses_further_modifications(
     statechart = statechart_executor.statechart
     with pytest.raises(ModificationDeliberatelyFailed):
         with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
             raise ModificationDeliberatelyFailed()
 
     with pytest.raises(StatechartBrokenByFailedModificationError):
@@ -368,6 +387,7 @@ def test_an_outer_modification_raises_after_the_error_of_an_inner_one_was_caught
         with statechart.modify():
             with pytest.raises(ModificationDeliberatelyFailed):
                 with statechart.modify():
+                    statechart.add_node(node=_node_arriving_at_once("kept"))
                     raise ModificationDeliberatelyFailed()
 
 
