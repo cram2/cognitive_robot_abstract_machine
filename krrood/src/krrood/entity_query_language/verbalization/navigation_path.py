@@ -1,3 +1,7 @@
+"""
+The hops of an attribute navigation chain, as the data a possessive is read out from.
+"""
+
 from __future__ import annotations
 
 import uuid
@@ -12,7 +16,6 @@ from krrood.entity_query_language.core.mapped_variable import (
     Index,
     MappedVariable,
 )
-from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.source_reference import (
     SourceReference,
 )
@@ -66,7 +69,7 @@ class PathStep:
     """
 
     name: str
-    """The display text for this hop (e.g. ``"amount"``, ``"handle[0]"``, ``"first"``)."""
+    """The display text for this hop (e.g. ``"amount"``, ``"[0]"``)."""
 
     source_reference: SourceReference | None = None
     """The attribute's source reference, or ``None`` for composite / index hops."""
@@ -81,10 +84,10 @@ class PathStep:
     A scalar leaf possessed by a plural subject distributes (*"their salaries"*); an entity owner of
     further structure does not (*"the begin and end of their period"*)."""
 
-    ordinal: str | None = None
-    """The ordinal phrase (*"first"*, *"last"*) when this attribute hop selects a single indexed
-    element of a collection: the collection noun singularizes and takes the ordinal (*"the first
-    task"* rather than *"the first of the tasks"*); ``None`` for a whole-collection hop."""
+    index: int | None = None
+    """The sequence index this hop selects, counted from the end when negative; ``None`` for a hop
+    that selects no element. On a plain attribute hop the collection noun singularizes and takes
+    the ordinal (*"the first task"* rather than *"the first of the tasks"*)."""
 
     @property
     def is_plain_attribute(self) -> bool:
@@ -199,15 +202,15 @@ def _append_index(parts: list[PathStep], node: Index) -> None:
     a call result) it becomes a standalone ordinal hop; a non-integer key keeps the ``"[key]"`` form.
     """
     key = node._key_
+    name = f"[{repr(key)}]"
     if not isinstance(key, int) or isinstance(key, bool):
-        parts.append(PathStep(name=f"[{repr(key)}]", source_reference=None))
+        parts.append(PathStep(name=name, source_reference=None))
         return
-    ordinal_phrase = morphology.index_ordinal(key)
-    if parts and parts[-1].is_plain_attribute and parts[-1].ordinal is None:
+    if parts and parts[-1].is_plain_attribute and parts[-1].index is None:
         parts[-1] = replace(
             parts[-1],
-            ordinal=ordinal_phrase,
+            index=key,
             is_scalar_value=_is_scalar_value(node._type_),
         )
         return
-    parts.append(PathStep(name=ordinal_phrase, source_reference=None))
+    parts.append(PathStep(name=name, index=key, source_reference=None))

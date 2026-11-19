@@ -18,6 +18,11 @@ on:
         description: "Lowercase repository name with tag"
         required: true
         type: string
+      check_rules:
+        description: "Whether the job checks the code a pull request changes against the rules that have a checker, before anything else"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   test:
@@ -53,6 +58,18 @@ jobs:
 
       - name: Install dependencies
         uses: ./cognitive_robot_abstract_machine/.github/actions/install-workspace
+
+      - name: Check the changed code against the rules that have a checker
+        # The check pre-commit runs, over the lines the pull request changes, so it holds
+        # even for commits made without the hooks. A pull request is checked out as its
+        # merge commit, whose first parent is the base.
+        if: ${{ inputs.check_rules && github.event_name == 'pull_request' }}
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          cd cognitive_robot_abstract_machine
+          git config --global --add safe.directory "$PWD"
+          git fetch --quiet --deepen=1 origin "$GITHUB_REF"
+          krrood check --since HEAD^1
 
       - name: Install drake
         if: ${{ contains(fromJSON(inputs.libs), 'semantic_digital_twin') }}

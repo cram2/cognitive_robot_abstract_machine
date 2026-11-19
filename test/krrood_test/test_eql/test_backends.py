@@ -66,7 +66,6 @@ from ..dataset.example_classes import (
     NestedAction,
     EnumAction,
 )
-from ..dataset.ormatic_interface import *  # type: ignore
 from ..dataset.value_comparisons import IsGreaterThan
 
 
@@ -240,11 +239,15 @@ def test_probabilistic_query_backend():
 
 
 def test_generative_eql_backend():
+    """
+    The generative backend yields one atom for every pair of a type and a charge the
+    condition admits.
+    """
     q = an(Atom)(
         element=...,
         type=variable_from([0, 1, 2]),
         charge=variable_from([0.0, 1.0, 2.0]),
-        timestamp=datetime.datetime.now(),
+        timestamp=datetime.now(),
     )
     # No explicit resolve(): the subject variable is available as soon as the pattern is
     # specified, so where() can reference it directly.

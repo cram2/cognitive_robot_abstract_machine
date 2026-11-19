@@ -560,8 +560,7 @@ class WorldModelManager:
     @property
     def has_open_modification(self) -> bool:
         """
-        Whether a :meth:`World.modify_world` block is still open, so the changes made in
-        it are not announced yet.
+        Whether a :meth:`World.modify_world` block of this world has not ended yet.
         """
         return bool(self._active_world_model_update_context_manager_ids)
 
@@ -743,7 +742,7 @@ class World(HasSimulatorProperties):
                 _world=self, mesh_decomposer=self.mesh_decomposer
             ),
         )
-        self.collision_manager.add_to_world(self)
+        self.collision_manager.add_to_world(world=self)
 
     @classmethod
     def create_with_root_body(
@@ -1019,7 +1018,7 @@ class World(HasSimulatorProperties):
 
         :param connection: The connection to be added to the kinematic structure.
         """
-        connection.add_to_world(self)
+        connection.add_to_world(world=self)
         self.kinematic_structure.add_edge(
             connection.parent.index, connection.child.index, connection
         )
@@ -1060,7 +1059,7 @@ class World(HasSimulatorProperties):
 
         :param kinematic_structure_entity: The kinematic_structure_entity to add.
         """
-        kinematic_structure_entity.add_to_world(self)
+        kinematic_structure_entity.add_to_world(world=self)
         kinematic_structure_entity.index = self.kinematic_structure.add_node(
             kinematic_structure_entity
         )
@@ -1090,7 +1089,7 @@ class World(HasSimulatorProperties):
         :param dof: The degree of freedom to be added to the system.
         :return: None
         """
-        dof.add_to_world(self)
+        dof.add_to_world(world=self)
         self.state.add_degree_of_freedom(dof)
         self.degrees_of_freedom.append(dof)
 
@@ -1159,7 +1158,7 @@ class World(HasSimulatorProperties):
         The atomic method that adds a semantic annotation to the current list of
         semantic annotations.
         """
-        semantic_annotation.add_to_world(self)
+        semantic_annotation.add_to_world(world=self)
         self.semantic_annotations.append(semantic_annotation)
         self._world_entity_hash_table[hash(semantic_annotation)] = semantic_annotation
 
@@ -1191,7 +1190,7 @@ class World(HasSimulatorProperties):
         :param actuator: The actuator to be added to the system.
         :return: None
         """
-        actuator.add_to_world(self)
+        actuator.add_to_world(world=self)
         self.actuators.append(actuator)
 
     def _raise_error_if_belongs_to_other_world(self, world_entity: WorldEntity):
@@ -2200,28 +2199,37 @@ class World(HasSimulatorProperties):
         return new_world
 
     # %% Change Notifications
-    def notify_state_change(self, publish_changes: bool = True, **kwargs) -> None:
+    def notify_state_change(
+        self, *, publish_changes: bool = True, **kwargs: Any
+    ) -> None:
         """
         Announce a change of the state of this world to its state change callbacks.
 
         Within :meth:`batch_state_changes` the batch announces it once when it ends,
-        with its own ``publish_changes``; within :meth:`modify_world` the block
-        announces it.
+        with its own ``publish_changes``. Within :meth:`modify_world` the outermost block
+        announces it when it ends.
         """
         if self._state_change_batch_depth > 0:
             self._state_change_batch_has_collected_change = True
             return
-        if not self.is_empty():
+        modification_is_open = self._model_manager.has_open_modification
+        # a block that changed the model has kinematics compiled for the old structure
+        if not self.is_empty() and (
+            not modification_is_open
+            or self._forward_kinematic_manager.matches_world_structure
+        ):
             self._forward_kinematic_manager.recompute()
-        if self._model_manager.has_open_modification:
+        if modification_is_open:
             return
         self.state._notify_state_change(publish_changes=publish_changes, **kwargs)
 
-    def _notify_model_change(self, publish_changes: bool = True, **kwargs) -> None:
+    def _notify_model_change(
+        self, *, publish_changes: bool = True, **kwargs: Any
+    ) -> None:
         """
         Announce a change of the model of this world, first to its model change
         callbacks and then to its state change callbacks, so a callback of both kinds
-        learns about the state after the model it belongs to.
+        hears of the state after the model it belongs to.
         """
         self._model_manager.update_model_version_and_notify_callbacks(
             publish_changes=publish_changes, **kwargs

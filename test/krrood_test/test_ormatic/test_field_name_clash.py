@@ -1,10 +1,23 @@
+"""
+Tests of mapping fields whose names clash with the columns ORMatic adds.
+"""
+
 from __future__ import annotations
 import sqlalchemy
-from ..dataset.ormatic_interface import ClashingEntityDAO, ClashingTargetDAO
+
 
 def test_duplicate_column():
-    """Test that clashing field names do not cause duplicate columns or shadowing."""
-    expected_columns = {"database_id", "clashing_target_id", "polymorphic_type", "_clashing_target_id"}
+    """
+    Test that clashing field names do not cause duplicate columns or shadowing.
+    """
+    from ..dataset.ormatic_interface import ClashingEntityDAO, ClashingTargetDAO
+
+    expected_columns = {
+        "database_id",
+        "clashing_target_id",
+        "polymorphic_type",
+        "_clashing_target_id",
+    }
     actual_columns = set(ClashingEntityDAO.__table__.columns.keys())
     assert expected_columns.issubset(actual_columns), (
         f"Missing columns in ClashingEntityDAO. Expected at least {expected_columns}, found {actual_columns}"

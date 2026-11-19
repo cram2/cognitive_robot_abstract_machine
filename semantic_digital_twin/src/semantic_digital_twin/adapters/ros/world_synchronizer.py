@@ -1,3 +1,8 @@
+"""
+Keeping worlds in several processes in step over ROS: each world publishes its model and
+state changes, and applies the changes the other worlds publish.
+"""
+
 from __future__ import annotations
 
 import json
@@ -586,14 +591,6 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     ``_world_lock``: receiving a message must never wait for the world.
     """
 
-    _unpublished_model_block: ModificationBlock | None = field(
-        default=None, init=False, repr=False
-    )
-    """
-    The model modification the world announced last, until it is sent together with the
-    state the world announces after it; guarded by the world lock.
-    """
-
     @classmethod
     def of_world(cls, world: World) -> WorldSynchronizer:
         """
@@ -623,8 +620,8 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         self, *, publish_changes: bool | None = None, **kwargs: Any
     ) -> None:
         """
-        Record the modification block the world just recorded; :meth:`on_state_change`
-        sends it with the state the world announces next.
+        Send the modification block the world just recorded to the other synchronizers,
+        together with every position, including those written inside the block.
 
         Implements
         :meth:`~semantic_digital_twin.callbacks.callback.ModelChangeCallback.on_model_change`.
@@ -638,20 +635,31 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         if not publish_changes:
             return
 
-        with self._world._world_lock:
-            self._unpublished_model_block = ModificationBlock(
-                meta_data=self.meta_data,
-                modifications=self._world.get_world_model_manager().model_modification_blocks[
-                    -1
-                ],
-            )
+        model_block = ModificationBlock(
+            meta_data=self.meta_data,
+            modifications=self._world.get_world_model_manager().model_modification_blocks[
+                -1
+            ],
+        )
+        positions = self._world.state.to_uuid_position_dict()
+        state_message = WorldStateUpdate(
+            meta_data=self.meta_data,
+            ids=list(positions.keys()),
+            states=list(positions.values()),
+        )
+        update = WorldUpdate(
+            meta_data=self.meta_data,
+            modification_block=model_block,
+            state_update=state_message,
+        )
+        self._publish_or_defer(update)
+        self.update_previous_world_state()
 
     def on_state_change(
         self, *, publish_changes: bool | None = None, **kwargs: Any
     ) -> None:
         """
-        Send the changed positions to the other synchronizers; after a model
-        modification, send that modification and every position together in one update.
+        Send the positions that moved since the last message to the other synchronizers.
 
         Implements
         :meth:`~semantic_digital_twin.callbacks.callback.StateChangeCallback.on_state_change`.
@@ -664,45 +672,24 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             raise MissingPublishChangesKWARG(kwargs)
         if not publish_changes:
             return
-        with self._world._world_lock:
-            model_block = self._unpublished_model_block
-            self._unpublished_model_block = None
-            positions = (
-                self._world.state.to_uuid_position_dict()
-                if model_block is not None
-                else self.compute_state_changes()
-            )
-            if model_block is None and not positions:
-                return
-            update = WorldUpdate(
-                meta_data=self.meta_data,
-                modification_block=model_block,
-                state_update=self._create_state_update(positions=positions),
-            )
-            self.update_previous_world_state()
-        self._publish_or_defer(update)
 
-    def _create_state_update(self, *, positions: dict[UUID, float]) -> WorldStateUpdate:
-        """
-        :param positions: The position of each degree of freedom to send, by its id.
-        :return: The message carrying ``positions`` from this synchronizer.
-        """
-        return WorldStateUpdate(
+        changes = self.compute_state_changes()
+        if not changes:
+            return
+
+        state_message = WorldStateUpdate(
             meta_data=self.meta_data,
-            ids=list(positions.keys()),
-            states=list(positions.values()),
+            ids=list(changes.keys()),
+            states=list(changes.values()),
         )
+        update = WorldUpdate(meta_data=self.meta_data, state_update=state_message)
+        self._publish_or_defer(update)
+        self.update_previous_world_state()
 
     def _publish_or_defer(self, update: WorldUpdate) -> None:
         """
-        Publishes ``update`` now, or defers it until the world lock is released.
-
-        A modification that is still running has not produced its model block yet, so
-        publishing a state change from inside it would send degrees of freedom that the
-        receivers cannot know yet. Deferring to the world's ``pending_publications``,
-        which are flushed after the lock is released, keeps a state update behind the
-        model update that introduces what it refers to. Outside a modification (usually
-        just during state changes) no lock is held, so we publish directly.
+        Publish ``update`` now, or, while a modification of the world is ending, once
+        that modification has released the world lock, in the order the updates came.
         """
         if self._world.world_is_being_modified:
             self._world.get_world_model_manager().pending_publications.append(
@@ -762,24 +749,22 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
 
     def apply_message(self, message: WorldUpdate) -> None:
         """
-        Apply the model change and the state of ``message`` as one change of this world.
+        Apply the model change of ``message`` and then its state, as one modification.
 
-        Neither another thread nor a callback of this world sees the new model without
-        the positions that came with it, and a state that cannot be applied leaves the
-        model untouched.
+        No other thread and no callback of the world sees the new model without the
+        state that came with it. A state that cannot be applied leaves the model
+        untouched too.
         """
-        if message.modification_block is not None:
-            with self._world.modify_world(publish_changes=False):
-                if message.state_update is not None:
-                    self._check_state_update(
-                        state_update=message.state_update,
-                        modification_block=message.modification_block,
-                    )
+        with self._world.modify_world(publish_changes=False):
+            if message.state_update is not None:
+                self._check_state_update(
+                    state_update=message.state_update,
+                    modification_block=message.modification_block,
+                )
+            if message.modification_block is not None:
                 self._apply_model(message.modification_block)
-                if message.state_update is not None:
-                    self._write_state(state_update_message=message.state_update)
-        elif message.state_update is not None:
-            self._apply_state(message.state_update)
+            if message.state_update is not None:
+                self._apply_state(message.state_update)
         self.record_applied(message)
 
     def _apply_model(self, modification_block_message: ModificationBlock):
@@ -831,18 +816,8 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
 
     def _apply_state(self, state_update_message: WorldStateUpdate) -> None:
         """
-        Write the received positions into this world and announce them.
-
-        :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the state refers to
-            a degree of freedom the world does not hold.
-        :raises StateUpdateContainsNonNumericValuesError: If a value is not a number.
-        """
-        self._write_state(state_update_message=state_update_message)
-        self._world.notify_state_change(publish_changes=False)
-
-    def _write_state(self, *, state_update_message: WorldStateUpdate) -> None:
-        """
-        Write the received positions into this world without announcing them.
+        Write the received positions to the degrees of freedom they name and announce
+        them to the state change callbacks of the world.
 
         :raises StateUpdateContainsUnknownDegreesOfFreedomError: If the state refers to
             a degree of freedom the world does not hold.
@@ -858,6 +833,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                 state_update_message.states, dtype=float
             )
             self.update_previous_world_state()
+        self._world.notify_state_change(publish_changes=False)
 
     def apply_missed_messages(self):
         """

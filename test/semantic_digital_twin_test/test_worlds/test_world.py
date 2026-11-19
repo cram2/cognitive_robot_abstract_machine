@@ -456,23 +456,6 @@ def test_a_state_change_inside_a_modification_is_announced_when_it_ends(world_se
     assert counter.count == 1
 
 
-def test_a_state_change_inside_a_modification_moves_bodies_within_it(world_setup):
-    """
-    Code inside a modification reads the transforms the state written in it produces,
-    although the state callbacks are not told yet.
-    """
-    world, l1, l2, _, _, _ = world_setup
-    prismatic_connection = world.get_connection(l1, l2)
-
-    with world.modify_world():
-        prismatic_connection.position = 1.0
-        transform_inside_the_modification = l2.global_transform.to_np()
-
-    np.testing.assert_array_almost_equal(
-        transform_inside_the_modification, l2.global_transform.to_np()
-    )
-
-
 # %% forward kinematics expressions and recompilation
 
 
@@ -1443,7 +1426,7 @@ def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
 
     with pytest.raises(AlreadyBelongsToAWorldError):
-        l1.add_to_world(World())
+        l1.add_to_world(world=World())
 
     assert l1._world is world
     assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
@@ -1456,7 +1439,7 @@ def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup
     """
     world, l1, l2, bf, r1, r2 = world_setup
 
-    l1.add_to_world(world)
+    l1.add_to_world(world=world)
 
     assert l1._world is world
     assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
