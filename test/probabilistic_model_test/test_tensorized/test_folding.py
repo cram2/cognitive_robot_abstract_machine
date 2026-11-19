@@ -17,6 +17,7 @@ from random_events.variable import Continuous, Symbolic
 from sortedcontainers import SortedSet
 
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
 )
@@ -115,11 +116,10 @@ def test_a_folded_random_network_has_one_layer_per_type_and_height(random_networ
     sums storing their edges as stacked blocks.
     """
     folded = random_network.folded()
-    kinds = [type(layer) for layer in folded.layers]
+    heights = LayerFolding(root=folded.root).heights
+    kinds = [(type(layer), heights[id(layer)]) for layer in folded.layers]
     assert len(folded.layers) < len(random_network.layers)
-    assert len(kinds) == len(
-        {(type(layer), height) for layer, height in zip(folded.layers, kinds)}
-    )
+    assert len(kinds) == len(set(kinds))
     assert all(
         isinstance(layer.edges, BlockEdgeMatrix)
         for layer in folded.layers
