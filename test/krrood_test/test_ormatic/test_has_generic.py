@@ -11,6 +11,9 @@ class NoGeneric(HasGeneric): ...
 
 
 def test_has_generic():
+    """
+    The data access object of a generic class knows the class it maps.
+    """
     from ..dataset.ormatic_interface import KRROODPositionDAO
 
     og = KRROODPositionDAO.original_class()

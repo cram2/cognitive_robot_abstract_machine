@@ -1,3 +1,7 @@
+"""
+Parses the ProcTHOR scene files into worlds and saves them to the database.
+"""
+
 from __future__ import annotations
 
 from typing_extensions import TYPE_CHECKING

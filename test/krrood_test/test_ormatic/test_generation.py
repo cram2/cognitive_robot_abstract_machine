@@ -1,3 +1,9 @@
+"""
+Tests of generating an ORM interface file.
+"""
+
+from __future__ import annotations
+
 import os
 
 from krrood.ormatic.custom_types import PolymorphicEnumType

@@ -1,3 +1,9 @@
+"""
+Fixtures, options and hooks shared by the test suites of every package.
+"""
+
+from __future__ import annotations
+
 import os
 import threading
 import time

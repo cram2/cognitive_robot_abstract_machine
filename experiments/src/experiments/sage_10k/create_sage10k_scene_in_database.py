@@ -1,3 +1,9 @@
+"""
+Recreates the Sage10k database holding one loaded scene.
+"""
+
+from __future__ import annotations
+
 import os
 import time
 

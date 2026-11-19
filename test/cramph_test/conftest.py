@@ -1,3 +1,9 @@
+"""
+Fixtures shared by the cramph tests: worlds, statechart contexts and executors.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every

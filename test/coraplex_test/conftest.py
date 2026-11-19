@@ -1,3 +1,9 @@
+"""
+Fixtures shared by the coraplex tests: robot contexts, arms, regions and a database.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
@@ -154,6 +160,10 @@ def hsr_apartment_context(hsr_apartment_world):
 
 @pytest.fixture(scope="function")
 def coraplex_testing_session():
+    """
+    :return: A session on an empty in-memory database holding coraplex's tables, which are
+        dropped again after the test.
+    """
     from coraplex.orm.ormatic_interface import Base
 
     engine = create_engine("sqlite:///:memory:")

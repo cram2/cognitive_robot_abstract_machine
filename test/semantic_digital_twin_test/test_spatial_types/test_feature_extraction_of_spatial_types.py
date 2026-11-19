@@ -1,3 +1,9 @@
+"""
+Tests of extracting features from spatial types and their data access objects.
+"""
+
+from __future__ import annotations
+
 import pytest
 
 from krrood.ormatic.data_access_objects.helper import to_dao

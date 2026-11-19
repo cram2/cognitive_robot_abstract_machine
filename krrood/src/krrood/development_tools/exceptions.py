@@ -5,6 +5,7 @@ Exceptions raised by the development tools.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from krrood.exceptions import DataclassException
 
@@ -49,3 +50,26 @@ class GitCommandFailed(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Run the command from inside a git repository."
+
+
+@dataclass(kw_only=True)
+class RuffCheckFailed(DataclassException):
+    """
+    Raised when ruff exits with an error instead of reporting what it found in a file.
+    """
+
+    path: Path
+    """
+    The file ruff was asked to check.
+    """
+
+    standard_error: str
+    """
+    What ruff printed to its error stream.
+    """
+
+    def error_message(self) -> str:
+        return f"ruff failed to check {self.path}: {self.standard_error.strip()}"
+
+    def suggest_correction(self) -> str:
+        return 'Install the ruff version krrood pins with `pip install "krrood[development-tools]"`.'

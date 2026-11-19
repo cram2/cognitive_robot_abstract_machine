@@ -1,3 +1,7 @@
+"""
+Tests of the entry point that preprocesses Sage10k scenes into the database.
+"""
+
 from __future__ import annotations
 
 import os

@@ -1,3 +1,9 @@
+"""
+Tests of synchronizing worlds over ROS topics.
+"""
+
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -291,6 +297,10 @@ def test_state_synchronization_world_model_change_after_init(rclpy_node):
 
 
 def test_model_reload(rclpy_node, in_memory_session_maker):
+    """
+    A world told to reload its model from the database ends up with the model of the
+    world that published the reload.
+    """
     from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
     session1 = in_memory_session_maker()
