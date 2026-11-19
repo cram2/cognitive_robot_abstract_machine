@@ -1,3 +1,8 @@
+"""
+Generic classes whose fields take the concrete types a subclass binds their type
+parameters to.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -160,10 +165,20 @@ class SubClassSafeGeneric(ABC):
         :return: The concrete type it is bound to.
         :raises UnboundGenericParameter: If it is bound to no concrete type.
         """
-        bound_type = cls._get_generic_type_substitutions().get(parameter)
-        if bound_type is None or isinstance(bound_type, (TypeVar, TypeVarTuple)):
+        if not cls.binds_generic_parameter(parameter=parameter):
             raise UnboundGenericParameter(affected_class=cls, parameter=parameter)
-        return bound_type
+        return cls._get_generic_type_substitutions()[parameter]
+
+    @classmethod
+    def binds_generic_parameter(cls, *, parameter: TypeVar) -> bool:
+        """
+        :param parameter: A type parameter declared anywhere in the inheritance chain.
+        :return: Whether this class or one of its bases binds it to a concrete type.
+        """
+        bound_type = cls._get_generic_type_substitutions().get(parameter)
+        return bound_type is not None and not isinstance(
+            bound_type, (TypeVar, TypeVarTuple)
+        )
 
     @staticmethod
     def _substitutions_bind_a_concrete_type(

@@ -1,3 +1,8 @@
+"""
+How :class:`~krrood.patterns.subclass_safe_generic.SubClassSafeGeneric` narrows the
+fields of a class that binds its generic parameters, and reads the bound types back.
+"""
+
 import sys
 from abc import ABCMeta
 from dataclasses import fields, field as dataclass_field
@@ -859,6 +864,42 @@ def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
         TextContainer.get_type_of_generic_parameter(parameter=ContentType)
         is first_lookup
     )
+
+
+def test_a_class_reports_whether_it_binds_a_parameter():
+    """
+    Whether a parameter is bound is asked without reading the bound type, so a class in
+    the middle of a chain can be told apart from one that binds everything.
+    """
+    ContentType = TypeVar("ContentType")
+    OtherType = TypeVar("OtherType")
+
+    @dataclass(kw_only=True)
+    class Container(Generic[ContentType], SubClassSafeGeneric):
+        """
+        Holds content of a type left to its subclasses.
+        """
+
+        content: ContentType
+        """
+        What the container holds.
+        """
+
+    @dataclass(kw_only=True)
+    class RenamingContainer(Container[OtherType], Generic[OtherType]):
+        """
+        Passes the content type on under another name, binding nothing.
+        """
+
+    @dataclass(kw_only=True)
+    class TextContainer(Container[str]):
+        """
+        Holds text.
+        """
+
+    assert not Container.binds_generic_parameter(parameter=ContentType)
+    assert not RenamingContainer.binds_generic_parameter(parameter=ContentType)
+    assert TextContainer.binds_generic_parameter(parameter=ContentType)
 
 
 # %% attributes an interface declares
