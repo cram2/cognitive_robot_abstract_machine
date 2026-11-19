@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import builtins
 import importlib
+import importlib.util
 import os
 import sys
 import types
@@ -167,15 +168,21 @@ def get_import_root_from_path(path: Path) -> Path:
     Find the directory an import of a path is resolved against.
 
     :param path: The file system path to find the import root of.
-    :return: The nearest ancestor of the path that is not itself a package.
+    :return: The nearest ancestor of the path that is neither a package nor a portion of
+        an importable namespace package.
     """
     root = Path(path).resolve()
-    while (root / "__init__.py").exists():
-        parent = root.parent
-        if parent == root:
-            break
-        root = parent
-    return root
+    while (root / "__init__.py").exists() and root.parent != root:
+        root = root.parent
+    namespace_specification = (
+        importlib.util.find_spec(root.name) if root.name.isidentifier() else None
+    )
+    if namespace_specification is None or namespace_specification.origin is not None:
+        return root
+    portions = namespace_specification.submodule_search_locations
+    if root not in [Path(portion).resolve() for portion in portions]:
+        return root
+    return root.parent
 
 
 def get_import_path_from_path(path: str) -> str | None:
