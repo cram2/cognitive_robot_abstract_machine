@@ -11,9 +11,6 @@ import numpy as np
 
 from probabilistic_model.jax_log_likelihood import CompiledLogLikelihood
 
-from .test_inner_layers_on_array_backends import (
-    mixture_of_products_case,
-)
 
 # %% compiled log-likelihood
 

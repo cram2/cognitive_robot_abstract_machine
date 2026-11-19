@@ -1,3 +1,8 @@
+"""
+The probabilities of the states of the nodes of a discrete layer, stored densely or
+sparsely.
+"""
+
 from __future__ import annotations
 
 import dataclasses

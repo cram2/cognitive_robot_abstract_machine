@@ -44,9 +44,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
     LayeredProbabilisticCircuit,
 )
 
-from .test_inner_layers_on_array_backends import (
-    mixture_of_products_case,
-)
 
 # %% the parameters as one list
 

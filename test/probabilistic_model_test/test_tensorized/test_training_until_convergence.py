@@ -34,8 +34,6 @@ from .test_circuit_parameters_and_training import (
     minimum_improvement,
     parameters_shifted,
 )
-from .test_inner_layers_on_array_backends import mixture_of_products_case
-
 # %% convergence criterion
 
 
