@@ -1,3 +1,7 @@
+"""
+Heartbeats by which Giskard tells whether the client of a goal is still there.
+"""
+
 from __future__ import annotations
 
 import json
@@ -17,7 +21,7 @@ from rclpy.timer import Timer
 
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from krrood_synchronization.messages import Sender
 from krrood.patterns.called_positionally import called_positionally
 
 # %% where heartbeats are sent and received
@@ -95,7 +99,7 @@ class ClientHeartbeatPublisher:
     Node of the client that announces itself.
     """
 
-    client: MetaData
+    client: Sender
     """
     Identity of that client, the same one its goals name.
     """
@@ -221,12 +225,12 @@ class HeartbeatPresence:
     deterministically instead of sleeping in real time.
     """
 
-    watched_client: MetaData | None = field(init=False, default=None)
+    watched_client: Sender | None = field(init=False, default=None)
     """
     The client this check reports on, or ``None`` while no goal is running.
     """
 
-    last_heartbeat: dict[MetaData, float] = field(init=False, default_factory=dict)
+    last_heartbeat: dict[Sender, float] = field(init=False, default_factory=dict)
     """
     When each client announced itself last.
     """
@@ -242,7 +246,7 @@ class HeartbeatPresence:
     """
 
     @property
-    def client(self) -> MetaData:
+    def client(self) -> Sender:
         """
         The client that is being watched.
 
@@ -285,7 +289,7 @@ class HeartbeatPresence:
         client = from_json(json.loads(message.data))
         self.last_heartbeat[client] = self.clock()
 
-    def has_recent_heartbeat(self, *, client: MetaData) -> bool:
+    def has_recent_heartbeat(self, *, client: Sender) -> bool:
         """
         Whether the given client announced itself within ``timeout``.
         """
@@ -294,7 +298,12 @@ class HeartbeatPresence:
             return False
         return self.clock() - last_heartbeat <= self.timeout.total_seconds()
 
-    def start_watching(self, *, client: MetaData) -> bool:
+    def start_watching(self, *, client: Sender) -> bool:
+        """
+        Watch ``client`` from now on, provided it announced itself within ``timeout``.
+
+        :return: Whether ``client`` is watched now.
+        """
         if not self.has_recent_heartbeat(client=client):
             return False
         self.watched_client = client
@@ -321,13 +330,13 @@ class ClientWatchdog:
     The check that reports on the client's continued presence.
     """
 
-    goal_client: MetaData | None = field(init=False, default=None)
+    goal_client: Sender | None = field(init=False, default=None)
     """
     The client of the running goal, or ``None`` while no goal is running.
     """
 
     @property
-    def client(self) -> MetaData:
+    def client(self) -> Sender:
         """
         The client of the running goal.
 
@@ -337,7 +346,7 @@ class ClientWatchdog:
             raise NoWatchedClientError(check_type=type(self))
         return self.presence.client
 
-    def watch(self, *, client: MetaData) -> None:
+    def watch(self, *, client: Sender) -> None:
         """
         Watch the client of a goal from the moment the presence check recognizes it.
 

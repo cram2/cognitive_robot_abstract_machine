@@ -12,6 +12,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from array_api_compat import array_namespace
+from random_events.variable import Continuous
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -24,6 +25,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matri
 )
 
 from ..circuit_building import mixture_of_products_of_mixtures, uniform_leaf
+from .test_inner_layers_on_array_backends import MixtureOfProductsCase
 
 # %% circuits
 
@@ -41,6 +43,14 @@ def shared_children_circuit(x, y) -> ProbabilisticCircuit:
         (uniform_leaf(y, 0, 1, circuit), uniform_leaf(y, 1, 2, circuit)),
         [((0.8, 0.2), (0.6, 0.4)), ((0.3, 0.7), (0.1, 0.9))],
     )
+
+
+@pytest.fixture
+def mixture_of_products_case() -> MixtureOfProductsCase:
+    """
+    The circuit whose queries are compared across backends.
+    """
+    return MixtureOfProductsCase(Continuous("x"), Continuous("y"))
 
 
 # %% sparsity

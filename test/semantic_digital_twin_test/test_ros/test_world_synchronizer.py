@@ -28,11 +28,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import JSONAttributeDiff, to_json, from_json
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.messages import (
-    MetaData,
     WorldStateUpdate,
     LoadModel,
-    StreamPosition,
     WorldUpdate,
 )
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
@@ -99,7 +98,6 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.adapters.ros.messages import (
-    MetaData,
     WorldStateUpdate,
     ModificationBlock,
     LoadModel,
@@ -371,7 +369,7 @@ def test_a_reloaded_world_keeps_the_ones_listening_to_it(
 
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
-                publisher_synchronizer.latest_published_position
+                position=publisher_synchronizer.latest_published_position
             )
         ), "the reload never reached the receiver"
         assert len(receiver_world.kinematic_structure_entities) == 3
@@ -512,7 +510,7 @@ def test_a_world_modified_right_after_its_synchronizer_was_created_is_published(
 
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
-                publisher_synchronizer.latest_published_position
+                position=publisher_synchronizer.latest_published_position
             )
         ), "the first modification of the world never reached the receiver"
         assert receiver_world.get_kinematic_structure_entity_by_name(
@@ -1305,39 +1303,37 @@ def test_world_state_update_serialization_round_trip():
     """
     Verify that WorldStateUpdate survives a to_json/from_json round trip.
     """
-    meta = MetaData(node_name="test_node", process_id=42)
+    origin = MessageOrigin(sender=Sender(node_name="test_node", process_id=42))
     original = WorldStateUpdate(
-        meta_data=meta,
+        position=StreamPosition(origin=origin, sequence_number=3),
         ids=[uuid.uuid4(), uuid.uuid4()],
         states=[1.5, 2.5],
-        sequence_number=3,
     )
 
     serialized = to_json(original)
     restored = from_json(serialized)
 
     assert isinstance(restored, WorldStateUpdate)
-    assert restored.meta_data.node_name == original.meta_data.node_name
-    assert restored.meta_data.process_id == original.meta_data.process_id
+    assert restored.position == original.position
     assert restored.ids == original.ids
     assert restored.states == original.states
-    assert restored.sequence_number == 3
 
 
 def test_load_model_serialization_round_trip():
     """
     Verify that LoadModel survives a to_json/from_json round trip.
     """
-    meta = MetaData(node_name="loader", process_id=99)
-    original = LoadModel(meta_data=meta, primary_key=7, sequence_number=5)
+    origin = MessageOrigin(sender=Sender(node_name="loader", process_id=99))
+    original = LoadModel(
+        position=StreamPosition(origin=origin, sequence_number=5), primary_key=7
+    )
 
     serialized = to_json(original)
     restored = from_json(serialized)
 
     assert isinstance(restored, LoadModel)
     assert restored.primary_key == 7
-    assert restored.meta_data.node_name == "loader"
-    assert restored.sequence_number == 5
+    assert restored.position == original.position
 
 
 def test_simultaneous_state_and_model_updates(rclpy_node):
@@ -1662,18 +1658,20 @@ def test_world_update_serialization_round_trip():
     import json
 
     w = create_dummy_world()
-    meta = MetaData(node_name="test_node", process_id=1, world_id=w._id)
+    origin = MessageOrigin(
+        sender=Sender(node_name="test_node", process_id=1), model_id=w._id
+    )
     state_msg = WorldStateUpdate(
-        meta_data=meta,
+        position=StreamPosition(origin=origin),
         ids=list(w.state.keys())[:2],
         states=[0.1, 0.2],
     )
-    update = WorldUpdate(meta_data=meta, state_update=state_msg)
+    update = WorldUpdate(position=StreamPosition(origin=origin), state_update=state_msg)
 
     serialized = json.dumps(to_json(update))
     restored = from_json(json.loads(serialized))
 
-    assert restored.meta_data.node_name == update.meta_data.node_name
+    assert restored.position == update.position
     assert restored.modification_block is None
     assert restored.state_update is not None
     assert restored.state_update.states == [0.1, 0.2]
@@ -1932,7 +1930,7 @@ def test_apply_state_with_unknown_identifier_raises(rclpy_node):
     unknown_identifier = uuid4()
 
     partially_unknown_state_update = WorldStateUpdate(
-        meta_data=world_synchronizer.meta_data,
+        position=StreamPosition(origin=world_synchronizer.origin),
         ids=[known_identifier, unknown_identifier],
         states=[0.0, 9.9],
     )
@@ -1941,7 +1939,7 @@ def test_apply_state_with_unknown_identifier_raises(rclpy_node):
         world_synchronizer._apply_state(partially_unknown_state_update)
 
     all_unknown_state_update = WorldStateUpdate(
-        meta_data=world_synchronizer.meta_data,
+        position=StreamPosition(origin=world_synchronizer.origin),
         ids=[uuid4(), uuid4()],
         states=[1.0, 2.0],
     )
@@ -2155,12 +2153,12 @@ def test_state_change_during_a_modification_is_published_after_its_model_change(
         assert not announcing_thread.is_alive()
 
         model_update_positions = [
-            update.sequence_number
+            update.position.sequence_number
             for update in published_updates
             if update.modification_block is not None
         ]
         state_only_update_positions = [
-            update.sequence_number
+            update.position.sequence_number
             for update in published_updates
             if update.state_update is not None and update.modification_block is None
         ]
@@ -2344,14 +2342,18 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
     model_block = source_world.get_world_model_manager().model_modification_blocks[-1]
     new_dof_id = connection.dof.id
 
-    source_meta = MetaData(node_name="atomic_src", process_id=0, world_id=uuid4())
+    source_origin = MessageOrigin(
+        sender=Sender(node_name="atomic_src", process_id=0), model_id=uuid4()
+    )
     combined_update = WorldUpdate(
-        meta_data=source_meta,
+        position=StreamPosition(origin=source_origin),
         modification_block=ModificationBlock(
-            meta_data=source_meta, modifications=model_block
+            position=StreamPosition(origin=source_origin), modifications=model_block
         ),
         state_update=WorldStateUpdate(
-            meta_data=source_meta, ids=[new_dof_id], states=[0.73]
+            position=StreamPosition(origin=source_origin),
+            ids=[new_dof_id],
+            states=[0.73],
         ),
     )
 
@@ -2400,7 +2402,7 @@ class WorldUpdateSender:
     The world whose changes are announced.
     """
 
-    meta_data: MetaData = field(init=False)
+    origin: MessageOrigin = field(init=False)
     """
     Identifies the sender, so a receiver does not mistake an update for its own.
     """
@@ -2411,10 +2413,12 @@ class WorldUpdateSender:
     """
 
     def __post_init__(self):
-        self.meta_data = MetaData(
-            node_name="world_update_sender",
-            process_id=os.getpid(),
-            world_id=self.world._id,
+        """
+        Name the sender after the world it announces, in this process.
+        """
+        self.origin = MessageOrigin(
+            sender=Sender(node_name="world_update_sender", process_id=os.getpid()),
+            model_id=self.world._id,
         )
 
     def lose_model_change(self) -> None:
@@ -2436,9 +2440,10 @@ class WorldUpdateSender:
         self._deliver(
             receiver,
             WorldUpdate(
-                meta_data=self.meta_data,
+                position=StreamPosition(origin=self.origin),
                 modification_block=ModificationBlock(
-                    meta_data=self.meta_data, modifications=modifications
+                    position=StreamPosition(origin=self.origin),
+                    modifications=modifications,
                 ),
             ),
         )
@@ -2455,9 +2460,9 @@ class WorldUpdateSender:
         self._deliver(
             receiver,
             WorldUpdate(
-                meta_data=self.meta_data,
+                position=StreamPosition(origin=self.origin),
                 state_update=WorldStateUpdate(
-                    meta_data=self.meta_data,
+                    position=StreamPosition(origin=self.origin),
                     ids=list(positions.keys()),
                     states=list(positions.values()),
                 ),
@@ -2477,7 +2482,9 @@ class WorldUpdateSender:
         Serialize the update and give it to the receiver the way ros would.
         """
         self._sequence_number += 1
-        update.sequence_number = self._sequence_number
+        update.position = StreamPosition(
+            origin=self.origin, sequence_number=self._sequence_number
+        )
         receiver.subscription_callback(
             std_msgs.msg.String(data=json.dumps(to_json(update)))
         )
@@ -2540,7 +2547,7 @@ def create_connected_worlds(
         )
     assert wait_for_condition(
         lambda: receiver_synchronizer.has_applied(
-            publisher_synchronizer.latest_published_position
+            position=publisher_synchronizer.latest_published_position
         )
     ), "the receiver never caught up with the initial model"
     return (
@@ -2798,11 +2805,12 @@ def test_message_arriving_during_a_drain_stays_buffered(rclpy_node):
     )
     try:
         empty_state_update = WorldStateUpdate(
-            meta_data=synchronizer.meta_data, ids=[], states=[]
+            position=StreamPosition(origin=synchronizer.origin), ids=[], states=[]
         )
         synchronizer.missed_messages.append(
             WorldUpdate(
-                meta_data=synchronizer.meta_data, state_update=empty_state_update
+                position=StreamPosition(origin=synchronizer.origin),
+                state_update=empty_state_update,
             )
         )
         drain = threading.Thread(
@@ -2811,7 +2819,8 @@ def test_message_arriving_during_a_drain_stays_buffered(rclpy_node):
         drain.start()
         time.sleep(0.1)
         late_message = WorldUpdate(
-            meta_data=synchronizer.meta_data, state_update=empty_state_update
+            position=StreamPosition(origin=synchronizer.origin),
+            state_update=empty_state_update,
         )
         synchronizer._subscription_callback(late_message)
         drain.join(timeout=5.0)
@@ -2823,18 +2832,6 @@ def test_message_arriving_during_a_drain_stays_buffered(rclpy_node):
 
 
 # %% positions in the stream of a publisher
-
-
-def test_a_message_reports_where_it_sits_in_the_stream_of_its_publisher():
-    """
-    A message carries everything a reader needs to tell how far it caught up with the
-    publisher that sent it.
-    """
-    meta_data = MetaData(node_name="publisher", process_id=1)
-
-    message = WorldUpdate(meta_data=meta_data, sequence_number=3)
-
-    assert message.position == StreamPosition(origin=meta_data, sequence_number=3)
 
 
 def test_every_publication_advances_the_stream_position(rclpy_node):
@@ -2852,9 +2849,11 @@ def test_every_publication_advances_the_stream_position(rclpy_node):
         for expected_position in (1, 2, 3):
             synchronizer.publish(
                 WorldUpdate(
-                    meta_data=synchronizer.meta_data,
+                    position=StreamPosition(origin=synchronizer.origin),
                     state_update=WorldStateUpdate(
-                        meta_data=synchronizer.meta_data, ids=[], states=[]
+                        position=StreamPosition(origin=synchronizer.origin),
+                        ids=[],
+                        states=[],
                     ),
                 )
             )
@@ -2864,7 +2863,7 @@ def test_every_publication_advances_the_stream_position(rclpy_node):
                 == expected_position
             )
             assert synchronizer.latest_published_position.origin == (
-                synchronizer.meta_data
+                synchronizer.origin
             )
     finally:
         synchronizer.close()
@@ -2886,15 +2885,15 @@ def test_applying_an_update_records_the_position_of_its_publisher(rclpy_node):
         position = publisher_synchronizer.latest_published_position
 
         assert wait_for_condition(
-            lambda: receiver_synchronizer.has_applied(position)
+            lambda: receiver_synchronizer.has_applied(position=position)
         ), "the receiver never caught up with the published position"
         assert receiver_synchronizer.has_applied(
-            StreamPosition(
+            position=StreamPosition(
                 origin=position.origin, sequence_number=position.sequence_number - 1
             )
         )
         assert not receiver_synchronizer.has_applied(
-            StreamPosition(
+            position=StreamPosition(
                 origin=position.origin, sequence_number=position.sequence_number + 1
             )
         )
@@ -2913,13 +2912,13 @@ def test_a_publisher_that_was_never_heard_from_is_at_the_start_of_its_stream(
     synchronizer = WorldSynchronizer(
         node=rclpy_node, _world=world, topic_name=f"/unknown_publisher_{uuid4().hex}"
     )
-    stranger = MetaData(node_name="stranger", process_id=1)
+    stranger = MessageOrigin(sender=Sender(node_name="stranger", process_id=1))
     try:
         assert synchronizer.has_applied(
-            StreamPosition(origin=stranger, sequence_number=0)
+            position=StreamPosition(origin=stranger, sequence_number=0)
         )
         assert not synchronizer.has_applied(
-            StreamPosition(origin=stranger, sequence_number=1)
+            position=StreamPosition(origin=stranger, sequence_number=1)
         )
     finally:
         synchronizer.close()
@@ -2944,11 +2943,11 @@ def test_a_buffered_update_does_not_count_as_caught_up_with(rclpy_node):
             lambda: len(receiver_synchronizer.missed_messages) == 1
         ), "the update was never received"
 
-        assert not receiver_synchronizer.has_applied(position)
+        assert not receiver_synchronizer.has_applied(position=position)
 
         receiver_synchronizer.apply_missed_messages()
 
-        assert receiver_synchronizer.has_applied(position)
+        assert receiver_synchronizer.has_applied(position=position)
     finally:
         publisher_synchronizer.close()
         receiver_synchronizer.close()
@@ -3064,10 +3063,10 @@ def test_an_update_referencing_an_entity_this_world_never_received_says_so(rclpy
         sender.announce_model_change(receiver_synchronizer)
 
         unknown_entity = receiver_synchronizer.divergence_from(
-            publisher=sender.meta_data
+            publisher=sender.origin
         ).raised_from
         assert isinstance(unknown_entity, WorldUpdateReferencesUnknownEntityError)
-        assert unknown_entity.publisher == sender.meta_data
+        assert unknown_entity.sender == sender.origin.sender
         assert unknown_entity.entity_id == post_root.id
         assert unknown_entity.entity_name == post_root.name
         assert receiver_world.kinematic_structure_entities == [sender_root]
@@ -3213,7 +3212,7 @@ def test_updates_published_while_a_receiver_is_busy_are_not_lost(rclpy_node) -> 
         moved_once = add_prismatic_connection(publisher_world, "busy_receiver_once")
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
-                publisher_synchronizer.latest_published_position
+                position=publisher_synchronizer.latest_published_position
             )
         ), "the receiver never caught up with the second connection"
 
@@ -3225,7 +3224,7 @@ def test_updates_published_while_a_receiver_is_busy_are_not_lost(rclpy_node) -> 
 
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
-                publisher_synchronizer.latest_published_position
+                position=publisher_synchronizer.latest_published_position
             )
         ), "the receiver never caught up with the burst"
         assert receiver_world.state[moved_once.dof.id].position == pytest.approx(
@@ -3268,15 +3267,16 @@ class ReceivingSynchronizer:
     Records the warnings of the node of :attr:`synchronizer`.
     """
 
-    def receive(self, publisher: MetaData, sequence_number: int) -> None:
+    def receive(self, *, publisher: MessageOrigin, sequence_number: int) -> None:
         """
         Hand the synchronizer an update of `publisher` at `sequence_number` in its
         stream that changes nothing.
         """
         update = WorldUpdate(
-            meta_data=publisher,
-            sequence_number=sequence_number,
-            state_update=WorldStateUpdate(meta_data=publisher, ids=[], states=[]),
+            position=StreamPosition(origin=publisher, sequence_number=sequence_number),
+            state_update=WorldStateUpdate(
+                position=StreamPosition(origin=publisher), ids=[], states=[]
+            ),
         )
         self.synchronizer.subscription_callback(
             std_msgs.msg.String(data=json.dumps(to_json(update)))
@@ -3302,9 +3302,9 @@ def test_a_receiver_that_lost_updates_warns_about_it(
     """
     Its world may differ from the publisher's in what the lost updates carried.
     """
-    publisher = MetaData(node_name="publisher", process_id=1)
-    receiving.receive(publisher, 1)
-    receiving.receive(publisher, 4)
+    publisher = MessageOrigin(sender=Sender(node_name="publisher", process_id=1))
+    receiving.receive(publisher=publisher, sequence_number=1)
+    receiving.receive(publisher=publisher, sequence_number=4)
 
     assert len(receiving.logger.warnings) == 1
 
@@ -3312,9 +3312,12 @@ def test_a_receiver_that_lost_updates_warns_about_it(
 def test_updates_received_in_sequence_are_not_lost(
     receiving: ReceivingSynchronizer,
 ) -> None:
-    publisher = MetaData(node_name="publisher", process_id=1)
-    receiving.receive(publisher, 1)
-    receiving.receive(publisher, 2)
+    """
+    Updates of a publisher that follow each other give no warning about lost updates.
+    """
+    publisher = MessageOrigin(sender=Sender(node_name="publisher", process_id=1))
+    receiving.receive(publisher=publisher, sequence_number=1)
+    receiving.receive(publisher=publisher, sequence_number=2)
 
     assert receiving.logger.warnings == []
 
@@ -3326,7 +3329,10 @@ def test_a_publisher_heard_from_for_the_first_time_has_lost_nothing(
     A receiver that joins late starts somewhere in the middle of the stream, having
     fetched what was published before.
     """
-    receiving.receive(MetaData(node_name="publisher", process_id=1), 7)
+    receiving.receive(
+        publisher=MessageOrigin(sender=Sender(node_name="publisher", process_id=1)),
+        sequence_number=7,
+    )
 
     assert receiving.logger.warnings == []
 
@@ -3392,7 +3398,7 @@ def test_a_body_placed_inside_its_modification_reaches_another_world_at_that_pla
 
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
-                publisher_synchronizer.latest_published_position
+                position=publisher_synchronizer.latest_published_position
             )
         ), "the receiver never applied the modification"
         received_body = receiver_world.get_kinematic_structure_entity_by_id(
@@ -3463,7 +3469,7 @@ def test_a_receiving_world_never_shows_a_new_body_away_from_its_place(rclpy_node
 
         assert wait_for_condition(
             lambda: receiver_synchronizer.has_applied(
-                publisher_synchronizer.latest_published_position
+                position=publisher_synchronizer.latest_published_position
             )
         ), "the receiver never applied the modification"
         assert recorder.recorded_transforms, "the receiver never announced the body"
@@ -3494,7 +3500,9 @@ def test_received_positions_land_on_the_degrees_of_freedom_they_name(rclpy_node)
         node=rclpy_node, _world=world, topic_name=unique_topic("rearranged_state")
     )
     received_positions = WorldStateUpdate(
-        meta_data=synchronizer.meta_data, ids=[kept_connection.dof.id], states=[0.7]
+        position=StreamPosition(origin=synchronizer.origin),
+        ids=[kept_connection.dof.id],
+        states=[0.7],
     )
     checked = threading.Event()
     original_check = synchronizer._check_state_update
