@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
@@ -15,15 +16,18 @@ import cv2
 import numpy
 import open3d
 import trimesh
+from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Color, Mesh
 from typing_extensions import TYPE_CHECKING, Self
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.annotators.exceptions import DuplicateObjectClassMesh
 from robokudo.annotators.object_observation import ColorAndDepthFrame, ObjectObservation
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Classification, PoseAnnotation
 from robokudo.types.cv import ColorToDepthRatio, Rect
 from robokudo.types.scene import ObjectHypothesis
@@ -721,11 +725,74 @@ class TrackPosedObjects(TrackingPoseUpdateMode):
         return self.previous_frame_tracking_request(candidate)
 
 
+# %% FoundationPose parameters
+
+
+@dataclass(kw_only=True)
+class FoundationPoseParameters(AnnotatorParameters):
+    """
+    Settings for estimating, tracking, and displaying poses of known object meshes.
+    """
+
+    class_meshes: list[ObjectClassMesh] = field(default_factory=list)
+    """
+    Meshes of the object classes to pose, one per class.
+    """
+
+    pose_update_mode: PoseUpdateMode = field(default_factory=EstimateAndTrack)
+    """
+    Which objects get a new pose, and how.
+    """
+
+    maximum_track_center_offset: float = 0.25
+    """
+    Fraction of the mask region size by which a tracked mesh center may leave the mask
+    before the pose is estimated anew.
+    """
+
+    depth_units_per_meter: float = 1000.0
+    """
+    Depth image values per meter.
+    """
+
+    visualization_frame: VisualizationFrame = VisualizationFrame.MESH
+    """
+    Frame the axes and the bounding box of a posed object are drawn in.
+    """
+
+    center_axes_on_bounding_box: bool = False
+    """
+    Whether drawn axes start at the smallest oriented bounding box center.
+    """
+
+    visualize_object_mesh: bool = False
+    """
+    Whether the posed mesh is shown in the 3D view.
+    """
+
+
+# %% FoundationPose descriptor
+
+
+@dataclass(kw_only=True)
+class FoundationPoseDescriptor(AnnotatorDescriptor[FoundationPoseParameters]):
+    """
+    Declarative configuration of :class:`FoundationPoseAnnotator`.
+    """
+
+    parameters: FoundationPoseParameters = field(
+        default_factory=FoundationPoseParameters.from_defaults
+    )
+    """
+    Effective settings initialized from application and annotator defaults.
+    """
+
+
 # %% FoundationPose annotator
 
 
-@dataclass(eq=False)
-class FoundationPoseAnnotator(ThreadedAnnotator):
+@dataclass(kw_only=True, eq=False)
+class FoundationPoseAnnotator(ThreadedAnnotator[FoundationPoseDescriptor]):
     """
     Estimate and track the 6D pose of classified object hypotheses with masks, using the
     mesh of their class.
@@ -733,54 +800,6 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
     Each posed object hypothesis gets a :class:`PoseAnnotation` of its mesh, in the camera
     frame.
     """
-
-    class Descriptor(BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self) -> None:
-                """
-                Set the default pose estimation and visualization settings.
-                """
-                self.class_meshes: list[ObjectClassMesh] = []
-                """
-                Meshes of the object classes to pose, one per class.
-                """
-
-                self.pose_update_mode: PoseUpdateMode = EstimateAndTrack()
-                """
-                Which objects get a new pose, and how.
-                """
-
-                self.maximum_track_center_offset: float = 0.25
-                """
-                Fraction of the mask region size by which the center of a tracked mesh may
-                lie outside the mask region before the pose is estimated anew.
-                """
-
-                self.depth_units_per_meter: float = 1000.0
-                """
-                Depth image values per meter.
-                """
-
-                self.visualization_frame: VisualizationFrame = VisualizationFrame.MESH
-                """
-                Frame the axes and the bounding box of a posed object are drawn in.
-                """
-
-                self.center_axes_on_bounding_box: bool = False
-                """
-                Whether the drawn axes start at the center of the smallest oriented
-                bounding box instead of the origin of the mesh.
-                """
-
-                self.visualize_object_mesh: bool = False
-                """
-                Whether the posed mesh is shown in the 3D view.
-                """
-
-        parameters = Parameters()
-        """
-        Pose estimation and visualization defaults.
-        """
 
     pose_estimator: MeshBasedPoseEstimator = field(kw_only=True)
     """
@@ -792,7 +811,9 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
     Name of the behaviour-tree node.
     """
 
-    descriptor: Descriptor = field(default_factory=Descriptor)
+    descriptor: FoundationPoseDescriptor = field(
+        default_factory=FoundationPoseDescriptor
+    )
     """
     Pose estimation and visualization configuration.
     """
@@ -809,13 +830,20 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
     Objects posed in the previous frame.
     """
 
+    @classproperty
+    def Descriptor(cls) -> type[FoundationPoseDescriptor]:
+        """
+        Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`.
+        """
+        return FoundationPoseDescriptor
+
     def __post_init__(self) -> None:
         """
-        Initialize the threaded behaviour and hand the meshes to the pose estimator.
+        Initialize mesh resources after :meth:`ThreadedAnnotator.__post_init__`.
 
         :raises DuplicateObjectClassMesh: If a class has more than one mesh.
         """
-        super().__init__(self.name, self.descriptor)
+        super().__post_init__()
         self.class_meshes = ObjectClassMeshes.from_class_meshes(
             self.descriptor.parameters.class_meshes
         )
