@@ -14,10 +14,10 @@ from krrood_spatial_math.point import Point
 from krrood_spatial_math.line import Line
 from krrood_spatial_math.space_map import (
     OrthogonalProjection,
-    ProjectionLineT,
-    SourcePointT,
+    GenericProjectionLine,
+    GenericSourcePoint,
     SpaceMap,
-    TargetPointT,
+    GenericTargetPoint,
 )
 from krrood_spatial_math.spatial_types import (
     CartesianPoint2Dimensional,
@@ -115,7 +115,7 @@ def test_a_space_map_cannot_be_instantiated():
         SpaceMap()
 
 
-@pytest.mark.parametrize("point_parameter", [SourcePointT, TargetPointT])
+@pytest.mark.parametrize("point_parameter", [GenericSourcePoint, GenericTargetPoint])
 def test_a_space_map_sends_affine_points_to_affine_points(point_parameter: object):
     """
     Both the points a space map takes and those it gives are points given in a frame.
@@ -124,7 +124,7 @@ def test_a_space_map_sends_affine_points_to_affine_points(point_parameter: objec
 
 
 def test_a_space_map_sends_points_along_straight_lines():
-    assert ProjectionLineT.__bound__ is Line
+    assert GenericProjectionLine.__bound__ is Line
 
 
 # %% projections along the normal of a plane

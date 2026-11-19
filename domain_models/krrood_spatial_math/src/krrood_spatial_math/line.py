@@ -8,14 +8,14 @@ from typing_extensions import Generic, TypeVar
 
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood_spatial_math.coordinate_system import CoordinateT
-from krrood_spatial_math.point import PointT
-from krrood_spatial_math.vector import VectorT
+from krrood_spatial_math.coordinate_system import GenericCoordinate
+from krrood_spatial_math.point import GenericPoint
+from krrood_spatial_math.vector import GenericVector
 
 # %% straight lines given by a point and a direction
 
 
-class Line(Generic[PointT, VectorT], SubClassSafeGeneric, Interface):
+class Line(Generic[GenericPoint, GenericVector], SubClassSafeGeneric, Interface):
     """
     A straight line of an affine space: the points ``point + direction * t`` for every
     number ``t``.
@@ -24,17 +24,19 @@ class Line(Generic[PointT, VectorT], SubClassSafeGeneric, Interface):
     it; :attr:`point` fixes which of those lines this one is.
     """
 
-    point: PointT
+    point: GenericPoint
     """
     A point the line passes through, where ``t`` is zero.
     """
 
-    direction: VectorT
+    direction: GenericVector
     """
     The vector the line runs along, given in the frame of :attr:`point`.
     """
 
-    def point_at_position(self, *, position_along_line: CoordinateT) -> PointT:
+    def point_at_position(
+        self, *, position_along_line: GenericCoordinate
+    ) -> GenericPoint:
         """
         :param position_along_line: How many :attr:`direction` vectors the point lies
             from :attr:`point`; negative positions lie behind it.
@@ -43,7 +45,7 @@ class Line(Generic[PointT, VectorT], SubClassSafeGeneric, Interface):
         return self.point + self.direction * position_along_line
 
 
-LineT = TypeVar("LineT", bound=Line)
+GenericLine = TypeVar("GenericLine", bound=Line)
 """
 The kind of straight line of an affine space.
 """
@@ -52,27 +54,27 @@ The kind of straight line of an affine space.
 # %% straight lines between two points
 
 
-class LineSegment(Generic[PointT, LineT], SubClassSafeGeneric, Interface):
+class LineSegment(Generic[GenericPoint, GenericLine], SubClassSafeGeneric, Interface):
     """
     The part of a straight line between two of its points: the points of :attr:`line`
     from position 0 at :attr:`start` to position 1 at :attr:`end`.
     """
 
-    start: PointT
+    start: GenericPoint
     """
     The point the segment runs from.
     """
 
-    end: PointT
+    end: GenericPoint
     """
     The point the segment runs to, given in the frame of :attr:`start`.
     """
 
     @property
-    def line(self) -> LineT:
+    def line(self) -> GenericLine:
         """
         :return: The line through :attr:`start` along the vector to :attr:`end`, on
             which :attr:`start` lies at position 0 and :attr:`end` at position 1.
         """
-        line_type = self.get_type_of_generic_parameter(parameter=LineT)
+        line_type = self.get_type_of_generic_parameter(parameter=GenericLine)
         return line_type(point=self.start, direction=self.end - self.start)

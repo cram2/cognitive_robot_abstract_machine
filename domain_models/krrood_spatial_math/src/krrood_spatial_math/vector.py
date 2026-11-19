@@ -12,10 +12,10 @@ from krrood.patterns.interface import Interface
 from krrood.patterns.mixin import Mixin
 from krrood.symbolic_math.exceptions import UnsupportedOperationError
 from krrood_spatial_math.coordinate_system import (
-    AffineFrameT,
-    CartesianFrameT,
+    GenericAffineFrame,
+    GenericCartesianFrame,
     CoordinateRepresentation,
-    CoordinateT,
+    GenericCoordinate,
 )
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 
@@ -23,8 +23,8 @@ from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 
 
 class Vector(
-    CoordinateRepresentation[AffineFrameT],
-    Generic[AffineFrameT, CoordinateT],
+    CoordinateRepresentation[GenericAffineFrame],
+    Generic[GenericAffineFrame, GenericCoordinate],
     Interface,
 ):
     """
@@ -34,7 +34,7 @@ class Vector(
     A vector has no position: a change of frame turns its axes but never shifts it.
     """
 
-    coordinates: tuple[CoordinateT, ...]
+    coordinates: tuple[GenericCoordinate, ...]
     """
     The amounts along the axes of the frame, one per axis, in the order of the axes.
     """
@@ -54,14 +54,14 @@ class Vector(
         """
 
     @abstractmethod
-    def __mul__(self, factor: CoordinateT) -> Self:
+    def __mul__(self, factor: GenericCoordinate) -> Self:
         """
         :param factor: The number every coordinate is multiplied by.
         :return: This vector stretched by ``factor``.
         """
 
 
-VectorT = TypeVar("VectorT", bound=Vector)
+GenericVector = TypeVar("GenericVector", bound=Vector)
 """
 The kind of vector the points of an affine space are moved by.
 """
@@ -70,7 +70,7 @@ The kind of vector the points of an affine space are moved by.
 # %% vectors whose frame kind measures them
 
 
-class MetricVector(Vector[CartesianFrameT, CoordinateT], Mixin):
+class MetricVector(Vector[GenericCartesianFrame, GenericCoordinate], Mixin):
     """
     A vector given in a Cartesian frame, whose length and angles the kind of that frame
     measures.
@@ -81,14 +81,14 @@ class MetricVector(Vector[CartesianFrameT, CoordinateT], Mixin):
         itself, so it reads like the vector's own.
     """
 
-    def norm(self) -> CoordinateT:
+    def norm(self) -> GenericCoordinate:
         """
         :return: The length of this vector.
         """
-        frame_kind = self.get_type_of_generic_parameter(parameter=CartesianFrameT)
+        frame_kind = self.get_type_of_generic_parameter(parameter=GenericCartesianFrame)
         return frame_kind.norm(vector=self)
 
-    def dot(self, other: Self) -> CoordinateT:
+    def dot(self, other: Self) -> GenericCoordinate:
         """
         :param other: A vector given in the same frame.
         :return: The product of both lengths and the cosine of the angle between them.
@@ -108,5 +108,5 @@ class MetricVector(Vector[CartesianFrameT, CoordinateT], Mixin):
                 actual_frame=other.coordinate_system,
                 context="the multiplied vector",
             )
-        frame_kind = self.get_type_of_generic_parameter(parameter=CartesianFrameT)
+        frame_kind = self.get_type_of_generic_parameter(parameter=GenericCartesianFrame)
         return frame_kind.inner_product(first=self, second=other)

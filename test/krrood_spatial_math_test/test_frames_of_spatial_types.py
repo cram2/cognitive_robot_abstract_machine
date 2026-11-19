@@ -12,13 +12,13 @@ import pytest
 from krrood.adapters.json_serializer import from_json, to_json
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.line import Line
-from krrood_spatial_math.point import PointT, MetricPoint
-from krrood_spatial_math.vector import VectorT, MetricVector
+from krrood_spatial_math.point import GenericPoint, MetricPoint
+from krrood_spatial_math.vector import GenericVector, MetricVector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
-    CoordinateSystemT,
-    CoordinateT,
+    GenericCoordinateSystem,
+    GenericCoordinate,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.exceptions import (
@@ -93,7 +93,7 @@ def test_a_value_in_a_cartesian_frame_is_a_coordinate_representation():
     assert issubclass(SymbolicSpatialValue3Dimensional, CoordinateRepresentation)
     assert (
         SymbolicSpatialValue3Dimensional.get_type_of_generic_parameter(
-            parameter=CoordinateSystemT
+            parameter=GenericCoordinateSystem
         )
         is CartesianFrame3Dimensional
     )
@@ -114,7 +114,7 @@ def test_a_spatial_values_coordinates_are_given_in_its_reference_frame(
 def test_a_three_dimensional_point_is_given_in_a_three_dimensional_cartesian_frame():
     assert (
         CartesianPoint3Dimensional.get_type_of_generic_parameter(
-            parameter=CoordinateSystemT
+            parameter=GenericCoordinateSystem
         )
         is CartesianFrame3Dimensional
     )
@@ -126,14 +126,18 @@ def test_a_three_dimensional_point_is_a_cartesian_point():
 
 def test_a_three_dimensional_point_stores_its_coordinates_as_symbolic_scalars():
     assert (
-        CartesianPoint3Dimensional.get_type_of_generic_parameter(parameter=CoordinateT)
+        CartesianPoint3Dimensional.get_type_of_generic_parameter(
+            parameter=GenericCoordinate
+        )
         is sm.Scalar
     )
 
 
 def test_a_three_dimensional_point_is_moved_by_a_three_dimensional_vector():
     assert (
-        CartesianPoint3Dimensional.get_type_of_generic_parameter(parameter=VectorT)
+        CartesianPoint3Dimensional.get_type_of_generic_parameter(
+            parameter=GenericVector
+        )
         is Vector3Dimensional
     )
 
@@ -144,7 +148,9 @@ def test_a_three_dimensional_point_is_moved_by_a_three_dimensional_vector():
 def test_a_three_dimensional_vector_is_a_cartesian_vector_of_a_three_dimensional_frame():
     assert issubclass(Vector3Dimensional, MetricVector)
     assert (
-        Vector3Dimensional.get_type_of_generic_parameter(parameter=CoordinateSystemT)
+        Vector3Dimensional.get_type_of_generic_parameter(
+            parameter=GenericCoordinateSystem
+        )
         is CartesianFrame3Dimensional
     )
 
@@ -162,11 +168,11 @@ def test_the_difference_of_two_three_dimensional_points_moves_one_onto_the_other
 def test_a_three_dimensional_line_runs_through_a_point_along_a_vector():
     assert issubclass(Line3Dimensional, Line)
     assert (
-        Line3Dimensional.get_type_of_generic_parameter(parameter=PointT)
+        Line3Dimensional.get_type_of_generic_parameter(parameter=GenericPoint)
         is CartesianPoint3Dimensional
     )
     assert (
-        Line3Dimensional.get_type_of_generic_parameter(parameter=VectorT)
+        Line3Dimensional.get_type_of_generic_parameter(parameter=GenericVector)
         is Vector3Dimensional
     )
 
@@ -189,7 +195,7 @@ def test_a_transformation_is_no_value_given_in_a_frame():
 def test_a_transformation_binds_cartesian_frames_as_its_coordinate_systems():
     assert (
         HomogeneousTransformationMatrix3Dimensional.get_type_of_generic_parameter(
-            parameter=CoordinateSystemT
+            parameter=GenericCoordinateSystem
         )
         is CartesianFrame3Dimensional
     )

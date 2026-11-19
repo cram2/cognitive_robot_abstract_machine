@@ -10,7 +10,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     EmbeddedPlaneRelation,
 )
-from krrood_spatial_math.coordinate_system import CoordinateRepresentationT
+from krrood_spatial_math.coordinate_system import GenericCoordinateRepresentation
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
@@ -48,8 +48,8 @@ class MountFrame(ExpressingFrame):
     """
 
     def transform_into_own_frame(
-        self, *, value: CoordinateRepresentationT
-    ) -> CoordinateRepresentationT:
+        self, *, value: GenericCoordinateRepresentation
+    ) -> GenericCoordinateRepresentation:
         value_frame = value.reference_frame
         if value_frame is self:
             return value
@@ -85,8 +85,8 @@ class MountedFrame(ExpressingFrame):
         )
 
     def transform_into_own_frame(
-        self, *, value: CoordinateRepresentationT
-    ) -> CoordinateRepresentationT:
+        self, *, value: GenericCoordinateRepresentation
+    ) -> GenericCoordinateRepresentation:
         value_frame = value.reference_frame
         if value_frame is self:
             return value

@@ -11,14 +11,14 @@ from typing_extensions import Self
 
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import Point, PointT
-from krrood_spatial_math.vector import Vector, VectorT
+from krrood_spatial_math.point import Point, GenericPoint
+from krrood_spatial_math.vector import Vector, GenericVector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
     AffineFrame,
-    AffineFrameT,
-    CoordinateT,
+    GenericAffineFrame,
+    GenericCoordinate,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.space import Space
@@ -43,28 +43,28 @@ class ScalablePlaneFrame(AffineFrame[ScalablePlane, str], Interface):
 
 
 @dataclass(kw_only=True)
-class StoredVector(Vector[AffineFrameT, CoordinateT]):
+class StoredVector(Vector[GenericAffineFrame, GenericCoordinate]):
     """
     A vector that stores its two coordinates and frame as given.
     """
 
-    x: CoordinateT
+    x: GenericCoordinate
     """
     The amount along the first axis.
     """
 
-    y: CoordinateT
+    y: GenericCoordinate
     """
     The amount along the second axis.
     """
 
-    coordinate_system: AffineFrameT | None
+    coordinate_system: GenericAffineFrame | None
     """
     The frame the coordinates are given in.
     """
 
     @property
-    def coordinates(self) -> tuple[CoordinateT, CoordinateT]:
+    def coordinates(self) -> tuple[GenericCoordinate, GenericCoordinate]:
         return self.x, self.y
 
     def __add__(self, other: Self) -> Self:
@@ -81,7 +81,7 @@ class StoredVector(Vector[AffineFrameT, CoordinateT]):
             coordinate_system=self.coordinate_system,
         )
 
-    def __mul__(self, factor: CoordinateT) -> Self:
+    def __mul__(self, factor: GenericCoordinate) -> Self:
         return type(self)(
             x=self.x * factor,
             y=self.y * factor,
@@ -97,39 +97,39 @@ class StoredScalablePlaneVector(StoredVector[ScalablePlaneFrame, float]):
 
 
 @dataclass(kw_only=True)
-class StoredPoint(Point[AffineFrameT, CoordinateT, VectorT]):
+class StoredPoint(Point[GenericAffineFrame, GenericCoordinate, GenericVector]):
     """
     A point that stores its two coordinates and frame as given.
     """
 
-    x: CoordinateT
+    x: GenericCoordinate
     """
     The first coordinate.
     """
 
-    y: CoordinateT
+    y: GenericCoordinate
     """
     The second coordinate.
     """
 
-    coordinate_system: AffineFrameT | None
+    coordinate_system: GenericAffineFrame | None
     """
     The frame the coordinates are given in.
     """
 
     @property
-    def coordinates(self) -> tuple[CoordinateT, CoordinateT]:
+    def coordinates(self) -> tuple[GenericCoordinate, GenericCoordinate]:
         return self.x, self.y
 
-    def __sub__(self, other: Self) -> VectorT:
-        vector_type = self.get_type_of_generic_parameter(parameter=VectorT)
+    def __sub__(self, other: Self) -> GenericVector:
+        vector_type = self.get_type_of_generic_parameter(parameter=GenericVector)
         return vector_type(
             x=self.x - other.x,
             y=self.y - other.y,
             coordinate_system=self.coordinate_system,
         )
 
-    def __add__(self, vector: VectorT) -> Self:
+    def __add__(self, vector: GenericVector) -> Self:
         return type(self)(
             x=self.x + vector.x,
             y=self.y + vector.y,
@@ -150,17 +150,17 @@ class StoredScalablePlanePoint(
 
 
 @dataclass(kw_only=True)
-class StoredLine(Line[PointT, VectorT]):
+class StoredLine(Line[GenericPoint, GenericVector]):
     """
     A line that stores its point and direction as given.
     """
 
-    point: PointT
+    point: GenericPoint
     """
     The point the line passes through.
     """
 
-    direction: VectorT
+    direction: GenericVector
     """
     The vector the line runs along.
     """

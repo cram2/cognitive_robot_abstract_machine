@@ -11,19 +11,19 @@ from typing_extensions import Generic, Self, TypeVar
 from krrood.patterns.interface import Interface
 from krrood.patterns.mixin import Mixin
 from krrood_spatial_math.coordinate_system import (
-    AffineFrameT,
-    CartesianFrameT,
+    GenericAffineFrame,
+    GenericCartesianFrame,
     CoordinateRepresentation,
-    CoordinateT,
+    GenericCoordinate,
 )
-from krrood_spatial_math.vector import VectorT
+from krrood_spatial_math.vector import GenericVector
 
 # %% points given in an affine frame
 
 
 class Point(
-    CoordinateRepresentation[AffineFrameT],
-    Generic[AffineFrameT, CoordinateT, VectorT],
+    CoordinateRepresentation[GenericAffineFrame],
+    Generic[GenericAffineFrame, GenericCoordinate, GenericVector],
     Interface,
 ):
     """
@@ -36,28 +36,28 @@ class Point(
         point type. The frame's space fixes how many coordinates a point has.
     """
 
-    coordinates: tuple[CoordinateT, ...]
+    coordinates: tuple[GenericCoordinate, ...]
     """
     The amounts along the axes of the frame from its origin, one per axis, in the order
     of the axes.
     """
 
     @abstractmethod
-    def __sub__(self, other: Self) -> VectorT:
+    def __sub__(self, other: Self) -> GenericVector:
         """
         :param other: A point given in the same frame.
         :return: The vector that moves ``other`` onto this point.
         """
 
     @abstractmethod
-    def __add__(self, vector: VectorT) -> Self:
+    def __add__(self, vector: GenericVector) -> Self:
         """
         :param vector: A vector given in the same frame.
         :return: This point moved by ``vector``.
         """
 
 
-PointT = TypeVar("PointT", bound=Point)
+GenericPoint = TypeVar("GenericPoint", bound=Point)
 """
 The kind of point of an affine space.
 """
@@ -66,7 +66,9 @@ The kind of point of an affine space.
 # %% points whose frame kind measures the distances between them
 
 
-class MetricPoint(Point[CartesianFrameT, CoordinateT, VectorT], Mixin):
+class MetricPoint(
+    Point[GenericCartesianFrame, GenericCoordinate, GenericVector], Mixin
+):
     """
     A point given in a Cartesian frame, whose distances to other points the kind of that
     frame measures.
@@ -77,10 +79,10 @@ class MetricPoint(Point[CartesianFrameT, CoordinateT, VectorT], Mixin):
         itself, so it reads like the point's own.
     """
 
-    def euclidean_distance(self, other: Self) -> CoordinateT:
+    def euclidean_distance(self, other: Self) -> GenericCoordinate:
         """
         :param other: A point given in the same frame.
         :return: The straight-line distance between this point and ``other``.
         """
-        frame_kind = self.get_type_of_generic_parameter(parameter=CartesianFrameT)
+        frame_kind = self.get_type_of_generic_parameter(parameter=GenericCartesianFrame)
         return frame_kind.distance(first=self, second=other)

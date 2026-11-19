@@ -8,14 +8,14 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dim
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
     AffineFrame,
-    AffineFrameT,
+    GenericAffineFrame,
     CartesianFrame,
-    CartesianFrameT,
+    GenericCartesianFrame,
     CoordinateChange,
     CoordinateRepresentation,
     CoordinateSystem,
     RigidCoordinateChange,
-    SpaceT,
+    GenericSpace,
 )
 from krrood_spatial_math.space import (
     EuclideanSpace,
@@ -88,7 +88,7 @@ def test_an_affine_frame_need_not_be_cartesian():
 
 def test_an_affine_frame_reports_the_space_it_charts():
     assert (
-        ScalablePlaneFrame.get_type_of_generic_parameter(parameter=SpaceT)
+        ScalablePlaneFrame.get_type_of_generic_parameter(parameter=GenericSpace)
         is ScalablePlane
     )
 
@@ -138,17 +138,17 @@ def test_an_affine_change_need_not_be_rigid():
 
 
 def test_an_affine_change_changes_between_affine_frames():
-    assert AffineFrameT.__bound__ is AffineFrame
+    assert GenericAffineFrame.__bound__ is AffineFrame
 
 
 def test_a_rigid_change_changes_between_cartesian_frames():
-    assert CartesianFrameT.__bound__ is CartesianFrame
+    assert GenericCartesianFrame.__bound__ is CartesianFrame
 
 
 def test_a_rigid_change_reports_the_kind_of_frame_it_changes():
     assert (
         CartesianFrame3DimensionalChange.get_type_of_generic_parameter(
-            parameter=CartesianFrameT
+            parameter=GenericCartesianFrame
         )
         is CartesianFrame3Dimensional
     )
@@ -156,6 +156,6 @@ def test_a_rigid_change_reports_the_kind_of_frame_it_changes():
 
 def test_an_affine_change_reports_the_kind_of_frame_it_changes():
     assert (
-        ScalingChange.get_type_of_generic_parameter(parameter=AffineFrameT)
+        ScalingChange.get_type_of_generic_parameter(parameter=GenericAffineFrame)
         is ScalablePlaneFrame
     )

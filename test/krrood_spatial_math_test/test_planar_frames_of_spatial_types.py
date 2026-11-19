@@ -10,13 +10,13 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.point import MetricPoint
-from krrood_spatial_math.vector import VectorT, MetricVector
+from krrood_spatial_math.vector import GenericVector, MetricVector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.coordinate_system import (
     CartesianFrame,
-    CoordinateSystemT,
-    CoordinateT,
+    GenericCoordinateSystem,
+    GenericCoordinate,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.exceptions import (
@@ -273,7 +273,7 @@ def test_a_planar_value_is_no_value_given_in_a_three_dimensional_frame(planar_va
 def test_a_two_dimensional_point_is_given_in_a_two_dimensional_cartesian_frame():
     assert (
         CartesianPoint2Dimensional.get_type_of_generic_parameter(
-            parameter=CoordinateSystemT
+            parameter=GenericCoordinateSystem
         )
         is CartesianFrame2Dimensional
     )
@@ -292,14 +292,18 @@ def test_the_euclidean_distance_between_two_dimensional_points_is_measured_on_th
 
 def test_a_two_dimensional_point_stores_its_coordinates_as_symbolic_scalars():
     assert (
-        CartesianPoint2Dimensional.get_type_of_generic_parameter(parameter=CoordinateT)
+        CartesianPoint2Dimensional.get_type_of_generic_parameter(
+            parameter=GenericCoordinate
+        )
         is sm.Scalar
     )
 
 
 def test_a_two_dimensional_point_is_moved_by_a_two_dimensional_vector():
     assert (
-        CartesianPoint2Dimensional.get_type_of_generic_parameter(parameter=VectorT)
+        CartesianPoint2Dimensional.get_type_of_generic_parameter(
+            parameter=GenericVector
+        )
         is Vector2Dimensional
     )
 
@@ -310,7 +314,9 @@ def test_a_two_dimensional_point_is_moved_by_a_two_dimensional_vector():
 def test_a_two_dimensional_vector_is_a_cartesian_vector_of_a_two_dimensional_frame():
     assert issubclass(Vector2Dimensional, MetricVector)
     assert (
-        Vector2Dimensional.get_type_of_generic_parameter(parameter=CoordinateSystemT)
+        Vector2Dimensional.get_type_of_generic_parameter(
+            parameter=GenericCoordinateSystem
+        )
         is CartesianFrame2Dimensional
     )
 
@@ -379,7 +385,7 @@ def test_a_planar_transformation_is_a_rigid_change_of_two_dimensional_frames():
     )
     assert (
         HomogeneousTransformationMatrix2Dimensional.get_type_of_generic_parameter(
-            parameter=CoordinateSystemT
+            parameter=GenericCoordinateSystem
         )
         is CartesianFrame2Dimensional
     )

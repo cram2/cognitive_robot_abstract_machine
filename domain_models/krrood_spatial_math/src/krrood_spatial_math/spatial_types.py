@@ -32,7 +32,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import (
-    CartesianFrameT,
+    GenericCartesianFrame,
     CoordinateRepresentation,
     RigidCoordinateChange,
 )
@@ -303,7 +303,7 @@ the value a frame expresses in its own coordinates.
 
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialChange(
-    SymbolicSpatialType, RigidCoordinateChange[CartesianFrameT], ABC
+    SymbolicSpatialType, RigidCoordinateChange[GenericCartesianFrame], ABC
 ):
     """
     A rigid change, as a symbolic matrix, of coordinates given in a frame derived from
@@ -385,8 +385,8 @@ class SpecialOrthogonalGroupAction(Interface):
         """
 
 
-SpecialOrthogonalGroupActionT = TypeVar(
-    "SpecialOrthogonalGroupActionT", bound=SpecialOrthogonalGroupAction
+GenericSpecialOrthogonalGroupAction = TypeVar(
+    "GenericSpecialOrthogonalGroupAction", bound=SpecialOrthogonalGroupAction
 )
 """
 The kind of value or change a rotation is applied to.
@@ -412,8 +412,8 @@ class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
         """
 
 
-SpecialEuclideanGroupActionT = TypeVar(
-    "SpecialEuclideanGroupActionT", bound=SpecialEuclideanGroupAction
+GenericSpecialEuclideanGroupAction = TypeVar(
+    "GenericSpecialEuclideanGroupAction", bound=SpecialEuclideanGroupAction
 )
 """
 The kind of value or change a transformation is applied to.
@@ -438,8 +438,8 @@ class PlanarSpecialEuclideanGroupAction(Interface):
         """
 
 
-PlanarSpecialEuclideanGroupActionT = TypeVar(
-    "PlanarSpecialEuclideanGroupActionT", bound=PlanarSpecialEuclideanGroupAction
+GenericPlanarSpecialEuclideanGroupAction = TypeVar(
+    "GenericPlanarSpecialEuclideanGroupAction", bound=PlanarSpecialEuclideanGroupAction
 )
 """
 The kind of value or change on a plane a planar transformation is applied to.
@@ -775,7 +775,9 @@ class HomogeneousTransformationMatrix3Dimensional(
     def z(self, value: sm.ScalarData):
         self[2, 3] = value
 
-    def dot(self, other: SpecialEuclideanGroupActionT) -> SpecialEuclideanGroupActionT:
+    def dot(
+        self, other: GenericSpecialEuclideanGroupAction
+    ) -> GenericSpecialEuclideanGroupAction:
         """
         This transformation applied to ``other``, a value given in its child frame or a
         change into it.
@@ -811,8 +813,8 @@ class HomogeneousTransformationMatrix3Dimensional(
         )
 
     def __matmul__(
-        self, other: SpecialEuclideanGroupActionT
-    ) -> SpecialEuclideanGroupActionT:
+        self, other: GenericSpecialEuclideanGroupAction
+    ) -> GenericSpecialEuclideanGroupAction:
         return self.dot(other)
 
     def inverse(self) -> HomogeneousTransformationMatrix3Dimensional:
@@ -1109,8 +1111,8 @@ class RotationMatrix(
         )
 
     def dot(
-        self, other: SpecialOrthogonalGroupActionT
-    ) -> SpecialOrthogonalGroupActionT:
+        self, other: GenericSpecialOrthogonalGroupAction
+    ) -> GenericSpecialOrthogonalGroupAction:
         """
         This rotation applied to ``other``, turning it about the origin of its reference
         frame.
@@ -1124,8 +1126,8 @@ class RotationMatrix(
         return other.apply_rotation(rotation=self)
 
     def __matmul__(
-        self, other: SpecialOrthogonalGroupActionT
-    ) -> SpecialOrthogonalGroupActionT:
+        self, other: GenericSpecialOrthogonalGroupAction
+    ) -> GenericSpecialOrthogonalGroupAction:
         """
         :meth:`dot`, as the ``@`` operator.
         """
@@ -3972,8 +3974,8 @@ class HomogeneousTransformationMatrix2Dimensional(
     # %% acting on values and changes
 
     def __matmul__(
-        self, other: PlanarSpecialEuclideanGroupActionT
-    ) -> PlanarSpecialEuclideanGroupActionT:
+        self, other: GenericPlanarSpecialEuclideanGroupAction
+    ) -> GenericPlanarSpecialEuclideanGroupAction:
         """
         :param other: A change into this change's child frame, or a point or pose given
             in it.

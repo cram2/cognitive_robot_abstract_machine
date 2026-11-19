@@ -15,14 +15,14 @@ if TYPE_CHECKING:
 
 # %% what coordinates are given in
 
-SpaceT = TypeVar("SpaceT", bound=Space)
+GenericSpace = TypeVar("GenericSpace", bound=Space)
 """
 The kind of space a coordinate system charts.
 """
 
 
 class CoordinateSystem(
-    HasName[NameT], Generic[SpaceT, NameT], SubClassSafeGeneric, HasID, Interface
+    HasName[NameT], Generic[GenericSpace, NameT], SubClassSafeGeneric, HasID, Interface
 ):
     """
     What the coordinates of a point are given in: an origin, axes and a unit on one
@@ -32,7 +32,7 @@ class CoordinateSystem(
     coordinate systems are combined only after changing one into the other.
     """
 
-    space: SpaceT | None
+    space: GenericSpace | None
     """
     The space this coordinate system charts; ``None`` where it is not known.
     """
@@ -41,7 +41,7 @@ class CoordinateSystem(
 # %% frames: coordinate systems with straight axes
 
 
-class AffineFrame(CoordinateSystem[SpaceT, NameT], Interface):
+class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
     """
     A coordinate system given by an origin and linearly independent, straight axes; the
     coordinates of a point are its amounts along the axes from the origin.
@@ -51,13 +51,13 @@ class AffineFrame(CoordinateSystem[SpaceT, NameT], Interface):
     """
 
 
-EuclideanSpaceT = TypeVar("EuclideanSpaceT", bound=EuclideanSpace)
+GenericEuclideanSpace = TypeVar("GenericEuclideanSpace", bound=EuclideanSpace)
 """
 The kind of Euclidean space a Cartesian frame charts.
 """
 
 
-class CartesianFrame(AffineFrame[EuclideanSpaceT, NameT], Interface):
+class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
     """
     An affine frame whose axes are perpendicular and one unit of its Euclidean space
     long.
@@ -67,7 +67,7 @@ class CartesianFrame(AffineFrame[EuclideanSpaceT, NameT], Interface):
     """
 
     @classmethod
-    def inner_product(cls, *, first: Vector, second: Vector) -> CoordinateT:
+    def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
         """
         :param first: A vector given in a frame of this kind.
         :param second: A vector given in the same frame.
@@ -81,7 +81,7 @@ class CartesianFrame(AffineFrame[EuclideanSpaceT, NameT], Interface):
         )
 
     @classmethod
-    def norm(cls, *, vector: Vector) -> CoordinateT:
+    def norm(cls, *, vector: Vector) -> GenericCoordinate:
         """
         :param vector: A vector given in a frame of this kind.
         :return: The length of ``vector``.
@@ -89,7 +89,7 @@ class CartesianFrame(AffineFrame[EuclideanSpaceT, NameT], Interface):
         return cls.inner_product(first=vector, second=vector) ** 0.5
 
     @classmethod
-    def distance(cls, *, first: Point, second: Point) -> CoordinateT:
+    def distance(cls, *, first: Point, second: Point) -> GenericCoordinate:
         """
         :param first: A point given in a frame of this kind.
         :param second: A point given in the same frame.
@@ -100,20 +100,20 @@ class CartesianFrame(AffineFrame[EuclideanSpaceT, NameT], Interface):
 
 # %% values given in a coordinate system
 
-CoordinateT = TypeVar("CoordinateT")
+GenericCoordinate = TypeVar("GenericCoordinate")
 """
 The type a coordinate's real value is stored as, such as a float, or a symbolic
 expression standing for a real number.
 """
 
-CoordinateSystemT = TypeVar("CoordinateSystemT", bound=CoordinateSystem)
+GenericCoordinateSystem = TypeVar("GenericCoordinateSystem", bound=CoordinateSystem)
 """
 The kind of coordinate system coordinates are given in.
 """
 
 
 class CoordinateRepresentation(
-    Generic[CoordinateSystemT], SubClassSafeGeneric, Interface
+    Generic[GenericCoordinateSystem], SubClassSafeGeneric, Interface
 ):
     """
     A geometric value, such as a point, a direction or an orientation, given by its
@@ -125,14 +125,14 @@ class CoordinateRepresentation(
         Magazine, 2013, which separates a geometric value from its coordinates.
     """
 
-    coordinate_system: CoordinateSystemT | None
+    coordinate_system: GenericCoordinateSystem | None
     """
     The coordinate system the coordinates are given in; ``None`` where it is not known.
     """
 
 
-CoordinateRepresentationT = TypeVar(
-    "CoordinateRepresentationT", bound=CoordinateRepresentation
+GenericCoordinateRepresentation = TypeVar(
+    "GenericCoordinateRepresentation", bound=CoordinateRepresentation
 )
 """
 The kind of value given in a coordinate system.
@@ -142,7 +142,9 @@ The kind of value given in a coordinate system.
 # %% changing coordinates within one space
 
 
-class CoordinateChange(Generic[CoordinateSystemT], SubClassSafeGeneric, Interface):
+class CoordinateChange(
+    Generic[GenericCoordinateSystem], SubClassSafeGeneric, Interface
+):
     """
     Turns coordinates given in one coordinate system into those of the same points in
     another coordinate system of the same space.
@@ -153,12 +155,12 @@ class CoordinateChange(Generic[CoordinateSystemT], SubClassSafeGeneric, Interfac
         :class:`~krrood_spatial_math.space_map.SpaceMap`, not a coordinate change.
     """
 
-    source_coordinate_system: CoordinateSystemT | None
+    source_coordinate_system: GenericCoordinateSystem | None
     """
     The coordinate system the coordinates are given in; ``None`` where it is not known.
     """
 
-    target_coordinate_system: CoordinateSystemT | None
+    target_coordinate_system: GenericCoordinateSystem | None
     """
     The coordinate system the coordinates are changed into; ``None`` where it is not
     known.
@@ -179,13 +181,13 @@ class CoordinateChange(Generic[CoordinateSystemT], SubClassSafeGeneric, Interfac
         """
 
 
-AffineFrameT = TypeVar("AffineFrameT", bound=AffineFrame)
+GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
 """
 The kind of affine frame coordinates are given in.
 """
 
 
-class AffineCoordinateChange(CoordinateChange[AffineFrameT], Interface):
+class AffineCoordinateChange(CoordinateChange[GenericAffineFrame], Interface):
     """
     A coordinate change between two affine frames, which scales, shears, rotates or
     reflects the axes and shifts the origin.
@@ -194,13 +196,13 @@ class AffineCoordinateChange(CoordinateChange[AffineFrameT], Interface):
     """
 
 
-CartesianFrameT = TypeVar("CartesianFrameT", bound=CartesianFrame)
+GenericCartesianFrame = TypeVar("GenericCartesianFrame", bound=CartesianFrame)
 """
 The kind of Cartesian frame coordinates are given in.
 """
 
 
-class RigidCoordinateChange(AffineCoordinateChange[CartesianFrameT], Interface):
+class RigidCoordinateChange(AffineCoordinateChange[GenericCartesianFrame], Interface):
     """
     An affine coordinate change between two Cartesian frames, which only rotates the
     axes and shifts the origin.

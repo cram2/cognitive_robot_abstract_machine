@@ -10,24 +10,24 @@ from typing_extensions import Generic, TypeVar
 
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood_spatial_math.coordinate_system import CoordinateT
+from krrood_spatial_math.coordinate_system import GenericCoordinate
 from krrood_spatial_math.line import Line
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.vector import Vector
 
 # %% maps from the points of one space to the points of another
 
-SourcePointT = TypeVar("SourcePointT", bound=Point)
+GenericSourcePoint = TypeVar("GenericSourcePoint", bound=Point)
 """
 The kind of point a space map takes, given in a frame of its source space.
 """
 
-TargetPointT = TypeVar("TargetPointT", bound=Point)
+GenericTargetPoint = TypeVar("GenericTargetPoint", bound=Point)
 """
 The kind of point a space map gives, in a frame of its target space.
 """
 
-ProjectionLineT = TypeVar("ProjectionLineT", bound=Line)
+GenericProjectionLine = TypeVar("GenericProjectionLine", bound=Line)
 """
 The kind of line, such as a straight line or a ray, of the source points a space map
 sends to one target point.
@@ -35,7 +35,9 @@ sends to one target point.
 
 
 class SpaceMap(
-    Generic[SourcePointT, TargetPointT, ProjectionLineT, CoordinateT],
+    Generic[
+        GenericSourcePoint, GenericTargetPoint, GenericProjectionLine, GenericCoordinate
+    ],
     SubClassSafeGeneric,
     Interface,
 ):
@@ -53,14 +55,14 @@ class SpaceMap(
     """
 
     @abstractmethod
-    def project(self, point: SourcePointT) -> TargetPointT:
+    def project(self, point: GenericSourcePoint) -> GenericTargetPoint:
         """
         :param point: A point of the source space.
         :return: The point of the target space ``point`` is sent to.
         """
 
     @abstractmethod
-    def projection_line(self, point: TargetPointT) -> ProjectionLineT:
+    def projection_line(self, point: GenericTargetPoint) -> GenericProjectionLine:
         """
         :param point: A point of the target space.
         :return: The line of every source point :meth:`project` sends to ``point``.
@@ -68,8 +70,8 @@ class SpaceMap(
 
     @abstractmethod
     def unproject(
-        self, point: TargetPointT, position_along_line: CoordinateT
-    ) -> SourcePointT:
+        self, point: GenericTargetPoint, position_along_line: GenericCoordinate
+    ) -> GenericSourcePoint:
         """
         :param point: A point of the target space.
         :param position_along_line: How many direction lengths the returned point lies
@@ -83,7 +85,10 @@ class SpaceMap(
 
 
 class OrthogonalProjection(
-    SpaceMap[SourcePointT, TargetPointT, ProjectionLineT, CoordinateT], Interface
+    SpaceMap[
+        GenericSourcePoint, GenericTargetPoint, GenericProjectionLine, GenericCoordinate
+    ],
+    Interface,
 ):
     """
     Sends each point of a space onto a plane in it, straight along the plane's unit
@@ -99,21 +104,21 @@ class OrthogonalProjection(
     """
 
     @abstractmethod
-    def embed_planar_point(self, *, point: TargetPointT) -> SourcePointT:
+    def embed_planar_point(self, *, point: GenericTargetPoint) -> GenericSourcePoint:
         """
         :param point: A point of the plane.
         :return: The same point, given as a point of the space the plane lies in.
         """
 
-    def projection_line(self, point: TargetPointT) -> ProjectionLineT:
-        line_type = self.get_type_of_generic_parameter(parameter=ProjectionLineT)
+    def projection_line(self, point: GenericTargetPoint) -> GenericProjectionLine:
+        line_type = self.get_type_of_generic_parameter(parameter=GenericProjectionLine)
         return line_type(
             point=self.embed_planar_point(point=point), direction=self.plane_normal
         )
 
     def unproject(
-        self, point: TargetPointT, position_along_line: CoordinateT = 0
-    ) -> SourcePointT:
+        self, point: GenericTargetPoint, position_along_line: GenericCoordinate = 0
+    ) -> GenericSourcePoint:
         """
         Differs from :meth:`SpaceMap.unproject` in defaulting ``position_along_line`` to
         zero, the point on the plane itself.

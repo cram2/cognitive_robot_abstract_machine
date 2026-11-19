@@ -12,7 +12,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     CartesianFrame3DimensionalReference,
 )
-from krrood_spatial_math.coordinate_system import CartesianFrame, SpaceT
+from krrood_spatial_math.coordinate_system import CartesianFrame, GenericSpace
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import MissingCartesianFrame3DimensionalResolver
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
@@ -33,7 +33,7 @@ def test_a_three_dimensional_cartesian_frame_is_a_cartesian_frame():
 
 def test_a_three_dimensional_cartesian_frame_charts_three_dimensional_euclidean_space():
     assert (
-        CartesianFrame3Dimensional.get_type_of_generic_parameter(parameter=SpaceT)
+        CartesianFrame3Dimensional.get_type_of_generic_parameter(parameter=GenericSpace)
         is EuclideanSpace3Dimensional
     )
 
@@ -62,7 +62,7 @@ def test_a_two_dimensional_cartesian_frame_is_a_cartesian_frame():
 
 def test_a_two_dimensional_cartesian_frame_charts_a_plane_in_three_dimensional_space():
     assert (
-        CartesianFrame2Dimensional.get_type_of_generic_parameter(parameter=SpaceT)
+        CartesianFrame2Dimensional.get_type_of_generic_parameter(parameter=GenericSpace)
         is EmbeddedPlane
     )
 

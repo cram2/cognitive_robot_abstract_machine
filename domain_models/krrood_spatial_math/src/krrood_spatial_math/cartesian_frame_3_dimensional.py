@@ -18,7 +18,7 @@ from krrood.patterns.identifier_and_name import NameT
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.coordinate_system import (
     CartesianFrame,
-    CoordinateRepresentationT,
+    GenericCoordinateRepresentation,
 )
 from krrood_spatial_math.exceptions import (
     FrameOutsideSpaceError,
@@ -85,8 +85,8 @@ class CartesianFrame3Dimensional(
     """
 
     def express_in_own_frame(
-        self, *, value: CoordinateRepresentationT
-    ) -> CoordinateRepresentationT:
+        self, *, value: GenericCoordinateRepresentation
+    ) -> GenericCoordinateRepresentation:
         """
         :param value: A value given in a frame of the same space as this frame.
         :return: The same value, given in this frame.
@@ -107,8 +107,8 @@ class CartesianFrame3Dimensional(
 
     @abstractmethod
     def transform_into_own_frame(
-        self, *, value: CoordinateRepresentationT
-    ) -> CoordinateRepresentationT:
+        self, *, value: GenericCoordinateRepresentation
+    ) -> GenericCoordinateRepresentation:
         """
         :param value: A value given in a frame of the same space as this frame.
         :return: The same value, given in this frame.

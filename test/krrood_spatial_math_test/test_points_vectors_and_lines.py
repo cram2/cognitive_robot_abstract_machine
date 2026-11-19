@@ -13,20 +13,20 @@ from krrood.patterns.exceptions import InterfaceInstantiationError
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineFrame,
-    AffineFrameT,
+    GenericAffineFrame,
     CartesianFrame,
-    CartesianFrameT,
+    GenericCartesianFrame,
     CoordinateRepresentation,
-    CoordinateT,
+    GenericCoordinate,
 )
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import MetricPoint, Point, PointT
+from krrood_spatial_math.point import MetricPoint, Point, GenericPoint
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Vector3Dimensional,
 )
-from krrood_spatial_math.vector import MetricVector, Vector, VectorT
+from krrood_spatial_math.vector import MetricVector, Vector, GenericVector
 
 from .dataset.frames import NamedFrame
 from .dataset.spaces import (
@@ -96,7 +96,9 @@ def test_a_metric_point_is_given_in_a_cartesian_frame():
 
 def test_a_point_reports_the_kind_of_frame_it_is_given_in():
     assert (
-        StoredScalablePlanePoint.get_type_of_generic_parameter(parameter=AffineFrameT)
+        StoredScalablePlanePoint.get_type_of_generic_parameter(
+            parameter=GenericAffineFrame
+        )
         is ScalablePlaneFrame
     )
 
@@ -106,14 +108,16 @@ def test_a_point_reports_what_its_coordinates_are_stored_as():
     The coordinate type a point binds is read back from the class, without an instance.
     """
     assert (
-        StoredScalablePlanePoint.get_type_of_generic_parameter(parameter=CoordinateT)
+        StoredScalablePlanePoint.get_type_of_generic_parameter(
+            parameter=GenericCoordinate
+        )
         is float
     )
 
 
 def test_a_point_reports_the_kind_of_vector_it_is_moved_by():
     assert (
-        StoredScalablePlanePoint.get_type_of_generic_parameter(parameter=VectorT)
+        StoredScalablePlanePoint.get_type_of_generic_parameter(parameter=GenericVector)
         is StoredScalablePlaneVector
     )
 
@@ -165,8 +169,8 @@ def test_a_line_cannot_be_instantiated():
 
 
 def test_a_line_runs_through_a_point_along_a_vector():
-    assert Line.__parameters__ == (PointT, VectorT)
-    assert PointT.__bound__ is Point
+    assert Line.__parameters__ == (GenericPoint, GenericVector)
+    assert GenericPoint.__bound__ is Point
 
 
 def test_a_lines_fields_are_narrowed_to_the_bound_types():

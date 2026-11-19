@@ -14,7 +14,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3DimensionalResolver,
     EmbeddedPlaneRelation,
 )
-from krrood_spatial_math.coordinate_system import CoordinateRepresentationT
+from krrood_spatial_math.coordinate_system import GenericCoordinateRepresentation
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
 
@@ -54,8 +54,8 @@ class NamedFrame(CartesianFrame3Dimensional[str]):
     """
 
     def transform_into_own_frame(
-        self, *, value: CoordinateRepresentationT
-    ) -> CoordinateRepresentationT:
+        self, *, value: GenericCoordinateRepresentation
+    ) -> GenericCoordinateRepresentation:
         if value.reference_frame is not self:
             raise ReferenceFrameMismatchError(
                 expected_frame=self, actual_frame=value.reference_frame
