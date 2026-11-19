@@ -31,8 +31,10 @@ from cramph.visualization import RvizVisualization, WorldVisualization
 from cramph.context import ContextExtension, StatechartContext
 from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.world_fetcher import (
+    fetch_world_from_service,
+    join_shared_world,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
@@ -337,8 +339,9 @@ class RobotDemonstration(ABC):
 
         :return: The world the controller serves, holding the scene.
         """
-        world = self.ros_session.fetch_world()
-        WorldSynchronizer(_world=world, node=self.ros_session.node)
+        world = join_shared_world(
+            self.ros_session.node, timeout_seconds=WORLD_FETCH_TIMEOUT_SECONDS
+        )
         if not self.is_scene_populated(world):
             scene = self.build_scene()
             world.merge_world(

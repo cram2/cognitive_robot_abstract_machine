@@ -216,9 +216,8 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
         error_throttle_period: float = 1.0,
     ) -> None:
         """
-        Handle a received message; if it cannot be applied, log that, and stop counting
-        its publisher as caught up with, instead of ending the spinning of the node or
-        the batch the message is applied in.
+        Handle a received message this world does not :meth:`contains` yet; log one that
+        cannot be applied and stop counting its publisher as caught up with.
 
         .. warning:: A model modification that fails part-way stays applied as far as it
             got, so the world may hold part of the failed message.
@@ -227,6 +226,8 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
         :param handle: What to do with the message.
         :param error_throttle_period: The fewest seconds between two logged errors.
         """
+        if self.contains(position=received.position):
+            return
         try:
             handle(received)
         except DataclassException as error:
@@ -257,6 +258,17 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
             f"one of the publisher.",
             throttle_duration_sec=warning_throttle_period,
         )
+
+    @property
+    def contained_positions(self) -> list[StreamPosition]:
+        """
+        The position of the last change of each publisher this world contains: its own
+        publications and what it applied of the others.
+        """
+        positions = self.applied_positions
+        if self.published_sequence_number > 0:
+            positions.append(self.latest_published_position)
+        return positions
 
     @abstractmethod
     def _subscription_callback(self, message: ReceivedMessage) -> None:
@@ -583,11 +595,23 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         }
 
     def _subscription_callback(self, message: ReceivedMessage) -> None:
-        if self._is_paused or self.defer_incoming_updates:
-            with self._missed_message_lock:
+        with self._missed_message_lock:
+            is_buffered = self._is_paused or self.defer_incoming_updates
+            if is_buffered:
                 self.missed_messages.append(message)
+        if is_buffered:
             return
         self.apply_message(message.to_message(world=self._world))
+
+    def stop_deferring_incoming_updates(self) -> None:
+        """
+        Apply the buffered messages, and every later message as it arrives, in the order
+        they were published.
+        """
+        with self._world._world_lock:
+            with self._missed_message_lock:
+                self.defer_incoming_updates = False
+            self.apply_missed_messages()
 
     @property
     def has_buffered_model_modification(self) -> bool:
@@ -621,7 +645,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                 self._apply_model(message.modification_block)
             if message.state_update is not None:
                 self._apply_state(message.state_update)
-        self.record_applied(position=message.position)
+            self.record_applied(position=message.position)
 
     def _apply_model(self, modification_block_message: ModificationBlock):
         """
