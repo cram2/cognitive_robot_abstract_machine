@@ -1,20 +1,26 @@
+"""
+The typed parts of speech a predicate clause is built from, before any word is
+inflected.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar, Iterable, Protocol, runtime_checkable
+from typing_extensions import Iterable, Protocol, runtime_checkable
 
 from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
-from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.fragments.base import (
     apply_subject_verb_agreement,
+    CardinalNumber,
     Clause,
     VerbalizationFragment,
     NounPhrase,
     PhraseFragment,
     RoleFragment,
+    VerbFormFragment,
     WordFragment,
     oxford_comma,
 )
@@ -39,6 +45,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
     Prepositions,
     SetMembership,
 )
+from krrood.patterns.classproperty import classproperty
 
 
 class ClauseElement(ABC):
@@ -143,6 +150,27 @@ class Verb(ClauseElement):
 
 
 @dataclass(kw_only=True, frozen=True)
+class VerbForm(ClauseElement):
+    """
+    A lexical verb given in any of its forms (*"connects"*), as read off a predicate's
+    name; the morphology pass reduces it to its lemma before inflecting it.
+    """
+
+    form: str
+    """
+    The verb as written (*"connects"*, *"has"*).
+    """
+
+    def as_fragment(self) -> VerbFormFragment:
+        """:return: a ``VERB``-role leaf carrying the form for the morphology pass to inflect.
+
+        >>> VerbForm(form="connects").as_fragment().role
+        <SemanticRole.VERB: 'verb'>
+        """
+        return VerbFormFragment(text=self.form)
+
+
+@dataclass(kw_only=True, frozen=True)
 class Adjective(ClauseElement):
     """
     A predicative adjective complement after a copula (*"is **reachable**"*).
@@ -169,11 +197,20 @@ class Copula(ClauseElement):
     and negation (*"is not"*) by the morphology pass.
     """
 
-    lemma: ClassVar[str] = "be"
-    """
-    The lemma a copular predicate name's leading word reduces to (``is`` / ``are`` ->
-    ``be``).
-    """
+    @classproperty
+    def lemma(cls) -> str:
+        """
+        The copula's base form, *"be"*.
+        """
+        return "be"
+
+    @classproperty
+    def forms(cls) -> frozenset[str]:
+        """
+        Every simple form of *"be"*, the words that make a predicate name copular
+        (``IsReachable``, ``WasMoved``).
+        """
+        return frozenset({"be", "am", "is", "are", "was", "were"})
 
     def as_fragment(self) -> RoleFragment:
         """:return: the affirmative singular copula leaf the morphology pass inflects.
@@ -236,7 +273,7 @@ class OneOf(ClauseElement):
         return PhraseFragment(
             parts=[
                 SetMembership.ONE_OF.as_fragment(),
-                WordFragment(text=morphology.cardinal(len(members))),
+                CardinalNumber(count=len(members)),
                 WordFragment(text="types" if are_types else "values"),
             ]
         )
@@ -555,7 +592,7 @@ def predicate_clause(
     """
     head, *rest = camel_case_to_words(predicate_class.__name__).split()
     complement = [WordFragment(text=word) for word in rest]
-    is_copular = morphology.verb_lemma(head) == Copula.lemma
+    is_copular = head.lower() in Copula.forms
     if is_copular and objects and (not rest or rest[-1] not in Prepositions.texts()):
         operands = ConjunctivePhrase(
             items=[Noun(content=subject), *(Noun(content=obj) for obj in objects)]
@@ -567,9 +604,7 @@ def predicate_clause(
             operands,
         )
     predicate = (
-        [Copula(), *complement]
-        if is_copular
-        else [Verb(lemma=morphology.verb_lemma(head)), *complement]
+        [Copula(), *complement] if is_copular else [VerbForm(form=head), *complement]
     )
     return clause(
         Noun(content=subject), *predicate, *(Noun(content=obj) for obj in objects)

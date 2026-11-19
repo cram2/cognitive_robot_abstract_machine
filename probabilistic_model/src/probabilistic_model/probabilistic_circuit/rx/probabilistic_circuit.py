@@ -2347,6 +2347,14 @@ class UnivariateContinuousLeaf(UnivariateLeaf):
 
     __hash__ = Unit.__hash__
 
+    def log_likelihood(self, events: npt.NDArray) -> None:
+        """
+        Like :meth:`LeafUnit.log_likelihood`, but reads the events as numbers, so that
+        rows of a circuit over symbolic and continuous variables may hold the domain
+        elements of the symbolic ones.
+        """
+        super().log_likelihood(np.asarray(events, dtype=float))
+
     def log_truncated_of_simple_event_in_place(
         self, event: SimpleEvent, singleton_allowed: bool = False
     ):

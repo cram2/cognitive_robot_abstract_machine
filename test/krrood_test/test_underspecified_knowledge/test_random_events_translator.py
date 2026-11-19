@@ -25,7 +25,6 @@ from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
 )
-from ..dataset.ormatic_interface import *  # type: ignore
 
 # %% helpers
 

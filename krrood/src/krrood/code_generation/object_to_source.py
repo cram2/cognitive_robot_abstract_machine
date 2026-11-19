@@ -1,0 +1,159 @@
+"""Create Python source-code strings from live objects (type hints, values, dict literals)."""
+
+from __future__ import annotations
+
+import enum
+import inspect
+from typing_extensions import (
+    Any,
+    Callable,
+    Dict,
+    ForwardRef,
+    Iterable,
+    Tuple,
+    get_args,
+    get_origin,
+)
+
+from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.utils import is_builtin_type, is_typing_type
+
+# %%
+# Type-hint serialisation
+
+
+def extract_types(type_hint: Any, seen: set[type] | None = None) -> set[type]:
+    """
+    Collect every class a type hint names: the hint itself if it is a class, otherwise
+    its origin and the classes its arguments name.
+
+    :param type_hint: The type hint to collect the classes of.
+    :param seen: The classes collected so far, extended in place.
+    :return: The collected classes.
+    """
+    if seen is None:
+        seen = set()
+
+    if type_hint in seen or isinstance(type_hint, str):
+        return seen
+
+    if isinstance(type_hint, ForwardRef):
+        return seen
+
+    origin = get_origin(type_hint)
+    args = get_args(type_hint)
+
+    if origin:
+        seen.add(origin)
+        for arg in args:
+            extract_types(arg, seen)
+    elif isinstance(type_hint, type):
+        seen.add(type_hint)
+
+    return seen
+
+
+def stringify_type_hint(type_hint: Any) -> str:
+    """
+    Recursively convert a type hint to its string representation.
+
+    Handles :class:`~typing.ForwardRef`, generic aliases (e.g. ``List[int]``), builtins,
+    and qualified names.  This is the **single canonical** function for converting type
+    hints to source-code strings — use it everywhere instead of manual ``t.__name__``
+    concatenation.
+
+    :param type_hint: The type hint to convert.
+    :returns: A Python source-code string for the type.
+    """
+    if isinstance(type_hint, str):
+        return type_hint
+
+    if isinstance(type_hint, ForwardRef):
+        return type_hint.__forward_arg__
+
+    origin = get_origin(type_hint)
+    args = get_args(type_hint)
+
+    if origin is not None:
+        origin_str = getattr(origin, "__name__", str(origin)).capitalize()
+        args_str = ", ".join(stringify_type_hint(arg) for arg in args)
+        return f"{origin_str}[{args_str}]"
+
+    if isinstance(type_hint, type):
+        if type_hint.__module__ == "builtins":
+            return type_hint.__name__
+        return f"{type_hint.__qualname__}"
+
+    return str(type_hint)
+
+
+def value_to_source(value: object) -> str:
+    """
+    Convert a Python value to its source-code representation.
+
+    Handles: ``None``, booleans, integers, floats, strings, enum members,
+    and type objects.  Falls back to ``repr(value)`` for unrecognized types.
+
+    :param value: The Python value to convert.
+    :returns: A source-code string.
+    """
+    if value is None:
+        return "None"
+    if isinstance(value, enum.Enum):
+        return f"{type(value).__name__}.{value.name}"
+    if isinstance(value, type) or is_typing_type(value):
+        return stringify_type_hint(value)
+    return repr(value)
+
+
+def render_dict_literal(items: Iterable[Tuple[str, str]]) -> str:
+    """Render a dict-display literal ``{key: value, ...}`` from source fragments.
+
+    :param items: The ``(key_source, value_source)`` pairs, already rendered to source and
+        in the order they should appear.
+    :return: The dict literal source (``"{}"`` when there are no items).
+    """
+    body = ", ".join(f"{key_source}: {value_source}" for key_source, value_source in items)
+    return "{" + body + "}"
+
+
+def get_types_to_import_from_type_hints(hints: list[type]) -> list[type]:
+    """
+    Extract importable types from a list of type hints.
+
+    :param hints: A list of type hints to extract types from.
+    :return: A set of types that need to be imported.
+    """
+    seen_types = extract_types(None, set())
+    for hint in hints:
+        extract_types(hint, seen_types)
+
+    to_import: list[type] = []
+    for type_ in seen_types:
+        if isinstance(type_, ForwardRef) or isinstance(type_, str):
+            continue
+        if not is_builtin_type(type_) and type_ not in to_import:
+            to_import.append(type_)
+
+    return to_import
+
+
+def get_types_to_import_from_function_type_hints(function: Callable) -> list[type]:
+    """
+    Extract importable types from a function's annotations.
+
+    :param function: The function to extract type hints from.
+    :returns: A list of types that need to be imported.
+    """
+    hints = get_type_hints_of_object(function)
+
+    sig = inspect.signature(function)
+    all_hints = list(hints.values())
+    if sig.return_annotation != inspect.Signature.empty:
+        all_hints.append(sig.return_annotation)
+
+    for param in sig.parameters.values():
+        if param.annotation != inspect.Parameter.empty:
+            all_hints.append(param.annotation)
+
+    return get_types_to_import_from_type_hints(all_hints)

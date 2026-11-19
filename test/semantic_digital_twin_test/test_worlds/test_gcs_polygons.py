@@ -42,7 +42,9 @@ def unit_box_world() -> World:
         root = Body(name=PrefixedName("map"))
         world.add_kinematic_structure_entity(root)
         obstacle = Body(name=PrefixedName("unit_cube"))
-        world.add_connection(FixedConnection.create_with_dofs(world, root, obstacle))
+        world.add_connection(
+            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+        )
         obstacle.collision.append(Box(scale=Scale(1.0, 1.0, 1.0)))
     return world
 
@@ -87,7 +89,9 @@ def non_convex_ring_world(tmp_path) -> World:
         root = Body(name=PrefixedName("map"))
         world.add_kinematic_structure_entity(root)
         obstacle = Body(name=PrefixedName("ring"))
-        world.add_connection(FixedConnection.create_with_dofs(world, root, obstacle))
+        world.add_connection(
+            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+        )
         ring_mesh = trimesh.creation.annulus(r_min=0.3, r_max=0.5, height=0.2)
         assert not ring_mesh.is_convex
         obstacle.collision.append(
