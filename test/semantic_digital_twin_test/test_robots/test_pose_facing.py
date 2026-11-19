@@ -1,3 +1,10 @@
+"""
+Tests of placing a mobile base so its front faces a heading, whatever the axis its model
+calls forward.
+"""
+
+from __future__ import annotations
+
 import importlib
 import pkgutil
 
@@ -21,8 +28,10 @@ from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
+    Vector3Dimensional,
 )
-from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 
 # %% the forward axes the declared robots use
@@ -187,12 +196,15 @@ def test_a_robot_is_selected_for_every_forward_axis_that_can_be_spawned():
 def test_forward_axis_points_along_the_heading(
     robot_type: type[AbstractRobot], heading_yaw: float
 ):
+    """
+    Placed for a heading, a base's forward axis points along the heading's x-axis.
+    """
     mobile_base = spawn(robot_type)
     heading = Pose3Dimensional.from_xyz_rpy(
         1.3, 2.0, 0.0, yaw=heading_yaw, reference_frame=mobile_base.root._world.root
     )
 
-    base_pose = mobile_base.pose_facing(heading)
+    base_pose = mobile_base.pose_facing(heading=heading)
 
     world_V_forward = base_pose.rotation_matrix @ mobile_base.forward_axis
     np.testing.assert_allclose(
@@ -206,17 +218,42 @@ def test_forward_axis_points_along_the_heading(
     "robot_type", ROBOTS_WITH_DISTINCT_FORWARD_AXES, ids=robot_name
 )
 def test_the_position_is_the_headings_own(robot_type: type[AbstractRobot]):
+    """
+    Placed for a heading, a base stands at the heading's position, in its frame.
+    """
     mobile_base = spawn(robot_type)
     heading = Pose3Dimensional.from_xyz_rpy(
         1.3, 2.0, 0.0, yaw=0.3, reference_frame=mobile_base.root._world.root
     )
 
-    base_pose = mobile_base.pose_facing(heading)
+    base_pose = mobile_base.pose_facing(heading=heading)
 
     np.testing.assert_allclose(
         base_pose.position.to_np(), heading.position.to_np(), atol=1e-9
     )
     assert base_pose.reference_frame is heading.reference_frame
+
+
+@pytest.mark.parametrize(
+    "robot_type", ROBOTS_WITH_DISTINCT_FORWARD_AXES, ids=robot_name
+)
+def test_a_planar_heading_places_the_base_as_its_pose_does(
+    robot_type: type[AbstractRobot],
+):
+    """
+    A heading given as a spot on the floor places the base where the same heading as a
+    full pose does.
+    """
+    mobile_base = spawn(robot_type)
+    heading = Pose2Dimensional.from_xy_yaw(
+        1.3, 2.0, yaw=0.3, reference_frame=mobile_base.root._world.root
+    )
+
+    np.testing.assert_allclose(
+        mobile_base.pose_facing(heading=heading).to_np(),
+        mobile_base.pose_facing(heading=heading.pose).to_np(),
+        atol=1e-9,
+    )
 
 
 # %% the heading a base stands at is read back off its pose
@@ -238,7 +275,7 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
         1.3, 2.0, 0.0, yaw=heading_yaw, reference_frame=mobile_base.root._world.root
     )
 
-    base_pose = mobile_base.pose_facing(heading)
+    base_pose = mobile_base.pose_facing(heading=heading)
 
     read_back = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
         base_pose.position,
@@ -255,11 +292,14 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
 def test_an_x_forward_base_takes_the_heading_unchanged(
     x_forward_robot: type[AbstractRobot],
 ):
+    """
+    A base modelled with its front along x is placed at the heading unchanged.
+    """
     mobile_base = spawn(x_forward_robot)
     heading = Pose3Dimensional.from_xyz_rpy(
         1.3, 2.0, 0.0, yaw=0.3, reference_frame=mobile_base.root._world.root
     )
 
     np.testing.assert_allclose(
-        mobile_base.pose_facing(heading).to_np(), heading.to_np(), atol=1e-9
+        mobile_base.pose_facing(heading=heading).to_np(), heading.to_np(), atol=1e-9
     )

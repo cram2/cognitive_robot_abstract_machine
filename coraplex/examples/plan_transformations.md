@@ -86,12 +86,12 @@ def show(node, depth=0):
 from cramph.composites import Sequence
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 grasp = milk.grasp_candidates()[0]
 
-reach = expand(Sequence(nodes=[ReachAction(grasp=grasp, arm=pr2.right_arm)]))
+reach = expand(Sequence(nodes=[ReachAction(grasp_candidate=grasp, arm=pr2.right_arm)]))
 
 show(reach)
 ```
@@ -109,7 +109,7 @@ from coraplex.robot_plans.plan_transformations import DetectBeforeGrasp
 
 plan_transformations.append(DetectBeforeGrasp())
 
-reach = expand(Sequence(nodes=[ReachAction(grasp=grasp, arm=pr2.right_arm)]))
+reach = expand(Sequence(nodes=[ReachAction(grasp_candidate=grasp, arm=pr2.right_arm)]))
 
 show(reach)
 ```
@@ -130,7 +130,7 @@ reach that `PickUpAction` builds. Nothing has to be passed down to it:
 ```python
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 
-pick_up = expand(Sequence(nodes=[PickUpAction(grasp=grasp, arm=pr2.right_arm)]))
+pick_up = expand(Sequence(nodes=[PickUpAction(grasp_candidate=grasp, arm=pr2.right_arm)]))
 
 show(pick_up)
 ```
@@ -194,7 +194,7 @@ plan_transformations = [OpenDrawerBeforePickUp()]
 spoon_annotation = world.get_semantic_annotations_by_type(Spoon)[0]
 
 pick_up = expand(
-    Sequence(nodes=[PickUpAction(grasp=spoon_annotation.grasp_candidates()[0], arm=pr2.right_arm)])
+    Sequence(nodes=[PickUpAction(grasp_candidate=spoon_annotation.grasp_candidates()[0], arm=pr2.right_arm)])
 )
 
 show(pick_up)
@@ -205,7 +205,7 @@ drive are grounded when they are run, and the parking was expanded in turn. The 
 open, so the same registration leaves its pick-up alone:
 
 ```python
-milk_pick_up = expand(Sequence(nodes=[PickUpAction(grasp=grasp, arm=pr2.right_arm)]))
+milk_pick_up = expand(Sequence(nodes=[PickUpAction(grasp_candidate=grasp, arm=pr2.right_arm)]))
 
 show(milk_pick_up)
 ```
@@ -261,7 +261,7 @@ plan_transformations = [ParkArmsBeforeNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(target_location=Pose3Dimensional.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+        nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -272,7 +272,7 @@ The parking is part of the plan like any other action, so it is performed with i
 
 ```python
 navigate = Sequence(
-    nodes=[NavigateAction(target_location=Pose3Dimensional.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+    nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
 )
 
 executor, statechart = statechart_for(navigate)
@@ -306,7 +306,7 @@ plan_transformations = [ParkArmsAfterNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(target_location=Pose3Dimensional.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+        nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -335,14 +335,14 @@ class LookAtTheGoalWhileNavigating(ParallelInsertion[NavigateAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: NavigateAction) -> List[StatechartNode]:
-        return [LookAtAction(target=plan_node.target_location)]
+        return [LookAtAction(look_target=plan_node.planar_goal_pose.pose)]
 
 
 plan_transformations = [LookAtTheGoalWhileNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(target_location=Pose3Dimensional.from_xyz_rpy(1.5, 2.4, 0.0, reference_frame=world.root))]
+        nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -368,9 +368,9 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
 
     def is_applicable(self, plan_node: NavigateAction) -> bool:
         navigate = plan_node
-        target = navigate.world.transform(navigate.target_location, navigate.world.root)
+        target = navigate.world.transform(navigate.planar_goal_pose, navigate.world.root)
         distance = navigate.robot.root.global_pose.position.euclidean_distance(
-            target.position
+            target.pose.position
         )
         return float(distance) > self.minimum_distance
 ```
@@ -378,7 +378,7 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
 ```python
 plan_transformations = [ParkArmsBeforeLongDrives()]
 
-navigate = expand(Sequence(nodes=[NavigateAction(target_location=pr2.root.global_pose)]))
+navigate = expand(Sequence(nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_pose(pr2.root.global_pose))]))
 
 show(navigate)
 ```

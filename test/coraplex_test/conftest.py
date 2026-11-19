@@ -63,6 +63,11 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 
 from ..plan_running import expand, robot_extensions, statechart_of, world_of
 
+# Below the ORM build at the top of this module, which has to run first.
+from semantic_digital_twin.world_description.kinematic_chain import (  # noqa: E402
+    KinematicChain,
+)
+
 # %% the arm a test runs with on any robot
 
 
@@ -243,10 +248,12 @@ def tool_center_point_goal(
     :return: The goal moving that tool center point there.
     """
     return CartesianPose(
-        root_link=RobotAccess(robot=robot).controlled_root,
-        tip_link=(
-            left_or_only_arm(robot) if arm is None else arm
-        ).end_effector.tool_frame,
+        kinematic_chain=KinematicChain(
+            root=RobotAccess(robot=robot).controlled_root,
+            tip=(
+                left_or_only_arm(robot) if arm is None else arm
+            ).end_effector.tool_frame,
+        ),
         goal_pose=(
             Pose3Dimensional(reference_frame=robot._world.root)
             if target is None

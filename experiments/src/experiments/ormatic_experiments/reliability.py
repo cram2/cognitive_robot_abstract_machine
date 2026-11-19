@@ -39,7 +39,7 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
-from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -98,14 +98,8 @@ def _random_navigate_action(world: World):
     Return an underspecified :class:`NavigateAction` with randomised pose.
     """
     action = a(NavigateAction)(
-        target_location=a(Pose3Dimensional.from_xyz_rpy)(
-            x=...,
-            y=...,
-            z=0.0,
-            roll=0.0,
-            pitch=0.0,
-            yaw=...,
-            reference_frame=world.root,
+        planar_goal_pose=a(Pose2Dimensional.from_xy_yaw)(
+            x=..., y=..., yaw=..., reference_frame=world.root
         ),
     )
     action.limit(n=10)

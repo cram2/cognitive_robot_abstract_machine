@@ -1,3 +1,8 @@
+"""
+Grid maps of the floor around a target that rate each place for a task, such as being
+free of obstacles, seeing the target or standing at a set distance from it.
+"""
+
 # %% Imports
 from __future__ import annotations
 
@@ -22,12 +27,11 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
     Quaternion,
     RotationMatrix,
-)
-from krrood_spatial_math.spatial_types import (
-    Pose3Dimensional,
     Point3Dimensional,
+    Pose3Dimensional,
     Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -173,12 +177,12 @@ class Costmap(Location):
     def __and__(self, other):
         return self.merge(other)
 
-    def candidates(self) -> Iterator[Pose3Dimensional]:
-        return self.sample(self.number_of_samples, self.seed)
+    def candidates(self) -> Iterator[Pose2Dimensional]:
+        return self.sample(number_of_samples=self.number_of_samples, seed=self.seed)
 
     def sample(
-        self, number_of_samples: int, seed: int | None = None
-    ) -> Iterator[Pose3Dimensional]:
+        self, *, number_of_samples: int, seed: int | None = None
+    ) -> Iterator[Pose2Dimensional]:
         """
         Sample pose candidates from this map.
 
@@ -273,7 +277,7 @@ class Costmap(Location):
         self,
         number_of_samples: int,
         random_generator: np.random.Generator,
-    ) -> Iterator[Pose3Dimensional]:
+    ) -> Iterator[Pose2Dimensional]:
         """
         Sample candidates, the given number of them spread over this map's segments.
 
@@ -301,11 +305,12 @@ class Costmap(Location):
                     offset[0], offset[1], 0
                 )
 
-                orientation: Quaternion = self._orientation_facing_origin(position)
-                yield Pose3Dimensional(
-                    position,
-                    orientation,
-                    self.world.root,
+                yield Pose2Dimensional.from_pose(
+                    Pose3Dimensional(
+                        position,
+                        self._orientation_facing_origin(position),
+                        self.world.root,
+                    )
                 )
 
     def segment_map(self) -> list[NDArray[np.float64]]:

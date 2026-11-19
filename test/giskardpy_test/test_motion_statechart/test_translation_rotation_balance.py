@@ -34,6 +34,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% scenarios
 
@@ -204,10 +205,13 @@ class BalanceRun:
 
     @property
     def translation_settling_time(self) -> float:
+        """
+        How long the position error took to settle below the goal's position threshold.
+        """
         return ErrorTrace.settling_time(
             times=self.trace.times,
             errors=self.trace.translation_errors,
-            threshold=self.goal.translation_threshold,
+            threshold=self.goal.position_threshold,
         )
 
     @property
@@ -231,7 +235,8 @@ def run_pose_goal(
     at most `maximum_cycles`.
     """
     goal = CartesianPose(
-        root_link=root, tip_link=tip, goal_pose=offset.goal_pose(tip=tip)
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal_pose=offset.goal_pose(tip=tip),
     )
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
@@ -351,7 +356,7 @@ def assert_every_goal_reached(runs: list[BalanceRun]):
     """
     assert [run.offset.label for run in runs if not run.reached] == []
     for run in runs:
-        assert run.trace.translation_errors[-1] <= run.goal.translation_threshold
+        assert run.trace.translation_errors[-1] <= run.goal.position_threshold
         assert run.trace.rotation_errors[-1] <= run.goal.orientation_threshold
 
 

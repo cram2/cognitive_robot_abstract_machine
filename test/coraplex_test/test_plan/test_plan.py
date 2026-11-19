@@ -18,11 +18,7 @@ from krrood.parametrization.model_registries import (
 )
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.orm.model import (
-    Point3DimensionalMapping,
-    QuaternionMapping,
-    Pose3DimensionalMapping,
-)
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
@@ -65,14 +61,12 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     """
     world, robot_view, extensions = apartment_world_pr2_copy_with_context
 
-    target_location = a(Pose3DimensionalMapping.from_point_mapping_quaternion_mapping)(
-        position=a(Point3DimensionalMapping)(x=..., y=..., z=0.0, reference_frame=None),
-        orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
-        reference_frame=variable_from([robot_view.root]),
+    target_location = a(Pose2Dimensional.from_xy_yaw)(
+        x=..., y=..., yaw=0.0, reference_frame=variable_from([robot_view.root])
     )
 
     navigate_action = a(NavigateAction)(
-        target_location=target_location,
+        planar_goal_pose=target_location,
     )
     # navigate_action.resolve()
 
@@ -96,6 +90,10 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
 
 
 def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
+    """
+    A pick-up whose parameters are left open runs, tolerating that no candidate may
+    succeed.
+    """
     world, robot_view, extensions = apartment_world_pr2_copy_with_context
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]
@@ -103,7 +101,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     grasp_variable = variable_from(milk.grasp_candidates())
 
     pick_up_description = a(PickUpAction)(
-        grasp=grasp_variable,
+        grasp_candidate=grasp_variable,
         arm=variable_from(robot_view.all_arms),
         approach_clearance=0.05,
     )

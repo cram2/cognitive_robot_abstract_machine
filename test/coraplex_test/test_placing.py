@@ -1,3 +1,9 @@
+"""
+Tests of putting down what an arm holds.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
@@ -14,7 +20,6 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional
 
-from ..conftest import SAMPLING_SEED
 from ..plan_running import expand, run_plan, simulated_executor, statechart_of
 
 # %% fixtures
@@ -90,7 +95,7 @@ def test_a_place_puts_the_held_object_on_the_target_however_it_is_held(
         1.2, 0.4, 0.9, yaw=np.pi / 4, reference_frame=world.root
     )
     place = _start(
-        PlaceAction(arm=robot.left_arm, object_designator=milk, target_location=target),
+        PlaceAction(arm=robot.left_arm, graspable=milk, goal_pose=target),
         extensions,
     )
 
@@ -112,12 +117,16 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     world, robot, milk, extensions = pr2_holding_milk
     target = Pose3Dimensional.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     place = _start(
-        PlaceAction(arm=robot.left_arm, object_designator=milk, target_location=target),
+        PlaceAction(arm=robot.left_arm, graspable=milk, goal_pose=target),
         extensions,
     )
     end_effector = robot.left_arm.end_effector
     grasp = GraspCandidate(milk, end_effector.held_body_T_grasp)
-    poses = place.grasp_pose_sequence(grasp.moved_to(target), end_effector, grasp)
+    poses = place.grasp_pose_sequence(
+        reference_T_grasp=grasp.moved_to(target),
+        end_effector=end_effector,
+        grasp_candidate=grasp,
+    )
 
     tool_goals = [goal.goal_pose for goal in _tool_goals_of(place)]
 
@@ -131,6 +140,10 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
 
 
 def test_a_place_leaves_the_object_standing_on_the_target(pr2_holding_milk):
+    """
+    Run to the end, a place hands the object back to the world, standing where it was
+    to be put.
+    """
     world, robot, milk, extensions = pr2_holding_milk
     # Beside and below where the milk is held, so the arm can reach it from there.
     target = Pose3Dimensional(
@@ -138,9 +151,7 @@ def test_a_place_leaves_the_object_standing_on_the_target(pr2_holding_milk):
         orientation=milk.root.global_pose.orientation,
         reference_frame=world.root,
     )
-    place = PlaceAction(
-        arm=robot.left_arm, object_designator=milk, target_location=target
-    )
+    place = PlaceAction(arm=robot.left_arm, graspable=milk, goal_pose=target)
 
     run_plan(Sequence(nodes=[place]), extensions)
 
@@ -167,10 +178,10 @@ def test_a_place_after_an_underspecified_pick_up_joins_the_statechart(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose3Dimensional.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
-    pick_up = a(PickUpAction)(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
-    place = PlaceAction(
-        arm=robot.left_arm, object_designator=milk, target_location=target
+    pick_up = a(PickUpAction)(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )
+    place = PlaceAction(arm=robot.left_arm, graspable=milk, goal_pose=target)
     expand(Sequence(nodes=[pick_up, place]), extensions)
 
     assert _arms_moved_by(place, robot) == {robot.left_arm}
@@ -183,17 +194,19 @@ def _arms_moved_by(place: PlaceAction, robot) -> set[Arm]:
     """
     :return: The arms of `robot` whose tool frames the expanded `place` moves.
     """
-    moved_tips = {goal.tip_link for goal in _tool_goals_of(place)}
+    moved_tips = {goal.kinematic_chain.tip for goal in _tool_goals_of(place)}
     return {arm for arm in robot.all_arms if arm.end_effector.tool_frame in moved_tips}
 
 
 def test_place_moves_only_the_arm_it_is_given(pr2_apartment_context):
+    """
+    Nothing holds the object while the plan is built, so the arm comes from the place
+    alone.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     target = Pose3Dimensional.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
-    place = PlaceAction(
-        arm=robot.right_arm, object_designator=milk, target_location=target
-    )
+    place = PlaceAction(arm=robot.right_arm, graspable=milk, goal_pose=target)
     expand(Sequence(nodes=[place]), extensions)
 
     assert _arms_moved_by(place, robot) == {robot.right_arm}

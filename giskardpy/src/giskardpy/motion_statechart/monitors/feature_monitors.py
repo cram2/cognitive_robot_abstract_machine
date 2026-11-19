@@ -1,3 +1,8 @@
+"""
+Monitors that observe a geometric relation between a feature on the tip of a kinematic
+chain and one on its root, such as a height, a distance or an angle.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field, dataclass
@@ -5,44 +10,62 @@ from dataclasses import field, dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from cramph.node import NodeArtifacts
-from krrood_spatial_math.spatial_types import (
-    Point3Dimensional,
-    Vector3Dimensional,
+from giskardpy.motion_statechart.mixins import (
+    HasKinematicChainParameter,
+    HasLowerAngleParameter,
+    HasLowerLimitParameter,
+    HasReferenceNormalParameter,
+    HasReferencePointParameter,
+    HasReferenceVectorParameter,
+    HasThresholdParameter,
+    HasTipNormalParameter,
+    HasTipPointParameter,
+    HasTipVectorParameter,
+    HasUpperAngleParameter,
+    HasUpperLimitParameter,
 )
-from semantic_digital_twin.world_description.world_entity import Body
+from cramph.node import NodeArtifacts
+from krrood_spatial_math.spatial_types import Point3Dimensional, Vector3Dimensional
+
+# %% monitors on geometric features
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FeatureFunctionMonitor(EndedByOwner, MotionStatechartNode):
+class FeatureFunctionMonitor(
+    EndedByOwner, MotionStatechartNode, HasKinematicChainParameter
+):
     """
-    Base for monitors that compare a controlled feature (attached to ``tip_link``) with a
-    reference feature (attached to ``root_link``) expressed in the root link frame.
+    Base for monitors that compare a controlled feature, attached to the tip of
+    :attr:`kinematic_chain`, with a reference feature attached to its root, expressed in
+    the frame of the root.
     """
 
-    tip_link: Body
-    """Link the controlled feature is attached to."""
-    root_link: Body
-    """Link the reference feature is attached to."""
     reference_feature: Point3Dimensional | Vector3Dimensional = field(init=False)
-    """Reference feature, typically the target for `controlled_feature`."""
+    """
+    Reference feature, typically the target for `controlled_feature`.
+    """
+
     controlled_feature: Point3Dimensional | Vector3Dimensional = field(init=False)
-    """Controlled feature, typically moved towards `reference_feature`."""
+    """
+    Controlled feature, typically moved towards `reference_feature`.
+    """
 
     def build_artifacts(self) -> NodeArtifacts:
         """
-        Transform the controlled and reference features into the root link frame and store them on
-        the node for use by subclasses.
+        Transform the controlled and reference features into the root link frame and
+        store them on the node for use by subclasses.
         """
         root_reference_feature = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_feature
+            target_frame=self.kinematic_chain.root,
+            spatial_object=self.reference_feature,
         )
         tip_controlled_feature = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.controlled_feature
+            target_frame=self.kinematic_chain.tip,
+            spatial_object=self.controlled_feature,
         )
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         if isinstance(self.controlled_feature, Point3Dimensional):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
@@ -58,20 +81,17 @@ class FeatureFunctionMonitor(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HeightMonitor(FeatureFunctionMonitor):
+class HeightMonitor(
+    FeatureFunctionMonitor,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasLowerLimitParameter,
+    HasUpperLimitParameter,
+):
     """
-    Observes ``True`` while the height difference between the controlled and reference point along
-    the root z-axis is within ``[lower_limit, upper_limit]``.
+    Observes ``True`` while the height difference between the controlled and reference
+    point along the root z-axis is within ``[lower_limit, upper_limit]``.
     """
-
-    reference_point: Point3Dimensional
-    """Reference point to measure the height against."""
-    tip_point: Point3Dimensional
-    """Controlled point whose height is checked."""
-    lower_limit: float
-    """Lower bound for the height difference in meters."""
-    upper_limit: float
-    """Upper bound for the height difference in meters."""
 
     def build_artifacts(self) -> NodeArtifacts:
         self.reference_feature = self.reference_point
@@ -89,18 +109,16 @@ class HeightMonitor(FeatureFunctionMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PerpendicularMonitor(FeatureFunctionMonitor):
+class PerpendicularMonitor(
+    FeatureFunctionMonitor,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
+    HasThresholdParameter,
+):
     """
-    Observes ``True`` while the controlled normal is perpendicular to the reference normal within
-    ``threshold``.
+    Observes ``True`` while the controlled normal is perpendicular to the reference
+    normal within ``threshold``, which bounds the dot product of the two normals.
     """
-
-    reference_normal: Vector3Dimensional
-    """Reference normal to check perpendicularity against."""
-    tip_normal: Vector3Dimensional
-    """Controlled normal."""
-    threshold: float = 0.01
-    """Threshold on the dot product of the two normals."""
 
     def build_artifacts(self) -> NodeArtifacts:
         self.reference_feature = self.reference_normal
@@ -113,20 +131,17 @@ class PerpendicularMonitor(FeatureFunctionMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DistanceMonitor(FeatureFunctionMonitor):
+class DistanceMonitor(
+    FeatureFunctionMonitor,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasLowerLimitParameter,
+    HasUpperLimitParameter,
+):
     """
-    Observes ``True`` while the planar distance (ignoring the z-axis) between the controlled and
-    reference point is within ``[lower_limit, upper_limit]``.
+    Observes ``True`` while the planar distance (ignoring the z-axis) between the
+    controlled and reference point is within ``[lower_limit, upper_limit]``.
     """
-
-    reference_point: Point3Dimensional
-    """Reference point to measure the distance against."""
-    tip_point: Point3Dimensional
-    """Controlled point whose distance is checked."""
-    lower_limit: float
-    """Lower bound for the distance in meters."""
-    upper_limit: float
-    """Upper bound for the distance in meters."""
 
     def build_artifacts(self) -> NodeArtifacts:
         self.reference_feature = self.reference_point
@@ -144,20 +159,17 @@ class DistanceMonitor(FeatureFunctionMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AngleMonitor(FeatureFunctionMonitor):
+class AngleMonitor(
+    FeatureFunctionMonitor,
+    HasTipVectorParameter,
+    HasReferenceVectorParameter,
+    HasLowerAngleParameter,
+    HasUpperAngleParameter,
+):
     """
-    Observes ``True`` while the angle between the controlled and reference vector is within
-    ``[lower_angle, upper_angle]``.
+    Observes ``True`` while the angle between the controlled and reference vector is
+    within ``[lower_angle, upper_angle]``.
     """
-
-    reference_vector: Vector3Dimensional
-    """Reference vector to measure the angle against."""
-    tip_vector: Vector3Dimensional
-    """Controlled vector."""
-    lower_angle: float
-    """Lower bound for the angle in radians."""
-    upper_angle: float
-    """Upper bound for the angle in radians."""
 
     def build_artifacts(self) -> NodeArtifacts:
         self.reference_feature = self.reference_vector

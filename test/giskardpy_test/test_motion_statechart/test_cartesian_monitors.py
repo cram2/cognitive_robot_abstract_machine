@@ -1,3 +1,10 @@
+"""
+Tests of the monitors that observe whether the tip of a kinematic chain has reached a
+Cartesian goal, each run while a task drives the PR2's right gripper there.
+"""
+
+from __future__ import annotations
+
 import pytest
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
@@ -30,6 +37,7 @@ from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def _create_executor(world: World) -> StatechartExecutor:
@@ -50,6 +58,9 @@ def _run(executor: StatechartExecutor, statechart: Statechart) -> None:
 
 
 def test_position_reached(pr2_world_state_reset: World):
+    """
+    A position monitor observes true once the gripper is driven to its goal point.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -58,12 +69,13 @@ def test_position_reached(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal_point)
+    drive = CartesianPosition(
+        kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=goal_point
+    )
     monitor = PositionReached(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=goal_point,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
+        goal_binding_policy=GoalBindingPolicy.Bind_at_build,
     )
     statechart.add_nodes(nodes=[drive, monitor])
     statechart.add_node(node=EndMotion.when_true(node=monitor))
@@ -74,11 +86,11 @@ def test_position_reached(pr2_world_state_reset: World):
 
 
 @pytest.mark.parametrize(
-    "binding_policy",
+    "goal_binding_policy",
     [GoalBindingPolicy.Bind_at_build, GoalBindingPolicy.Bind_on_start],
 )
 def test_position_reached_binding_policies(
-    pr2_world_state_reset: World, binding_policy: GoalBindingPolicy
+    pr2_world_state_reset: World, goal_binding_policy: GoalBindingPolicy
 ):
     """
     The robot is driven toward a goal expressed relative to the tip.
@@ -93,16 +105,14 @@ def test_position_reached_binding_policies(
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
     drive = CartesianPosition(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=goal_point,
-        binding_policy=binding_policy,
+        goal_binding_policy=goal_binding_policy,
     )
     monitor = PositionReached(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=goal_point,
-        binding_policy=binding_policy,
+        goal_binding_policy=goal_binding_policy,
     )
     statechart.add_nodes(nodes=[drive, monitor])
     statechart.add_node(node=EndMotion.when_true(node=monitor))
@@ -113,6 +123,10 @@ def test_position_reached_binding_policies(
 
 
 def test_orientation_reached(pr2_world_state_reset: World):
+    """
+    An orientation monitor observes true once the gripper is turned to its goal
+    orientation.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -125,13 +139,13 @@ def test_orientation_reached(pr2_world_state_reset: World):
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
     drive = CartesianOrientation(
-        root_link=root, tip_link=tip, goal_orientation=goal_orientation
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal_orientation=goal_orientation,
     )
     monitor = OrientationReached(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_orientation=goal_orientation,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
+        goal_binding_policy=GoalBindingPolicy.Bind_at_build,
     )
     statechart.add_nodes(nodes=[drive, monitor])
     statechart.add_node(node=EndMotion.when_true(node=monitor))
@@ -142,6 +156,10 @@ def test_orientation_reached(pr2_world_state_reset: World):
 
 
 def test_pose_reached(pr2_world_state_reset: World):
+    """
+    A pose monitor observes true once the gripper reaches both the position and the
+    orientation of its goal.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -152,12 +170,13 @@ def test_pose_reached(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianPose(root_link=root, tip_link=tip, goal_pose=goal_pose)
+    drive = CartesianPose(
+        kinematic_chain=KinematicChain(root=root, tip=tip), goal_pose=goal_pose
+    )
     monitor = PoseReached(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_pose=goal_pose,
-        binding_policy=GoalBindingPolicy.Bind_at_build,
+        goal_binding_policy=GoalBindingPolicy.Bind_at_build,
     )
     statechart.add_nodes(nodes=[drive, monitor])
     statechart.add_node(node=EndMotion.when_true(node=monitor))
@@ -168,6 +187,10 @@ def test_pose_reached(pr2_world_state_reset: World):
 
 
 def test_pointing_at(pr2_world_state_reset: World):
+    """
+    A pointing monitor observes true once the gripper's pointing axis points at its goal
+    point.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -178,10 +201,14 @@ def test_pointing_at(pr2_world_state_reset: World):
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
     drive = Pointing(
-        root_link=root, tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal_point=goal_point,
+        pointing_axis=pointing_axis,
     )
     monitor = PointingAt(
-        root_link=root, tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal_point=goal_point,
+        pointing_axis=pointing_axis,
     )
     statechart.add_nodes(nodes=[drive, monitor])
     statechart.add_node(node=EndMotion.when_true(node=monitor))
@@ -192,20 +219,28 @@ def test_pointing_at(pr2_world_state_reset: World):
 
 
 def test_vectors_aligned(pr2_world_state_reset: World):
+    """
+    An alignment monitor observes true once the gripper's normal is aligned with the
+    reference normal.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
-    goal_normal = Vector3Dimensional.X(reference_frame=root)
+    reference_normal = Vector3Dimensional.X(reference_frame=root)
     tip_normal = Vector3Dimensional.X(reference_frame=tip)
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
     drive = AlignPlanes(
-        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        reference_normal=reference_normal,
+        tip_normal=tip_normal,
     )
     monitor = VectorsAligned(
-        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        reference_normal=reference_normal,
+        tip_normal=tip_normal,
     )
     statechart.add_nodes(nodes=[drive, monitor])
     statechart.add_node(node=EndMotion.when_true(node=monitor))
@@ -216,6 +251,9 @@ def test_vectors_aligned(pr2_world_state_reset: World):
 
 
 def test_distance_to_line(pr2_world_state_reset: World):
+    """
+    A line monitor observes true once the gripper is on the segment it watches.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -225,10 +263,11 @@ def test_distance_to_line(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianPosition(root_link=root, tip_link=tip, goal_point=center_point)
+    drive = CartesianPosition(
+        kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=center_point
+    )
     monitor = DistanceToLine(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         center_point=center_point,
         line_axis=line_axis,
         line_length=0.4,

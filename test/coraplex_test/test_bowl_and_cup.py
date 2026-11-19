@@ -33,6 +33,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -46,6 +47,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from ..plan_running import robot_extensions, run_plan
 
 # %% a kitchen with a bowl and a cup in a drawer
@@ -206,8 +208,8 @@ def pick_ups_from_above(kitchen: KitchenWithFilledDrawer) -> list[PickUpAction]:
         arm, each coming down onto it from above.
     """
     return [
-        PickUpAction.from_above(kitchen.bowl, kitchen.robot.left_arm),
-        PickUpAction.from_above(kitchen.cup, kitchen.robot.right_arm),
+        PickUpAction.from_above(graspable=kitchen.bowl, arm=kitchen.robot.left_arm),
+        PickUpAction.from_above(graspable=kitchen.cup, arm=kitchen.robot.right_arm),
     ]
 
 
@@ -222,48 +224,52 @@ def transport_plan(
         once.
     """
     world, robot = kitchen.world, kitchen.robot
-    in_front_of_the_closed_drawer = Pose3Dimensional.from_xyz_rpy(
+    in_front_of_the_closed_drawer = Pose2Dimensional.from_xy_yaw(
         x=0.4, y=0.7, reference_frame=world.root
     )
-    in_front_of_the_open_drawer = Pose3Dimensional.from_xyz_rpy(
+    in_front_of_the_open_drawer = Pose2Dimensional.from_xy_yaw(
         x=0.3, y=0.89, reference_frame=world.root
     )
-    facing_the_kitchen_island = Pose3Dimensional.from_xyz_rpy(
+    facing_the_kitchen_island = Pose2Dimensional.from_xy_yaw(
         x=-0.25, y=1.85, yaw=np.pi, reference_frame=world.root
     )
     return Sequence(
         nodes=[
             # The arms start stretched out, which would reach into the counter.
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(target_location=in_front_of_the_closed_drawer),
+            NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
             OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(target_location=in_front_of_the_open_drawer),
+            NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
             Parallel(
                 nodes=[
                     HoldPose(
-                        root_link=kitchen.world.root, tip_link=robot.mobile_base.root
+                        kinematic_chain=KinematicChain(
+                            root=kitchen.world.root, tip=robot.mobile_base.root
+                        )
                     ),
                     *pick_ups,
                 ]
             ),
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(target_location=facing_the_kitchen_island),
+            NavigateAction(planar_goal_pose=facing_the_kitchen_island),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             Parallel(
                 nodes=[
                     HoldPose(
-                        root_link=kitchen.world.root, tip_link=robot.mobile_base.root
+                        kinematic_chain=KinematicChain(
+                            root=kitchen.world.root, tip=robot.mobile_base.root
+                        )
                     ),
                     PlaceAction(
                         arm=robot.left_arm,
-                        object_designator=kitchen.bowl,
-                        target_location=kitchen.world_T_bowl_goal,
+                        graspable=kitchen.bowl,
+                        goal_pose=kitchen.world_T_bowl_goal,
                     ),
                     PlaceAction(
                         arm=robot.right_arm,
-                        object_designator=kitchen.cup,
-                        target_location=kitchen.world_T_cup_goal,
+                        graspable=kitchen.cup,
+                        goal_pose=kitchen.world_T_cup_goal,
                     ),
                 ]
             ),
@@ -328,7 +334,7 @@ def test_bowl_and_cup_picked_up_as_statements_are_moved_onto_the_kitchen_island(
     """
     kitchen = kitchen_with_filled_drawer
     pick_ups = [
-        a(PickUpAction)(grasp=pick_up.grasp, arm=pick_up.arm)
+        a(PickUpAction)(grasp_candidate=pick_up.grasp_candidate, arm=pick_up.arm)
         for pick_up in pick_ups_from_above(kitchen)
     ]
 

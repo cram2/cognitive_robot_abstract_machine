@@ -1,3 +1,7 @@
+"""
+Actions that look around for an object until they detect it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,8 +19,9 @@ from cramph.node import StatechartNode
 from krrood.entity_query_language.factories import a, variable
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
 )
-from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
@@ -111,8 +116,8 @@ class SearchAction(SequentialAction):
         ]
         return cls(
             navigate=a(NavigateAction)(
-                target_location=variable(
-                    Pose3Dimensional,
+                planar_goal_pose=variable(
+                    Pose2Dimensional,
                     domain=VisibilityLocation(
                         target_pose=target_location, context=context
                     ),
@@ -121,7 +126,7 @@ class SearchAction(SequentialAction):
             looks=[
                 LookAtAndDetectAction(
                     look_at=LookAtAction(
-                        target=Pose3Dimensional.from_xyz_rpy(
+                        look_target=Pose3Dimensional.from_xyz_rpy(
                             target_location.x + x_offset,
                             target_location.y + y_offset,
                             target_location.z,

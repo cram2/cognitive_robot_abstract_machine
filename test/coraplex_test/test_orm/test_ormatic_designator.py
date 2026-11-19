@@ -22,6 +22,7 @@ from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import context_of, simulated_executor, statechart_of
 from cramph.context import ContextExtension
@@ -29,13 +30,17 @@ from cramph.context import ContextExtension
 
 @pytest.fixture()
 def simple_plan(pr2_apartment_context):
+    """
+    A plan that navigates, raises the torso and parks the arms, to be stored in the
+    database.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose3Dimensional.from_xyz_quaternion(
-                    1.6, 1.9, 0, 0, 0, 0, 1, reference_frame=world.root
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+                    1.6, 1.9, reference_frame=world.root
                 )
             ),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
@@ -112,20 +117,20 @@ def complex_plan(pr2_apartment_context):
 
     plan = TransportAction(
         pick_up=MoveAndPickUpAction.from_standing_position(
-            standing_position=Pose3Dimensional.from_xyz_rpy(
-                1.63, 1.98, 0.0, reference_frame=world.root
+            standing_position=Pose2Dimensional.from_xy_yaw(
+                x=1.63, y=1.98, reference_frame=world.root
             ),
             grasp=milk.grasp_candidates()[0],
             arm=robot_view.left_arm,
         ),
         place=MoveAndPlaceAction.from_standing_position(
-            standing_position=Pose3Dimensional.from_xyz_rpy(
-                1.8, 2.54, 0.0, reference_frame=world.root
+            standing_position=Pose2Dimensional.from_xy_yaw(
+                x=1.8, y=2.54, reference_frame=world.root
             ),
-            target_location=Pose3Dimensional.from_xyz_quaternion(
+            graspable=milk,
+            goal_pose=Pose3Dimensional.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
-            object_designator=milk,
             arm=robot_view.left_arm,
         ),
     )

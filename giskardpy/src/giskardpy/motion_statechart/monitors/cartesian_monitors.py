@@ -1,135 +1,90 @@
+"""
+Monitors observing whether the tip of a kinematic chain has reached a goal.
+"""
+
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-
+from abc import ABC
+from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.binding_policy import (
-    ForwardKinematicsBinding,
-    GoalBindingPolicy,
+from cramph.node import EndedByOwner, NodeArtifacts
+from giskardpy.motion_statechart.graph_node import (
+    BindsGoalReferenceFrame,
+    MotionStatechartNode,
 )
-from cramph.node import EndedByOwner
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from cramph.node import NodeArtifacts
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import (
-    Point3Dimensional,
-    Vector3Dimensional,
-    RotationMatrix,
-    HomogeneousTransformationMatrix3Dimensional,
+from giskardpy.motion_statechart.mixins import (
+    HasGoalOrientationParameter,
+    HasGoalPointParameter,
+    HasGoalPoseParameter,
+    HasKinematicChainParameter,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
+    HasPointingAxisParameter,
+    HasReferenceNormalParameter,
+    HasThresholdParameter,
+    HasTipNormalParameter,
 )
-from krrood_spatial_math.spatial_types import SymbolicSpatialType
-from semantic_digital_twin.world_description.world_entity import Body
+from krrood_spatial_math.spatial_types import Vector3Dimensional, Point3Dimensional
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
+
+# %% goals given in a frame that may move
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class RootRelativeGoalMonitor(EndedByOwner, MotionStatechartNode, ABC):
+class RootRelativeGoalMonitor(
+    EndedByOwner,
+    MotionStatechartNode,
+    BindsGoalReferenceFrame,
+    HasKinematicChainParameter,
+    ABC,
+):
     """
-    Base for monitors whose goal is captured relative to the kinematic chain via a
-    forward kinematics binding.
-
-    The :class:`GoalBindingPolicy` decides whether the goal is frozen once at build time
-    or recaptured every time the monitor starts.
-    """
-
-    root_link: Body
-    """
-    Root link of the kinematic chain the goal is expressed in.
-    """
-
-    binding_policy: GoalBindingPolicy = GoalBindingPolicy.Bind_on_start
-    """
-    When the goal reference frame is captured.
-
-    See :class:`GoalBindingPolicy`.
-    """
-
-    _forward_kinematics_binding: ForwardKinematicsBinding | None = field(
-        default=None, init=False, repr=False
-    )
-    """
-    Binding used to freeze the forward kinematics of the goal reference frame.
+    A monitor observing the tip of :attr:`kinematic_chain` against a goal whose frame is
+    read relative to its root.
     """
 
     @property
-    @abstractmethod
-    def goal(self) -> SymbolicSpatialType:
-        """
-        :return: The goal spatial object, expressed in its own reference frame.
-        """
-
-    def set_up(self) -> None:
-        """
-        Bind the goal reference frame, which the goal is captured relative to.
-        """
-        super().set_up()
-        self._forward_kinematics_binding = ForwardKinematicsBinding(
-            name=PrefixedName("root_T_goal_ref", str(self.name)),
-            root=self.root_link,
-            tip=self.goal.reference_frame,
-            float_variable_data=self.context.float_variable_data,
-        )
-        self._forward_kinematics_binding.bind(world=self.context.world)
-
-    def resolve_root_goal(self) -> SymbolicSpatialType:
-        """
-        Express the goal in the root link frame, captured relative to the goal reference
-        frame via a forward kinematics binding.
-        """
-        return self._forward_kinematics_binding.root_T_tip @ self.goal
-
-    def on_start(self) -> None:
-        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._forward_kinematics_binding.bind(world=self.context.world)
+    def goal_binding_root(self) -> KinematicStructureEntity:
+        return self.kinematic_chain.root
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PoseReached(RootRelativeGoalMonitor):
+class PoseReached(
+    RootRelativeGoalMonitor,
+    HasGoalPoseParameter,
+    HasPositionThresholdParameter,
+    HasOrientationThresholdParameter,
+):
     """
-    Observes ``True`` once the tip link has reached the goal pose within the position
-    and orientation thresholds.
-    """
-
-    tip_link: Body
-    """
-    Link that should reach the goal pose.
-    """
-
-    goal_pose: HomogeneousTransformationMatrix3Dimensional
-    """
-    Target pose to reach.
-    """
-
-    position_threshold: float = 0.01
-    """
-    Distance threshold for the position part of the goal in meters.
-    """
-
-    orientation_threshold: float = 0.01
-    """
-    Rotation error threshold for the orientation part of the goal in radians.
+    Observes ``True`` once the tip link has reached :attr:`goal_pose` within the
+    position and orientation thresholds.
     """
 
     @property
-    def goal(self) -> HomogeneousTransformationMatrix3Dimensional:
-        return self.goal_pose
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_pose.reference_frame
 
     def build_artifacts(self) -> NodeArtifacts:
-        root_T_goal = self.resolve_root_goal()
-
-        root_P_goal = root_T_goal.position
-        root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        ).position
-        distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
+        """
+        :return: Artifacts observing whether the tip is within
+            :attr:`position_threshold` of the goal position and within
+            :attr:`orientation_threshold` of the goal orientation.
+        """
+        root_T_goal = self.root_T_goal_reference_frame @ self.goal_pose
+        root_T_current = self.context.world.compose_forward_kinematics_expression(
+            self.kinematic_chain.root, self.kinematic_chain.tip
+        )
+        distance_to_goal = root_T_goal.position.euclidean_distance(
+            root_T_current.position
+        )
         position_reached = distance_to_goal < self.position_threshold
 
-        root_R_goal = root_T_goal.rotation_matrix
-        root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
-        ).rotation_matrix
-        rotation_error = root_R_current.rotational_distance(root_R_goal)
+        rotation_error = root_T_current.rotation_matrix.rotational_distance(
+            root_T_goal.rotation_matrix
+        )
         orientation_reached = sm.abs(rotation_error) < self.orientation_threshold
 
         return NodeArtifacts(
@@ -138,119 +93,89 @@ class PoseReached(RootRelativeGoalMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PositionReached(RootRelativeGoalMonitor):
+class PositionReached(
+    RootRelativeGoalMonitor, HasGoalPointParameter, HasThresholdParameter
+):
     """
-    Observes ``True`` once the tip link is within ``threshold`` of the goal point.
-    """
-
-    tip_link: Body
-    """
-    Link that should reach the goal point.
-    """
-
-    goal_point: Point3Dimensional
-    """
-    Target 3D point to reach.
-    """
-
-    threshold: float = 0.01
-    """
-    Distance threshold for goal achievement in meters.
+    Observes ``True`` once the tip link is within :attr:`threshold` meters of
+    :attr:`goal_point`.
     """
 
     @property
-    def goal(self) -> Point3Dimensional:
-        return self.goal_point
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_point.reference_frame
 
     def build_artifacts(self) -> NodeArtifacts:
-        root_P_goal = self.resolve_root_goal()
-
+        """
+        :return: Artifacts observing whether the tip is within :attr:`threshold` of
+            :attr:`goal_point`.
+        """
+        root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
         return NodeArtifacts(observation=distance_to_goal < self.threshold)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class OrientationReached(RootRelativeGoalMonitor):
+class OrientationReached(
+    RootRelativeGoalMonitor, HasGoalOrientationParameter, HasThresholdParameter
+):
     """
-    Observes ``True`` once the tip link orientation is within ``threshold`` of the goal
-    orientation.
-    """
-
-    tip_link: Body
-    """
-    Link that should reach the goal orientation.
-    """
-
-    goal_orientation: RotationMatrix
-    """
-    Target orientation to reach.
-    """
-
-    threshold: float = 0.01
-    """
-    Rotation error threshold for goal achievement in radians.
+    Observes ``True`` once the orientation of the tip link is within :attr:`threshold`
+    radians of :attr:`goal_orientation`.
     """
 
     @property
-    def goal(self) -> RotationMatrix:
-        return self.goal_orientation
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_orientation.reference_frame
 
     def build_artifacts(self) -> NodeArtifacts:
-        root_R_goal = self.resolve_root_goal()
-
+        """
+        :return: Artifacts observing whether the tip is turned less than
+            :attr:`threshold` away from :attr:`goal_orientation`.
+        """
+        root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
         root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         rotation_error = root_R_current.rotational_distance(root_R_goal)
         return NodeArtifacts(observation=sm.abs(rotation_error) < self.threshold)
 
 
+# %% goals given in a fixed frame
+
+
 @dataclass(eq=False, repr=False, kw_only=True)
-class PointingAt(EndedByOwner, MotionStatechartNode):
+class PointingAt(
+    EndedByOwner,
+    MotionStatechartNode,
+    HasKinematicChainParameter,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+    HasThresholdParameter,
+):
     """
-    Observes ``True`` once the pointing axis of the tip link is aimed at the goal point
-    within ``threshold``.
-    """
-
-    tip_link: Body
-    """
-    Link whose pointing axis is checked.
-    """
-
-    goal_point: Point3Dimensional
-    """
-    Point the tip link should point at.
-    """
-
-    root_link: Body
-    """
-    Reference link the goal point is expressed in.
-    """
-
-    pointing_axis: Vector3Dimensional
-    """
-    Axis of the tip link that should point at the goal point.
-    """
-
-    threshold: float = 0.01
-    """
-    Distance threshold between the goal point and the pointing line in meters.
+    Observes ``True`` once the pointing axis of the tip link passes within
+    :attr:`threshold` meters of :attr:`goal_point`.
     """
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the line along :attr:`pointing_axis` from
+            the tip passes within :attr:`threshold` of :attr:`goal_point`.
+        """
         root_P_goal_point = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_point
+            target_frame=self.kinematic_chain.root, spatial_object=self.goal_point
         )
 
         tip_V_pointing_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.pointing_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_P_tip = root_T_tip.position
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
@@ -262,50 +187,36 @@ class PointingAt(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class VectorsAligned(EndedByOwner, MotionStatechartNode):
+class VectorsAligned(
+    EndedByOwner,
+    MotionStatechartNode,
+    HasKinematicChainParameter,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
+    HasThresholdParameter,
+):
     """
-    Observes ``True`` once the tip normal is aligned with the goal normal within
-    ``threshold``.
-    """
-
-    root_link: Body
-    """
-    Reference link the goal normal is expressed in.
-    """
-
-    tip_link: Body
-    """
-    Link the tip normal is expressed in.
-    """
-
-    goal_normal: Vector3Dimensional
-    """
-    Reference normal the tip normal should align with.
-    """
-
-    tip_normal: Vector3Dimensional
-    """
-    Normal of the tip link that should align with the goal normal.
-    """
-
-    threshold: float = 0.01
-    """
-    Angle threshold between the two normals in radians.
+    Observes ``True`` once :attr:`tip_normal` is aligned with :attr:`reference_normal`
+    within :attr:`threshold` radians.
     """
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the angle between :attr:`tip_normal` and
+            :attr:`reference_normal` is below :attr:`threshold`.
+        """
         tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_normal
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
         )
         tip_V_tip_normal.scale(1)
 
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_normal
+            target_frame=self.kinematic_chain.root, spatial_object=self.reference_normal
         )
         root_V_root_normal.scale(1)
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
         error = root_V_tip_normal.angle_between(root_V_root_normal)
@@ -313,20 +224,15 @@ class VectorsAligned(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DistanceToLine(EndedByOwner, MotionStatechartNode):
+class DistanceToLine(
+    EndedByOwner,
+    MotionStatechartNode,
+    HasKinematicChainParameter,
+    HasThresholdParameter,
+):
     """
-    Observes ``True`` once the tip link is within ``threshold`` of the line segment
-    centered at ``center_point`` along ``line_axis``.
-    """
-
-    root_link: Body
-    """
-    Reference link the line is expressed in.
-    """
-
-    tip_link: Body
-    """
-    Link whose distance to the line is checked.
+    Observes ``True`` once the tip link is within :attr:`threshold` meters of the line
+    segment centered at ``center_point`` along ``line_axis``.
     """
 
     center_point: Point3Dimensional
@@ -344,21 +250,20 @@ class DistanceToLine(EndedByOwner, MotionStatechartNode):
     Length of the line segment.
     """
 
-    threshold: float = 0.01
-    """
-    Distance threshold to the line segment in meters.
-    """
-
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the tip is within :attr:`threshold` of the
+            line segment of :attr:`line_length` centred on :attr:`center_point`.
+        """
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         root_V_line_axis = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.line_axis
+            target_frame=self.kinematic_chain.root, spatial_object=self.line_axis
         )
         root_V_line_axis.scale(1)
         root_P_center = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.center_point
+            target_frame=self.kinematic_chain.root, spatial_object=self.center_point
         )
         root_P_line_start = root_P_center + root_V_line_axis * (self.line_length / 2)
         root_P_line_end = root_P_center - root_V_line_axis * (self.line_length / 2)

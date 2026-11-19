@@ -69,6 +69,7 @@ from cramph.context import StatechartContext
 from cramph.exceptions import TickLimitReachedError
 from cramph.executor import StatechartExecutor
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% motion nodes in a statechart
 
@@ -314,6 +315,10 @@ def test_local_minimum_reached_raises_on_explicitly_empty_degrees_of_freedom(
 
 
 def test_long_goal(pr2_world_state_reset: World):
+    """
+    A PR2 base goal fifty meters away runs to its end beside a joint goal, printing the
+    time each tick took.
+    """
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
@@ -322,9 +327,11 @@ def test_long_goal(pr2_world_state_reset: World):
     statechart.add_nodes(
         nodes=[
             cart_goal := CartesianPose(
-                root_link=pr2_world_state_reset.root,
-                tip_link=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-                    "base_footprint"
+                kinematic_chain=KinematicChain(
+                    root=pr2_world_state_reset.root,
+                    tip=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+                        "base_footprint"
+                    ),
                 ),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=50, reference_frame=pr2_world_state_reset.root
@@ -441,16 +448,14 @@ class TestTemplates:
         statechart = Statechart(context=executor.context)
         position_knife = CartesianPose(
             name="Position Knife",
-            root_link=map_link,
-            tip_link=knife,
+            kinematic_chain=KinematicChain(root=map_link, tip=knife),
             goal_pose=pre_cut_pose,
         )
         cut = Sequence(
             nodes=[
                 CartesianPose(
                     name="Down",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose3Dimensional(
                         position=Point3Dimensional(x=-depth, reference_frame=knife),
                         reference_frame=knife,
@@ -458,8 +463,7 @@ class TestTemplates:
                 ),
                 CartesianPose(
                     name="Up",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose3Dimensional(
                         position=Point3Dimensional(x=depth, reference_frame=knife),
                         reference_frame=knife,
@@ -467,8 +471,7 @@ class TestTemplates:
                 ),
                 CartesianPose(
                     name="Move Right",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose3Dimensional(
                         position=Point3Dimensional(
                             y=right_shift, reference_frame=knife
@@ -519,6 +522,10 @@ class TestTemplates:
         assert restarts >= 1
 
     def test_parallel_with_tasks(self, *, pr2_world_state_reset: World):
+        """
+        Two plane alignments of the PR2's right gripper run in one parallel until both
+        are reached.
+        """
         map = pr2_world_state_reset.root
         r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -533,16 +540,14 @@ class TestTemplates:
                 parallel := Parallel(
                     nodes=[
                         AlignPlanes(
-                            root_link=map,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(root=map, tip=r_tip),
                             tip_normal=Vector3Dimensional.X(reference_frame=r_tip),
-                            goal_normal=Vector3Dimensional.X(reference_frame=map),
+                            reference_normal=Vector3Dimensional.X(reference_frame=map),
                         ),
                         AlignPlanes(
-                            root_link=map,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(root=map, tip=r_tip),
                             tip_normal=Vector3Dimensional.Y(reference_frame=r_tip),
-                            goal_normal=Vector3Dimensional.Z(reference_frame=map),
+                            reference_normal=Vector3Dimensional.Z(reference_frame=map),
                         ),
                     ]
                 )
@@ -657,7 +662,15 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
 
 class TestMaxManipulability:
+    """
+    Maximizing manipulability beside another goal.
+    """
+
     def test_MaxManipulability(self, *, pr2_world_state_reset: World) -> None:
+        """
+        Maximizing manipulability until a pose goal of the PR2's right gripper is
+        reached still brings the gripper to that pose.
+        """
         root = pr2_world_state_reset.get_body_by_name("base_footprint")
         tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
 
@@ -670,14 +683,15 @@ class TestMaxManipulability:
         )
         statechart = Statechart(context=executor.context)
         cart_goal = CartesianPose(
-            root_link=pr2_world_state_reset.root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=pr2_world_state_reset.root, tip=tip),
             goal_pose=goal_pose,
         )
         statechart.add_nodes(
             nodes=[
                 cart_goal,
-                manipulability := MaxManipulability(root_link=root, tip_link=tip),
+                manipulability := MaxManipulability(
+                    kinematic_chain=KinematicChain(root=root, tip=tip)
+                ),
             ]
         )
         manipulability.interrupt_condition = cart_goal.observes_true
@@ -689,4 +703,4 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.translation_threshold)
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.position_threshold)

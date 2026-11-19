@@ -251,6 +251,9 @@ def test_monitored_subtree_nested_in_a_sequence_compiles(
 
 
 def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
+    """
+    A reach of the PR2's right arm towards the milk runs until it succeeds.
+    """
     world, view, extensions = pr2_apartment_context
 
     milk_connection = world.get_body_by_name("milk.stl").parent_connection
@@ -258,8 +261,8 @@ def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
         2, 1.5, 0.7, 0, 0, 0, reference_frame=milk_connection.parent
     )
     reach = ReachAction(
-        grasp=GraspCandidate.from_body_origin(
-            world.get_semantic_annotations_by_type(Milk)[0]
+        grasp_candidate=GraspCandidate.from_body_origin(
+            graspable=world.get_semantic_annotations_by_type(Milk)[0]
         ),
         arm=view.right_arm,
     )
@@ -280,7 +283,9 @@ def test_a_pick_up_moves_the_object_to_the_gripper_between_closing_and_lifting(
 
     root = expand(
         PickUpAction(
-            grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
+            grasp_candidate=world.get_semantic_annotations_by_type(Milk)[
+                0
+            ].grasp_candidates()[0],
             arm=view.right_arm,
         ),
         extensions,
@@ -412,7 +417,10 @@ def reach_action(milk: Milk, view) -> ReachAction:
     :param view: The robot reaching for it.
     :return: A reach at the object's own frame.
     """
-    return ReachAction(grasp=GraspCandidate.from_body_origin(milk), arm=view.right_arm)
+    return ReachAction(
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=view.right_arm,
+    )
 
 
 def test_a_reach_does_not_perceive_by_default(pr2_apartment_context) -> None:
@@ -445,7 +453,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_body = milk.root
 
-    plan = PickUpAction(grasp=milk.grasp_candidates()[0], arm=view.right_arm)
+    plan = PickUpAction(grasp_candidate=milk.grasp_candidates()[0], arm=view.right_arm)
     targets = [
         node.goal_pose
         for node in motion_nodes_of(plan, extensions)

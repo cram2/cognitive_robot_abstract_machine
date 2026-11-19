@@ -13,7 +13,6 @@ import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.patterns.classproperty import classproperty
 from cramph.context import ContextExtension
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.graph_node import (
@@ -21,38 +20,33 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
     MotionNodeArtifacts,
 )
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasHoleNormalParameter,
+    HasHolePointParameter,
+    HasKinematicChainParameter,
+)
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    Point3Dimensional,
     Vector3Dimensional,
     RotationMatrix,
 )
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class WiggleInsert(ConvergingTask):
+class WiggleInsert(
+    ConvergingTask,
+    HasKinematicChainParameter,
+    HasHolePointParameter,
+    HasHoleNormalParameter,
+    HasCruiseVelocityParameter,
+):
     """
     Presses the tip link down towards a hole while wiggling it with random translational
-    and angular noise.
+    and angular noise. Its error is the distance to the hole, in meters.
 
     The wiggle is driven per control cycle through auxiliary variables that are updated
     in :meth:`on_tick`.
-    """
-
-    root_link: Body
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: Body
-    """
-    Tip link that is pressed into the hole.
-    """
-
-    hole_point: Point3Dimensional
-    """
-    Center point of the hole.
     """
 
     noise_translation: float = 0.5
@@ -67,26 +61,6 @@ class WiggleInsert(ConvergingTask):
     Strength of the angular wiggle.
 
     Default is an untuned preset, not a calibrated value.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the tip is pressed into the hole, in m/s, and wiggled, in rad/s; not
-    strictly enforced.
-
-    Default is an untuned preset, not a calibrated value.
-    """
-
-    hole_normal: Vector3Dimensional | None = None
-    """
-    Vector perpendicular to the hole.
-
-    Defaults to the root z-axis.
-    """
-
-    threshold: float = 0.01
-    """
-    Distance to the hole point below which the task is achieved.
     """
 
     random_walk: bool = True
@@ -192,7 +166,7 @@ class WiggleInsert(ConvergingTask):
         self._random_translation = Vector3Dimensional.create_with_variables(
             f"{self.name}_rand_translation"
         )
-        self._random_translation.reference_frame = self.root_link
+        self._random_translation.reference_frame = self.kinematic_chain.root
         self.context.float_variable_data.register_expression(
             expression=self._random_translation
         )
@@ -210,15 +184,8 @@ class WiggleInsert(ConvergingTask):
             and the hole.
         """
         artifacts = MotionNodeArtifacts()
-        # The previous default was a zero vector, which has no well-defined perpendicular plane;
-        # the root z-axis is used instead so the default is usable.
         hole_normal = self.context.world.transform(
-            target_frame=self.root_link,
-            spatial_object=(
-                self.hole_normal
-                if self.hole_normal is not None
-                else Vector3Dimensional.Z(reference_frame=self.root_link)
-            ),
+            target_frame=self.kinematic_chain.root, spatial_object=self.hole_normal
         )
 
         self._perpendicular_basis_first, self._perpendicular_basis_second = (
@@ -226,10 +193,10 @@ class WiggleInsert(ConvergingTask):
         )
 
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).position
         root_P_hole = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.hole_point
+            target_frame=self.kinematic_chain.root, spatial_object=self.hole_point
         )
 
         root_P_hole_wiggled = root_P_hole + self._random_translation
@@ -242,13 +209,13 @@ class WiggleInsert(ConvergingTask):
         )
 
         tip_V_hole_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=hole_normal
+            target_frame=self.kinematic_chain.tip, spatial_object=hole_normal
         )
         tip_R_hole_normal = RotationMatrix.from_axis_angle(
             AxisAngle(angle=self._random_angle, axis=tip_V_hole_normal)
         )
         root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_R_goal = root_R_current.dot(tip_R_hole_normal)
 

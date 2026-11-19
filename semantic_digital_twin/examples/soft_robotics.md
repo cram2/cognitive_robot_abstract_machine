@@ -24,6 +24,7 @@ import numpy as np
 import time
 from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.datastructures.soft_trunk import SoftTrunk, SoftTrunkSection
 
 # Start the ROS 2 node of this process
@@ -75,18 +76,15 @@ msc_pcc.add_node(
     node=(goal_pcc := Sequence(
         nodes=[
             CartesianPosition(
-                root_link=world_pcc.root,
-                tip_link=trunk_pcc.arms[0].tip,
+                kinematic_chain=KinematicChain(root=world_pcc.root, tip=trunk_pcc.arms[0].tip),
                 goal_point=Point3Dimensional(x=0.4, y=0.0, z=0.5, reference_frame=world_pcc.root),
             ),
             CartesianPosition(
-                root_link=world_pcc.root,
-                tip_link=trunk_pcc.arms[0].tip,
+                kinematic_chain=KinematicChain(root=world_pcc.root, tip=trunk_pcc.arms[0].tip),
                 goal_point=Point3Dimensional(x=0.0, y=0.4, z=0.5, reference_frame=world_pcc.root),
             ),
             CartesianPosition(
-                root_link=world_pcc.root,
-                tip_link=trunk_pcc.arms[0].tip,
+                kinematic_chain=KinematicChain(root=world_pcc.root, tip=trunk_pcc.arms[0].tip),
                 goal_point=Point3Dimensional(x=0.0, y=0.0, z=0.9, reference_frame=world_pcc.root),
             )
         ]
@@ -132,19 +130,16 @@ msc_cos.add_node(
     node=(goal_cos := Sequence(
         nodes=[
             CartesianPosition(
-                root_link=world_cosserat.root,
-                tip_link=trunk_cos.arms[0].tip,
+                kinematic_chain=KinematicChain(root=world_cosserat.root, tip=trunk_cos.arms[0].tip),
                 goal_point=Point3Dimensional(x=0.4, y=0.0, z=0.5, reference_frame=world_cosserat.root),
             ),
             CartesianPosition(
-                root_link=world_cosserat.root,
-                tip_link=trunk_cos.arms[0].tip,
+                kinematic_chain=KinematicChain(root=world_cosserat.root, tip=trunk_cos.arms[0].tip),
                 goal_point=Point3Dimensional(x=0.0, y=0.7, z=0.4, reference_frame=world_cosserat.root),
             ),
             # Distal target (stretching)
             CartesianPosition(
-                root_link=world_cosserat.root,
-                tip_link=trunk_cos.arms[0].tip,
+                kinematic_chain=KinematicChain(root=world_cosserat.root, tip=trunk_cos.arms[0].tip),
                 goal_point=Point3Dimensional(x=0.4, y=0.5, z=1.2, reference_frame=world_cosserat.root),
             )
         ]

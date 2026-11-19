@@ -1,7 +1,18 @@
+"""
+Tests of the poses an action passes through to grasp an object: before, at and after the
+grasp.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses
+from coraplex.robot_plans.actions.base import SequentialAction
+from coraplex.robot_plans.mixins import HasGraspApproach
+from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -21,6 +32,20 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+
+# %% an action approaching grasps
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class GraspApproachingAction(HasGraspApproach, SequentialAction):
+    """
+    An action that approaches grasps with the default clearance and retreat distance,
+    and has no steps of its own.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        return []
+
 
 # %% fixtures
 
@@ -58,7 +83,7 @@ def grasp_at_origin(graspable) -> GraspCandidate:
     :param graspable: The annotation of the object to grasp.
     :return: A grasp at the object's origin, approaching along the body's x-axis.
     """
-    return GraspCandidate.from_body_origin(graspable)
+    return GraspCandidate.from_body_origin(graspable=graspable)
 
 
 def grasp_from_above(graspable) -> GraspCandidate:
@@ -101,13 +126,13 @@ def test_pre_grasp_pose_clears_the_body_it_grasps(boxed_pr2_world):
     """
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
 
     origin_grasp = grasp_at_origin(graspable)
     poses = action.grasp_pose_sequence(
-        origin_grasp.grasp_pose,
-        end_effector,
-        origin_grasp,
+        reference_T_grasp=origin_grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=origin_grasp,
     )
 
     expected_standoff = BOX_SCALE.x / 2 + action.approach_clearance
@@ -125,13 +150,13 @@ def test_pre_grasp_pose_of_a_surface_grasp_only_adds_the_clearance(boxed_pr2_wor
     """
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
     surface_grasp = grasp_from_above(graspable)
 
     poses = action.grasp_pose_sequence(
-        surface_grasp.grasp_pose,
-        end_effector,
-        surface_grasp,
+        reference_T_grasp=surface_grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=surface_grasp,
     )
 
     np.testing.assert_allclose(
@@ -153,11 +178,11 @@ def test_a_body_without_collision_is_approached_from_the_clearance_alone(
         world.add_connection(FixedConnection(parent=world.root, child=body))
         graspable = Milk(root=body)
         world.add_semantic_annotation(graspable)
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
 
-    assert action._approach_distance(grasp_at_origin(graspable)) == pytest.approx(
-        action.approach_clearance
-    )
+    assert action._approach_distance(
+        grasp_candidate=grasp_at_origin(graspable)
+    ) == pytest.approx(action.approach_clearance)
 
 
 def test_a_grasp_outside_the_body_is_approached_from_the_clearance_alone(
@@ -168,7 +193,7 @@ def test_a_grasp_outside_the_body_is_approached_from_the_clearance_alone(
     retrace before the clearance.
     """
     _, _, graspable = boxed_pr2_world
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
     in_front = GraspCandidate(
         graspable,
         Pose3Dimensional(
@@ -177,7 +202,7 @@ def test_a_grasp_outside_the_body_is_approached_from_the_clearance_alone(
         ),
     )
 
-    assert action._approach_distance(in_front) == pytest.approx(
+    assert action._approach_distance(grasp_candidate=in_front) == pytest.approx(
         action.approach_clearance
     )
 
@@ -190,7 +215,7 @@ def test_a_diagonal_approach_leaves_the_body_through_its_nearest_face(
     first, here the narrow one along x.
     """
     _, _, graspable = boxed_pr2_world
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
     diagonal = GraspCandidate(
         graspable,
         Pose3Dimensional(
@@ -199,18 +224,25 @@ def test_a_diagonal_approach_leaves_the_body_through_its_nearest_face(
         ),
     )
 
-    assert action._approach_distance(diagonal) == pytest.approx(
+    assert action._approach_distance(grasp_candidate=diagonal) == pytest.approx(
         BOX_SCALE.x / 2 * np.sqrt(2) + action.approach_clearance
     )
 
 
 def test_grasp_pose_is_the_middle_of_the_sequence(boxed_pr2_world):
+    """
+    The grasp pose of the sequence puts the tool frame where the grasp needs it.
+    """
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
     grasp = grasp_at_origin(graspable)
 
-    approach = HasApproachesGraspPoses()
-    poses = approach.grasp_pose_sequence(grasp.grasp_pose, end_effector, grasp)
+    approach = GraspApproachingAction()
+    poses = approach.grasp_pose_sequence(
+        reference_T_grasp=grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=grasp,
+    )
 
     np.testing.assert_allclose(
         poses.grasp.to_np(),
@@ -230,13 +262,13 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
     turned, so a grasp taken from above does not drag it sideways.
     """
     world, robot, graspable = boxed_pr2_world
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
     grasp = grasp_on(graspable)
 
     poses = action.grasp_pose_sequence(
-        grasp.grasp_pose,
-        robot.left_arm.end_effector,
-        grasp,
+        reference_T_grasp=grasp.grasp_pose,
+        end_effector=robot.left_arm.end_effector,
+        grasp_candidate=grasp,
     )
 
     world_P_grasp = world.transform(
@@ -253,14 +285,17 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
 
 
 def test_retreat_pose_keeps_the_grasp_orientation(boxed_pr2_world):
+    """
+    Retreating from a grasp keeps the gripper turned as it was at the grasp.
+    """
     _, robot, graspable = boxed_pr2_world
 
-    approach = HasApproachesGraspPoses()
+    approach = GraspApproachingAction()
     origin_grasp = grasp_at_origin(graspable)
     poses = approach.grasp_pose_sequence(
-        origin_grasp.grasp_pose,
-        robot.left_arm.end_effector,
-        origin_grasp,
+        reference_T_grasp=origin_grasp.grasp_pose,
+        end_effector=robot.left_arm.end_effector,
+        grasp_candidate=origin_grasp,
     )
 
     np.testing.assert_allclose(
@@ -271,12 +306,17 @@ def test_retreat_pose_keeps_the_grasp_orientation(boxed_pr2_world):
 
 
 def test_sequence_without_a_body_stands_off_by_the_clearance_alone(boxed_pr2_world):
+    """
+    Without a body to clear, the gripper stands off from the grasp by the approach
+    clearance alone.
+    """
     _, robot, graspable = boxed_pr2_world
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
 
     end_effector = robot.left_arm.end_effector
     poses = action.grasp_pose_sequence(
-        grasp_at_origin(graspable).grasp_pose, end_effector
+        reference_T_grasp=grasp_at_origin(graspable).grasp_pose,
+        end_effector=end_effector,
     )
 
     np.testing.assert_allclose(
@@ -296,9 +336,13 @@ def _assert_the_gripper_approaches_along_the_grasp(world, end_effector) -> None:
     """
     graspable = Milk(root=world.root)
     grasp = grasp_at_origin(graspable)
-    action = HasApproachesGraspPoses()
+    action = GraspApproachingAction()
 
-    poses = action.grasp_pose_sequence(grasp.grasp_pose, end_effector, grasp)
+    poses = action.grasp_pose_sequence(
+        reference_T_grasp=grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=grasp,
+    )
 
     root_R_tool = poses.grasp.rotation_matrix.to_np()[:3, :3]
     np.testing.assert_allclose(
@@ -306,7 +350,7 @@ def _assert_the_gripper_approaches_along_the_grasp(world, end_effector) -> None:
     )
     np.testing.assert_allclose(
         _fingers_at(poses.pre_grasp, end_effector),
-        [-action._approach_distance(grasp), 0, 0],
+        [-action._approach_distance(grasp_candidate=grasp), 0, 0],
         atol=1e-9,
     )
 
@@ -332,15 +376,17 @@ def test_a_tracy_gripper_approaches_along_the_grasp(tracy_world):
 
 def test_a_grasp_is_aimed_at_the_point_the_fingers_meet_at(boxed_pr2_world):
     """
-    A gripper's tool frame need not sit where its fingers meet, so the sequence aims
-    the point they meet at rather than the tool frame itself.
+    A gripper's tool frame need not sit where its fingers meet, so the sequence aims the
+    point they meet at rather than the tool frame itself.
     """
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
     grasp = grasp_at_origin(graspable)
 
-    poses = HasApproachesGraspPoses().grasp_pose_sequence(
-        grasp.grasp_pose, end_effector, grasp
+    poses = GraspApproachingAction().grasp_pose_sequence(
+        reference_T_grasp=grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=grasp,
     )
 
     np.testing.assert_allclose(
@@ -358,8 +404,10 @@ def test_reaching_the_grasp_goal_leaves_the_fingers_on_the_grasp(boxed_pr2_world
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
     grasp = grasp_at_origin(graspable)
-    poses = HasApproachesGraspPoses().grasp_pose_sequence(
-        grasp.grasp_pose, end_effector, grasp
+    poses = GraspApproachingAction().grasp_pose_sequence(
+        reference_T_grasp=grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=grasp,
     )
 
     np.testing.assert_allclose(
@@ -378,11 +426,17 @@ def test_the_approach_travels_the_distance_it_was_given(boxed_pr2_world):
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
     grasp = grasp_at_origin(graspable)
-    sequence = HasApproachesGraspPoses()
+    sequence = GraspApproachingAction()
 
-    poses = sequence.grasp_pose_sequence(grasp.grasp_pose, end_effector, grasp)
+    poses = sequence.grasp_pose_sequence(
+        reference_T_grasp=grasp.grasp_pose,
+        end_effector=end_effector,
+        grasp_candidate=grasp,
+    )
 
     travelled = poses.grasp.to_np()[:3, 3] - poses.pre_grasp.to_np()[:3, 3]
     np.testing.assert_allclose(
-        np.linalg.norm(travelled), sequence._approach_distance(grasp), atol=1e-9
+        np.linalg.norm(travelled),
+        sequence._approach_distance(grasp_candidate=grasp),
+        atol=1e-9,
     )

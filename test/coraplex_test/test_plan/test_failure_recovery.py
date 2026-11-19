@@ -32,7 +32,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from ...plan_running import run_plan
 
@@ -170,7 +170,7 @@ class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
 
     def nodes_to_insert(self, plan_node: GripperIsOpen) -> list[StatechartNode]:
         action = SetGripperAction(
-            configuration=plan_node.end_effector.default_configuration(
+            gripper_configuration=plan_node.end_effector.default_configuration(
                 self.gripper_state
             )
         )
@@ -242,7 +242,7 @@ class CloseGripperBeforeAFailingStep(SequentialInsertion[StepFailingItsFirstRuns
     ) -> list[StatechartNode]:
         return [
             SetGripperAction(
-                configuration=self.end_effector.default_configuration(
+                gripper_configuration=self.end_effector.default_configuration(
                     GripperState.CLOSE
                 )
             )
@@ -257,7 +257,7 @@ def _closed_gripper(end_effector: EndEffector) -> SetGripperAction:
     :return: An action closing the gripper of `end_effector`.
     """
     return SetGripperAction(
-        configuration=end_effector.default_configuration(GripperState.CLOSE)
+        gripper_configuration=end_effector.default_configuration(GripperState.CLOSE)
     )
 
 
@@ -269,13 +269,15 @@ def _pick_up_of_the_milk(
         recovering from a failure with `recovery`, its pick-up, and the milk.
     """
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.right_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.right_arm
+    )
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                target_location=Pose3Dimensional.from_xyz_rpy(
-                    1.5, 2.4, 0.0, reference_frame=world.root
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+                    x=1.5, y=2.4, reference_frame=world.root
                 )
             ),
             HandledOnFailure(handled_node=pick_up, failure_handling_strategy=recovery),

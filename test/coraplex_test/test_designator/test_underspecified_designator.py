@@ -59,7 +59,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
 )
-from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -350,14 +350,10 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     """
     world, robot, extensions = apartment_world_pr2_copy_with_context
     action = a(NavigateAction)(
-        target_location=variable_from(
+        planar_goal_pose=variable_from(
             [
-                Pose3Dimensional.from_xyz_quaternion(
-                    1, -1, 0, reference_frame=world.root
-                ),
-                Pose3Dimensional.from_xyz_quaternion(
-                    2, -1, 0, reference_frame=world.root
-                ),
+                Pose2Dimensional.from_xy_yaw(1, -1, reference_frame=world.root),
+                Pose2Dimensional.from_xy_yaw(2, -1, reference_frame=world.root),
             ]
         ),
     )
@@ -377,14 +373,8 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     world, robot, extensions = apartment_world_pr2_copy_with_context
     extensions = with_grounding(extensions, query_backend=ProbabilisticBackend())
     action = a(NavigateAction)(
-        target_location=a(Pose3Dimensional.from_xyz_rpy)(
-            x=...,
-            y=...,
-            z=0.0,
-            roll=0.0,
-            pitch=0.0,
-            yaw=0.0,
-            reference_frame=robot.root,
+        planar_goal_pose=a(Pose2Dimensional.from_xy_yaw)(
+            x=..., y=..., yaw=0.0, reference_frame=robot.root
         ),
     )
 
@@ -404,14 +394,14 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
     plan_generator = a(Sequence)(
         nodes=[
             a(NavigateAction)(
-                target_location=(
+                planar_goal_pose=(
                     target_locations := variable_from(
                         [
-                            Pose3Dimensional.from_xyz_quaternion(
-                                1, 0, 0, reference_frame=world.root
+                            Pose2Dimensional.from_xy_yaw(
+                                1, 0, reference_frame=world.root
                             ),
-                            Pose3Dimensional.from_xyz_quaternion(
-                                2, 0, 0, reference_frame=world.root
+                            Pose2Dimensional.from_xy_yaw(
+                                2, 0, reference_frame=world.root
                             ),
                         ]
                     )
@@ -419,7 +409,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
             ),
             a(PickUpAction)(
                 arm=variable(Arm, domain=robot.all_arms),
-                grasp=milk.grasp_candidates()[0],
+                grasp_candidate=milk.grasp_candidates()[0],
             ),
         ],
     )
@@ -936,8 +926,8 @@ def test_a_trial_puts_a_differentially_driven_base_at_its_goal(
     copied = trial._copy()
     trial_executor = trial._trial_executor(copied)
     navigation = NavigateAction(
-        target_location=Pose3Dimensional.from_xyz_rpy(
-            2.0, 2.0, 0.0, reference_frame=copied.root
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+            x=2.0, y=2.0, reference_frame=copied.root
         )
     )
 
@@ -950,6 +940,10 @@ def test_a_trial_puts_a_differentially_driven_base_at_its_goal(
 def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
     stretch_apartment_context,
 ) -> None:
+    """
+    A trial of a Stretch reach moves the tool center point in straight lines, as the
+    Stretch does when it runs the plan.
+    """
     world, robot, extensions = stretch_apartment_context
     trial = ActionTrial(
         executor=simulated_executor(extensions),
@@ -958,7 +952,9 @@ def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
     copied = trial._copy()
     trial_executor = trial._trial_executor(copied)
     reach = ReachAction(
-        grasp=copied.get_semantic_annotations_by_type(Handle)[0].grasp_candidates()[0],
+        grasp_candidate=copied.get_semantic_annotations_by_type(Handle)[
+            0
+        ].grasp_candidates()[0],
         arm=copied.get_semantic_annotations_by_type(Stretch)[0].all_arms[0],
     )
 
@@ -969,7 +965,7 @@ def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
         type(node)
         for node in reach.descendants
         if isinstance(node, (CartesianPosition, CartesianPositionStraight))
-        and node.tip_link is tool_frame
+        and node.kinematic_chain.tip is tool_frame
     ] == [CartesianPositionStraight] * 2
     trial.discard()
 
@@ -1002,8 +998,8 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(
     node the run publishes through, which a trial must not try to copy.
     """
     world, robot, executor = debugging_executor
-    stand_where_it_is = robot.root.global_pose
-    action = NavigateAction(target_location=stand_where_it_is)
+    stand_where_it_is = Pose2Dimensional.from_pose(robot.root.global_pose)
+    action = NavigateAction(planar_goal_pose=stand_where_it_is)
     statechart_of(executor, Sequence(nodes=[action]))
     trial = ActionTrial(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor

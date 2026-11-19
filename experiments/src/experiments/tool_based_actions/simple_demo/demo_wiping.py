@@ -12,6 +12,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState, Torso
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Sponge
 from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 from coraplex.robot_plans.actions.composite.tool_based import WipingAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -45,15 +46,15 @@ def main() -> None:
     plan = Sequence(
         nodes=[
             SetGripperAction(
-                configuration=pr2.right_arm.end_effector.default_configuration(
+                gripper_configuration=pr2.right_arm.end_effector.default_configuration(
                     GripperState.CLOSE
                 )
             ),
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                target_location=Pose3Dimensional.from_xyz_rpy(
-                    *BASE_POSITION_XYZ, reference_frame=world.root
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+                    *BASE_POSITION_XYZ[:2], reference_frame=world.root
                 )
             ),
             WipingAction(

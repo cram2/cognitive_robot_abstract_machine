@@ -1,3 +1,9 @@
+"""
+Tests of running motions in a world fetched over ROS 2.
+"""
+
+from __future__ import annotations
+
 import json
 import time
 
@@ -27,6 +33,7 @@ from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def to_and_from_json(
@@ -47,6 +54,10 @@ def to_and_from_json(
 
 
 def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_reset):
+    """
+    A motion avoiding collisions, sent through JSON, runs to its local minimum in a copy
+    of the PR2 world fetched from a world server.
+    """
     pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
     fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
@@ -90,8 +101,9 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
                 Parallel(
                     nodes=[
                         CartesianPose(
-                            root_link=base_footprint,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(
+                                root=base_footprint, tip=r_tip
+                            ),
                             goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),

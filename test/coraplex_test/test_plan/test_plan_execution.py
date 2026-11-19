@@ -220,7 +220,8 @@ def executor_reaching_out_of_range(
         )
     )
     plan = ReachAction(
-        grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=robot_view.right_arm,
     )
     executor = simulated_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))

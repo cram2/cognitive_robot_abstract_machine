@@ -38,6 +38,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
 )
@@ -222,12 +223,12 @@ class MilkTransportDemonstration(RobotDemonstration):
                 nodes=[
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     ParkArmsAction(arms=hsrb.all_arms),
-                    NavigateAction(target_location=taking_pose),
-                    PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
-                    NavigateAction(target_location=self._standing_pose_facing(target)),
-                    PlaceAction(
-                        arm=arm, object_designator=milk, target_location=target
+                    NavigateAction(planar_goal_pose=taking_pose),
+                    PickUpAction(
+                        grasp_candidate=self._grasp_from(taking_pose, milk), arm=arm
                     ),
+                    NavigateAction(planar_goal_pose=self._standing_pose_facing(target)),
+                    PlaceAction(arm=arm, graspable=milk, goal_pose=target),
                     ParkArmsAction(arms=hsrb.all_arms),
                 ]
             )
@@ -268,21 +269,23 @@ class MilkTransportDemonstration(RobotDemonstration):
             reference_frame=world.root,
         )
 
-    def _standing_pose_facing(self, milk_pose: Pose3Dimensional) -> Pose3Dimensional:
+    def _standing_pose_facing(self, milk_pose: Pose3Dimensional) -> Pose2Dimensional:
         """
         :param milk_pose: Where the milk stands or is set down.
         :return: Where the robot's base stands on the floor to reach the milk there,
             :attr:`standing_distance` before it and facing it.
         """
-        return (
-            milk_pose.homogeneous_matrix
-            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-                x=-self.standing_distance, z=-float(milk_pose.z)
-            )
-        ).pose
+        return Pose2Dimensional.from_pose(
+            (
+                milk_pose.homogeneous_matrix
+                @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-self.standing_distance
+                )
+            ).pose
+        )
 
     def _grasp_from(
-        self, standing_pose: Pose3Dimensional, milk: Milk
+        self, standing_pose: Pose2Dimensional, milk: Milk
     ) -> GraspCandidate:
         """
         :param standing_pose: Where the robot stands to take the milk.

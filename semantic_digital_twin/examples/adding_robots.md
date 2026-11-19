@@ -69,7 +69,7 @@ on your robot.
 | :class:`~semantic_digital_twin.robots.robot_parts.Camera` | A sensor body | A single body + optical parameters                 |
 
 :class:`~semantic_digital_twin.robots.robot_parts.MobileBase`, :class:`~semantic_digital_twin.robots.robot_parts.EndEffector`, and :class:`~semantic_digital_twin.robots.robot_parts.Camera` only require a single root body.
-:class:`~semantic_digital_twin.robots.robot_parts.Torso`, :class:`~semantic_digital_twin.robots.robot_parts.Arm`, :class:`~semantic_digital_twin.robots.robot_parts.Neck`, and :class:`~semantic_digital_twin.robots.robot_parts.Finger` are :class:`~semantic_digital_twin.robots.robot_parts.KinematicChain` subclasses and need
+:class:`~semantic_digital_twin.robots.robot_parts.Torso`, :class:`~semantic_digital_twin.robots.robot_parts.Arm`, :class:`~semantic_digital_twin.robots.robot_parts.Neck`, and :class:`~semantic_digital_twin.robots.robot_parts.Finger` are :class:`~semantic_digital_twin.robots.robot_parts.RobotKinematicChain` subclasses and need
 both a **root** and a **tip** body — the framework computes all bodies and
 connections between them automatically.
 
@@ -174,7 +174,7 @@ from semantic_digital_twin.world_description.world_entity import KinematicStruct
 
 
 # %% Fingers 
-# A Finger is a KinematicChain: it needs a root body and a tip body.
+# A Finger is a RobotKinematicChain: it needs a root body and a tip body.
 # Replace the link names with the actual names from your URDF.
 
 @dataclass(eq=False)
@@ -344,7 +344,7 @@ class MyRobotGripper(
 
 ### Arm and Neck
 
-Both are :class:`~semantic_digital_twin.robots.robot_parts.KinematicChain` subclasses: they need a root and a tip.
+Both are :class:`~semantic_digital_twin.robots.robot_parts.RobotKinematicChain` subclasses: they need a root and a tip.
 :class:`Arm[T] <semantic_digital_twin.robots.robot_parts.Arm>` already inherits :class:`HasEndEffector[T] <semantic_digital_twin.robots.robot_part_mixins.HasEndEffector>`, while :class:`Neck[T] <semantic_digital_twin.robots.robot_parts.Neck>`
 inherits from :class:`HasSensors[T] <semantic_digital_twin.robots.robot_part_mixins.HasSensors>`, so don't inherit from those mixins seperately here.
 

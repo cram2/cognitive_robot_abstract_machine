@@ -88,6 +88,7 @@ run(Sequence(nodes=[ParkArmsAction(arms=pr2_view.all_arms),
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.locations.locations import ReachabilityLocation
 from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 location = ReachabilityLocation(
     Pose3Dimensional(reference_frame=world.get_body_by_name("milk.stl")),
@@ -95,7 +96,7 @@ location = ReachabilityLocation(
     context=context,
 )
 
-run(NavigateAction(target_location=location.ground()))
+run(NavigateAction(planar_goal_pose=location.ground()))
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
@@ -148,7 +149,7 @@ location = VisibilityLocation(
     Pose3Dimensional(reference_frame=world.get_body_by_name("milk.stl")), context=context
 )
 
-run(NavigateAction(target_location=location.ground()))
+run(NavigateAction(planar_goal_pose=location.ground()))
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
@@ -183,8 +184,8 @@ from cramph.composites import StatementNode
 from krrood.entity_query_language.factories import a, variable
 
 navigate = a(NavigateAction)(
-    target_location=variable(
-        Pose3Dimensional,
+    planar_goal_pose=variable(
+        Pose2Dimensional,
         domain=ReachabilityLocation(
             Pose3Dimensional(reference_frame=world.get_body_by_name("milk.stl")),
             pr2_view.left_arm,

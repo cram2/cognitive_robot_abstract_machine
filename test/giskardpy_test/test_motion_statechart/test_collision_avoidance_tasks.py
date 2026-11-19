@@ -119,6 +119,7 @@ from ..motion_control_context import (
     SentThroughJSON,
     StatechartOrigin,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @pytest.fixture(
@@ -135,6 +136,10 @@ def statechart_origin(request: pytest.FixtureRequest) -> StatechartOrigin:
 def test_external_collision_avoidance(
     cylinder_bot_world: World, statechart_origin: StatechartOrigin
 ) -> None:
+    """
+    A goal behind an obstacle leaves the cylinder bot outside the buffer zone of the one
+    contact, and the motion leaves no collision consumer behind.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -161,11 +166,10 @@ def test_external_collision_avoidance(
                 ]
             ),
             distance_violated := ExternalCollisionDistanceMonitor(
-                body=robot.root, threshold=0.049
+                body=robot.root, distance_threshold=0.049
             ),
             CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
@@ -189,6 +193,11 @@ def test_external_collision_avoidance(
 
 
 def test_external_collision_avoidance_battle():
+    """
+    Two bots driven at a wall with avoidance weights of different strength: the strong
+    one ends within the buffer zone without passing through the wall, the weak one stays
+    outside the buffer zone.
+    """
     strong_robot_world = World()
     with strong_robot_world.modify_world():
         strong = Body(
@@ -312,16 +321,14 @@ def test_external_collision_avoidance_battle():
                 ]
             ),
             CartesianPose(
-                root_link=map,
-                tip_link=strong,
+                kinematic_chain=KinematicChain(root=map, tip=strong),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=strong
                 ),
                 weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             ),
             CartesianPose(
-                root_link=map,
-                tip_link=weak,
+                kinematic_chain=KinematicChain(root=map, tip=weak),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=weak
                 ),
@@ -358,6 +365,10 @@ def test_external_collision_avoidance_battle():
 def test_external_collision_avoidance_with_weight_above_ca(
     cylinder_bot_world: World, statechart_origin: StatechartOrigin
 ) -> None:
+    """
+    A goal weighted above collision avoidance pushes the bot into the buffer zone of the
+    obstacle, but not into it.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -384,11 +395,10 @@ def test_external_collision_avoidance_with_weight_above_ca(
                 ]
             ),
             distance_violated := ExternalCollisionDistanceMonitor(
-                body=robot.root, threshold=0.0
+                body=robot.root, distance_threshold=0.0
             ),
             CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
@@ -433,8 +443,7 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
         nodes=[
             ExternalCollisionAvoidance(robot=robot),
             cart_goal_reached := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
@@ -486,6 +495,9 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
 
 
 def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
+    """
+    A motion cancelled at its local minimum still leaves no collision consumer behind.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -509,8 +521,7 @@ def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
                 ]
             ),
             CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
@@ -537,11 +548,21 @@ def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
 
 
 def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World):
+    """
+    Two motions run one after another each leave no collision consumer behind.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
 
     def run_motion(goal_x):
+        """
+        Drive the bot to ``goal_x`` while avoiding external collisions, until it reaches
+        a local minimum.
+
+        :param goal_x: Where along x the bot is sent.
+        :return: The executor the motion ran in.
+        """
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
             extensions=[MotionControl()],
@@ -560,8 +581,9 @@ def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World
                     ]
                 ),
                 CartesianPose(
-                    root_link=cylinder_bot_world.root,
-                    tip_link=tip,
+                    kinematic_chain=KinematicChain(
+                        root=cylinder_bot_world.root, tip=tip
+                    ),
                     goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=goal_x, reference_frame=cylinder_bot_world.root
                     ),
@@ -674,6 +696,10 @@ def test_self_collision_avoidance(
 
 
 def test_avoid_collision_go_around_corner(pr2_with_box):
+    """
+    The PR2's right gripper reaches around the corner of a box without coming closer to
+    it than the violated distance, which would cancel the motion.
+    """
     r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
 
@@ -722,8 +748,9 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                 Parallel(
                     nodes=[
                         CartesianPose(
-                            root_link=pr2_with_box.root,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(
+                                root=pr2_with_box.root, tip=r_tip
+                            ),
                             goal_pose=Pose3Dimensional.from_xyz_axis_angle(
                                 x=0.8,
                                 y=-0.38,
@@ -746,7 +773,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                 body=pr2_with_box.get_kinematic_structure_entity_by_name(
                     "r_gripper_palm_link"
                 ),
-                threshold=0.0,
+                distance_threshold=0.0,
             )
         ),
     )
@@ -760,6 +787,10 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
 
 
 def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
+    """
+    The PR2's right arm moves past its left arm without the two touching, which would
+    cancel the motion.
+    """
     VizMarkerPublisher(
         _world=pr2_with_box, node=rclpy_node
     ).with_collision_visualization()
@@ -814,8 +845,9 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
                 Parallel(
                     nodes=[
                         CartesianPose(
-                            root_link=base_footprint,
-                            tip_link=r_tip,
+                            kinematic_chain=KinematicChain(
+                                root=base_footprint, tip=r_tip
+                            ),
                             goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
@@ -830,7 +862,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
     statechart.add_node(
         node=(
             contact := SelfCollisionDistanceMonitor(
-                body_a=r_palm_link, body_b=l_forearm_link, threshold=0.01
+                body_a=r_palm_link, body_b=l_forearm_link, distance_threshold=0.01
             )
         )
     )
@@ -1156,8 +1188,7 @@ def _build_arms_crossing_statechart(
                         )
                     ),
                     CartesianPose(
-                        root_link=base_footprint,
-                        tip_link=r_tip,
+                        kinematic_chain=KinematicChain(root=base_footprint, tip=r_tip),
                         goal_pose=Pose3Dimensional.from_xyz_rpy(
                             0.2, reference_frame=r_tip
                         ),
@@ -1210,6 +1241,9 @@ def test_collisions_are_computed_with_collision_avoidance_node(pr2_with_box):
 
 
 def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
+    """
+    A distance monitor without collision avoidance still has collisions computed for it.
+    """
     executor = _create_counting_executor(pr2_with_box)
     statechart = _build_arms_crossing_statechart(executor, collision_avoidance=False)
     statechart.add_node(
@@ -1217,7 +1251,7 @@ def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
             body=pr2_with_box.get_kinematic_structure_entity_by_name(
                 "r_gripper_palm_link"
             ),
-            threshold=0.0,
+            distance_threshold=0.0,
         )
     )
 
@@ -1316,8 +1350,9 @@ def executor_driving_into_obstacles(
                 Parallel(
                     nodes=[
                         CartesianPose(
-                            root_link=cylinder_bot_world.root,
-                            tip_link=tip,
+                            kinematic_chain=KinematicChain(
+                                root=cylinder_bot_world.root, tip=tip
+                            ),
                             goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 x=1, reference_frame=cylinder_bot_world.root
                             ),
@@ -1391,6 +1426,10 @@ def test_violated_body_pairs_survive_storing_the_history(
 def test_collision_for_robot_with_static_base(
     fix_name, tool_frame_id, robot_type, request, rclpy_node
 ):
+    """
+    A robot with a fixed base reaches towards an obstacle without its gripper
+    penetrating it.
+    """
     world = request.getfixturevalue(fix_name)
     robot = world.get_semantic_annotations_by_type(robot_type)[0]
 
@@ -1423,8 +1462,7 @@ def test_collision_for_robot_with_static_base(
             goal := Parallel(
                 nodes=[
                     CartesianPosition(
-                        root_link=world.root,
-                        tip_link=tool_frame,
+                        kinematic_chain=KinematicChain(root=world.root, tip=tool_frame),
                         goal_point=Point3Dimensional(
                             0.5, 0.5, 1, reference_frame=world.root
                         ),
@@ -1459,6 +1497,10 @@ def test_collision_for_robot_with_static_base(
 def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
     pr2_apartment_world,
 ):
+    """
+    Moving the PR2 into collision in the apartment again and again does not make the
+    later motions slower than the first.
+    """
     world = deepcopy(pr2_apartment_world)
 
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
@@ -1497,8 +1539,7 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
                     ]
                 ),
                 CartesianPose(
-                    root_link=world.root,
-                    tip_link=tool_frame,
+                    kinematic_chain=KinematicChain(root=world.root, tip=tool_frame),
                     goal_pose=body.global_pose,
                 ),
                 ExternalCollisionAvoidance(robot=robot),
@@ -1769,8 +1810,7 @@ def test_attached_self_collision_avoid_stick(
         ),
     )
     cart_goal = CartesianPose(
-        root_link=pr2_world_copy.root,
-        tip_link=left_tip,
+        kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=left_tip),
         goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=0.2, reference_frame=left_tip
         ),
@@ -1811,8 +1851,7 @@ def test_box_overlapping_with_gripper(
         ),
     )
     cart_goal = CartesianPose(
-        root_link=pr2_world_copy.root,
-        tip_link=box,
+        kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=box),
         goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=-0.5, reference_frame=box
         ),
@@ -1852,10 +1891,12 @@ def test_avoid_self_collision_specific_link(
     )
     right_gripper = robot.right_arm.end_effector.bodies_with_collision
     cart_goal = CartesianPose(
-        root_link=pr2_world_copy.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+        kinematic_chain=KinematicChain(
+            root=pr2_world_copy.get_kinematic_structure_entity_by_name(
+                "base_footprint"
+            ),
+            tip=right_tip,
         ),
-        tip_link=right_tip,
         goal_pose=Pose3Dimensional.from_xyz_rpy(0.2, reference_frame=right_tip),
     )
 
@@ -1908,10 +1949,12 @@ def test_get_out_of_self_collision(
         "l_gripper_tool_frame"
     )
     into_collision = CartesianPose(
-        root_link=pr2_world_copy.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+        kinematic_chain=KinematicChain(
+            root=pr2_world_copy.get_kinematic_structure_entity_by_name(
+                "base_footprint"
+            ),
+            tip=left_tip,
         ),
-        tip_link=left_tip,
         goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0.15, reference_frame=left_tip
         ),
@@ -1954,10 +1997,12 @@ def test_attached_two_items(
         "l_gripper_tool_frame"
     )
     grippers_facing = CartesianPose(
-        root_link=pr2_world_copy.get_kinematic_structure_entity_by_name(
-            "torso_lift_link"
+        kinematic_chain=KinematicChain(
+            root=pr2_world_copy.get_kinematic_structure_entity_by_name(
+                "torso_lift_link"
+            ),
+            tip=left_tip,
         ),
-        tip_link=left_tip,
         # The boxes reach 0.2 m out of each gripper, so grippers 0.4 m apart would leave
         # them touching, which violates the collision before avoidance can act.
         goal_pose=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
@@ -2036,16 +2081,18 @@ def test_avoid_collision_box_between_3_boxes(
         pr2_world_copy,
         [
             AlignPlanes(
-                root_link=pr2_world_copy.root,
-                tip_link=box,
+                kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=box),
                 tip_normal=Vector3Dimensional.X(reference_frame=box),
-                goal_normal=Vector3Dimensional.X(reference_frame=pr2_world_copy.root),
+                reference_normal=Vector3Dimensional.X(
+                    reference_frame=pr2_world_copy.root
+                ),
             ),
             AlignPlanes(
-                root_link=pr2_world_copy.root,
-                tip_link=box,
+                kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=box),
                 tip_normal=Vector3Dimensional.Y(reference_frame=box),
-                goal_normal=Vector3Dimensional.Y(reference_frame=pr2_world_copy.root),
+                reference_normal=Vector3Dimensional.Y(
+                    reference_frame=pr2_world_copy.root
+                ),
             ),
             ExternalCollisionAvoidance(robot=robot),
             local_min,
@@ -2082,9 +2129,11 @@ def test_hsr_self_collision_avoidance(
     ).apply_to(hsr_world_copy)
     robot = hsr_world_copy.get_semantic_annotations_by_type(HSRB)[0]
     cart_goal = CartesianPose(
-        root_link=hsr_world_copy.root,
-        tip_link=hsr_world_copy.get_kinematic_structure_entity_by_name(
-            "hand_gripper_tool_frame"
+        kinematic_chain=KinematicChain(
+            root=hsr_world_copy.root,
+            tip=hsr_world_copy.get_kinematic_structure_entity_by_name(
+                "hand_gripper_tool_frame"
+            ),
         ),
         goal_pose=Pose3Dimensional.from_xyz_axis_angle(
             x=0.5,

@@ -20,6 +20,7 @@ import os
 from cramph.context import StatechartContext
 from cramph.executor import SimulationPacer, StatechartExecutor
 from giskardpy.motion_control import MotionControl
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -87,8 +88,7 @@ goal_pose = Pose3Dimensional(
 )
 goal = CartesianPose(
     name="move_to_goal", 
-    root_link=root_link, 
-    tip_link=tip_link, 
+    kinematic_chain=KinematicChain(root=root_link, tip=tip_link),
     goal_pose=goal_pose
 )
 

@@ -50,6 +50,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState, Torso
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from ...plan_running import robot_executor, run_plan, simulated_executor, statechart_of
 from ...statechart_json_round_trip import StatechartSentThroughJSON
@@ -57,13 +58,16 @@ from ...statechart_json_round_trip import StatechartSentThroughJSON
 # %% helpers
 
 
-def _pose_in_front_of_the_robot(world, robot) -> Pose3Dimensional:
+def _pose_in_front_of_the_robot(world, robot) -> Pose2Dimensional:
     """
-    :return: A pose in the world frame, a few centimetres in front of where the robot
-        stands now.
+    :return: A pose on the floor in the world frame, a few centimetres in front of where
+        the robot stands now.
     """
-    return world.transform(
-        Pose3Dimensional.from_xyz_rpy(x=0.05, reference_frame=robot.root), world.root
+    return Pose2Dimensional.from_pose(
+        world.transform(
+            Pose3Dimensional.from_xyz_rpy(x=0.05, reference_frame=robot.root),
+            world.root,
+        )
     )
 
 
@@ -89,7 +93,7 @@ class RecordingLocationInFrontOfTheRobot(Location):
     Whether the torso stood high, once per sampling.
     """
 
-    def candidates(self) -> Iterator[Pose3Dimensional]:
+    def candidates(self) -> Iterator[Pose2Dimensional]:
         torso_high = self.robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
         self.torso_high_when_sampled.append(torso_high.is_achieved())
         yield _pose_in_front_of_the_robot(self.world, self.robot)
@@ -101,6 +105,10 @@ class RecordingLocationInFrontOfTheRobot(Location):
 def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
     pr2_apartment_context,
 ) -> None:
+    """
+    An action grounded in the middle of a sequence runs in the same statechart as the
+    steps around it, which ends once.
+    """
     world, robot, extensions = pr2_apartment_context
     torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
     plan = Sequence(
@@ -108,8 +116,8 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
             torso,
             StatementNode(
                 statement=a(NavigateAction)(
-                    target_location=variable(
-                        Pose3Dimensional,
+                    planar_goal_pose=variable(
+                        Pose2Dimensional,
                         domain=[_pose_in_front_of_the_robot(world, robot)],
                     )
                 )
@@ -131,6 +139,10 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
 def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before_left(
     pr2_apartment_context,
 ) -> None:
+    """
+    An underspecified action is grounded in the world as the steps before it left it,
+    not as it was when the plan was built.
+    """
     world, robot, extensions = pr2_apartment_context
     torso_high = robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
     assert not torso_high.is_achieved()
@@ -141,7 +153,7 @@ def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
                 statement=a(NavigateAction)(
-                    target_location=variable(Pose3Dimensional, domain=location)
+                    planar_goal_pose=variable(Pose2Dimensional, domain=location)
                 )
             ),
         ]
@@ -184,13 +196,18 @@ def test_actions_with_the_same_parameters_are_different_nodes() -> None:
 def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     pr2_apartment_context,
 ) -> None:
+    """
+    The pick-up to the left of a place in a sequence is the one preceding it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
-        object_designator=milk,
-        target_location=Pose3Dimensional.from_xyz_rpy(
+        graspable=milk,
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
             0.8, -1.9, 0.7, reference_frame=world.root
         ),
     )
@@ -207,13 +224,19 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
 def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pause around the place makes the pick-up a sibling of its parent, which still
+    counts as preceding it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
-        object_designator=milk,
-        target_location=Pose3Dimensional.from_xyz_rpy(
+        graspable=milk,
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
             0.8, -1.9, 0.7, reference_frame=world.root
         ),
     )
@@ -288,9 +311,11 @@ def test_a_sent_plan_compiles_without_what_its_actions_read_to_expand(
             nodes=[
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    target_location=_pose_in_front_of_the_robot(world, robot)
+                    planar_goal_pose=_pose_in_front_of_the_robot(world, robot)
                 ),
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
+                PickUpAction(
+                    grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+                ),
             ]
         ),
     )
@@ -313,7 +338,7 @@ def test_an_underspecified_node_is_sent_as_a_node_choosing_its_child(
     itself, and not the statement it is grounded from.
     """
     world, robot, extensions = pr2_apartment_context
-    node = StatementNode(statement=a(NavigateAction)(target_location=...))
+    node = StatementNode(statement=a(NavigateAction)(planar_goal_pose=...))
 
     received = from_json(json.loads(json.dumps(to_json(node))))
 
@@ -324,6 +349,10 @@ def test_an_underspecified_node_is_sent_as_a_node_choosing_its_child(
 def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions(
     pr2_apartment_context, monkeypatch
 ) -> None:
+    """
+    A plan run on the robot is sent once, with the executor's chooser grounding its
+    actions.
+    """
     world, robot, extensions = pr2_apartment_context
     giskard = GiskardRecordingTheGoal()
     monkeypatch.setattr(
@@ -334,8 +363,8 @@ def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
                 statement=a(NavigateAction)(
-                    target_location=variable(
-                        Pose3Dimensional,
+                    planar_goal_pose=variable(
+                        Pose2Dimensional,
                         domain=[_pose_in_front_of_the_robot(world, robot)],
                     )
                 )
@@ -467,6 +496,10 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
 def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empty(
     pr2_apartment_context, monkeypatch
 ) -> None:
+    """
+    An underspecified action left without candidates on the robot fails, naming itself
+    as empty.
+    """
     world, robot, extensions = pr2_apartment_context
     monkeypatch.setattr(
         executors,
@@ -475,7 +508,7 @@ def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empt
     )
     plan = StatementNode(
         statement=a(NavigateAction)(
-            target_location=variable(Pose3Dimensional, domain=[])
+            planar_goal_pose=variable(Pose2Dimensional, domain=[])
         )
     )
     executor = robot_executor(extensions)
@@ -499,7 +532,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     sent.add_node(
         node=(
             action := SetGripperAction(
-                configuration=robot.left_arm.end_effector.default_configuration(
+                gripper_configuration=robot.left_arm.end_effector.default_configuration(
                     GripperState.OPEN
                 )
             )
@@ -529,7 +562,8 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     sent.add_node(
         node=(
             action := FaceAndLookAtAction(
-                face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
+                face_at=FaceAtAction(look_target=target),
+                look_at=LookAtAction(look_target=target),
             )
         )
     )

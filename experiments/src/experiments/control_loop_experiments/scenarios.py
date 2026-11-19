@@ -69,6 +69,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 # %% how much the measurement records
@@ -363,10 +364,12 @@ class CartesianGoalScenario(BenchmarkScenario):
         motion_statechart.add_node(
             node=(
                 cartesian_goal := CartesianPose(
-                    root_link=robot.get_kinematic_structure_entity(
-                        name="base_footprint"
+                    kinematic_chain=KinematicChain(
+                        root=robot.get_kinematic_structure_entity(
+                            name="base_footprint"
+                        ),
+                        tip=tip,
                     ),
-                    tip_link=tip,
                     goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                         pos_x=-0.2, reference_frame=tip
                     ),
@@ -405,9 +408,11 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
         motion_statechart = Statechart(context=robot.api.context)
         motion_statechart.add_node(
             node=CartesianPose(
-                root_link=robot.default_root,
-                tip_link=robot.get_kinematic_structure_entity(
-                    name="r_gripper_tool_frame"
+                kinematic_chain=KinematicChain(
+                    root=robot.default_root,
+                    tip=robot.get_kinematic_structure_entity(
+                        name="r_gripper_tool_frame"
+                    ),
                 ),
                 goal_pose=Pose3Dimensional.from_xyz_axis_angle(
                     x=0.8,
@@ -466,8 +471,9 @@ class ApartmentDrivingScenario(BenchmarkScenario):
         motion_statechart.add_node(
             node=(
                 cartesian_goal := CartesianPose(
-                    root_link=robot.get_kinematic_structure_entity(name="map"),
-                    tip_link=base,
+                    kinematic_chain=KinematicChain(
+                        root=robot.get_kinematic_structure_entity(name="map"), tip=base
+                    ),
                     goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.4, y=-2.0, reference_frame=base
                     ),
@@ -520,23 +526,25 @@ class KitchenPointingScenario(BenchmarkScenario):
                 sequence := Sequence(
                     nodes=[
                         Pointing(
-                            root_link=map_frame,
-                            tip_link=camera,
+                            kinematic_chain=KinematicChain(root=map_frame, tip=camera),
                             goal_point=handle_point,
                             pointing_axis=pointing_axis,
                         ),
                         Parallel(
                             nodes=[
                                 Pointing(
-                                    root_link=map_frame,
-                                    tip_link=camera,
+                                    kinematic_chain=KinematicChain(
+                                        root=map_frame, tip=camera
+                                    ),
                                     goal_point=handle_point,
                                     pointing_axis=pointing_axis,
                                 ),
                                 CartesianPose(
-                                    root_link=map_frame,
-                                    tip_link=robot.get_kinematic_structure_entity(
-                                        name="base_footprint"
+                                    kinematic_chain=KinematicChain(
+                                        root=map_frame,
+                                        tip=robot.get_kinematic_structure_entity(
+                                            name="base_footprint"
+                                        ),
                                     ),
                                     goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
                                         y=2.0,
@@ -591,8 +599,10 @@ class LongSequenceScenario(BenchmarkScenario):
         ]
         waypoints = [
             CartesianPose(
-                root_link=robot.get_kinematic_structure_entity(name="base_footprint"),
-                tip_link=tips[index % len(tips)],
+                kinematic_chain=KinematicChain(
+                    root=robot.get_kinematic_structure_entity(name="base_footprint"),
+                    tip=tips[index % len(tips)],
+                ),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tips[index % len(tips)]
                 ),
@@ -650,8 +660,10 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
                 for _ in range(self.instant_steps_per_waypoint)
             ]
             waypoint = CartesianPose(
-                root_link=robot.get_kinematic_structure_entity(name="base_footprint"),
-                tip_link=tip,
+                kinematic_chain=KinematicChain(
+                    root=robot.get_kinematic_structure_entity(name="base_footprint"),
+                    tip=tip,
+                ),
                 goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tip
                 ),

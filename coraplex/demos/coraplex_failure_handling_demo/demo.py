@@ -246,7 +246,7 @@ class CheckGraspBeforeAttaching(SequentialInsertion[PickUpAction]):
         return [
             GraspCheck(
                 name="grasp check",
-                body=plan_node.grasp.graspable.root,
+                body=plan_node.grasp_candidate.graspable.root,
                 gripper=plan_node.arm.end_effector,
             )
         ]
@@ -281,8 +281,8 @@ class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
         ][-1]
 
     def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
-        approach = plan_node.grasp.world_T_grasp.to_np()[:3, 0]
-        body = plan_node.grasp.graspable.root
+        approach = plan_node.grasp_candidate.world_T_grasp.to_np()[:3, 0]
+        body = plan_node.grasp_candidate.graspable.root
         return [
             Nudge(
                 name="nudge",
@@ -321,7 +321,7 @@ class OpenGripperBeforeReading(SequentialInsertion[JointReading]):
         return [
             SetGripperAction(
                 name="open gripper",
-                configuration=self.end_effector.default_configuration(
+                gripper_configuration=self.end_effector.default_configuration(
                     GripperState.OPEN
                 ),
             )
@@ -454,15 +454,15 @@ class FailureHandlingDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    target_location=Pose2Dimensional(
+                    planar_goal_pose=Pose2Dimensional(
                         position=self.counter_stand.position,
                         yaw=self.counter_stand.yaw,
                         reference_frame=world.root,
-                    ).pose
+                    )
                 ),
                 SetGripperAction(
                     name="close gripper",
-                    configuration=end_effector.default_configuration(
+                    gripper_configuration=end_effector.default_configuration(
                         GripperState.CLOSE
                     ),
                 ),
@@ -485,7 +485,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
                     name="milk is picked up",
                     handled_node=PickUpAction(
                         name="pick up milk",
-                        grasp=milk.grasp_candidates()[0],
+                        grasp_candidate=milk.grasp_candidates()[0],
                         arm=arm,
                     ),
                     failure_handling_strategy=RetryFailedNode(

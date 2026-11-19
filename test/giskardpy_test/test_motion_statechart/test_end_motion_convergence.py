@@ -1,3 +1,9 @@
+"""
+Tests of how a motion comes to its end.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -8,9 +14,14 @@ from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def test_end_motion_abruptness(cylinder_bot_world: World):
+    """
+    Ends a motion of the cylinder bot and prints how fast the bot still moves when the
+    statechart ends.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
 
     executor = StatechartExecutor(
@@ -19,12 +30,11 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
     )
     motion_statechart = Statechart(context=executor.context)
     goal = CartesianPose(
-        root_link=cylinder_bot_world.root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
         goal_pose=Pose3Dimensional.from_xyz_rpy(
             x=1, reference_frame=cylinder_bot_world.root
         ),
-        translation_threshold=0.01,
+        position_threshold=0.01,
     )
     motion_statechart.add_node(node=goal)
     end = EndMotion.when_true(node=goal)
