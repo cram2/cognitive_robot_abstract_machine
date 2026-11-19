@@ -3,6 +3,8 @@ Tests of which world updates Giskard and its clients apply, when, and how they t
 the other side caught up with.
 """
 
+from __future__ import annotations
+
 import json
 import time
 from dataclasses import dataclass, field

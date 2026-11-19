@@ -2,6 +2,8 @@
 The messages the synchronizers of worlds exchange over ROS 2 topics.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, fields
 from enum import StrEnum
 from uuid import UUID

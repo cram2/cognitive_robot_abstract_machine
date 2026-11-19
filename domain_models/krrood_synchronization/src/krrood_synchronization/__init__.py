@@ -3,4 +3,6 @@ Keeping copies of a model in different processes in step: the streams of message
 publish, and the record of how far each copy caught up with every publisher.
 """
 
-from ._version import __version__
+from __future__ import annotations
+
+from krrood_synchronization._version import __version__

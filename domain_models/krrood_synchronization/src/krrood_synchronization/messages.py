@@ -75,7 +75,7 @@ class MessageOrigin(SubclassJSONSerializer):
         )
 
     @memoize
-    def to_json(self, **kwargs) -> dict[str, Any]:
+    def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
         :meth:`SubclassJSONSerializer.to_json`, computed once, since every message of
         the stream carries the same origin.
@@ -83,7 +83,7 @@ class MessageOrigin(SubclassJSONSerializer):
         return DataclassJSONSerializer.to_json(instance=self, **kwargs)
 
     @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         The inverse of :meth:`to_json`.
         """

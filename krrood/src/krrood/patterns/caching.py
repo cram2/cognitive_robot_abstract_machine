@@ -1,3 +1,7 @@
+"""
+Caches of the results of function calls, kept per key or per receiver of the call.
+"""
+
 from __future__ import annotations
 
 import threading
@@ -170,7 +174,7 @@ class MemoizationCache:
     """
 
     @classmethod
-    def of(cls, *, owner: Any, function_name: str) -> MemoizationCache:
+    def find_or_create(cls, *, owner: Any, function_name: str) -> MemoizationCache:
         """
         Returns the owner's cache, creating it on first use.
 
@@ -288,12 +292,16 @@ def _wrap_with_memoization(
 
     @wraps(function)
     def wrapper(owner: Any, *arguments: Any, **keyword_arguments: Any) -> Any:
+        """
+        The result of ``function`` for ``owner`` and these arguments, computed on the
+        first such call and taken from the owner's cache afterwards.
+        """
         key = MemoizationKey(
             function=function,
             arguments=arguments,
             keyword_arguments=frozenset(keyword_arguments.items()),
         )
-        entry = MemoizationCache.of(
+        entry = MemoizationCache.find_or_create(
             owner=owner, function_name=function.__name__
         ).entry_for(key=key)
         return resolve(

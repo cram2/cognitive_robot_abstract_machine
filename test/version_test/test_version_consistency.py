@@ -1,3 +1,9 @@
+"""
+Tests that every package of the workspace has the version of the repository.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 PACKAGES = [
