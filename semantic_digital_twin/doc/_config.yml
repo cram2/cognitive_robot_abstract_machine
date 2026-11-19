@@ -28,6 +28,8 @@ sphinx:
   config:
     bibtex_bibfiles:
       - references.bib
+    bibtex_reference_style: author_year
+    bibtex_default_style: plain
     # AutoAPI configuration
     autoapi_dirs:
       - ../src

@@ -1369,8 +1369,9 @@ class TestArticulateGraspedMechanism:
         # Tighten again, this time commanding how far the cap must travel back down
         # the thread instead of how far it must rotate.
         unscrew_travel_distance = float(np.linalg.norm(cap_translation))
-        tightened_goal_joint_state = unscrew_goal - unscrew_travel_distance / float(
-            root_C_screw.screw_axis.linear_velocity.norm()
+        tightened_goal_joint_state = (
+            unscrew_goal
+            - root_C_screw.position_for_translation(distance=unscrew_travel_distance)
         )
 
         executor = StatechartExecutor(

@@ -2570,7 +2570,8 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
     at the origin of the reference frame moves, both along that frame's axes and per
     unit of the parameter they are taken with respect to, usually time. Unlike a
-    :class:`Displacement`, it is a velocity (Lynch and Park, *Modern Robotics*, §3.3.2).
+    :class:`Displacement`, it is a velocity (Lynch and Park, `Modern Robotics, section
+    3.3.2 <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=115>`__).
     """
 
     def __init__(
@@ -2652,7 +2653,9 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :return: The unit direction of the twist's screw axis: that of the angular
             velocity, or of the linear velocity for a twist that does not turn (Lynch
-            and Park, *Modern Robotics*, §3.3.2.2). The zero vector for a zero twist.
+            and Park, `Modern Robotics, section 3.3.2.2
+            <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=121>`__). The
+            zero vector for a zero twist.
         """
         angular_velocity = self.angular_velocity
         linear_velocity = self.linear_velocity

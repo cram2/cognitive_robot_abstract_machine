@@ -23,6 +23,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import (
     ScrewAxisOffConnectionOriginError,
+    ScrewAxisWithoutTranslationError,
     UnnormalizedScrewAxisError,
 )
 from krrood_spatial_math.spatial_types import (
@@ -221,14 +222,18 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
 class ScrewAxisConnection(ActiveConnection1DOF):
     """
     Moves the child along a screw axis through the origin of the connection frame, in
-    proportion to the position, so hinges, slides and screws differ only in their
-    :attr:`screw_axis`. :attr:`parent_T_connection_expression` places the axis.
+    proportion to the position, so revolute, prismatic and helical connections differ
+    only in their :attr:`screw_axis`.
+
+    :attr:`parent_T_connection_expression` places the axis.
     """
 
     screw_axis: Twist
     """
     The twist of the child per unit of position in the connection frame, normalized
-    (Lynch and Park, *Modern Robotics*, Definition 3.24), through the frame's origin.
+    as a screw axis (Lynch and Park, `Modern Robotics, Definition 3.24
+    <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122>`__), through the
+    frame's origin.
 
     .. warning:: Set it only before the connection is added to a world: a later
         assignment is not recorded, published or rolled back. Replace the connection.
@@ -258,7 +263,7 @@ class ScrewAxisConnection(ActiveConnection1DOF):
     def create_revolute_screw_axis(cls, *, axis: Vector3) -> Twist:
         """
         :param axis: The unit vector the child rotates about, in the connection frame.
-        :return: The screw axis of a hinge, such as a door's.
+        :return: The screw axis of a revolute connection, such as a door's hinge.
         """
         return Twist(angular_velocity=axis)
 
@@ -267,7 +272,7 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         """
         :param axis: The unit vector the child translates along, in the connection
             frame.
-        :return: The screw axis of a slide, such as a drawer's.
+        :return: The screw axis of a prismatic connection, such as a drawer's.
         """
         return Twist(linear_velocity=axis)
 
@@ -277,8 +282,11 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         :param axis: The unit vector the child rotates about and translates along, in
             the connection frame.
         :param pitch: How far the child advances along ``axis`` per revolution, in
-            meters; negative for a left-handed thread.
-        :return: The screw axis of a thread, such as a bottle cap's.
+            meters, as the `pitch of a single-start thread
+            <https://en.wikipedia.org/wiki/Screw_thread#Lead,_pitch,_and_starts>`__;
+            negative for a left-handed thread. Lynch and Park's pitch is per radian:
+            ``pitch / (2 * pi)``.
+        :return: The screw axis of a helical connection, such as a bottle cap's.
         """
         return Twist(
             angular_velocity=axis, linear_velocity=axis * (pitch / (2 * np.pi))
@@ -354,6 +362,22 @@ class ScrewAxisConnection(ActiveConnection1DOF):
             angle=self.screw_axis.angular_velocity.norm() * position,
             child_frame=self.child,
         )
+
+    def position_for_translation(self, *, distance: float) -> float:
+        """
+        :param distance: How far the child is to advance along the direction of the
+            screw axis, in meters; negative to move it back.
+        :return: The position at which the child has advanced ``distance`` from its pose
+            at position zero, which is also the change of position that advances it by
+            ``distance``.
+        :raises ScrewAxisWithoutTranslationError: if the child only rotates.
+        """
+        if not self._translates_child:
+            raise ScrewAxisWithoutTranslationError(screw_axis=self.screw_axis)
+        translation_per_position = self.screw_axis.linear_velocity.dot(
+            self.screw_axis.screw_axis_direction
+        )
+        return distance / float(translation_per_position)
 
     @property
     def behaves_like_a_revolute_connection(self) -> bool:

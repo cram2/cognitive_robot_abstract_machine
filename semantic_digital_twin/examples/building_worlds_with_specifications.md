@@ -67,7 +67,6 @@ import numpy as np
 
 from semantic_digital_twin.world import World
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from krrood_spatial_math.spatial_types import Twist
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ScrewAxisConnection,
@@ -285,9 +284,10 @@ Every entity specification carries an optional `connection_specification`; when 
 `spawn` attaches the entity with a fixed connection. Set it to give the entity a degree of freedom.
 A `ScrewAxisConnectionSpecification` requires a `screw_axis`, and optionally accepts a `multiplier`, an
 `offset`, and `dof_limits`. The `screw_axis` is a `Twist`: how fast the child rotates and translates per
-unit of position. `Twist(angular_velocity=axis)` makes a hinge, `Twist(linear_velocity=axis)` a slide, and
-`Twist(angular_velocity=axis, linear_velocity=axis * (pitch / (2 * np.pi)))` a thread, whose `pitch` is the
-distance between adjacent threads along the axis, which is what couples its rotation to its translation.
+unit of position. `ScrewAxisConnection.create_revolute_screw_axis(axis=axis)` builds the screw axis of a
+revolute connection, `create_prismatic_screw_axis(axis=axis)` that of a prismatic connection, and
+`create_helical_screw_axis(axis=axis, pitch=pitch)` that of a helical one, such as a thread.
+[Screw axis connections](screw_axis_connections.md) explains the screw axis and these connections.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
@@ -299,7 +299,7 @@ drawer = BodySpecification.box(
     name="drawer",
     scale=Scale(0.4, 0.5, 0.2),
     connection_specification=ScrewAxisConnectionSpecification(
-        screw_axis=Twist(linear_velocity=Vector3.Z())
+        screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z())
     ),
 ).spawn(world)
 
@@ -308,8 +308,8 @@ print("Drawer is attached by a", type(drawer.parent_connection).__name__)
 ```
 
 ```{warning}
-An active connection has no meaningful default axis, so a `ScrewAxisConnectionSpecification` without an
-`axis` cannot be constructed.
+An active connection has no meaningful default motion, so a `ScrewAxisConnectionSpecification` without a
+`screw_axis` cannot be constructed.
 ```
 
 (connecting-existing-entities)=
@@ -400,7 +400,9 @@ drawer = SemanticAnnotationWithRootSpecification(
     root_specification=BodySpecification.box(
         "drawer",
         Scale(0.4, 0.5, 0.2),
-        connection_specification=ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X())),
+        connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
+        ),
     ),
 ).spawn(world)
 
@@ -579,7 +581,8 @@ door = Door.get_annotation_specification(
     "door",
     Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.03, 1, 2)),
     parent_connection_specification=ScrewAxisConnectionSpecification(
-        screw_axis=Twist(angular_velocity=Vector3.Z()), connection_T_child=hinge_T_door
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        connection_T_child=hinge_T_door,
     ),
 ).spawn(world)
 assert door.movable_joint.behaves_like_a_revolute_connection

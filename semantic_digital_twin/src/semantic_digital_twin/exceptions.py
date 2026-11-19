@@ -889,6 +889,28 @@ class ScrewAxisOffConnectionOriginError(UsageError):
         )
 
 
+@dataclass(kw_only=True)
+class ScrewAxisWithoutTranslationError(UsageError):
+    """
+    Raised when a translation is asked of a screw axis connection that only rotates its
+    child, so that no position advances the child along the axis.
+    """
+
+    screw_axis: Twist
+    """
+    The screw axis of the connection.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} has no "
+            f"linear velocity, so the child never translates along it."
+        )
+
+    def suggest_correction(self) -> str:
+        return "give the rotation as a position in radians instead."
+
+
 @dataclass
 class MissingURDFJointAxisError(UsageError):
     """

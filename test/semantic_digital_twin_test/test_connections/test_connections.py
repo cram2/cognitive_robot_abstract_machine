@@ -13,6 +13,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.exceptions import (
     ScrewAxisOffConnectionOriginError,
+    ScrewAxisWithoutTranslationError,
     UnnormalizedScrewAxisError,
 )
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
@@ -896,3 +897,73 @@ def test_screw_axis_connection_rejects_a_screw_axis_off_the_connection_origin(
                 angular_velocity=Vector3.Z(), linear_velocity=Vector3(0, -0.4, 0)
             ),
         )
+
+
+# %% position for a translation along the screw axis
+
+
+@pytest.mark.parametrize(
+    "screw_axis",
+    [
+        ScrewAxisConnection.create_prismatic_screw_axis(
+            axis=Vector3.unit_vector(1, 2, 2)
+        ),
+        ScrewAxisConnection.create_helical_screw_axis(
+            axis=Vector3.unit_vector(1, 2, 2), pitch=0.02
+        ),
+        ScrewAxisConnection.create_helical_screw_axis(
+            axis=Vector3.unit_vector(1, 2, 2), pitch=-0.02
+        ),
+    ],
+    ids=["prismatic", "right-handed helical", "left-handed helical"],
+)
+def test_position_for_translation_advances_the_child_by_that_distance(
+    world_with_two_bodies, screw_axis
+):
+    """
+    Moving to the position returned for a distance advances the child that far along the
+    direction of the screw axis, whatever the multiplier and offset.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            screw_axis=screw_axis,
+            multiplier=2.0,
+            offset=0.3,
+        )
+        world.add_connection(connection)
+    distance = 0.05
+
+    connection.position = 0
+    parent_T_child_before = world.compute_forward_kinematics_np(root=parent, tip=child)
+    connection.position = connection.position_for_translation(distance=distance)
+    parent_T_child_after = world.compute_forward_kinematics_np(root=parent, tip=child)
+
+    assert_allclose(
+        parent_T_child_after[:3, 3] - parent_T_child_before[:3, 3],
+        distance * screw_axis.screw_axis_direction.to_np()[:3],
+        atol=1e-9,
+    )
+
+
+def test_position_for_translation_of_a_revolute_connection_raises(
+    world_with_two_bodies,
+):
+    """
+    A revolute connection never translates its child, so no position advances it.
+    """
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        )
+        world.add_connection(connection)
+
+    with pytest.raises(ScrewAxisWithoutTranslationError):
+        connection.position_for_translation(distance=0.05)
