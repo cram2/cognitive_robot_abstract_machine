@@ -1,3 +1,9 @@
+"""
+Symbolic spatial types, such as points, vectors, rotations, transformations, poses,
+displacements, twists and screw axes, that carry the Cartesian frames they are
+expressed in.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -11,6 +17,7 @@ from typing_extensions import Any, overload, Self, Callable, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
     UnsupportedOperationError,
@@ -132,9 +139,13 @@ class SpatialType(ValueInCartesianFrame3D, ABC):
         """
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        """
+        Extends :meth:`SubclassJSONSerializer._from_json` by reading a constant value
+        from its numbers and a symbolic one from its expression graph.
+        """
         if sm.SymbolicMathJSONKey.EXPRESSION not in data:
-            return cls._from_constant_json(data, **kwargs)
+            return cls._from_constant_json(data=data, **kwargs)
         result = sm.ExpressionGraph.from_json(
             data=data[sm.SymbolicMathJSONKey.EXPRESSION], **kwargs
         ).to_expression(expression_type=cls)
@@ -154,7 +165,7 @@ class SpatialType(ValueInCartesianFrame3D, ABC):
 
     @classmethod
     @abstractmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         :param data: The json of a constant value, as :meth:`_constant_to_json` wrote it.
         :param kwargs: The kwargs of the ``_from_json`` that is reading it.
@@ -2481,8 +2492,107 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return RotationMatrix.from_axis_angle(self)
 
 
-@dataclass(eq=False, init=False, repr=False)
-class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
+    """
+    Six numbers made of two vectors given along the axes of the same reference frame:
+    the first vector in the upper three entries, the second in the lower three.
+    """
+
+    def __init__(
+        self,
+        *,
+        first_vector: Vector3 | None,
+        second_vector: Vector3 | None,
+        reference_frame: CartesianFrame3D | None,
+    ) -> None:
+        """
+        :param first_vector: The upper three entries; zero if None.
+        :param second_vector: The lower three entries; zero if None.
+        :param reference_frame: The frame along whose axes both vectors are given.
+        """
+        if first_vector is None:
+            first_vector = Vector3()
+        if second_vector is None:
+            second_vector = Vector3()
+        self.casadi_sx = sm.to_sx(
+            [
+                first_vector.x,
+                first_vector.y,
+                first_vector.z,
+                second_vector.x,
+                second_vector.y,
+                second_vector.z,
+            ]
+        )
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    @classproperty
+    @abstractmethod
+    def vector_names(cls) -> type[StrEnum]:
+        """
+        :return: The names of the two vectors in the order they are stored, which are
+            both the keywords of the constructor and the keys of the json.
+        """
+
+    def _verify_type(self) -> None:
+        if self.shape != (6, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        first_name, second_name = cls.vector_names
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            **{
+                first_name: Vector3(*data[first_name]),
+                second_name: Vector3(*data[second_name]),
+            },
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        first_name, second_name = self.vector_names
+        return {
+            first_name: self._first_vector.to_np()[:3].tolist(),
+            second_name: self._second_vector.to_np()[:3].tolist(),
+        }
+
+    @property
+    def _first_vector(self) -> Vector3:
+        """
+        :return: The vector in the upper three entries.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def _second_vector(self) -> Vector3:
+        """
+        :return: The vector in the lower three entries.
+        """
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
+
+
+class DisplacementVector(StrEnum):
+    """
+    The two vectors of a :class:`Displacement`, in the order they are stored.
+    """
+
+    TRANSLATION = "translation"
+    ROTATION_VECTOR = "rotation_vector"
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class Displacement(VectorPair):
     """
     A rigid-body displacement: the transformation that rotates a body by
     :attr:`rotation_vector` about its origin and moves that origin by
@@ -2492,10 +2602,11 @@ class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
+        *,
         translation: Vector3 | None = None,
         rotation_vector: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
-    ):
+    ) -> None:
         """
         :param translation: Where the body's origin ended up, relative to where it
             started, in meters. Defaults to no translation.
@@ -2503,45 +2614,15 @@ class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             turned by in radians. Defaults to no rotation.
         :param reference_frame: The frame along whose axes the body moved.
         """
-        if translation is None:
-            translation = Vector3()
-        if rotation_vector is None:
-            rotation_vector = Vector3()
-        self.casadi_sx = sm.to_sx(
-            [
-                translation.x,
-                translation.y,
-                translation.z,
-                rotation_vector.x,
-                rotation_vector.y,
-                rotation_vector.z,
-            ]
-        )
-        self.reference_frame = reference_frame
-        super().__post_init__()
-
-    def _verify_type(self):
-        if self.shape != (6, 1):
-            raise WrongDimensionsError(
-                expected_dimensions=(6, 1), actual_dimensions=self.shape
-            )
-
-    @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        reference_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.REFERENCE, **kwargs
-        )
-        return cls(
-            translation=Vector3(*data["translation"]),
-            rotation_vector=Vector3(*data["rotation_vector"]),
+        super().__init__(
+            first_vector=translation,
+            second_vector=rotation_vector,
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "translation": self.translation.to_np()[:3].tolist(),
-            "rotation_vector": self.rotation_vector.to_np()[:3].tolist(),
-        }
+    @classproperty
+    def vector_names(cls) -> type[DisplacementVector]:
+        return DisplacementVector
 
     @property
     def translation(self) -> Vector3:
@@ -2549,9 +2630,7 @@ class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: Where the body's origin ended up, relative to where it started, in
             meters.
         """
-        return Vector3(
-            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
-        )
+        return self._first_vector
 
     @property
     def rotation_vector(self) -> Vector3:
@@ -2559,13 +2638,20 @@ class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The axis the body turned around, scaled by the angle it turned by in
             radians.
         """
-        return Vector3(
-            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
-        )
+        return self._second_vector
 
 
-@dataclass(eq=False, init=False, repr=False)
-class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+class TwistVector(StrEnum):
+    """
+    The two vectors of a :class:`Twist`, in the order they are stored.
+    """
+
+    ANGULAR_VELOCITY = "angular_velocity"
+    LINEAR_VELOCITY = "linear_velocity"
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class Twist(VectorPair):
     """
     A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
     at the origin of the reference frame moves, both along that frame's axes and per
@@ -2575,10 +2661,11 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
+        *,
         angular_velocity: Vector3 | None = None,
         linear_velocity: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
-    ):
+    ) -> None:
         """
         :param angular_velocity: The axis the body turns around, scaled by how fast it
             turns, in radians per unit of the parameter. Defaults to no turning.
@@ -2587,45 +2674,15 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             standing still.
         :param reference_frame: The frame along whose axes both velocities are given.
         """
-        if angular_velocity is None:
-            angular_velocity = Vector3()
-        if linear_velocity is None:
-            linear_velocity = Vector3()
-        self.casadi_sx = sm.to_sx(
-            [
-                angular_velocity.x,
-                angular_velocity.y,
-                angular_velocity.z,
-                linear_velocity.x,
-                linear_velocity.y,
-                linear_velocity.z,
-            ]
-        )
-        self.reference_frame = reference_frame
-        super().__post_init__()
-
-    def _verify_type(self):
-        if self.shape != (6, 1):
-            raise WrongDimensionsError(
-                expected_dimensions=(6, 1), actual_dimensions=self.shape
-            )
-
-    @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        reference_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.REFERENCE, **kwargs
-        )
-        return cls(
-            angular_velocity=Vector3(*data["angular_velocity"]),
-            linear_velocity=Vector3(*data["linear_velocity"]),
+        super().__init__(
+            first_vector=angular_velocity,
+            second_vector=linear_velocity,
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "angular_velocity": self.angular_velocity.to_np()[:3].tolist(),
-            "linear_velocity": self.linear_velocity.to_np()[:3].tolist(),
-        }
+    @classproperty
+    def vector_names(cls) -> type[TwistVector]:
+        return TwistVector
 
     @property
     def angular_velocity(self) -> Vector3:
@@ -2633,9 +2690,7 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The axis the body turns around, scaled by how fast it turns, in radians
             per unit of the parameter.
         """
-        return Vector3(
-            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
-        )
+        return self._first_vector
 
     @property
     def linear_velocity(self) -> Vector3:
@@ -2643,13 +2698,20 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: How fast the point of the body at the origin of the reference frame
             moves, in meters per unit of the parameter.
         """
-        return Vector3(
-            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
-        )
+        return self._second_vector
 
 
-@dataclass(eq=False, init=False, repr=False)
-class ScrewAxis(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+class ScrewAxisVector(StrEnum):
+    """
+    The two vectors of a :class:`ScrewAxis`, in the order they are stored.
+    """
+
+    ROTATION_PER_UNIT_POSITION = "rotation_per_unit_position"
+    TRANSLATION_PER_UNIT_POSITION = "translation_per_unit_position"
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class ScrewAxis(VectorPair):
     """
     How a rigid body's pose changes per unit of a position that moves it along a screw
     axis: the axis's line, the pitch along it and the unit of the position (Lynch and
@@ -2659,10 +2721,11 @@ class ScrewAxis(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
+        *,
         rotation_per_unit_position: Vector3 | None = None,
         translation_per_unit_position: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
-    ):
+    ) -> None:
         """
         :param rotation_per_unit_position: The axis the body turns around, scaled by the
             angle it turns by per unit of position, in radians. Defaults to no turning.
@@ -2671,51 +2734,15 @@ class ScrewAxis(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             Defaults to no moving.
         :param reference_frame: The frame along whose axes both parts are given.
         """
-        if rotation_per_unit_position is None:
-            rotation_per_unit_position = Vector3()
-        if translation_per_unit_position is None:
-            translation_per_unit_position = Vector3()
-        self.casadi_sx = sm.to_sx(
-            [
-                rotation_per_unit_position.x,
-                rotation_per_unit_position.y,
-                rotation_per_unit_position.z,
-                translation_per_unit_position.x,
-                translation_per_unit_position.y,
-                translation_per_unit_position.z,
-            ]
-        )
-        self.reference_frame = reference_frame
-        super().__post_init__()
-
-    def _verify_type(self):
-        if self.shape != (6, 1):
-            raise WrongDimensionsError(
-                expected_dimensions=(6, 1), actual_dimensions=self.shape
-            )
-
-    @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        reference_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.REFERENCE, **kwargs
-        )
-        return cls(
-            rotation_per_unit_position=Vector3(*data["rotation_per_unit_position"]),
-            translation_per_unit_position=Vector3(
-                *data["translation_per_unit_position"]
-            ),
+        super().__init__(
+            first_vector=rotation_per_unit_position,
+            second_vector=translation_per_unit_position,
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "rotation_per_unit_position": self.rotation_per_unit_position.to_np()[
-                :3
-            ].tolist(),
-            "translation_per_unit_position": self.translation_per_unit_position.to_np()[
-                :3
-            ].tolist(),
-        }
+    @classproperty
+    def vector_names(cls) -> type[ScrewAxisVector]:
+        return ScrewAxisVector
 
     @property
     def rotation_per_unit_position(self) -> Vector3:
@@ -2723,9 +2750,7 @@ class ScrewAxis(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The axis the body turns around, scaled by the angle it turns by per
             unit of position, in radians.
         """
-        return Vector3(
-            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
-        )
+        return self._first_vector
 
     @property
     def translation_per_unit_position(self) -> Vector3:
@@ -2733,9 +2758,7 @@ class ScrewAxis(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: How far the point of the body at the origin of the reference frame
             moves per unit of position, in meters.
         """
-        return Vector3(
-            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
-        )
+        return self._second_vector
 
     @property
     def unit_direction(self) -> Vector3:
