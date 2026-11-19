@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.patterns.classproperty import classproperty
 from cramph.context import ContextExtension
 from giskardpy.motion_statechart.weights import DefaultWeights
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     DebugExpression,
@@ -236,7 +236,7 @@ class WiggleInsert(
         artifacts.error = root_P_current.euclidean_distance(root_P_hole)
         return artifacts
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         if self.random_walk:
             translation = self._random_walk_translation()
             angle = self._random_walk_angle()

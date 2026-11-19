@@ -192,6 +192,8 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             name=plan_node.name,
             kinematic_chain=plan_node.kinematic_chain,
             goal_pose=plan_node.goal_pose,
+            cruise_linear_velocity=plan_node.cruise_linear_velocity,
+            cruise_angular_velocity=plan_node.cruise_angular_velocity,
             position_threshold=plan_node.position_threshold,
             orientation_threshold=plan_node.orientation_threshold,
             goal_binding_policy=plan_node.goal_binding_policy,

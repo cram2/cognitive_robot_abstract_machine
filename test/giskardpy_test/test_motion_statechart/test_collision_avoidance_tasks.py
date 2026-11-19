@@ -33,12 +33,10 @@ from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from cramph.composites import Sequence, Parallel
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
-from cramph.orm.ormatic_interface import StatechartMappingDAO
-from giskardpy.orm.ormatic_interface import Base
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.patterns.called_positionally import called_positionally
 from krrood.ormatic.utils import create_engine
@@ -1353,6 +1351,9 @@ def test_violated_body_pairs_survive_storing_the_history(
     The body pairs that came too close are still known once the state history is stored
     and read back.
     """
+    from cramph.orm.ormatic_interface import StatechartMappingDAO
+    from giskardpy.orm.ormatic_interface import Base
+
     with pytest.raises(CollisionViolatedError) as exc_info:
         executor_driving_into_obstacles.tick_until_end()
     statechart = executor_driving_into_obstacles.statechart
@@ -1556,7 +1557,7 @@ def test_building_a_rules_node_keeps_the_temporary_rules_in_force(
 
     executor.compile(statechart=statechart)
 
-    assert rules_node.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert rules_node.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert collision_manager.temporary_rules == [rule_in_force]
 
 
@@ -1724,7 +1725,7 @@ def test_cable_guide_collision(
         end_when=local_min,
     )
 
-    assert joint_goal.observation_state == ObservationStateValues.FALSE
+    assert joint_goal.observation_state == ObservationStateValue.FALSE
 
 
 def test_attached_self_collision_avoid_stick(
@@ -1813,7 +1814,7 @@ def test_box_overlapping_with_gripper(
         end_when=cart_goal,
     )
 
-    assert cart_goal.observation_state == ObservationStateValues.TRUE
+    assert cart_goal.observation_state == ObservationStateValue.TRUE
 
 
 def test_avoid_self_collision_specific_link(
@@ -2095,4 +2096,4 @@ def test_hsr_self_collision_avoidance(
         end_when=cart_goal,
     )
 
-    assert cart_goal.observation_state == ObservationStateValues.TRUE
+    assert cart_goal.observation_state == ObservationStateValue.TRUE

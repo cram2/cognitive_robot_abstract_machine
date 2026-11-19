@@ -411,7 +411,9 @@ def test_from_world_with_rotated_box():
         # Box 1: at origin
         axis_aligned_box_body = Body(name=PrefixedName("box_one"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world, root_body, axis_aligned_box_body)
+            FixedConnection.create_with_dofs(
+                world=world, parent=root_body, child=axis_aligned_box_body
+            )
         )
         axis_aligned_box = Box(scale=Scale(1, 1, 1))
         axis_aligned_box_body.collision.append(axis_aligned_box)
@@ -423,9 +425,9 @@ def test_from_world_with_rotated_box():
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root_body,
-                rotated_box_body,
+                world=world,
+                parent=root_body,
+                child=rotated_box_body,
                 parent_T_connection_expression=rotated_box_body_pose,
             )
         )
@@ -621,9 +623,9 @@ def _floor_with_an_obstacle_standing_on_it() -> Floor:
         obstacle = Body(name=PrefixedName("obstacle"))
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                world.root,
-                obstacle,
+                world=world,
+                parent=world.root,
+                child=obstacle,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.0, 0.0, 0.5, reference_frame=world.root
                 ),
@@ -785,9 +787,9 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
         wall = Body(name=PrefixedName("wall"))
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                world.root,
-                wall,
+                world=world,
+                parent=world.root,
+                child=wall,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     10.0, 0.0, 0.5, reference_frame=world.root
                 ),
@@ -1077,7 +1079,9 @@ def test_free_space_from_world_keeps_the_given_height_clearance_off_obstacles():
         world.add_kinematic_structure_entity(root_body)
         box_body = Body(name=PrefixedName("box"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world, root_body, box_body)
+            FixedConnection.create_with_dofs(
+                world=world, parent=root_body, child=box_body
+            )
         )
         box_body.collision.append(Box(scale=Scale(1, 1, 1)))
     search_space = BoundingBoxCollection(

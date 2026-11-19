@@ -52,7 +52,7 @@ with world.modify_world():
     localization_body = Body(name=PrefixedName("odom_combined"))
 
     map_C_localization = Connection6DoF.create_with_dofs(
-        world, map_body, localization_body
+        world=world, parent=map_body, child=localization_body
     )
     world.add_connection(map_C_localization)
 

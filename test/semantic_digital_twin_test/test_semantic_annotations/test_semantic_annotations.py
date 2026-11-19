@@ -161,9 +161,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         world.add_kinematic_structure_entity(root)
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root,
-                obstacle_body,
+                world=world,
+                parent=root,
+                child=obstacle_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     -2.0, 0.0, 0.0, reference_frame=root
                 ),
@@ -171,9 +171,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root,
-                wall_body,
+                world=world,
+                parent=root,
+                child=wall_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     2.0, 0.0, 0.0, reference_frame=root
                 ),

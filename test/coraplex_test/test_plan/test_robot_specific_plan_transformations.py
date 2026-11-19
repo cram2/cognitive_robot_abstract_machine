@@ -1,3 +1,8 @@
+"""
+Tests that a plan is adapted to the robot executing it, such as driving a differential
+drive, closing a container or moving the tool center point in a straight line.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -22,7 +27,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.tasks.drive_tasks import (
@@ -99,7 +104,7 @@ class OrientationWhileRunning(TickingExecutorExtension):
     """
 
     def after_tick(self, *, executor: StatechartExecutor) -> None:
-        if self.node.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.node.life_cycle_state != LifeCycleValue.RUNNING:
             return
         self.orientations.append(self.body.global_pose.to_np()[:3, :3])
 
@@ -528,6 +533,34 @@ def test_stretch_reaches_in_a_straight_line(
         assert goal.goal_binding_policy == default_goal.goal_binding_policy
 
 
+def test_stretch_reaches_in_a_straight_line_at_the_approach_speeds(
+    stretch_apartment_context,
+) -> None:
+    """
+    The straight line keeps the speeds the reach approaches at.
+    """
+    world, robot, extensions = stretch_apartment_context
+    action = prepared(
+        ReachAction(
+            grasp_candidate=handle_grasp(world),
+            arm=robot.all_arms[0],
+            pre_approach_cruise_linear_velocity=0.05,
+            final_approach_cruise_linear_velocity=0.02,
+        ),
+        simulated_executor(extensions),
+    )
+
+    goals = reaching_goals_of(action)
+
+    assert [goal.nodes[0].cruise_velocity for goal in goals] == [
+        action.pre_approach_cruise_linear_velocity,
+        action.final_approach_cruise_linear_velocity,
+    ]
+    assert [goal.nodes[1].cruise_angular_velocity for goal in goals] == [
+        goal.cruise_angular_velocity for goal in goals
+    ]
+
+
 @pytest.mark.parametrize("build_executor", [simulated_executor, robot_executor])
 def test_stretch_lifts_in_a_straight_line(
     stretch_apartment_context, build_executor
@@ -742,7 +775,7 @@ def test_a_simulated_stretch_reaches_without_turning_its_base(
 
     executor.execute()
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert_kept_its_heading(recording)
 
 

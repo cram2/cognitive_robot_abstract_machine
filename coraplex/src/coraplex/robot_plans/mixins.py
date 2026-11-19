@@ -16,22 +16,17 @@ import numpy as np
 from coraplex.robot_plans.actions.base import Action
 from cramph.node import StatechartNode
 from cramph.world_modification_nodes import MoveBranch
-from cramph.composites import Parallel
 from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.mixins import (
     HasOrientationThresholdParameter,
     HasPositionThresholdParameter,
 )
 from krrood.patterns.mixin import ParameterMixin
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianPose,
-    CartesianPositionVelocityLimit,
-    CartesianRotationVelocityLimit,
-)
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
@@ -225,31 +220,30 @@ class HasGraspDetectionThresholdParameter(ParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxPreApproachLinearVelocityParameter(ParameterMixin):
+class HasPreApproachCruiseLinearVelocityParameter(ParameterMixin):
     """
     Mixin for actions that move the gripper to a pre-grasp pose before a grasp.
     """
 
-    max_pre_approach_linear_velocity: float | None = None
+    pre_approach_cruise_linear_velocity: float | None = None
     """
-    Maximum linear speed (in m/s) for the initial pre-pose approach, enforced via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    Speed (in m/s) of the tool center point approaching the pre-pose, set as the cruise velocity of its
+    pose goal. ``None`` keeps the default of
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose`.
     """
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxFinalApproachLinearVelocityParameter(ParameterMixin):
+class HasFinalApproachCruiseLinearVelocityParameter(ParameterMixin):
     """
     Mixin for actions that move the gripper from a pre-grasp pose onto a grasp.
     """
 
-    max_final_approach_linear_velocity: float | None = None
+    final_approach_cruise_linear_velocity: float | None = None
     """
-    Maximum linear speed (in m/s) for the final approach onto the target pose, enforced
-    via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    Speed (in m/s) of the tool center point on the final approach onto the target pose, set as the cruise velocity of its
+    pose goal. ``None`` keeps the default of
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose`.
     """
 
 
@@ -269,17 +263,16 @@ class HasMaxGraspClosingVelocityParameter(ParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxLiftLinearVelocityParameter(ParameterMixin):
+class HasLiftCruiseLinearVelocityParameter(ParameterMixin):
     """
     Mixin for actions that lift a grasped object.
     """
 
-    max_lift_linear_velocity: float | None = None
+    lift_cruise_linear_velocity: float | None = None
     """
-    Maximum linear speed (in m/s) for lifting the object clear of the table after
-    grasping, enforced via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    Speed (in m/s) of the tool center point lifting the object clear of the table after grasping, set as the cruise velocity of its
+    pose goal. ``None`` keeps the default of
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose`.
     """
 
 
@@ -300,32 +293,31 @@ class HasObjectFrictionParameter(ParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxPlacingLinearVelocityParameter(ParameterMixin):
+class HasPlacingCruiseLinearVelocityParameter(ParameterMixin):
     """
     Mixin for actions that lower a held object onto where it is put down.
     """
 
-    max_placing_linear_velocity: float | None = None
+    placing_cruise_linear_velocity: float | None = None
     """
-    Maximum linear speed (in m/s) for the final descent onto the target location,
-    enforced via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    Speed (in m/s) of the tool center point on the final descent onto the target location, set as the cruise velocity of its
+    pose goal. ``None`` keeps the default of
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose`.
     """
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxTransportLinearVelocityParameter(ParameterMixin):
+class HasTransportCruiseLinearVelocityParameter(ParameterMixin):
     """
     Mixin for actions that carry a held object above where it is put down.
     """
 
-    max_transport_linear_velocity: float | None = None
+    transport_cruise_linear_velocity: float | None = None
     """
-    Maximum linear speed (in m/s) for carrying the held object above the target
-    location, before the final descent, enforced via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    Speed (in m/s) of the tool center point carrying the held object above the target location, before the
+    final descent, set as the cruise velocity of its
+    pose goal. ``None`` keeps the default of
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose`.
     """
 
 
@@ -345,17 +337,16 @@ class HasMaxReleaseOpeningVelocityParameter(ParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxRetractLinearVelocityParameter(ParameterMixin):
+class HasRetractCruiseLinearVelocityParameter(ParameterMixin):
     """
     Mixin for actions that withdraw the gripper from an object they let go of.
     """
 
-    max_retract_linear_velocity: float | None = None
+    retract_cruise_linear_velocity: float | None = None
     """
-    Maximum linear speed (in m/s) for retracting the end effector away from the placed
-    object, enforced via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    Speed (in m/s) of the tool center point retracting away from the placed object, set as the cruise velocity of its
+    pose goal. ``None`` keeps the default of
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose`.
     """
 
 
@@ -578,78 +569,44 @@ class MovesToolCenterPoint(
 
     def tool_center_point_goal(
         self,
+        *,
         target: Pose,
         arm: Arm,
-        max_linear_velocity: float | None = None,
-        max_angular_velocity: float | None = None,
-    ) -> MotionStatechartNode:
+        cruise_linear_velocity: float | None = None,
+        cruise_angular_velocity: float | None = None,
+    ) -> CartesianPose:
         """
         :param target: Where the tool center point should end up.
         :param arm: The arm whose tool center point is moved.
-        :param max_linear_velocity: Cap on the speed of the tool center point, in m/s.
-        :param max_angular_velocity: Cap on how fast it turns, in rad/s.
-        :return: The goal moving the tool center point there, together with whatever
-            speed caps were asked for, and the task keeping the base still, see :meth:`~coraplex.robot_plans.actions.base.Action.keep_base_still`.
-            A goal that is a parallel of its tasks holds them itself; any other is put in
-            a parallel with them.
+        :param cruise_linear_velocity: Speed of the tool center point, in m/s, or
+            ``None`` for the default of :class:`CartesianPose`.
+        :param cruise_angular_velocity: How fast the tool center point turns, in rad/s,
+            or ``None`` for the default of :class:`CartesianPose`.
+        :return: The goal moving the tool center point there, holding the task keeping
+            the base still, see
+            :meth:`~coraplex.robot_plans.actions.base.Action.keep_base_still`.
         """
-        root = self.controlled_root
-        tip = arm.end_effector.tool_frame
-        accompanying: list[MotionStatechartNode] = self._velocity_limits(
-            root, tip, max_linear_velocity, max_angular_velocity
-        )
-        accompanying.extend(self.keep_base_still())
-        goal = self._reach_target(target, root, tip)
-        if not accompanying:
-            return goal
-        if isinstance(goal, Parallel):
-            for node in accompanying:
-                goal.add_node(node=node)
-            return goal
-        return Parallel(nodes=[goal, *accompanying], name=type(goal).__name__)
-
-    def _reach_target(
-        self,
-        target: Pose,
-        root: KinematicStructureEntity,
-        tip: KinematicStructureEntity,
-    ) -> MotionStatechartNode:
-        """
-        :return: The task that brings `tip` to `target`.
-        """
-        return CartesianPose(
-            kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal = CartesianPose(
+            kinematic_chain=KinematicChain(
+                root=self.controlled_root, tip=arm.end_effector.tool_frame
+            ),
             goal_pose=target,
+            cruise_linear_velocity=(
+                DefaultCruiseVelocity.TRANSLATION
+                if cruise_linear_velocity is None
+                else cruise_linear_velocity
+            ),
+            cruise_angular_velocity=(
+                DefaultCruiseVelocity.ROTATION
+                if cruise_angular_velocity is None
+                else cruise_angular_velocity
+            ),
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
         )
-
-    @staticmethod
-    def _velocity_limits(
-        root: KinematicStructureEntity,
-        tip: KinematicStructureEntity,
-        max_linear_velocity: float | None,
-        max_angular_velocity: float | None,
-    ) -> list[MotionStatechartNode]:
-        """
-        :return: The speed caps that were asked for, if any.
-        """
-        limits: list[MotionStatechartNode] = []
-        if max_linear_velocity is not None:
-            limits.append(
-                CartesianPositionVelocityLimit(
-                    kinematic_chain=KinematicChain(root=root, tip=tip),
-                    max_linear_velocity=max_linear_velocity,
-                )
-            )
-        if max_angular_velocity is not None:
-            limits.append(
-                CartesianRotationVelocityLimit(
-                    kinematic_chain=KinematicChain(root=root, tip=tip),
-                    max_angular_velocity=max_angular_velocity,
-                )
-            )
-        return limits
+        for node in self.keep_base_still():
+            goal.add_node(node=node)
+        return goal
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

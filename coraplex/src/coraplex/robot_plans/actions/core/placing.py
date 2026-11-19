@@ -15,10 +15,10 @@ from coraplex.robot_plans.mixins import (
     HasArmParameter,
     HasGraspableParameter,
     HasGraspApproach,
-    HasMaxPlacingLinearVelocityParameter,
-    HasMaxTransportLinearVelocityParameter,
+    HasPlacingCruiseLinearVelocityParameter,
+    HasTransportCruiseLinearVelocityParameter,
     HasMaxReleaseOpeningVelocityParameter,
-    HasMaxRetractLinearVelocityParameter,
+    HasRetractCruiseLinearVelocityParameter,
     HasVariablePoses,
     MovesToolCenterPoint,
     OperatesGripper,
@@ -47,10 +47,10 @@ class PlaceAction(
     HasGraspableParameter,
     HasGoalPoseParameter,
     HasGraspApproach,
-    HasMaxPlacingLinearVelocityParameter,
-    HasMaxTransportLinearVelocityParameter,
+    HasPlacingCruiseLinearVelocityParameter,
+    HasTransportCruiseLinearVelocityParameter,
     HasMaxReleaseOpeningVelocityParameter,
-    HasMaxRetractLinearVelocityParameter,
+    HasRetractCruiseLinearVelocityParameter,
 ):
     """
     Puts down :attr:`graspable`, which :attr:`arm` holds, so that it ends up at
@@ -98,14 +98,14 @@ class PlaceAction(
         # along the way the grasp was approached.
         return [
             self.tool_center_point_goal(
-                self._tool_goals.retreat,
-                self.arm,
-                max_linear_velocity=self.max_transport_linear_velocity,
+                target=self._tool_goals.retreat,
+                arm=self.arm,
+                cruise_linear_velocity=self.transport_cruise_linear_velocity,
             ),
             self.tool_center_point_goal(
-                self._tool_goals.grasp,
-                self.arm,
-                max_linear_velocity=self.max_placing_linear_velocity,
+                target=self._tool_goals.grasp,
+                arm=self.arm,
+                cruise_linear_velocity=self.placing_cruise_linear_velocity,
             ),
             Parallel(
                 nodes=[
@@ -117,15 +117,17 @@ class PlaceAction(
                     ),
                     # Keeps the gripper in place while it opens, whatever else
                     # moves the robot meanwhile.
-                    self.tool_center_point_goal(self._tool_goals.grasp, self.arm),
+                    self.tool_center_point_goal(
+                        target=self._tool_goals.grasp, arm=self.arm
+                    ),
                 ]
             ),
             *self.reattach(self.graspable.root, self.world.root),
             # The gripper starts out around the object it has just let go of.
             self.tool_center_point_goal(
-                self._tool_goals.pre_grasp,
-                self.arm,
-                max_linear_velocity=self.max_retract_linear_velocity,
+                target=self._tool_goals.pre_grasp,
+                arm=self.arm,
+                cruise_linear_velocity=self.retract_cruise_linear_velocity,
             ),
         ]
 

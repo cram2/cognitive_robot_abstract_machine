@@ -356,8 +356,7 @@ class HasCruiseVelocityParameter(ParameterMixin):
 
     cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    How fast the goal is approached, in the units of the node's error per second; not
-    strictly enforced, a velocity limit sets a strict one.
+    How fast the goal is approached, in the units of the node's error per second.
     """
 
 
@@ -369,8 +368,7 @@ class HasCruiseLinearVelocityParameter(ParameterMixin):
 
     cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    How fast the goal position is approached, in m/s; not strictly enforced, a velocity
-    limit sets a strict one.
+    How fast the goal position is approached, in m/s.
     """
 
 
@@ -382,32 +380,7 @@ class HasCruiseAngularVelocityParameter(ParameterMixin):
 
     cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    How fast the goal orientation is approached, in rad/s; not strictly enforced, a
-    velocity limit sets a strict one.
-    """
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class HasMaxLinearVelocityParameter(ParameterMixin):
-    """
-    A node capping how fast the tip of a kinematic chain moves.
-    """
-
-    max_linear_velocity: float = 0.1
-    """
-    The highest linear speed of the tip allowed, in m/s.
-    """
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class HasMaxAngularVelocityParameter(ParameterMixin):
-    """
-    A node capping how fast the tip of a kinematic chain turns.
-    """
-
-    max_angular_velocity: float = 0.4
-    """
-    The highest angular speed of the tip allowed, in rad/s.
+    How fast the goal orientation is approached, in rad/s.
     """
 
 

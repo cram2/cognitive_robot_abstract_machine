@@ -27,7 +27,7 @@ from coraplex.robot_plans.mixins import (
     HasArmParameter,
     HasGraspCandidateParameter,
     HasGripperConfigurationParameter,
-    HasMaxPlacingLinearVelocityParameter,
+    HasPlacingCruiseLinearVelocityParameter,
     HasPlanarGoalPoseParameter,
     HasRetreatDistanceParameter,
     MovesToolCenterPoint,
@@ -232,9 +232,9 @@ def test_inherited_parameters_keep_their_declared_types():
 
     assert types["arm"] is HasArmParameter.__annotations__["arm"]
     assert (
-        types["max_placing_linear_velocity"]
-        == HasMaxPlacingLinearVelocityParameter.__annotations__[
-            "max_placing_linear_velocity"
+        types["placing_cruise_linear_velocity"]
+        == HasPlacingCruiseLinearVelocityParameter.__annotations__[
+            "placing_cruise_linear_velocity"
         ]
     )
 

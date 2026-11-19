@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from giskardpy.motion_statechart.weights import DefaultWeights
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
@@ -154,7 +154,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert height_goal.observation_state == ObservationStateValues.TRUE
+        assert height_goal.observation_state == ObservationStateValue.TRUE
 
         # Compute actual height difference
         root_P_tip = pr2_world_state_reset.transform(
@@ -204,7 +204,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert height_goal.observation_state == ObservationStateValues.TRUE
+        assert height_goal.observation_state == ObservationStateValue.TRUE
 
         # Verify actual height difference
         root_P_tip = pr2_world_state_reset.transform(
@@ -256,7 +256,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert reach_point.observation_state == ObservationStateValues.TRUE
+        assert reach_point.observation_state == ObservationStateValue.TRUE
 
         root_P_tip_final = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=tip_point
@@ -302,7 +302,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert distance_goal.observation_state == ObservationStateValues.TRUE
+        assert distance_goal.observation_state == ObservationStateValue.TRUE
 
         # Compute actual horizontal distance
         root_P_tip = pr2_world_state_reset.transform(
@@ -356,7 +356,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert distance_goal.observation_state == ObservationStateValues.TRUE
+        assert distance_goal.observation_state == ObservationStateValue.TRUE
 
         # Verify horizontal distance is near zero
         root_P_tip = pr2_world_state_reset.transform(
@@ -410,7 +410,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert distance_goal.observation_state == ObservationStateValues.TRUE
+        assert distance_goal.observation_state == ObservationStateValue.TRUE
 
         # Verify z difference is large but goal still succeeded
         root_P_tip = pr2_world_state_reset.transform(
@@ -477,7 +477,7 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert combined_goal.observation_state == ObservationStateValues.TRUE
+        assert combined_goal.observation_state == ObservationStateValue.TRUE
 
         # Verify both constraints are satisfied
         root_P_tip = pr2_world_state_reset.transform(
@@ -562,10 +562,10 @@ class TestFeatureFunctions:
         executor.compile(statechart=statechart)
         executor.tick_until_end()
 
-        assert combined_goal.observation_state == ObservationStateValues.TRUE
-        assert height_goal.observation_state == ObservationStateValues.TRUE
-        assert distance_goal.observation_state == ObservationStateValues.TRUE
-        assert align_perpendicular.observation_state == ObservationStateValues.TRUE
+        assert combined_goal.observation_state == ObservationStateValue.TRUE
+        assert height_goal.observation_state == ObservationStateValue.TRUE
+        assert distance_goal.observation_state == ObservationStateValue.TRUE
+        assert align_perpendicular.observation_state == ObservationStateValue.TRUE
 
         root_P_tip = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=tip_point
@@ -1185,8 +1185,8 @@ class TestArticulateGraspedMechanism:
         executor.tick_until_end()
         statechart.draw(file_name=tmp_path / "muh.pdf")
 
-        assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert opening.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert closing.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_a_drawer_faster_than_the_arm_stays_with_the_gripper(
         self, *, pr2_world_copy
@@ -1250,7 +1250,7 @@ class TestArticulateGraspedMechanism:
             executor.tick()
             if executor.statechart.is_ended():
                 break
-            if opening.life_cycle_state != LifeCycleValues.RUNNING:
+            if opening.life_cycle_state != LifeCycleValue.RUNNING:
                 continue
             handle_P_tip = world.compute_forward_kinematics_np(handle.root, tip)[:3, 3]
             if handle_P_tip_when_grasped is None:
@@ -1261,7 +1261,7 @@ class TestArticulateGraspedMechanism:
             )
 
         [hold] = [node for node in opening.nodes if isinstance(node, CartesianPose)]
-        assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert opening.life_cycle_state == LifeCycleValue.SUCCEEDED
         assert largest_drift <= hold.position_threshold
 
     def test_unscrew_and_tighten_bottle_cap(self, *, pr2_world_copy):
@@ -1338,7 +1338,7 @@ class TestArticulateGraspedMechanism:
         executor.compile(statechart=unscrew_statechart)
         executor.tick_until_end()
 
-        assert open.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert open.life_cycle_state == LifeCycleValue.SUCCEEDED
 
         # One full turn must have moved the cap one screw pitch along the screw axis,
         # away from the bottle (towards the robot, -x).
@@ -1375,7 +1375,7 @@ class TestArticulateGraspedMechanism:
         executor.compile(statechart=tighten_statechart)
         executor.tick_until_end()
 
-        assert close.observation_state == ObservationStateValues.TRUE
+        assert close.observation_state == ObservationStateValue.TRUE
 
         # The tightened cap must be back at its initial pose.
         world_T_cap_tightened = pr2_world_copy.compute_forward_kinematics_np(

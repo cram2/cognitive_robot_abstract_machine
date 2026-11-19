@@ -1,8 +1,12 @@
-import uuid
-from abc import ABC
+"""
+The messages the synchronizers of worlds exchange over ROS 2 topics, and the snapshot a
+world is fetched as.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
-from krrood.patterns.caching import memoize
 from uuid import UUID
 
 from typing_extensions import Any, Self, get_args, get_type_hints
@@ -13,6 +17,7 @@ from krrood.adapters.json_serializer import (
     to_json,
     from_json,
 )
+from krrood_synchronization.messages import Message, MessageField, StreamPosition
 from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.ros.exceptions import (
     WorldUpdateReferencesUnknownEntityError,
@@ -26,86 +31,6 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_modification import (
     WorldModelModificationBlock,
 )
-
-
-@dataclass
-class MetaData(SubclassJSONSerializer):
-    """
-    Class for data describing the origin of a message.
-    """
-
-    node_name: str
-    """The name of the node that published this message."""
-
-    process_id: int
-    """The id of the process that published this message."""
-
-    world_id: UUID = field(default_factory=uuid.uuid4)
-    """The id of the origin world. This is used to identify messages that were published by the same publisher."""
-
-    @memoize
-    def to_json(self, **kwargs) -> dict[str, Any]:
-        return {
-            **super().to_json(**kwargs),
-            "node_name": self.node_name,
-            "process_id": self.process_id,
-            "world_id": to_json(self.world_id, **kwargs),
-        }
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return cls(
-            node_name=data["node_name"],
-            process_id=data["process_id"],
-            world_id=from_json(data["world_id"]),
-        )
-
-    def __hash__(self):
-        return hash((self.node_name, self.process_id, self.world_id))
-
-
-@dataclass
-class StreamPosition:
-    """
-    A position in the stream of messages that one publisher sent.
-
-    Positions of different publishers are not comparable, which is why the publisher is
-    part of the position. A process that has to know whether it caught up with a change
-    of another process compares this against what it applied from that publisher.
-    """
-
-    origin: MetaData
-    """The publisher whose stream this position belongs to."""
-
-    sequence_number: int
-    """The position in the stream of that publisher."""
-
-
-@dataclass
-class Message(ABC):
-    """
-    Abstract base class for all messages.
-    """
-
-    meta_data: MetaData
-    """Message origin meta data."""
-
-    sequence_number: int = field(default=0, kw_only=True)
-    """Position of this message in the stream of messages its publisher sent.
-
-    Counts up by one per publication, so a recipient can tell how far it has caught up
-    with that publisher, and a publisher can tell others what to catch up with. Assigned
-    when the message is published; a message that was never published has no position.
-    """
-
-    @property
-    def position(self) -> StreamPosition:
-        """
-        Where this message sits in the stream of its publisher.
-        """
-        return StreamPosition(
-            origin=self.meta_data, sequence_number=self.sequence_number
-        )
 
 
 @dataclass
@@ -175,46 +100,34 @@ class LoadModel(Message):
     """The primary key identifying the model to be loaded."""
 
 
-class MessageField(StrEnum):
-    """
-    The parts of a serialized message that are read without building it.
-    """
-
-    META_DATA = "meta_data"
-    """The origin of the message."""
-
-    SEQUENCE_NUMBER = "sequence_number"
-    """The position of the message in the stream of its publisher."""
-
-
-@dataclass
+@dataclass(kw_only=True)
 class ReceivedMessage:
     """
-    A message as it arrived: its origin and position read, everything else still json.
+    A message as it arrived: its position read, everything else still json.
 
     The rest refers to entities of the world it is applied to, so it is built only when
     the message is applied, against the world as it is then.
     """
 
     content: JSONData
-    """The serialized message."""
+    """
+    The serialized message.
+    """
 
-    publisher: MetaData
-    """The origin of the message."""
-
-    sequence_number: int
-    """The position of the message in the stream of its publisher."""
+    position: StreamPosition
+    """
+    The position of the message in the stream of its publisher.
+    """
 
     @classmethod
-    def from_json(cls, content: JSONData) -> Self:
+    def from_json(cls, *, content: JSONData) -> Self:
         """
         :param content: A serialized message.
-        :return: The message with its origin and position read.
+        :return: The message with its position read.
         """
         return cls(
             content=content,
-            publisher=from_json(content[MessageField.META_DATA]),
-            sequence_number=content[MessageField.SEQUENCE_NUMBER],
+            position=from_json(content[MessageField.POSITION]),
         )
 
     @property
@@ -237,7 +150,7 @@ class ReceivedMessage:
                 return from_json(self.content, **tracker.create_kwargs())
             except WorldEntityWithIDNotInKwargs as unknown_entity:
                 raise WorldUpdateReferencesUnknownEntityError(
-                    publisher=self.publisher,
+                    sender=self.position.origin.sender,
                     entity_id=unknown_entity.key,
                     entity_name=unknown_entity.world_entity_name,
                 ) from unknown_entity
@@ -260,6 +173,9 @@ class SnapshotField(StrEnum):
     STATES = "states"
     """The values of the free variables, inside the state."""
 
+    STREAM_POSITIONS = "stream_positions"
+    """How far the snapshot caught up with each publisher."""
+
 
 @dataclass
 class WorldModelSnapshot(SubclassJSONSerializer):
@@ -276,7 +192,16 @@ class WorldModelSnapshot(SubclassJSONSerializer):
     states: list[float]
     """The values of the free variables contained in the state snapshot."""
 
+    stream_positions: list[StreamPosition] = field(default_factory=list)
+    """
+    The position of the last message of each publisher whose changes the snapshot
+    contains; a publisher it names no position of contributed nothing to it.
+    """
+
     def to_json(self, **kwargs) -> dict[str, Any]:
+        """
+        :meth:`SubclassJSONSerializer.to_json`, laid out by :class:`SnapshotField`.
+        """
         return {
             **super().to_json(**kwargs),
             SnapshotField.MODIFICATIONS: to_json(self.modifications, **kwargs),
@@ -284,10 +209,15 @@ class WorldModelSnapshot(SubclassJSONSerializer):
                 SnapshotField.IDS: to_json(self.ids, **kwargs),
                 SnapshotField.STATES: list(self.states),
             },
+            SnapshotField.STREAM_POSITIONS: to_json(self.stream_positions, **kwargs),
         }
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        """
+        :meth:`SubclassJSONSerializer._from_json` of a snapshot laid out by
+        :class:`SnapshotField`.
+        """
         state = data.get(SnapshotField.STATE, {})
         return cls(
             modifications=[
@@ -296,7 +226,21 @@ class WorldModelSnapshot(SubclassJSONSerializer):
             ],
             ids=from_json(state[SnapshotField.IDS]),
             states=state.get(SnapshotField.STATES, []),
+            stream_positions=cls.stream_positions_from_json(json_data=data),
         )
+
+    @staticmethod
+    def stream_positions_from_json(
+        *, json_data: dict[str, Any]
+    ) -> list[StreamPosition]:
+        """
+        :param json_data: A serialized snapshot.
+        :return: The stream positions of the snapshot; none for a snapshot of a server
+            that does not name them.
+        """
+        if SnapshotField.STREAM_POSITIONS not in json_data:
+            return []
+        return from_json(json_data[SnapshotField.STREAM_POSITIONS])
 
     @staticmethod
     def apply_to_json_snapshot_to_world(

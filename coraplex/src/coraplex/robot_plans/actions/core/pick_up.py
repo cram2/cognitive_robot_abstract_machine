@@ -1,3 +1,8 @@
+"""
+Actions that take hold of an object: reaching for it, grasping it, picking it up and
+holding it in place.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -18,10 +23,10 @@ from coraplex.robot_plans.mixins import (
     HasGraspCandidateParameter,
     HasGraspDetectionThresholdParameter,
     HasMaxGraspClosingVelocityParameter,
-    HasMaxLiftLinearVelocityParameter,
+    HasLiftCruiseLinearVelocityParameter,
     HasObjectFrictionParameter,
-    HasMaxPreApproachLinearVelocityParameter,
-    HasMaxFinalApproachLinearVelocityParameter,
+    HasPreApproachCruiseLinearVelocityParameter,
+    HasFinalApproachCruiseLinearVelocityParameter,
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
@@ -52,8 +57,8 @@ class ReachAction(
     HasGraspCandidateParameter,
     HasArmParameter,
     HasGraspApproach,
-    HasMaxPreApproachLinearVelocityParameter,
-    HasMaxFinalApproachLinearVelocityParameter,
+    HasPreApproachCruiseLinearVelocityParameter,
+    HasFinalApproachCruiseLinearVelocityParameter,
     HasGraspDetectionThresholdParameter,
 ):
     """
@@ -88,9 +93,9 @@ class ReachAction(
         pre_pose = poses.retreat if self.reverse_reach_order else poses.pre_grasp
         children = [
             self.tool_center_point_goal(
-                pre_pose,
-                self.arm,
-                max_linear_velocity=self.max_pre_approach_linear_velocity,
+                target=pre_pose,
+                arm=self.arm,
+                cruise_linear_velocity=self.pre_approach_cruise_linear_velocity,
             ),
         ]
         if self.open_gripper_at_pre_pose:
@@ -103,9 +108,9 @@ class ReachAction(
             )
         children.append(
             self.tool_center_point_goal(
-                poses.grasp,
-                self.arm,
-                max_linear_velocity=self.max_final_approach_linear_velocity,
+                target=poses.grasp,
+                arm=self.arm,
+                cruise_linear_velocity=self.final_approach_cruise_linear_velocity,
             )
         )
         return children
@@ -119,10 +124,10 @@ class PickUpAction(
     HasGraspCandidateParameter,
     HasArmParameter,
     HasGraspApproach,
-    HasMaxPreApproachLinearVelocityParameter,
-    HasMaxFinalApproachLinearVelocityParameter,
+    HasPreApproachCruiseLinearVelocityParameter,
+    HasFinalApproachCruiseLinearVelocityParameter,
     HasMaxGraspClosingVelocityParameter,
-    HasMaxLiftLinearVelocityParameter,
+    HasLiftCruiseLinearVelocityParameter,
     HasObjectFrictionParameter,
     HasGraspDetectionThresholdParameter,
     HasTolerateFingerStallParameter,
@@ -162,8 +167,8 @@ class PickUpAction(
                 arm=self.arm,
                 approach_clearance=self.approach_clearance,
                 retreat_distance=self.retreat_distance,
-                max_pre_approach_linear_velocity=self.max_pre_approach_linear_velocity,
-                max_final_approach_linear_velocity=self.max_final_approach_linear_velocity,
+                pre_approach_cruise_linear_velocity=self.pre_approach_cruise_linear_velocity,
+                final_approach_cruise_linear_velocity=self.final_approach_cruise_linear_velocity,
                 max_grasp_closing_velocity=self.max_grasp_closing_velocity,
                 finger_stall_minimum_time=self.finger_stall_minimum_time,
                 tolerate_finger_stall=self.tolerate_finger_stall,
@@ -194,9 +199,9 @@ class PickUpAction(
         return [
             *self._grasp_steps(),
             self.tool_center_point_goal(
-                lift_to_pose,
-                self.arm,
-                max_linear_velocity=self.max_lift_linear_velocity,
+                target=lift_to_pose,
+                arm=self.arm,
+                cruise_linear_velocity=self.lift_cruise_linear_velocity,
             ),
         ]
 
@@ -209,10 +214,10 @@ class GraspingAction(
     HasGraspCandidateParameter,
     HasArmParameter,
     HasGraspApproach,
-    HasMaxPreApproachLinearVelocityParameter,
-    HasMaxFinalApproachLinearVelocityParameter,
+    HasPreApproachCruiseLinearVelocityParameter,
+    HasFinalApproachCruiseLinearVelocityParameter,
     HasMaxGraspClosingVelocityParameter,
-    HasMaxLiftLinearVelocityParameter,
+    HasLiftCruiseLinearVelocityParameter,
     HasObjectFrictionParameter,
     HasGraspDetectionThresholdParameter,
     HasTolerateFingerStallParameter,
@@ -239,8 +244,8 @@ class GraspingAction(
                 arm=self.arm,
                 approach_clearance=self.approach_clearance,
                 retreat_distance=self.retreat_distance,
-                max_pre_approach_linear_velocity=self.max_pre_approach_linear_velocity,
-                max_final_approach_linear_velocity=self.max_final_approach_linear_velocity,
+                pre_approach_cruise_linear_velocity=self.pre_approach_cruise_linear_velocity,
+                final_approach_cruise_linear_velocity=self.final_approach_cruise_linear_velocity,
                 open_gripper_at_pre_pose=True,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,
@@ -268,12 +273,12 @@ class GraspingAction(
             nodes=[
                 closing_goal,
                 self.tool_center_point_goal(
-                    self.grasp_pose_sequence(
+                    target=self.grasp_pose_sequence(
                         reference_T_grasp=self.grasp_candidate.grasp_pose,
                         end_effector=self.arm.end_effector,
                         grasp_candidate=self.grasp_candidate,
                     ).grasp,
-                    self.arm,
+                    arm=self.arm,
                 ),
             ]
         )

@@ -17,7 +17,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.exceptions import MissingExecutorExtensionError
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
@@ -240,7 +240,7 @@ def tick_until_running(
     """
     for _ in range(tick_limit):
         executor.tick()
-        if node.life_cycle_state == LifeCycleValues.RUNNING:
+        if node.life_cycle_state == LifeCycleValue.RUNNING:
             return
     pytest.fail(f"{node.name} did not start within {tick_limit} ticks")
 

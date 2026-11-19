@@ -129,7 +129,7 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_room_get_world(self):
         room = self.house_json["rooms"][0]
         procthor_room = ProcthorRoom(room_dict=room)
-        procthor_room.add_to_world(self.world)
+        procthor_room.add_to_world(world=self.world)
         self.assertEqual(
             self.world.root.child_kinematic_structure_entities[0].name.name,
             "Kitchen_4_floor",
@@ -212,7 +212,7 @@ class ProcTHORTestCase(unittest.TestCase):
             world_T_parent_wall=HomogeneousTransformationMatrix(),
         )
 
-        double_door = procthor_door.add_to_world(self.world)
+        double_door = procthor_door.add_to_world(world=self.world)
         doors = self.world.get_semantic_annotations_by_type(Door)
 
         self.assertEqual(double_door.name.name, "Doorway_Double_7_room1_room4")
