@@ -1,3 +1,8 @@
+"""
+Tests that a plan is adapted to the robot executing it, such as driving a differential
+drive, closing a container or moving the tool center point in a straight line.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -524,6 +529,34 @@ def test_stretch_reaches_in_a_straight_line(
         assert goal.translation_threshold == default_goal.translation_threshold
         assert goal.orientation_threshold == default_goal.orientation_threshold
         assert goal.binding_policy == default_goal.binding_policy
+
+
+def test_stretch_reaches_in_a_straight_line_at_the_approach_speeds(
+    stretch_apartment_context,
+) -> None:
+    """
+    The straight line keeps the speeds the reach approaches at.
+    """
+    world, robot, extensions = stretch_apartment_context
+    action = prepared(
+        ReachAction(
+            grasp=handle_grasp(world),
+            arm=robot.all_arms[0],
+            pre_approach_linear_velocity=0.05,
+            final_approach_linear_velocity=0.02,
+        ),
+        simulated_executor(extensions),
+    )
+
+    goals = reaching_goals_of(action)
+
+    assert [goal.nodes[0].cruise_velocity for goal in goals] == [
+        action.pre_approach_linear_velocity,
+        action.final_approach_linear_velocity,
+    ]
+    assert [goal.nodes[1].cruise_velocity for goal in goals] == [
+        goal.cruise_angular_velocity for goal in goals
+    ]
 
 
 @pytest.mark.parametrize("build_executor", [simulated_executor, robot_executor])
