@@ -232,7 +232,7 @@ class TestSingleModelParsing:
         inertial = body_named(world, "link").inertial
         assert inertial.mass == 2.5
         assert np.allclose(inertial.center_of_mass.to_np()[:3], [0.1, 0.2, 0.3])
-        assert np.allclose(np.diag(inertial.inertia.matrix), [0.4, 0.5, 0.6])
+        assert np.allclose(np.diag(inertial.inertia.data), [0.4, 0.5, 0.6])
 
 
 # %% joints

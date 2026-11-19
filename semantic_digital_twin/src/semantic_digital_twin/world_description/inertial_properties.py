@@ -5,16 +5,8 @@ from typing_extensions import Self, TypeVar, Any
 import numpy as np
 from numpy._typing import NDArray
 
-from krrood.adapters.json_serializer import (
-    DataclassJSONSerializer,
-    SubclassJSONSerializer,
-)
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood_spatial_math.spatial_types import Point3, RotationMatrix
-from semantic_digital_twin.world_description.exceptions import (
-    AsymmetricInertiaTensorError,
-    InertiaTensorElementCountError,
-    NegativeMomentOfInertiaError,
-)
 
 
 @dataclass
@@ -132,8 +124,8 @@ class PrincipalAxes(NPMatrix3x3):
         return RotationMatrix(self.data)
 
 
-@dataclass(eq=False, kw_only=True)
-class InertiaTensor(SubclassJSONSerializer):
+@dataclass(eq=False)
+class InertiaTensor(NPMatrix3x3):
     """
     Represents the inertia tensor of a body in a given coordinate frame.
 
@@ -141,45 +133,21 @@ class InertiaTensor(SubclassJSONSerializer):
     https://en.wikipedia.org/wiki/Moment_of_inertia#Definition_2
     """
 
-    data: list[float]
-    """
-    The nine elements of the tensor's matrix, row after row.
-    """
-
-    def __post_init__(self) -> None:
-        if len(self.data) != 9:
-            raise InertiaTensorElementCountError(element_count=len(self.data))
-        matrix = self.matrix
-        if np.any(np.diag(matrix) < 0.0):
-            raise NegativeMomentOfInertiaError(moments=np.diag(matrix).tolist())
-        if not np.allclose(matrix, matrix.T, atol=1e-10):
-            raise AsymmetricInertiaTensorError(elements=self.data)
-
-    @property
-    def matrix(self) -> NDArray:
-        """
-        The tensor as a 3x3 matrix.
-        """
-        return np.array(self.data, dtype=np.float64).reshape((3, 3))
-
-    @classmethod
-    def from_matrix(cls, *, matrix: NDArray) -> Self:
-        """
-        :param matrix: The tensor as a 3x3 matrix.
-        :return: The tensor holding the elements of the matrix.
-        """
-        return cls(data=np.asarray(matrix, dtype=np.float64).ravel().tolist())
+    def __post_init__(self):
+        super().__post_init__()
+        if self.data is None:
+            return
+        diag = np.diag(self.data)
+        assert np.all(diag >= 0.0), (
+            "Diagonal elements of inertia tensor must be non-negative"
+        )
+        assert np.allclose(self.data, self.data.T, atol=1e-10), (
+            "Inertia tensor must be symmetric"
+        )
 
     @classmethod
     def from_values(
-        cls,
-        *,
-        ixx: float,
-        iyy: float,
-        izz: float,
-        ixy: float,
-        ixz: float,
-        iyz: float,
+        cls, ixx: float, iyy: float, izz: float, ixy: float, ixz: float, iyz: float
     ) -> Self:
         """
         Construct inertia tensor from individual components.
@@ -192,7 +160,14 @@ class InertiaTensor(SubclassJSONSerializer):
         :param iyz: Product of inertia yz
         :return: InertiaTensor
         """
-        return cls(data=[ixx, ixy, ixz, ixy, iyy, iyz, ixz, iyz, izz])
+        data = np.array(
+            [
+                [ixx, ixy, ixz],
+                [ixy, iyy, iyz],
+                [ixz, iyz, izz],
+            ]
+        )
+        return InertiaTensor(data=data)
 
     def to_values(self) -> tuple[float, float, float, float, float, float]:
         """
@@ -200,32 +175,29 @@ class InertiaTensor(SubclassJSONSerializer):
 
         :return: (ixx, iyy, izz, ixy, ixz, iyz)
         """
-        matrix = self.matrix
-        return (
-            matrix[0, 0],
-            matrix[1, 1],
-            matrix[2, 2],
-            matrix[0, 1],
-            matrix[0, 2],
-            matrix[1, 2],
-        )
+        ixx = self.data[0, 0]
+        iyy = self.data[1, 1]
+        izz = self.data[2, 2]
+        ixy = self.data[0, 1]
+        ixz = self.data[0, 2]
+        iyz = self.data[1, 2]
+        return ixx, iyy, izz, ixy, ixz, iyz
 
     @classmethod
     def from_principal_moments_and_axes(
         cls,
-        *,
         moments: PrincipalMoments,
-        axes: PrincipalAxes,
+        axes: PrincipalAxes = PrincipalAxes(data=np.eye(3)),
     ) -> Self:
         """
         Construct from principal representation:
         R * I_diag * R^T
         """
-        product = axes @ moments.as_matrix() @ axes.T()
-        return cls.from_matrix(matrix=product.data)
+        data = axes @ moments.as_matrix() @ axes.T()
+        return InertiaTensor(data=data.data)
 
     def to_principal_moments_and_axes(
-        self, *, sorted_array: NDArray | None = None
+        self, sorted_array: NDArray | None = None
     ) -> tuple[PrincipalMoments, PrincipalAxes]:
         """
         Decompose inertia tensor into principal moments and axes.
@@ -235,7 +207,7 @@ class InertiaTensor(SubclassJSONSerializer):
             (e.g., [2, 1, 0], [4.5, 6.4, 1.2]).
         :return: (PrincipalMoments, PrincipalAxes)
         """
-        eigenvalues, eigenvectors = np.linalg.eigh(self.matrix)
+        eigenvalues, eigenvectors = np.linalg.eigh(self.data)
         if sorted_array is not None:
             sorted_indices = np.argsort(np.argsort(sorted_array))
             eigenvalues = eigenvalues[sorted_indices]
@@ -245,13 +217,6 @@ class InertiaTensor(SubclassJSONSerializer):
         moments = PrincipalMoments.from_values(*eigenvalues)
         axes = PrincipalAxes(data=eigenvectors)
         return moments, axes
-
-    def to_json(self, **kwargs) -> dict[str, Any]:
-        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
 
 
 @dataclass
@@ -275,9 +240,7 @@ class Inertial:
     """
 
     inertia: InertiaTensor = field(
-        default_factory=lambda: InertiaTensor.from_values(
-            ixx=1.0, iyy=1.0, izz=1.0, ixy=0.0, ixz=0.0, iyz=0.0
-        )
+        default_factory=lambda: InertiaTensor.from_values(1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
     )
     """
     The inertia tensor of the body about its center of mass, expressed in the body's
@@ -293,7 +256,5 @@ class Inertial:
         """
         return cls(
             mass=1e-6,
-            inertia=InertiaTensor.from_values(
-                ixx=1e-12, iyy=1e-12, izz=1e-12, ixy=0.0, ixz=0.0, iyz=0.0
-            ),
+            inertia=InertiaTensor.from_values(1e-12, 1e-12, 1e-12, 0.0, 0.0, 0.0),
         )

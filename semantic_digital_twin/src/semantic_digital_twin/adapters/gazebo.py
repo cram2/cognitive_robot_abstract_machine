@@ -616,12 +616,12 @@ class GazeboParser(WorldModelParser):
         )
 
         link_R_inertial = link_T_inertial[:3, :3]
-        inertia = link_R_inertial @ inertia_in_inertial_frame.matrix @ link_R_inertial.T
+        inertia = link_R_inertial @ inertia_in_inertial_frame.data @ link_R_inertial.T
 
         return Inertial(
             mass=self.parse_float(element, "mass", 1.0),
             center_of_mass=Point3(*link_T_inertial[:3, 3], reference_frame=body),
-            inertia=InertiaTensor.from_matrix(matrix=inertia),
+            inertia=InertiaTensor(data=inertia),
         )
 
     # %% shapes
