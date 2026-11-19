@@ -197,12 +197,15 @@ class MovesToolCenterPoint(Action, ABC):
         target: Pose,
         arm: Arm,
         cruise_linear_velocity: float | None = None,
+        cruise_angular_velocity: float | None = None,
     ) -> CartesianPose:
         """
         :param target: Where the tool center point should end up.
         :param arm: The arm whose tool center point is moved.
         :param cruise_linear_velocity: Speed of the tool center point, in m/s, or
             ``None`` for the default of :class:`CartesianPose`.
+        :param cruise_angular_velocity: How fast the tool center point turns, in rad/s,
+            or ``None`` for the default of :class:`CartesianPose`.
         :return: The goal moving the tool center point there, holding the task keeping
             the base still, see
             :meth:`~coraplex.robot_plans.actions.base.Action.keep_base_still`.
@@ -215,6 +218,11 @@ class MovesToolCenterPoint(Action, ABC):
                 DefaultCruiseVelocity.TRANSLATION
                 if cruise_linear_velocity is None
                 else cruise_linear_velocity
+            ),
+            cruise_angular_velocity=(
+                DefaultCruiseVelocity.ROTATION
+                if cruise_angular_velocity is None
+                else cruise_angular_velocity
             ),
             translation_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,

@@ -1477,6 +1477,36 @@ def test_a_tool_center_point_goal_approaches_at_the_speed_asked_for(
     assert goal.cruise_linear_velocity == expected_cruise_linear_velocity
 
 
+@pytest.mark.parametrize(
+    "cruise_angular_velocity, expected_cruise_angular_velocity",
+    [(0.3, 0.3), (None, DefaultCruiseVelocity.ROTATION)],
+    ids=["asked for", "default"],
+)
+def test_a_tool_center_point_goal_turns_at_the_speed_asked_for(
+    multiple_robot_apartment_context,
+    cruise_angular_velocity: float | None,
+    expected_cruise_angular_velocity: float,
+) -> None:
+    """
+    How fast the tool center point turns is the angular cruise velocity of its pose
+    goal, and no speed asked for keeps the default of the goal.
+    """
+    world, robot, extensions = multiple_robot_apartment_context
+    arm = left_or_only_arm(robot)
+    action = MoveManipulatorAction(
+        target_pose=Pose(),
+        end_effector=arm.end_effector,
+        allow_gripper_collision=False,
+    )
+    expand(action, extensions)
+
+    goal = action.tool_center_point_goal(
+        target=Pose(), arm=arm, cruise_angular_velocity=cruise_angular_velocity
+    )
+
+    assert goal.cruise_angular_velocity == expected_cruise_angular_velocity
+
+
 def test_a_reach_approaches_at_its_tuned_speeds(
     multiple_robot_apartment_context,
 ) -> None:
