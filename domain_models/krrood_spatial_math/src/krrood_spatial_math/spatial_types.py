@@ -2530,7 +2530,7 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
 
     @classproperty
     @abstractmethod
-    def _first_vector_name(cls) -> StrEnum:
+    def _first_vector_name(cls) -> str:
         """
         :return: The name of the vector in the upper three entries, which is both its
             keyword in the constructor and its key in the json.
@@ -2538,7 +2538,7 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
 
     @classproperty
     @abstractmethod
-    def _second_vector_name(cls) -> StrEnum:
+    def _second_vector_name(cls) -> str:
         """
         :return: The name of the vector in the lower three entries, which is both its
             keyword in the constructor and its key in the json.
@@ -2588,15 +2588,6 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
         )
 
 
-class DisplacementVector(StrEnum):
-    """
-    The two vectors of a :class:`Displacement`, in the order they are stored.
-    """
-
-    TRANSLATION = "translation"
-    ROTATION_VECTOR = "rotation_vector"
-
-
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class Displacement(VectorPair):
     """
@@ -2627,12 +2618,12 @@ class Displacement(VectorPair):
         )
 
     @classproperty
-    def _first_vector_name(cls) -> DisplacementVector:
-        return DisplacementVector.TRANSLATION
+    def _first_vector_name(cls) -> str:
+        return "translation"
 
     @classproperty
-    def _second_vector_name(cls) -> DisplacementVector:
-        return DisplacementVector.ROTATION_VECTOR
+    def _second_vector_name(cls) -> str:
+        return "rotation_vector"
 
     @property
     def translation(self) -> Vector3:
@@ -2649,15 +2640,6 @@ class Displacement(VectorPair):
             radians.
         """
         return self._second_vector
-
-
-class TwistVector(StrEnum):
-    """
-    The two vectors of a :class:`Twist`, in the order they are stored.
-    """
-
-    ANGULAR_VELOCITY = "angular_velocity"
-    LINEAR_VELOCITY = "linear_velocity"
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
@@ -2691,12 +2673,12 @@ class Twist(VectorPair):
         )
 
     @classproperty
-    def _first_vector_name(cls) -> TwistVector:
-        return TwistVector.ANGULAR_VELOCITY
+    def _first_vector_name(cls) -> str:
+        return "angular_velocity"
 
     @classproperty
-    def _second_vector_name(cls) -> TwistVector:
-        return TwistVector.LINEAR_VELOCITY
+    def _second_vector_name(cls) -> str:
+        return "linear_velocity"
 
     @property
     def angular_velocity(self) -> Vector3:
@@ -2713,15 +2695,6 @@ class Twist(VectorPair):
             moves, in meters per unit of the parameter.
         """
         return self._second_vector
-
-
-class ScrewAxisVector(StrEnum):
-    """
-    The two vectors of a :class:`ScrewAxis`, in the order they are stored.
-    """
-
-    ROTATION_PER_UNIT_POSITION = "rotation_per_unit_position"
-    TRANSLATION_PER_UNIT_POSITION = "translation_per_unit_position"
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
@@ -2755,12 +2728,12 @@ class ScrewAxis(VectorPair):
         )
 
     @classproperty
-    def _first_vector_name(cls) -> ScrewAxisVector:
-        return ScrewAxisVector.ROTATION_PER_UNIT_POSITION
+    def _first_vector_name(cls) -> str:
+        return "rotation_per_unit_position"
 
     @classproperty
-    def _second_vector_name(cls) -> ScrewAxisVector:
-        return ScrewAxisVector.TRANSLATION_PER_UNIT_POSITION
+    def _second_vector_name(cls) -> str:
+        return "translation_per_unit_position"
 
     @property
     def rotation_per_unit_position(self) -> Vector3:
