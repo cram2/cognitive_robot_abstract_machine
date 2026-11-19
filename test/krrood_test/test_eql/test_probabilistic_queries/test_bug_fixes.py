@@ -1,3 +1,7 @@
+"""
+Regressions of probabilistic queries.
+"""
+
 from dataclasses import dataclass
 
 import pytest
@@ -10,8 +14,12 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.interval import closed
 from random_events.variable import Continuous
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import average, probability_of, variable
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
+from krrood.entity_query_language.factories import (
+    average,
+    variable,
+)
+from krrood.entity_query_language.factories import probability_of
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.parametrization.exceptions import (
     JointQueryAcrossClassesNotSupported,

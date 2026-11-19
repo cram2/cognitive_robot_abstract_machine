@@ -419,6 +419,117 @@ class ConditionChange(StatechartChange):
         )
 
 
+# %% changes waiting for the nodes they name
+
+
+@dataclass(kw_only=True, eq=False)
+class PendingChange(ABC):
+    """
+    A change recorded but not written into a block yet, because it is written with the
+    value it has once every node it names has joined the statechart.
+    """
+
+    node: StatechartNode
+    """
+    The node the change is about.
+    """
+
+    @property
+    @abstractmethod
+    def named_nodes(self) -> list[StatechartNode]:
+        """
+        :return: The nodes the change names as it would be written now, which have to
+            join the statechart before it is written.
+        """
+
+    @abstractmethod
+    def create_change(self) -> StatechartChange:
+        """
+        :return: The change, with the value it has now.
+        """
+
+    def is_same_change_as(self, *, other: PendingChange) -> bool:
+        """
+        :return: Whether `other` is the same kind of change about :attr:`node` itself,
+            whatever other node it compares equal to, so it is written only once.
+        """
+        return type(other) is type(self) and other.node is self.node
+
+
+@dataclass(kw_only=True, eq=False)
+class PendingChildrenChange(PendingChange):
+    """
+    The children of a composite node changed.
+    """
+
+    node: CompositeNode
+    """
+    The node whose children changed.
+    """
+
+    @property
+    def named_nodes(self) -> list[StatechartNode]:
+        return self.node.nodes
+
+    def create_change(self) -> ChildrenChange:
+        return ChildrenChange(node=self.node, children=list(self.node.nodes))
+
+
+@dataclass(kw_only=True, eq=False)
+class PendingChosenChildrenChange(PendingChange):
+    """
+    A node choosing its child chose another child.
+    """
+
+    node: CompositeNodeChoosingItsChild
+    """
+    The node whose chosen children changed.
+    """
+
+    @property
+    def named_nodes(self) -> list[StatechartNode]:
+        return self.node.chosen_children
+
+    def create_change(self) -> ChosenChildrenChange:
+        return ChosenChildrenChange(node=self.node, children=self.node.chosen_children)
+
+
+@dataclass(kw_only=True, eq=False)
+class PendingConditionChange(PendingChange):
+    """
+    The condition of a transition of a node changed.
+    """
+
+    transition_kind: TransitionKind
+    """
+    The kind of the transition.
+    """
+
+    @property
+    def named_nodes(self) -> list[StatechartNode]:
+        return self.node._get_transition(
+            transition_kind=self.transition_kind
+        ).node_dependencies
+
+    def create_change(self) -> ConditionChange:
+        return ConditionChange(
+            owner=self.node,
+            kind=self.transition_kind,
+            expression=self.node._get_transition(
+                transition_kind=self.transition_kind
+            ).expression,
+        )
+
+    def is_same_change_as(self, *, other: PendingChange) -> bool:
+        """
+        Is also about the same transition, see :meth:`PendingChange.is_same_change_as`.
+        """
+        return (
+            super().is_same_change_as(other=other)
+            and other.transition_kind == self.transition_kind
+        )
+
+
 # %% blocks of changes
 
 

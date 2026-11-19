@@ -1,3 +1,7 @@
+"""
+Causal queries answered by the probabilistic backend.
+"""
+
 import math
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -20,7 +24,7 @@ from random_events.interval import closed
 from random_events.set import Set
 from random_events.variable import Continuous, Symbolic
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.exceptions import (
     NoCauseVariablesForRanking,
     NoCausesEffectConditionForCause,

@@ -1,3 +1,8 @@
+"""
+Collection of the constraints of a motion task, grouped by how they enter the quadratic
+program.
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -6,10 +11,10 @@ from dataclasses import dataclass, field
 from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.data_types.exceptions import (
+from giskardpy.exceptions import (
     DuplicateNameException,
 )
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from giskardpy.motion_statechart.exceptions import (
     InvalidConstraintExpressionShapeError,
 )
@@ -136,7 +141,7 @@ class ConstraintCollection:
         for constraint in self._constraints:
             is_running = sm.if_eq(
                 node.life_cycle_variable,
-                LifeCycleValues.RUNNING,
+                LifeCycleValue.RUNNING,
                 if_result=sm.Scalar(1),
                 else_result=sm.Scalar(0),
             )

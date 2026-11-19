@@ -1,5 +1,9 @@
-from krrood.ormatic.data_access_objects.base import HasGeneric
-from krrood.ormatic.exceptions import NoGenericError
+"""
+Reading the generic argument a class binds.
+"""
+
+from krrood.patterns.exceptions import NoGenericError
+from krrood.patterns.has_generic import HasGeneric
 from ..dataset.example_classes import KRROODPosition
 from ..dataset.ormatic_interface import KRROODPositionDAO
 

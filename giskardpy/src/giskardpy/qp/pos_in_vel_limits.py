@@ -17,7 +17,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.linear_program_solver_highs import LinearProgramSolverHighs
-from giskardpy.utils.decorators import memoize
+from krrood.patterns.caching import memoize
 from krrood.symbolic_math.symbolic_math import (
     Scalar,
     Vector,
@@ -71,10 +71,10 @@ class BrakingProfile:
             time_step=braking.time_step,
         )
 
-    @staticmethod
+    @classmethod
     @memoize
     def _solve_fastest_braking(
-        *, braking: JerkLimitedBraking, prediction_horizon: int
+        cls, *, braking: JerkLimitedBraking, prediction_horizon: int
     ) -> npt.NDArray:
         """
         Solves the linear program behind :meth:`fastest` and returns its solution: the
@@ -93,7 +93,7 @@ class BrakingProfile:
         for derivative in range(number_of_derivatives - 1):
             last_step = (derivative + 1) * prediction_horizon - 1
             lower_bounds[last_step] = upper_bounds[last_step] = 0
-        link_model = BrakingProfile._derivative_link_model(
+        link_model = cls._derivative_link_model(
             time_step=braking.time_step,
             prediction_horizon=prediction_horizon,
             number_of_derivatives=number_of_derivatives,

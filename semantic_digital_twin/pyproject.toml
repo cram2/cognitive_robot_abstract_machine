@@ -41,7 +41,6 @@ dependencies = [
     "xxhash",  # Fast hashing for trimesh, which hashes meshes to check its caches
     "random_events>=26.10.0",
     "plotly",
-    "daqp",
     "pathlib",
     "probabilistic_model>=26.10.0",
     "python-fcl",
