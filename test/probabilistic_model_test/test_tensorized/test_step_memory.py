@@ -24,8 +24,6 @@ from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.training_schedule import MiniBatches
 
 from ...krrood_compute_resources_test.dataset.memory import FixedFreeMemory
-from .test_inner_layers_on_array_backends import mixture_of_products_case
-
 # %% memory of a step
 
 
