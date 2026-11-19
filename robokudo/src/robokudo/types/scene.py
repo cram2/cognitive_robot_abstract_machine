@@ -22,7 +22,7 @@ from semantic_digital_twin.reasoning.queries import annotation_class_by_label
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Human,
-    PerceivedObject,
+    UnknownObject,
 )
 from typing_extensions import TYPE_CHECKING, Any, TypeVar
 
@@ -122,7 +122,7 @@ class ObjectHypothesis(AnalyzableAnnotation):
         """
         :param minimum_class_confidence: How confident a classification has to be.
         :return: :attr:`semantic_class` if the latest classification is at least
-            ``minimum_class_confidence`` confident, else :class:`PerceivedObject`.
+            ``minimum_class_confidence`` confident, else :class:`UnknownObject`.
         """
         classification = self.latest_annotation_of_type(annotation_type=Classification)
         semantic_class = self.semantic_class
@@ -131,7 +131,7 @@ class ObjectHypothesis(AnalyzableAnnotation):
             or classification is None
             or classification.confidence < minimum_class_confidence
         ):
-            return PerceivedObject
+            return UnknownObject
         return semantic_class
 
 

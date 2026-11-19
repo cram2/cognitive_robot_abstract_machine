@@ -31,7 +31,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
-    PerceivedObject,
+    UnknownObject,
 )
 from krrood.exceptions import DataclassException
 from krrood.patterns.called_positionally import called_positionally
@@ -436,7 +436,7 @@ class TestJoiningSharedWorld:
                     )
                     if annotation.root.id == body_id
                 ]
-                == [(PerceivedObject, class_label)]
+                == [(UnknownObject, class_label)]
             )
         )
 
@@ -804,10 +804,10 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick_tree()
 
-        [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
-            PerceivedObject
+        [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
+            UnknownObject
         )
-        assert perceived_object.root in robokudo.world.bodies
+        assert unknown_object.root in robokudo.world.bodies
         robokudo.close()
 
     def test_failed_pass_puts_nothing_into_the_world(self, *, node: Node) -> None:
@@ -818,7 +818,7 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick_tree()
 
-        assert robokudo.world.get_semantic_annotations_by_type(PerceivedObject) == []
+        assert robokudo.world.get_semantic_annotations_by_type(UnknownObject) == []
         robokudo.close()
 
 
@@ -851,8 +851,8 @@ class TestPublishingItsOwnWorld:
 
         robokudo.tick_tree()
 
-        [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
-            PerceivedObject
+        [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
+            UnknownObject
         )
         tf_publisher = robokudo.world_publisher.tf_publisher
         published = tf_publisher.tf_model_callback
@@ -864,9 +864,7 @@ class TestPublishingItsOwnWorld:
             for transform in transforms
             for frame in (transform.header.frame_id, transform.child_frame_id)
         }
-        assert (
-            tf_publisher.frame_names.assign(perceived_object.root) in published_frames
-        )
+        assert tf_publisher.frame_names.assign(unknown_object.root) in published_frames
         assert published_frames & {FrameName.WORLD, FrameName.CAMERA} == set()
         robokudo.close()
 
@@ -876,13 +874,13 @@ class TestPublishingItsOwnWorld:
 
         robokudo.tick_tree()
 
-        [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
-            PerceivedObject
+        [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
+            UnknownObject
         )
         world_publisher = robokudo.world_publisher
         assert {
             marker.header.frame_id for marker in world_publisher.markers.markers
-        } == {world_publisher.tf_publisher.frame_names.assign(perceived_object.root)}
+        } == {world_publisher.tf_publisher.frame_names.assign(unknown_object.root)}
         robokudo.close()
 
     def test_publishes_nothing_unless_asked_to(self, *, node: Node) -> None:

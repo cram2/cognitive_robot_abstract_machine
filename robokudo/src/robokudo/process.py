@@ -100,7 +100,7 @@ class RoboKudo:
     minimum_class_confidence: float = 0.5
     """
     How confident a classification has to be for an object to be believed of the class
-    it names; a less confident one is believed a :class:`PerceivedObject`.
+    it names; a less confident one is believed an :class:`UnknownObject`.
     """
 
     world: World = field(init=False)

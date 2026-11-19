@@ -20,7 +20,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsPerceivable,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    PerceivedObject,
+    UnknownObject,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description import geometry
@@ -228,17 +228,17 @@ class PerceptionBelief:
     def update_known_object(self, *, known_object: IsPerceivable, world: World) -> None:
         """
         Move ``known_object`` to where the object was seen, keeping its orientation and
-        shape. A :class:`PerceivedObject` becomes an annotation of
+        shape. An :class:`UnknownObject` becomes an annotation of
         :attr:`believed_class`; any other semantic annotation keeps its class.
 
         :param known_object: The object of ``world`` the belief was matched to.
         :param world: The world ``known_object`` belongs to.
         """
         self._move(body=known_object.root, world=world)
-        if isinstance(known_object, PerceivedObject):
-            self._replace_perceived_object(perceived_object=known_object, world=world)
+        if isinstance(known_object, UnknownObject):
+            self._replace_unknown_object(unknown_object=known_object, world=world)
             return
-        if self.believed_class is not PerceivedObject and not isinstance(
+        if self.believed_class is not UnknownObject and not isinstance(
             known_object, self.believed_class
         ):
             logging.getLogger(PACKAGE_NAME).info(
@@ -266,23 +266,23 @@ class PerceptionBelief:
             )
         )
 
-    def _replace_perceived_object(
-        self, *, perceived_object: PerceivedObject, world: World
+    def _replace_unknown_object(
+        self, *, unknown_object: UnknownObject, world: World
     ) -> None:
         """
-        Replace ``perceived_object`` by an annotation of :attr:`believed_class` rooted
-        at its body, unless the object is believed to be a :class:`PerceivedObject`.
+        Replace ``unknown_object`` by an annotation of :attr:`believed_class` rooted at
+        its body, unless the object is believed to be an :class:`UnknownObject`.
 
-        :param perceived_object: The object of ``world`` the belief was matched to.
-        :param world: The world ``perceived_object`` belongs to.
+        :param unknown_object: The object of ``world`` the belief was matched to.
+        :param world: The world ``unknown_object`` belongs to.
         """
-        if self.believed_class is PerceivedObject:
+        if self.believed_class is UnknownObject:
             return
         with world.modify_world():
-            world.remove_semantic_annotation(perceived_object)
+            world.remove_semantic_annotation(unknown_object)
             world.add_semantic_annotation(
                 self.believed_class(
-                    root=perceived_object.root, class_label=self.hypothesis.class_label
+                    root=unknown_object.root, class_label=self.hypothesis.class_label
                 )
             )
 
@@ -433,12 +433,12 @@ class ObjectMatcher:
         :param known_object: The object.
         :return: Whether the object of ``belief`` was classified as something
             ``known_object`` is not: another semantic annotation, or, for a
-            :class:`PerceivedObject`, another class label.
+            :class:`UnknownObject`, another class label.
         """
         class_label = belief.hypothesis.class_label
         if class_label is None:
             return False
-        if isinstance(known_object, PerceivedObject):
+        if isinstance(known_object, UnknownObject):
             return (
                 known_object.class_label is not None
                 and known_object.class_label != class_label

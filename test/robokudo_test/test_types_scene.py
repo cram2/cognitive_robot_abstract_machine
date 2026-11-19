@@ -7,7 +7,7 @@ from __future__ import annotations
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
     Human,
-    PerceivedObject,
+    UnknownObject,
 )
 
 from robokudo.types.annotation import Classification, PoseAnnotation
@@ -123,17 +123,17 @@ class TestBelievedSemanticClass:
             is Cup
         )
 
-    def test_is_a_perceived_object_below_the_minimum_confidence(self) -> None:
+    def test_is_an_unknown_object_below_the_minimum_confidence(self) -> None:
         hypothesis = ObjectHypothesis(
             annotations=[Classification(classname="cup", confidence=0.4)]
         )
 
         assert (
             hypothesis.believed_semantic_class(minimum_class_confidence=0.5)
-            is PerceivedObject
+            is UnknownObject
         )
 
-    def test_is_a_perceived_object_for_a_label_naming_no_semantic_annotation(
+    def test_is_an_unknown_object_for_a_label_naming_no_semantic_annotation(
         self,
     ) -> None:
         hypothesis = ObjectHypothesis(
@@ -142,7 +142,7 @@ class TestBelievedSemanticClass:
 
         assert (
             hypothesis.believed_semantic_class(minimum_class_confidence=0.5)
-            is PerceivedObject
+            is UnknownObject
         )
 
     def test_is_human_for_an_unclassified_human(self) -> None:

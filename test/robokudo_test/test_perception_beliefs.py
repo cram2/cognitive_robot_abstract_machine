@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
     Human,
     Milk,
-    PerceivedObject,
+    UnknownObject,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -258,7 +258,7 @@ class TestNewObjects:
     Beliefs no object of the world is about become objects of their own.
     """
 
-    def test_unclassified_object_becomes_a_perceived_object_at_its_world_pose(
+    def test_unclassified_object_becomes_an_unknown_object_at_its_world_pose(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         translation = (0.0, 0.5, 2.0)
@@ -270,7 +270,7 @@ class TestNewObjects:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label is None
         assert np.allclose(
             position_of(annotation.root),
@@ -348,10 +348,10 @@ class TestNewObjects:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label == class_label
 
-    def test_object_classified_without_confidence_becomes_a_perceived_object(
+    def test_object_classified_without_confidence_becomes_an_unknown_object(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         class_label = "cup"
@@ -363,7 +363,7 @@ class TestNewObjects:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label == class_label
 
     def test_new_object_takes_the_shape_fitted_to_it_at_its_pose(
@@ -627,13 +627,13 @@ class TestHumans:
         assert perceivable_objects(world) == [human]
         assert np.allclose(position_of(human.root), translation)
 
-    def test_perceived_object_seen_as_a_human_becomes_a_human(
+    def test_unknown_object_seen_as_a_human_becomes_a_human(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [perceived_object] = perceivable_objects(world)
+        [unknown_object] = perceivable_objects(world)
 
         put_pass_into_world(
             robokudo,
@@ -643,7 +643,7 @@ class TestHumans:
 
         [annotation] = perceivable_objects(world)
         assert type(annotation) is Human
-        assert annotation.root is perceived_object.root
+        assert annotation.root is unknown_object.root
 
 
 # %% objects seen again
@@ -870,7 +870,7 @@ class TestClassificationOfObjectsSeenAgain:
     How the semantic annotation of an object seen again follows its classification.
     """
 
-    def test_perceived_object_becomes_its_semantic_annotation_once_classified(
+    def test_unknown_object_becomes_its_semantic_annotation_once_classified(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         class_label = "cup"
@@ -890,7 +890,7 @@ class TestClassificationOfObjectsSeenAgain:
         assert type(annotation) is Cup
         assert annotation.class_label == class_label
 
-    def test_perceived_object_classified_without_confidence_stays_as_it_is(
+    def test_unknown_object_classified_without_confidence_stays_as_it_is(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         put_pass_into_world(
@@ -904,7 +904,7 @@ class TestClassificationOfObjectsSeenAgain:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label is None
 
     def test_semantic_annotation_keeps_its_class_when_seen_as_another(

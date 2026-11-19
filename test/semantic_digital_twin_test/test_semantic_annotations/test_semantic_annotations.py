@@ -704,23 +704,23 @@ def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
 # %% perceived objects
 
 
-def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
+def test_unknown_object_keeps_its_class_label_when_sent_to_another_process():
     """
     A perceived object keeps its class label through serialization to another process.
     """
     world = World()
-    body = Body(name=PrefixedName("perceived_object"))
+    body = Body(name=PrefixedName("unknown_object"))
     with world.modify_world():
         world.add_body(body)
-        perceived_object = PerceivedObject(root=body, class_label="fork")
-        world.add_semantic_annotation(perceived_object)
+        unknown_object = UnknownObject(root=body, class_label="fork")
+        world.add_semantic_annotation(unknown_object)
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
 
-    received = from_json(to_json(perceived_object), **tracker.create_kwargs())
+    received = from_json(to_json(unknown_object), **tracker.create_kwargs())
 
-    assert type(received) is PerceivedObject
+    assert type(received) is UnknownObject
     assert received.root is body
-    assert received.class_label == perceived_object.class_label
+    assert received.class_label == unknown_object.class_label
 
 
 def test_human_is_found_among_the_perceivable_objects_with_its_class_label():

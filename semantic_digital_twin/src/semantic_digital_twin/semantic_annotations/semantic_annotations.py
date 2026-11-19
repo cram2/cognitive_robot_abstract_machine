@@ -1175,7 +1175,7 @@ class SaltContainer(Container, IsPerceivable):
 
 
 @dataclass(eq=False, kw_only=True)
-class PerceivedObject(HasRootBody, IsPerceivable):
+class UnknownObject(HasRootBody, IsPerceivable):
     """
     An object perception found that no more specific semantic annotation describes.
     """
