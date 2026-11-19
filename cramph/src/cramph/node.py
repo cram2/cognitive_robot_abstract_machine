@@ -65,6 +65,10 @@ from krrood.symbolic_math.symbolic_math import (
     GenericSymbolicType,
     Scalar,
 )
+from cramph.structure_change_recorder import (
+    StructureChangeRecorder,
+    StructureChangeRecorderOutsideStatechart,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
@@ -180,8 +184,8 @@ class TransitionCondition(SubclassJSONSerializer):
         self._sanity_check(new_expression=new_expression)
         self.expression = new_expression
         self._child = child
-        if self.owner is not None and self.owner._statechart is not None:
-            self.owner._statechart._record_changed_condition(
+        if self.owner is not None:
+            self.owner._structure_change_recorder._record_changed_condition(
                 node=self.owner, transition_kind=self.kind
             )
 
@@ -1234,10 +1238,9 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 self._interrupt_condition = transition
             case _:
                 raise UnknownTransitionKindError(transition_kind=transition.kind)
-        if self._statechart is not None:
-            self._statechart._record_changed_condition(
-                node=self, transition_kind=transition.kind
-            )
+        self._structure_change_recorder._record_changed_condition(
+            node=self, transition_kind=transition.kind
+        )
 
     def create_lifecycle_transitions(
         self, *, own_transitions_allowed: sm.Scalar
@@ -1538,6 +1541,16 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param statechart: The statechart this node now belongs to.
         """
         self._statechart = statechart
+
+    @property
+    def _structure_change_recorder(self) -> StructureChangeRecorder:
+        """
+        :return: The statechart this node belongs to, or a recorder that records
+            nothing if it belongs to none.
+        """
+        if self._statechart is None:
+            return StructureChangeRecorderOutsideStatechart()
+        return self._statechart
 
     @property
     def context(self) -> StatechartContext:
@@ -2397,13 +2410,13 @@ class CompositeNode(StatechartNode):
         :param children: The nodes to hold as children.
         """
         self.nodes = list(children)
-        if self._statechart is not None:
-            self._statechart._record_changed_children(node=self)
+        self._structure_change_recorder._record_changed_children(node=self)
 
     def insert_child(self, *, position: int, node: StatechartNode) -> None:
         """
-        Lists `node` among the children at `position`, leaving the statechart as it is,
-        and records the change like :meth:`set_children`.
+        Lists `node` among the children at `position`, without adding it to the
+        statechart, and records the change like :meth:`set_children`. See
+        :meth:`_add_listed_child_to_statechart` for adding it.
 
         :param position: The index among the children `node` takes.
         :param node: The node to list as a child.
@@ -2415,8 +2428,8 @@ class CompositeNode(StatechartNode):
     def remove_child(self, *, child: StatechartNode) -> None:
         """
         Stops listing `child` itself among the children, whatever other child it
-        compares equal to, leaving the statechart as it is, and records the change like
-        :meth:`set_children`.
+        compares equal to, without removing it from the statechart, and records the
+        change like :meth:`set_children`.
 
         :param child: One of :attr:`nodes`.
         """
@@ -2477,12 +2490,12 @@ class CompositeNode(StatechartNode):
         self._check_accepts_children()
         if node not in self.nodes:
             self.insert_child(position=len(self.nodes), node=node)
-        self._place_child_in_statechart(node=node)
+        self._add_listed_child_to_statechart(node=node)
 
-    def _place_child_in_statechart(self, *, node: StatechartNode) -> None:
+    def _add_listed_child_to_statechart(self, *, node: StatechartNode) -> None:
         """
-        Makes `node` a child of this node in the statechart this node belongs to,
-        without touching :attr:`nodes`.
+        Adds `node`, which :attr:`nodes` lists already, to the statechart this node
+        belongs to, as a child of this node, without touching :attr:`nodes`.
 
         .. note:: It does not check :meth:`_check_accepts_children`; check that before
             changing :attr:`nodes`, so a rejected node leaves this node as it was.

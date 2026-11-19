@@ -70,6 +70,7 @@ from cramph.statechart_changes import (
     StatechartChange,
     StatechartChangeBlock,
 )
+from cramph.structure_change_recorder import StructureChangeRecorder
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityReferenceWriter,
 )
@@ -284,7 +285,7 @@ class StatechartJSONKey(StrEnum):
 
 
 @dataclass(kw_only=True)
-class Statechart(SubclassJSONSerializer):
+class Statechart(StructureChangeRecorder, SubclassJSONSerializer):
     """
     A directed graph of nodes whose life cycle and observation states :meth:`tick`
     brings up to date, until an :class:`EndStatechart` observes True or a
@@ -703,36 +704,26 @@ class Statechart(SubclassJSONSerializer):
             self._record_changed_condition(node=node, transition_kind=transition_kind)
 
     def _record_changed_children(self, *, node: CompositeNode) -> None:
-        """
-        Records that the children of `node` changed, to be written into a block once
-        all of them joined this statechart.
-        """
         self._record_pending_change(pending=PendingChildrenChange(node=node))
 
     def _record_changed_chosen_children(
         self, *, node: CompositeNodeChoosingItsChild
     ) -> None:
-        """
-        Records that `node` chose a child, to be written into a block once all of its
-        chosen children joined this statechart.
-        """
         self._record_pending_change(pending=PendingChosenChildrenChange(node=node))
 
     def _record_changed_condition(
         self, *, node: StatechartNode, transition_kind: TransitionKind
     ) -> None:
-        """
-        Records that the condition of the transition of `node` of `transition_kind`
-        changed, to be written into a block once every node it reads joined this
-        statechart.
-        """
         self._record_pending_change(
             pending=PendingConditionChange(node=node, transition_kind=transition_kind)
         )
 
     def _record_pending_change(self, *, pending: PendingChange) -> None:
         """
-        Records `pending` for a later block, unless the same change waits already.
+        Records `pending`, to be written into a block with the value it has once every
+        node it names joined this statechart. A pending change that is the same change,
+        see :meth:`~cramph.statechart_changes.PendingChange.is_same_change_as`, stays
+        the only one.
         """
         if not any(
             recorded.is_same_change_as(other=pending)
