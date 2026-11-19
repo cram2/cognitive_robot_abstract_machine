@@ -39,8 +39,7 @@ from demo import DemoRunner, ShapeSortingPlan
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.launch_files import (
     TracyGiskardLaunchFile,
 )
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.world_fetcher import join_shared_world
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.world import World
 
@@ -143,10 +142,9 @@ class RealRunner(DemoRunner):
                 target=executor.spin, daemon=True, name="rclpy-executor"
             ).start()
 
-            world = fetch_world_from_service(
+            world = join_shared_world(
                 node=node, timeout_seconds=self.world_fetch_timeout.total_seconds()
             )
-            WorldSynchronizer(_world=world, node=node)
             yield RunningRobot(world=world, node=node)
         finally:
             os.killpg(os.getpgid(controllers.pid), signal.SIGTERM)
