@@ -1,9 +1,12 @@
+"""
+A live 3d-force-graph view of a rustworkx graph whose nodes are drawn with their meshes.
+"""
+
 from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
 
-import trimesh
 from typing_extensions import Any, ClassVar, TYPE_CHECKING, Callable
 
 from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
@@ -11,6 +14,7 @@ from krrood.rustworkx_utils.visualization.three_graph_visualizer import (
 )
 
 if TYPE_CHECKING:
+    import trimesh
     from flask import Flask
 
 

@@ -9,8 +9,9 @@ description = "Probabilistic queries and feature extraction over entity queries.
 requires-python = ">=3.10"
 license = "LGPL-3.0-only"
 authors = [
-    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
-    {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
+    {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"},
+    {name = "Naren Vasantakumaar", email = "naren@uni-bremen.de"},
+    {name = "David Prüser", email = "david@pruesernet.de"}
 ]
 dependencies = [
     "krrood-core==26.10.0",
