@@ -811,6 +811,32 @@ class TestMatching:
         assert np.allclose(position_of(bodies["bowl"]), bowl_translation)
         assert np.allclose(position_of(bodies["cup"]), cup_translation)
 
+    def test_object_classified_without_confidence_is_taken_as_the_nearest_object(
+        self, *, robokudo: RoboKudo, world: World
+    ) -> None:
+        bowl_translation = (0.05, 0.0, 1.0)
+        put_pass_into_world(
+            robokudo,
+            cas_seen_from(world, camera_pose()),
+            make_object_hypothesis(translation=bowl_translation, class_label="bowl"),
+        )
+        [bowl] = perceivable_objects(world)
+        milk = add_perceivable_object(world, position=(-0.05, 0.0, 1.0))
+        # Closer to the milk, but classified as a bowl without confidence.
+        translation = (-0.01, 0.0, 1.0)
+
+        put_pass_into_world(
+            robokudo,
+            cas_seen_from(world, camera_pose()),
+            make_object_hypothesis(
+                translation=translation, class_label="bowl", class_confidence=0.0
+            ),
+        )
+
+        assert len(perceivable_objects(world)) == 2
+        assert np.allclose(position_of(milk), translation)
+        assert np.allclose(position_of(bowl.root), bowl_translation)
+
     def test_object_of_a_very_different_size_gets_a_body_of_its_own(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:

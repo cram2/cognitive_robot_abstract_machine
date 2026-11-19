@@ -53,26 +53,22 @@ class PerceptionBelief:
     The hypothesis the object was found as.
     """
 
-    body: Body
+    annotation: IsPerceivable
     """
-    The body, of no world yet, that shows and collides with the shape the object was
-    seen with.
+    The semantic annotation the object is believed to be, an :class:`UnknownObject` if
+    its classification is not confident enough, rooted at a body of no world yet that
+    shows and collides with the shape the object was seen with.
     """
 
     pose: HomogeneousTransformationMatrix
     """
     The pose of the geometry the object was seen with, relative to the world frame of
-    the pass; the pose :attr:`body` is placed at.
+    the pass; the pose the body of :attr:`annotation` is placed at.
     """
 
     scale: geometry.Scale
     """
     The lengths of the geometry the object was seen with along the axes of its pose.
-    """
-
-    believed_class: type[IsPerceivable]
-    """
-    The semantic annotation the object is believed to be.
     """
 
     @classproperty
@@ -120,14 +116,19 @@ class PerceptionBelief:
         if color is not None:
             shape.color = color
         visual = ShapeCollection(shapes=[shape])
+        semantic_class = hypothesis.determine_semantic_class(
+            minimum_class_confidence=minimum_class_confidence
+        )
         return cls(
             hypothesis=hypothesis,
-            body=Body(visual=visual, collision=visual.copy_without_reference_frame()),
+            annotation=semantic_class(
+                root=Body(
+                    visual=visual, collision=visual.copy_without_reference_frame()
+                ),
+                class_label=hypothesis.class_label,
+            ),
             pose=world_T_camera @ seen_geometry.origin,
             scale=seen_geometry.local_frame_bounding_box.scale,
-            believed_class=hypothesis.believed_semantic_class(
-                minimum_class_confidence=minimum_class_confidence
-            ),
         )
 
     @classmethod
@@ -207,31 +208,28 @@ class PerceptionBelief:
 
     def add_to_world(self, *, world: World) -> None:
         """
-        Add :attr:`body` to ``world`` at the box the object was seen in, below the world
-        frame of its pass, as an annotation of :attr:`believed_class`.
+        Add :attr:`annotation` and its body to ``world``, the body at the box the object
+        was seen in, below the world frame of its pass.
 
         :param world: The world the belief is about.
         """
+        body = self.annotation.root
         with world.modify_world():
             world.add_connection(
                 Connection6DoF.create_with_dofs(
-                    world=world, parent=self.pose.reference_frame, child=self.body
+                    world=world, parent=self.pose.reference_frame, child=body
                 )
             )
-            world.add_semantic_annotation(
-                self.believed_class(
-                    root=self.body, class_label=self.hypothesis.class_label
-                )
-            )
-            self.body.parent_connection.origin = self.pose
+            world.add_semantic_annotation(self.annotation)
+            body.parent_connection.origin = self.pose
 
     def update_object_in_world(
         self, *, object_in_world: IsPerceivable, world: World
     ) -> None:
         """
         Move ``object_in_world`` to where the object was seen, keeping its orientation
-        and shape. An :class:`UnknownObject` becomes an annotation of
-        :attr:`believed_class`; any other semantic annotation keeps its class.
+        and shape. An :class:`UnknownObject` takes the class of :attr:`annotation`; any
+        other semantic annotation keeps its class.
 
         :param object_in_world: The object of ``world`` the belief was matched to.
         :param world: The world ``object_in_world`` belongs to.
@@ -240,13 +238,14 @@ class PerceptionBelief:
         if isinstance(object_in_world, UnknownObject):
             self._replace_unknown_object(unknown_object=object_in_world, world=world)
             return
-        if self.believed_class is not UnknownObject and not isinstance(
-            object_in_world, self.believed_class
+        if isinstance(self.annotation, UnknownObject) or isinstance(
+            object_in_world, type(self.annotation)
         ):
-            logging.getLogger(PACKAGE_NAME).info(
-                f"Keeping {type(object_in_world).__name__} {object_in_world.root.name} "
-                f"although it was classified as {self.believed_class.__name__}."
-            )
+            return
+        logging.getLogger(PACKAGE_NAME).info(
+            f"Keeping {type(object_in_world).__name__} {object_in_world.root.name} "
+            f"although it was classified as {type(self.annotation).__name__}."
+        )
 
     def _move(self, *, body: Body, world: World) -> None:
         """
@@ -272,19 +271,19 @@ class PerceptionBelief:
         self, *, unknown_object: UnknownObject, world: World
     ) -> None:
         """
-        Replace ``unknown_object`` by an annotation of :attr:`believed_class` rooted at
-        its body, unless the object is believed to be an :class:`UnknownObject`.
+        Replace ``unknown_object`` by an annotation of the class of :attr:`annotation`
+        rooted at its body, unless :attr:`annotation` is an :class:`UnknownObject`.
 
         :param unknown_object: The object of ``world`` the belief was matched to.
         :param world: The world ``unknown_object`` belongs to.
         """
-        if self.believed_class is UnknownObject:
+        if isinstance(self.annotation, UnknownObject):
             return
         with world.modify_world():
             world.remove_semantic_annotation(unknown_object)
             world.add_semantic_annotation(
-                self.believed_class(
-                    root=unknown_object.root, class_label=self.hypothesis.class_label
+                type(self.annotation)(
+                    root=unknown_object.root, class_label=self.annotation.class_label
                 )
             )
 
@@ -439,16 +438,16 @@ class ObjectMatcher:
         :param belief: The belief.
         :param object_in_world: The object.
         :return: Whether the object of ``belief`` was classified as something
-            ``object_in_world`` is not: another semantic annotation, or, for a
-            :class:`UnknownObject`, another class label.
+            ``object_in_world`` is not: another class label if either is an
+            :class:`UnknownObject`, else another semantic annotation.
         """
-        class_label = belief.hypothesis.class_label
-        if class_label is None:
-            return False
-        if isinstance(object_in_world, UnknownObject):
+        annotation = belief.annotation
+        if isinstance(annotation, UnknownObject) or isinstance(
+            object_in_world, UnknownObject
+        ):
             return (
-                object_in_world.class_label is not None
-                and object_in_world.class_label != class_label
+                annotation.class_label is not None
+                and object_in_world.class_label is not None
+                and object_in_world.class_label != annotation.class_label
             )
-        semantic_class = belief.hypothesis.semantic_class
-        return semantic_class is None or not isinstance(object_in_world, semantic_class)
+        return not isinstance(object_in_world, type(annotation))

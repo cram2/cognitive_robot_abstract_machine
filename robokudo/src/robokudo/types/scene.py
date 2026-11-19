@@ -106,31 +106,23 @@ class ObjectHypothesis(AnalyzableAnnotation):
             return None
         return classification.classname
 
-    @property
-    def semantic_class(self) -> type[IsPerceivable] | None:
-        """
-        The semantic annotation :attr:`class_label` names, however confident its
-        classification is; None if it names none or the hypothesis was not classified.
-        """
-        if self.class_label is None:
-            return None
-        return annotation_class_by_label(self.class_label)
-
-    def believed_semantic_class(
+    def determine_semantic_class(
         self, *, minimum_class_confidence: float
     ) -> type[IsPerceivable]:
         """
         :param minimum_class_confidence: How confident a classification has to be.
-        :return: :attr:`semantic_class` if the latest classification is at least
-            ``minimum_class_confidence`` confident, else :class:`UnknownObject`.
+        :return: The semantic annotation :attr:`class_label` names, if the latest
+            classification is at least ``minimum_class_confidence`` confident; else
+            :class:`UnknownObject`.
         """
         classification = self.latest_annotation_of_type(annotation_type=Classification)
-        semantic_class = self.semantic_class
         if (
-            semantic_class is None
-            or classification is None
+            self.class_label is None
             or classification.confidence < minimum_class_confidence
         ):
+            return UnknownObject
+        semantic_class = annotation_class_by_label(self.class_label)
+        if semantic_class is None:
             return UnknownObject
         return semantic_class
 
@@ -162,20 +154,12 @@ class HumanHypothesis(ObjectHypothesis):
     Result of human-related processing.
     """
 
-    @property
-    def semantic_class(self) -> type[IsPerceivable]:
-        """
-        Unlike :attr:`ObjectHypothesis.semantic_class`, :class:`Human` whatever the
-        class label names.
-        """
-        return Human
-
-    def believed_semantic_class(
+    def determine_semantic_class(
         self, *, minimum_class_confidence: float
     ) -> type[IsPerceivable]:
         """
-        Unlike :meth:`ObjectHypothesis.believed_semantic_class`, :class:`Human` however
-        confident the classification is.
+        Unlike :meth:`ObjectHypothesis.determine_semantic_class`, :class:`Human`
+        whatever the classification says.
         """
         return Human
 

@@ -73,42 +73,13 @@ class TestClassLabel:
 # %% semantic class
 
 
-class TestSemanticClass:
-    """
-    The semantic annotation a hypothesis names, however confident its classification.
-    """
-
-    def test_is_the_semantic_annotation_the_class_label_names(self) -> None:
-        hypothesis = ObjectHypothesis(
-            annotations=[Classification(classname="cup", confidence=0.0)]
-        )
-
-        assert hypothesis.semantic_class is Cup
-
-    def test_is_none_for_a_class_label_naming_no_semantic_annotation(self) -> None:
-        hypothesis = ObjectHypothesis(annotations=[Classification(classname="fork")])
-
-        assert hypothesis.semantic_class is None
-
-    def test_is_none_without_a_classification(self) -> None:
-        assert ObjectHypothesis().semantic_class is None
-
-    def test_is_human_for_a_human_whatever_its_class_label(self) -> None:
-        hypothesis = HumanHypothesis(annotations=[Classification(classname="cup")])
-
-        assert hypothesis.semantic_class is Human
-
-
-# %% believed semantic class
-
-
-class TestBelievedSemanticClass:
+class TestDetermineSemanticClass:
     """
     The semantic annotation a hypothesis is believed to be, given how confident a
     classification has to be.
     """
 
-    def test_is_the_semantic_class_of_a_confident_classification(self) -> None:
+    def test_is_the_semantic_annotation_a_confident_class_label_names(self) -> None:
         minimum_class_confidence = 0.5
         hypothesis = ObjectHypothesis(
             annotations=[
@@ -117,7 +88,7 @@ class TestBelievedSemanticClass:
         )
 
         assert (
-            hypothesis.believed_semantic_class(
+            hypothesis.determine_semantic_class(
                 minimum_class_confidence=minimum_class_confidence
             )
             is Cup
@@ -129,7 +100,7 @@ class TestBelievedSemanticClass:
         )
 
         assert (
-            hypothesis.believed_semantic_class(minimum_class_confidence=0.5)
+            hypothesis.determine_semantic_class(minimum_class_confidence=0.5)
             is UnknownObject
         )
 
@@ -141,12 +112,27 @@ class TestBelievedSemanticClass:
         )
 
         assert (
-            hypothesis.believed_semantic_class(minimum_class_confidence=0.5)
+            hypothesis.determine_semantic_class(minimum_class_confidence=0.5)
+            is UnknownObject
+        )
+
+    def test_is_an_unknown_object_without_a_classification(self) -> None:
+        assert (
+            ObjectHypothesis().determine_semantic_class(minimum_class_confidence=0.5)
             is UnknownObject
         )
 
     def test_is_human_for_an_unclassified_human(self) -> None:
         assert (
-            HumanHypothesis().believed_semantic_class(minimum_class_confidence=0.5)
+            HumanHypothesis().determine_semantic_class(minimum_class_confidence=0.5)
             is Human
+        )
+
+    def test_is_human_for_a_human_whatever_its_class_label(self) -> None:
+        hypothesis = HumanHypothesis(
+            annotations=[Classification(classname="cup", confidence=1.0)]
+        )
+
+        assert (
+            hypothesis.determine_semantic_class(minimum_class_confidence=0.5) is Human
         )
