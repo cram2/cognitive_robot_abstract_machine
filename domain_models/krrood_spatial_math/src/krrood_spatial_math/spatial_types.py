@@ -2496,33 +2496,36 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
     """
     Six numbers made of two vectors given along the axes of the same reference frame:
-    the first vector in the upper three entries, the second in the lower three.
+    a rotational part in the upper three entries and a translational part in the lower
+    three, such as the angular and the linear velocity of a :class:`Twist`.
     """
 
     def __init__(
         self,
         *,
-        first_vector: Vector3 | None,
-        second_vector: Vector3 | None,
+        rotational_part: Vector3 | None,
+        translational_part: Vector3 | None,
         reference_frame: CartesianFrame3D | None,
     ) -> None:
         """
-        :param first_vector: The upper three entries; zero if None.
-        :param second_vector: The lower three entries; zero if None.
+        :param rotational_part: How the body turns, in the upper three entries; zero if
+            None.
+        :param translational_part: How a point of the body moves, in the lower three
+            entries; zero if None.
         :param reference_frame: The frame along whose axes both vectors are given.
         """
-        if first_vector is None:
-            first_vector = Vector3()
-        if second_vector is None:
-            second_vector = Vector3()
+        if rotational_part is None:
+            rotational_part = Vector3()
+        if translational_part is None:
+            translational_part = Vector3()
         self.casadi_sx = sm.to_sx(
             [
-                first_vector.x,
-                first_vector.y,
-                first_vector.z,
-                second_vector.x,
-                second_vector.y,
-                second_vector.z,
+                rotational_part.x,
+                rotational_part.y,
+                rotational_part.z,
+                translational_part.x,
+                translational_part.y,
+                translational_part.z,
             ]
         )
         self.reference_frame = reference_frame
@@ -2530,18 +2533,18 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
 
     @classproperty
     @abstractmethod
-    def _first_vector_name(cls) -> str:
+    def _rotational_part_name(cls) -> str:
         """
-        :return: The name of the vector in the upper three entries, which is both its
-            keyword in the constructor and its key in the json.
+        :return: The name of the rotational part, which is both its keyword in the
+            constructor and its key in the json.
         """
 
     @classproperty
     @abstractmethod
-    def _second_vector_name(cls) -> str:
+    def _translational_part_name(cls) -> str:
         """
-        :return: The name of the vector in the lower three entries, which is both its
-            keyword in the constructor and its key in the json.
+        :return: The name of the translational part, which is both its keyword in the
+            constructor and its key in the json.
         """
 
     def _verify_type(self) -> None:
@@ -2557,31 +2560,35 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
         )
         return cls(
             **{
-                cls._first_vector_name: Vector3(*data[cls._first_vector_name]),
-                cls._second_vector_name: Vector3(*data[cls._second_vector_name]),
+                cls._rotational_part_name: Vector3(*data[cls._rotational_part_name]),
+                cls._translational_part_name: Vector3(
+                    *data[cls._translational_part_name]
+                ),
             },
             reference_frame=reference_frame,
         )
 
     def _constant_to_json(self) -> dict[str, Any]:
         return {
-            self._first_vector_name: self._first_vector.to_np()[:3].tolist(),
-            self._second_vector_name: self._second_vector.to_np()[:3].tolist(),
+            self._rotational_part_name: self._rotational_part.to_np()[:3].tolist(),
+            self._translational_part_name: self._translational_part.to_np()[
+                :3
+            ].tolist(),
         }
 
     @property
-    def _first_vector(self) -> Vector3:
+    def _rotational_part(self) -> Vector3:
         """
-        :return: The vector in the upper three entries.
+        :return: How the body turns, in the upper three entries.
         """
         return Vector3(
             x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
         )
 
     @property
-    def _second_vector(self) -> Vector3:
+    def _translational_part(self) -> Vector3:
         """
-        :return: The vector in the lower three entries.
+        :return: How a point of the body moves, in the lower three entries.
         """
         return Vector3(
             x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
@@ -2612,17 +2619,17 @@ class Displacement(VectorPair):
         :param reference_frame: The frame along whose axes the body moved.
         """
         super().__init__(
-            first_vector=rotation_vector,
-            second_vector=translation,
+            rotational_part=rotation_vector,
+            translational_part=translation,
             reference_frame=reference_frame,
         )
 
     @classproperty
-    def _first_vector_name(cls) -> str:
+    def _rotational_part_name(cls) -> str:
         return "rotation_vector"
 
     @classproperty
-    def _second_vector_name(cls) -> str:
+    def _translational_part_name(cls) -> str:
         return "translation"
 
     @property
@@ -2631,7 +2638,7 @@ class Displacement(VectorPair):
         :return: The axis the body turned around, scaled by the angle it turned by in
             radians.
         """
-        return self._first_vector
+        return self._rotational_part
 
     @property
     def translation(self) -> Vector3:
@@ -2639,7 +2646,7 @@ class Displacement(VectorPair):
         :return: Where the body's origin ended up, relative to where it started, in
             meters.
         """
-        return self._second_vector
+        return self._translational_part
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
@@ -2667,17 +2674,17 @@ class Twist(VectorPair):
         :param reference_frame: The frame along whose axes both velocities are given.
         """
         super().__init__(
-            first_vector=angular_velocity,
-            second_vector=linear_velocity,
+            rotational_part=angular_velocity,
+            translational_part=linear_velocity,
             reference_frame=reference_frame,
         )
 
     @classproperty
-    def _first_vector_name(cls) -> str:
+    def _rotational_part_name(cls) -> str:
         return "angular_velocity"
 
     @classproperty
-    def _second_vector_name(cls) -> str:
+    def _translational_part_name(cls) -> str:
         return "linear_velocity"
 
     @property
@@ -2686,7 +2693,7 @@ class Twist(VectorPair):
         :return: The axis the body turns around, scaled by how fast it turns, in radians
             per unit of the parameter.
         """
-        return self._first_vector
+        return self._rotational_part
 
     @property
     def linear_velocity(self) -> Vector3:
@@ -2694,7 +2701,7 @@ class Twist(VectorPair):
         :return: How fast the point of the body at the origin of the reference frame
             moves, in meters per unit of the parameter.
         """
-        return self._second_vector
+        return self._translational_part
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
@@ -2721,17 +2728,17 @@ class ScrewAxis(VectorPair):
         :param reference_frame: The frame along whose axes both parts are given.
         """
         super().__init__(
-            first_vector=rotation_per_unit_position,
-            second_vector=translation_per_unit_position,
+            rotational_part=rotation_per_unit_position,
+            translational_part=translation_per_unit_position,
             reference_frame=reference_frame,
         )
 
     @classproperty
-    def _first_vector_name(cls) -> str:
+    def _rotational_part_name(cls) -> str:
         return "rotation_per_unit_position"
 
     @classproperty
-    def _second_vector_name(cls) -> str:
+    def _translational_part_name(cls) -> str:
         return "translation_per_unit_position"
 
     @property
@@ -2740,7 +2747,7 @@ class ScrewAxis(VectorPair):
         :return: The axis the body turns around, scaled by the angle it turns by per
             unit of position, in radians.
         """
-        return self._first_vector
+        return self._rotational_part
 
     @property
     def translation_per_unit_position(self) -> Vector3:
@@ -2748,7 +2755,7 @@ class ScrewAxis(VectorPair):
         :return: How far the point of the body at the origin of the reference frame
             moves per unit of position, in meters.
         """
-        return self._second_vector
+        return self._translational_part
 
     @property
     def unit_direction(self) -> Vector3:

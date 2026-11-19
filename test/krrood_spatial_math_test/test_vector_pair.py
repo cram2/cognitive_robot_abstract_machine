@@ -26,19 +26,22 @@ def test_a_vector_pair_stores_its_vectors_under_their_names(
     vector_pair_type: type[VectorPair],
 ):
     """
-    Each vector is given to the constructor by its name and read back in the json under
-    that name, first vector first.
+    Each part is given to the constructor by its name and read back in the json under
+    that name.
     """
-    first_name = vector_pair_type._first_vector_name
-    second_name = vector_pair_type._second_vector_name
+    rotational_name = vector_pair_type._rotational_part_name
+    translational_name = vector_pair_type._translational_part_name
     vector_pair = vector_pair_type(
-        **{first_name: Vector3(1.0, 2.0, 3.0), second_name: Vector3(4.0, 5.0, 6.0)}
+        **{
+            rotational_name: Vector3(1.0, 2.0, 3.0),
+            translational_name: Vector3(4.0, 5.0, 6.0),
+        }
     )
 
     json_data = to_json(vector_pair)
 
-    assert json_data[first_name] == [1.0, 2.0, 3.0]
-    assert json_data[second_name] == [4.0, 5.0, 6.0]
+    assert json_data[rotational_name] == [1.0, 2.0, 3.0]
+    assert json_data[translational_name] == [4.0, 5.0, 6.0]
 
 
 @pytest.mark.parametrize("vector_pair_type", VECTOR_PAIR_TYPES)
