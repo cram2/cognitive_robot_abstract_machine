@@ -1,15 +1,17 @@
 """
-Serving a world to other processes through a ROS service, and finding and fetching a
-world another process serves.
+Serving a world to other processes, and finding, fetching or joining a world another
+process serves.
 """
 
 from __future__ import annotations
 
 import json
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from time import time, sleep
 
 from rclpy.node import Node
+from typing_extensions import Any
 from rclpy.service import Service
 from std_srvs.srv import Trigger
 
@@ -19,6 +21,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
+from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 
 
 @dataclass
@@ -81,29 +84,25 @@ class FetchWorldServer(HasROS2Node):
 
     def get_payload_as_json(self) -> str:
         """
-        Serialize both the world modification blocks and a snapshot of the current
-        state.
-
-        The returned JSON has the structure:
-        {
-            "modifications": [ ... ],
-            "state": {
-                "ids": [ UUIDJson, ... ],
-                "states": [ float, ... ]
-            }
-        }
-
-        This ensures a receiver can rebuild the model from the modification blocks
-        and then apply the most recent state values.
+        Serialize the served world as a :class:`WorldModelSnapshot`, naming the stream
+        positions the world contains.
         """
-        # Build snapshot object and serialize through its serializer
-        snapshot = WorldModelSnapshot(
-            modifications=list(
-                self.world.get_world_model_manager().model_modification_blocks
-            ),
-            ids=list(self.world.state.keys()),
-            states=list(self.world.state.positions),
-        )
+        model_manager = self.world.get_world_model_manager()
+        # Every modification that ended before the snapshot has been published once its
+        # turn in the publication order is free, so the positions match the content.
+        with self.world._world_lock, model_manager.publishing_in_order():
+            snapshot = WorldModelSnapshot(
+                modifications=list(model_manager.model_modification_blocks),
+                ids=list(self.world.state.keys()),
+                states=list(self.world.state.positions),
+                stream_positions=[
+                    position
+                    for synchronizer in WorldSynchronizer.all_callbacks_of_this_type_from_world(
+                        self.world
+                    )
+                    for position in synchronizer.contained_positions
+                ],
+            )
 
         return json.dumps(snapshot.to_json())
 
@@ -150,22 +149,19 @@ def find_world_fetcher_service(
         sleep(0.1)
 
 
-def fetch_world_from_service(
+def fetch_world_snapshot_json(
     node: Node,
     service_suffix: str = "fetch_world",
     timeout_seconds: float = 10.0,
-) -> World:
+) -> dict[str, Any]:
     """
-    Fetch a world from any WorldFetcher Service.
-
-    This method discovers all available WorldFetcher Services in the ROS2 network and
-    picks the first one to get all world modification blocks from it.
+    Fetch the snapshot of the world the first WorldFetcher service found serves.
 
     :param node: The ROS2 node to use for communication.
     :param service_suffix: The suffix (last part behind '/') of the WorldFetcher
         services to look for.
     :param timeout_seconds: Maximum time to wait for service availability and response.
-    :return: The fetched modification blocks.
+    :return: The serialized :class:`WorldModelSnapshot`.
     """
     deadline = time() + timeout_seconds
     chosen_service = find_world_fetcher_service(node, service_suffix, timeout_seconds)
@@ -181,19 +177,76 @@ def fetch_world_from_service(
             f"WorldFetcher service '{chosen_service}' not available after {timeout_seconds} seconds"
         )
 
-    # fetch world
     response = client.call(Trigger.Request(), timeout_sec=remaining)
     if response is None:
         raise TimeoutError(
             f"WorldFetcher service '{chosen_service}' did not respond after {remaining} seconds"
         )
+    return json.loads(response.message)
 
-    # New format is an object {"modifications": [...], "state": {...}}.
+
+def fetch_world_from_service(
+    node: Node,
+    service_suffix: str = "fetch_world",
+    timeout_seconds: float = 10.0,
+) -> World:
+    """
+    Fetch a world from any WorldFetcher Service.
+
+    The fetched world is not kept in step with the served one; :func:`join_shared_world`
+    does that.
+
+    :param node: The ROS2 node to use for communication.
+    :param service_suffix: The suffix (last part behind '/') of the WorldFetcher
+        services to look for.
+    :param timeout_seconds: Maximum time to wait for service availability and response.
+    :return: The fetched world.
+    """
     world = World()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    kwargs = tracker.create_kwargs()
+    WorldModelSnapshot.apply_to_json_snapshot_to_world(
+        world,
+        fetch_world_snapshot_json(node, service_suffix, timeout_seconds),
+        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+    )
+    return world
 
-    payload = json.loads(response.message)
-    WorldModelSnapshot.apply_to_json_snapshot_to_world(world, payload, **kwargs)
 
+def join_shared_world(
+    node: Node,
+    service_suffix: str = "fetch_world",
+    timeout_seconds: float = 10.0,
+) -> World:
+    """
+    Fetch the world a WorldFetcher service serves and keep it in step with the served
+    world through a :class:`WorldSynchronizer`, see :meth:`WorldSynchronizer.of_world`.
+    No update published while the world is fetched is lost or applied twice, and taking
+    in the fetched world is not published.
+
+    :param node: The ROS2 node to use for communication.
+    :param service_suffix: The suffix (last part behind '/') of the WorldFetcher
+        services to look for.
+    :param timeout_seconds: Maximum time to wait for service availability and response.
+    :return: The joined world.
+    """
+    world = World()
+    synchronizer = WorldSynchronizer(
+        node=node, _world=world, defer_incoming_updates=True
+    )
+    with ExitStack() as closing_on_failure:
+        closing_on_failure.callback(synchronizer.close)
+        snapshot_json = fetch_world_snapshot_json(node, service_suffix, timeout_seconds)
+        synchronizer.pause()
+        WorldModelSnapshot.apply_to_json_snapshot_to_world(
+            world,
+            snapshot_json,
+            **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        )
+        synchronizer.update_previous_world_state()
+        synchronizer.resume()
+        for position in WorldModelSnapshot.stream_positions_from_json(
+            json_data=snapshot_json
+        ):
+            synchronizer.record_applied(position=position)
+        synchronizer.stop_deferring_incoming_updates()
+        closing_on_failure.pop_all()
     return world
