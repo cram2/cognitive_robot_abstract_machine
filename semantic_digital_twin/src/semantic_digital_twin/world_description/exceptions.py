@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from numpy.typing import NDArray
+
 from krrood.exceptions import DataclassException
 
 # %% Color channels
@@ -75,9 +77,9 @@ class AsymmetricInertiaTensorError(DataclassException, ValueError):
     The matrix of an inertia tensor is not symmetric.
     """
 
-    matrix: list[list[float]]
+    matrix: NDArray
     """
-    The rows of the matrix.
+    The matrix of the tensor.
     """
 
     def error_message(self) -> str:

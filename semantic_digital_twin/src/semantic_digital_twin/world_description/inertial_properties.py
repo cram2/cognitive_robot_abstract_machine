@@ -20,7 +20,7 @@ class NPMatrix3x3(SubclassJSONSerializer):
     A 3x3 matrix of numbers.
     """
 
-    data: np.ndarray
+    data: NDArray
     """
     The elements of the matrix.
     """
@@ -49,7 +49,7 @@ class NPVector3(SubclassJSONSerializer):
     A vector of three numbers.
     """
 
-    data: np.ndarray
+    data: NDArray
     """
     The elements of the vector.
     """
@@ -158,7 +158,7 @@ class InertiaTensor(NPMatrix3x3):
         if np.any(moments < 0.0):
             raise NegativeMomentOfInertiaError(moments=moments.tolist())
         if not np.allclose(self.data, self.data.T, atol=1e-10):
-            raise AsymmetricInertiaTensorError(matrix=self.data.tolist())
+            raise AsymmetricInertiaTensorError(matrix=self.data)
 
     @classmethod
     def from_values(
