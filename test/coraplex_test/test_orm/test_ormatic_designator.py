@@ -10,7 +10,6 @@ from krrood.ormatic.data_access_objects.helper import (
 )
 from sqlalchemy import select
 from krrood.ormatic.exceptions import QueryCannotBePersisted
-from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndPickUpAction,

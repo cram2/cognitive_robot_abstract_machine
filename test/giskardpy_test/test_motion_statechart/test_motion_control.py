@@ -20,6 +20,7 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
+from giskardpy.qp.exceptions import EmptyProblemException
 from semantic_digital_twin.datastructures.joint_state import JointState
 from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
 from semantic_digital_twin.world import World
@@ -229,3 +230,26 @@ def test_a_joint_is_at_rest_once_its_node_ended(prismatic_bot2: World) -> None:
 
     # Stopping leaves nothing but the rounding error of the last integration step.
     assert recording.velocities[-1] == pytest.approx(0.0, abs=1e-12)
+
+
+# %% goals no degree of freedom can reach
+
+
+def test_a_goal_that_depends_on_no_degree_of_freedom_is_an_empty_problem(
+    prismatic_bot: World,
+) -> None:
+    (slider,) = prismatic_bot.controlled_connections
+    executor = StatechartExecutor(
+        context=StatechartContext(world=prismatic_bot), extensions=[MotionControl()]
+    )
+    statechart = Statechart(context=executor.context)
+    reach = CartesianPosition(
+        root_link=slider.child,
+        tip_link=slider.child,
+        goal_point=CartesianPoint3Dimensional(1, 0, 0, reference_frame=slider.child),
+    )
+    statechart.add_node(node=reach)
+    statechart.add_node(node=EndMotion.when_true(node=reach))
+
+    with pytest.raises(EmptyProblemException):
+        executor.compile(statechart=statechart)

@@ -254,3 +254,15 @@ def milk_annotated_in_the_apartment(milk_in_the_apartment):
     yield world, annotation, box
     with world.modify_world():
         world.remove_semantic_annotation(annotation)
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load segmind's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import segmind.orm.ormatic_interface  # noqa: F401

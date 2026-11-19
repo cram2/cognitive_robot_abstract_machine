@@ -96,9 +96,9 @@ def add_box_body(
     body = Body(name=PrefixedName(name))
     world.add_connection(
         FixedConnection.create_with_dofs(
-            world,
-            world.root,
-            body,
+            world=world,
+            parent=world.root,
+            child=body,
             parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x, y, z, reference_frame=world.root
             ),

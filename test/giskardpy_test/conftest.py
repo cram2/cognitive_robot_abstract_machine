@@ -1,3 +1,9 @@
+"""
+Fixtures shared by the giskardpy tests: robot poses, worlds and Giskard instances.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
@@ -415,3 +421,15 @@ def daisy_world_specification() -> WorldSpecification:
     DAiSy alone, as Giskard sets it up.
     """
     return WorldSpecification(robots=[RobotSpecification.specify_real_robot(DAiSy)])
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load giskardpy's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import giskardpy.orm.ormatic_interface  # noqa: F401

@@ -4,7 +4,7 @@ Reproduction tests for bugs found during the ORMatic package review.
 
 import pytest
 import sys
-import types
+from types import ModuleType, new_class
 
 from sqlalchemy import select
 
@@ -30,7 +30,7 @@ from ..dataset.alternative_mappings_construction_order import (
     OwnsAHolder,
 )
 from ..dataset.example_classes import *
-from ..dataset.ormatic_interface import *
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
 
 
 def test_an_alternative_mapping_is_handed_the_domain_object_it_holds():
@@ -189,6 +189,8 @@ def test_shared_state_does_not_rerun_post_init(session, database, monkeypatch):
     Converting an already converted root DAO again with a shared state must not re-run
     population and ``__post_init__``.
     """
+    from ..dataset.ormatic_interface import ContainerGenerationDAO
+
     container = ContainerGeneration(
         items=[ItemWithBackreference(value=10), ItemWithBackreference(value=20)]
     )
@@ -225,6 +227,8 @@ def test_shared_state_converts_alternative_mappings_once(
     graph nodes nor call ``to_domain_object`` repeatedly for the same alternative
     mapping instance.
     """
+    from ..dataset.ormatic_interface import AlternativeMappingAggregatorDAO
+
     entity = Entity(name="shared")
     to_state = ToDataAccessObjectState()
     dao_1 = to_dao(
@@ -267,6 +271,8 @@ def test_alternatively_mapped_root_in_cycle_keeps_identity(session, database):
     If the root DAO is alternatively mapped and the object graph cycles back to it, the
     returned domain object must be the same instance the cycle points to.
     """
+    from ..dataset.ormatic_interface import BackreferenceMappingDAO
+
     backreference = Backreference(unmappable={1: 1})
     reference = Reference(value=0, backreference=backreference)
     backreference.reference = reference
@@ -289,6 +295,8 @@ def test_repeated_from_dao_on_alternatively_mapped_dao_with_shared_state_returns
     Two ``from_dao`` calls on the same alternatively mapped DAO with a shared state must
     return the same domain object.
     """
+    from ..dataset.ormatic_interface import BackreferenceMappingDAO
+
     backreference = Backreference(unmappable={1: 1})
     reference = Reference(value=0, backreference=backreference)
     backreference.reference = reference
@@ -324,6 +332,8 @@ def test_empty_collection_is_not_aliased(session, database):
     An empty collection on the domain object must be a fresh container, not the DAO's
     live instrumented collection.
     """
+    from ..dataset.ormatic_interface import KRROODPositionsDAO
+
     positions = KRROODPositions(positions=[], some_strings=["a"])
     session.add(to_dao(positions))
     session.commit()
@@ -441,11 +451,11 @@ def _reexecuted_under(
     :param monkeypatch: Registers the synthetic module so it is torn down afterwards.
     :return: A distinct class object standing in for the entry-point reload.
     """
-    entry_point_module = types.ModuleType(entry_point_module_name)
+    entry_point_module = ModuleType(entry_point_module_name)
     entry_point_module.__file__ = sys.modules[domain_class.__module__].__file__
     monkeypatch.setitem(sys.modules, entry_point_module_name, entry_point_module)
 
-    reexecuted = types.new_class(domain_class.__name__, domain_class.__bases__)
+    reexecuted = new_class(domain_class.__name__, domain_class.__bases__)
     reexecuted.__qualname__ = domain_class.__qualname__
     reexecuted.__module__ = entry_point_module_name
     return reexecuted
@@ -480,7 +490,7 @@ def test_dao_lookup_does_not_conflate_unrelated_same_named_classes():
     class here was, so a coincidentally matching name must not resolve to the other's
     DAO.
     """
-    unrelated_class = types.new_class("_SpawnWorkerDomainClass")
+    unrelated_class = new_class("_SpawnWorkerDomainClass")
     unrelated_class.__qualname__ = _SpawnWorkerDomainClass.__qualname__
 
     assert get_data_access_object_class(unrelated_class) is None

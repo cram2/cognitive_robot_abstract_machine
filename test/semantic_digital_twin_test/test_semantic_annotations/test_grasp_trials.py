@@ -23,7 +23,7 @@ from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    Twist,
+    Displacement,
     Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
@@ -52,8 +52,10 @@ class RecordingPerformer(GraspPerformer):
         return GraspResult(
             object_raised=True,
             motion_completed=True,
-            object_displacement=Twist(translation=Vector3Dimensional(0.0, 0.0, 0.2)),
-            slip=Twist(),
+            object_displacement=Displacement(
+                translation=Vector3Dimensional(0.0, 0.0, 0.2)
+            ),
+            slip=Displacement(),
         )
 
 

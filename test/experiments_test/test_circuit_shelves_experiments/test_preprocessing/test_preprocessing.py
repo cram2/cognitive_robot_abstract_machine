@@ -1,4 +1,10 @@
+"""
+Tests of preprocessing Sage10k scenes into shelves, layers and the objects on them.
+"""
+
 from __future__ import annotations
+
+from typing_extensions import TYPE_CHECKING
 
 import dataclasses
 import math
@@ -10,20 +16,9 @@ import pytest
 import trimesh
 from sqlalchemy.orm import Session
 
-import experiments.orm.ormatic_interface  # noqa: F401  registers ORM mappers
+if TYPE_CHECKING:
+    from semantic_digital_twin.orm.ormatic_interface import Sage10kObjectDAO
 from sqlalchemy import select
-from experiments.orm.ormatic_interface import (
-    Base,
-    PreprocessedObjectDAO,
-    RelationalCircuitExperimentShelfDAO,
-)
-from semantic_digital_twin.orm.ormatic_interface import (
-    Sage10kObjectDAO,
-    Sage10kPhysicallyBasedRenderingDAO,
-    Sage10kPositionDAO,
-    Sage10kRotationDAO,
-    Sage10kSizeDAO,
-)
 from experiments.shelf_generation_experiments.preprocessing.classification import (
     ClassificationRule,
     ObjectTypeClassifier,
@@ -397,6 +392,18 @@ def _sage10k_object(
     source_id: str = "book_src",
     place_id: str = "room_1_shelf_1",
 ) -> Sage10kObjectDAO:
+    """
+    :return: A raw Sage10k object as the database stores it, a book on a shelf unless the
+        arguments say otherwise.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import (
+        Sage10kObjectDAO,
+        Sage10kPhysicallyBasedRenderingDAO,
+        Sage10kPositionDAO,
+        Sage10kRotationDAO,
+        Sage10kSizeDAO,
+    )
+
     return Sage10kObjectDAO(
         id=object_id,
         room_id=room_id,
@@ -1141,6 +1148,12 @@ def test_partition_round_robin_leaves_extra_partitions_empty() -> None:
 
 
 def _populated_sqlite_engine(tmp_path: Path, objects: list[Sage10kObjectDAO]):
+    """
+    :return: An engine on a file database in *tmp_path* that holds the raw Sage10k tables
+        and *objects*.
+    """
+    from experiments.orm.ormatic_interface import Base
+
     engine = create_engine(f"sqlite:///{tmp_path}/raw.db")
     Base.metadata.create_all(bind=engine)
     with Session(engine) as session:
@@ -1155,6 +1168,8 @@ def test_sharded_object_pass_writes_every_object_exactly_once(tmp_path: Path) ->
     processed database must end up with exactly the rows a single-shard pass would have
     written.
     """
+    from experiments.orm.ormatic_interface import Base, PreprocessedObjectDAO
+
     objects = [
         _sage10k_object(object_id="book_1", room_id="room_1", source_id="book_1_src"),
         _sage10k_object(object_id="book_2", room_id="room_2", source_id="book_2_src"),
@@ -1191,6 +1206,8 @@ def test_reading_the_raw_dataset_in_chunks_smaller_than_it_stores_every_object(
     The raw dataset is read in chunks of the run's own configured size, so a chunk
     smaller than the dataset must still let every object through.
     """
+    from experiments.orm.ormatic_interface import Base, PreprocessedObjectDAO
+
     objects = [
         _sage10k_object(object_id="book_1", room_id="room_1", source_id="book_1_src"),
         _sage10k_object(object_id="book_2", room_id="room_1", source_id="book_2_src"),
@@ -1229,6 +1246,11 @@ def test_sharded_object_pass_keeps_shelf_contents_regardless_of_shard(
     shelf must be extracted and stored with its book on it, regardless of which of the
     two shards happened to own its room.
     """
+    from experiments.orm.ormatic_interface import (
+        Base,
+        RelationalCircuitExperimentShelfDAO,
+    )
+
     objects = [
         _sage10k_object(
             object_id="shelf_1",
@@ -1291,6 +1313,8 @@ def test_only_shelf_relevant_meshes_are_measured(tmp_path: Path) -> None:
     :attr:`ShelfContents.relevant_source_ids` -- shelves and their own contents -- and
     nothing downstream of layer extraction reads any other object's correction.
     """
+    from experiments.orm.ormatic_interface import Base, PreprocessedObjectDAO
+
     objects = [
         _sage10k_object(
             object_id="shelf_1",

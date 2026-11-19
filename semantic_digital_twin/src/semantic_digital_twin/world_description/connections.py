@@ -62,10 +62,10 @@ class FixedConnection(Connection):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
         | None = None,
@@ -154,10 +154,10 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
         | None = None,
@@ -289,8 +289,8 @@ class PrismaticConnection(ActiveConnection1DOF):
     Allows translation along an axis.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        super().add_to_world(world=world)
 
         translation_axis = self.axis * self.dof.variables.position
         self._kinematics = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
@@ -307,8 +307,8 @@ class RevoluteConnection(ActiveConnection1DOF):
     Allows rotation about an axis.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        super().add_to_world(world=world)
 
         self._kinematics = (
             HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
@@ -348,8 +348,8 @@ class ScrewConnection(ActiveConnection1DOF):
         assignment is not recorded, published or rolled back. Replace the connection.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        super().add_to_world(world=world)
 
         angle = self.dof.variables.position
         translation_axis = self.axis * (self.screw_pitch * angle / (2 * np.pi))
@@ -380,10 +380,10 @@ class ScrewConnection(ActiveConnection1DOF):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
         | None = None,
@@ -459,8 +459,8 @@ class Connection6DoF(Connection):
     KinematicStructureEntity represented as a quaternion.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        super().add_to_world(world=world)
         parent_P_child = CartesianPoint3Dimensional(
             x=self.x.variables.position,
             y=self.y.variables.position,
@@ -483,10 +483,10 @@ class Connection6DoF(Connection):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
         | None = None,
@@ -711,8 +711,8 @@ class OmniDrive(WheeledDrive):
     Represented with respect to the child frame.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        super().add_to_world(world=world)
         odom_T_bf = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
@@ -735,10 +735,10 @@ class OmniDrive(WheeledDrive):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
         | None = None,
@@ -864,8 +864,8 @@ class DifferentialDrive(WheeledDrive):
     Represented with respect to the child frame.
     """
 
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
+    def add_to_world(self, *, world: World):
+        super().add_to_world(world=world)
         odom_T_bf = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
@@ -888,10 +888,10 @@ class DifferentialDrive(WheeledDrive):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
         | None = None,

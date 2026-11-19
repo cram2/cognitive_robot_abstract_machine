@@ -1,3 +1,9 @@
+"""
+Fixtures, options and hooks shared by the test suites of every package.
+"""
+
+from __future__ import annotations
+
 import os
 import threading
 import time
@@ -537,7 +543,7 @@ def world_with_urdf_factory(
         localization_body = Body(name=PrefixedName("odom_combined"))
 
         map_C_localization = Connection6DoF.create_with_dofs(
-            world_with_urdf, map, localization_body
+            world=world_with_urdf, parent=map, child=localization_body
         )
         world_with_urdf.add_connection(map_C_localization)
 

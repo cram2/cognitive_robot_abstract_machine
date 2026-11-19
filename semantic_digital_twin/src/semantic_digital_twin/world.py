@@ -310,7 +310,7 @@ class WorldModelUpdateContextManager:
                 # the modifications applied before the error are not rolled back,
                 # so cached queries must be invalidated
                 clear_memoization_cache(self.world)
-                if not model_manager._active_world_model_update_context_manager_ids:
+                if not model_manager.has_open_modification:
                     # discard publications buffered before the error; they must not be sent
                     model_manager.pending_publications.clear()
                     # discard the modifications of the failed block too, so that the
@@ -340,7 +340,7 @@ class WorldModelUpdateContextManager:
                 self._id
             )
             # if there are still open context managers dont publish yet
-            if model_manager._active_world_model_update_context_manager_ids:
+            if model_manager.has_open_modification:
                 return
 
             # a block that modified nothing leaves the model as it was, but announces
@@ -404,7 +404,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
         def wrapper(current_world: World, *args, **kwargs):
             if current_world._current_active_atomic_world_modification is not None:
                 raise AtomicWorldModificationNotAtomic(func, current_world)
-            if not current_world._model_manager._active_world_model_update_context_manager_ids:
+            if not current_world._model_manager.has_open_modification:
                 raise MissingWorldModificationContextError(func)
             current_world._current_active_atomic_world_modification = func
 
@@ -560,6 +560,13 @@ class WorldModelManager:
         """
         with self._publication_order_lock:
             yield
+
+    @property
+    def has_open_modification(self) -> bool:
+        """
+        Whether a :meth:`World.modify_world` block of this world has not ended yet.
+        """
+        return bool(self._active_world_model_update_context_manager_ids)
 
     @property
     def revision(self) -> ModelRevision:
@@ -738,7 +745,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
                 _world=self, mesh_decomposer=self.mesh_decomposer
             ),
         )
-        self.collision_manager.add_to_world(self)
+        self.collision_manager.add_to_world(world=self)
 
     @classmethod
     def create_with_root_body(
@@ -1014,7 +1021,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
 
         :param connection: The connection to be added to the kinematic structure.
         """
-        connection.add_to_world(self)
+        connection.add_to_world(world=self)
         self.kinematic_structure.add_edge(
             connection.parent.index, connection.child.index, connection
         )
@@ -1055,7 +1062,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
 
         :param kinematic_structure_entity: The kinematic_structure_entity to add.
         """
-        kinematic_structure_entity.add_to_world(self)
+        kinematic_structure_entity.add_to_world(world=self)
         kinematic_structure_entity.index = self.kinematic_structure.add_node(
             kinematic_structure_entity
         )
@@ -1085,7 +1092,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
         :param dof: The degree of freedom to be added to the system.
         :return: None
         """
-        dof.add_to_world(self)
+        dof.add_to_world(world=self)
         self.state.add_degree_of_freedom(dof)
         self.degrees_of_freedom.append(dof)
 
@@ -1154,7 +1161,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
         The atomic method that adds a semantic annotation to the current list of
         semantic annotations.
         """
-        semantic_annotation.add_to_world(self)
+        semantic_annotation.add_to_world(world=self)
         self.semantic_annotations.append(semantic_annotation)
         self._world_entity_hash_table[hash(semantic_annotation)] = semantic_annotation
 
@@ -1186,7 +1193,7 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
         :param actuator: The actuator to be added to the system.
         :return: None
         """
-        actuator.add_to_world(self)
+        actuator.add_to_world(world=self)
         self.actuators.append(actuator)
 
     def _raise_error_if_belongs_to_other_world(self, world_entity: WorldEntity):
@@ -2195,35 +2202,42 @@ class World(HasSimulatorProperties, EuclideanSpace3Dimensional):
         return new_world
 
     # %% Change Notifications
-    def notify_state_change(self, publish_changes: bool = True, **kwargs) -> None:
+    def notify_state_change(
+        self, *, publish_changes: bool = True, **kwargs: Any
+    ) -> None:
         """
-        If you have changed the state of the world, call this function to trigger
-        necessary events and increase the state version.
+        Announce a change of the state of this world to its state change callbacks.
 
-        Inside a :meth:`batch_state_changes` context the notification is collected and
-        emitted once when that context ends, with the ``publish_changes`` of that
-        context: the setters that write the state cannot know they are part of a batch,
-        so the batch is what decides whether its changes are published.
+        Within :meth:`batch_state_changes` the batch announces it once when it ends,
+        with its own ``publish_changes``. Within :meth:`modify_world` the outermost block
+        announces it when it ends.
         """
         if self._state_change_batch_depth > 0:
             self._state_change_batch_has_collected_change = True
             return
-        if not self.is_empty():
+        modification_is_open = self._model_manager.has_open_modification
+        # a block that changed the model has kinematics compiled for the old structure
+        if not self.is_empty() and (
+            not modification_is_open
+            or self._forward_kinematic_manager.matches_world_structure
+        ):
             self._forward_kinematic_manager.recompute()
+        if modification_is_open:
+            return
         self.state._notify_state_change(publish_changes=publish_changes, **kwargs)
 
-    def _notify_model_change(self, publish_changes: bool = True, **kwargs) -> None:
+    def _notify_model_change(
+        self, *, publish_changes: bool = True, **kwargs: Any
+    ) -> None:
         """
-        Notifies the system of a model change and updates the necessary states, caches,
-        and forward kinematics expressions while also triggering registered callbacks
-        for model changes.
+        Announce a change of the model of this world, first to its model change
+        callbacks and then to its state change callbacks, so a callback of both kinds
+        hears of the state after the model it belongs to.
         """
         self._model_manager.update_model_version_and_notify_callbacks(
             publish_changes=publish_changes, **kwargs
         )
-        self.notify_state_change(
-            publish_changes=publish_changes, force_republish=True, **kwargs
-        )
+        self.notify_state_change(publish_changes=publish_changes, **kwargs)
 
         for callback in list(self.state.state_change_callbacks):
             callback.update_previous_world_state()

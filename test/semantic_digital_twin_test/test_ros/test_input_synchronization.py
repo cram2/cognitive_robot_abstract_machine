@@ -206,7 +206,9 @@ def tracked_connection(world_with_two_bodies):
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
     return world, connection
 

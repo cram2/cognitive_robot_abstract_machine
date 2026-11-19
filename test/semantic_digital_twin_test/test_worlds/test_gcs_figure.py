@@ -101,9 +101,9 @@ def add_box_body(world: World, name: str, scale: Scale, x: float, y: float) -> B
     body = Body(name=PrefixedName(name))
     world.add_connection(
         FixedConnection.create_with_dofs(
-            world,
-            world.root,
-            body,
+            world=world,
+            parent=world.root,
+            child=body,
             parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x, y, ROOM_HEIGHT / 2, reference_frame=world.root
             ),

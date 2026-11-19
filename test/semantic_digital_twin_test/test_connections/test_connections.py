@@ -36,7 +36,9 @@ def _add_drive(world_with_two_bodies, drive_type):
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = drive_type.create_with_dofs(world, parent, child)
+        connection = drive_type.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
     return connection
 
@@ -48,9 +50,9 @@ def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_
     )
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3Dimensional.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
@@ -77,9 +79,9 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
     )
     with world.modify_world():
         connection = Connection6DoF.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             parent_T_connection_expression=parent_T_connection,
             connection_T_child_expression=connection_T_child,
         )
@@ -96,7 +98,9 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
 def test_connection6dof_origin_setter_requires_a_reference_frame(world_with_two_bodies):
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     transformation_without_reference_frame = (
@@ -123,13 +127,15 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
     with world.modify_world():
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                grandparent,
-                parent,
+                world=world,
+                parent=grandparent,
+                child=parent,
                 parent_T_connection_expression=grandparent_T_parent,
             )
         )
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     desired_origin_in_grandparent = (
@@ -157,9 +163,9 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
     )
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3Dimensional.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
@@ -238,9 +244,9 @@ def _add_screw_connection(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = ScrewConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3Dimensional.Z(),
             screw_pitch=screw_pitch,
             multiplier=multiplier,
@@ -429,9 +435,9 @@ def test_copy_with_new_parent_keeps_name(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = connection_type.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             name=PrefixedName("named_connection"),
             **additional_arguments,
         )
@@ -503,9 +509,9 @@ def test_create_with_dofs_rejects_unknown_keyword_argument(
     world, parent, child = world_with_two_bodies
     with pytest.raises(TypeError):
         connection_type.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             translation_velocity_limit=0.2,
             **additional_arguments,
         )
@@ -523,9 +529,9 @@ def test_create_with_dofs_applies_drive_velocity_limits(
     rotation_velocity_limit = 0.15
     with world.modify_world():
         connection = drive_type.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             translation_velocity_limits=translation_velocity_limit,
             rotation_velocity_limits=rotation_velocity_limit,
         )
@@ -551,9 +557,9 @@ def test_create_with_dofs_applies_lateral_velocity_limit_of_omni_drive(
     translation_velocity_limit = 0.25
     with world.modify_world():
         connection = OmniDrive.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             translation_velocity_limits=translation_velocity_limit,
         )
         world.add_connection(connection)
@@ -575,9 +581,9 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
     offset = 0.5
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
-            world,
-            parent,
-            child,
+            world=world,
+            parent=parent,
+            child=child,
             axis=Vector3Dimensional.Z(),
             multiplier=multiplier,
             offset=offset,
@@ -599,7 +605,7 @@ def test_create_with_dofs_without_axis_raises(world_with_two_bodies, connection_
     """
     world, parent, child = world_with_two_bodies
     with pytest.raises(MissingConnectionAxisError):
-        connection_type.create_with_dofs(world, parent, child)
+        connection_type.create_with_dofs(world=world, parent=parent, child=child)
 
 
 def test_create_with_dofs_registers_the_six_dof_state(world_with_two_bodies):
@@ -608,7 +614,9 @@ def test_create_with_dofs_registers_the_six_dof_state(world_with_two_bodies):
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = Connection6DoF.create_with_dofs(world, parent, child)
+        connection = Connection6DoF.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     assert len(connection.passive_dofs) == 7
@@ -624,7 +632,9 @@ def test_create_with_dofs_of_fixed_connection_adds_no_degrees_of_freedom(
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
-        connection = FixedConnection.create_with_dofs(world, parent, child)
+        connection = FixedConnection.create_with_dofs(
+            world=world, parent=parent, child=child
+        )
         world.add_connection(connection)
 
     assert connection.dofs == []
@@ -685,7 +695,7 @@ def test_a_connection_survives_a_json_round_trip(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = connection_type.create_with_dofs(
-            world, parent, child, **additional_arguments
+            world=world, parent=parent, child=child, **additional_arguments
         )
         world.add_connection(connection)
     payload = connection.to_json()

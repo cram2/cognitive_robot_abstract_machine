@@ -1,3 +1,7 @@
+"""
+Tests of :class:`krrood_spatial_math.spatial_types.Twist`.
+"""
+
 from __future__ import annotations
 
 import json
@@ -5,105 +9,81 @@ import json
 import numpy as np
 
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood_spatial_math.spatial_types import SymbolicSpatialValue3Dimensional
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix3Dimensional,
+    SymbolicSpatialValue3Dimensional,
     Twist,
     Vector3Dimensional,
 )
 
 from .dataset.frames import KnownFrames
 
-# %% reading a twist off a transformation
-
-
-def test_a_twist_moves_as_far_as_the_transformation():
-    start_T_end = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-        0.1, -0.2, 0.3
-    )
-
-    twist = Twist.from_transformation(start_T_end)
-
-    np.testing.assert_allclose(twist.translation.to_np()[:3], [0.1, -0.2, 0.3])
+# %% the parts of a twist
 
 
 def test_a_twist_has_six_entries():
-    twist = Twist.from_transformation(HomogeneousTransformationMatrix3Dimensional())
+    """
+    Three entries for the angular and three for the linear velocity.
+    """
+    twist = Twist()
 
     assert twist.shape == (6, 1)
 
 
-def test_a_twist_turns_by_the_axis_scaled_by_the_angle():
-    axis, angle = np.array([0.0, 1.0, 0.0]), 0.7
-    start_T_end = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
-        axis=Vector3Dimensional(*axis), angle=angle
-    )
-
-    twist = Twist.from_transformation(start_T_end)
-
-    np.testing.assert_allclose(
-        twist.rotation_vector.to_np()[:3], axis * angle, atol=1e-9
-    )
-
-
-def test_no_rotation_is_the_zero_rotation_vector():
-    twist = Twist.from_transformation(HomogeneousTransformationMatrix3Dimensional())
-
-    np.testing.assert_allclose(twist.rotation_vector.to_np()[:3], [0.0, 0.0, 0.0])
-
-
-def test_a_rotation_is_stated_by_an_angle_of_at_most_half_a_turn():
-    three_quarter_turn = (
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
-            axis=Vector3Dimensional.X(), angle=1.5 * np.pi
-        )
-    )
-
-    twist = Twist.from_transformation(three_quarter_turn)
-
-    np.testing.assert_allclose(
-        twist.rotation_vector.to_np()[:3], [-np.pi / 2, 0.0, 0.0], atol=1e-9
-    )
-
-
-def test_a_twist_is_built_from_constants():
+def test_a_twist_without_parts_stands_still():
     """
-    A twist is data to record and learn from, so it holds numbers, not expressions.
+    Left out, both velocities default to zero.
     """
-    twist = Twist.from_transformation(
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            0.1, 0.2, 0.3, roll=0.4
-        )
+    twist = Twist()
+
+    np.testing.assert_allclose(twist.angular_velocity.to_np()[:3], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(twist.linear_velocity.to_np()[:3], [0.0, 0.0, 0.0])
+
+
+def test_a_twist_returns_the_velocities_it_was_given():
+    """
+    The angular and linear velocity read back as they were given.
+    """
+    twist = Twist(
+        angular_velocity=Vector3Dimensional(0.0, 0.0, 1.0),
+        linear_velocity=Vector3Dimensional(0.0, -1.0, 0.0),
     )
 
-    assert twist.translation.casadi_sx.is_constant()
-    assert twist.rotation_vector.casadi_sx.is_constant()
+    np.testing.assert_allclose(twist.angular_velocity.to_np()[:3], [0.0, 0.0, 1.0])
+    np.testing.assert_allclose(twist.linear_velocity.to_np()[:3], [0.0, -1.0, 0.0])
 
 
 # %% the frame a twist is expressed in
 
 
 def test_a_twist_is_a_value_given_in_a_cartesian_frame():
+    """
+    A twist is expressed in a reference frame.
+    """
     assert issubclass(Twist, SymbolicSpatialValue3Dimensional)
 
 
-def test_a_twist_is_expressed_in_the_frame_of_the_transformation(table_frame):
-    start_T_end = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-        x=0.1, yaw=0.2, reference_frame=table_frame
+def test_the_velocities_of_a_twist_are_expressed_in_its_frame(table_frame):
+    """
+    Both velocities carry the twist's reference frame.
+    """
+    twist = Twist(
+        angular_velocity=Vector3Dimensional(0.0, 0.0, 0.2),
+        linear_velocity=Vector3Dimensional(0.1, 0.0, 0.0),
+        reference_frame=table_frame,
     )
 
-    twist = Twist.from_transformation(start_T_end)
-
-    assert twist.reference_frame is table_frame
-    assert twist.translation.reference_frame is table_frame
-    assert twist.rotation_vector.reference_frame is table_frame
+    assert twist.angular_velocity.reference_frame is table_frame
+    assert twist.linear_velocity.reference_frame is table_frame
 
 
 def test_a_deserialized_twist_refers_to_the_readers_frame(table_frame):
-    twist = Twist.from_transformation(
-        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-            0.1, 0.2, 0.3, roll=0.4, reference_frame=table_frame
-        )
+    """
+    A JSON round trip keeps the values and resolves the frame on the reading side.
+    """
+    twist = Twist(
+        angular_velocity=Vector3Dimensional(0.4, 0.0, 0.0),
+        linear_velocity=Vector3Dimensional(0.1, 0.2, 0.3),
+        reference_frame=table_frame,
     )
     known_frames = KnownFrames()
     known_frames.add(key=table_frame.id, tracked_object=table_frame)
