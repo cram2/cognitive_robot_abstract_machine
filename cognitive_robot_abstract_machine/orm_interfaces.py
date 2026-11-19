@@ -27,7 +27,7 @@ from cognitive_robot_abstract_machine.exceptions import (
     UnknownOrmPackageError,
     UnorderableOrmInterfacesError,
 )
-from krrood.utils import module_level_imports
+from krrood.source_analysis.import_scope import module_level_imports
 from krrood.class_diagrams.progress_report import (
     ClassDiagramProgress,
     ProgressEnvironmentVariable,
@@ -42,6 +42,20 @@ INTERFACE_FILE_NAME = "ormatic_interface.py"
 """
 Name every package's generator writes its interface to.
 """
+
+
+class OrmScriptFileName(StrEnum):
+    """
+    The names of the scripts every package with an ORM interface keeps in its
+    ``scripts`` folder.
+    """
+
+    GENERATOR = "generate_orm.py"
+    """
+    The script generating the package's interface, whose module-level imports of other
+    interfaces declare the interfaces it builds on.
+    """
+
 
 SOURCE_FILE_PATTERN = "*.py"
 """
@@ -207,7 +221,12 @@ class OrmInterface:
         """
         The script that generates this interface.
         """
-        return self.repository_root / self.package_name / "scripts" / "generate_orm.py"
+        return (
+            self.repository_root
+            / self.package_name
+            / "scripts"
+            / OrmScriptFileName.GENERATOR
+        )
 
     @property
     def path(self) -> Path:

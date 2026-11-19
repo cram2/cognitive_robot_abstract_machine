@@ -10,7 +10,11 @@ from numpy.typing import NDArray
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.qp_data_factories import QPDataFactory
-from giskardpy.qp.exceptions import InfeasibleException, SolverReturnedFailureError
+from giskardpy.qp.exceptions import (
+    EmptyProblemException,
+    InfeasibleException,
+    SolverReturnedFailureError,
+)
 from giskardpy.qp.qp_data import QPData, QPDataExplicit
 from giskardpy.qp.qp_data_symbolic import QPDataSymbolic
 from giskardpy.qp.qp_debugger import QuadraticProgramDebugger
@@ -44,7 +48,11 @@ class QPController:
     debugger: QuadraticProgramDebugger = field(default=None, init=False)
     dof_filter: np.ndarray = field(default=None, init=False)
 
-    def __post_init__(self, degrees_of_freedom: list[DegreeOfFreedom]):
+    def __post_init__(self, degrees_of_freedom: list[DegreeOfFreedom]) -> None:
+        """
+        :raises EmptyProblemException: If the constraints do not depend on any of the
+            given degrees of freedom.
+        """
         self.qp_solver = self.config.qp_solver_class()
         if self.config.verbose:
             logger.info(
@@ -55,6 +63,8 @@ class QPController:
                 f'QP solver: "{self.config.qp_solver_class.__name__}"'
             )
         self._set_active_dofs(degrees_of_freedom=degrees_of_freedom)
+        if self.has_not_free_variables():
+            raise EmptyProblemException()
         generic_qp_data_symbolic = QPDataSymbolic(
             degrees_of_freedom=self.active_degrees_of_freedom,
             constraint_collection=self.constraint_collection,

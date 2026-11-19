@@ -1,3 +1,9 @@
+"""
+Tests of an ORM interface built on top of another one.
+"""
+
+from __future__ import annotations
+
 import importlib
 import importlib.util
 import sys
@@ -8,13 +14,14 @@ from krrood.ormatic.helper import (
     OrmaticInterfaceInformation,
 )
 from ..dataset.dataset_extension import AggregatorOfExternalInstances, CustomPosition
-from ..dataset import ormatic_interface
 
 
 def test_extension(tmp_path):
     """
     Test that existing ormatic interfaces can be extended.
     """
+    from ..dataset import ormatic_interface
+
     # import classes from the existing interface
     interface_info = get_classes_of_ormatic_interface(ormatic_interface)
     classes = interface_info.classes

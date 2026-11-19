@@ -14,7 +14,6 @@ from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
-from ..dataset import ormatic_interface  # type: ignore # noqa: F401
 from ..dataset.example_classes import (
     GraspAttempt,
     RobotStation,

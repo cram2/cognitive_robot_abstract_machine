@@ -14,7 +14,6 @@ import pytest
 from random_events.interval import open
 from random_events.product_algebra import SimpleEvent
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import (
     a,

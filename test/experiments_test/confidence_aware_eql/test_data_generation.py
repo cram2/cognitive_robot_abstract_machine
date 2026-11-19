@@ -1,7 +1,12 @@
+"""
+Tests of generating familiar kitchen objects from an underspecified query.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Pot

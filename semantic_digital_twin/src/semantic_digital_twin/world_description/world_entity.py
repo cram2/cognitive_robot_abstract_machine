@@ -100,7 +100,7 @@ class WorldEntity(Symbol, HasName[PrefixedName]):
         if self.name is None:
             self.name = PrefixedName(f"{self.__class__.__name__}_{hash(self)}")
         if self._world is not None:
-            self.add_to_world(self._world)
+            self.add_to_world(world=self._world)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
@@ -110,7 +110,7 @@ class WorldEntity(Symbol, HasName[PrefixedName]):
             return NotImplemented
         return hash(self) == hash(other)
 
-    def add_to_world(self, world: World):
+    def add_to_world(self, *, world: World):
         """
         Register this entity as part of the given world.
 
@@ -161,9 +161,6 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
 
     def __hash__(self):
         return self._hash
-
-    def add_to_world(self, world: World):
-        super().add_to_world(world)
 
     def to_json(self, **kwargs) -> dict[str, Any]:
         result = super().to_json(**kwargs)
@@ -1220,10 +1217,10 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     @abstractmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
