@@ -1,3 +1,9 @@
+"""
+Tests of storing giskardpy's QP data in a database.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 import scipy.sparse as sp
@@ -13,6 +19,10 @@ from giskardpy.qp.qp_data import QPDataExplicit
 
 @pytest.fixture
 def session():
+    """
+    :return: A session on an in-memory database holding giskardpy's tables, which are
+        dropped again after the test.
+    """
     from giskardpy.orm.ormatic_interface import Base
 
     session = Session(create_engine("sqlite:///:memory:"))

@@ -1,3 +1,9 @@
+"""
+Tests of an ORM interface built on top of another one.
+"""
+
+from __future__ import annotations
+
 import importlib
 import importlib.util
 import sys

@@ -1,3 +1,9 @@
+"""
+Fixtures shared by the giskardpy tests: robot poses, worlds and Giskard instances.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every

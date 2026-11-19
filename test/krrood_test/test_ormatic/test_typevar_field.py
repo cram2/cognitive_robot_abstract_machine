@@ -1,3 +1,9 @@
+"""
+Tests of mapping a field typed with a type variable.
+"""
+
+from __future__ import annotations
+
 import pytest
 from sqlalchemy import select, inspect
 

@@ -239,6 +239,10 @@ def test_probabilistic_query_backend():
 
 
 def test_generative_eql_backend():
+    """
+    The generative backend yields one atom for every pair of a type and a charge the
+    condition admits.
+    """
     q = an(Atom)(
         element=...,
         type=variable_from([0, 1, 2]),

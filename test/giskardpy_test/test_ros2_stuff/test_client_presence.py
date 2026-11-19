@@ -1,3 +1,8 @@
+"""
+Tests that a client announces itself by heartbeats and that Giskard notices when the
+client of a goal is gone.
+"""
+
 from __future__ import annotations
 
 import json
@@ -21,7 +26,7 @@ from giskardpy.middleware.ros2.client_presence import (
 )
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from krrood_synchronization.messages import Sender
 
 # %% helpers
 
@@ -59,14 +64,14 @@ def wait_until(condition: Callable[[], bool], timeout: float = 5.0) -> bool:
     return condition()
 
 
-def create_client(node_name: str = "some_client") -> MetaData:
+def create_client(node_name: str = "some_client") -> Sender:
     """
     The identity a client names itself with.
     """
-    return MetaData(node_name=node_name, process_id=1234)
+    return Sender(node_name=node_name, process_id=1234)
 
 
-def heartbeat_of(client: MetaData) -> std_msgs.msg.String:
+def heartbeat_of(client: Sender) -> std_msgs.msg.String:
     """
     The message that client sends to announce itself.
     """
@@ -136,9 +141,12 @@ class TestClientHeartbeat:
     """
 
     def test_giskard_receives_the_heartbeat_of_a_client(self, *, rclpy_node: Node):
+        """
+        A heartbeat a client publishes reaches Giskard, so the client counts as present.
+        """
         presence = HeartbeatPresence(node=rclpy_node)
         client_node = rclpy.create_node("heartbeat_sender")
-        client = MetaData(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         publisher = ClientHeartbeatPublisher(
             node=client_node,
             client=client,
@@ -163,7 +171,7 @@ class TestClientHeartbeat:
         client_node = rclpy.create_node("heartbeat_sender")
         publisher = ClientHeartbeatPublisher(
             node=client_node,
-            client=MetaData(node_name=client_node.get_name(), process_id=7),
+            client=Sender(node_name=client_node.get_name(), process_id=7),
             giskard_node_name=rclpy_node.get_name(),
         )
 
@@ -180,7 +188,7 @@ class TestClientHeartbeat:
         client_node = rclpy.create_node("heartbeat_sender")
         publisher = ClientHeartbeatPublisher(
             node=client_node,
-            client=MetaData(node_name=client_node.get_name(), process_id=7),
+            client=Sender(node_name=client_node.get_name(), process_id=7),
             giskard_node_name=rclpy_node.get_name(),
         )
         publisher.stop()
@@ -350,11 +358,15 @@ class TestHeartbeatWhileNodeIsBusy:
     def test_giskard_receives_heartbeats_while_its_node_is_busy(
         self, *, init_background_node
     ):
+        """
+        Heartbeats are received on a thread of their own, so a busy callback of
+        Giskard's node does not hide a client that is still there.
+        """
         giskard_node = background_node.get_node()
         presence = HeartbeatPresence(node=giskard_node)
         busy = BusyDefaultCallbackGroup(node=giskard_node)
         client_node = rclpy.create_node("heartbeat_sender")
-        client = MetaData(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         sender = client_node.create_publisher(
             std_msgs.msg.String,
             ClientHeartbeatPublisher.topic_name(
@@ -378,10 +390,14 @@ class TestHeartbeatWhileNodeIsBusy:
     def test_a_client_keeps_announcing_itself_while_its_node_is_busy(
         self, *, init_background_node
     ):
+        """
+        Heartbeats are sent on a thread of their own, so a busy callback of the client's
+        node does not make the client look gone.
+        """
         giskard_node = background_node.get_node()
         presence = HeartbeatPresence(node=giskard_node)
         client_node = rclpy.create_node("heartbeat_sender")
-        client = MetaData(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         assert wait_until(lambda: background_node.executor is not None)
         background_node.executor.add_node(client_node)
         busy = BusyDefaultCallbackGroup(node=client_node)
@@ -438,9 +454,12 @@ class TestHeartbeatWithoutItsNodeBeingSpun:
     def test_a_client_announces_itself_while_nothing_spins_its_node(
         self, *, rclpy_node: Node
     ):
+        """
+        A client whose node nobody spins still sends its heartbeats.
+        """
         presence = HeartbeatPresence(node=rclpy_node)
         client_node = rclpy.create_node("client_nothing_spins")
-        client = MetaData(node_name=client_node.get_name(), process_id=7)
+        client = Sender(node_name=client_node.get_name(), process_id=7)
         publisher = ClientHeartbeatPublisher(
             node=client_node,
             client=client,

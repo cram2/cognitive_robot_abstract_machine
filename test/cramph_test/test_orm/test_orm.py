@@ -29,6 +29,10 @@ from cramph.visualization import RvizVisualization
 
 @pytest.fixture
 def session():
+    """
+    :return: A session on an in-memory database holding cramph's tables, which are dropped
+        again after the test.
+    """
     from cramph.orm.ormatic_interface import Base
 
     session = Session(create_engine("sqlite:///:memory:"))

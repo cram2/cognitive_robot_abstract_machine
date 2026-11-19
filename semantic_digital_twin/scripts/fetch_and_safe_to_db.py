@@ -1,3 +1,9 @@
+"""
+Fetches the world a running world service publishes and saves it to the database.
+"""
+
+from __future__ import annotations
+
 import threading
 import time
 

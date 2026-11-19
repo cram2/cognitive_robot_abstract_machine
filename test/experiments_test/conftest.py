@@ -1,5 +1,5 @@
 """
-The ORM build every experiment test may need.
+The ORM build and the ORM mappers every experiment test may need.
 
 Each experiment keeps its own tests, and the fixtures they need, in a package of its own
 under this one, so that tests needing ROS and tests needing nothing but the domain live

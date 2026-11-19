@@ -1,3 +1,9 @@
+"""
+Tests of the PR2's kinematics, control commands and semantic annotations.
+"""
+
+from __future__ import annotations
+
 from collections import defaultdict
 
 import numpy as np

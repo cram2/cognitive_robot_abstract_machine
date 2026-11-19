@@ -7,7 +7,7 @@ from __future__ import annotations
 from enum import IntEnum, StrEnum
 from pathlib import Path
 
-from typing_extensions import ClassVar, Protocol
+from typing_extensions import ClassVar, Protocol  # noqa: TID251
 
 import krrood
 from krrood.adapters import json_serializer
@@ -16,6 +16,12 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
+from krrood.development_tools.agents.ruff_rules import (
+    CheckedModules,
+    RuffRule,
+    RuffRuleChecker,
+    RuffSetting,
+)
 from krrood.exceptions import DataclassException
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -40,13 +46,20 @@ class DesignPrinciplesRules(Section):
             ),
             (
                 "Interface Segregation: many small interfaces over one large one. An "
-                "interface is an explicit superclass or mixin, never a "
-                f"{CodeReference(target=Protocol).name}"
+                "interface is an explicit superclass or mixin"
             ),
             (
                 "Dependency Inversion: depend on abstractions, not concrete "
                 "implementations"
             ),
+        ),
+    )
+
+    NO_PROTOCOLS = (
+        f"Never declare an interface as a {CodeReference(target=Protocol).name}",
+        (),
+        RuffRuleChecker(
+            lint_rules=(RuffRule.BANNED_API,), settings=(RuffSetting.PROTOCOL_BANNED,)
         ),
     )
 
@@ -97,6 +110,21 @@ class MethodsRules(Section):
         "abstraction never justifies deep nesting; split the method instead"
     )
 
+    NO_SUPERFLUOUS_NESTING = (
+        "Never put an `else` after a branch that returns or raises, nest an `if` "
+        "whose condition could join its parent's, or nest blocks more than five deep",
+        (),
+        RuffRuleChecker(
+            lint_rules=(
+                RuffRule.SUPERFLUOUS_ELSE_RETURN,
+                RuffRule.SUPERFLUOUS_ELSE_RAISE,
+                RuffRule.COLLAPSIBLE_IF,
+                RuffRule.TOO_MANY_NESTED_BLOCKS,
+            ),
+            settings=(RuffSetting.PREVIEW_ENABLED,),
+        ),
+    )
+
 
 class ExceptionModellingRules(Section):
     """
@@ -113,6 +141,17 @@ class ExceptionModellingRules(Section):
     )
 
     DECLARE_AS_DATACLASSES = "Create meaningful custom exceptions as dataclasses"
+
+    RAISE_CUSTOM_EXCEPTIONS = (
+        "Never raise `Exception` itself, and never word an exception's message where "
+        "it is raised: its "
+        f"{CodeReference(target=DataclassException.error_message).name} words it",
+        (),
+        RuffRuleChecker(
+            lint_rules=(RuffRule.RAISE_VANILLA_CLASS, RuffRule.RAISE_VANILLA_ARGS),
+            modules=CheckedModules.OUTSIDE_TESTS,
+        ),
+    )
 
     PLACE_IN_THE_CLOSEST_MODULE = (
         "Put each exception in the `exceptions.py` closest to the code that raises it:",
@@ -131,7 +170,11 @@ class ExceptionModellingRules(Section):
 
     NO_ASSERT_OUTSIDE_TESTS = (
         "Never use `assert` outside tests: Python drops it when run with `-O`, so "
-        "the check silently disappears. Raise a custom exception instead"
+        "the check silently disappears. Raise a custom exception instead",
+        (),
+        RuffRuleChecker(
+            lint_rules=(RuffRule.ASSERT,), modules=CheckedModules.OUTSIDE_TESTS
+        ),
     )
 
     SUBCLASS_THE_KRROOD_BASE_CLASS = (
@@ -169,6 +212,12 @@ class ConstantsAndClassLevelValuesRules(Section):
                 "applies"
             ),
         ),
+    )
+
+    NO_GLOBAL_STATEMENT = (
+        "Never rebind a module's variable from a function with `global`",
+        (),
+        RuffRuleChecker(lint_rules=(RuffRule.GLOBAL_STATEMENT,)),
     )
 
     USE_KRROOD_CLASSPROPERTY = (

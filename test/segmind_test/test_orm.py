@@ -1,3 +1,7 @@
+"""
+Tests of segmind's database tables and how they build on those of other packages.
+"""
+
 from __future__ import annotations
 
 from sqlalchemy import create_engine, inspect
@@ -7,6 +11,9 @@ from sqlalchemy import create_engine, inspect
 
 
 def test_every_table_of_segmind_can_be_created_in_a_database() -> None:
+    """
+    Creating segmind's tables creates exactly the tables its metadata declares.
+    """
     from segmind.orm.ormatic_interface import Base
 
     engine = create_engine("sqlite:///:memory:")
