@@ -1,3 +1,8 @@
+"""
+A goal that moves a mechanism, such as a door or a drawer, by the handle the robot
+holds.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,6 +18,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.mixins import HasTipLinkParameter
 from cramph.node import CompositeNode, NodeArtifacts
 from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
@@ -22,14 +28,17 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
+class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParameter):
     """
     Drive the degree of freedom of a 1-dof mechanism in an environment to a position
     while keeping the end effector fixed relative to the grasped part. The mechanism
     moves only as fast as the end effector can move with it.
+
+    :attr:`tip_link` is the end effector grasping the part.
 
     Assumes that the grasped part (e.g. a handle or a bottle cap) has already been
     grasped. Works with any mechanism whose grasped part hangs below an
@@ -38,20 +47,15 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
     While it runs, :attr:`holding_end_effector`, if given, may touch its surroundings.
     """
 
-    tip_link: KinematicStructureEntity
-    """
-    End effector that is grasping the handle.
-    """
-
     environment_link: KinematicStructureEntity
     """
     Name of the handle that was grasped.
     """
 
-    goal_joint_state: float
+    goal_position: float
     """
-    The position the degree of freedom of the mechanism is driven to, clamped to its
-    limits once this goal expands.
+    The position the degree of freedom is driven to, in rad or m; clamped to its limits
+    once this goal expands.
     """
 
     holding_end_effector: EndEffector | None = None
@@ -81,12 +85,16 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
     """
 
     def expand(self) -> None:
+        """
+        Create the goal that turns the joint of the mechanism to :attr:`goal_position`,
+        clipped to the joint's limits, while the tip keeps holding the handle.
+        """
         self.connection = self.environment_link.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )
         limits = self.connection.dof.limits
-        self.goal_joint_state = float(
-            np.clip(self.goal_joint_state, limits.lower.position, limits.upper.position)
+        self.goal_position = float(
+            np.clip(self.goal_position, limits.lower.position, limits.upper.position)
         )
 
         allowances = []
@@ -102,21 +110,23 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
                 JointPositionList(
                     name="hinge goal",
                     goal_state=JointState.from_mapping(
-                        {self.connection: self.goal_joint_state}
+                        {self.connection: self.goal_position}
                     ),
                     weight=self.mechanism_weight,
                 ),
                 CartesianPose(
                     name="hold handle",
-                    root_link=self.environment_link,
-                    tip_link=self.tip_link,
+                    kinematic_chain=KinematicChain(
+                        root=self.environment_link, tip=self.tip_link
+                    ),
                     goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.grasp_weight,
                 ),
                 RigidCoupling(
                     name="move with handle",
-                    root_link=self.environment_link,
-                    tip_link=self.tip_link,
+                    kinematic_chain=KinematicChain(
+                        root=self.environment_link, tip=self.tip_link
+                    ),
                     weight=self.grasp_weight,
                 ),
             ]
