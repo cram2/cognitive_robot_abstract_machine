@@ -194,8 +194,31 @@ class StreamReceiver:
         with self._reception_lock:
             if position.origin in self._divergences:
                 return False
+            return self.contains(position=position)
+
+    def contains(self, *, position: StreamPosition) -> bool:
+        """
+        Whether this copy already holds the change published at ``position``, so that
+        its message must not be applied again.
+
+        Unlike :meth:`has_applied`, a publisher this copy diverged from is not treated
+        differently.
+        """
+        with self._reception_lock:
             applied = self._applied_sequence_numbers.get(position.origin, 0)
         return applied >= position.sequence_number
+
+    @property
+    def applied_positions(self) -> list[StreamPosition]:
+        """
+        The highest position applied so far of each publisher, see
+        :meth:`record_applied`.
+        """
+        with self._reception_lock:
+            return [
+                StreamPosition(origin=publisher, sequence_number=sequence_number)
+                for publisher, sequence_number in self._applied_sequence_numbers.items()
+            ]
 
     def record_divergence(self, *, divergence: DivergedFromPublisherError) -> None:
         """

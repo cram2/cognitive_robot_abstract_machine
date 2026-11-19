@@ -68,7 +68,6 @@ from giskardpy.motion_statechart.tasks.align_planes import KeepHeldBodyUpright
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPoseStraight,
     CartesianPose,
-    CartesianPositionVelocityLimit,
     HoldPose,
 )
 from giskardpy.motion_statechart.tasks.collision_avoidance import (
@@ -112,6 +111,7 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import MissingMovableJointError
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from semantic_digital_twin.reasoning.robot_predicates import get_visible_bodies
 from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -1444,12 +1444,95 @@ def test_a_pose_of_the_tool_center_point_holds_what_accompanies_it(
     )
     expand(action, extensions)
 
-    goal = action.tool_center_point_goal(Pose(), arm, max_linear_velocity=0.1)
+    goal = action.tool_center_point_goal(target=Pose(), arm=arm)
 
     assert isinstance(goal, (CartesianPose, CartesianPoseStraight))
-    assert [type(node) for node in goal.nodes] == [
-        CartesianPositionVelocityLimit,
-        HoldPose,
+    assert [type(node) for node in goal.nodes] == [HoldPose]
+
+
+@pytest.mark.parametrize(
+    "cruise_linear_velocity, expected_cruise_linear_velocity",
+    [(0.05, 0.05), (None, DefaultCruiseVelocity.TRANSLATION)],
+    ids=["asked for", "default"],
+)
+def test_a_tool_center_point_goal_approaches_at_the_speed_asked_for(
+    multiple_robot_apartment_context,
+    cruise_linear_velocity: float | None,
+    expected_cruise_linear_velocity: float,
+) -> None:
+    """
+    The speed of the tool center point is the cruise velocity of its pose goal, and no
+    speed asked for keeps the default of the goal.
+    """
+    world, robot, extensions = multiple_robot_apartment_context
+    arm = left_or_only_arm(robot)
+    action = MoveManipulatorAction(
+        target_pose=Pose(),
+        end_effector=arm.end_effector,
+        allow_gripper_collision=False,
+    )
+    expand(action, extensions)
+
+    goal = action.tool_center_point_goal(
+        target=Pose(), arm=arm, cruise_linear_velocity=cruise_linear_velocity
+    )
+
+    assert goal.cruise_linear_velocity == expected_cruise_linear_velocity
+
+
+@pytest.mark.parametrize(
+    "cruise_angular_velocity, expected_cruise_angular_velocity",
+    [(0.3, 0.3), (None, DefaultCruiseVelocity.ROTATION)],
+    ids=["asked for", "default"],
+)
+def test_a_tool_center_point_goal_turns_at_the_speed_asked_for(
+    multiple_robot_apartment_context,
+    cruise_angular_velocity: float | None,
+    expected_cruise_angular_velocity: float,
+) -> None:
+    """
+    How fast the tool center point turns is the angular cruise velocity of its pose
+    goal, and no speed asked for keeps the default of the goal.
+    """
+    world, robot, extensions = multiple_robot_apartment_context
+    arm = left_or_only_arm(robot)
+    action = MoveManipulatorAction(
+        target_pose=Pose(),
+        end_effector=arm.end_effector,
+        allow_gripper_collision=False,
+    )
+    expand(action, extensions)
+
+    goal = action.tool_center_point_goal(
+        target=Pose(), arm=arm, cruise_angular_velocity=cruise_angular_velocity
+    )
+
+    assert goal.cruise_angular_velocity == expected_cruise_angular_velocity
+
+
+def test_a_reach_approaches_at_its_tuned_speeds(
+    multiple_robot_apartment_context,
+) -> None:
+    """
+    A reach moves to the pre-grasp pose at its pre-approach speed and onto the grasp at
+    its final approach speed.
+    """
+    world, robot, extensions = multiple_robot_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    action = ReachAction(
+        grasp=GraspCandidate(milk, Pose(reference_frame=milk.root)),
+        arm=left_or_only_arm(robot),
+        pre_approach_linear_velocity=0.05,
+        final_approach_linear_velocity=0.02,
+    )
+
+    expand(action, extensions)
+
+    assert [
+        pose.cruise_linear_velocity for pose in nodes_of_type(action, CartesianPose)
+    ] == [
+        action.pre_approach_linear_velocity,
+        action.final_approach_linear_velocity,
     ]
 
 
