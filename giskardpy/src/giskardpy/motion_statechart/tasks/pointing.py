@@ -6,39 +6,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseAngularVelocityParameter,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
+# %% pointing an axis at a point
+
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class Pointing(CartesianTask):
+class Pointing(
+    CartesianTask,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
-    Will orient pointing_axis at goal_point.
-    """
-
-    goal_point: Point3
-    """
-    Where to point pointing_axis at.
-    """
-
-    pointing_axis: Vector3
-    """
-    The axis of tip_link that will be used for pointing.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
-    """
-
-    threshold: float = 0.01
-    """
-    Observation is true if the pointing angle is below this threshold.
+    Will orient :attr:`pointing_axis` at :attr:`goal_point`, with an error in radians.
     """
 
     @property
@@ -55,12 +45,12 @@ class Pointing(CartesianTask):
         artifacts = MotionNodeArtifacts()
 
         tip_V_pointing_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.pointing_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
@@ -68,15 +58,15 @@ class Pointing(CartesianTask):
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip @ tip_V_pointing_axis
-        root_V_pointing_axis.visualisation_frame = self.tip_link
-        root_V_goal_axis.visualisation_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.kinematic_chain.tip
+        root_V_goal_axis.visualisation_frame = self.kinematic_chain.tip
 
         tip_V_goal_axis = root_T_tip.inverse() @ root_V_goal_axis
         tip_V_goal_axis.scale(1)
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=tip_V_goal_axis,
             frame_V_goal=tip_V_pointing_axis,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(
@@ -88,34 +78,20 @@ class Pointing(CartesianTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PointingCone(CartesianTask):
+class PointingCone(
+    CartesianTask,
+    HasGoalPointParameter,
+    HasPointingAxisParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
-    Will orient pointing_axis at goal_point with a cone-shaped tolerance region.
-    """
-
-    goal_point: Point3
-    """
-    Where to point pointing_axis at.
-    """
-
-    pointing_axis: Vector3
-    """
-    The axis of tip_link that will be used for pointing.
+    Will orient :attr:`pointing_axis` at :attr:`goal_point` with a cone-shaped tolerance
+    region, with an error in radians.
     """
 
     cone_theta: float = 0.0
     """
     Slack cone region in radians.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
-    """
-
-    threshold: float = 0.01
-    """
-    Observation is true if the pointing angle is below this threshold.
     """
 
     @property
@@ -131,12 +107,12 @@ class PointingCone(CartesianTask):
         """
         artifacts = MotionNodeArtifacts()
         tip_V_pointing_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.pointing_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.pointing_axis
         )
         tip_V_pointing_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
@@ -144,19 +120,19 @@ class PointingCone(CartesianTask):
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
-        root_V_pointing_axis.visualisation_frame = self.tip_link
+        root_V_pointing_axis.visualisation_frame = self.kinematic_chain.tip
 
-        root_V_goal_axis.visualisation_frame = self.tip_link
+        root_V_goal_axis.visualisation_frame = self.kinematic_chain.tip
 
         root_V_goal_axis_proj = root_V_pointing_axis.project_to_cone(
             root_V_goal_axis, self.cone_theta
         )
-        root_V_goal_axis_proj.visualisation_frame = self.tip_link
+        root_V_goal_axis_proj.visualisation_frame = self.kinematic_chain.tip
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis_proj,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(

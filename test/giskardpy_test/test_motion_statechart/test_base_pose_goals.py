@@ -204,10 +204,10 @@ def _peak_yaw_per_tick_towards(
     """
     base = world.get_semantic_annotations_by_type(MinimalRobot)[0].root
     turn = BaseOrientation(
-        base=base,
+        driven_body=base,
         goal_pose=Pose.from_xyz_rpy(yaw=yaw, reference_frame=world.root),
         parent_T_goal_reference_frame=HomogeneousTransformationMatrix(),
-        cruise_velocity=cruise_velocity,
+        cruise_angular_velocity=cruise_velocity,
     )
     executor = _compiled(world, turn)
 

@@ -69,10 +69,10 @@ class PiecewiseConstantCurvatureConnection(Connection):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -113,11 +113,11 @@ class PiecewiseConstantCurvatureConnection(Connection):
             segment_length=segment_length,
         )
 
-    def add_to_world(self, world: World):
+    def add_to_world(self, *, world: World):
         """
         Defines the symbolic transformation matrix for the PCC segment.
         """
-        super().add_to_world(world)
+        super().add_to_world(world=world)
 
         # Access DOFs through the world using the stored UUIDs
         kappa_dof = world.get_degree_of_freedom_by_id(self.kappa_dof_id)
@@ -243,10 +243,10 @@ class CosseratRodConnection(Connection):
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -297,12 +297,12 @@ class CosseratRodConnection(Connection):
             segment_length=segment_length,
         )
 
-    def add_to_world(self, world: World):
+    def add_to_world(self, *, world: World):
         """
         Integrates the Cosserat differential equations along the length of the segment
         to compute the child's pose relative to the parent.
         """
-        super().add_to_world(world)
+        super().add_to_world(world=world)
 
         bending_x_dof = world.get_degree_of_freedom_by_id(self.bending_x_dof_id)
         bending_y_dof = world.get_degree_of_freedom_by_id(self.bending_y_dof_id)

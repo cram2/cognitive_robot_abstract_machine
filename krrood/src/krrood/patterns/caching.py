@@ -1,9 +1,13 @@
+"""
+Caches of the results of function calls, kept per key or per receiver of the call.
+"""
+
 from __future__ import annotations
 
 import threading
 import weakref
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
 from functools import partial, wraps
 
 from typing_extensions import Any, Callable, ClassVar, TypeVar
@@ -170,7 +174,7 @@ class MemoizationCache:
     """
 
     @classmethod
-    def of(cls, *, owner: Any, function_name: str) -> MemoizationCache:
+    def find_or_create(cls, *, owner: Any, function_name: str) -> MemoizationCache:
         """
         Returns the owner's cache, creating it on first use.
 
@@ -187,8 +191,27 @@ class MemoizationCache:
             cache = cls.existing_for(owner=owner)
             if cache is None:
                 cache = cls()
-                setattr(owner, cls.attribute_name, cache)
+                cls.attach(owner=owner, cache=cache)
             return cache
+
+    @classmethod
+    def attach(cls, *, owner: Any, cache: MemoizationCache) -> None:
+        """
+        Give the owner the cache as an attribute of its own, also where the owner is a
+        frozen dataclass, which refuses assignments to its fields but holds a cache that
+        is none of them.
+
+        :param owner: The receiver of a memoized call, which has no cache yet.
+        :param cache: The cache the owner keeps from now on.
+        """
+        if (
+            is_dataclass(owner)
+            and not isinstance(owner, type)
+            and owner.__dataclass_params__.frozen
+        ):
+            object.__setattr__(owner, cls.attribute_name, cache)
+            return
+        setattr(owner, cls.attribute_name, cache)
 
     @classmethod
     def existing_for(cls, *, owner: Any) -> MemoizationCache | None:
@@ -269,12 +292,16 @@ def _wrap_with_memoization(
 
     @wraps(function)
     def wrapper(owner: Any, *arguments: Any, **keyword_arguments: Any) -> Any:
+        """
+        The result of ``function`` for ``owner`` and these arguments, computed on the
+        first such call and taken from the owner's cache afterwards.
+        """
         key = MemoizationKey(
             function=function,
             arguments=arguments,
             keyword_arguments=frozenset(keyword_arguments.items()),
         )
-        entry = MemoizationCache.of(
+        entry = MemoizationCache.find_or_create(
             owner=owner, function_name=function.__name__
         ).entry_for(key=key)
         return resolve(

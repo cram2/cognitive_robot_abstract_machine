@@ -38,7 +38,6 @@ from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import Pacer, StatechartExecutor
 from cramph.node import CancelStatechart
 from cramph.nodes_for_testing import NodeFailingOnObservingFalse
-from cramph.orm.ormatic_interface import StatechartMappingDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 from sqlalchemy import select
 from giskardpy.motion_control import MotionControl
@@ -217,7 +216,8 @@ def executor_reaching_out_of_range(
         2, 1.5, 50, reference_frame=milk.root.parent_connection.parent
     )
     plan = ReachAction(
-        grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=robot_view.right_arm,
     )
     executor = simulated_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))
@@ -243,6 +243,8 @@ def test_a_plan_given_up_on_keeps_the_stalled_tasks_in_its_stored_history(
     Once the statechart of the plan is stored and read back, it still names the tasks
     that stopped approaching their goal, as copies of them.
     """
+    from cramph.orm.ormatic_interface import StatechartMappingDAO
+
     with pytest.raises(MotionMadeNoProgress) as failure:
         executor_reaching_out_of_range.execute()
     statechart = executor_reaching_out_of_range.statechart

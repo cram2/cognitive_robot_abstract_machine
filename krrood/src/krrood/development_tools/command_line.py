@@ -14,7 +14,12 @@ from pathlib import Path
 
 from typing_extensions import Sequence
 
-from krrood.development_tools.agents.checker import CodeRulesCheck, StagedLines
+from krrood.development_tools.agents.checker import (
+    CodeRulesCheck,
+    LinesChangedSince,
+    StagedLines,
+)
+from krrood.development_tools.agents.excluded_files import ExcludedFiles
 from krrood.development_tools.agents.instructions import (
     AgentsInstructions,
     RepositorySkills,
@@ -46,6 +51,12 @@ class Option(StrEnum):
     ALL_LINES = "--all-lines"
     """
     Check every line of a file, not only those the staged change touches.
+    """
+
+    SINCE = "--since"
+    """
+    Check the lines the working tree changes since the revision that follows, instead of
+    the staged change.
     """
 
     FORM = "--form"
@@ -165,10 +176,19 @@ class CommandLine:
             help="Report the code that breaks a rule a checker enforces.",
         )
         check_parser.add_argument("files", nargs="*", type=Path)
-        check_parser.add_argument(
+        changed_lines_options = check_parser.add_mutually_exclusive_group()
+        changed_lines_options.add_argument(
             Option.ALL_LINES,
             action="store_true",
             help="Check every line, not only those the staged change touches.",
+        )
+        changed_lines_options.add_argument(
+            Option.SINCE,
+            metavar="REVISION",
+            help=(
+                "Check the lines changed since REVISION, staged or not; without files, "
+                "check every tracked Python file changed since then."
+            ),
         )
         check_parser.set_defaults(run=self.check_files)
 
@@ -284,17 +304,31 @@ class CommandLine:
 
     def check_files(self, *, arguments: argparse.Namespace) -> ExitStatus:
         """
-        Report the code in the files named on the command line that breaks a rule a
-        checker enforces.
+        Report the code that breaks a rule a checker enforces, in the files named on the
+        command line or, with :attr:`Option.SINCE` and none named, in the files changed
+        since the revision. Files the repository excludes are left out.
 
         :param arguments: The parsed command line.
         :return: :attr:`ExitStatus.FAILURE` if any code breaks a rule.
         """
-        instructions = AgentsInstructions.from_repository(repository_root=Path.cwd())
-        staged = None if arguments.all_lines else StagedLines(repository=Path.cwd())
+        repository_root = Path.cwd()
+        instructions = AgentsInstructions.from_repository(
+            repository_root=repository_root
+        )
+        if arguments.since is not None:
+            changed_lines = LinesChangedSince(
+                repository=repository_root, revision=arguments.since
+            )
+            paths = arguments.files or changed_lines.find_changed_files()
+        else:
+            changed_lines = (
+                None if arguments.all_lines else StagedLines(repository=repository_root)
+            )
+            paths = arguments.files
+        excluded = ExcludedFiles.from_repository(repository_root=repository_root)
         violations = CodeRulesCheck(
-            checkers=instructions.checkers, staged=staged
-        ).violations(paths=arguments.files)
+            checkers=instructions.checkers, changed_lines=changed_lines
+        ).violations(paths=[path for path in paths if not excluded.excludes(path=path)])
         for violation in violations:
             logger.error(violation.render())
         if violations:
