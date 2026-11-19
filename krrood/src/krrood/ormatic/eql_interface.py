@@ -6,7 +6,7 @@ objects.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Callable, Any
+from typing_extensions import Callable, Any, TYPE_CHECKING
 import operator
 
 import sqlalchemy.inspection
@@ -22,6 +22,7 @@ from sqlalchemy import (
     exists as sqlalchemy_exists,
 )
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.selectable import CTE
 
 from krrood.entity_query_language.query.query import (
     Query,
@@ -57,6 +58,9 @@ from krrood.ormatic.exceptions import (
     NoDAOFoundForSelectionError,
 )
 
+if TYPE_CHECKING:
+    from krrood.entity_query_language.query.match import Match
+
 
 @dataclass(kw_only=True)
 class EQLTranslationError(DataclassException):
@@ -88,6 +92,32 @@ class UnsupportedQueryTypeError(EQLTranslationError, TypeError):
             "Express the query using supported constructs: entity() or set_of() combined "
             "with where(), and(), or(), not(), exists(), comparators or aggregators."
         )
+
+
+@dataclass(kw_only=True)
+class UnsupportedNestedQueryError(EQLTranslationError, TypeError):
+    """
+    Raised when a query selected by another query, such as the query of a match wrapped
+    in ``entity()``, states a modifier its translation would lose.
+    """
+
+    query: Entity
+    """
+    The selected query whose modifiers cannot be translated.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The selected query {self.query} states a limit, an order, a grouping, "
+            f"a having clause, distinct results or a quantifier other than an()."
+        )
+
+    def suggest_correction(self) -> str:
+        """
+        Overrides :meth:`EQLTranslationError.suggest_correction` to move the modifiers
+        to the outer query.
+        """
+        return "State these modifiers on the outer query instead of the selected one."
 
 
 @dataclass(kw_only=True)
@@ -646,13 +676,42 @@ class EQLTranslator:
         Translate the EQL query to SQL.
         """
         selected = self.select_like.selected_variable
-        if isinstance(selected, Attribute):
+        if isinstance(selected, Entity):
+            self._translate_entity_from_selected_query(query=selected)
+        elif isinstance(selected, Attribute):
             self._translate_entity_from_attribute(attribute=selected)
         else:
             self.sql_query = select(
                 self._require_dao_class(domain_type=selected._type_)
             )
         self._apply_clauses()
+
+    def _translate_entity_from_selected_query(self, *, query: Entity) -> None:
+        """
+        Translate ``entity(query)``, such as ``entity(a(Drawer)(body=...))``, into the
+        selection of *query* restricted by its conditions.
+
+        :param query: The query the outer query selects.
+        :raises UnsupportedNestedQueryError: When *query* states a modifier besides its
+            conditions.
+        """
+        if (
+            query._limit_ is not None
+            or query._ordered_by_builder_ is not None
+            or query._grouped_by_builder_ is not None
+            or query._having_builder_ is not None
+            or query._distinct_on
+            or (
+                query._quantifier_builder_ is not None
+                and not issubclass(query._quantifier_builder_.type, An)
+            )
+        ):
+            raise UnsupportedNestedQueryError(query=query)
+        selected_query_translator = EQLTranslator(
+            eql_query=query, session=self.session, join_manager=self.join_manager
+        )
+        selected_query_translator.translate()
+        self.sql_query = selected_query_translator.sql_query
 
     def _translate_entity_from_attribute(self, *, attribute: Attribute) -> None:
         """
@@ -1503,10 +1562,13 @@ class EQLTranslator:
 
 
 def eql_to_sql(
-    query: Query, session: Session, as_common_table_expression: str | None = None
-) -> Union[EQLTranslator, Any]:
+    query: Query | Match,
+    session: Session,
+    as_common_table_expression: str | None = None,
+) -> EQLTranslator | CTE:
     """
-    Translate an EQL query to SQL.
+    Translate an EQL query, or a match, which translates as the query it stands for, to
+    SQL.
 
     .. code-block:: python
 
@@ -1528,6 +1590,7 @@ def eql_to_sql(
     (e.g. WITH large_bodies AS (SELECT ...))
     :return: EQLTranslator or SQLAlchemy common table expression
     """
+    query = query._get_expression_()
     query.build()
     result = EQLTranslator(eql_query=query, session=session)
     result.translate()
