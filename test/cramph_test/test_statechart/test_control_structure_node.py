@@ -1,3 +1,7 @@
+"""
+Tests the control structure nodes and replacing the nodes they hold.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -517,6 +521,30 @@ def test_a_failed_replacement_by_another_node_leaves_the_step_where_it_was(
 
     with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
         statechart.replace(node=second, replacement=replacement)
+    _run(statechart_executor, statechart, sequence)
+
+    assert not replacement.belongs_to_statechart()
+    assert sequence.nodes == [first, second]
+    assert second.parent_node is sequence
+    assert _start_order(statechart, [second, first]) == [first, second]
+
+
+def test_a_modification_failing_after_a_step_was_replaced_puts_the_step_back(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The replaced step left the statechart, and comes back in the place of its
+    replacement.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    first, second = _succeeding("1"), _succeeding("2")
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
+    replacement = _succeeding("3")
+
+    with pytest.raises(ZeroDivisionError):
+        with statechart.modify():
+            statechart.replace(node=second, replacement=replacement)
+            1 / 0
     _run(statechart_executor, statechart, sequence)
 
     assert not replacement.belongs_to_statechart()
