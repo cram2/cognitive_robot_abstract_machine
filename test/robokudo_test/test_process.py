@@ -332,6 +332,33 @@ class TestJoiningSharedWorld:
             body.id for body in shared_world.world.bodies
         ]
 
+    def test_counts_the_changes_it_joined_with_as_applied(
+        self,
+        *,
+        node: Node,
+        shared_world: SharedWorld,
+        engine: EngineRunningABehaviour,
+    ) -> None:
+        """
+        A change the shared world published before RoboKudo joined is contained in the
+        joined world, so RoboKudo has caught up with it without receiving it.
+        """
+        with shared_world.world.modify_world():
+            shared_world.world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    parent=shared_world.world.root,
+                    child=Body(name=PrefixedName("table")),
+                    world=shared_world.world,
+                )
+            )
+
+        robokudo = robokudo_joining_a_shared_world(node, engine)
+
+        assert robokudo.synchronizer.has_applied(
+            position=shared_world.synchronizer.latest_published_position
+        )
+        robokudo.close()
+
     def test_changes_of_the_shared_world_reach_perception(
         self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
@@ -658,7 +685,8 @@ class TestDiscoveringASharedWorld:
             raise SynchronizerUnavailableError()
 
         monkeypatch.setattr(
-            "robokudo.process.WorldSynchronizer", unavailable_synchronizer
+            "semantic_digital_twin.adapters.ros.world_fetcher.WorldSynchronizer",
+            unavailable_synchronizer,
         )
 
         with pytest.raises(SynchronizerUnavailableError):

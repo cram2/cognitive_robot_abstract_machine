@@ -22,8 +22,8 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.executors import SingleThreadedExecutor
 from semantic_digital_twin.adapters.ros.world_fetcher import (
-    fetch_world_from_service,
     find_world_fetcher_service,
+    join_shared_world,
 )
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -170,11 +170,11 @@ class RoboKudo:
                 )
                 self.world = World()
             else:
-                self.world = fetch_world_from_service(
+                self.world = join_shared_world(
                     self.node,
                     timeout_seconds=self.world_fetch_timeout.total_seconds(),
                 )
-                self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
+                self.synchronizer = WorldSynchronizer.of_world(self.world)
             closing_on_failure.pop_all()
 
     # %% lifecycle
