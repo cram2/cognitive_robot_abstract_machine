@@ -28,9 +28,13 @@ class TypeDict:
         """
         child_class = get_origin(clazz) or clazz
         return {
-            k: v
-            for k in self._dict.keys()
-            if (v := inheritance_path_length(child_class=child_class, parent_class=k))
+            key: path_length
+            for key in self._dict.keys()
+            if (
+                path_length := inheritance_path_length(
+                    child_class=child_class, parent_class=key
+                )
+            )
             is not None
         }
 
