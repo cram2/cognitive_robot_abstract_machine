@@ -38,6 +38,11 @@ jobs:
           - krrood-rdr
           - krrood-ontomatic
           - krrood-development-tools
+        # krrood.parametrization imports probabilistic_model's relational circuits, which
+        # import jpt, and probabilistic_model installs pyjpt only on Linux.
+        exclude:
+          - os: windows-latest
+            distribution: krrood-probabilistic
     defaults:
       run:
         shell: bash
