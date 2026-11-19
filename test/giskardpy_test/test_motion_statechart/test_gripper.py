@@ -1,3 +1,9 @@
+"""
+Tests of the nodes that open and close a gripper and move its fingers.
+"""
+
+from __future__ import annotations
+
 from datetime import timedelta
 
 import numpy as np

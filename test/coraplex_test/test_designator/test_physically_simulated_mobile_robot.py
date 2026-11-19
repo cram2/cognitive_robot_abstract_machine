@@ -45,6 +45,10 @@ def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
 def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
     simulated_hsrb,
 ) -> None:
+    """
+    In a physical simulation the HSR raises its torso to the joint positions asked for
+    and drives to where it is sent.
+    """
     hsrb, simulation = simulated_hsrb
     world = hsrb._world
     goal = Pose.from_xyz_rpy(1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root)

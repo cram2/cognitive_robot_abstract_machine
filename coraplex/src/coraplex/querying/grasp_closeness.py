@@ -1,3 +1,7 @@
+"""
+The order in which the grasps of an object are tried from a standing position.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -616,6 +616,10 @@ class ScriptedErrorRun:
     """
 
     def __post_init__(self):
+        """
+        Create the tasks, the monitor watching them and the executor, and compile the
+        motion.
+        """
         self.tasks = [
             CartesianPosition(
                 name=f"goal at {goal_x}",
@@ -800,6 +804,10 @@ class TestConvergenceRule:
 
 
 class TestErrorDrivesObservation:
+    """
+    How the error of a task decides what it observes.
+    """
+
     def test_error_is_the_distance_to_the_goal(self, *, cylinder_bot_world: World):
         """
         CartesianPosition reports the distance between tip and goal as its error.
@@ -1006,6 +1014,10 @@ class TestNothingToConverge:
 
 
 class TestNodeDependencies:
+    """
+    How the nodes a node depends on are ordered and checked.
+    """
+
     def test_a_dependency_is_built_first_even_when_added_later(
         self, *, cylinder_bot_world: World
     ):
@@ -1082,6 +1094,10 @@ class TestNodeDependencies:
 
 
 class TestTrajectoryProgress:
+    """
+    How progress is judged for a task following a trajectory.
+    """
+
     def test_a_trajectory_being_followed_is_progressing(
         self, *, cylinder_bot_world: World
     ):

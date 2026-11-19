@@ -233,7 +233,10 @@ class FixedlyGraspedHandle(Handle):
     """
 
     def grasp_candidates(self, model_registry=None, result_pattern=None):
-        return [GraspCandidate.from_body_origin(self)]
+        """
+        :return: One grasp, at the origin of the object's body.
+        """
+        return [GraspCandidate.from_body_origin(graspable=self)]
 
 
 def test_an_annotation_can_offer_its_grasps_its_own_way():
@@ -335,12 +338,15 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
 
 
 def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
+    """
+    A bowl's rim is pinched in the middle half of its wall.
+    """
     allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
-    assert PinchARim().depth_unit(bowl.rim, bowl.rim.grasp_surface()) == pytest.approx(
-        wall_thickness, rel=0.02
-    )
+    assert PinchARim().depth_unit(
+        graspable=bowl.rim, surface=bowl.rim.grasp_surface()
+    ) == pytest.approx(wall_thickness, rel=0.02)
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
         0.25 * wall_thickness, rel=0.02
     )
@@ -350,9 +356,14 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
 
 
 def test_a_wall_is_pinched_as_deep_as_asked(bowl):
+    """
+    A wall is pinched within the fraction of its thickness the strategy was given.
+    """
     strategy = PinchARim(depth=Bounds(lower=0.1, upper=0.9))
     allowed = allowed_intervals(strategy.statement(bowl.rim))
-    wall_thickness = strategy.depth_unit(bowl.rim, bowl.rim.grasp_surface())
+    wall_thickness = strategy.depth_unit(
+        graspable=bowl.rim, surface=bowl.rim.grasp_surface()
+    )
 
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
         strategy.depth.lower * wall_thickness
@@ -824,10 +835,13 @@ def test_drawn_handle_grasps_hold_the_bar_on_its_axis_and_close_across_it(bar_ax
 
 @pytest.mark.parametrize("position", [0.0, 0.5, 1.0])
 def test_an_axial_grasp_closes_where_along_the_axis_it_names(position):
+    """
+    An axial grasp closes at the fraction along the axis it names.
+    """
     handle = _handle_with_bar_along(1)
     lowest, highest = handle.grasp_surface().bounds
 
-    grasp = AxialGrasp(position=position, angle=0.0).grasp_candidate(handle)
+    grasp = AxialGrasp(position=position, angle=0.0).grasp_candidate(graspable=handle)
 
     np.testing.assert_allclose(
         grasp.grasp_pose.to_np()[:3, 3],
@@ -852,7 +866,7 @@ def test_an_axial_grasp_turns_its_approach_about_the_axis(
     bar_direction = np.eye(3)[bar_axis]
 
     unturned, quarter_turned = (
-        AxialGrasp(position=0.5, angle=angle).grasp_candidate(handle)
+        AxialGrasp(position=0.5, angle=angle).grasp_candidate(graspable=handle)
         for angle in (0.0, np.pi / 2)
     )
 
@@ -897,6 +911,10 @@ class HandleWithDiagonalBar(Handle):
 
 
 def test_an_axial_grasp_follows_the_axis_its_object_states():
+    """
+    An axial grasp of an object with a diagonal axis closes on that axis, its closing and
+    approach directions across it.
+    """
     handle = _handle_with_bar_along(0)
     diagonal = HandleWithDiagonalBar(root=handle.root)
     with handle._world.modify_world():
@@ -905,7 +923,7 @@ def test_an_axial_grasp_follows_the_axis_its_object_states():
     start, end = axis.start.to_np()[:3], axis.end.to_np()[:3]
     axis_direction = axis.direction.to_np()[:3]
 
-    grasp = AxialGrasp(position=0.25, angle=1.0).grasp_candidate(diagonal)
+    grasp = AxialGrasp(position=0.25, angle=1.0).grasp_candidate(graspable=diagonal)
 
     np.testing.assert_allclose(
         grasp.grasp_pose.to_np()[:3, 3], start + 0.25 * (end - start), atol=1e-9
@@ -915,12 +933,16 @@ def test_an_axial_grasp_follows_the_axis_its_object_states():
 
 
 def test_an_axial_grasp_beyond_the_ends_of_the_axis_does_not_lie_on_the_object():
+    """
+    An axial grasp beyond the ends of the axis lies off the object, so no grasp candidate
+    can be made from it.
+    """
     handle = _handle_with_bar_along(1)
     beyond = AxialGrasp(position=1.5, angle=0.0)
 
-    assert not beyond.reaches_surface_of(handle)
+    assert not beyond.reaches_surface_of(graspable=handle)
     with pytest.raises(GraspNotOnObjectError):
-        beyond.grasp_candidate(handle)
+        beyond.grasp_candidate(graspable=handle)
 
 
 # %% the frame a grasp is expressed in
@@ -944,7 +966,10 @@ def test_a_grasp_without_a_frame_is_refused(milk):
 
 
 def test_a_grasp_from_the_body_origin_takes_the_object_at_its_own_origin(milk):
-    grasp = GraspCandidate.from_body_origin(milk)
+    """
+    A grasp from the body origin takes the object at its root body's origin.
+    """
+    grasp = GraspCandidate.from_body_origin(graspable=milk)
 
     assert grasp.graspable is milk
     assert grasp.grasp_pose.reference_frame is milk.root
@@ -1084,6 +1109,9 @@ def test_a_diagonal_grasp_meets_the_box_across_its_shadow(milk):
 
 
 def test_an_object_without_collision_has_no_width_to_measure():
+    """
+    An object without collision geometry has no width along the closing axis to measure.
+    """
     body = Body(name=PrefixedName("shapeless", prefix="grasp_candidates"))
     annotation = Milk(root=body)
     world = World()
@@ -1092,4 +1120,4 @@ def test_an_object_without_collision_has_no_width_to_measure():
         world.add_semantic_annotation(annotation)
 
     with pytest.raises(ObjectHasNoWidthWithoutCollision):
-        GraspCandidate.from_body_origin(annotation).width_along_closing_axis
+        GraspCandidate.from_body_origin(graspable=annotation).width_along_closing_axis

@@ -1,3 +1,7 @@
+"""
+Annotations that describe a body in natural language.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -60,6 +60,10 @@ def extensions(request) -> list[ContextExtension]:
 def test_a_real_robot_moves_its_gripper_through_the_parallel_gripper_command_server(
     extensions, state
 ) -> None:
+    """
+    A real robot moves its gripper through the parallel gripper command server, to the
+    position of the configuration asked for.
+    """
     gripper = robot_of(extensions).all_arms[0].end_effector
     configuration = gripper.default_configuration(state)
 
@@ -76,6 +80,9 @@ def test_a_real_robot_moves_its_gripper_through_the_parallel_gripper_command_ser
 
 
 def test_a_simulated_robot_moves_its_fingers_with_a_giskard_goal(extensions) -> None:
+    """
+    A simulated robot moves its fingers with a motion goal.
+    """
     configuration = (
         robot_of(extensions)
         .all_arms[0]
@@ -95,6 +102,10 @@ def test_a_simulated_robot_moves_its_fingers_with_a_giskard_goal(extensions) -> 
 def test_a_real_robot_whose_grippers_take_other_action_messages_keeps_its_finger_goals(
     daisy_world,
 ) -> None:
+    """
+    A real robot whose grippers take other action messages keeps moving its fingers with
+    motion goals.
+    """
     extensions = robot_extensions(
         deepcopy(daisy_world).get_semantic_annotations_by_type(DAiSy)[0]
     )
@@ -121,6 +132,10 @@ def test_a_real_robot_whose_grippers_take_other_action_messages_keeps_its_finger
 def test_a_real_robot_opens_and_shuts_its_gripper_on_a_grasp_through_the_parallel_gripper_command_server(
     extensions,
 ) -> None:
+    """
+    On a grasp a real robot opens and then shuts its gripper through the parallel
+    gripper command server.
+    """
     grasp = top_down_grasp_of_a_box(extensions)
     arm = robot_of(extensions).all_arms[0]
 

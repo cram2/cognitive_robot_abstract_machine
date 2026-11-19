@@ -1,3 +1,7 @@
+"""
+Tests of motions of joints that mimic other joints, on the HSR's torso.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -122,6 +126,10 @@ def test_mimic_joint_velocity_limits_are_scaled_by_its_multiplier(
 def test_lifting_the_gripper_lifts_the_torso_along(
     hsr_world_copy: World, default_hsr_pose: dict[str, float]
 ) -> None:
+    """
+    Lifting the HSR's gripper drives the arm lift, and the torso, which mimics it, rises
+    by the lift times its multiplier.
+    """
     JointState.from_str_dict(default_hsr_pose, hsr_world_copy).apply_to(hsr_world_copy)
     torso_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
         HSRBJoint.TORSO_LIFT
@@ -162,6 +170,10 @@ def test_lifting_the_gripper_lifts_the_torso_along(
 def test_lifting_the_head_drives_the_joint_the_torso_mimics(
     hsr_world_copy: World, default_hsr_pose: dict[str, float]
 ) -> None:
+    """
+    Lifting the HSR's head drives the arm lift, which the torso mimics, by the lift
+    divided by the multiplier.
+    """
     JointState.from_str_dict(default_hsr_pose, hsr_world_copy).apply_to(hsr_world_copy)
     torso_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
         HSRBJoint.TORSO_LIFT

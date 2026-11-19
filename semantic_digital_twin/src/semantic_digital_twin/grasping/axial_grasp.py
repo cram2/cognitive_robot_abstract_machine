@@ -29,15 +29,12 @@ if TYPE_CHECKING:
 @dataclass
 class AxialGrasp(ObjectRelativeGrasp):
     """
-    A grasp of an elongated object with the gripper's tool centre point on the axis the
-    object runs along, closing across it.
+    A grasp of an elongated object with the gripper's tool centre point on the object's
+    :meth:`~IsGraspable.grasp_axis`, closing across it.
 
-    The axis is the object's :meth:`~IsGraspable.grasp_axis`, running along
-    ``root_V_axis``. The x-axis of ``root_T_grasp`` is the direction of approach,
-    ``root_V_reference`` turned by :attr:`angle` about ``root_V_axis``; its y-axis is
-    the closing direction, ``root_V_axis`` crossed with the approach.
-    ``root_V_reference`` is the part of the root body's negative z-axis across the axis,
-    or of its negative y-axis when the axis runs mostly along z.
+    The gripper approaches across the axis, turned by :attr:`angle` about it from the
+    root body's negative z-axis, or from its negative y-axis when the axis runs mostly
+    along z.
     """
 
     position: float
@@ -52,14 +49,14 @@ class AxialGrasp(ObjectRelativeGrasp):
     radians.
     """
 
-    def reaches_surface_of(self, graspable: IsGraspable) -> bool:
+    def reaches_surface_of(self, *, graspable: IsGraspable) -> bool:
         """
         :return: Whether :attr:`position` lies between the ends of the axis.
         """
         return 0.0 <= self.position <= 1.0
 
-    def grasp_candidate(self, graspable: IsGraspable) -> GraspCandidate:
-        if not self.reaches_surface_of(graspable):
+    def grasp_candidate(self, *, graspable: IsGraspable) -> GraspCandidate:
+        if not self.reaches_surface_of(graspable=graspable):
             raise GraspNotOnObjectError(grasp=self, graspable=graspable)
         axis = graspable.grasp_axis()
         root_V_axis = axis.direction

@@ -1,3 +1,7 @@
+"""
+Tasks that insert a cylinder held by the robot into a hole.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -182,6 +186,11 @@ class InsertCylinder(
     """
 
     def expand(self) -> None:
+        """
+        Create the tasks that reach a point above :attr:`hole_point` with the cylinder
+        tilted, lower it along :attr:`hole_normal` into the hole, and straighten it once
+        it reaches the bottom.
+        """
         root = self.context.world.root
         root_V_up = self.context.world.transform(
             target_frame=root, spatial_object=self.hole_normal

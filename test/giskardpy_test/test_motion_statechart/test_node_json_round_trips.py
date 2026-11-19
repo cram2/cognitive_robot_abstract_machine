@@ -248,6 +248,10 @@ def _self_collision_avoidance(world: World) -> list[StatechartNode]:
 
 
 def _feature_fields(world: World) -> dict[str, KinematicChain]:
+    """
+    :param world: The world the features are taken from.
+    :return: The keyword arguments giving a feature node its kinematic chain.
+    """
     return {"kinematic_chain": KinematicChain(root=_root(world), tip=_tip(world))}
 
 
@@ -615,6 +619,9 @@ def _feature_cases() -> list[NodeRoundTripCase]:
 
 
 def _monitor_cases() -> list[NodeRoundTripCase]:
+    """
+    :return: The monitors whose JSON round trip is tested.
+    """
     return [
         NodeRoundTripCase(
             PoseReached,
@@ -743,6 +750,9 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
 
 
 def _joint_and_base_cases() -> list[NodeRoundTripCase]:
+    """
+    :return: The joint, gripper and base nodes whose JSON round trip is tested.
+    """
     return [
         NodeRoundTripCase(
             EndMotion, lambda world: [EndMotion()], WorldFixture.PR2_WORLD
@@ -790,6 +800,9 @@ def _joint_and_base_cases() -> list[NodeRoundTripCase]:
 
 
 def _collision_cases() -> list[NodeRoundTripCase]:
+    """
+    :return: The collision nodes whose JSON round trip is tested.
+    """
     return [
         NodeRoundTripCase(
             UpdateTemporaryCollisionRules,

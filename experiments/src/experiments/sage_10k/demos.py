@@ -177,6 +177,9 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=0.94, y=0.2, yaw=-np.pi / 2, reference_frame=self.world.root
         )
@@ -189,6 +192,9 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def place_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to put the object down at :attr:`place_pose`.
+        """
         return Pose2D.from_xy_yaw(
             x=-0.12, y=4, yaw=np.pi / 2, reference_frame=self.world.root
         )
@@ -308,6 +314,10 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks up the book and brings it back to
+        :attr:`robot_starting_pose` to present it.
+        """
         open_door = Sage10kOpenDoor(door=self.main_entrance)
         mpa = MoveAndPickUpAction.from_standing_position(
             standing_position=Pose2D.from_xy_yaw(
@@ -337,6 +347,9 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=6.83, y=5.38, yaw=1.78, reference_frame=self.world.root
         )
@@ -415,6 +428,9 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=2.45265, y=7.28, yaw=2.16, reference_frame=self.world.root
         )
@@ -446,6 +462,10 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks up the cup between two drives to the same place
+        with the arm parked, and brings it back to :attr:`robot_starting_pose`.
+        """
         navigate1 = NavigateAction(
             planar_goal_pose=Pose2D.from_xy_yaw(
                 x=2.86, y=5.89, reference_frame=self.world.root
@@ -487,6 +507,9 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=0.93235, y=4.74108, yaw=2.90782, reference_frame=self.world.root
         )
@@ -562,6 +585,9 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=2.7337, y=4.60152, yaw=-1.79685, reference_frame=self.world.root
         )
@@ -593,6 +619,10 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks up the cup between two drives to the same place
+        with the arm parked, and brings it back to :attr:`robot_starting_pose`.
+        """
         navigate1 = NavigateAction(
             planar_goal_pose=Pose2D.from_xy_yaw(
                 x=1.27, y=4.45, reference_frame=self.world.root
@@ -709,6 +739,9 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=0.63, y=0.7, yaw=np.pi / 2, reference_frame=self.world.root
         )
@@ -719,6 +752,9 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def place_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to put the object down at :attr:`place_pose`.
+        """
         return Pose2D.from_xy_yaw(x=3.99, y=4.66, reference_frame=self.world.root)
 
     @cached_property
@@ -826,6 +862,9 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=8.31, y=0.82, yaw=np.pi, reference_frame=self.world.root
         )
@@ -838,6 +877,9 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def place_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to put the object down at :attr:`place_pose`.
+        """
         return Pose2D.from_xy_yaw(
             x=0.66, y=5.81, yaw=np.pi / 2, reference_frame=self.world.root
         )
@@ -932,6 +974,9 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def pickup_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to pick up the object of interest.
+        """
         return Pose2D.from_xy_yaw(
             x=4.66, y=8.62, yaw=0, reference_frame=self.world.root
         )
@@ -944,6 +989,9 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def place_navigation_pose(self) -> Pose2D:
+        """
+        Where the robot stands to put the object down at :attr:`place_pose`.
+        """
         return Pose2D.from_xy_yaw(
             x=7.23, y=1.16, yaw=np.pi / 2, reference_frame=self.world.root
         )

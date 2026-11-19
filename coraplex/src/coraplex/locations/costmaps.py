@@ -1,3 +1,8 @@
+"""
+Grid maps of the floor around a target that rate each place for a task, such as being
+free of obstacles, seeing the target or standing at a set distance from it.
+"""
+
 # %% Imports
 from __future__ import annotations
 
@@ -173,10 +178,10 @@ class Costmap(Location):
         return self.merge(other)
 
     def candidates(self) -> Iterator[Pose2D]:
-        return self.sample(self.number_of_samples, self.seed)
+        return self.sample(number_of_samples=self.number_of_samples, seed=self.seed)
 
     def sample(
-        self, number_of_samples: int, seed: int | None = None
+        self, *, number_of_samples: int, seed: int | None = None
     ) -> Iterator[Pose2D]:
         """
         Sample pose candidates from this map.

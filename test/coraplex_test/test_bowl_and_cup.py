@@ -204,8 +204,8 @@ def pick_ups_from_above(kitchen: KitchenWithFilledDrawer) -> list[PickUpAction]:
         arm, each coming down onto it from above.
     """
     return [
-        PickUpAction.from_above(kitchen.bowl, kitchen.robot.left_arm),
-        PickUpAction.from_above(kitchen.cup, kitchen.robot.right_arm),
+        PickUpAction.from_above(graspable=kitchen.bowl, arm=kitchen.robot.left_arm),
+        PickUpAction.from_above(graspable=kitchen.cup, arm=kitchen.robot.right_arm),
     ]
 
 

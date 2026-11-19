@@ -1,3 +1,8 @@
+"""
+Tasks that control a geometric relation between a feature on the tip of a kinematic
+chain and one on its root, such as a height, a distance or an angle.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -66,6 +71,10 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
         raise NotImplementedError
 
     def build(self) -> MotionNodeArtifacts:
+        """
+        Differs from the inherited ``build`` in also expressing both features relative
+        to the root of :attr:`kinematic_chain` and drawing them as debug expressions.
+        """
         self.controlled_feature, self.reference_feature = (
             self.get_controlled_and_reference_features()
         )

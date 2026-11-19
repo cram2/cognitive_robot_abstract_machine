@@ -1,3 +1,7 @@
+"""
+Goals that shape a motion by scaling the weights of the other tasks.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

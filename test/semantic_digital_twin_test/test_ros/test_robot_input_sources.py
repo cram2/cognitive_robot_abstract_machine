@@ -101,6 +101,10 @@ def test_a_robot_read_by_both_loops_subscribes_to_its_joint_states_once(
 
 
 def test_every_part_read_from_the_robot_is_an_input_to_apply(annotated_pr2, rclpy_node):
+    """
+    Every part of the PR2 switched to the real robot reads from an input synchronizer
+    the robot hands out.
+    """
     switched_parts = [
         part
         for part in annotated_pr2._robot_parts

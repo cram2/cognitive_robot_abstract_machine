@@ -138,7 +138,7 @@ class PickUpAction(
     """
 
     @classmethod
-    def from_above(cls, graspable: IsGraspable, arm: Arm) -> PickUpAction:
+    def from_above(cls, *, graspable: IsGraspable, arm: Arm) -> PickUpAction:
         """
         :param graspable: The annotation of an object standing upright.
         :param arm: The arm that picks it up.
@@ -177,8 +177,8 @@ class PickUpAction(
                 orientation_threshold=self.orientation_threshold,
             ),
             *self.reattach(
-                self.grasp_candidate.graspable.root,
-                self.arm.end_effector.tool_frame,
+                branch_root=self.grasp_candidate.graspable.root,
+                new_parent=self.arm.end_effector.tool_frame,
             ),
         ]
 

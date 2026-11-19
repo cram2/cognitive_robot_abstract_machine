@@ -640,6 +640,7 @@ class ReattachesBranches(Action, ABC):
 
     def reattach(
         self,
+        *,
         branch_root: KinematicStructureEntity,
         new_parent: KinematicStructureEntity,
     ) -> list[StatechartNode]:

@@ -2,6 +2,8 @@
 Fixing forward kinematics to the values they have at one moment of a motion.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field, replace
 
 import numpy as np
@@ -63,6 +65,10 @@ class ForwardKinematicsBinding(HasKinematicChainParameter):
     """
 
     def __post_init__(self) -> None:
+        """
+        Create :attr:`root_T_tip` over new variables if none was given, and register it
+        with :attr:`float_variable_data`.
+        """
         if self.root_T_tip is None:
             self.root_T_tip = HomogeneousTransformationMatrix.create_with_variables(
                 str(self.name)

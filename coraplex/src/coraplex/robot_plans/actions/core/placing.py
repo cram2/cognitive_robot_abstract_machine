@@ -122,7 +122,7 @@ class PlaceAction(
                     ),
                 ]
             ),
-            *self.reattach(self.graspable.root, self.world.root),
+            *self.reattach(branch_root=self.graspable.root, new_parent=self.world.root),
             # The gripper starts out around the object it has just let go of.
             self.tool_center_point_goal(
                 target=self._tool_goals.pre_grasp,

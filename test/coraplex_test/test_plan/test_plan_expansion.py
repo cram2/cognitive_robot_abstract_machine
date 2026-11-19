@@ -246,6 +246,9 @@ def test_monitored_subtree_nested_in_a_sequence_compiles(
 
 
 def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
+    """
+    A reach of the PR2's right arm towards the milk runs until it succeeds.
+    """
     world, view, extensions = pr2_apartment_context
 
     milk_connection = world.get_body_by_name("milk.stl").parent_connection
@@ -254,7 +257,7 @@ def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
     )
     reach = ReachAction(
         grasp_candidate=GraspCandidate.from_body_origin(
-            world.get_semantic_annotations_by_type(Milk)[0]
+            graspable=world.get_semantic_annotations_by_type(Milk)[0]
         ),
         arm=view.right_arm,
     )
@@ -406,7 +409,8 @@ def reach_action(milk: Milk, view) -> ReachAction:
     :return: A reach at the object's own frame.
     """
     return ReachAction(
-        grasp_candidate=GraspCandidate.from_body_origin(milk), arm=view.right_arm
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=view.right_arm,
     )
 
 

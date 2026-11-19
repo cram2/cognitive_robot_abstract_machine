@@ -57,7 +57,7 @@ class GraspCandidate:
             )
 
     @classmethod
-    def from_body_origin(cls, graspable: IsGraspable) -> GraspCandidate:
+    def from_body_origin(cls, *, graspable: IsGraspable) -> GraspCandidate:
         """
         The grasp that takes an object at the origin of its own body.
 

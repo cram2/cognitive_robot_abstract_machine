@@ -1,3 +1,9 @@
+"""
+Tests of the actions that use a tool, such as mixing, cutting, wiping and pouring.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -124,6 +130,10 @@ def _alignments_of(goal):
 
 
 def test_mixing_action_expands_to_aligned_motion(tool_action_world):
+    """
+    Mixing expands to one tool path goal, which moves the whisk's tool frame along its
+    waypoints while keeping it aligned.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     whisk = Whisk(root=tool_body)
 
@@ -378,6 +388,10 @@ def test_a_tool_path_is_followed_within_the_position_threshold_of_its_action(
 def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
     tool_action_world,
 ) -> None:
+    """
+    A wipe is done once the tool reaches its final waypoint within the action's
+    threshold.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     sponge = Sponge(root=tool_body)
     action = WipingAction(
@@ -492,6 +506,9 @@ def wipe_stuck_away_from_its_final_waypoint(
 def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
     tool_action_world,
 ) -> None:
+    """
+    A wipe whose tool stalls within the threshold of its final waypoint succeeds.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     wiping = wipe_stuck_away_from_its_final_waypoint(
         world, robot, WipingAction.final_waypoint_threshold / 2
@@ -508,6 +525,10 @@ def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
 def test_a_wipe_stalled_beyond_its_tolerance_of_the_final_waypoint_is_not_done(
     tool_action_world,
 ) -> None:
+    """
+    A wipe whose tool stalls beyond the threshold of its final waypoint fails, having
+    made no progress.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     wiping = wipe_stuck_away_from_its_final_waypoint(
         world, robot, 2 * WipingAction.final_waypoint_threshold
@@ -543,6 +564,9 @@ def _rewritten_mixing(world, robot):
 
 
 def test_justin_keeps_its_torso_upright_while_it_uses_a_tool(justin_world) -> None:
+    """
+    Justin keeps its torso upright with one alignment while it mixes.
+    """
     robot = justin_world.get_semantic_annotations_by_type(Justin)[0]
 
     action = _rewritten_mixing(justin_world, robot)

@@ -90,6 +90,10 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
 
 
 def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
+    """
+    A pick-up whose parameters are left open runs, tolerating that no candidate may
+    succeed.
+    """
     world, robot_view, extensions = apartment_world_pr2_copy_with_context
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]

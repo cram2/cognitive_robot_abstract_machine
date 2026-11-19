@@ -58,7 +58,11 @@ from .world_snapshot import WorldSnapshot
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 
 from ..plan_running import expand, robot_extensions, statechart_of, world_of
-from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
+
+# Below the ORM build at the top of this module, which has to run first.
+from semantic_digital_twin.world_description.kinematic_chain import (  # noqa: E402
+    KinematicChain,
+)
 
 # %% the arm a test runs with on any robot
 

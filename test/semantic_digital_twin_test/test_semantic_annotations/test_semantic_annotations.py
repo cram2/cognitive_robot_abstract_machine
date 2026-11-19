@@ -386,6 +386,9 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
 
 
 def test_kinematic_chain_with_root_equal_tip_has_no_connections():
+    """
+    A kinematic chain whose root is its tip has no connections.
+    """
 
     @dataclass(eq=False)
     class ReviewKinematicChain(RobotKinematicChain):

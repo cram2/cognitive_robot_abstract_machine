@@ -1,3 +1,9 @@
+"""
+Tests that the coraplex actions take their parameters from one mixin per parameter.
+"""
+
+from __future__ import annotations
+
 import dataclasses
 import inspect
 from types import ModuleType
@@ -163,10 +169,18 @@ def test_no_parameter_mixin_bundles_several_parameters():
     sorted(all_parameter_mixins(), key=lambda mixin: mixin.__qualname__),
 )
 def test_every_parameter_mixin_is_a_parameter_mixin(mixin: type):
+    """
+    Every class in the mixin module named for a parameter is marked as a parameter
+    mixin.
+    """
     assert issubclass(mixin, ParameterMixin)
 
 
 def test_action_inherits_parameter_mixins():
+    """
+    A pick-up takes its arm, grasp, clearance and retreat from their mixins, and its
+    approach from the grasp approach behaviour.
+    """
     assert parameter_mixins(PickUpAction) >= {
         HasArmParameter,
         HasGraspCandidateParameter,
@@ -178,6 +192,9 @@ def test_action_inherits_parameter_mixins():
 
 
 def test_pick_up_action_takes_its_grasp_and_arm(pr2_apartment_context):
+    """
+    A pick-up records the grasp and the arm it was given as its designator parameters.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     grasp = milk.grasp_candidates()[0]
@@ -191,6 +208,9 @@ def test_pick_up_action_takes_its_grasp_and_arm(pr2_apartment_context):
 
 
 def test_open_action_takes_hold_of_its_handle_by_a_grasp():
+    """
+    Opening takes hold of its handle by a grasp, with an arm.
+    """
     assert parameter_mixins(OpenAction) >= {
         HasGraspCandidateParameter,
         HasArmParameter,
@@ -217,6 +237,9 @@ def test_move_to_reach_takes_no_approach_it_would_not_use():
 
 
 def test_set_gripper_action_takes_the_configuration_it_reaches():
+    """
+    Setting a gripper takes only the configuration the gripper is brought into.
+    """
     assert parameter_mixins(SetGripperAction) == {HasGripperConfigurationParameter}
 
 
@@ -252,6 +275,10 @@ def test_behaviours_driving_a_tool_center_point_carry_their_own_tolerances():
 
 
 def test_a_tool_center_point_comes_closer_to_its_goal_than_a_pose_goal_requires():
+    """
+    The tool center point is brought closer to its goal than a pose goal requires by
+    default, so an approach does not stop short of a small object.
+    """
     assert MovesToolCenterPoint.position_threshold < CartesianPose.position_threshold
 
 
@@ -298,6 +325,10 @@ def test_navigation_actions_take_the_same_goal():
 def test_an_action_shares_the_parameter_mixin_of_the_node_it_builds(
     action_type: type, node_type: type, mixin: type
 ):
+    """
+    An action and the node it passes a parameter to take that parameter from the same
+    mixin.
+    """
     assert issubclass(action_type, mixin)
     assert issubclass(node_type, mixin)
 

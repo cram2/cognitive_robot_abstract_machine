@@ -1,3 +1,8 @@
+"""
+Tests of actions as nodes of a statechart: how they expand into steps and goals and
+how they end.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -721,6 +726,10 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
 
 
 def test_opening_lets_the_gripper_on_the_handle_touch(pr2_apartment_context) -> None:
+    """
+    Opening lets the gripper on the handle touch it, through a collision rule of the
+    action rather than a node of its own.
+    """
     world, robot, extensions = pr2_apartment_context
     handle = _handle_annotation(world, "handle_cab10_m")
     action = OpenAction(
@@ -790,6 +799,10 @@ def _goal_moving_the_tool(step: StatechartNode) -> StatechartNode:
 def test_a_pick_up_grasps_reattaches_and_lifts_as_its_own_steps(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pick-up grasps, moves the object onto the gripper and lifts it, each as a step of
+    its own.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(

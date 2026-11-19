@@ -171,7 +171,7 @@ def build_statechart(
                     planar_goal_pose=standing_pose_in_front_of(source, world)
                 ),
                 PickUpAction(
-                    grasp_candidate=GraspCandidate.from_body_origin(parcel),
+                    grasp_candidate=GraspCandidate.from_body_origin(graspable=parcel),
                     arm=robot.torso.left_arm,
                 ),
                 ParkArmsAction(arms=robot.all_arms),

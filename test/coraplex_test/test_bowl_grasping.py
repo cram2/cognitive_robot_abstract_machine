@@ -1,3 +1,9 @@
+"""
+Tests of grasping a bowl by its rim, closing the fingers on the bowl's wall.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np

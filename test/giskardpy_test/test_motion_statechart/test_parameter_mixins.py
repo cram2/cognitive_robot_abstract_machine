@@ -197,6 +197,10 @@ def _feature_parameters(cls: type) -> dict[str, object]:
 
 
 def test_no_parameter_mixin_combines_another():
+    """
+    A parameter mixin declares one parameter, so none inherits another; a class needing
+    several inherits each of them.
+    """
     combined_mixins = {
         mixin: {
             other
@@ -227,6 +231,9 @@ def test_no_parameter_mixin_combines_another():
     ],
 )
 def test_one_concept_has_one_name(retired_name: str):
+    """
+    A name retired for the one every node now uses is no field of any node.
+    """
     nodes_with_retired_name = [
         cls
         for cls in _node_classes()
@@ -273,6 +280,10 @@ def test_one_concept_has_one_name(retired_name: str):
     ],
 )
 def test_a_shared_parameter_comes_from_its_mixin(node_class: type, mixin: type):
+    """
+    A node taking a shared parameter inherits the mixin declaring it instead of
+    declaring a copy of its own.
+    """
     assert issubclass(node_class, mixin)
 
 
@@ -323,15 +334,26 @@ def test_every_parameter_a_mixin_declares_comes_from_that_mixin():
 def test_a_task_with_an_error_in_radians_approaches_its_goal_at_an_angular_velocity(
     node_class: type,
 ):
+    """
+    A task whose error is an angle takes its cruise velocity in rad/s, never the m/s
+    :attr:`cruise_velocity`.
+    """
     assert issubclass(node_class, HasCruiseAngularVelocityParameter)
     assert not issubclass(node_class, HasCruiseVelocityParameter)
 
 
 def test_a_forward_kinematics_binding_takes_its_chain_from_its_mixin():
+    """
+    A forward kinematics binding is told its chain the way the nodes are.
+    """
     assert issubclass(ForwardKinematicsBinding, HasKinematicChainParameter)
 
 
-def test_a_joint_velocity_limit_names_its_cap_as_the_cartesian_limits_do():
+def test_a_joint_velocity_limit_takes_its_cap_as_a_max_joint_velocity():
+    """
+    A joint velocity limit takes its cap as ``max_joint_velocity``, not under the
+    retired ``max_velocity``.
+    """
     assert {field.name for field in dataclasses.fields(JointVelocityLimit)} >= {
         "max_joint_velocity"
     }
@@ -344,6 +366,10 @@ def test_a_joint_velocity_limit_names_its_cap_as_the_cartesian_limits_do():
 
 
 def test_every_root_and_tip_link_is_a_kinematic_structure_entity():
+    """
+    A link a node is still given apart from a chain is typed as any entity of the
+    kinematic structure, not as a body.
+    """
     link_types = {
         (cls, field.name): _declared_type(cls, field.name)
         for cls in _node_classes()
@@ -358,6 +384,9 @@ def test_every_root_and_tip_link_is_a_kinematic_structure_entity():
 
 
 def test_no_node_takes_a_root_and_a_tip_link_apart():
+    """
+    No node takes a root and a tip link as two parameters; it takes a kinematic chain.
+    """
     assert [
         cls
         for cls in _node_classes()
@@ -367,6 +396,9 @@ def test_no_node_takes_a_root_and_a_tip_link_apart():
 
 
 def test_every_kinematic_chain_comes_from_its_mixin():
+    """
+    Every node taking a kinematic chain inherits it from its mixin.
+    """
     assert [
         cls
         for cls in _node_classes()
@@ -470,6 +502,10 @@ def test_a_grasped_mechanism_names_the_position_it_drives_to():
 
 
 def test_the_goal_reference_frame_is_the_frame_of_the_goal():
+    """
+    A task's goal reference frame is the frame its goal is expressed in, not the root of
+    its chain.
+    """
     goal_frame = Body(name=PrefixedName("goal_frame"))
     task = CartesianPosition(
         kinematic_chain=KinematicChain(
@@ -481,6 +517,10 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
 
 
 def test_nodes_with_equal_parameters_are_told_apart_by_identity():
+    """
+    Two nodes built from equal parameters are still two nodes, in comparisons and in
+    sets.
+    """
     root, tip = Body(name=PrefixedName("root")), Body(name=PrefixedName("tip"))
     goal = Point3(reference_frame=root)
     first = CartesianPosition(
@@ -514,6 +554,10 @@ def test_nodes_with_equal_parameters_are_told_apart_by_identity():
 def test_a_node_takes_its_features_by_what_they_are(
     node_class: type, feature_parameters: dict[str, type]
 ):
+    """
+    A node names each geometric feature it takes after the kind of feature, such as a
+    point or a normal, and types it accordingly.
+    """
     assert _feature_parameters(node_class) == feature_parameters
 
 
@@ -530,10 +574,18 @@ def test_a_node_takes_its_features_by_what_they_are(
 def test_a_feature_task_takes_its_features_as_its_monitor_does(
     task: type, monitor: type
 ):
+    """
+    A feature task and the monitor observing the same relation take the same features
+    under the same names.
+    """
     assert _feature_parameters(task) == _feature_parameters(monitor)
 
 
 def test_an_alignment_pair_names_its_normals_as_align_planes_takes_them():
+    """
+    An alignment pair names its normals as :class:`AlignPlanes` does, so one can be
+    handed on to the other.
+    """
     assert _feature_parameters(AlignmentPair) == _feature_parameters(AlignPlanes)
 
 
@@ -586,4 +638,7 @@ def test_an_alignment_pair_names_its_normals_as_align_planes_takes_them():
     ],
 )
 def test_a_feature_comes_from_its_mixin(node_class: type, mixin: type):
+    """
+    A node taking a geometric feature inherits the mixin declaring it.
+    """
     assert issubclass(node_class, mixin)

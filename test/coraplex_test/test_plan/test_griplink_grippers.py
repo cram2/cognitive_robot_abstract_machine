@@ -70,6 +70,10 @@ def left_gripper_of(extensions: list[ContextExtension]) -> DAiSyLeftGripper:
 def test_the_real_daisy_moves_its_gripper_to_a_preset_state_through_the_griplink_server(
     daisy_extensions,
 ) -> None:
+    """
+    The real Daisy moves its gripper to a preset state through the action of the
+    Griplink server for that state.
+    """
     gripper = left_gripper_of(daisy_extensions)
     configuration = gripper.default_configuration(GripperState.CLOSE)
 
@@ -88,6 +92,10 @@ def test_the_real_daisy_moves_its_gripper_to_a_preset_state_through_the_griplink
 def test_the_real_daisy_moves_its_gripper_to_a_width_through_the_griplink_server(
     daisy_extensions,
 ) -> None:
+    """
+    The real Daisy moves its gripper to a width through the flexible action of the
+    Griplink server.
+    """
     gripper = left_gripper_of(daisy_extensions)
     configuration = GriplinkFlexConfiguration.from_state_type(
         gripper, GripperState.FLEXCLOSE, grip_position=0.04
@@ -105,6 +113,10 @@ def test_the_real_daisy_moves_its_gripper_to_a_width_through_the_griplink_server
 def test_a_daisy_driven_by_a_standalone_giskard_moves_its_fingers_with_a_giskard_goal(
     daisy_extensions,
 ) -> None:
+    """
+    A Daisy run by a standalone Giskard moves its fingers with the motion goal any robot
+    would use.
+    """
     configuration = left_gripper_of(daisy_extensions).default_configuration(
         GripperState.CLOSE
     )
@@ -125,6 +137,10 @@ def test_a_daisy_driven_by_a_standalone_giskard_moves_its_fingers_with_a_giskard
 def test_the_real_daisy_opens_and_shuts_its_gripper_on_a_grasp_through_the_griplink_server(
     daisy_extensions,
 ) -> None:
+    """
+    On a grasp the real Daisy opens and then shuts its gripper through the preset
+    actions of the Griplink server.
+    """
     grasp = top_down_grasp_of_a_box(daisy_extensions)
     arm = world_of(daisy_extensions).get_semantic_annotations_by_type(DAiSy)[0].left_arm
 

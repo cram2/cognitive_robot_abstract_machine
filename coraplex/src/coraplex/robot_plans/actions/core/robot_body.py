@@ -1,3 +1,7 @@
+"""
+Actions that move the robot's own body: its torso, grippers, fingers and arms.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -971,7 +971,10 @@ class Bottle(Container):
 
 
 @dataclass(eq=False)
-class Statue(IsGraspable): ...
+class Statue(IsGraspable):
+    """
+    A sculpture small enough to be picked up.
+    """
 
 
 @dataclass(eq=False)
@@ -1356,7 +1359,10 @@ class WallDecor(Decor):
 
 
 @dataclass(eq=False)
-class Cloth(IsGraspable): ...
+class Cloth(IsGraspable):
+    """
+    A piece of fabric, such as a towel or a rag.
+    """
 
 
 @dataclass(eq=False)

@@ -88,6 +88,9 @@ def test_to_json_joint_position_list(mini_world):
 
 
 def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
+    """
+    A node keeps its default weight through a JSON round trip.
+    """
     root, tip = mini_world.bodies
     node = CartesianPositionStraight(
         kinematic_chain=KinematicChain(root=root, tip=tip),
@@ -169,6 +172,9 @@ def test_executing_json_parsed_statechart(tmp_path):
 
 
 def test_cart_goal_simple(pr2_world_state_reset: World):
+    """
+    A pose goal read back from JSON still brings the PR2's base to the goal pose.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(

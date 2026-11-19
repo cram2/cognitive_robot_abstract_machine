@@ -2,6 +2,8 @@
 Tests of putting down what an arm holds.
 """
 
+from __future__ import annotations
+
 import numpy as np
 import pytest
 

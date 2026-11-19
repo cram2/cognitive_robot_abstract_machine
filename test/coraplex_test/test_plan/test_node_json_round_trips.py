@@ -184,10 +184,18 @@ def _whole_scene(world: World) -> VolumetricBoundingBox:
 
 
 def _navigate(world: World) -> NavigateAction:
+    """
+    :param world: The world the goal is taken from.
+    :return: A navigation to the shared test pose.
+    """
     return NavigateAction(planar_goal_pose=Pose2D.from_pose(_pose(world)))
 
 
 def _face_and_look_at(world: World) -> FaceAndLookAtAction:
+    """
+    :param world: The world the target is taken from.
+    :return: Facing and looking at the shared test pose.
+    """
     return FaceAndLookAtAction(
         face_at=FaceAtAction(look_target=_pose(world)),
         look_at=LookAtAction(look_target=_pose(world)),
@@ -195,6 +203,10 @@ def _face_and_look_at(world: World) -> FaceAndLookAtAction:
 
 
 def _pick_up(world: World) -> PickUpAction:
+    """
+    :param world: The world the milk is taken from.
+    :return: A pick-up of the milk with its first grasp.
+    """
     return PickUpAction(
         grasp_candidate=_milk(world).grasp_candidates()[0], arm=_arm(world)
     )
@@ -375,6 +387,9 @@ def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
 
 
 def _manipulation_cases() -> list[ActionRoundTripCase]:
+    """
+    :return: The manipulation actions whose JSON round trip is tested.
+    """
     return [
         ActionRoundTripCase(
             ReachAction,

@@ -1,3 +1,9 @@
+"""
+Tests of opening and closing containers, such as drawers, by their handles.
+"""
+
+from __future__ import annotations
+
 from enum import StrEnum
 
 import numpy as np
@@ -71,7 +77,7 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
     """
     world, robot, extensions, handle = pr2_at_drawer
     arm = left_or_only_arm(robot)
-    grasp = GraspCandidate.from_body_origin(handle)
+    grasp = GraspCandidate.from_body_origin(graspable=handle)
     action = action_type(grasp_candidate=grasp, arm=arm)
     statechart_of(simulated_executor(extensions), action)
 
@@ -98,7 +104,7 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
     world, robot, extensions, handle = pr2_at_drawer
     end_effector = left_or_only_arm(robot).end_effector
     action = OpenAction(
-        grasp_candidate=GraspCandidate.from_body_origin(handle),
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=handle),
         arm=left_or_only_arm(robot),
     )
     grasp_pose = Pose(reference_frame=handle.root)

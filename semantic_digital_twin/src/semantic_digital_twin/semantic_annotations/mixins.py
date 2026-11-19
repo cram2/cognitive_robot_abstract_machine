@@ -488,9 +488,9 @@ class IsGraspable(HasRootBody, Mixin):
             model_registry,
         )
         return [
-            grasp.grasp_candidate(self)
+            grasp.grasp_candidate(graspable=self)
             for grasp in grasps
-            if grasp.reaches_surface_of(self)
+            if grasp.reaches_surface_of(graspable=self)
         ]
 
     def grasp_surface(self) -> trimesh.Trimesh:

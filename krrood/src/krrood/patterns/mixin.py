@@ -1,3 +1,7 @@
+"""
+Markers for classes that add behaviour or parameters to the classes inheriting them.
+"""
+
 from __future__ import annotations
 
 from abc import ABC

@@ -1,3 +1,7 @@
+"""
+A task that grasps a bar anywhere along its length.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

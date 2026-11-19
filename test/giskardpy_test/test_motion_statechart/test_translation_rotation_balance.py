@@ -205,6 +205,9 @@ class BalanceRun:
 
     @property
     def translation_settling_time(self) -> float:
+        """
+        How long the position error took to settle below the goal's position threshold.
+        """
         return ErrorTrace.settling_time(
             times=self.trace.times,
             errors=self.trace.translation_errors,

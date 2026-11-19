@@ -761,14 +761,11 @@ class CartesianPose(
 class HoldLink(Task, HasKinematicChainParameter, ABC):
     """
     Keeps the tip of :attr:`kinematic_chain` as it was relative to its root when this
-    task started.
+    task started, and observes whether it still is. It holds an invariant rather than
+    closing on a goal, so it reports no progress.
 
-    An invariant rather than a goal, so it does not report progress. It observes
-    whether the link is still held.
-
-    .. note:: Unlike :class:`CartesianPose`, this constrains the chain between
-        :attr:`kinematic_chain` without naming a pose, because the pose
-        to keep is the one the link is already at.
+    .. note:: Unlike :class:`CartesianPose`, it names no pose: the pose to keep is the
+        one the link is already at.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
@@ -799,6 +796,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
 
     def _hold_orientation(
         self,
+        *,
         artifacts: MotionNodeArtifacts,
         cruise_velocity: float,
         threshold: float,
@@ -828,6 +826,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
 
     def _hold_position(
         self,
+        *,
         artifacts: MotionNodeArtifacts,
         cruise_velocity: float,
         threshold: float,
@@ -872,7 +871,9 @@ class HoldOrientation(
         """
         artifacts = MotionNodeArtifacts()
         artifacts.observation = self._hold_orientation(
-            artifacts, self.cruise_angular_velocity, self.threshold
+            artifacts=artifacts,
+            cruise_velocity=self.cruise_angular_velocity,
+            threshold=self.threshold,
         )
         return artifacts
 
@@ -898,10 +899,14 @@ class HoldPose(
         artifacts = MotionNodeArtifacts()
         artifacts.observation = sm.logic_and(
             self._hold_orientation(
-                artifacts, self.cruise_angular_velocity, self.orientation_threshold
+                artifacts=artifacts,
+                cruise_velocity=self.cruise_angular_velocity,
+                threshold=self.orientation_threshold,
             ),
             self._hold_position(
-                artifacts, self.cruise_linear_velocity, self.position_threshold
+                artifacts=artifacts,
+                cruise_velocity=self.cruise_linear_velocity,
+                threshold=self.position_threshold,
             ),
         )
         return artifacts

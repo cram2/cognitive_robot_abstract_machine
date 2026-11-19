@@ -1,3 +1,10 @@
+"""
+Tests of the transformations that rewrite a plan before it runs, and of the plan
+adaptations of the executors that apply them.
+"""
+
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 
@@ -270,7 +277,8 @@ def reach_action(milk: Milk, view) -> ReachAction:
     :return: A reach at the object's own frame.
     """
     return ReachAction(
-        grasp_candidate=GraspCandidate.from_body_origin(milk), arm=view.right_arm
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=view.right_arm,
     )
 
 
@@ -676,7 +684,8 @@ def test_the_perception_precedes_the_final_approach_of_a_straight_reach(
 
     plan = rewritten(
         ReachAction(
-            grasp_candidate=GraspCandidate.from_body_origin(milk), arm=view.all_arms[0]
+            grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+            arm=view.all_arms[0],
         ),
         extensions,
         plan_transformations,
@@ -1124,6 +1133,10 @@ def test_parking_ends_before_a_first_action_running_in_parallel_starts(
 
 
 def test_parking_ends_before_a_plan_that_starts_in_parallel(pr2_apartment_context):
+    """
+    Parking the arms before the first action ends before a parallel at the start of the
+    plan begins.
+    """
     world, view, extensions = pr2_apartment_context
     in_parallel = Parallel(
         nodes=[
@@ -1264,6 +1277,10 @@ def test_a_move_and_pick_up_whose_grasps_are_on_several_objects_is_opened_per_ca
 def test_a_move_and_pick_up_of_an_object_in_no_drawer_is_left_alone(
     pr2_apartment_context,
 ):
+    """
+    A move-and-pick-up of an object that stands in no drawer is not rewritten to open
+    one first.
+    """
     world, view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
@@ -1613,7 +1630,7 @@ def grasp_of(milk: Milk) -> GraspCandidate:
     :param milk: The object to grasp.
     :return: A grasp at that object's own origin.
     """
-    return GraspCandidate.from_body_origin(milk)
+    return GraspCandidate.from_body_origin(graspable=milk)
 
 
 @pytest.mark.parametrize(
@@ -1622,6 +1639,10 @@ def grasp_of(milk: Milk) -> GraspCandidate:
 def test_a_grasp_closes_to_the_objects_width_where_objects_push_back(
     pr2_apartment_context, executor_for
 ):
+    """
+    Where objects push back, a grasp closes the fingers to the object's width instead of
+    shutting them.
+    """
     world, view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
@@ -1677,6 +1698,9 @@ def test_a_gripper_whose_fingers_are_not_modelled_like_the_real_ones_still_shuts
 
 
 def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
+    """
+    The squeeze the adaptation was given is handed on to the fingers.
+    """
     world, view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     squeeze = 0.002
@@ -1694,6 +1718,9 @@ def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
 
 
 def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_context):
+    """
+    In a physical simulation the HSR's hand is closed with the squeeze of its gripper.
+    """
     world, view, extensions = hsr_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
@@ -1709,6 +1736,9 @@ def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_contex
 
 
 def test_the_real_hsr_hand_is_squeezed_as_its_executor_says(hsr_apartment_context):
+    """
+    The real HSR's hand is closed with the squeeze its executor's adaptation gives.
+    """
     world, view, extensions = hsr_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     executors = []

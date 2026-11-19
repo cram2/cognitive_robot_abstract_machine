@@ -1174,7 +1174,7 @@ class MobileBase(
         """
         return RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
 
-    def pose_facing(self, heading: Pose | Pose2D) -> Pose:
+    def pose_facing(self, *, heading: Pose | Pose2D) -> Pose:
         """
         The base pose whose :attr:`forward_axis` points along ``heading``.
 

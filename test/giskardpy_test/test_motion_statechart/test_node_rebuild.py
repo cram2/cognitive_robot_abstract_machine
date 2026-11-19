@@ -1,3 +1,7 @@
+"""
+Tests of which monitors are kept when the tasks they watch are built anew.
+"""
+
 from __future__ import annotations
 
 from krrood_spatial_math.spatial_types import Point3

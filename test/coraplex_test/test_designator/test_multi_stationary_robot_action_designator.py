@@ -72,6 +72,11 @@ from ...pytest_environment import runs_in_continuous_integration
     ids=["Tracy", "DAiSy"],
 )
 def robot_setup(request):
+    """
+    The world of a robot with a fixed base, with two boxes it can grasp.
+
+    :return: The world and the type of its robot.
+    """
     world = request.getfixturevalue(request.param[0])
 
     box1 = Body(
@@ -236,6 +241,9 @@ def test_reach_action_multi(stationary_block_context):
 
 
 def test_move_gripper_multi(stationary_block_context):
+    """
+    Closing the gripper brings every finger joint to its closed position.
+    """
     world, view, extensions = stationary_block_context
 
     plan = SetGripperAction(
@@ -264,6 +272,9 @@ def test_move_gripper_multi(stationary_block_context):
 
 
 def test_grasping(stationary_block_context):
+    """
+    Grasping a box at its origin ends with the box between the fingers.
+    """
     world, robot_view, extensions = stationary_block_context
     left_arm = left_or_only_arm(robot_view)
 
@@ -283,6 +294,9 @@ def test_grasping(stationary_block_context):
 
 
 def test_pick_up_multi(stationary_block_context):
+    """
+    Picking up a box leaves it attached to the gripper.
+    """
     world, view, extensions = stationary_block_context
 
     left_arm = left_or_only_arm(view)

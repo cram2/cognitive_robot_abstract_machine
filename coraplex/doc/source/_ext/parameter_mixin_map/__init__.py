@@ -74,7 +74,7 @@ class Framework(StrEnum):
     GISKARDPY = "giskardpy"
 
     @classmethod
-    def defining(cls, defined_class: type) -> Self:
+    def defining(cls, *, defined_class: type) -> Self:
         """
         :param defined_class: A class one of the frameworks defines.
         :return: The framework that defines it.
@@ -104,7 +104,7 @@ class ParameterTakingPackage(StrEnum):
 # %% parameters
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParameterDeclaration:
     """
     A parameter as a class body declares it.
@@ -180,7 +180,7 @@ class ParameterDeclaration:
 # %% parameter mixins
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParameterMixinDescription:
     """
     A mixin that declares parameters of actions or nodes.
@@ -212,7 +212,7 @@ class ParameterMixinDescription:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MixinModule(ABC):
     """
     A module that declares parameter mixins.
@@ -258,7 +258,7 @@ class MixinModule(ABC):
         return [
             ParameterMixinDescription(
                 name=mixin.__name__,
-                framework=Framework.defining(mixin),
+                framework=Framework.defining(defined_class=mixin),
                 section=self.section_heading(mixin=mixin),
                 documentation=" ".join(inspect.getdoc(mixin).split()),
                 parameters=ParameterDeclaration.class_body_declarations(
@@ -282,7 +282,7 @@ class MixinModule(ABC):
         ][-1]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionMixinModule(MixinModule):
     """
     The module of the coraplex action parameter mixins, which also defines the
@@ -306,7 +306,7 @@ class ActionMixinModule(MixinModule):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeMixinModule(MixinModule):
     """
     The module of the giskardpy motion statechart node parameter mixins.
@@ -319,7 +319,7 @@ class NodeMixinModule(MixinModule):
 # %% classes taking parameter mixins
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RedeclaredParameter:
     """
     A parameter of a mixin that a class between the mixin and a class taking it declares
@@ -355,7 +355,7 @@ class RedeclaredParameter:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParameterisedClass:
     """
     An action or a motion statechart node, with the parameter mixins it takes.
@@ -394,6 +394,7 @@ class ParameterisedClass:
     @classmethod
     def from_class(
         cls,
+        *,
         taking_class: type,
         parameter_mixins: list[type],
         behaviours: list[type],
@@ -409,7 +410,7 @@ class ParameterisedClass:
         ]
         return cls(
             name=taking_class.__name__,
-            framework=Framework.defining(taking_class),
+            framework=Framework.defining(defined_class=taking_class),
             defining_module=taking_class.__module__.rpartition(".")[2],
             parameter_mixins=[mixin.__name__ for mixin in taken_mixins],
             behaviours=[
@@ -436,7 +437,7 @@ class ParameterisedClass:
 # %% the map
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParameterMixinMap:
     """
     Which actions and nodes take which parameter mixin.
@@ -459,8 +460,8 @@ class ParameterMixinMap:
         """
         for package in ParameterTakingPackage:
             package.import_modules()
-        action_module = ActionMixinModule(action_mixins)
-        modules = [action_module, NodeMixinModule(node_mixins)]
+        action_module = ActionMixinModule(module=action_mixins)
+        modules = [action_module, NodeMixinModule(module=node_mixins)]
         mixin_classes = [
             mixin for module in modules for mixin in module.parameter_mixin_classes()
         ]
@@ -468,7 +469,7 @@ class ParameterMixinMap:
             subclass
             for mixin in mixin_classes
             for subclass in recursive_subclasses(mixin)
-            if cls.is_shown(subclass)
+            if cls.is_shown(candidate=subclass)
         }
         return cls(
             parameter_mixins=[
@@ -476,7 +477,9 @@ class ParameterMixinMap:
             ],
             classes=[
                 ParameterisedClass.from_class(
-                    taking_class, mixin_classes, action_module.behaviours()
+                    taking_class=taking_class,
+                    parameter_mixins=mixin_classes,
+                    behaviours=action_module.behaviours(),
                 )
                 for taking_class in sorted(
                     taking_classes, key=lambda taking_class: taking_class.__name__
@@ -485,7 +488,7 @@ class ParameterMixinMap:
         )
 
     @staticmethod
-    def is_shown(candidate: type) -> bool:
+    def is_shown(*, candidate: type) -> bool:
         """
         :param candidate: A class that inherits a parameter mixin.
         :return: Whether *candidate* is a concrete action or node of one of the
@@ -514,6 +517,10 @@ class ParameterMixinMapDirective(SphinxDirective):
     """
 
     def run(self) -> list[nodes.Node]:
+        """
+        Render the map as raw HTML, read from the code on every build, so it never shows
+        mixins the code no longer has.
+        """
         self.env.note_reread()
         markup = Template(ExtensionFile.MARKUP.read_text()).substitute(
             map=ParameterMixinMap.from_code().to_json()

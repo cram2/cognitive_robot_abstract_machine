@@ -1,3 +1,7 @@
+"""
+Tasks that open and close a gripper and move its fingers.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

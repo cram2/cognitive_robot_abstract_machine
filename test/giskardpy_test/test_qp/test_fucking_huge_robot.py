@@ -1,3 +1,9 @@
+"""
+Tests of reaching a goal with robots whose links are very short or very long.
+"""
+
+from __future__ import annotations
+
 from copy import deepcopy
 
 from cramph.composites import Sequence
@@ -162,6 +168,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
 
 def execute(link_length: float, vel_limit: float):
+    """
+    Move the tip of a robot built with links of link_length to a goal and run the motion
+    to its end.
+
+    :param link_length: How long each link of the robot is, in meters.
+    :param vel_limit: The velocity limit of each joint.
+    """
     fucking_huge_robot = robot_factory(
         fucking_huge_link_length=link_length, vel_limit=vel_limit
     )

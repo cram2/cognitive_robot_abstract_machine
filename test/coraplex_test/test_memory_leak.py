@@ -1,3 +1,10 @@
+"""
+Tests that running a plan in a copy of a world keeps no reference from the original
+world to the copy.
+"""
+
+from __future__ import annotations
+
 import gc
 from copy import deepcopy
 
@@ -26,6 +33,10 @@ def test_ref_chain_after_copy(pr2_apartment_context):
 
 
 def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
+    """
+    After a plan ran in a copy of the world, the original world holds no reference to
+    the copy.
+    """
     world, view, _ = pr2_apartment_context
     copy_world = deepcopy(world)
     copy_world.name = "copy_world"

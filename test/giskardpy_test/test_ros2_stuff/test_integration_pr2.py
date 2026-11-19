@@ -173,6 +173,9 @@ class TestCartGoals:
     """
 
     def test_cart_goal_1eef(self, *, giskard: PR2Tester):
+        """
+        A pose goal of the PR2's right gripper runs through the ROS 2 interface.
+        """
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=giskard.right_tip
         )
@@ -282,6 +285,9 @@ class TestActionServerEvents:
 
     @pytest.mark.asyncio
     async def test_cancel_with_new_goal(self, *, giskard: PR2Tester) -> None:
+        """
+        A goal sent while another still runs replaces it.
+        """
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
@@ -323,6 +329,9 @@ class TestActionServerEvents:
 
     @pytest.mark.asyncio
     async def test_interrupt(self, *, giskard: PR2Tester) -> None:
+        """
+        Cancelling a running goal ends it with an :class:`ExecutionCanceledException`.
+        """
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(

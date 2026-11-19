@@ -934,6 +934,10 @@ def test_a_trial_puts_a_differentially_driven_base_at_its_goal(
 def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
     stretch_apartment_context,
 ) -> None:
+    """
+    A trial of a Stretch reach moves the tool center point in straight lines, as the
+    Stretch does when it runs the plan.
+    """
     world, robot, extensions = stretch_apartment_context
     trial = ActionTrial(
         executor=simulated_executor(extensions),

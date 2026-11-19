@@ -1,3 +1,9 @@
+"""
+Tests of grasping a bar anywhere along its length.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 
 from cramph.data_types import ObservationStateValue
@@ -16,6 +22,10 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 
 
 def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
+    """
+    The PR2's right gripper grasps a vertical bar, ending on the bar's axis within the
+    segment the bar spans.
+    """
     VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"

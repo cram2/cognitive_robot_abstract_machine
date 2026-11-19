@@ -1,3 +1,8 @@
+"""
+Tests of motions that keep running while bodies of the world are moved to another
+parent, and of how the robot comes to rest before that happens.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -60,6 +65,10 @@ def _add_box_next_to_the_robot(world: World) -> Body:
 def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A motion built while a box stood on its own still brings the box to its goal pose
+    after the box was moved onto the robot.
+    """
     world = cylinder_bot_world
     box = _add_box_next_to_the_robot(world)
     robot = world.get_kinematic_structure_entity_by_name("bot")
@@ -101,6 +110,10 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
 def test_building_the_nodes_again_registers_no_further_variables(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    Building the nodes again after a body was moved reuses the variables already
+    registered.
+    """
     world = cylinder_bot_world
     box = _add_box_next_to_the_robot(world)
     robot = world.get_kinematic_structure_entity_by_name("bot")
@@ -250,6 +263,10 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
 def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_at_rest(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    The robot counts as at rest below the speed at rest given to its motion control, and
+    not above it.
+    """
     world = cylinder_bot_world
     robot = world.get_kinematic_structure_entity_by_name("bot")
     motion_control = MotionControl(speed_at_rest=0.5)

@@ -1,3 +1,10 @@
+"""
+Tests of composing plans from actions with sequences, parallels and the ways of trying
+alternatives, and of how their failures propagate.
+"""
+
+from __future__ import annotations
+
 import threading
 
 import numpy as np
@@ -31,6 +38,9 @@ from ...plan_running import run_plan
 
 
 def test_factory_construction():
+    """
+    A sequence holds the actions it was built from as its children.
+    """
     act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
@@ -41,6 +51,9 @@ def test_factory_construction():
 
 
 def test_parallel_construction():
+    """
+    A parallel holds the actions it was built from as its children.
+    """
     act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
@@ -51,6 +64,9 @@ def test_parallel_construction():
 
 
 def test_try_in_order_construction():
+    """
+    Trying in order holds the actions it was built from as its children.
+    """
     act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
@@ -61,6 +77,9 @@ def test_try_in_order_construction():
 
 
 def test_try_all_construction():
+    """
+    Trying all holds the actions it was built from as its children.
+    """
     act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
@@ -71,6 +90,9 @@ def test_try_all_construction():
 
 
 def test_combination_construction():
+    """
+    A parallel can hold a sequence beside an action.
+    """
     act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
@@ -82,6 +104,10 @@ def test_combination_construction():
 
 
 def test_perform_execute_single(pr2_apartment_context):
+    """
+    A sequence of a navigation, a torso motion and a detection moves the PR2 to the goal
+    and its torso to the height asked for.
+    """
     world, robot_view, extensions = pr2_apartment_context
     act = NavigateAction(
         planar_goal_pose=Pose2D.from_xy_yaw(x=0.3, y=-1.3, reference_frame=world.root)
@@ -160,6 +186,9 @@ def test_perform_repeat_runs_a_succeeding_motion_once(pr2_apartment_context):
 
 
 def test_exception_sequential(pr2_apartment_context):
+    """
+    A step of a sequence raising a plan failure fails the sequence, which raises it.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     def raise_except():
@@ -182,6 +211,9 @@ def test_exception_sequential(pr2_apartment_context):
 
 
 def test_exception_try_in_order(pr2_apartment_context):
+    """
+    Trying in order succeeds once one step succeeds, although a later one would fail.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     def raise_except():
@@ -199,6 +231,9 @@ def test_exception_try_in_order(pr2_apartment_context):
 
 
 def test_exception_try_all(pr2_apartment_context):
+    """
+    Trying all succeeds although one of its steps fails.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     def raise_except() -> Never:

@@ -433,6 +433,11 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
         self._goal_reference_frame_binding.bind(world=self.context.world)
 
     def on_start(self) -> None:
+        """
+        Differs from the inherited ``on_start`` in also binding the goal reference frame
+        again under :attr:`GoalBindingPolicy.Bind_on_start`, so the goal is read from
+        where that frame is each time the node starts.
+        """
         super().on_start()
         if self.goal_binding_policy == GoalBindingPolicy.Bind_on_start:
             self._goal_reference_frame_binding.bind(world=self.context.world)

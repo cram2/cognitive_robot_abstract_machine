@@ -42,6 +42,9 @@ def _bound(*, chain: KinematicChain, world: World) -> ForwardKinematicsBinding:
 def test_changing_the_root_measures_the_chain_from_the_new_root(
     mini_world: World, tip_only_chain: KinematicChain
 ):
+    """
+    A binding given a new root measures its chain from that root to the old tip.
+    """
     binding = _bound(chain=tip_only_chain, world=mini_world)
     binding.change_root(root=mini_world.root, world=mini_world)
     assert binding.kinematic_chain == KinematicChain(
@@ -52,6 +55,9 @@ def test_changing_the_root_measures_the_chain_from_the_new_root(
 def test_changing_the_root_leaves_the_chain_the_binding_was_given(
     mini_world: World, tip_only_chain: KinematicChain
 ):
+    """
+    Giving a binding a new root leaves the chain it was built with unchanged.
+    """
     tip = tip_only_chain.tip
     binding = _bound(chain=tip_only_chain, world=mini_world)
     binding.change_root(root=mini_world.root, world=mini_world)
@@ -61,6 +67,10 @@ def test_changing_the_root_leaves_the_chain_the_binding_was_given(
 def test_changing_the_tip_leaves_the_chain_the_binding_was_given(
     mini_world: World, tip_only_chain: KinematicChain
 ):
+    """
+    A binding given a new tip measures its chain to it, leaving the chain it was built
+    with unchanged.
+    """
     tip = tip_only_chain.tip
     binding = _bound(chain=tip_only_chain, world=mini_world)
     binding.change_tip(tip=mini_world.root, world=mini_world)

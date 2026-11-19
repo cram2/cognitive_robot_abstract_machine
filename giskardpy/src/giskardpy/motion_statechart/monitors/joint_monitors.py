@@ -1,3 +1,9 @@
+"""
+Monitors of the positions of joints.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm

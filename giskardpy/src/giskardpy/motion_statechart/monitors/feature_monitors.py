@@ -1,3 +1,8 @@
+"""
+Monitors that observe a geometric relation between a feature on the tip of a kinematic
+chain and one on its root, such as a height, a distance or an angle.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field, dataclass

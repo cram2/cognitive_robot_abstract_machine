@@ -1,3 +1,8 @@
+"""
+A goal that moves a mechanism, such as a door or a drawer, by the handle the robot
+holds.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -80,6 +85,10 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParamete
     """
 
     def expand(self) -> None:
+        """
+        Create the goal that turns the joint of the mechanism to :attr:`goal_position`,
+        clipped to the joint's limits, while the tip keeps holding the handle.
+        """
         self.connection = self.environment_link.get_first_parent_connection_of_type(
             ActiveConnection1DOF
         )

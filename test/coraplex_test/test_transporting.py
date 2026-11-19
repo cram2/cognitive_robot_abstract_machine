@@ -277,6 +277,10 @@ def test_move_and_pick_up_takes_the_grasp_it_was_given(pr2_apartment_context) ->
 def test_move_and_pick_up_approaches_with_the_clearances_it_was_given(
     pr2_apartment_context,
 ) -> None:
+    """
+    A move-and-pick-up hands its approach clearance and retreat distance on to its pick-
+    up.
+    """
     world, robot, extensions = pr2_apartment_context
     approach_clearance, retreat_distance = 0.07, 0.13
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
@@ -478,6 +482,9 @@ def test_grasps_ranked_from_the_robot_are_ranked_from_where_it_stands_when_ranke
 
 
 def test_grasps_ranked_without_a_number_are_all_kept(pr2_apartment_context):
+    """
+    Ranking grasps without a number of grasps keeps every grasp the object offers.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
@@ -563,6 +570,10 @@ def test_a_grasp_higher_up_is_as_close_as_one_below_it(pr2_apartment_context) ->
 def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_grasps(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pick-up of a graspable tries two standing poses, each with the default number of
+    closest grasps.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
@@ -585,6 +596,10 @@ def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_gras
 def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pick-up of a graspable tries as many closest grasps from each standing pose as it
+    was asked for.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
@@ -610,6 +625,9 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
 def test_a_pick_up_of_a_graspable_tries_the_grasps_from_each_standing_pose_closest_first(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pick-up of a graspable tries the grasps from each standing pose closest first.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
@@ -717,6 +735,10 @@ def _assert_every_target_is_at(targets: list[Pose], body: Body, world: World) ->
 def test_a_transport_of_a_graspable_faces_it_where_it_is_when_it_picks_it_up(
     pr2_apartment_context,
 ) -> None:
+    """
+    A transport faces and looks at the object where it is when it picks it up, not where
+    it was when the plan was built.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
@@ -742,6 +764,9 @@ def test_a_transport_of_a_graspable_faces_it_where_it_is_when_it_picks_it_up(
 def test_a_move_and_pick_up_faces_the_object_where_it_is_when_it_picks_it_up(
     pr2_apartment_context,
 ) -> None:
+    """
+    A move-and-pick-up faces and looks at the object where it is when it picks it up.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
@@ -777,6 +802,10 @@ How far :data:`DRAWER` is pulled out after an opening of it has been built.
 def test_a_move_and_open_faces_the_handle_where_it_is_when_it_opens_the_container(
     pr2_apartment_context,
 ) -> None:
+    """
+    A move-and-open faces and looks at the handle where it is when it opens the
+    container.
+    """
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
     move_and_open = MoveAndOpenAction.from_standing_position(
@@ -835,6 +864,10 @@ def test_a_move_and_place_from_a_standing_position_places_with_the_given_arm(
 def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
     pr2_apartment_context,
 ) -> None:
+    """
+    A move-and-open from a standing position drives there and opens with the given grasp
+    and arm.
+    """
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
     [grasp, *_] = handle.grasp_candidates()
@@ -855,6 +888,10 @@ def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
 def test_an_opening_of_a_handle_is_grounded_by_every_grasp_the_handle_offers(
     pr2_apartment_context,
 ) -> None:
+    """
+    Opening a handle is grounded once for every grasp the handle offers, each with the
+    given arm.
+    """
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
 
@@ -949,6 +986,10 @@ def _navigation_targets(action: Action) -> list[Pose]:
 
 
 def _standing_pose(world: World) -> Pose2D:
+    """
+    :param world: The world the pose is expressed in.
+    :return: The pose the robot is sent to before it faces a target.
+    """
     return Pose2D.from_xy_yaw(*STANDING_POSITION, reference_frame=world.root)
 
 
@@ -1015,6 +1056,10 @@ def _assert_base_faces(robot: AbstractRobot, target: Point3):
 def test_facing_after_navigating_turns_where_the_robot_was_sent(
     pr2_apartment_context,
 ) -> None:
+    """
+    Facing a target after navigating turns the robot where it was sent, without driving
+    it away.
+    """
     world, robot, extensions = pr2_apartment_context
     target = Pose.from_xyz_rpy(4.0, 2.5, 0.9, reference_frame=world.root)
     plan = Sequence(
@@ -1036,6 +1081,9 @@ def test_facing_after_navigating_turns_where_the_robot_was_sent(
 def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
     pr2_apartment_context,
 ) -> None:
+    """
+    Facing a target given relative to a body turns the base towards that body.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0].root
     plan = Sequence(
@@ -1052,6 +1100,10 @@ def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
 def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it(
     pr2_apartment_context,
 ) -> None:
+    """
+    Facing and looking at a target turns the base towards it and points the camera at
+    it.
+    """
     world, robot, extensions = pr2_apartment_context
     target = Pose.from_xyz_rpy(4.0, 2.5, 0.9, reference_frame=world.root)
     plan = Sequence(

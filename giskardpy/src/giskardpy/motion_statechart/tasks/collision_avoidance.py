@@ -200,6 +200,9 @@ class CollisionAvoidance(EndedByOwner, CompositeNode, HasCruiseVelocityParameter
     plot_specifications: NodePlotSpec = plot_specification_field(
         NodePlotSpec.create_collapsed_composite_node_style
     )
+    """
+    How this node is drawn: collapsed, so its children are left out.
+    """
 
     robot: AbstractRobot | None = None
     """
@@ -214,6 +217,10 @@ class CollisionAvoidance(EndedByOwner, CompositeNode, HasCruiseVelocityParameter
 
     @classproperty
     def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        """
+        :return: The extensions of the base, and the motion control context the avoidance
+            constraints are built in.
+        """
         return super().required_context_extensions + (MotionControlContext,)
 
     @abstractmethod

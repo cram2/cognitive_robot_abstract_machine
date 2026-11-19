@@ -41,6 +41,9 @@ def _create_executor(world: World) -> StatechartExecutor:
 def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A pose goal is a parallel of a position and an orientation task, in that order.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
@@ -99,6 +102,9 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
 def test_cartesian_pose_observes_its_goal_reached(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A pose goal observes true once both its tasks do.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
@@ -125,6 +131,10 @@ def test_cartesian_pose_observes_its_goal_reached(
 def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A straight-line pose goal is a parallel of a straight-line position task and an
+    orientation task, in that order.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)

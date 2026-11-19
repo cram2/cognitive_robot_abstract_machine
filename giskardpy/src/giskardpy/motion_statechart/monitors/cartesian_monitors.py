@@ -68,6 +68,11 @@ class PoseReached(
         return self.goal_pose.reference_frame
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the tip is within
+            :attr:`position_threshold` of the goal position and within
+            :attr:`orientation_threshold` of the goal orientation.
+        """
         root_T_goal = self.root_T_goal_reference_frame @ self.goal_pose
         root_T_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
@@ -101,6 +106,10 @@ class PositionReached(
         return self.goal_point.reference_frame
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the tip is within :attr:`threshold` of
+            :attr:`goal_point`.
+        """
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
@@ -123,6 +132,10 @@ class OrientationReached(
         return self.goal_orientation.reference_frame
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the tip is turned less than
+            :attr:`threshold` away from :attr:`goal_orientation`.
+        """
         root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
         root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
@@ -149,6 +162,10 @@ class PointingAt(
     """
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the line along :attr:`pointing_axis` from
+            the tip passes within :attr:`threshold` of :attr:`goal_point`.
+        """
         root_P_goal_point = self.context.world.transform(
             target_frame=self.kinematic_chain.root, spatial_object=self.goal_point
         )
@@ -184,6 +201,10 @@ class VectorsAligned(
     """
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the angle between :attr:`tip_normal` and
+            :attr:`reference_normal` is below :attr:`threshold`.
+        """
         tip_V_tip_normal = self.context.world.transform(
             target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
         )
@@ -230,6 +251,10 @@ class DistanceToLine(
     """
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: Artifacts observing whether the tip is within :attr:`threshold` of the
+            line segment of :attr:`line_length` centred on :attr:`center_point`.
+        """
         root_P_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).position

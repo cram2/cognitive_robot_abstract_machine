@@ -611,6 +611,9 @@ class TestFeatureFunctions:
 
 
 def test_pointing(pr2_world_state_reset: World):
+    """
+    A pointing task ends once the gripper's pointing axis points at the goal point.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -752,6 +755,10 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
 
 
 def test_pointing_cone(pr2_world_state_reset: World):
+    """
+    A pointing cone task leaves the gripper's pointing axis within the cone around the
+    direction from the gripper to the goal.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -809,6 +816,10 @@ def test_pointing_cone(pr2_world_state_reset: World):
 
 
 def test_align_planes(pr2_world_state_reset: World):
+    """
+    Aligning planes leaves the gripper's normal within the task's threshold of the
+    reference normal.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -939,6 +950,10 @@ def test_keep_held_body_upright_holding_nothing_keeps_the_tool_frame_as_it_is(
 
 
 def test_align_perpendicular(pr2_world_state_reset: World):
+    """
+    Aligning perpendicular leaves the gripper's normal at a right angle to the reference
+    normal, within the task's threshold.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -1265,6 +1280,10 @@ class TestArticulateGraspedMechanism:
         assert largest_drift <= hold.position_threshold
 
     def test_unscrew_and_tighten_bottle_cap(self, *, pr2_world_copy):
+        """
+        The PR2 unscrews a bottle cap a full turn, lifting it by the screw pitch, and
+        then tightens it back to where it started.
+        """
         screw_pitch = 0.03
         unscrew_goal = 2 * np.pi
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
@@ -1475,6 +1494,10 @@ class TestArticulateGraspedMechanism:
     def test_without_an_end_effector_holding_the_grasped_part_nothing_is_let_off_collision_avoidance(
         self, *, prismatic_bot
     ):
+        """
+        Without an end effector holding the grasped part, the goal adds no collision
+        allowance: only the joint goal, the hold and the coupling.
+        """
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=prismatic_bot.get_body_by_name("robot"),
@@ -1494,6 +1517,9 @@ class TestArticulateGraspedMechanism:
         ]
 
     def test_a_goal_within_the_limits_is_kept(self, *, prismatic_bot):
+        """
+        A goal position within the joint limits is kept as it was given.
+        """
         grasped_part = prismatic_bot.get_body_by_name("robot")
         connection = grasped_part.get_first_parent_connection_of_type(
             ActiveConnection1DOF
@@ -1527,6 +1553,9 @@ class TestArticulateGraspedMechanism:
         assert goal.goal_position == goal.connection.dof.limits.upper.position
 
     def test_a_goal_below_the_lower_limit_is_clamped_to_it(self, *, prismatic_bot):
+        """
+        A goal position below the lower joint limit is clamped to that limit.
+        """
         grasped_part = prismatic_bot.get_body_by_name("robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,

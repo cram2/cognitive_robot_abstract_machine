@@ -123,14 +123,14 @@ class ObjectRelativeGrasp(ABC):
         )
 
     @abstractmethod
-    def reaches_surface_of(self, graspable: IsGraspable) -> bool:
+    def reaches_surface_of(self, *, graspable: IsGraspable) -> bool:
         """
         :param graspable: The object to take hold of.
         :return: Whether the place this grasp names reaches the surface of the object.
         """
 
     @abstractmethod
-    def grasp_candidate(self, graspable: IsGraspable) -> GraspCandidate:
+    def grasp_candidate(self, *, graspable: IsGraspable) -> GraspCandidate:
         """
         :param graspable: The object to take hold of.
         :return: This grasp as ``root_T_grasp`` on the object's root body, approaching

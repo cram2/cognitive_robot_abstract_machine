@@ -128,7 +128,7 @@ class GraspTrials:
         """
         part = self.grasped_part
         for grasp in self.drawn_grasps():
-            if not grasp.reaches_surface_of(part):
+            if not grasp.reaches_surface_of(graspable=part):
                 continue
-            grasp.result = self.performer.perform(grasp.grasp_candidate(part))
+            grasp.result = self.performer.perform(grasp.grasp_candidate(graspable=part))
             yield GraspTrialRecord(grasped_part=part, grasp=grasp)

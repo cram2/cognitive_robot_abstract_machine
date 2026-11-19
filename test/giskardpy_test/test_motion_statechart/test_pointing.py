@@ -1,3 +1,9 @@
+"""
+Tests of the debug expressions the pointing tasks draw.
+"""
+
+from __future__ import annotations
+
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
@@ -17,6 +23,10 @@ class TestPointingDebugExpressions:
     """
 
     def test_pointing(self, *, cylinder_bot_world: World):
+        """
+        A pointing task draws the direction to its goal and its pointing axis as vectors
+        in the goal and the current colour.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = Pointing(
@@ -37,6 +47,10 @@ class TestPointingDebugExpressions:
         assert current.color == CURRENT_COLOR
 
     def test_pointing_cone(self, *, cylinder_bot_world: World):
+        """
+        A pointing cone task draws the direction to its goal and its pointing axis as
+        vectors in the goal and the current colour.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = PointingCone(

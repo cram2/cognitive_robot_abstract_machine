@@ -526,6 +526,10 @@ class TestCartesianPositionTrajectory:
         assert np.max(distances) <= tolerance
 
     def test_cartesian_position_trajectory_spiral(self, *, cylinder_bot_world: World):
+        """
+        The cylinder bot's tip follows a spiral of ten thousand points that widens as it
+        turns.
+        """
         points = []
         growth_factor = 0.05  # tunes how fast the spiral radius grows
 
@@ -570,6 +574,9 @@ class TestCartesianPositionTrajectory:
         )
 
     def test_cartesian_position_trajectory_circle(self, *, cylinder_bot_world: World):
+        """
+        The cylinder bot's tip follows a circle of five thousand points.
+        """
         points = []
         radius = 0.1
 
@@ -682,6 +689,10 @@ class TestCartesianPositionTrajectory:
     def test_cartesian_position_trajectory_spiral_pr2(
         self, *, pr2_world_state_reset: World, better_pr2_pose
     ):
+        """
+        A PR2 gripper follows a spiral given relative to the gripper itself, from a
+        seeded arm configuration.
+        """
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
@@ -750,6 +761,9 @@ class TestCartesianTasks:
     """
 
     def test_simple_cartesian_pose(self, *, cylinder_bot_world: World):
+        """
+        A pose goal of the cylinder bot ends with the bot at the goal pose.
+        """
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
 
         executor = StatechartExecutor(
@@ -902,6 +916,10 @@ class TestCartesianTasks:
         )
 
     def test_long_goal(self, *, pr2_world_state_reset: World):
+        """
+        A pose goal fifty meters away, run beside a joint goal for the arms, is reached
+        in the end.
+        """
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
             extensions=[MotionControl()],
@@ -954,6 +972,10 @@ class TestCartesianTasks:
         assert cart_goal.observation_state == ObservationStateValue.TRUE
 
     def test_cart_goal_1eef(self, *, pr2_world_state_reset: World):
+        """
+        A pose goal of the PR2's right gripper relative to its base ends with the
+        gripper at the goal pose.
+        """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
         )
@@ -1226,6 +1248,10 @@ class TestCartesianTasks:
     def test_daisy_finger_tip_reaches_its_goal(
         self, *, daisy_world_copy: World, default_daisy_pose: dict[str, float]
     ) -> None:
+        """
+        A pose goal relative to the arm's base brings a Daisy finger tip to the goal
+        pose.
+        """
         JointState.from_str_dict(default_daisy_pose, daisy_world_copy).apply_to(
             daisy_world_copy
         )
@@ -1567,6 +1593,10 @@ class TestCartesianTasks:
     def test_cartesian_position_with_sequence_node(
         self, *, pr2_world_state_reset: World
     ):
+        """
+        Two position goals bound when they start, run in sequence, move the base 0.2 m
+        back and then 0.2 m forward from where it is, ending where it began.
+        """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "base_footprint"
         )
@@ -2578,6 +2608,10 @@ class TestDebugExpressions:
     """
 
     def test_cartesian_position(self, *, cylinder_bot_world: World):
+        """
+        A position task draws its goal and its current position as points in the goal
+        and the current colour.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPosition(
@@ -2599,6 +2633,10 @@ class TestDebugExpressions:
         assert current.color == CURRENT_COLOR
 
     def test_cartesian_position_straight(self, *, cylinder_bot_world: World):
+        """
+        A straight-line position task draws its goal and its current position as points
+        in the goal and the current colour.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPositionStraight(
@@ -2620,6 +2658,10 @@ class TestDebugExpressions:
         assert current.color == CURRENT_COLOR
 
     def test_cartesian_orientation(self, *, cylinder_bot_world: World):
+        """
+        An orientation task draws its goal and its current orientation as frames in the
+        goal and the current colour.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianOrientation(
@@ -2643,6 +2685,10 @@ class TestDebugExpressions:
         assert current.color == CURRENT_COLOR
 
     def test_cartesian_position_trajectory(self, *, cylinder_bot_world: World):
+        """
+        A trajectory task draws the point it currently heads for and its current
+        position as points in the goal and the current colour.
+        """
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = CartesianPositionTrajectory(

@@ -1,3 +1,7 @@
+"""
+Grasps of an object at a point on its surface.
+"""
+
 from __future__ import annotations
 
 import math
@@ -62,7 +66,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
     How far the closing direction is turned about the direction of approach, in radians.
     """
 
-    def grasp_candidate(self, graspable: IsGraspable) -> GraspCandidate:
+    def grasp_candidate(self, *, graspable: IsGraspable) -> GraspCandidate:
         root_V_outward = self._outward_direction()
         root_P_surface = self._surface_point(graspable, root_V_outward)
         if root_P_surface is None:
@@ -86,7 +90,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         )
         return GraspCandidate(graspable, root_T_grasp.pose)
 
-    def reaches_surface_of(self, graspable: IsGraspable) -> bool:
+    def reaches_surface_of(self, *, graspable: IsGraspable) -> bool:
         """
         :return: Whether the object's grasp surface reaches ``root_P_surface``.
         """

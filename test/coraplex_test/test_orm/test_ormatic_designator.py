@@ -29,6 +29,10 @@ from cramph.context import ContextExtension
 
 @pytest.fixture()
 def simple_plan(pr2_apartment_context):
+    """
+    A plan that navigates, raises the torso and parks the arms, to be stored in the
+    database.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     plan = Sequence(

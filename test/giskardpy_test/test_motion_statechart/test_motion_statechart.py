@@ -315,6 +315,10 @@ def test_local_minimum_reached_raises_on_explicitly_empty_degrees_of_freedom(
 
 
 def test_long_goal(pr2_world_state_reset: World):
+    """
+    A PR2 base goal fifty meters away runs to its end beside a joint goal, printing the
+    time each tick took.
+    """
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
@@ -516,6 +520,10 @@ class TestTemplates:
         assert restarts >= 1
 
     def test_parallel_with_tasks(self, *, pr2_world_state_reset: World):
+        """
+        Two plane alignments of the PR2's right gripper run in one parallel until both
+        are reached.
+        """
         map = pr2_world_state_reset.root
         r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -650,7 +658,15 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
 
 class TestMaxManipulability:
+    """
+    Maximizing manipulability beside another goal.
+    """
+
     def test_MaxManipulability(self, *, pr2_world_state_reset: World) -> None:
+        """
+        Maximizing manipulability until a pose goal of the PR2's right gripper is
+        reached still brings the gripper to that pose.
+        """
         root = pr2_world_state_reset.get_body_by_name("base_footprint")
         tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
 

@@ -86,7 +86,7 @@ class NavigateAction(DrivesBase, GoalAction, HasPlanarGoalPoseParameter):
     def create_goal(self) -> StatechartNode:
         return self.base_goal_type.moving_base_of(
             robot=self.robot,
-            goal_pose=self.robot.mobile_base.pose_facing(self.planar_goal_pose),
+            goal_pose=self.robot.mobile_base.pose_facing(heading=self.planar_goal_pose),
             threshold=self.threshold,
         )
 
@@ -310,14 +310,14 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
                     planar_goal_pose=Pose2D(reference_frame=self.elevator.root)
                 ),
             ),
-            *self.reattach(self.robot.root, self.elevator.root),
+            *self.reattach(branch_root=self.robot.root, new_parent=self.elevator.root),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self.target_floor),
                 monitored_node=NavigateAction(
                     planar_goal_pose=self._pose_infront_of_elevator
                 ),
             ),
-            *self.reattach(self.robot.root, self.world.root),
+            *self.reattach(branch_root=self.robot.root, new_parent=self.world.root),
         ]
 
     @property

@@ -1,3 +1,7 @@
+"""
+Pairs of normals a tool motion keeps aligned.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

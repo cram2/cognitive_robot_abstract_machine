@@ -185,7 +185,7 @@ def assert_drives_differentially_to(
     assert goal.threshold == action.threshold
     np.testing.assert_allclose(
         goal.goal_pose.to_np(),
-        robot.mobile_base.pose_facing(action.planar_goal_pose).to_np(),
+        robot.mobile_base.pose_facing(heading=action.planar_goal_pose).to_np(),
     )
     assert goal.goal_pose.reference_frame is action.planar_goal_pose.reference_frame
 
@@ -223,6 +223,10 @@ def test_stretch_drives_with_its_differential_drive_whatever_the_plan_adaptation
 def test_the_differential_drive_goal_takes_the_threshold_of_the_action(
     stretch_apartment_context,
 ) -> None:
+    """
+    A Stretch drives to a navigation's goal with its differential drive, at the
+    threshold the navigation was given.
+    """
     world, robot, extensions = stretch_apartment_context
     default_action = navigation_to(world)
 
@@ -238,6 +242,10 @@ def test_the_differential_drive_goal_takes_the_threshold_of_the_action(
 def test_the_base_pose_threshold_defaults_to_the_one_of_the_differential_drive_goal(
     stretch_apartment_context,
 ) -> None:
+    """
+    A navigation given no threshold takes the default threshold of the differential
+    drive goal.
+    """
     world, robot, extensions = stretch_apartment_context
 
     assert navigation_to(world).threshold == (DifferentialDriveBaseGoal.threshold)
@@ -246,6 +254,10 @@ def test_the_base_pose_threshold_defaults_to_the_one_of_the_differential_drive_g
 def test_stretch_drives_every_leg_of_a_path_with_its_differential_drive(
     stretch_apartment_context,
 ) -> None:
+    """
+    A Stretch drives every leg of a planned path with its differential drive, at the
+    navigation's threshold, the last leg ending at the target.
+    """
     world, robot, extensions = stretch_apartment_context
     target = Pose2D.from_xy_yaw(2.0, 2.0, reference_frame=world.root)
     unchanged = prepared(
@@ -322,6 +334,10 @@ def test_stretch_keeps_its_drive_goal_without_its_robot_adaptations(
 def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
     stretch_apartment_context,
 ) -> None:
+    """
+    A simulated Stretch arrives at the navigation's goal pose, driving with its
+    differential drive.
+    """
     world, robot, extensions = stretch_apartment_context
     executor = simulated_executor(extensions)
     action = navigation_to(world)
@@ -331,7 +347,7 @@ def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
 
     np.testing.assert_allclose(
         robot.root.global_pose.to_np(),
-        robot.mobile_base.pose_facing(action.planar_goal_pose).to_np(),
+        robot.mobile_base.pose_facing(heading=action.planar_goal_pose).to_np(),
         atol=2 * action.threshold,
     )
 
@@ -339,6 +355,10 @@ def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
 def test_a_simulated_stretch_drives_differentially_to_a_pose_chosen_while_running(
     stretch_apartment_context,
 ) -> None:
+    """
+    A simulated Stretch also drives differentially to a goal pose chosen only while the
+    plan runs.
+    """
     world, robot, extensions = stretch_apartment_context
     executor = simulated_executor(extensions)
     navigation = StatementNode(
@@ -405,6 +425,10 @@ def closing_step_of(action: CloseAction) -> StatechartNode:
 def test_a_simulated_stretch_stays_in_front_of_the_container_it_closes(
     stretch_apartment_context,
 ) -> None:
+    """
+    Closing a container, a simulated Stretch keeps the side its arm reaches out of
+    facing the container, and closes it as any robot would.
+    """
     world, robot, extensions = stretch_apartment_context
     unchanged = prepared(close_action(world, robot), robot_executor(extensions))
     default_close = closing_step_of(unchanged)
@@ -508,6 +532,10 @@ def lifting_goal_of(action: PickUpAction) -> StatechartNode:
 def test_stretch_reaches_in_a_straight_line(
     stretch_apartment_context, build_executor
 ) -> None:
+    """
+    A Stretch reaches in a straight line, to the same goal and with the same thresholds
+    as the default reach.
+    """
     world, robot, extensions = stretch_apartment_context
     unchanged = prepared(
         ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
@@ -565,6 +593,10 @@ def test_stretch_reaches_in_a_straight_line_at_the_approach_speeds(
 def test_stretch_lifts_in_a_straight_line(
     stretch_apartment_context, build_executor
 ) -> None:
+    """
+    A Stretch lifts what it picked up in a straight line, to the same goal and with the
+    same thresholds as the default lift.
+    """
     world, robot, extensions = stretch_apartment_context
     unchanged = lifting_goal_of(
         prepared(
@@ -603,6 +635,10 @@ def held_orientations_of(action: StatechartNode) -> list[HoldOrientation]:
 def test_stretch_holds_the_orientation_of_its_base_while_it_reaches(
     stretch_apartment_context, build_executor
 ) -> None:
+    """
+    A Stretch holds the orientation of its base beside a reach, so only its arm and lift
+    move the gripper sideways.
+    """
     world, robot, extensions = stretch_apartment_context
 
     action = prepared(
@@ -656,6 +692,10 @@ def test_stretch_holds_the_orientation_of_its_base_for_each_of_successive_tool_m
 def test_stretch_holds_the_orientation_of_its_base_beside_a_hold_of_something_else(
     stretch_apartment_context,
 ) -> None:
+    """
+    A Stretch holds the orientation of its base also when the reach runs beside a hold
+    of another link.
+    """
     world, robot, extensions = stretch_apartment_context
     reach = ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0])
     tool_frame = robot.all_arms[0].end_effector.tool_frame
@@ -806,6 +846,9 @@ def test_a_simulated_stretch_facing_away_fails_to_reach_rather_than_turning(
 def test_a_robot_of_another_type_reaches_without_its_base_orientation_held(
     pr2_apartment_context,
 ) -> None:
+    """
+    A robot of another type reaches without its base orientation held.
+    """
     world, robot, extensions = pr2_apartment_context
 
     action = prepared(
@@ -817,6 +860,9 @@ def test_a_robot_of_another_type_reaches_without_its_base_orientation_held(
 
 
 def test_a_robot_of_another_type_reaches_unchanged(pr2_apartment_context) -> None:
+    """
+    A robot of another type reaches with the default pose goals.
+    """
     world, robot, extensions = pr2_apartment_context
 
     action = prepared(
@@ -828,6 +874,9 @@ def test_a_robot_of_another_type_reaches_unchanged(pr2_apartment_context) -> Non
 
 
 def test_a_robot_of_another_type_lifts_unchanged(pr2_apartment_context) -> None:
+    """
+    A robot of another type lifts with the default pose goal.
+    """
     world, robot, extensions = pr2_apartment_context
 
     goal = lifting_goal_of(
@@ -852,6 +901,10 @@ def garmi_extensions(_garmi_world_setup) -> list[ContextExtension]:
 def test_a_simulated_garmi_drives_its_fingers_with_a_giskard_goal(
     garmi_extensions,
 ) -> None:
+    """
+    A simulated Garmi moves its fingers with a motion goal rather than a gripper
+    command.
+    """
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
         GarmiLeftGripper
     )[0]

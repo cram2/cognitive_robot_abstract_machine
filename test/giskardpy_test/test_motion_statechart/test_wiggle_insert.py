@@ -1,3 +1,10 @@
+"""
+Tests of :class:`~giskardpy.motion_statechart.tasks.cylinder_insertion.WiggleInsert`,
+which wiggles a held object into a hole.
+"""
+
+from __future__ import annotations
+
 import random
 
 import numpy as np
@@ -37,6 +44,9 @@ def _hole_at_current_tip(world: World, tip, root) -> Point3:
 
 
 def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
+    """
+    Wiggling the PR2's gripper towards a hole right under it reaches the hole.
+    """
     VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
     random.seed(0)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -106,6 +116,9 @@ def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: 
 
 
 def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
+    """
+    The noise wiggling the gripper changes from one control cycle to the next.
+    """
     random.seed(1)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
@@ -142,6 +155,10 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
 
 
 def test_wiggle_insert(hsr_world_state_reset):
+    """
+    Wiggling the HSR's hand into a hole while a stronger goal pulls it elsewhere for
+    five seconds still ends at the hole, having wiggled.
+    """
     goal_state = {
         HSRBJoint.ARM_FLEX: -1.5,
         HSRBJoint.ARM_LIFT: 0.5,

@@ -1,3 +1,10 @@
+"""
+Tests of the poses an action passes through to grasp an object: before, at and after the
+grasp.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -70,7 +77,7 @@ def grasp_at_origin(graspable) -> GraspCandidate:
     :param graspable: The annotation of the object to grasp.
     :return: A grasp at the object's origin, approaching along the body's x-axis.
     """
-    return GraspCandidate.from_body_origin(graspable)
+    return GraspCandidate.from_body_origin(graspable=graspable)
 
 
 def grasp_from_above(graspable) -> GraspCandidate:
@@ -217,6 +224,9 @@ def test_a_diagonal_approach_leaves_the_body_through_its_nearest_face(
 
 
 def test_grasp_pose_is_the_middle_of_the_sequence(boxed_pr2_world):
+    """
+    The grasp pose of the sequence puts the tool frame where the grasp needs it.
+    """
     _, robot, graspable = boxed_pr2_world
     end_effector = robot.left_arm.end_effector
     grasp = grasp_at_origin(graspable)
@@ -269,6 +279,9 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
 
 
 def test_retreat_pose_keeps_the_grasp_orientation(boxed_pr2_world):
+    """
+    Retreating from a grasp keeps the gripper turned as it was at the grasp.
+    """
     _, robot, graspable = boxed_pr2_world
 
     approach = GraspApproachingAction()
@@ -287,6 +300,10 @@ def test_retreat_pose_keeps_the_grasp_orientation(boxed_pr2_world):
 
 
 def test_sequence_without_a_body_stands_off_by_the_clearance_alone(boxed_pr2_world):
+    """
+    Without a body to clear, the gripper stands off from the grasp by the approach
+    clearance alone.
+    """
     _, robot, graspable = boxed_pr2_world
     action = GraspApproachingAction()
 

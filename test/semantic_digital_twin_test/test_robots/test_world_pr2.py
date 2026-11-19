@@ -439,6 +439,9 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
 
 
 def test_kinematic_chains(pr2_world_state_reset):
+    """
+    Every kinematic chain of the PR2 has a root and a tip.
+    """
     semantic_kinematic_chain_annotation: list[RobotKinematicChain] = (
         pr2_world_state_reset.get_semantic_annotations_by_type(RobotKinematicChain)
     )

@@ -1,3 +1,7 @@
+"""
+The regions a robot can be sent to, iterated as the poses sampled from them.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

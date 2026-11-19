@@ -136,6 +136,10 @@ def statechart_origin(request: pytest.FixtureRequest) -> StatechartOrigin:
 def test_external_collision_avoidance(
     cylinder_bot_world: World, statechart_origin: StatechartOrigin
 ) -> None:
+    """
+    A goal behind an obstacle leaves the cylinder bot outside the buffer zone of the one
+    contact, and the motion leaves no collision consumer behind.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -189,6 +193,11 @@ def test_external_collision_avoidance(
 
 
 def test_external_collision_avoidance_battle():
+    """
+    Two bots driven at a wall with avoidance weights of different strength: the strong
+    one ends within the buffer zone without passing through the wall, the weak one stays
+    outside the buffer zone.
+    """
     strong_robot_world = World()
     with strong_robot_world.modify_world():
         strong = Body(
@@ -356,6 +365,10 @@ def test_external_collision_avoidance_battle():
 def test_external_collision_avoidance_with_weight_above_ca(
     cylinder_bot_world: World, statechart_origin: StatechartOrigin
 ) -> None:
+    """
+    A goal weighted above collision avoidance pushes the bot into the buffer zone of the
+    obstacle, but not into it.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -482,6 +495,9 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
 
 
 def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
+    """
+    A motion cancelled at its local minimum still leaves no collision consumer behind.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
@@ -532,11 +548,21 @@ def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
 
 
 def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World):
+    """
+    Two motions run one after another each leave no collision consumer behind.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
 
     def run_motion(goal_x):
+        """
+        Drive the bot to ``goal_x`` while avoiding external collisions, until it reaches
+        a local minimum.
+
+        :param goal_x: Where along x the bot is sent.
+        :return: The executor the motion ran in.
+        """
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
             extensions=[MotionControl()],
@@ -670,6 +696,10 @@ def test_self_collision_avoidance(
 
 
 def test_avoid_collision_go_around_corner(pr2_with_box):
+    """
+    The PR2's right gripper reaches around the corner of a box without coming closer to
+    it than the violated distance, which would cancel the motion.
+    """
     r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
 
@@ -757,6 +787,10 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
 
 
 def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
+    """
+    The PR2's right arm moves past its left arm without the two touching, which would
+    cancel the motion.
+    """
     VizMarkerPublisher(
         _world=pr2_with_box, node=rclpy_node
     ).with_collision_visualization()
@@ -1205,6 +1239,9 @@ def test_collisions_are_computed_with_collision_avoidance_node(pr2_with_box):
 
 
 def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
+    """
+    A distance monitor without collision avoidance still has collisions computed for it.
+    """
     executor = _create_counting_executor(pr2_with_box)
     statechart = _build_arms_crossing_statechart(executor, collision_avoidance=False)
     statechart.add_node(
@@ -1387,6 +1424,10 @@ def test_violated_body_pairs_survive_storing_the_history(
 def test_collision_for_robot_with_static_base(
     fix_name, tool_frame_id, robot_type, request, rclpy_node
 ):
+    """
+    A robot with a fixed base reaches towards an obstacle without its gripper
+    penetrating it.
+    """
     world = request.getfixturevalue(fix_name)
     robot = world.get_semantic_annotations_by_type(robot_type)[0]
 
@@ -1452,6 +1493,10 @@ def test_collision_for_robot_with_static_base(
 def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
     pr2_apartment_world,
 ):
+    """
+    Moving the PR2 into collision in the apartment again and again does not make the
+    later motions slower than the first.
+    """
     world = deepcopy(pr2_apartment_world)
 
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")

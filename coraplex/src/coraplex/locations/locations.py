@@ -1,3 +1,8 @@
+"""
+Where the robot can stand to reach or to see a target, sampled from costmaps of the
+world as it is when they are sampled.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -68,7 +73,9 @@ class CostmapLocation(Location, ABC):
         """
 
     def candidates(self) -> Iterator[Pose2D]:
-        return self.costmap().sample(self.number_of_samples, self.sampling_seed)
+        return self.costmap().sample(
+            number_of_samples=self.number_of_samples, seed=self.sampling_seed
+        )
 
     def _in_world(self, pose: Pose) -> Pose:
         """

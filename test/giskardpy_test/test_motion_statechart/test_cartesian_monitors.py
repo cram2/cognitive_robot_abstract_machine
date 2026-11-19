@@ -1,3 +1,10 @@
+"""
+Tests of the monitors that observe whether the tip of a kinematic chain has reached a
+Cartesian goal, each run while a task drives the PR2's right gripper there.
+"""
+
+from __future__ import annotations
+
 import pytest
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
@@ -51,6 +58,9 @@ def _run(executor: StatechartExecutor, statechart: Statechart) -> None:
 
 
 def test_position_reached(pr2_world_state_reset: World):
+    """
+    A position monitor observes true once the gripper is driven to its goal point.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -113,6 +123,10 @@ def test_position_reached_binding_policies(
 
 
 def test_orientation_reached(pr2_world_state_reset: World):
+    """
+    An orientation monitor observes true once the gripper is turned to its goal
+    orientation.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -142,6 +156,10 @@ def test_orientation_reached(pr2_world_state_reset: World):
 
 
 def test_pose_reached(pr2_world_state_reset: World):
+    """
+    A pose monitor observes true once the gripper reaches both the position and the
+    orientation of its goal.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -169,6 +187,10 @@ def test_pose_reached(pr2_world_state_reset: World):
 
 
 def test_pointing_at(pr2_world_state_reset: World):
+    """
+    A pointing monitor observes true once the gripper's pointing axis points at its goal
+    point.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -197,6 +219,10 @@ def test_pointing_at(pr2_world_state_reset: World):
 
 
 def test_vectors_aligned(pr2_world_state_reset: World):
+    """
+    An alignment monitor observes true once the gripper's normal is aligned with the
+    reference normal.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )
@@ -225,6 +251,9 @@ def test_vectors_aligned(pr2_world_state_reset: World):
 
 
 def test_distance_to_line(pr2_world_state_reset: World):
+    """
+    A line monitor observes true once the gripper is on the segment it watches.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
     )

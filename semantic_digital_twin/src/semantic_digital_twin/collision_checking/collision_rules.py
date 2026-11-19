@@ -1,3 +1,8 @@
+"""
+The rules that decide which pairs of bodies collision checking avoids or allows to
+collide.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -672,12 +677,12 @@ class AllowCollisionBetweenFingers(AllowCollisionRule):
             for end_effector in self.robot.all_end_effectors
             if isinstance(end_effector, HasFingers)
             for finger_a, finger_b in combinations(end_effector.fingers, 2)
-            for body_a in self._finger_bodies(finger_a)
-            for body_b in self._finger_bodies(finger_b)
+            for body_a in self._finger_bodies(finger=finger_a)
+            for body_b in self._finger_bodies(finger=finger_b)
         }
 
     @staticmethod
-    def _finger_bodies(finger: RobotKinematicChain) -> list[Body]:
+    def _finger_bodies(*, finger: RobotKinematicChain) -> list[Body]:
         """
         :param finger: A finger of a gripper.
         :return: Its bodies with collision geometry, without the one it is mounted on,

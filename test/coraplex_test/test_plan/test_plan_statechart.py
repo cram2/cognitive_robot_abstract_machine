@@ -103,6 +103,10 @@ class RecordingLocationInFrontOfTheRobot(Location):
 def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
     pr2_apartment_context,
 ) -> None:
+    """
+    An action grounded in the middle of a sequence runs in the same statechart as the
+    steps around it, which ends once.
+    """
     world, robot, extensions = pr2_apartment_context
     torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
     plan = Sequence(
@@ -132,6 +136,10 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
 def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before_left(
     pr2_apartment_context,
 ) -> None:
+    """
+    An underspecified action is grounded in the world as the steps before it left it,
+    not as it was when the plan was built.
+    """
     world, robot, extensions = pr2_apartment_context
     torso_high = robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
     assert not torso_high.is_achieved()
@@ -334,6 +342,10 @@ def test_an_underspecified_node_is_sent_as_a_node_choosing_its_child(
 def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions(
     pr2_apartment_context, monkeypatch
 ) -> None:
+    """
+    A plan run on the robot is sent once, with the executor's chooser grounding its
+    actions.
+    """
     world, robot, extensions = pr2_apartment_context
     giskard = GiskardRecordingTheGoal()
     monkeypatch.setattr(
@@ -476,6 +488,10 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
 def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empty(
     pr2_apartment_context, monkeypatch
 ) -> None:
+    """
+    An underspecified action left without candidates on the robot fails, naming itself
+    as empty.
+    """
     world, robot, extensions = pr2_apartment_context
     monkeypatch.setattr(
         executors,

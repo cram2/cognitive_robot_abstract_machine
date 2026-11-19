@@ -1,3 +1,9 @@
+"""
+Nodes that read a force-torque sensor from a ROS 2 topic.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -53,6 +59,10 @@ class ForceImpactMonitor(ForceTorqueNode):
     """
 
     def on_tick(self) -> ObservationStateValue | None:
+        """
+        :return: :attr:`ObservationStateValue.UNKNOWN` until a message arrives, then
+            whether the measured force exceeds :attr:`force_threshold`.
+        """
         super().on_tick()
         if not self.has_msg():
             return ObservationStateValue.UNKNOWN

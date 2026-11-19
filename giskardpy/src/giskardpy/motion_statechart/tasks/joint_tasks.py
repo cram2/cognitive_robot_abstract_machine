@@ -116,6 +116,10 @@ class JointVelocityLimit(Task, HasMaxJointVelocityParameter):
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
+        """
+        :return: Artifacts keeping the velocity of every connection within
+            :attr:`max_joint_velocity`, and observing whether all of them are.
+        """
         artifacts = MotionNodeArtifacts()
         velocities = []
         for connection in self.connections:

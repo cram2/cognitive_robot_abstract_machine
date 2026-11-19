@@ -236,7 +236,7 @@ def stand_facing(
     arm or off to its side.
     """
     return robot.mobile_base.pose_facing(
-        heading_towards(world_P_stand, world_P_target, world)
+        heading=heading_towards(world_P_stand, world_P_target, world)
     ).homogeneous_matrix
 
 
@@ -364,6 +364,10 @@ def test_move_torso_multi(multiple_robot_apartment_context):
 
 
 def test_navigate_multi(multiple_robot_apartment_context, rclpy_node):
+    """
+    Navigating takes each robot to the target position, with its front along the world's
+    x-axis for an identity heading.
+    """
     world, view, extensions = multiple_robot_apartment_context
     target_position = [5, 2, 0]
 
@@ -531,12 +535,15 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
 
 
 def test_grasping(multiple_robot_apartment_context):
+    """
+    Grasping the milk at its origin ends with the milk between the fingers.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     left_arm = left_or_only_arm(robot)
 
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     grasping_action = GraspingAction(
-        grasp_candidate=GraspCandidate.from_body_origin(milk),
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
         arm=left_or_only_arm(robot),
     )
 
@@ -565,6 +572,9 @@ def test_grasping(multiple_robot_apartment_context):
 
 
 def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
+    """
+    Picking up the milk leaves it attached to the gripper, between the fingers.
+    """
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
@@ -653,6 +663,9 @@ def test_place_multi(multiple_robot_apartment_context):
 
 
 def test_look_at(multiple_robot_apartment_context):
+    """
+    Looking at a point keeps that point as the look target and runs to its end.
+    """
     world, robot_view, extensions = multiple_robot_apartment_context
     description = LookAtAction(
         look_target=Pose(Point3.from_iterable([3, 0, 1]), reference_frame=world.root)
@@ -700,6 +713,9 @@ def test_detect(multiple_robot_apartment_context):
 
 
 def test_open(multiple_robot_apartment_context):
+    """
+    Opening a drawer by its handle pulls the drawer out.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     if isinstance(robot, Garmi):
         return
@@ -730,6 +746,9 @@ def test_open(multiple_robot_apartment_context):
 
 
 def test_close(multiple_robot_apartment_context, rclpy_node):
+    """
+    Closing a half open drawer by its handle pushes it shut.
+    """
     world, robot, extensions = multiple_robot_apartment_context
 
     world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
@@ -763,6 +782,9 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
 
 
 def test_facing(multiple_robot_apartment_context):
+    """
+    Facing the milk turns the base until the milk lies along its forward axis.
+    """
     world, robot, extensions = multiple_robot_apartment_context
 
     milk_pose = world.get_body_by_name("milk.stl").global_pose
@@ -1152,6 +1174,10 @@ def test_search_action(multiple_robot_apartment_context) -> None:
 def test_a_search_looks_at_the_target_then_at_the_ends_of_a_cross_around_it(
     multiple_robot_apartment_context,
 ):
+    """
+    A search looks at its target first and then at the four ends of a cross of the given
+    arm length around it.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     target = Pose.from_xyz_rpy(6, -2, 1.2, reference_frame=world.root)
     arm = 0.3
@@ -1311,6 +1337,9 @@ def test_park_arms_caps_joint_velocity_only_when_asked(
 def test_closing_drives_the_mechanism_to_the_closed_joint_position(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    Closing drives the mechanism to the closed joint position the action was given.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     handle = _handle_annotation(world, "handle_cab10_m")
     action = CloseAction(
@@ -1328,6 +1357,9 @@ def test_closing_drives_the_mechanism_to_the_closed_joint_position(
 def test_opening_drives_the_mechanism_to_its_upper_limit(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    Opening drives the mechanism to the upper limit of its joint.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     handle = _handle_annotation(world, "handle_cab10_m")
     action = OpenAction(
@@ -1694,6 +1726,9 @@ def test_fingers_sent_to_a_width_are_given_the_distance_between_their_facing_poi
 def test_a_squeeze_sends_the_fingers_past_the_width(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    A squeeze sends each finger past the width by the squeeze.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     gripper = left_or_only_arm(robot).end_effector
     width = 0.04
@@ -1730,6 +1765,9 @@ def test_fingers_squeezing_an_object_are_done_once_it_stops_them(
 def test_fingers_sent_only_to_a_width_have_to_reach_it(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    Fingers sent only to a width do not settle for stalling before they reach it.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     gripper = left_or_only_arm(robot).end_effector
     touching = MoveFingersToWidthAction(two_finger_gripper=gripper, width=0.04)
@@ -1759,6 +1797,9 @@ def test_fingers_sent_to_a_width_stand_that_far_apart(
 def test_fingers_are_not_sent_wider_than_their_gripper_opens(
     multiple_robot_apartment_context,
 ):
+    """
+    Sending the fingers wider than the gripper opens is rejected.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     gripper = left_or_only_arm(robot).end_effector
     action = MoveFingersToWidthAction(
@@ -1772,6 +1813,9 @@ def test_fingers_are_not_sent_wider_than_their_gripper_opens(
 def test_fingers_may_be_sent_as_wide_as_their_gripper_opens(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    The fingers may be sent exactly as wide as the gripper opens.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     gripper = left_or_only_arm(robot).end_effector
     action = MoveFingersToWidthAction(
@@ -1911,11 +1955,15 @@ def cup_in_reach(robot: AbstractRobot, name: str, roll: float = 0.0) -> Cup:
 def test_a_pick_up_from_above_comes_down_onto_the_objects_origin(
     multiple_robot_apartment_context,
 ):
+    """
+    A pick-up from above grasps the cup at its origin, approaching along the cup's
+    negative z-axis.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     cup = cup_in_reach(robot, "cup")
     arm = left_or_only_arm(robot)
 
-    pick_up = PickUpAction.from_above(cup, arm)
+    pick_up = PickUpAction.from_above(graspable=cup, arm=arm)
 
     cup_T_grasp = pick_up.grasp_candidate.grasp_pose
     assert pick_up.grasp_candidate.graspable is cup
@@ -2002,7 +2050,7 @@ def test_a_cup_picked_up_earlier_in_the_plan_ends_upright(
     carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[arm])
 
     run_plan(
-        Sequence(nodes=[PickUpAction.from_above(cup, arm), carry]),
+        Sequence(nodes=[PickUpAction.from_above(graspable=cup, arm=arm), carry]),
         [*extensions, PlanRewriting(transformations=[ParkArmsBeforeFirstAction()])],
     )
 
@@ -2113,7 +2161,9 @@ def test_a_cup_picked_up_by_a_statement_ends_upright(
         Sequence(
             nodes=[
                 a(PickUpAction)(
-                    grasp_candidate=PickUpAction.from_above(cup, arm).grasp_candidate,
+                    grasp_candidate=PickUpAction.from_above(
+                        graspable=cup, arm=arm
+                    ).grasp_candidate,
                     arm=arm,
                 ),
                 carry,
@@ -2274,6 +2324,10 @@ class CupForEachArm:
 
 @pytest.fixture
 def cup_for_each_arm(multiple_robot_apartment_context) -> CupForEachArm:
+    """
+    A robot with two arms standing before two cups out of reach, one nearer than the
+    other, with one pick-up of a cup for each arm.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     left_arm = robot.get_left_arm_if_specified()
     right_arm = robot.get_right_arm_if_specified()
@@ -2304,8 +2358,8 @@ def cup_for_each_arm(multiple_robot_apartment_context) -> CupForEachArm:
         world=world,
         context_extensions=extensions,
         pick_ups=[
-            PickUpAction.from_above(near_cup, left_arm),
-            PickUpAction.from_above(far_cup, right_arm),
+            PickUpAction.from_above(graspable=near_cup, arm=left_arm),
+            PickUpAction.from_above(graspable=far_cup, arm=right_arm),
         ],
     )
 
@@ -2313,6 +2367,9 @@ def cup_for_each_arm(multiple_robot_apartment_context) -> CupForEachArm:
 def test_a_gripper_closes_at_its_grasp_although_the_other_arm_is_moving(
     cup_for_each_arm: CupForEachArm,
 ) -> None:
+    """
+    Each gripper closes on its cup's grasp although the other arm still moves.
+    """
     run_plan(
         Parallel(nodes=cup_for_each_arm.pick_ups),
         cup_for_each_arm.extensions_parking_first(),

@@ -1,3 +1,8 @@
+"""
+A ROS 2 tool that lets a user drag markers in RViz to move the tips of kinematic chains
+to Cartesian poses.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
