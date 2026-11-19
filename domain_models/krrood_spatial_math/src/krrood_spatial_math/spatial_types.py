@@ -2656,18 +2656,18 @@ class RigidMotionRate(VectorPair, ABC):
     @classproperty
     def _series_rotation_angle(cls) -> float:
         """
-        The rotation angle in radians, about 0.042, below which the coefficients of the
-        left Jacobian use three terms of their series: where the series' truncation
-        error, ``2 φ⁶ / 8!`` relative, equals the closed forms' cancellation error in
-        double precision, ``2 ε / φ²``, both about ``2e-13``.
+        The angle, about 0.042 radians, below which the left Jacobian's coefficients
+        use three terms of their series: where its truncation error ``2 φ⁶ / 8!`` equals
+        the closed forms' round-off error ``2 ε / φ²`` (`Todesco and Brüls
+        <https://orbi.uliege.be/handle/2268/306081>`__, section 5.1, equation (91)).
         """
         return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
 
     def _integrate(self, *, parameter_change: sm.ScalarData) -> Displacement:
         """
-        The exponential of this rate times ``parameter_change`` (Lynch and Park,
-        *Modern Robotics*, section 3.3.3), for any axis and pitch, and free of NaN where
-        the body does not turn, also in its derivatives.
+        The exponential of this rate times ``parameter_change`` (Solà, Deray and
+        Atchuthan, *A micro Lie theory*, equation (172)), for any axis and pitch, and
+        free of NaN where the body does not turn, also in its derivatives.
 
         :param parameter_change: How much the parameter of the rate changed.
         :return: The displacement of the body while it did, at this constant rate.
@@ -2691,7 +2691,8 @@ class RigidMotionRate(VectorPair, ABC):
         :param translation: How far the origin of the body would move without turning.
         :return: Where the origin of the body ends up when it turns while moving: the
             left Jacobian of ``rotation`` applied to ``translation`` (Solà, Deray and
-            Atchuthan, `A micro Lie theory <https://arxiv.org/abs/1812.01537>`__).
+            Atchuthan, `A micro Lie theory <https://arxiv.org/abs/1812.01537>`__,
+            equation (174), which equals the left Jacobian of equation (145)).
         """
         angle_squared = rotation.dot(rotation)
         first_order = rotation.cross(translation)
@@ -2707,7 +2708,8 @@ class RigidMotionRate(VectorPair, ABC):
         """
         :param angle_squared: The square of the angle the body turns by.
         :return: ``(1 − cos φ) / φ²`` for the angle ``φ``, by three terms of its series
-            below :attr:`_series_rotation_angle`.
+            below :attr:`_series_rotation_angle` (Lynch and Park, *Modern Robotics*,
+            equation (3.87), divided by ``φ²``).
         """
         angle = sm.sqrt(angle_squared)
         return sm.if_less(
@@ -2724,7 +2726,8 @@ class RigidMotionRate(VectorPair, ABC):
         """
         :param angle_squared: The square of the angle the body turns by.
         :return: ``(φ − sin φ) / φ³`` for the angle ``φ``, by three terms of its series
-            below :attr:`_series_rotation_angle`.
+            below :attr:`_series_rotation_angle` (Lynch and Park, *Modern Robotics*,
+            equation (3.87), divided by ``φ³``).
         """
         angle = sm.sqrt(angle_squared)
         return sm.if_less(
