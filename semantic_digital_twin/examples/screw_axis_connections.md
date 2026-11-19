@@ -18,7 +18,8 @@ like a door on its hinges. A [prismatic connection](https://en.wikipedia.org/wik
 its child along an axis, like a drawer. In the semantic digital twin, both are a `ScrewAxisConnection`:
 the connection describes how its child moves with one
 [screw axis](https://en.wikipedia.org/wiki/Screw_axis), the twist the child performs per unit of the
-connection's position.
+connection's position. The idea of describing every such connection with one screw axis was inspired by
+MoMa-SG {cite:p}`buechner2026articulated`.
 
 The screw axis is normalized as {cite:t}`lynch2017modern` define it in
 [Definition 3.24 of Modern Robotics](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122).
