@@ -1,3 +1,8 @@
+"""
+The fragment tree a verbalization is built as: its leaves, its structural nodes, and
+the folds and maps over it.
+"""
+
 from __future__ import annotations
 
 import uuid
@@ -278,6 +283,67 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         'greater than'
         """
         return cls(text=label, role=SemanticRole.OPERATOR)
+
+
+# %% leaves whose words the morphology pass decides
+
+
+@dataclass(kw_only=True)
+class IndefiniteArticle(WordFragment):
+    """
+    The indefinite article, whose surface the morphology pass makes agree with the sound
+    of the word after it (*"a Robot"*, *"an hour"*).
+    """
+
+
+@dataclass(kw_only=True)
+class VerbFormFragment(RoleFragment):
+    """
+    A ``VERB`` leaf whose text is any form of the verb (*"connects"*), as read off a name;
+    the morphology pass reduces it to its lemma before inflecting it like any verb leaf.
+    """
+
+    role: SemanticRole = SemanticRole.VERB
+    """
+    Always the verb role.
+    """
+
+
+@dataclass(kw_only=True)
+class CollectionElementNoun(RoleFragment):
+    """
+    A noun naming one element of a collection, whose text is the collection's name
+    (*"tasks"*); the morphology pass singularizes it (*"task"*) before realizing its number.
+    """
+
+
+@dataclass(kw_only=True)
+class CardinalNumber(VerbalizationFragment):
+    """
+    A count, realized by the morphology pass as its English cardinal word (*"seven"*).
+    """
+
+    count: int
+    """
+    The number counted.
+    """
+
+
+@dataclass(kw_only=True)
+class IndexOrdinal(VerbalizationFragment):
+    """
+    A position in a sequence, realized by the morphology pass as its English ordinal
+    phrase (*"first"*, *"last"*, *"second to last"*).
+    """
+
+    index: int
+    """
+    The position as a sequence index: counted from the start when non-negative, from the
+    end when negative.
+    """
+
+
+# %% structural fragments
 
 
 @dataclass(kw_only=True)

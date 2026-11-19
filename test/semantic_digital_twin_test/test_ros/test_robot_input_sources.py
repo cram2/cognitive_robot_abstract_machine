@@ -15,7 +15,7 @@ from semantic_digital_twin.adapters.sensors.lidar import SimulatedLidarSource
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from semantic_digital_twin.robots.input_source import RobotTopic
 from semantic_digital_twin.robots.pr2 import PR2, PR2Topic
-from semantic_digital_twin.robots.robot_parts import KinematicChain, MobileBase
+from semantic_digital_twin.robots.robot_parts import RobotKinematicChain, MobileBase
 from semantic_digital_twin.world import World
 
 SCANNER_TOPIC = "scanner"
@@ -101,10 +101,14 @@ def test_a_robot_read_by_both_loops_subscribes_to_its_joint_states_once(
 
 
 def test_every_part_read_from_the_robot_is_an_input_to_apply(annotated_pr2, rclpy_node):
+    """
+    Every part of the PR2 switched to the real robot reads from an input synchronizer
+    the robot hands out.
+    """
     switched_parts = [
         part
         for part in annotated_pr2._robot_parts
-        if isinstance(part, (KinematicChain, MobileBase))
+        if isinstance(part, (RobotKinematicChain, MobileBase))
     ]
     annotated_pr2.use_real_sources(rclpy_node)
 

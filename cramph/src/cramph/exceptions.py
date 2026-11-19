@@ -1,3 +1,7 @@
+"""
+Exceptions raised while building, compiling, modifying and running statecharts.
+"""
+
 from __future__ import annotations
 
 from abc import ABC

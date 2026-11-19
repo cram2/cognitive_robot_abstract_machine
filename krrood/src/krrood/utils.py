@@ -1,11 +1,10 @@
 """
-Standard-library helpers for naming and resolving classes, modules and import paths,
-reading dataclass fields, and building the names a source file's imports bind.
+Standard-library helpers for naming and resolving classes, modules and import paths, and
+reading dataclass fields.
 """
 
 from __future__ import annotations
 
-import ast
 import builtins
 import importlib
 import os
@@ -14,22 +13,25 @@ import types
 from dataclasses import Field
 from dataclasses import fields, MISSING
 from functools import lru_cache
-from importlib.util import resolve_name
 from inspect import isclass
 from os import PathLike
 from os.path import dirname
 from pathlib import Path
-from typing_extensions import Iterator, get_origin, get_args, Generic, Hashable, Any
+from typing_extensions import (
+    get_origin,
+    get_args,
+    Generic,
+    Hashable,
+    Any,
+)
 
 from typing_extensions import TypeVar, Callable, TypeVarTuple, _SpecialForm
 
-from krrood import logger
 from krrood.exceptions import (
     NoModuleSourceProvided,
     NoDefaultValueFound,
     PackageNameNotFoundError,
     PathMissingRequiredPartsError,
-    SourceDataNotProvided,
 )
 
 T = TypeVar("T")
@@ -450,326 +452,6 @@ def ensure_hashable(obj) -> Hashable:
     if not is_hashable(obj):
         return id(obj)
     return obj
-
-
-def get_scope_from_imports(
-    file_path: str | None = None,
-    tree: ast.AST | None = None,
-    package_name: str | None = None,
-    source: str | None = None,
-) -> dict[str, Any]:
-    """
-    Create a scope dictionary from imports in a Python file or an AST tree.
-
-    An import in an ``if TYPE_CHECKING:`` block whose module cannot be imported
-    contributes no names; elsewhere, a plain ``import`` of such a module raises.
-
-    :param file_path: The path to the Python file to extract imports from.
-    :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
-    :param package_name: The name of the package to use for relative imports.
-    :param source: The source code to extract imports from. If provided, file_path and
-        tree are ignored.
-    :return: A dictionary representing the scope with imported modules and their
-        attributes.
-    """
-    if tree is None and file_path is None and source is None:
-        raise SourceDataNotProvided(file_path=file_path, tree=tree, source_code=source)
-
-    # Ensure we have source and a parsed AST
-    if file_path and source is None:
-        with open(file_path, "r") as f:
-            source = f.read()
-    parsed_tree = tree or (
-        ast.parse(source)
-        if file_path is None
-        else ast.parse(source, filename=file_path)
-    )
-
-    scope: dict[str, Any] = {}
-    imports_that_never_run = set(type_checking_imports(parsed_tree))
-
-    for node in module_level_imports(parsed_tree):
-        if isinstance(node, ast.Import):
-            _handle_import_node(
-                node=node,
-                scope=scope,
-                file_path=file_path,
-                package_name=package_name,
-                skips_unimportable_module=node in imports_that_never_run,
-            )
-        elif isinstance(node, ast.ImportFrom):
-            package_name = _handle_import_from_node(
-                node=node,
-                scope=scope,
-                file_path=file_path,
-                package_name=package_name,
-            )
-
-    return scope
-
-
-def module_level_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]:
-    """
-    Yield the import statements that bind names in the module namespace.
-
-    Imports inside functions, lambdas and class bodies are skipped, since the names they
-    bind are local to that body.
-
-    :param node: The node whose statements are searched.
-    :return: The module-level import statements, including those nested in compound
-        statements such as ``if TYPE_CHECKING:`` or ``try``.
-    """
-    for child in ast.iter_child_nodes(node):
-        if isinstance(child, (ast.Import, ast.ImportFrom)):
-            yield child
-        elif not isinstance(
-            child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
-        ):
-            yield from module_level_imports(child)
-
-
-def type_checking_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]:
-    """
-    Yield the module-level import statements that only run while type checking.
-
-    :param node: The node whose statements are searched.
-    :return: The module-level import statements inside ``if TYPE_CHECKING:`` blocks,
-        whether the condition names ``TYPE_CHECKING`` directly or as a module attribute.
-    """
-    for child in ast.iter_child_nodes(node):
-        if (
-            isinstance(child, ast.If)
-            and ast.unparse(child.test).rpartition(".")[2] == "TYPE_CHECKING"
-        ):
-            yield from module_level_imports(
-                ast.Module(body=child.body, type_ignores=[])
-            )
-        elif not isinstance(
-            child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
-        ):
-            yield from type_checking_imports(child)
-
-
-def get_and_import_module(
-    module_name: str, package_name: str | None
-) -> types.ModuleType:
-    """
-    Attempt to import a module with an optional package context and return the module or
-    raise.
-
-    :param module_name: The name of the module to import.
-    :param package_name: The package name to use for relative imports, or None for
-        absolute imports.
-    :return: The imported module.
-    :raises ModuleNotFoundError: If the module cannot be found.
-    """
-    module = get_module_object(module_name, package_name)
-    if module is not None:
-        return module
-
-    try:
-        return importlib.import_module(module_name, package=package_name)
-    except ModuleNotFoundError as e:
-        if not package_name:
-            raise e
-        if module_name.startswith(".") and package_name:
-            full_name = resolve_name(module_name, package_name)
-        else:
-            full_name = f"{package_name}.{module_name}"
-        if full_name in sys.modules:
-            return sys.modules[full_name]
-        return importlib.import_module(full_name)
-
-
-def get_module_object(
-    module_name: str, package_name: str | None = None
-) -> types.ModuleType | None:
-    """
-    :param module_name: The name of the module to import.
-    :param package_name: The name of the package containing the module.
-    :return: The imported module object.
-    """
-    try:
-        full_name = module_name
-        if module_name.startswith(".") and package_name:
-            full_name = resolve_name(module_name, package_name)
-
-        if full_name in sys.modules:
-            return sys.modules[full_name]
-    except Exception:
-        return None
-
-
-def _resolve_relative_import(
-    file_path: str | None,
-    node: ast.ImportFrom,
-    module_name: str | None,
-    package_name: str | None,
-) -> tuple[str | None, str | None]:
-    """
-    Resolve relative import context and possibly adjust module and package names based
-    on file location.
-
-    :param file_path: The path to the file containing the import statement.
-    :param node: The import from node to process.
-    :param module_name: The module name to resolve.
-    :param package_name: The package name to use for relative imports.
-    :return: a tuple of (resolved_module_name, resolved_package_name).
-    """
-    resolved_module = module_name
-    resolved_package = package_name
-
-    if node.level > 0 and file_path is not None:
-        try:
-            resolved_package = get_import_path_from_path(
-                Path(os.path.join(file_path, *[".."] * node.level)).resolve()
-            )
-        except Exception:
-            # Keep original package if resolution fails
-            pass
-
-        if resolved_package is not None and module_name is not None:
-            try:
-                module_rel_path = Path(
-                    os.path.join(file_path, *[".."] * node.level, module_name)
-                ).resolve()
-                idx = str(module_rel_path).rfind(resolved_package)
-                if idx != -1:
-                    resolved_module = str(module_rel_path)[idx:].replace(
-                        os.path.sep, "."
-                    )
-            except Exception:
-                # Fall back to original module name
-                pass
-
-    return resolved_module, resolved_package
-
-
-def _handle_import_node(
-    node: ast.Import,
-    scope: dict[str, Any],
-    file_path: str | None,
-    package_name: str | None,
-    skips_unimportable_module: bool,
-) -> None:
-    """
-    Process a standard import node and update the provided scope mapping.
-
-    :param node: The import node to process.
-    :param scope: The scope mapping to update.
-    :param file_path: The path to the file containing the import statement.
-    :param package_name: The package name to use for relative imports.
-    :param skips_unimportable_module: Whether a module that cannot be imported
-        contributes no name instead of raising.
-    """
-    for alias in node.names:
-        asname = alias.asname or alias.name
-        try:
-            scope[asname] = get_and_import_module(alias.name, package_name)
-        except ImportError as error:
-            if not skips_unimportable_module:
-                raise
-            _log_unresolvable_import_once(alias.name, asname, file_path, str(error))
-
-
-@lru_cache(maxsize=None)
-def _log_unresolvable_import_once(
-    resolved_module_name: str | None,
-    name: str,
-    file_path: str | None,
-    error_message: str,
-) -> None:
-    """
-    Log, at most once per process for a given ``(resolved_module_name, name,
-    file_path)`` triple, that a name could not be imported while extracting a file's
-    imports.
-
-    A dataclass field annotated under ``if TYPE_CHECKING:`` with a name from a module
-    involved in a circular import can be re-resolved many times while that module is
-    still initializing (once per class needing it, and once per lookup attempt). Every
-    attempt fails identically and is otherwise harmless, so repeating the warning for
-    each attempt only floods the log without adding information; the ``lru_cache``
-    collapses repeats of the identical triple to a single log line.
-
-    :param resolved_module_name: The module the failed import targeted.
-    :param name: The name that could not be bound from that module.
-    :param file_path: The path of the file whose imports were being extracted.
-    :param error_message: The message of the error that was raised.
-    """
-    logger.debug(
-        f"Could not import {resolved_module_name}: {error_message} while extracting imports from {file_path}"
-    )
-
-
-def _handle_import_from_node(
-    node: ast.ImportFrom,
-    scope: dict[str, Any],
-    file_path: str | None,
-    package_name: str | None,
-) -> str | None:
-    """
-    Process a from-import node and update the provided scope mapping.
-
-    A statement whose module cannot be imported, because it is missing or only partially
-    initialized in a circular import, contributes no names and is skipped, just as a
-    name missing from an imported module is: the scope is built for
-    best-effort name resolution, so one statement that cannot be bound must not cost
-    the caller every other name in the file.
-
-    ..note:: A module a generator is about to write, such as an ORM interface, is
-        absent for exactly as long as that generator runs.
-
-    ..note:: A ``TYPE_CHECKING`` import never runs at runtime, so it may target a module
-        that imports this file back.
-
-    :param node: The from-import node to process.
-    :param scope: The scope mapping to update.
-    :param file_path: The path to the file containing the import statement.
-    :param package_name: The package name to use for relative imports.
-    :return: the (possibly) updated package_name to mimic original behavior.
-    """
-    module_name = node.module
-
-    # Resolve relative imports (may update package_name and module_name)
-    resolved_module_name, resolved_package_name = _resolve_relative_import(
-        file_path=file_path,
-        node=node,
-        module_name=module_name,
-        package_name=package_name,
-    )
-
-    # Mimic original behavior: allow package_name to be overwritten for subsequent iterations
-    package_name = resolved_package_name
-
-    try:
-        module = None
-        if resolved_module_name is not None:
-            module = get_and_import_module(resolved_module_name, package_name)
-
-        if module is None and resolved_package_name and resolved_module_name:
-            # Fallback already attempted in _import_module_safely; keep for parity
-            module = get_and_import_module(
-                f"{resolved_package_name}.{resolved_module_name}", None
-            )
-    except ImportError as error:
-        for alias in node.names:
-            _log_unresolvable_import_once(
-                resolved_module_name, alias.name, file_path, str(error)
-            )
-        return package_name
-
-    for alias in node.names:
-        name = alias.name
-        asname = alias.asname or name
-        try:
-            if name == "*":
-                scope.update(module.__dict__)
-            else:
-                scope[asname] = getattr(module, name)
-        except AttributeError as e:
-            _log_unresolvable_import_once(resolved_module_name, name, file_path, str(e))
-
-    return package_name
 
 
 def is_dynamic_class(cls: type) -> bool:
