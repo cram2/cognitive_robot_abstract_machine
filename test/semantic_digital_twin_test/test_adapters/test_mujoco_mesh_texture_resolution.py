@@ -15,14 +15,16 @@ import PIL.Image
 from semantic_digital_twin.adapters.multi_sim import MujocoMeshConverter
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FakeMaterial:
     """
     Mimics a trimesh ``TextureVisuals.material``.
     """
 
     name: str
-    """The material's name, sometimes itself a texture file path."""
+    """
+    The material's name, sometimes itself a texture file path.
+    """
 
     image: PIL.Image.Image
     """

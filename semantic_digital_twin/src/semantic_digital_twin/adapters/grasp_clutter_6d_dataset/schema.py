@@ -48,7 +48,7 @@ def _millimeters_to_meters(value: npt.ArrayLike) -> np.ndarray:
     return np.array(value, dtype=float) * 1e-3
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DCameraInfo:
     """
     Camera parameters of one frame, parsed from one entry of a scene's
@@ -106,7 +106,7 @@ class GraspClutter6DCameraInfo:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DObjectPose:
     """
     One object's ground-truth pose in one frame, parsed from one entry of a scene's
@@ -140,7 +140,7 @@ class GraspClutter6DObjectPose:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DFrame:
     """
     One annotated camera frame of a scene: its camera parameters and the ground-truth pose
@@ -162,7 +162,7 @@ class GraspClutter6DFrame:
     """The ground-truth pose of every object visible in this frame."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DScene:
     """
     One scene of the GraspClutter6D dataset (https://sites.google.com/view/graspclutter6d),
@@ -395,8 +395,8 @@ class GraspClutter6DScene:
             mesh=loaded_mesh,
             origin=HomogeneousTransformationMatrix(reference_frame=body),
         )
-        body.visual = ShapeCollection([mesh], reference_frame=body)
-        body.collision = ShapeCollection([mesh], reference_frame=body)
+        body.visual = ShapeCollection(shapes=[mesh], reference_frame=body)
+        body.collision = ShapeCollection(shapes=[mesh], reference_frame=body)
 
         with world.modify_world():
             connection = Connection6DoF.create_with_dofs(

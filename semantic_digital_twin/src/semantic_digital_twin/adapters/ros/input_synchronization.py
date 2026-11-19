@@ -33,7 +33,7 @@ from semantic_digital_twin.world_description.connections import (
 # %% base classes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TopicInputSynchronizer(
     LatestMessageSubscriber[MessageType], InputSynchronizer, ABC
 ):
@@ -64,7 +64,7 @@ class TopicInputSynchronizer(
 # %% joint states
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     """
     Writes the positions of a joint state message into the world state.
@@ -104,7 +104,7 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PendingJointStateSynchronizer(JointStateInputSynchronizer):
     """
     Writes every joint state message exactly once, leaving nothing pending.
@@ -119,7 +119,7 @@ class PendingJointStateSynchronizer(JointStateInputSynchronizer):
         return message
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LatestJointStateSynchronizer(JointStateInputSynchronizer):
     """
     Writes the most recent joint state message in every cycle, however old it is.
@@ -133,7 +133,7 @@ class LatestJointStateSynchronizer(JointStateInputSynchronizer):
         return self.latest_message
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscribedJointPositionSource(
     JointStateInputSynchronizer, JointPositionSource, ABC
 ):
@@ -154,7 +154,7 @@ class SubscribedJointPositionSource(
         return connection in self.connections
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PendingJointPositionSource(
     SubscribedJointPositionSource, PendingJointStateSynchronizer
 ):
@@ -171,7 +171,7 @@ class PendingJointPositionSource(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LatestJointPositionSource(
     SubscribedJointPositionSource, LatestJointStateSynchronizer
 ):
@@ -184,7 +184,7 @@ class LatestJointPositionSource(
 # %% base pose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OdometrySynchronizer(TopicInputSynchronizer[Odometry]):
     """
     Writes the pose of an odometry message into a drive connection.
@@ -208,14 +208,14 @@ class OdometrySynchronizer(TopicInputSynchronizer[Odometry]):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscribedBasePoseSource(OdometrySynchronizer, BasePoseSource):
     """
     The pose a real mobile base reports as odometry on a ROS 2 topic.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TfFrameSynchronizer(InputSynchronizer, HasROS2Node):
     """
     Writes tf transforms into 6 degree of freedom connections.

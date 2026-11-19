@@ -100,7 +100,7 @@ world = World.create_with_root_body()
 
 table_top = BodySpecification.box(
     name="table_top", 
-    scale=Scale(1.2, 0.8, 0.05), 
+    scale=Scale(x=1.2, y=0.8, z=0.05), 
     color=Color.from_rgba(red=0.6, green=0.4, blue=0.2, opacity=1.0)
 ).spawn(world)
 
@@ -122,12 +122,12 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 # Bake a default pose straight into the specification.
 leg = BodySpecification.box(
     name="leg_0",
-    scale=Scale(0.05, 0.05, 0.7),
+    scale=Scale(x=0.05, y=0.05, z=0.7),
     parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.55, y=0.35, z=-0.35),
 ).spawn(world, parent=table_top)
 
 # The same specification is reusable; override the pose (and name) per spawn.
-leg_spec = BodySpecification.box("leg", Scale(0.05, 0.05, 0.7))
+leg_spec = BodySpecification.box("leg", Scale(x=0.05, y=0.05, z=0.7))
 for index, (x, y) in enumerate([(0.55, -0.35), (-0.55, 0.35), (-0.55, -0.35)], start=1):
     leg_spec.spawn(
         world,
@@ -159,9 +159,9 @@ world = World.create_with_root_body()
 
 shelf = BodySpecification.box(
     name="shelf",
-    scale=Scale(0.8, 0.3, 0.02),
+    scale=Scale(x=0.8, y=0.3, z=0.02),
     child_specifications=[
-        BodySpecification.box("book", Scale(0.15, 0.2, 0.25)),
+        BodySpecification.box("book", Scale(x=0.15, y=0.2, z=0.25)),
         BodySpecification.sphere("ball", 0.06),
     ],
 ).spawn(world)
@@ -199,8 +199,8 @@ milk_mesh = BodySpecification.mesh(
 ).spawn(world)
 
 # A hollow crate: the outer box minus the carved-out interior, expressed as one event.
-outer = Scale(0.3, 0.3, 0.3).to_simple_event().as_composite_set()
-inner = Scale(0.26, 0.26, 0.3).to_simple_event().as_composite_set()
+outer = Scale(x=0.3, y=0.3, z=0.3).to_simple_event().as_composite_set()
+inner = Scale(x=0.26, y=0.26, z=0.3).to_simple_event().as_composite_set()
 crate = BodySpecification.from_event("crate", outer - inner).spawn(world)
 
 # The convex hull of a point cloud.
@@ -233,15 +233,15 @@ world = World.create_with_root_body()
 
 detailed = BodySpecification(
     name="detailed_box",
-    shapes=Box(scale=Scale(1, 1, 1)).as_shape_collection(),
-    visual_shapes=ShapeCollection([Box(scale=Scale(1.1, 1.1, 1.1))]),
+    shapes=Box(scale=Scale(x=1, y=1, z=1)).as_shape_collection(),
+    visual_shapes=ShapeCollection(shapes=[Box(scale=Scale(x=1.1, y=1.1, z=1.1))]),
     inertial=Inertial(mass=2.0),
 ).spawn(world)
 
 assert detailed.visual is not detailed.collision
 assert len(detailed.visual.shapes) == 1
 assert detailed.inertial.mass == 2.0
-assert BodySpecification.box("probe", Scale(1.2, 0.8, 0.05)).scale == Scale(1.2, 0.8, 0.05)
+assert BodySpecification.box("probe", Scale(x=1.2, y=0.8, z=0.05)).scale == Scale(x=1.2, y=0.8, z=0.05)
 print("Distinct visual/collision geometry, mass =", detailed.inertial.mass)
 ```
 
@@ -261,7 +261,7 @@ world = World.create_with_root_body()
 
 placement_area = RegionSpecification.box(
     name="placement_area", 
-    scale=Scale(0.4, 0.4, 0.01)
+    scale=Scale(x=0.4, y=0.4, z=0.01)
 ).spawn(world)
 assert len(placement_area.area.shapes) == 1
 print("Spawned region:", placement_area.name)
@@ -297,7 +297,7 @@ world = World.create_with_root_body()
 
 drawer = BodySpecification.box(
     name="drawer",
-    scale=Scale(0.4, 0.5, 0.2),
+    scale=Scale(x=0.4, y=0.5, z=0.2),
     connection_specification=ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z())
     ),
@@ -329,7 +329,7 @@ from semantic_digital_twin.specifications.connections import FixedConnectionSpec
 world = World.create_with_root_body()
 
 # Materialize a body in isolation, then attach it with an explicit connection.
-free_body = BodySpecification.box("crate", Scale(0.3, 0.3, 0.3)).to_domain_object()
+free_body = BodySpecification.box("crate", Scale(x=0.3, y=0.3, z=0.3)).to_domain_object()
 connection = FixedConnectionSpecification().connect(
     world,
     parent=world.root,
@@ -369,7 +369,7 @@ milk = SemanticAnnotationWithRootSpecification(
     semantic_annotation_type=Milk,
     root_specification=BodySpecification.box(
          name="milk", 
-         scale=Scale(0.1, 0.1, 0.2),
+         scale=Scale(x=0.1, y=0.1, z=0.2),
          parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, z=0.8)
     ),
 ).spawn(world)
@@ -399,7 +399,7 @@ drawer = SemanticAnnotationWithRootSpecification(
     semantic_annotation_type=Drawer,
     root_specification=BodySpecification.box(
         "drawer",
-        Scale(0.4, 0.5, 0.2),
+        Scale(x=0.4, y=0.5, z=0.2),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
         ),
@@ -434,7 +434,7 @@ names them, so geometry is described in exactly one place:
 Drawer.get_annotation_specification(
     "drawer",
     Drawer.get_default_root_kinematic_structure_entity_specification(
-        scale=Scale(0.4, 0.5, 0.6), wall_thickness=0.05
+        scale=Scale(x=0.4, y=0.5, z=0.6), wall_thickness=0.05
     ),
 )
 ```
@@ -454,10 +454,10 @@ world = World.create_with_root_body()
 
 drawer = Drawer.get_annotation_specification(
     "drawer",
-    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.6)),
+    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.4, y=0.5, z=0.6)),
     part_specifications={
         "handle": Handle.get_annotation_specification(
-            "handle", Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05))
+            "handle", Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.05, z=0.05))
         ),
     },
 ).spawn(world)
@@ -473,7 +473,7 @@ specification can produce many identically shaped annotations under different na
 
 ```{code-cell} ipython3
 handle_specification = Handle.get_annotation_specification(
-    "handle", Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05))
+    "handle", Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.05, z=0.05))
 )
 left = handle_specification.spawn(
     world,
@@ -503,10 +503,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Tabl
 
 world = World.create_with_root_body()
 
-surface = RegionSpecification.box("surface", Scale(1, 1, 0.01)).spawn(world)
+surface = RegionSpecification.box("surface", Scale(x=1, y=1, z=0.01)).spawn(world)
 table = Table.get_annotation_specification(
     "table",
-    Table.get_default_root_kinematic_structure_entity_specification(scale=Scale(1, 1, 0.5)),
+    Table.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=1, y=1, z=0.5)),
     annotation_kwargs={"supporting_surface": surface},
 ).spawn(world)
 
@@ -530,17 +530,17 @@ from semantic_digital_twin.world_description.world_entity import Region
 world = World.create_with_root_body()
 
 plain_wall = Wall.get_annotation_specification(
-    "plain_wall", Wall.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 3, 3))
+    "plain_wall", Wall.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=3, z=3))
 ).spawn(world)
 
 window_left = Aperture.get_annotation_specification(
-    "window_left", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.5, 0.5))
+    "window_left", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.5, z=0.5))
 )
 window_left.root_specification.parent_T_self = (
     HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.8)
 )
 window_right = Aperture.get_annotation_specification(
-    "window_right", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.5, 0.5))
+    "window_right", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.5, z=0.5))
 )
 window_right.root_specification.parent_T_self = (
     HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
@@ -548,7 +548,7 @@ window_right.root_specification.parent_T_self = (
 
 wall = Wall.get_annotation_specification(
     "wall",
-    Wall.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 3, 3)),
+    Wall.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=3, z=3)),
     part_specifications={"apertures": [window_left, window_right]},
 ).spawn(world)
 
@@ -579,7 +579,7 @@ world = World.create_with_root_body()
 hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
 door = Door.get_annotation_specification(
     "door",
-    Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.03, 1, 2)),
+    Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.03, y=1, z=2)),
     parent_connection_specification=ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         connection_T_child=hinge_T_door,
@@ -623,9 +623,9 @@ specification = WorldSpecification.from_urdf(
         SemanticAnnotationWithRootSpecification(
             name="milk",
             semantic_annotation_type=Milk,
-            root_specification=BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
+            root_specification=BodySpecification.box("milk", Scale(x=0.1, y=0.1, z=0.2)),
         ),
-        BodySpecification.box("cup", Scale(0.07, 0.07, 0.1)),
+        BodySpecification.box("cup", Scale(x=0.07, y=0.07, z=0.1)),
     ],
 )
 
@@ -645,7 +645,7 @@ print("Materialized two independent worlds, each with one milk and one cup")
 ```{code-cell} ipython3
 mjcf_world = WorldSpecification.from_mjcf(
     str(resources / "mjcf" / "table.xml"),
-    objects=[BodySpecification.box("cup", Scale(0.07, 0.07, 0.1))],
+    objects=[BodySpecification.box("cup", Scale(x=0.07, y=0.07, z=0.1))],
 ).create_world()
 
 assert mjcf_world.get_body_by_name("cup") is not None
@@ -731,11 +731,11 @@ world = WorldSpecification.from_urdf(
     objects=[
         Drawer.get_annotation_specification(
             "drawer",
-            Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.4, 0.5, 0.3)),
+            Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.4, y=0.5, z=0.3)),
             part_specifications={
                 "handle": Handle.get_annotation_specification(
                     "handle",
-                    Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.05, 0.05)),
+                    Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.05, z=0.05)),
                 ),
             },
         ),
@@ -744,7 +744,7 @@ world = WorldSpecification.from_urdf(
             semantic_annotation_type=Milk,
             root_specification=BodySpecification.box(
                 "milk",
-                Scale(0.1, 0.1, 0.2),
+                Scale(x=0.1, y=0.1, z=0.2),
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, z=0.8),
             ),
         ),
@@ -756,7 +756,7 @@ assert len(world.get_semantic_annotations_by_type(Milk)) == 1
 print("Semantic annotations:")
 print(*world.semantic_annotations, sep="\n")
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

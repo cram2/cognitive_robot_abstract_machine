@@ -21,7 +21,6 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import timedelta
-from functools import partial
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -55,7 +54,7 @@ logger = logging.getLogger(__name__)
 # %% keeping the answers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingCache:
     """
     The parts found for every query so far, one file per query and locator.
@@ -102,7 +101,7 @@ class PartFindingCache:
 # %% the server
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingServer:
     """
     Answers part queries over http with a locator that runs on this machine.
@@ -162,8 +161,15 @@ class PartFindingServer:
     """
 
     def __post_init__(self) -> None:
+        # the http server creates each handler with positional arguments
         self.http_server = ThreadingHTTPServer(
-            (self.host, self.port), partial(PartFindingRequestHandler, self)
+            (self.host, self.port),
+            lambda request, client_address, server: PartFindingRequestHandler(
+                part_finding_server=self,
+                request=request,
+                client_address=client_address,
+                server=server,
+            ),
         )
 
     @property
@@ -284,7 +290,7 @@ class PartFindingServer:
 # %% answering a request
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartFindingRequestHandler(BaseHTTPRequestHandler):
     """
     Answers one http request to a :class:`PartFindingServer`.

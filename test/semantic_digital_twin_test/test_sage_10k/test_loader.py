@@ -100,7 +100,7 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
 
     world = scene.create_world()
     decomposer = BoxDecomposer()
-    pipeline = Pipeline([decomposer])
+    pipeline = Pipeline(steps=[decomposer])
     pipeline.apply(world)
 
     viz_marker = pytest.importorskip(

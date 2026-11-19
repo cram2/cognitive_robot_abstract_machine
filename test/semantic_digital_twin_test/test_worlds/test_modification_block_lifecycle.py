@@ -38,7 +38,7 @@ def test_nested_block_keeps_degree_of_freedom_of_outer_block(
     world_with_two_bodies: tuple[World, Body, Body],
 ):
     world, parent, child = world_with_two_bodies
-    degree_of_freedom = DegreeOfFreedom(name=PrefixedName("hinge"))
+    degree_of_freedom = DegreeOfFreedom(name=PrefixedName(name="hinge"))
     with world.modify_world():
         world.add_kinematic_structure_entity(parent)
         world.add_degree_of_freedom(degree_of_freedom)

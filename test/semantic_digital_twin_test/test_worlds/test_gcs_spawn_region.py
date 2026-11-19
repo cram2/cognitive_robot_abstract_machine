@@ -21,7 +21,7 @@ def simple_world():
     world = World.create_with_root_body("map")
 
     # Add a target body
-    target = Body(name=PrefixedName("target"))
+    target = Body(name=PrefixedName(name="target"))
     with world.modify_world():
         world.add_body(target)
         world.add_connection(
@@ -36,8 +36,8 @@ def simple_world():
 
     # Add an obstacle body
     obstacle = Body(
-        name=PrefixedName("obstacle"),
-        collision=ShapeCollection([Box(scale=Scale(0.5, 0.5, 0.5))]),
+        name=PrefixedName(name="obstacle"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.5, y=0.5, z=0.5))]),
     )
     with world.modify_world():
         world.add_body(obstacle)
@@ -66,8 +66,8 @@ def test_spawn_as_region(simple_world):
     half_height = slab_height / 2
     floor = Floor(root=target, _world=world)
     boxes = BoundingBoxCollection(
-        [box.extrude(half_height) for box in gcs.graph.nodes()],
-        gcs.search_space.reference_frame,
+        shapes=[box.extrude(half_height) for box in gcs.graph.nodes()],
+        reference_frame=gcs.search_space.reference_frame,
     )
     region = floor.spawn_bounding_boxes_as_region(boxes=boxes)
 

@@ -98,12 +98,12 @@ BOWL_RIM_DEPTH = 0.02
 How far below the top of the synthetic bowl's wall its rim reaches.
 """
 
-BOX_SCALE = Scale(0.1, 0.2, 0.3)
+BOX_SCALE = Scale(x=0.1, y=0.2, z=0.3)
 """
 Extents of the box body used by the default grasp pose tests.
 """
 
-PIECE_SCALE = Scale(0.03, 0.04, 0.03)
+PIECE_SCALE = Scale(x=0.03, y=0.04, z=0.03)
 """
 Extents of the shape-sorting piece, a rectangular prism.
 """
@@ -137,8 +137,8 @@ def bowl(tmp_path) -> Bowl:
     mesh.export(mesh_path)
     shape = Mesh(origin=HomogeneousTransformationMatrix(), filename=str(mesh_path))
     body = Body(
-        name=PrefixedName("bowl", prefix="grasp_candidates"),
-        collision=ShapeCollection([shape]),
+        name=PrefixedName(name="bowl", prefix="grasp_candidates"),
+        collision=ShapeCollection(shapes=[shape]),
     )
     annotation = Bowl(root=body)
     world = World()
@@ -158,9 +158,9 @@ def milk() -> Milk:
     A box-shaped body, which the default implementation grasps at its origin.
     """
     body = Body(
-        name=PrefixedName("milk", prefix="grasp_candidates"),
+        name=PrefixedName(name="milk", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=BOX_SCALE)]
+            shapes=[Box(origin=HomogeneousTransformationMatrix(), scale=BOX_SCALE)]
         ),
     )
     annotation = Milk(root=body)
@@ -226,7 +226,7 @@ def test_default_grasp_candidates_approach_along_evenly_spaced_yaws(milk):
 # %% changing how an annotation is grasped
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class FixedlyGraspedHandle(Handle):
     """
     A handle that offers one grasp at its origin, whatever its shape.
@@ -249,7 +249,7 @@ def test_an_annotation_can_offer_its_grasps_its_own_way():
     np.testing.assert_allclose(grasps[0].grasp_pose.to_np(), np.eye(4), atol=1e-9)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MilkGraspedLow(Milk):
     """
     A carton that may be grasped only at its lower half.
@@ -272,7 +272,7 @@ def test_an_annotation_can_state_where_it_may_be_grasped(milk):
         assert grasp.grasp_pose.to_np()[2, 3] < 0.0
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MilkDrawnUniformly(HasDrawnGraspsByDefault, Milk):
     """
     A carton that offers grasps drawn uniformly from its statement while no model is
@@ -423,9 +423,14 @@ def _spoon_lying_along(length_axis: int) -> Spoon:
     extents = [0.02, 0.02, 0.01]
     extents[length_axis] = 0.15
     body = Body(
-        name=PrefixedName(f"spoon_along_{length_axis}", prefix="grasp_candidates"),
+        name=PrefixedName(name=f"spoon_along_{length_axis}", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(*extents))]
+            shapes=[
+                Box(
+                    origin=HomogeneousTransformationMatrix(),
+                    scale=Scale(x=extents[0], y=extents[1], z=extents[2]),
+                )
+            ]
         ),
     )
     annotation = Spoon(root=body)
@@ -493,7 +498,7 @@ def test_cutlery_is_grasped_along_its_length_as_far_as_asked():
 
 
 def test_cutlery_without_a_shape_offers_no_grasp():
-    body = Body(name=PrefixedName("shapeless_spoon", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="shapeless_spoon", prefix="grasp_candidates"))
     spoon = Spoon(root=body)
     world = World()
     with world.modify_world():
@@ -520,11 +525,11 @@ def _mug(with_handle: bool, handle_type: type = Handle) -> Mug:
     handle_shape = trimesh.creation.box(extents=[0.03, 0.01, BOWL_HEIGHT / 2])
     handle_shape.apply_translation([BOWL_OUTER_RADIUS + 0.015, 0.0, 0.0])
     body = Body(
-        name=PrefixedName(f"mug_{with_handle}", prefix="grasp_candidates"),
+        name=PrefixedName(name=f"mug_{with_handle}", prefix="grasp_candidates"),
         inertial=Inertial(),
     )
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=trimesh.util.concatenate([body_shape, handle_shape]),
                 origin=HomogeneousTransformationMatrix(reference_frame=body),
@@ -630,7 +635,7 @@ def _shape_sorting_piece(collision: ShapeCollection) -> ShapeSortingPiece:
     :return: A shape-sorting piece standing alone in a world of its own.
     """
     body = Body(
-        name=PrefixedName("shape_sorting_piece", prefix="grasp_candidates"),
+        name=PrefixedName(name="shape_sorting_piece", prefix="grasp_candidates"),
         collision=collision,
     )
     annotation = ShapeSortingPiece(root=body, grasp_height=PIECE_GRASP_HEIGHT)
@@ -649,7 +654,7 @@ def shape_sorting_piece() -> ShapeSortingPiece:
     """
     return _shape_sorting_piece(
         ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
+            shapes=[Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
         )
     )
 
@@ -722,12 +727,12 @@ def _handle_with_bar_along(
     extents = [0.03, 0.03, 0.02]
     extents[bar_axis] = 0.2
     body = Body(
-        name=PrefixedName(f"handle_along_{bar_axis}", prefix="grasp_candidates"),
+        name=PrefixedName(name=f"handle_along_{bar_axis}", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(*bar_center),
-                    scale=Scale(*extents),
+                    scale=Scale(x=extents[0], y=extents[1], z=extents[2]),
                 )
             ]
         ),
@@ -797,7 +802,7 @@ def test_a_kitchen_handle_can_be_approached_into_the_furniture(kitchen_world) ->
 
 
 def test_a_handle_without_a_shape_offers_no_grasp() -> None:
-    body = Body(name=PrefixedName("shapeless_handle", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="shapeless_handle", prefix="grasp_candidates"))
     handle = Handle(root=body)
     world = World()
     with world.modify_world():
@@ -897,7 +902,7 @@ def test_the_grasp_axis_of_a_bar_runs_through_its_centre_along_its_length(bar_ax
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HandleWithDiagonalBar(Handle):
     """
     A handle that states its grasp axis instead of leaving it to its bounding box.
@@ -954,7 +959,7 @@ def test_a_grasp_in_a_foreign_frame_is_refused(milk, bowl):
     clear the wrong geometry. Nothing downstream can tell, so it is refused here.
     """
     with pytest.raises(ReferenceFrameMismatchError):
-        GraspCandidate(milk, Pose(reference_frame=bowl.root))
+        GraspCandidate(graspable=milk, grasp_pose=Pose(reference_frame=bowl.root))
 
 
 def test_a_grasp_without_a_frame_is_refused(milk):
@@ -962,7 +967,7 @@ def test_a_grasp_without_a_frame_is_refused(milk):
     A frameless pose names no body at all, so it cannot be a grasp on one.
     """
     with pytest.raises(MissingReferenceFrameError):
-        GraspCandidate(milk, Pose())
+        GraspCandidate(graspable=milk, grasp_pose=Pose())
 
 
 def test_a_grasp_from_the_body_origin_takes_the_object_at_its_own_origin(milk):
@@ -978,8 +983,8 @@ def test_a_grasp_from_the_body_origin_takes_the_object_at_its_own_origin(milk):
 
 def test_a_grasp_in_the_world_frame_follows_where_the_object_stands():
     world = World()
-    world_root = Body(name=PrefixedName("map", prefix="grasp_candidates"))
-    body = Body(name=PrefixedName("milk", prefix="grasp_candidates"))
+    world_root = Body(name=PrefixedName(name="map", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="milk", prefix="grasp_candidates"))
     milk = Milk(root=body)
     world_T_milk = HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 0.5, yaw=0.3)
     with world.modify_world():
@@ -1054,8 +1059,8 @@ def test_the_width_is_the_objects_extent_along_the_closing_axis(milk):
     exactly that extent.
     """
     grasp = GraspCandidate(
-        milk,
-        Pose(
+        graspable=milk,
+        grasp_pose=Pose(
             orientation=RotationMatrix.from_vectors(
                 x=Vector3.NEGATIVE_Z(), y=Vector3.Y()
             ).quaternion,
@@ -1073,8 +1078,8 @@ def test_turning_the_grasp_changes_the_width_it_meets(milk):
     """
     along_y, along_x = (
         GraspCandidate(
-            milk,
-            Pose(
+            graspable=milk,
+            grasp_pose=Pose(
                 orientation=RotationMatrix.from_vectors(
                     x=Vector3.NEGATIVE_Z(), y=closing_axis
                 ).quaternion,
@@ -1094,8 +1099,8 @@ def test_a_diagonal_grasp_meets_the_box_across_its_shadow(milk):
     axis, since that is the widest the fingers can run into.
     """
     diagonal = GraspCandidate(
-        milk,
-        Pose(
+        graspable=milk,
+        grasp_pose=Pose(
             orientation=RotationMatrix.from_vectors(
                 x=Vector3.NEGATIVE_Z(),
                 y=Vector3(x=1 / np.sqrt(2), y=1 / np.sqrt(2), z=0),
@@ -1112,7 +1117,7 @@ def test_an_object_without_collision_has_no_width_to_measure():
     """
     An object without collision geometry has no width along the closing axis to measure.
     """
-    body = Body(name=PrefixedName("shapeless", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="shapeless", prefix="grasp_candidates"))
     annotation = Milk(root=body)
     world = World()
     with world.modify_world():

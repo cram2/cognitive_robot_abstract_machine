@@ -220,7 +220,7 @@ def get_visible_bodies(camera: Camera) -> list[KinematicStructureEntity]:
     :param camera: The camera for which the visible objects should be returned
     :return: A list of bodies/regions that are visible from the camera
     """
-    rt = RayTracer(camera._world)
+    rt = RayTracer(world=camera._world)
     rt.update_scene()
 
     seg = rt.create_segmentation_mask(
@@ -236,7 +236,7 @@ def get_visible_bodies(camera: Camera) -> list[KinematicStructureEntity]:
     return bodies
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class VisibleTo(Triple[TKinematicStructureEntity, TCamera]):
     """
     Whether a camera can see something.
@@ -298,7 +298,7 @@ def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
 
     # create a world only containing the target body
     world_without_occlusion = deepcopy(body._world)
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     copied_body = Body.from_json(data=body.to_json())
     root_T_body = body.global_transform
     root_T_body.reference_frame = root
@@ -313,7 +313,7 @@ def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
         world_without_occlusion.add_connection(root_to_copied_body)
 
     # get segmentation mask without occlusion
-    ray_tracer_without_occlusion = RayTracer(world_without_occlusion)
+    ray_tracer_without_occlusion = RayTracer(world=world_without_occlusion)
     ray_tracer_without_occlusion.update_scene()
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
@@ -325,7 +325,7 @@ def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
     )
 
     # get segmentation mask with occlusion
-    ray_tracer_with_occlusion = RayTracer(camera._world)
+    ray_tracer_with_occlusion = RayTracer(world=camera._world)
     ray_tracer_with_occlusion.update_scene()
     segmentation_mask_with_occlusion = (
         ray_tracer_with_occlusion.create_segmentation_mask(

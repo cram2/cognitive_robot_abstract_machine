@@ -29,14 +29,16 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SoftTrunkSection:
     """
     Encapsulates the physical and visual properties of a single soft section.
     """
 
     length: float
-    """The rest length of the section in meters."""
+    """
+    The rest length of the section in meters.
+    """
 
     radius: float
     """
@@ -44,10 +46,12 @@ class SoftTrunkSection:
     """
 
     resolution: int
-    """The number of discrete rigid segments used to approximate the continuous curve."""
+    """
+    The number of discrete rigid segments used to approximate the continuous curve.
+    """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PiecewiseConstantCurvatureSection:
     """
     The degrees of freedom one section of a piecewise constant curvature trunk bends
@@ -67,7 +71,7 @@ class PiecewiseConstantCurvatureSection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CosseratRodSection:
     """
     The strain degrees of freedom one section of a Cosserat rod trunk deforms with.
@@ -230,10 +234,12 @@ class SoftTrunk(SemanticAnnotation):
 
             for section_index, section in enumerate(sections):
                 curvature = DegreeOfFreedom(
-                    name=PrefixedName(f"kappa_{section_index}", prefix), limits=limits
+                    name=PrefixedName(name=f"kappa_{section_index}", prefix=prefix),
+                    limits=limits,
                 )
                 bending_plane = DegreeOfFreedom(
-                    name=PrefixedName(f"phi_{section_index}", prefix), limits=limits
+                    name=PrefixedName(name=f"phi_{section_index}", prefix=prefix),
+                    limits=limits,
                 )
                 world.add_degree_of_freedom(curvature)
                 world.add_degree_of_freedom(bending_plane)
@@ -261,10 +267,10 @@ class SoftTrunk(SemanticAnnotation):
 
                     curr_body = Body(
                         name=PrefixedName(
-                            f"sec{section_index}_seg{segment_index}", prefix
+                            name=f"sec{section_index}_seg{segment_index}", prefix=prefix
                         ),
-                        visual=ShapeCollection([visual_shape]),
-                        collision=ShapeCollection([visual_shape]),
+                        visual=ShapeCollection(shapes=[visual_shape]),
+                        collision=ShapeCollection(shapes=[visual_shape]),
                     )
                     world.add_body(curr_body)
 
@@ -279,13 +285,13 @@ class SoftTrunk(SemanticAnnotation):
                     prev_body = curr_body
 
             effector = SoftEndEffector(
-                name=PrefixedName("effector", prefix),
+                name=PrefixedName(name="effector", prefix=prefix),
                 root=prev_body,
                 tool_frame=prev_body,
                 _world=world,
             )
             arm = SoftArm(
-                name=PrefixedName("arm", prefix),
+                name=PrefixedName(name="arm", prefix=prefix),
                 root=root_body,
                 tip=prev_body,
                 _world=world,
@@ -340,19 +346,19 @@ class SoftTrunk(SemanticAnnotation):
 
             for section_index, section in enumerate(sections):
                 bending_x = DegreeOfFreedom(
-                    name=PrefixedName(f"bending_x_{section_index}", prefix),
+                    name=PrefixedName(name=f"bending_x_{section_index}", prefix=prefix),
                     limits=strain_limits,
                 )
                 bending_y = DegreeOfFreedom(
-                    name=PrefixedName(f"bending_y_{section_index}", prefix),
+                    name=PrefixedName(name=f"bending_y_{section_index}", prefix=prefix),
                     limits=strain_limits,
                 )
                 torsion = DegreeOfFreedom(
-                    name=PrefixedName(f"torsion_{section_index}", prefix),
+                    name=PrefixedName(name=f"torsion_{section_index}", prefix=prefix),
                     limits=strain_limits,
                 )
                 extension = DegreeOfFreedom(
-                    name=PrefixedName(f"extension_{section_index}", prefix),
+                    name=PrefixedName(name=f"extension_{section_index}", prefix=prefix),
                     limits=extension_limits,
                 )
 
@@ -387,10 +393,10 @@ class SoftTrunk(SemanticAnnotation):
 
                     curr_body = Body(
                         name=PrefixedName(
-                            f"sec{section_index}_seg{segment_index}", prefix
+                            name=f"sec{section_index}_seg{segment_index}", prefix=prefix
                         ),
-                        visual=ShapeCollection([visual_shape]),
-                        collision=ShapeCollection([visual_shape]),
+                        visual=ShapeCollection(shapes=[visual_shape]),
+                        collision=ShapeCollection(shapes=[visual_shape]),
                     )
                     world.add_body(curr_body)
 
@@ -407,13 +413,13 @@ class SoftTrunk(SemanticAnnotation):
                     prev_body = curr_body
 
             effector = SoftEndEffector(
-                name=PrefixedName("effector", prefix),
+                name=PrefixedName(name="effector", prefix=prefix),
                 root=prev_body,
                 tool_frame=prev_body,
                 _world=world,
             )
             arm = SoftArm(
-                name=PrefixedName("arm", prefix),
+                name=PrefixedName(name="arm", prefix=prefix),
                 root=root_body,
                 tip=prev_body,
                 _world=world,

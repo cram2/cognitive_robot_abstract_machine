@@ -9,7 +9,7 @@ from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LifecycleOwnedNode:
     """
     Records whether something outside its lifecycle owner tries to destroy it.

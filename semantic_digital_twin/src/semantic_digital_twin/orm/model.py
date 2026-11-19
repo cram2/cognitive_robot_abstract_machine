@@ -48,7 +48,7 @@ from semantic_digital_twin.world_description.world_modification import (
 from semantic_digital_twin.world_description.world_state import WorldState
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     """
     A world as ORMatic stores it: the modifications that build it again, its state and
@@ -94,7 +94,7 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
     __hash__ = AlternativeMapping.__hash__
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldStateMapping(AlternativeMapping[WorldState]):
     data: list[float]
     ids: list[UUID]
@@ -114,7 +114,7 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Vector3Mapping(AlternativeMapping[Vector3]):
     """
     The coordinates of a :class:`Vector3`, as they evaluate in the world's state when
@@ -139,7 +139,7 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Point3Mapping(AlternativeMapping[Point3]):
     """
     The coordinates of a :class:`Point3`, as they evaluate in the world's state when it
@@ -164,7 +164,7 @@ class Point3Mapping(AlternativeMapping[Point3]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class QuaternionMapping(AlternativeMapping[Quaternion]):
     """
     The components of a :class:`Quaternion`, as they evaluate in the world's state when
@@ -194,7 +194,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AxisAngleMapping(AlternativeMapping[AxisAngle]):
     """
     The axis of an :class:`AxisAngle` and its angle, as the angle evaluates in the
@@ -223,7 +223,7 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
         return [Vector3]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DisplacementMapping(AlternativeMapping[Displacement]):
     translation: Vector3
     rotation_vector: Vector3
@@ -341,7 +341,7 @@ class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
         return [Vector3]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
     axis_angle: AxisAngle
     reference_frame: KinematicStructureEntity | None
@@ -360,7 +360,7 @@ class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
         return [AxisAngle]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HomogeneousTransformationMatrixMapping(
     AlternativeMapping[HomogeneousTransformationMatrix]
 ):
@@ -392,7 +392,7 @@ class HomogeneousTransformationMatrixMapping(
         return [Point3, AxisAngle]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PoseMapping(AlternativeMapping[Pose]):
     position: Point3
     axis_angle: AxisAngle
@@ -445,7 +445,7 @@ class PoseMapping(AlternativeMapping[Pose]):
         return [Point3, AxisAngle]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Point2Mapping(AlternativeMapping[Point2]):
     """
     The coordinates of a :class:`Point2`, as they evaluate in the world's state when it
@@ -467,7 +467,7 @@ class Point2Mapping(AlternativeMapping[Point2]):
         return Point2(x=self.x, y=self.y, reference_frame=self.reference_frame)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pose2DMapping(AlternativeMapping[Pose2D]):
     """
     The position of a :class:`Pose2D` and its yaw, as the yaw evaluates in the world's

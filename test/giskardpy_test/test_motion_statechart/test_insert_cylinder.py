@@ -48,8 +48,10 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
 
     with world.modify_world():
         cylinder = Body(
-            name=PrefixedName("cylinder"),
-            visual=ShapeCollection([Cylinder(width=0.04, height=cylinder_height)]),
+            name=PrefixedName(name="cylinder"),
+            visual=ShapeCollection(
+                shapes=[Cylinder(width=0.04, height=cylinder_height)]
+            ),
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
@@ -62,8 +64,8 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
             )
         )
         hole = Body(
-            name=PrefixedName("hole"),
-            visual=ShapeCollection([Cylinder(width=0.06, height=0.01)]),
+            name=PrefixedName(name="hole"),
+            visual=ShapeCollection(shapes=[Cylinder(width=0.06, height=0.01)]),
         )
         world.add_connection(
             FixedConnection.create_with_dofs(

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactFriction:
     """
     The friction a shape's surface offers in a contact, in the three coefficients a
@@ -48,7 +48,7 @@ class ContactFriction:
         return [self.sliding, self.torsional, self.rolling]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactStiffness:
     """
     How stiff and how damped a contact is, as the time it takes to resolve a penetration
@@ -73,7 +73,7 @@ class ContactStiffness:
         return [self.time_constant.total_seconds(), self.damping_ratio]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactImpedance:
     """
     How hard a contact pushes back as it is penetrated: the impedance rises from a
@@ -112,7 +112,7 @@ class ContactImpedance:
         return [self.minimum, self.maximum, self.width, self.midpoint, self.power]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactParameters(UniqueSimulatorProperty):
     """
     The contact parameters a shape carries for a physical simulation: its friction and,

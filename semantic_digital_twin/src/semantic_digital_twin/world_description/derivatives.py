@@ -26,7 +26,7 @@ class Derivatives(IntEnum):
         return [item for item in cls if start <= item <= stop][::step]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DerivativeMap(Generic[T]):
     """
     A container class that maps derivatives (position, velocity, acceleration, jerk) to
@@ -60,10 +60,10 @@ class DerivativeMap(Generic[T]):
         :return: The new instance with the resulting values.
         """
         return type(self)(
-            operand(self.position),
-            operand(self.velocity),
-            operand(self.acceleration),
-            operand(self.jerk),
+            position=operand(self.position),
+            velocity=operand(self.velocity),
+            acceleration=operand(self.acceleration),
+            jerk=operand(self.jerk),
         )
 
     def __mul__(self, other: float) -> DerivativeMap[T]:

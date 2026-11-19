@@ -98,18 +98,18 @@ from semantic_digital_twin.world_description.world_state_trajectory_plotter impo
 
 def test_create_with_root_body_names_the_root_from_a_given_prefixed_name():
     world = World.create_with_root_body("kitchen")
-    assert world.root.name == PrefixedName("kitchen")
+    assert world.root.name == PrefixedName(name="kitchen")
 
 
 def test_create_with_root_body_defaults_the_root_name_to_map():
     world = World.create_with_root_body()
-    assert world.root.name == PrefixedName("map")
+    assert world.root.name == PrefixedName(name="map")
 
 
 def test_force_root_name_renames_the_root_body():
     world = World.create_with_root_body("map")
-    world.force_root_name(PrefixedName("odom"))
-    assert world.root.name == PrefixedName("odom")
+    world.force_root_name(PrefixedName(name="odom"))
+    assert world.root.name == PrefixedName(name="odom")
 
 
 def test_force_root_name_preserves_root_identity_and_children(world_setup):
@@ -117,19 +117,19 @@ def test_force_root_name_preserves_root_identity_and_children(world_setup):
     root_id = world.root.id
     bf_connection_before = world.get_connection(world.root, bf)
 
-    world.force_root_name(PrefixedName("new_root", prefix="world"))
+    world.force_root_name(PrefixedName(name="new_root", prefix="world"))
 
     assert world.root.id == root_id
-    assert world.root.name == PrefixedName("new_root", prefix="world")
+    assert world.root.name == PrefixedName(name="new_root", prefix="world")
     assert world.get_connection(world.root, bf) is bf_connection_before
-    assert world.get_kinematic_structure_entity_by_name(PrefixedName("bf")) is bf
+    assert world.get_kinematic_structure_entity_by_name(PrefixedName(name="bf")) is bf
 
 
 def test_force_root_name_records_an_attribute_update_modification():
     world = World.create_with_root_body("map")
     root_id = world.root.id
 
-    world.force_root_name(PrefixedName("odom"))
+    world.force_root_name(PrefixedName(name="odom"))
 
     last_block = world._model_manager.model_modification_blocks[-1]
     attribute_updates = [
@@ -664,7 +664,7 @@ def test_compute_relative_pose_only_rotation(world_setup):
 
 def test_add_semantic_annotation(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    v = SemanticAnnotation(name=PrefixedName("muh"))
+    v = SemanticAnnotation(name=PrefixedName(name="muh"))
     with world.modify_world():
         world.add_semantic_annotation(v)
         world.add_semantic_annotation(v)
@@ -673,7 +673,7 @@ def test_add_semantic_annotation(world_setup):
 
 def test_duplicate_semantic_annotation(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    v = SemanticAnnotation(name=PrefixedName("muh"))
+    v = SemanticAnnotation(name=PrefixedName(name="muh"))
     with world.modify_world():
         world.add_semantic_annotation(v)
         world.semantic_annotations.append(v)
@@ -778,10 +778,10 @@ def test_merge_with_connection(world_setup, pr2_world_copy):
 
 def test_merge_world_with_connection_worldless_parent():
     world1 = World()
-    b1 = Body(name=PrefixedName("b1"))
+    b1 = Body(name=PrefixedName(name="b1"))
 
     world2 = World()
-    b2 = Body(name=PrefixedName("b2"))
+    b2 = Body(name=PrefixedName(name="b2"))
 
     with world2.modify_world():
         world2.add_body(b2)
@@ -795,10 +795,10 @@ def test_merge_world_with_connection_worldless_parent():
 
 def test_merge_world_with_connection_worldless_child():
     world1 = World()
-    b1 = Body(name=PrefixedName("b1"))
+    b1 = Body(name=PrefixedName(name="b1"))
 
     world2 = World()
-    b2 = Body(name=PrefixedName("b2"))
+    b2 = Body(name=PrefixedName(name="b2"))
 
     with world2.modify_world():
         world2.add_body(b2)
@@ -906,7 +906,7 @@ def test_remove_connection(world_setup):
 
     with world.modify_world():
         world.remove_connection(world.get_connection(r1, r2))
-        new_connection = FixedConnection(r1, r2)
+        new_connection = FixedConnection(parent=r1, child=r2)
         world.add_connection(new_connection)
 
     with pytest.raises(WorldHasNoUniqueRootError):
@@ -1073,7 +1073,7 @@ def test_world_str_contains_class_name():
 
 def test_world_state_item_not_set_yet(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    new_dof = DegreeOfFreedom(name=PrefixedName("new_dof"))
+    new_dof = DegreeOfFreedom(name=PrefixedName(name="new_dof"))
 
     with pytest.raises(DofNotInWorldStateError):
         world.state[new_dof.id] = np.asarray([0, 0, 0, 0])
@@ -1185,8 +1185,8 @@ def test_copy_connections(pr2_world_state_reset):
 
 def test_omnidrive_translation_dofs_get_translation_limits():
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
-    base = Body(name=PrefixedName("base", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
+    base = Body(name=PrefixedName(name="base", prefix="review"))
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(base)
@@ -1209,12 +1209,12 @@ def test_bug_05_has_collision_respects_volume_threshold():
     world_entity.py:487-497: Body.has_collision documents and accepts volume/ surface
     thresholds but ignores them entirely.
     """
-    tiny_body = Body(name=PrefixedName("tiny", prefix="review"))
+    tiny_body = Body(name=PrefixedName(name="tiny", prefix="review"))
     collision = Box(
-        scale=Scale(0.001, 0.001, 0.001),
+        scale=Scale(x=0.001, y=0.001, z=0.001),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=tiny_body),
     )
-    tiny_body.collision = ShapeCollection([collision], reference_frame=tiny_body)
+    tiny_body.collision = ShapeCollection(shapes=[collision], reference_frame=tiny_body)
     # volume = 1e-9 m^3, far below the documented default threshold of 1.001e-6 m^3
     assert tiny_body.has_collision() is False
 
@@ -1223,12 +1223,12 @@ def create_body_with_box(name: str, scale: Scale) -> Body:
     """
     A body whose only collision shape is a box of the given scale.
     """
-    body = Body(name=PrefixedName(name, prefix="review"))
+    body = Body(name=PrefixedName(name=name, prefix="review"))
     collision = Box(
         scale=scale,
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
     )
-    body.collision = ShapeCollection([collision], reference_frame=body)
+    body.collision = ShapeCollection(shapes=[collision], reference_frame=body)
     return body
 
 
@@ -1237,7 +1237,7 @@ def test_shape_of_sufficient_volume_needs_no_mesh(monkeypatch):
     A shape big enough to be checked is recognised from its own volume, without building
     the mesh that only stands in for it.
     """
-    body = create_body_with_box("chunky", Scale(0.1, 0.1, 0.1))
+    body = create_body_with_box("chunky", Scale(x=0.1, y=0.1, z=0.1))
 
     def refuse_to_build_mesh(self):
         raise AssertionError("the mesh was built to answer has_collision")
@@ -1252,7 +1252,7 @@ def test_flat_shape_is_recognised_by_its_surface():
     A shape without volume still counts as collision geometry if its surface is large
     enough, which is the case the surface threshold exists for.
     """
-    flat_body = create_body_with_box("flat", Scale(1.0, 1.0, 0.0))
+    flat_body = create_body_with_box("flat", Scale(x=1.0, y=1.0, z=0.0))
 
     assert flat_body.collision[0].volume == 0
     assert flat_body.has_collision() is True
@@ -1317,7 +1317,7 @@ def test_rebind_nested_dataclass(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
 
-    @dataclass
+    @dataclass(kw_only=True)
     class BodyReference:
         body: Body
         label: str
@@ -1486,7 +1486,7 @@ def test_rebind_a_cycle_keeps_its_shape(world_setup):
     to each other the same way instead of being walked without end.
     """
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class Link:
         body: Body
         partner: Link | None = None
@@ -1503,11 +1503,11 @@ def test_rebind_a_cycle_keeps_its_shape(world_setup):
 
 
 def test_rebind_keeps_an_object_reached_twice_one_object(world_setup):
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class Mark:
         body: Body
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class TwoReferences:
         first: Mark
         second: Mark
@@ -1528,14 +1528,14 @@ def test_rebind_copies_a_type_that_says_how_it_is_copied_its_own_way(world_setup
     be copied, is copied that way rather than having its fields walked.
     """
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class SharedResource:
         lock: type(threading.Lock()) = field(default_factory=threading.Lock)
 
         def __deepcopy__(self, memo):
             return self
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class UsesResource:
         body: Body
         resource: SharedResource
@@ -1551,10 +1551,10 @@ def test_rebind_copies_a_type_that_says_how_it_is_copied_its_own_way(world_setup
 
 
 def test_world_entity_with_class_id():
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class A(WorldEntityWithClassBasedID): ...
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class B(WorldEntityWithClassBasedID): ...
 
     a_1 = A()
@@ -1594,7 +1594,7 @@ def test_set_omni_after_copy(pr2_world_state_reset):
 
 def test_add_entity_with_duplicate_name(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    body_duplicate = Body(name=PrefixedName("l1"))
+    body_duplicate = Body(name=PrefixedName(name="l1"))
     connection = FixedConnection(parent=l1, child=body_duplicate)
     with world.modify_world():
         world.add_kinematic_structure_entity(body_duplicate)
@@ -1667,7 +1667,7 @@ def test_overwrite_dof_limits(world_setup):
     assert connection.dof.limits.lower.velocity == -1
     assert connection.dof.limits.upper.velocity == 1
 
-    new_limits = DerivativeMap(0.69, 0.42, 1337, 23)
+    new_limits = DerivativeMap(position=0.69, velocity=0.42, acceleration=1337, jerk=23)
 
     connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits * -1, new_upper_limits=new_limits
@@ -1681,7 +1681,9 @@ def test_overwrite_dof_limits(world_setup):
     assert connection.dof.limits.lower.jerk == -new_limits.jerk
     assert connection.dof.limits.upper.jerk == new_limits.jerk
 
-    new_limits2 = DerivativeMap(3333, 3333, 3333, 3333)
+    new_limits2 = DerivativeMap(
+        position=3333, velocity=3333, acceleration=3333, jerk=3333
+    )
 
     connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits2 * -1, new_upper_limits=new_limits2
@@ -1704,7 +1706,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
         if connection.behaves_like_a_prismatic_connection
     ][0]
     with world.modify_world():
-        body = Body(name=PrefixedName("muh"))
+        body = Body(name=PrefixedName(name="muh"))
         mimic_connection = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3(0, 0, 1)
@@ -1728,7 +1730,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
         connection.dof.limits.upper.velocity * 2,
     )
 
-    new_limits = DerivativeMap(0.69, 0.42, 1337, 23)
+    new_limits = DerivativeMap(position=0.69, velocity=0.42, acceleration=1337, jerk=23)
 
     with pytest.raises(UsageError):
         mimic_connection.dof._overwrite_dof_limits(
@@ -1771,7 +1773,9 @@ def test_overwrite_dof_limits_mimic(world_setup):
     assert np.isclose(mimic_connection.dof.limits.upper.jerk, new_limits.jerk * 2)
 
     # limits are only applied if the new ones are lower
-    new_limits2 = DerivativeMap(3333, 3333, 3333, 3333)
+    new_limits2 = DerivativeMap(
+        position=3333, velocity=3333, acceleration=3333, jerk=3333
+    )
 
     mimic_connection.raw_dof._overwrite_dof_limits(
         new_lower_limits=new_limits2 * -1, new_upper_limits=new_limits2
@@ -1809,20 +1813,20 @@ def test_missing_world_modification_context(world_setup):
 
 def test_attribute_change_without_world_modification_context_leaves_entity_unchanged():
     world = World()
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
 
     with pytest.raises(MissingWorldModificationContextError):
-        body.update_name(PrefixedName("renamed"))
+        body.update_name(PrefixedName(name="renamed"))
 
-    assert body.name == PrefixedName("body")
+    assert body.name == PrefixedName(name="body")
 
 
 def test_dof_removal_simple():
     world = World()
-    body1 = Body(name=PrefixedName("body1"))
-    body2 = Body(name=PrefixedName("body2"))
+    body1 = Body(name=PrefixedName(name="body1"))
+    body2 = Body(name=PrefixedName(name="body2"))
     with world.modify_world():
         c = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -1845,12 +1849,12 @@ def test_dof_removal_simple():
 
 def test_dof_removal():
     world = World()
-    body1 = Body(name=PrefixedName("body1"))
+    body1 = Body(name=PrefixedName(name="body1"))
     with world.modify_world():
         world.add_body(body1)
 
     world2 = World()
-    body2 = Body(name=PrefixedName("body2"))
+    body2 = Body(name=PrefixedName(name="body2"))
     with world2.modify_world():
         world2.add_body(body2)
 
@@ -1872,7 +1876,7 @@ def test_actuators(world_setup):
     connection: ScrewAxisConnection = world.get_connection(r1, r2)
     dof = connection.dof
     actuator = Actuator(
-        name=PrefixedName("actuator"),
+        name=PrefixedName(name="actuator"),
     )
     actuator.add_dof(dof)
     with world.modify_world():
@@ -1884,7 +1888,7 @@ def test_actuators(world_setup):
 
 def test_add_body_hash():
     world = World()
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     with world.modify_world():
         world.add_body(body)
 
@@ -1953,7 +1957,7 @@ def test_adding_a_second_connection_between_connected_entities_keeps_the_first(
 def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     connection: ScrewAxisConnection = world.get_connection(r1, r2)
-    new_child = Body(name=PrefixedName("r3"))
+    new_child = Body(name=PrefixedName(name="r3"))
 
     connection_copy = connection.copy_with_new_child(new_child)
 
@@ -2073,7 +2077,7 @@ def test_world_state_trajectory_rejects_a_model_with_other_degrees_of_freedom(
             Connection6DoF.create_with_dofs(
                 world=world,
                 parent=world.root,
-                child=Body(name=PrefixedName("free_box")),
+                child=Body(name=PrefixedName(name="free_box")),
             )
         )
 
@@ -2140,10 +2144,10 @@ def test_move_branch_preserves_connection_type_and_pose():
     kwarg before) and the Connection6DoF branch.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    new_parent = Body(name=PrefixedName("new_parent"))
-    fixed_child = Body(name=PrefixedName("fixed_child"))
-    free_child = Body(name=PrefixedName("free_child"))
+    root = Body(name=PrefixedName(name="root"))
+    new_parent = Body(name=PrefixedName(name="new_parent"))
+    fixed_child = Body(name=PrefixedName(name="fixed_child"))
+    free_child = Body(name=PrefixedName(name="free_child"))
     with world.modify_world():
         for body in [root, new_parent, fixed_child, free_child]:
             world.add_kinematic_structure_entity(body)
@@ -2188,11 +2192,11 @@ def test_move_branch_preserves_connection_type_and_pose():
 
 def test_memoization_clears_only_last_modification_block():
     world = World()
-    b1 = Body(name=PrefixedName("b1"))
+    b1 = Body(name=PrefixedName(name="b1"))
     with world.modify_world():
         world.add_body(b1)
 
-    b2 = Body(name=PrefixedName("b2"))
+    b2 = Body(name=PrefixedName(name="b2"))
     b1_C_b2 = FixedConnection(parent=b2, child=b1)
 
     with world.modify_world():
@@ -2218,10 +2222,10 @@ def test_move_branch_offline_preserves_connection_type_and_pose():
     already-open modification block.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    new_parent = Body(name=PrefixedName("new_parent"))
-    fixed_child = Body(name=PrefixedName("fixed_child"))
-    free_child = Body(name=PrefixedName("free_child"))
+    root = Body(name=PrefixedName(name="root"))
+    new_parent = Body(name=PrefixedName(name="new_parent"))
+    fixed_child = Body(name=PrefixedName(name="fixed_child"))
+    free_child = Body(name=PrefixedName(name="free_child"))
     with world.modify_world():
         for body in [root, new_parent, fixed_child, free_child]:
             world.add_kinematic_structure_entity(body)
@@ -2305,9 +2309,9 @@ def create_world_with_free_floating_child() -> tuple[World, Body, Body]:
     :return: The world, the free-floating child and the body to re-parent it onto.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    new_parent = Body(name=PrefixedName("new_parent"))
-    free_child = Body(name=PrefixedName("free_child"))
+    root = Body(name=PrefixedName(name="root"))
+    new_parent = Body(name=PrefixedName(name="new_parent"))
+    free_child = Body(name=PrefixedName(name="free_child"))
     with world.modify_world():
         for body in [root, new_parent, free_child]:
             world.add_kinematic_structure_entity(body)
@@ -2402,9 +2406,9 @@ def create_world_with_driven_child(
     :return: The world, the driven child and the body to re-parent it onto.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    new_parent = Body(name=PrefixedName("new_parent"))
-    driven_child = Body(name=PrefixedName("driven_child"))
+    root = Body(name=PrefixedName(name="root"))
+    new_parent = Body(name=PrefixedName(name="new_parent"))
+    driven_child = Body(name=PrefixedName(name="driven_child"))
     with world.modify_world():
         for body in [root, new_parent, driven_child]:
             world.add_kinematic_structure_entity(body)
@@ -2470,8 +2474,8 @@ def test_copy_for_world():
     w2 = World()
     b1_uuid = UUID(int=1)
     b1_w1 = Body(
-        name=PrefixedName("b1"),
-        collision=ShapeCollection([Box(scale=Scale())]),
+        name=PrefixedName(name="b1"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale())]),
         id=b1_uuid,
     )
 
@@ -2494,39 +2498,39 @@ def test_copy_for_world():
 
 
 def make_bodies(*names: tuple) -> list:
-    return [Body(name=PrefixedName(name, prefix)) for name, prefix in names]
+    return [Body(name=PrefixedName(name=name, prefix=prefix)) for name, prefix in names]
 
 
 def test_suggest_typo_in_string_name():
     bodies = make_bodies(("torso_lift_link", "pr2"), ("head_pan_link", "pr2"))
     suggestions = World._suggest_world_entity_names("torso_lft_link", bodies)
-    assert suggestions == [PrefixedName("torso_lift_link", "pr2")]
+    assert suggestions == [PrefixedName(name="torso_lift_link", prefix="pr2")]
 
 
 def test_suggest_typo_in_prefixed_name():
     bodies = make_bodies(("torso_lift_link", "pr2"), ("head_pan_link", "pr2"))
     suggestions = World._suggest_world_entity_names(
-        PrefixedName("torso_lft_link", "pr2"), bodies
+        PrefixedName(name="torso_lft_link", prefix="pr2"), bodies
     )
-    assert suggestions == [PrefixedName("torso_lift_link", "pr2")]
+    assert suggestions == [PrefixedName(name="torso_lift_link", prefix="pr2")]
 
 
 def test_suggest_same_bare_name_with_different_prefix():
     bodies = make_bodies(("base_link", "pr2"), ("head_pan_link", "pr2"))
     suggestions = World._suggest_world_entity_names(
-        PrefixedName("base_link", "kitchen"), bodies
+        PrefixedName(name="base_link", prefix="kitchen"), bodies
     )
-    assert suggestions == [PrefixedName("base_link", "pr2")]
+    assert suggestions == [PrefixedName(name="base_link", prefix="pr2")]
 
 
 def test_suggest_returns_all_prefixes_of_exact_bare_name_match():
     bodies = make_bodies(("base_link", "pr2"), ("base_link", "kitchen"))
     suggestions = World._suggest_world_entity_names(
-        PrefixedName("base_link", "unknown"), bodies
+        PrefixedName(name="base_link", prefix="unknown"), bodies
     )
     assert suggestions == [
-        PrefixedName("base_link", "pr2"),
-        PrefixedName("base_link", "kitchen"),
+        PrefixedName(name="base_link", prefix="pr2"),
+        PrefixedName(name="base_link", prefix="kitchen"),
     ]
 
 
@@ -2534,43 +2538,48 @@ def test_suggest_exact_bare_name_matches_rank_before_fuzzy_matches():
     # the fuzzy candidate comes first in the iterable to prove ordering is by match
     # quality, not iteration order
     bodies = make_bodies(("torsoo", "b"), ("torso", "a"))
-    suggestions = World._suggest_world_entity_names(PrefixedName("torso", "x"), bodies)
-    assert suggestions == [PrefixedName("torso", "a"), PrefixedName("torsoo", "b")]
+    suggestions = World._suggest_world_entity_names(
+        PrefixedName(name="torso", prefix="x"), bodies
+    )
+    assert suggestions == [
+        PrefixedName(name="torso", prefix="a"),
+        PrefixedName(name="torsoo", prefix="b"),
+    ]
 
 
 def test_suggest_fuzzy_match_expands_to_all_prefixes():
     bodies = make_bodies(("torso_lift_link", "pr2"), ("torso_lift_link", "pr2_copy"))
     suggestions = World._suggest_world_entity_names("torso_lft_link", bodies)
     assert suggestions == [
-        PrefixedName("torso_lift_link", "pr2"),
-        PrefixedName("torso_lift_link", "pr2_copy"),
+        PrefixedName(name="torso_lift_link", prefix="pr2"),
+        PrefixedName(name="torso_lift_link", prefix="pr2_copy"),
     ]
 
 
 def test_suggest_no_duplicates_when_exact_match_is_also_fuzzy_match():
     bodies = make_bodies(("torso", "pr2"))
     suggestions = World._suggest_world_entity_names(
-        PrefixedName("torso", "wrong"), bodies
+        PrefixedName(name="torso", prefix="wrong"), bodies
     )
-    assert suggestions == [PrefixedName("torso", "pr2")]
+    assert suggestions == [PrefixedName(name="torso", prefix="pr2")]
 
 
 def test_suggest_respects_default_max_suggestions():
     bodies = make_bodies(*[("base_link", prefix) for prefix in "abcde"])
     suggestions = World._suggest_world_entity_names(
-        PrefixedName("base_link", "unknown"), bodies
+        PrefixedName(name="base_link", prefix="unknown"), bodies
     )
     assert suggestions == [
-        PrefixedName("base_link", "a"),
-        PrefixedName("base_link", "b"),
-        PrefixedName("base_link", "c"),
+        PrefixedName(name="base_link", prefix="a"),
+        PrefixedName(name="base_link", prefix="b"),
+        PrefixedName(name="base_link", prefix="c"),
     ]
 
 
 def test_suggest_respects_explicit_max_suggestions():
     bodies = make_bodies(*[("base_link", prefix) for prefix in "abcde"])
     suggestions = World._suggest_world_entity_names(
-        PrefixedName("base_link", "unknown"), bodies, max_suggestions=2
+        PrefixedName(name="base_link", prefix="unknown"), bodies, max_suggestions=2
     )
     assert len(suggestions) == 2
 
@@ -2583,7 +2592,10 @@ def test_suggest_no_similar_names_returns_empty():
 def test_suggest_empty_iterable_returns_empty():
     assert World._suggest_world_entity_names("anything", []) == []
     assert (
-        World._suggest_world_entity_names(PrefixedName("anything", "prefix"), []) == []
+        World._suggest_world_entity_names(
+            PrefixedName(name="anything", prefix="prefix"), []
+        )
+        == []
     )
 
 
@@ -2591,7 +2603,7 @@ def test_not_found_error_contains_suggestions(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     with pytest.raises(WorldEntityNotFoundError) as exc_info:
         world.get_kinematic_structure_entity_by_name("rooot")
-    assert exc_info.value.suggestions == [PrefixedName("root", "world")]
+    assert exc_info.value.suggestions == [PrefixedName(name="root", prefix="world")]
     assert "Suggestion: did you mean" in str(exc_info.value)
     assert "world/root" in str(exc_info.value)
 
@@ -2599,7 +2611,7 @@ def test_not_found_error_contains_suggestions(world_setup):
 def test_not_found_error_with_wrong_prefix_suggests_existing_entity(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     with pytest.raises(WorldEntityNotFoundError) as exc_info:
-        world.get_body_by_name(PrefixedName("l1", "wrong_prefix"))
+        world.get_body_by_name(PrefixedName(name="l1", prefix="wrong_prefix"))
     assert exc_info.value.suggestions == [l1.name]
 
 
@@ -2615,18 +2627,18 @@ def test_not_found_error_suggestions_for_connections(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     with pytest.raises(WorldEntityNotFoundError) as exc_info:
         world.get_connection_by_name("l1_T_l3")
-    assert PrefixedName("l1_T_l2") in exc_info.value.suggestions
+    assert PrefixedName(name="l1_T_l2") in exc_info.value.suggestions
 
 
 def test_clearing_the_world_detaches_connections():
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
-    child = Body(name=PrefixedName("child", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
+    child = Body(name=PrefixedName(name="child", prefix="review"))
     collision = Box(
         scale=Scale(),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=child),
     )
-    child.collision = ShapeCollection([collision], reference_frame=child)
+    child.collision = ShapeCollection(shapes=[collision], reference_frame=child)
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(child)
@@ -2641,17 +2653,17 @@ def test_clearing_the_world_detaches_connections():
 
 def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
 
-    def _make_box_body(name: str, scale: Scale = Scale(1.0, 1.0, 1.0)) -> Body:
-        body = Body(name=PrefixedName(name, prefix="review"))
+    def _make_box_body(name: str, scale: Scale = Scale(x=1.0, y=1.0, z=1.0)) -> Body:
+        body = Body(name=PrefixedName(name=name, prefix="review"))
         collision = Box(
             scale=scale,
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
         )
-        body.collision = ShapeCollection([collision], reference_frame=body)
+        body.collision = ShapeCollection(shapes=[collision], reference_frame=body)
         return body
 
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
     robot_base = _make_box_body("robot_base")
     robot_link = _make_box_body("robot_link")
     drawer_body = _make_box_body("drawer_body")
@@ -2696,7 +2708,7 @@ def test_get_semantic_annotation_by_id_raises_package_exception():
 
 def test_failed_add_without_context_does_not_brick_the_world():
     world = World()
-    body = Body(name=PrefixedName("body", prefix="review"))
+    body = Body(name=PrefixedName(name="body", prefix="review"))
 
     with pytest.raises(MissingWorldModificationContextError):
         world.add_kinematic_structure_entity(body)
@@ -2709,7 +2721,7 @@ def test_failed_add_without_context_does_not_brick_the_world():
 
 def test_hash_table_lookup_survives_annotation_mutation():
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class ReviewAnnotation(SemanticAnnotation):
         """
         Semantic annotation with a mutable entity list, for hash-stability tests.
@@ -2717,17 +2729,17 @@ def test_hash_table_lookup_survives_annotation_mutation():
 
         parts: list[Body] = field(default_factory=list)
 
-    def _make_box_body(name: str, scale: Scale = Scale(1.0, 1.0, 1.0)) -> Body:
-        body = Body(name=PrefixedName(name, prefix="review"))
+    def _make_box_body(name: str, scale: Scale = Scale(x=1.0, y=1.0, z=1.0)) -> Body:
+        body = Body(name=PrefixedName(name=name, prefix="review"))
         collision = Box(
             scale=scale,
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
         )
-        body.collision = ShapeCollection([collision], reference_frame=body)
+        body.collision = ShapeCollection(shapes=[collision], reference_frame=body)
         return body
 
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
     child = _make_box_body("child")
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
@@ -2740,7 +2752,7 @@ def test_hash_table_lookup_survives_annotation_mutation():
         world.add_kinematic_structure_entity(extra)
         world.add_connection(FixedConnection(parent=root, child=extra))
         annotation = ReviewAnnotation(
-            name=PrefixedName("annotation", prefix="review"), parts=[child]
+            name=PrefixedName(name="annotation", prefix="review"), parts=[child]
         )
         world.add_semantic_annotation(annotation)
 
@@ -2775,11 +2787,11 @@ def test_validation_still_works_with_python_optimize_flag():
 
 
 def test_world_entity_equality_works_across_subclasses():
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class EntityA(WorldEntityWithID):
         pass
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class EntityB(EntityA):
         pass
 
@@ -2812,8 +2824,8 @@ def test_exception_after_a_modification_raises_partially_applied_world_modificat
     The error names those modifications and is caused by the exception that escaped.
     """
     world = World()
-    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
-    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    body_1 = Body(name=PrefixedName(name="body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName(name="body_2", prefix="review"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
 
@@ -2833,8 +2845,8 @@ def test_exception_after_a_modification_raises_partially_applied_world_modificat
 
 def test_memoized_queries_match_graph_after_exception():
     world = World()
-    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
-    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    body_1 = Body(name=PrefixedName(name="body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName(name="body_2", prefix="review"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
 
@@ -2850,8 +2862,8 @@ def test_memoized_queries_match_graph_after_exception():
 
 def test_world_accepts_modification_block_after_a_partially_applied_one():
     world = World()
-    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
-    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    body_1 = Body(name=PrefixedName(name="body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName(name="body_2", prefix="review"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
 
@@ -2867,9 +2879,9 @@ def test_world_accepts_modification_block_after_a_partially_applied_one():
 
 def test_modification_block_after_a_partially_applied_one_records_only_its_own_modifications():
     world = World()
-    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
-    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
-    body_3 = Body(name=PrefixedName("body_3", prefix="review"))
+    body_1 = Body(name=PrefixedName(name="body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName(name="body_2", prefix="review"))
+    body_3 = Body(name=PrefixedName(name="body_3", prefix="review"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
 
@@ -2907,14 +2919,16 @@ def world_with_branch(branch_length: int) -> tuple[World, Body]:
     :return: The world and the root of its branch.
     """
     world = World(name="source")
-    branch_root = Body(name=PrefixedName("branch_root"))
+    branch_root = Body(name=PrefixedName(name="branch_root"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(parent=Body(name=PrefixedName("root")), child=branch_root)
+            FixedConnection(
+                parent=Body(name=PrefixedName(name="root")), child=branch_root
+            )
         )
         parent = branch_root
         for index in range(branch_length):
-            child = Body(name=PrefixedName(f"branch_body_{index}"))
+            child = Body(name=PrefixedName(name=f"branch_body_{index}"))
             world.add_connection(FixedConnection(parent=parent, child=child))
             parent = child
     return world, branch_root
@@ -3040,7 +3054,7 @@ def test_world_does_not_record_removing_a_kinematic_structure_entity_it_does_not
     A world only records the removal of a kinematic_structure_entity it actually holds.
     """
     world = World(name="source")
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     with world.modify_world():
         world.add_body(body)
     other_world = World(name="other")
@@ -3096,7 +3110,7 @@ def test_world_does_not_record_removing_a_semantic_annotation_it_does_not_hold()
     A world only records the removal of a semantic annotation it actually holds.
     """
     world = World(name="source")
-    annotation = SemanticAnnotation(name=PrefixedName("annotation"))
+    annotation = SemanticAnnotation(name=PrefixedName(name="annotation"))
     with world.modify_world():
         world.add_semantic_annotation(annotation)
     other_world = World(name="other")
@@ -3114,7 +3128,7 @@ def test_removing_a_semantic_annotation_keeps_an_equal_one():
     other one in the world.
     """
     world = World()
-    body = Body(name=PrefixedName("milk"))
+    body = Body(name=PrefixedName(name="milk"))
     kept = Milk(root=body)
     removed = Milk(root=body)
     with world.modify_world():
@@ -3136,7 +3150,7 @@ def test_world_does_not_record_removing_an_actuator_it_does_not_hold():
     A world only records the removal of an actuator it actually holds.
     """
     world = World(name="source")
-    actuator = Actuator(name=PrefixedName("actuator"))
+    actuator = Actuator(name=PrefixedName(name="actuator"))
     with world.modify_world():
         world.add_actuator(actuator)
     other_world = World(name="other")
@@ -3176,13 +3190,13 @@ def test_column_indices_of_degree_of_freedom_outside_the_state(world_setup):
     world, *_ = world_setup
 
     with pytest.raises(DofNotInWorldStateError):
-        world.state.column_indices([DegreeOfFreedom(name=PrefixedName("new_dof"))])
+        world.state.column_indices([DegreeOfFreedom(name=PrefixedName(name="new_dof"))])
 
 
 # %% World Replacement
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ModelChangeRecordingCallback(ModelChangeCallback):
     notifications: list = field(default_factory=list, init=False)
 
@@ -3190,7 +3204,7 @@ class ModelChangeRecordingCallback(ModelChangeCallback):
         self.notifications.append(publish_changes)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StateChangeRecordingCallback(StateChangeCallback):
     notifications: list = field(default_factory=list, init=False)
 
@@ -3200,13 +3214,13 @@ class StateChangeRecordingCallback(StateChangeCallback):
 
 def test_replace_with_replaces_entities_and_kinematic_structure():
     world = World.create_with_root_body("old_root")
-    old_body = Body(name=PrefixedName("old_body"))
+    old_body = Body(name=PrefixedName(name="old_body"))
     with world.modify_world():
         world.add_body(old_body)
         world.add_connection(FixedConnection(parent=world.root, child=old_body))
 
     other_world = World.create_with_root_body("new_root")
-    new_body = Body(name=PrefixedName("new_body"))
+    new_body = Body(name=PrefixedName(name="new_body"))
     with other_world.modify_world():
         other_world.add_body(new_body)
         other_world.add_connection(
@@ -3215,22 +3229,22 @@ def test_replace_with_replaces_entities_and_kinematic_structure():
 
     world._replace_with(other_world)
 
-    assert world.root.name == PrefixedName("new_root")
+    assert world.root.name == PrefixedName(name="new_root")
     assert world.is_kinematic_structure_entity_in_world_by_name("new_body")
     assert not world.is_kinematic_structure_entity_in_world_by_name("old_body")
     assert (
-        world.get_kinematic_structure_entity_by_name(PrefixedName("new_body"))
+        world.get_kinematic_structure_entity_by_name(PrefixedName(name="new_body"))
         is not None
     )
     with pytest.raises(WorldEntityNotFoundError):
-        world.get_kinematic_structure_entity_by_name(PrefixedName("old_body"))
+        world.get_kinematic_structure_entity_by_name(PrefixedName(name="old_body"))
     assert len(world.kinematic_structure_entities) == 2
 
 
 def test_replace_with_transfers_degrees_of_freedom_and_state():
     world = World.create_with_root_body("w1_root")
     other_world = World.create_with_root_body("w2_root")
-    child_body = Body(name=PrefixedName("moving_child"))
+    child_body = Body(name=PrefixedName(name="moving_child"))
     with other_world.modify_world():
         other_world.add_body(child_body)
         conn = ScrewAxisConnection.create_with_dofs(
@@ -3254,7 +3268,7 @@ def test_replace_with_preserves_registered_callbacks_and_notifies():
     state_callback = StateChangeRecordingCallback(_world=world)
 
     other_world = World.create_with_root_body("replacement_root")
-    other_body = Body(name=PrefixedName("replacement_body"))
+    other_body = Body(name=PrefixedName(name="replacement_body"))
     with other_world.modify_world():
         other_world.add_body(other_body)
         other_world.add_connection(
@@ -3274,7 +3288,7 @@ def test_replace_with_preserves_registered_callbacks_and_notifies():
 def test_replace_with_clears_other_world():
     world = World.create_with_root_body("w1")
     other_world = World.create_with_root_body("w2")
-    other_body = Body(name=PrefixedName("b2"))
+    other_body = Body(name=PrefixedName(name="b2"))
     with other_world.modify_world():
         other_world.add_body(other_body)
         other_world.add_connection(
@@ -3299,7 +3313,7 @@ def create_chain_world(length: int) -> tuple[World, list[Body]]:
     :return: The world and its bodies from the root down.
     """
     world = World()
-    bodies = [Body(name=PrefixedName(f"link_{index}")) for index in range(length)]
+    bodies = [Body(name=PrefixedName(name=f"link_{index}")) for index in range(length)]
     with world.modify_world():
         for body in bodies:
             world.add_kinematic_structure_entity(body)

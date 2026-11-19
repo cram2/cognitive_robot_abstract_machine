@@ -42,14 +42,14 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 world = World()
-root = Body(name=PrefixedName("root"))
+root = Body(name=PrefixedName(name="root"))
 
 with world.modify_world():
     world.add_body(root)
 with world.modify_world():
     drawer= Drawer.create_with_new_body_in_world(
         name="drawer",
-        scale=Scale(0.3, 0.3, 0.2),
+        scale=Scale(x=0.3, y=0.3, z=0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
         parent_connection_specification=ScrewAxisConnectionSpecification(
@@ -65,13 +65,13 @@ with world.modify_world():
 
     dresser = Dresser.create_with_new_body_in_world(
         name="dresser",
-        scale=Scale(0.31, 0.31, 0.21),
+        scale=Scale(x=0.31, y=0.31, z=0.21),
         world=world,
     )
 
     dresser.add(part=drawer)
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -90,7 +90,7 @@ We can update the drawer's state by altering the free variables position of its 
 
 ```{code-cell} ipython3
 drawer.movable_joint.position = 0.1
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -107,17 +107,17 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 with world.modify_world():
     old_root = world.root
-    new_root = Body(name=PrefixedName("virtual root"))
+    new_root = Body(name=PrefixedName(name="virtual root"))
     
     # Add a visual for the new root so we can see the change of position in the visualization
     box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=new_root)
-    box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1.))
+    box = Box(origin=box_origin, scale=Scale(x=0.1, y=0.1, z=0.1), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1.))
     new_root.collision = [box]
     
     world.add_body(new_root)
     root_T_dresser = Connection6DoF.create_with_dofs(parent=new_root, child=old_root, world=world)
     world.add_connection(root_T_dresser)
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -131,7 +131,7 @@ connection = variable(type_=Connection, domain=world.connections)
 free_connection = the(entity(connection).where(connection.parent == world.root)).first()
 with world.modify_world():
     free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi, reference_frame=world.root)
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -152,7 +152,7 @@ connection = the(
 ).first()
 with world.modify_world():
     world.state[connection.dof.id] = [0., 0., 0., 0.]
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

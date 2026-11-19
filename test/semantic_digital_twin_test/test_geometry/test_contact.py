@@ -30,8 +30,22 @@ def test_contact_parameters_round_trip_through_their_list_forms():
         minimum=0.96, maximum=0.99, width=0.002, midpoint=0.4, power=3.0
     )
 
-    assert ContactFriction(*friction.to_list()) == friction
-    assert ContactImpedance(*impedance.to_list()) == impedance
+    sliding, torsional, rolling = friction.to_list()
+    assert (
+        ContactFriction(sliding=sliding, torsional=torsional, rolling=rolling)
+        == friction
+    )
+    minimum, maximum, width, midpoint, power = impedance.to_list()
+    assert (
+        ContactImpedance(
+            minimum=minimum,
+            maximum=maximum,
+            width=width,
+            midpoint=midpoint,
+            power=power,
+        )
+        == impedance
+    )
     assert friction.to_list() == [0.4, 0.05, 0.001]
     assert stiffness.to_list() == [0.008, 0.9]
     assert impedance.to_list() == [0.96, 0.99, 0.002, 0.4, 3.0]
@@ -41,11 +55,11 @@ def test_contact_parameters_round_trip_through_their_list_forms():
 
 
 def test_contact_parameters_reach_every_collision_geometry():
-    body = Body(name=PrefixedName("box"))
+    body = Body(name=PrefixedName(name="box"))
     body.collision = ShapeCollection(
-        [
-            Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1)),
-            Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1)),
+        shapes=[
+            Box(origin=HomogeneousTransformationMatrix(), scale=Scale(x=1, y=1, z=1)),
+            Box(origin=HomogeneousTransformationMatrix(), scale=Scale(x=1, y=1, z=1)),
         ],
         reference_frame=body,
     )
@@ -63,9 +77,9 @@ def test_contact_parameters_reach_every_collision_geometry():
 
 
 def test_a_surface_leaves_the_geometrys_own_stiffness_and_impedance():
-    body = Body(name=PrefixedName("table"))
-    shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1))
-    body.collision = ShapeCollection([shape], reference_frame=body)
+    body = Body(name=PrefixedName(name="table"))
+    shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(x=1, y=1, z=1))
+    body.collision = ShapeCollection(shapes=[shape], reference_frame=body)
     own_stiffness = ContactStiffness(time_constant=timedelta(milliseconds=50))
     own = ContactParameters(friction=ContactFriction(), stiffness=own_stiffness)
     shape.add_simulator_property(own)
@@ -79,9 +93,9 @@ def test_a_surface_leaves_the_geometrys_own_stiffness_and_impedance():
 
 
 def test_a_body_without_collision_geometry_is_skipped():
-    body = Body(name=PrefixedName("frame"))
-    shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1))
-    body.visual = ShapeCollection([shape], reference_frame=body)
+    body = Body(name=PrefixedName(name="frame"))
+    shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(x=1, y=1, z=1))
+    body.visual = ShapeCollection(shapes=[shape], reference_frame=body)
 
     ContactParameters.create_for_surface().apply_to([body])
 

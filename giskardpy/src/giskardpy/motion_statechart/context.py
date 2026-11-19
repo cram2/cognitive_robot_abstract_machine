@@ -54,7 +54,7 @@ class MotionControlContext(ContextExtension):
         """
         if self.self_collision_manager is None:
             self.self_collision_manager = SelfCollisionVariableManager(
-                context.float_variable_data
+                float_variable_data=context.float_variable_data
             )
             context.world.collision_manager.add_collision_consumer(
                 self.self_collision_manager
@@ -71,7 +71,7 @@ class MotionControlContext(ContextExtension):
         """
         if self.external_collision_manager is None:
             self.external_collision_manager = ExternalCollisionVariableManager(
-                context.float_variable_data
+                float_variable_data=context.float_variable_data
             )
             context.world.collision_manager.add_collision_consumer(
                 self.external_collision_manager

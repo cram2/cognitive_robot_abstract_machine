@@ -61,17 +61,17 @@ with table_world.modify_world():
     table_world.remove_connection(root_C_left_leg)
     table_world.add_connection(moved_root_C_left_leg)
 
-cube = Box(scale=Scale(0.2, 0.2, 0.2), color=Color.from_rgba(red=1, green=0, blue=0, opacity=1))
+cube = Box(scale=Scale(x=0.2, y=0.2, z=0.2), color=Color.from_rgba(red=1, green=0, blue=0, opacity=1))
 box_body = Body(
     name=PrefixedName(name="cube", prefix="transformation_exercise"),
-    collision=ShapeCollection([cube]),
-    visual=ShapeCollection([cube]),
+    collision=ShapeCollection(shapes=[cube]),
+    visual=ShapeCollection(shapes=[cube]),
 )
 with table_world.modify_world():
     table_world_C_box = Connection6DoF.create_with_dofs(parent=table_world.root, child=box_body, world=table_world)
     table_world.add_connection(table_world_C_box)
 
-rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
+rt = RayTracer(world=table_world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 
 ## 1. Craft a transform: Place the cube on top of the table
@@ -96,7 +96,7 @@ Store your transform in a variable named `new_table_world_T_box`.
 new_table_world_T_box: HomogeneousTransformationMatrix = ...
 
 # Visualization
-rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
+rt = RayTracer(world=table_world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 
 ```{code-cell} ipython3
@@ -110,14 +110,14 @@ new_table_world_T_box = HomogeneousTransformationMatrix.from_xyz_rpy(
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if new_table_world_T_box is ...: raise ExerciseVerificationFailed("Create and assign a HomogeneousTransformationMatrix to place the cube on the table.")
-if not isinstance(new_table_world_T_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed("Use a HomogeneousTransformationMatrix for `T_root_cube_on_table`.")
+if new_table_world_T_box is ...: raise ExerciseVerificationFailed(requirement="Create and assign a HomogeneousTransformationMatrix to place the cube on the table.")
+if not isinstance(new_table_world_T_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed(requirement="Use a HomogeneousTransformationMatrix for `T_root_cube_on_table`.")
 with table_world.modify_world():
     table_world_C_box.origin = new_table_world_T_box
-if not abs(new_table_world_T_box.x.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should be at the middle of the table.")
-if not abs(new_table_world_T_box.y.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should be at the middle of the table.")
-if not abs(new_table_world_T_box.z.to_np() - 0.72) < 1e-5: raise ExerciseVerificationFailed("The cube should be at z=0.72 on top of the table.")
-rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
+if not abs(new_table_world_T_box.x.to_np()) < 1e-5: raise ExerciseVerificationFailed(requirement="The cube should be at the middle of the table.")
+if not abs(new_table_world_T_box.y.to_np()) < 1e-5: raise ExerciseVerificationFailed(requirement="The cube should be at the middle of the table.")
+if not abs(new_table_world_T_box.z.to_np() - 0.72) < 1e-5: raise ExerciseVerificationFailed(requirement="The cube should be at z=0.72 on top of the table.")
+rt = RayTracer(world=table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ```
 
@@ -158,16 +158,16 @@ table_world_T_moved_box = table_world_T_box @ box_T_moved_box
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if table_world_T_moved_box is ...: raise ExerciseVerificationFailed("Craft a new transform to move and rotate the cube and assign it to `table_world_T_moved_box`.")
-if not isinstance(table_world_T_moved_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed("`table_world_T_moved_box` must be a HomogeneousTransformationMatrix.")
+if table_world_T_moved_box is ...: raise ExerciseVerificationFailed(requirement="Craft a new transform to move and rotate the cube and assign it to `table_world_T_moved_box`.")
+if not isinstance(table_world_T_moved_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed(requirement="`table_world_T_moved_box` must be a HomogeneousTransformationMatrix.")
 
 with table_world.modify_world():
     table_world_C_box.origin = table_world_T_moved_box
     
-if not abs(table_world_T_moved_box.x.to_np() - 0.3) < 1e-5: raise ExerciseVerificationFailed("The cube should be at x=0.3 after the move.")
-if not abs(table_world_T_moved_box.y.to_np() + 0.4) < 1e-5: raise ExerciseVerificationFailed("The cube should be at y=-0.4 after the move.")
-if not abs(table_world_T_moved_box.z.to_np() - new_table_world_T_box.z.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should stay on top of the table after the move.")
-rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
+if not abs(table_world_T_moved_box.x.to_np() - 0.3) < 1e-5: raise ExerciseVerificationFailed(requirement="The cube should be at x=0.3 after the move.")
+if not abs(table_world_T_moved_box.y.to_np() + 0.4) < 1e-5: raise ExerciseVerificationFailed(requirement="The cube should be at y=-0.4 after the move.")
+if not abs(table_world_T_moved_box.z.to_np() - new_table_world_T_box.z.to_np()) < 1e-5: raise ExerciseVerificationFailed(requirement="The cube should stay on top of the table after the move.")
+rt = RayTracer(world=table_world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 
 ## Final Notes

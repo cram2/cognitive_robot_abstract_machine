@@ -16,7 +16,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def test_mujoco_camera_converter_honors_a_given_string_name():
-    body = Body(name=PrefixedName("world"))
+    body = Body(name=PrefixedName(name="world"))
     camera = MujocoCamera(name="my_named_camera", body=body)
 
     properties = MujocoCameraConverter.convert(camera)
@@ -25,7 +25,7 @@ def test_mujoco_camera_converter_honors_a_given_string_name():
 
 
 def test_mujoco_camera_converter_falls_back_to_an_id_based_name_when_unnamed():
-    body = Body(name=PrefixedName("world"))
+    body = Body(name=PrefixedName(name="world"))
     camera = MujocoCamera(name="", body=body)
 
     properties = MujocoCameraConverter.convert(camera)

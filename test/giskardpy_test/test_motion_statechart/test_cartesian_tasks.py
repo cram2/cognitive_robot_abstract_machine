@@ -1291,8 +1291,10 @@ class TestCartesianTasks:
         """
         with _hsr_world_setup.modify_world():
             box = Body(
-                name=PrefixedName("muh"),
-                collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+                name=PrefixedName(name="muh"),
+                collision=ShapeCollection(
+                    shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]
+                ),
             )
             connection = FixedConnection(
                 parent=_hsr_world_setup.root,
@@ -2463,7 +2465,7 @@ class TestDiffDriveBaseGoal:
         """
         world = cylinder_bot_diff_world
         base = world.get_connections_by_type(DifferentialDrive)[0].child
-        lift = Body(name=PrefixedName("lift"))
+        lift = Body(name=PrefixedName(name="lift"))
         with world.modify_world():
             lift_connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -2527,7 +2529,7 @@ class TestDiffDriveBaseGoal:
         """
         world = cylinder_bot_diff_world
         base = world.get_connections_by_type(DifferentialDrive)[0].child
-        platform = Body(name=PrefixedName("platform"))
+        platform = Body(name=PrefixedName(name="platform"))
         with world.modify_world():
             world.add_connection(FixedConnection(parent=world.root, child=platform))
         executor = StatechartExecutor(

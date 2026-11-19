@@ -217,9 +217,9 @@ def orientation_speed_ratio_tolerance() -> float:
 def pr2_with_box(pr2_world_copy) -> World:
     with pr2_world_copy.modify_world():
         box = Body(
-            name=PrefixedName("box"),
-            visual=ShapeCollection(shapes=[Box(scale=Scale(1, 1, 1))]),
-            collision=ShapeCollection(shapes=[Box(scale=Scale(1, 1, 1))]),
+            name=PrefixedName(name="box"),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=1))]),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=1))]),
         )
         root_C_box = FixedConnection(
             parent=pr2_world_copy.root,
@@ -312,10 +312,10 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
     """
     world = World()
     with world.modify_world():
-        map_body = Body(name=PrefixedName("map"))
+        map_body = Body(name=PrefixedName(name="map"))
         for index, limits in enumerate(dof_limits):
             child = Body(
-                name=PrefixedName("robot" if index == 0 else f"robot{index + 1}")
+                name=PrefixedName(name="robot" if index == 0 else f"robot{index + 1}")
             )
             dof = DegreeOfFreedom(limits=limits, has_hardware_interface=True)
             world.add_degree_of_freedom(dof)

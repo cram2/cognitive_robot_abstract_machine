@@ -96,7 +96,7 @@ class NPVector3(SubclassJSONSerializer):
         return cls(data=np.array(data["data"]))
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PrincipalMoments(NPVector3):
     """
     Represents the three principal moments of inertia (I1, I2, I3) about the principal
@@ -117,7 +117,7 @@ class PrincipalMoments(NPVector3):
         return cls(data=np.array([i1, i2, i3]))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrincipalAxes(NPMatrix3x3):
     """
     The principal axes of the inertia tensor is a 3x3 matrix where each column is a
@@ -154,7 +154,7 @@ class PrincipalAxes(NPMatrix3x3):
         return RotationMatrix(self.data)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InertiaTensor(NPMatrix3x3):
     """
     Represents the inertia tensor of a body in a given coordinate frame.
@@ -252,7 +252,7 @@ class InertiaTensor(NPMatrix3x3):
         return moments, axes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Inertial:
     """
     Represents the inertial properties of a body.

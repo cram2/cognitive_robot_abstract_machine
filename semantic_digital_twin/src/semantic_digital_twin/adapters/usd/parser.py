@@ -83,21 +83,21 @@ logger = logging.getLogger(__name__)
 # krrood.class_diagrams.mocking.MockedClass.
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedUSDPrim(MockedClass):
     """
     Mocked class for Usd.Prim in pxr.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedUSDStage(MockedClass):
     """
     Mocked class for Usd.Stage in pxr.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedUSDModule(MockedModule):
     """
     Mocked module for pxr.Usd.
@@ -107,14 +107,14 @@ class _MockedUSDModule(MockedModule):
     Stage: type[_MockedUSDStage] = _MockedUSDStage
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedGfMatrix4d(MockedClass):
     """
     Mocked class for Gf.Matrix4d in pxr.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedGfModule(MockedModule):
     """
     Mocked module for pxr.Gf.
@@ -214,7 +214,7 @@ class USDGeomPrimType(StrEnum):
             USDGeomPrimType.SPHERE: USDSphereShapeBuilder,
             USDGeomPrimType.CYLINDER: USDCylinderShapeBuilder,
         }
-        return builders[self](prim, link_to_world).build()
+        return builders[self](prim=prim, link_to_world=link_to_world).build()
 
 
 class USDPhysicsJointType(StrEnum):
@@ -270,7 +270,7 @@ class USDAxis(StrEnum):
         return Vector3(*unit_vectors[self], reference_frame=reference_frame)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class USDShapeBuilder(ABC):
     """
     Builds the :class:`~semantic_digital_twin.world_description.geometry.Shape` one USD
@@ -294,7 +294,7 @@ class USDShapeBuilder(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class USDCubeShapeBuilder(USDShapeBuilder):
     """
     Builds the Box shape a ``UsdGeom.Cube`` prim describes.
@@ -305,11 +305,11 @@ class USDCubeShapeBuilder(USDShapeBuilder):
         side = UsdGeom.Cube(self.prim).GetSizeAttr().Get()
         return Box(
             origin=origin,
-            scale=Scale(side * scale[0], side * scale[1], side * scale[2]),
+            scale=Scale(x=side * scale[0], y=side * scale[1], z=side * scale[2]),
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class USDSphereShapeBuilder(USDShapeBuilder):
     """
     Builds the Sphere shape a ``UsdGeom.Sphere`` prim describes.
@@ -325,7 +325,7 @@ class USDSphereShapeBuilder(USDShapeBuilder):
         return Sphere(origin=origin, radius=radius * average_scale)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class USDCylinderShapeBuilder(USDShapeBuilder):
     """
     Builds the Cylinder shape a ``UsdGeom.Cylinder`` prim describes.
@@ -359,7 +359,7 @@ class USDCylinderShapeBuilder(USDShapeBuilder):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class USDMeshShapeBuilder(USDShapeBuilder):
     """
     Builds the Mesh shape one USD mesh prim describes, positioned relative to its link.
@@ -670,9 +670,9 @@ class USDStageParser(WorldModelParser, ABC):
             link_to_world=link_to_world,
             excluded_prim_paths=excluded_prim_paths,
         )
-        shape_collection = ShapeCollection(shapes)
+        shape_collection = ShapeCollection(shapes=shapes)
         body = Body(
-            name=PrefixedName(name, self.prefix),
+            name=PrefixedName(name=name, prefix=self.prefix),
             visual=shape_collection,
             collision=shape_collection,
         )
@@ -1116,7 +1116,9 @@ class USDParser(USDStageParser):
             shapes = self._shapes_in_subtree(
                 link_prim=root_prim, link_to_world=self._local_to_world(prim=root_prim)
             )
-            shape_collection = ShapeCollection(shapes, reference_frame=world.root)
+            shape_collection = ShapeCollection(
+                shapes=shapes, reference_frame=world.root
+            )
             shape_collection.transform_all_shapes_to_own_frame()
             world.root.visual = shape_collection
             world.root.collision = shape_collection
@@ -1216,7 +1218,9 @@ class USDComponentParser(USDStageParser):
         # Every shape and joint is built before the world is modified: a World left
         # partway through a failed modification is unusable.
         content = self._scene_content(scene_root=self._scene_root())
-        root_shapes = ShapeCollection(content.root_shapes, reference_frame=world.root)
+        root_shapes = ShapeCollection(
+            shapes=content.root_shapes, reference_frame=world.root
+        )
         world.root.visual = root_shapes
         world.root.collision = root_shapes
         components = self._create_components(component_prims=content.component_prims)

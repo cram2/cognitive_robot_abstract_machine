@@ -196,7 +196,7 @@ class ResetStateContextManager:
         self.world.notify_state_change()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateBatchContextManager:
     """
     Context manager collapsing many state changes of a `World` into a single
@@ -226,7 +226,8 @@ class WorldStateBatchContextManager:
             self.world._state_change_batch_publishes_changes = self.publish_changes
         elif self.world._state_change_batch_publishes_changes != self.publish_changes:
             raise MismatchingPublishChangesAttribute(
-                self.world._state_change_batch_publishes_changes, self.publish_changes
+                active_publish_changes=self.world._state_change_batch_publishes_changes,
+                proposed_publish_changes=self.publish_changes,
             )
         self.world._state_change_batch_depth += 1
         return self
@@ -249,7 +250,7 @@ class WorldStateBatchContextManager:
         self.world.notify_state_change(publish_changes=publish_changes)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelUpdateContextManager:
     """
     Context manager for updating the state of a given `World` instance.
@@ -287,8 +288,8 @@ class WorldModelUpdateContextManager:
             == self.publish_changes
         ):
             raise MismatchingPublishChangesAttribute(
-                model_manager._current_modifications_will_be_published,
-                self.publish_changes,
+                active_publish_changes=model_manager._current_modifications_will_be_published,
+                proposed_publish_changes=self.publish_changes,
             )
 
         self.world.world_is_being_modified = True
@@ -409,9 +410,11 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
             that world.
             """
             if current_world._current_active_atomic_world_modification is not None:
-                raise AtomicWorldModificationNotAtomic(func, current_world)
+                raise AtomicWorldModificationNotAtomic(
+                    modification=func, world=current_world
+                )
             if not current_world._model_manager.has_open_modification:
-                raise MissingWorldModificationContextError(func)
+                raise MissingWorldModificationContextError(function=func)
             current_world._current_active_atomic_world_modification = func
 
             # bind args and kwargs
@@ -445,7 +448,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
     return _decorate(func)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ModelRevision:
     """
     Identifies one state of the kinematic structure.
@@ -470,7 +473,7 @@ class ModelRevision:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelManager:
     """
     Manages the world model version and modification blocks.
@@ -611,7 +614,7 @@ class WorldModelManager:
 _LRU_CACHE_SIZE: int = 2048
 
 
-@dataclass
+@dataclass(kw_only=True)
 class World(HasSimulatorProperties):
     """
     A class representing the world.
@@ -764,7 +767,7 @@ class World(HasSimulatorProperties):
         :param root_body_name: The root body's name.
         :param prefix: Optional namespace prefix for the root body's name.
         """
-        root_body = Body(name=PrefixedName(root_body_name, prefix))
+        root_body = Body(name=PrefixedName(name=root_body_name, prefix=prefix))
         world = World()
         with world.modify_world():
             world.add_body(root_body)
@@ -1000,7 +1003,9 @@ class World(HasSimulatorProperties):
                     no_dependency_queue.append(annotation)
 
         if len(sorted_annotations) != len(annotations):
-            raise SemanticAnnotationCircularDependencyError(sorted_annotations)
+            raise SemanticAnnotationCircularDependencyError(
+                semantic_annotations=sorted_annotations
+            )
 
         return sorted_annotations
 
@@ -1603,7 +1608,7 @@ class World(HasSimulatorProperties):
         match matches:
             case []:
                 raise WorldEntityNotFoundError(
-                    name,
+                    name_or_hash=name,
                     suggestions=self._suggest_world_entity_names(
                         name, world_entity_iterable
                     ),
@@ -1611,7 +1616,7 @@ class World(HasSimulatorProperties):
             case [entity]:
                 return entity
             case _:
-                raise DuplicateWorldEntityError(matches)
+                raise DuplicateWorldEntityError(world_entities=matches)
 
     @memoize
     def get_semantic_annotations_by_name(
@@ -1725,7 +1730,7 @@ class World(HasSimulatorProperties):
         """
         entity = self.find_world_entity_with_id(id)
         if entity is None:
-            raise WorldEntityWithIDNotFoundError(id)
+            raise WorldEntityWithIDNotFoundError(name_or_hash=id)
         return entity
 
     def find_world_entity_with_id(self, entity_id: UUID) -> WorldEntityWithID | None:
@@ -1800,7 +1805,7 @@ class World(HasSimulatorProperties):
     def get_semantic_annotation_by_id(self, id: UUID) -> SemanticAnnotation:
         matches = [s for s in self.semantic_annotations if s.id == id]
         if not matches:
-            raise WorldEntityWithIDNotFoundError(id)
+            raise WorldEntityWithIDNotFoundError(name_or_hash=id)
         return matches[0]
 
     def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
@@ -1812,7 +1817,7 @@ class World(HasSimulatorProperties):
         """
         entity = self._world_entity_hash_table.get(entity_hash, None)
         if entity is None:
-            raise WorldEntityNotFoundError(entity_hash)
+            raise WorldEntityNotFoundError(name_or_hash=entity_hash)
         return entity
 
     # %% Existence Checks
@@ -2101,7 +2106,9 @@ class World(HasSimulatorProperties):
             block (used when attaching freshly created entities). It is slower than the FK manager.
         """
         if branch_root._world != new_parent._world:
-            raise MismatchingWorld(branch_root._world, new_parent._world)
+            raise MismatchingWorld(
+                expected_world=branch_root._world, given_world=new_parent._world
+            )
 
         if branch_root.parent_kinematic_structure_entity == new_parent:
             return
@@ -2915,7 +2922,7 @@ class World(HasSimulatorProperties):
 
         :return: A ray tracer for the world.
         """
-        return RayTracer(self)
+        return RayTracer(world=self)
 
     def apply_control_commands(
         self, commands: np.ndarray, dt: float, derivative: Derivatives

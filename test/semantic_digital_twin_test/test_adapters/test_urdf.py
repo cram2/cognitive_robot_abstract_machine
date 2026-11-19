@@ -34,7 +34,7 @@ from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class URDFPaths:
     """
     Data class to hold paths to URDF files used in tests.
@@ -312,7 +312,7 @@ def test_inertia_tensor_is_expressed_in_the_link_frame(table_parser):
             origin=urdfpy.Pose(xyz=[0.0, 0.0, 0.0], rpy=[0.0, 0.0, pi / 2]),
         ),
     )
-    body = Body(name=PrefixedName("rotated_inertial_link"))
+    body = Body(name=PrefixedName(name="rotated_inertial_link"))
 
     inertial = table_parser.parse_inertial(link, body)
     inertia_rotated_by_ninety_degrees_around_z = np.diag([0.003, 0.002, 0.004])

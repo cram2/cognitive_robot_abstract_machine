@@ -13,7 +13,7 @@ from krrood.ripple_down_rules.rdr import GeneralRDR
 class ReasoningResult(UserDict[str, Any]): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseReasoner:
     """
     Uses Ripple Down Rules to infer concepts about a case.

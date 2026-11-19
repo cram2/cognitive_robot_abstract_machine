@@ -452,7 +452,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
         :return: The name the variables of :attr:`root_T_goal_reference_frame` are
             created under.
         """
-        return PrefixedName("root_T_goal_ref", str(self.name))
+        return PrefixedName(name="root_T_goal_ref", prefix=str(self.name))
 
     def _root_T_goal_reference_frame_to_bind(
         self,

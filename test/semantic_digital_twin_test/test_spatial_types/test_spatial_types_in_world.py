@@ -42,8 +42,8 @@ def tilted_world() -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        tip = Body(name=PrefixedName("tip"))
+        root = Body(name=PrefixedName(name="root"))
+        tip = Body(name=PrefixedName(name="tip"))
         connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=root,

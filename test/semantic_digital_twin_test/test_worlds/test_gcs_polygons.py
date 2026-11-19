@@ -39,20 +39,20 @@ from semantic_digital_twin.world_description.world_entity import Body
 def unit_box_world() -> World:
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
+        root = Body(name=PrefixedName(name="map"))
         world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("unit_cube"))
+        obstacle = Body(name=PrefixedName(name="unit_cube"))
         world.add_connection(
             FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
         )
-        obstacle.collision.append(Box(scale=Scale(1.0, 1.0, 1.0)))
+        obstacle.collision.append(Box(scale=Scale(x=1.0, y=1.0, z=1.0)))
     return world
 
 
 @pytest.fixture
 def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
     return BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-2,
                 max_x=3,
@@ -65,7 +65,7 @@ def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
                 ),
             )
         ],
-        unit_box_world.root,
+        reference_frame=unit_box_world.root,
     )
 
 
@@ -86,9 +86,9 @@ def non_convex_ring_world(tmp_path) -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
+        root = Body(name=PrefixedName(name="map"))
         world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("ring"))
+        obstacle = Body(name=PrefixedName(name="ring"))
         world.add_connection(
             FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
         )
@@ -103,7 +103,7 @@ def non_convex_ring_world(tmp_path) -> World:
 @pytest.fixture
 def non_convex_ring_search_space(non_convex_ring_world: World) -> BoundingBoxCollection:
     return BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-2,
                 max_x=3,
@@ -116,7 +116,7 @@ def non_convex_ring_search_space(non_convex_ring_world: World) -> BoundingBoxCol
                 ),
             )
         ],
-        non_convex_ring_world.root,
+        reference_frame=non_convex_ring_world.root,
     )
 
 
@@ -205,11 +205,27 @@ class TestGraphOfConvexPolygons:
     def test_from_world_rejects_a_multi_box_search_space(self, unit_box_world: World):
         origin = HomogeneousTransformationMatrix(reference_frame=unit_box_world.root)
         two_boxes = BoundingBoxCollection(
-            [
-                VolumetricBoundingBox(-2, -2, -0.5, -1, -1, 0.5, origin),
-                VolumetricBoundingBox(1, 1, -0.5, 2, 2, 0.5, origin),
+            shapes=[
+                VolumetricBoundingBox(
+                    min_x=-2,
+                    min_y=-2,
+                    min_z=-0.5,
+                    max_x=-1,
+                    max_y=-1,
+                    max_z=0.5,
+                    origin=origin,
+                ),
+                VolumetricBoundingBox(
+                    min_x=1,
+                    min_y=1,
+                    min_z=-0.5,
+                    max_x=2,
+                    max_y=2,
+                    max_z=0.5,
+                    origin=origin,
+                ),
             ],
-            unit_box_world.root,
+            reference_frame=unit_box_world.root,
         )
         with pytest.raises(UnboundedSearchSpaceError):
             GraphOfConvexPolygons.from_world(unit_box_world, two_boxes)

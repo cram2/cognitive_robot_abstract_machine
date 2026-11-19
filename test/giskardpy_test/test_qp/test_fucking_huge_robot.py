@@ -61,9 +61,9 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
     world = World()
     with world.modify_world():
         # %% joint1
-        root = Body(name=PrefixedName("map"))
+        root = Body(name=PrefixedName(name="map"))
         link1 = Body(
-            name=PrefixedName("link1"),
+            name=PrefixedName(name="link1"),
             collision=deepcopy(fucking_huge_sphere),
             visual=deepcopy(fucking_huge_sphere),
         )
@@ -81,7 +81,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
         # %% joint2
         link2 = Body(
-            name=PrefixedName("link2"),
+            name=PrefixedName(name="link2"),
             collision=deepcopy(fucking_huge_cylinder),
             visual=deepcopy(fucking_huge_cylinder),
         )
@@ -102,7 +102,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
         # %% joint3
         link3 = Body(
-            name=PrefixedName("link3"),
+            name=PrefixedName(name="link3"),
             collision=deepcopy(fucking_huge_cylinder),
             visual=deepcopy(fucking_huge_cylinder),
         )
@@ -123,7 +123,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
         # %% joint4
         link4 = Body(
-            name=PrefixedName("link4"),
+            name=PrefixedName(name="link4"),
             collision=deepcopy(fucking_huge_sphere),
             visual=deepcopy(fucking_huge_sphere),
         )
@@ -141,7 +141,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
         # %% joint5
         link5 = Body(
-            name=PrefixedName("link5"),
+            name=PrefixedName(name="link5"),
             collision=deepcopy(fucking_huge_sphere),
             visual=deepcopy(fucking_huge_sphere),
         )
@@ -159,7 +159,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
         # %% joint6
         eef = Body(
-            name=PrefixedName("eef"),
+            name=PrefixedName(name="eef"),
             collision=deepcopy(fucking_huge_sphere),
             visual=deepcopy(fucking_huge_sphere),
         )

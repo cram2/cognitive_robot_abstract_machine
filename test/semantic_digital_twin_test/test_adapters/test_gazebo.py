@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.geometry import Box, Cylinder, Mesh, Sphere
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GazeboFixturePaths:
     """
     The paths of the SDF files used in these tests.

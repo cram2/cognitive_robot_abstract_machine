@@ -71,12 +71,12 @@ class ConnectionModificationTestCase(unittest.TestCase):
         w = World()
 
         with w.modify_world():
-            b1 = Body(name=PrefixedName("b1"))
-            b2 = Body(name=PrefixedName("b2"))
+            b1 = Body(name=PrefixedName(name="b1"))
+            b2 = Body(name=PrefixedName(name="b2"))
             w.add_kinematic_structure_entity(b1)
             w.add_kinematic_structure_entity(b2)
 
-            connection = FixedConnection(b1, b2)
+            connection = FixedConnection(parent=b1, child=b2)
             w.add_connection(connection)
 
         modifications = w.get_world_model_manager().model_modification_blocks[-1]
@@ -91,12 +91,12 @@ class ConnectionModificationTestCase(unittest.TestCase):
         w = World()
 
         with w.modify_world():
-            b1 = Body(name=PrefixedName("b1"))
-            b2 = Body(name=PrefixedName("b2"))
+            b1 = Body(name=PrefixedName(name="b1"))
+            b2 = Body(name=PrefixedName(name="b2"))
             w.add_kinematic_structure_entity(b1)
             w.add_kinematic_structure_entity(b2)
 
-            dof = DegreeOfFreedom(name=PrefixedName("dofyboi"))
+            dof = DegreeOfFreedom(name=PrefixedName(name="dofyboi"))
             w.add_degree_of_freedom(dof)
             connection = ScrewAxisConnection(
                 parent=b1,
@@ -117,16 +117,16 @@ class ConnectionModificationTestCase(unittest.TestCase):
         world = World()
 
         with world.modify_world():
-            b1 = Body(name=PrefixedName("b1"))
-            b2 = Body(name=PrefixedName("b2"))
-            b3 = Body(name=PrefixedName("b3"))
+            b1 = Body(name=PrefixedName(name="b1"))
+            b2 = Body(name=PrefixedName(name="b2"))
+            b3 = Body(name=PrefixedName(name="b3"))
             world.add_kinematic_structure_entity(b1)
             world.add_kinematic_structure_entity(b2)
             world.add_kinematic_structure_entity(b3)
             world.add_connection(
                 Connection6DoF.create_with_dofs(parent=b1, child=b2, world=world)
             )
-            dof = DegreeOfFreedom(name=PrefixedName("dofyboi"))
+            dof = DegreeOfFreedom(name=PrefixedName(name="dofyboi"))
             world.add_degree_of_freedom(dof)
             world.add_connection(
                 ScrewAxisConnection(
@@ -196,7 +196,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
     def test_semantic_annotation_modifications(self):
         w = World()
         with w.modify_world():
-            w.add_kinematic_structure_entity(b1 := Body(name=PrefixedName("b1")))
+            w.add_kinematic_structure_entity(b1 := Body(name=PrefixedName(name="b1")))
         v1 = Handle(root=b1)
         v2 = Door(root=b1, handle=v1)
 
@@ -212,8 +212,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         self.assertEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
         self.assertEqual(v1.root, w.get_kinematic_structure_entity_by_name("b1"))
 
-        rm_v1 = RemoveSemanticAnnotationModification(v1.id)
-        rm_v2 = RemoveSemanticAnnotationModification(v2.id)
+        rm_v1 = RemoveSemanticAnnotationModification(semantic_annotation_id=v1.id)
+        rm_v2 = RemoveSemanticAnnotationModification(semantic_annotation_id=v2.id)
         with w.modify_world():
             rm_v1.apply(world=w)
             rm_v2.apply(world=w)
@@ -223,21 +223,21 @@ class ConnectionModificationTestCase(unittest.TestCase):
     def test_duplicate_name_modification_serialization(self):
         w = World()
         with w.modify_world():
-            b1 = Body(name=PrefixedName("b1"))
+            b1 = Body(name=PrefixedName(name="b1"))
             w.add_kinematic_structure_entity(b1)
 
-            b2 = Body(name=PrefixedName("b1"))  # Duplicate name
+            b2 = Body(name=PrefixedName(name="b1"))  # Duplicate name
             w.add_kinematic_structure_entity(b2)
 
-            b3 = Body(name=PrefixedName("b3"))
+            b3 = Body(name=PrefixedName(name="b3"))
             w.add_kinematic_structure_entity(b3)
 
             c1 = Connection6DoF.create_with_dofs(
-                name=PrefixedName("name1"), parent=b1, child=b2, world=w
+                name=PrefixedName(name="name1"), parent=b1, child=b2, world=w
             )
             w.add_connection(c1)
             c2 = Connection6DoF.create_with_dofs(
-                name=PrefixedName("name1"), parent=b1, child=b3, world=w
+                name=PrefixedName(name="name1"), parent=b1, child=b3, world=w
             )
             w.add_connection(c2)
 
@@ -256,14 +256,14 @@ class ConnectionModificationTestCase(unittest.TestCase):
     def test_actuator_serialization(self):
         w = World()
         with w.modify_world():
-            b1 = Body(name=PrefixedName("b1"))
+            b1 = Body(name=PrefixedName(name="b1"))
             w.add_kinematic_structure_entity(b1)
-            b2 = Body(name=PrefixedName("b2"))
+            b2 = Body(name=PrefixedName(name="b2"))
             w.add_kinematic_structure_entity(b2)
             c = Connection6DoF.create_with_dofs(parent=b1, child=b2, world=w)
             w.add_connection(c)
             dof = w.degrees_of_freedom[0]
-            actuator = Actuator(name=PrefixedName("actuator"))
+            actuator = Actuator(name=PrefixedName(name="actuator"))
             actuator.add_dof(dof)
             w.add_actuator(actuator)
 
@@ -283,8 +283,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
 def test_connection_t_child_expression_survives_json_roundtrip():
 
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
-    child = Body(name=PrefixedName("child", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
+    child = Body(name=PrefixedName(name="child", prefix="review"))
     connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, child_frame=child
     )
@@ -309,12 +309,12 @@ def test_connection_t_child_expression_survives_json_roundtrip():
 
 def test_body_inertial_survives_world_deepcopy():
     world = World()
-    body = Body(name=PrefixedName("heavy_body", prefix="review"))
+    body = Body(name=PrefixedName(name="heavy_body", prefix="review"))
     collision = Box(
         scale=Scale(),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
     )
-    body.collision = ShapeCollection([collision], reference_frame=body)
+    body.collision = ShapeCollection(shapes=[collision], reference_frame=body)
     body.inertial = Inertial(mass=5.0)
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
@@ -335,21 +335,21 @@ def test_design_09_failed_atomic_modification_is_not_recorded():
     block, a phantom modification stays in the history.
     """
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
-    child = Body(name=PrefixedName("child", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
+    child = Body(name=PrefixedName(name="child", prefix="review"))
     collision = Box(
         scale=Scale(),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=child),
     )
-    child.collision = ShapeCollection([collision], reference_frame=child)
+    child.collision = ShapeCollection(shapes=[collision], reference_frame=child)
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(child)
         connection = FixedConnection(parent=root, child=child)
         world.add_connection(connection)
 
-    outside_parent = Body(name=PrefixedName("outside_parent", prefix="review"))
-    outside_child = Body(name=PrefixedName("outside_child", prefix="review"))
+    outside_parent = Body(name=PrefixedName(name="outside_parent", prefix="review"))
+    outside_child = Body(name=PrefixedName(name="outside_child", prefix="review"))
 
     with world.modify_world():
         bad_connection = FixedConnection(parent=outside_parent, child=outside_child)
@@ -378,7 +378,7 @@ def test_revert_add_kinematic_structure_entity():
     Reverting the addition of a body removes it again.
     """
     world = World()
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
 
@@ -396,7 +396,7 @@ def test_revert_remove_kinematic_structure_entity():
     Reverting the removal of a body adds it back.
     """
     world = World()
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
     with world.modify_world():
@@ -417,11 +417,11 @@ def test_revert_add_connection():
     """
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b1)
         world.add_kinematic_structure_entity(b2)
-        connection = FixedConnection(b1, b2)
+        connection = FixedConnection(parent=b1, child=b2)
         world.add_connection(connection)
 
     modification = next(
@@ -446,11 +446,11 @@ def test_revert_remove_connection():
     """
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b1)
         world.add_kinematic_structure_entity(b2)
-        connection = FixedConnection(b1, b2)
+        connection = FixedConnection(parent=b1, child=b2)
         world.add_connection(connection)
     with world.modify_world():
         # removing the connection alone would leave b2 disconnected from the world's
@@ -480,11 +480,11 @@ def test_revert_add_degree_of_freedom():
     # so it has to be attached to a connection to observe revert() removing it deliberately.
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b1)
         world.add_kinematic_structure_entity(b2)
-        dof = DegreeOfFreedom(name=PrefixedName("dof"))
+        dof = DegreeOfFreedom(name=PrefixedName(name="dof"))
         world.add_degree_of_freedom(dof)
         connection = ScrewAxisConnection(
             parent=b1,
@@ -518,11 +518,11 @@ def test_revert_remove_degree_of_freedom():
     """
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b1)
         world.add_kinematic_structure_entity(b2)
-        dof = DegreeOfFreedom(name=PrefixedName("dof"))
+        dof = DegreeOfFreedom(name=PrefixedName(name="dof"))
         world.add_degree_of_freedom(dof)
         connection = ScrewAxisConnection(
             parent=b1,
@@ -561,7 +561,7 @@ def test_revert_add_semantic_annotation():
     """
     world = World()
     with world.modify_world():
-        body = Body(name=PrefixedName("body"))
+        body = Body(name=PrefixedName(name="body"))
         world.add_kinematic_structure_entity(body)
     handle = Handle(root=body)
 
@@ -583,7 +583,7 @@ def test_revert_remove_semantic_annotation():
     """
     world = World()
     with world.modify_world():
-        body = Body(name=PrefixedName("body"))
+        body = Body(name=PrefixedName(name="body"))
         world.add_kinematic_structure_entity(body)
     handle = Handle(root=body)
     with world.modify_world():
@@ -606,7 +606,7 @@ def test_revert_add_actuator():
     Reverting the addition of an actuator removes it again.
     """
     world = World()
-    actuator = Actuator(name=PrefixedName("actuator"))
+    actuator = Actuator(name=PrefixedName(name="actuator"))
     with world.modify_world():
         world.add_actuator(actuator)
 
@@ -622,7 +622,7 @@ def test_revert_remove_actuator():
     Reverting the removal of an actuator adds it back.
     """
     world = World()
-    actuator = Actuator(name=PrefixedName("actuator"))
+    actuator = Actuator(name=PrefixedName(name="actuator"))
     with world.modify_world():
         world.add_actuator(actuator)
     with world.modify_world():
@@ -646,14 +646,14 @@ def test_revert_set_dofs_has_hardware_interface_restores_per_dof_previous_value(
     # orphan when the modify_world block that adds it closes.
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
-        b3 = Body(name=PrefixedName("b3"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
+        b3 = Body(name=PrefixedName(name="b3"))
         world.add_kinematic_structure_entity(b1)
         world.add_kinematic_structure_entity(b2)
         world.add_kinematic_structure_entity(b3)
-        dof1 = DegreeOfFreedom(name=PrefixedName("dof1"))
-        dof2 = DegreeOfFreedom(name=PrefixedName("dof2"))
+        dof1 = DegreeOfFreedom(name=PrefixedName(name="dof1"))
+        dof2 = DegreeOfFreedom(name=PrefixedName(name="dof2"))
         world.add_degree_of_freedom(dof1)
         world.add_degree_of_freedom(dof2)
         world.add_connection(
@@ -700,15 +700,15 @@ def test_revert_attribute_update_scalar():
     Reverting the update of a scalar attribute restores its previous value.
     """
     world = World()
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
 
     original_name = body.name
     with world.modify_world():
-        body.update_name(PrefixedName("renamed"))
+        body.update_name(PrefixedName(name="renamed"))
 
-    assert body.name == PrefixedName("renamed")
+    assert body.name == PrefixedName(name="renamed")
 
     modification = _last_modification_block(world)[0]
     assert isinstance(modification, AttributeUpdateModification)
@@ -725,12 +725,12 @@ def test_revert_attribute_update_list():
     """
     world = World()
     with world.modify_world():
-        oven_body = Body(name=PrefixedName("oven_body"))
-        door_body = Body(name=PrefixedName("door_body"))
+        oven_body = Body(name=PrefixedName(name="oven_body"))
+        door_body = Body(name=PrefixedName(name="door_body"))
         world.add_kinematic_structure_entity(oven_body)
         world.add_kinematic_structure_entity(door_body)
         # a world must stay a single connected tree across modify_world blocks.
-        world.add_connection(FixedConnection(oven_body, door_body))
+        world.add_connection(FixedConnection(parent=oven_body, child=door_body))
 
     oven = Oven(root=oven_body)
     door = Door(root=door_body)
@@ -762,11 +762,11 @@ def test_world_model_modification_block_revert_restores_removed_branch():
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        child = Body(name=PrefixedName("child"))
+        root = Body(name=PrefixedName(name="root"))
+        child = Body(name=PrefixedName(name="child"))
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(child)
-        connection = FixedConnection(root, child)
+        connection = FixedConnection(parent=root, child=child)
         world.add_connection(connection)
 
     world.remove_branch_from_world(child)
@@ -786,12 +786,12 @@ def test_world_rollback_modification_blocks_reverts_most_recent_block():
     # each modify_world block, as required.
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         world.add_kinematic_structure_entity(b1)
     with world.modify_world():
-        b2 = Body(name=PrefixedName("b2"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b2)
-        world.add_connection(FixedConnection(b1, b2))
+        world.add_connection(FixedConnection(parent=b1, child=b2))
 
     rolled_back = world.rollback_modification_blocks()
 
@@ -809,12 +809,12 @@ def test_world_rollback_modification_blocks_reverts_most_recent_block():
 def test_world_rollback_modification_blocks_reverts_several_blocks_in_order():
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         world.add_kinematic_structure_entity(b1)
     with world.modify_world():
-        b2 = Body(name=PrefixedName("b2"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b2)
-        world.add_connection(FixedConnection(b1, b2))
+        world.add_connection(FixedConnection(parent=b1, child=b2))
 
     world.rollback_modification_blocks(count=2)
 
@@ -825,7 +825,7 @@ def test_world_rollback_modification_blocks_reverts_several_blocks_in_order():
 def test_world_rollback_modification_blocks_raises_when_insufficient_history():
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         world.add_kinematic_structure_entity(b1)
 
     with pytest.raises(InsufficientModificationHistoryError):
@@ -837,18 +837,18 @@ def test_world_rollback_modification_blocks_raises_when_insufficient_history():
 def test_world_rollback_to_version_reverts_blocks_after_it():
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         world.add_kinematic_structure_entity(b1)
     version_after_b1 = world.get_world_model_manager().version
 
     with world.modify_world():
-        b2 = Body(name=PrefixedName("b2"))
+        b2 = Body(name=PrefixedName(name="b2"))
         world.add_kinematic_structure_entity(b2)
-        world.add_connection(FixedConnection(b1, b2))
+        world.add_connection(FixedConnection(parent=b1, child=b2))
     with world.modify_world():
-        b3 = Body(name=PrefixedName("b3"))
+        b3 = Body(name=PrefixedName(name="b3"))
         world.add_kinematic_structure_entity(b3)
-        world.add_connection(FixedConnection(b2, b3))
+        world.add_connection(FixedConnection(parent=b2, child=b3))
 
     rolled_back = world.rollback_to_version(version_after_b1)
 
@@ -861,7 +861,7 @@ def test_world_rollback_to_version_reverts_blocks_after_it():
 def test_world_rollback_to_version_is_noop_at_current_version():
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         world.add_kinematic_structure_entity(b1)
     current_version = world.get_world_model_manager().version
 
@@ -874,7 +874,7 @@ def test_world_rollback_to_version_is_noop_at_current_version():
 def test_world_rollback_to_version_raises_for_version_ahead_of_current():
     world = World()
     with world.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         world.add_kinematic_structure_entity(b1)
     current_version = world.get_world_model_manager().version
 

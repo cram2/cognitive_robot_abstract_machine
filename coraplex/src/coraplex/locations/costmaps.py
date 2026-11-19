@@ -413,7 +413,7 @@ class OccupancyCostmap(Costmap):
 
         free_space_mask = np.ones(len(rays))
 
-        ray_tracer = RayTracer(self.world)
+        ray_tracer = RayTracer(world=self.world)
         ray_intersections = ray_tracer.ray_test(rays[:, 0], rays[:, 1])
         hit_ray_indices = ray_intersections.ray_indices
         hit_bodies = ray_intersections.bodies
@@ -549,7 +549,7 @@ class VisibilityCostmap(Costmap):
         """
         images = []
 
-        ray_tracer = RayTracer(self.world)
+        ray_tracer = RayTracer(world=self.world)
 
         origin_copy = deepcopy(self.origin).homogeneous_matrix
 

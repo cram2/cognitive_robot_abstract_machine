@@ -667,7 +667,7 @@ def test_a_trial_catches_its_copy_up_with_what_the_world_gained(
         trial_executor_type=KinematicallySimulatedPlanExecutor,
     )
     copied = trial._copy()
-    body = Body(name=PrefixedName("added_after_the_copy"))
+    body = Body(name=PrefixedName(name="added_after_the_copy"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_connection(FixedConnection(parent=world.root, child=body))

@@ -257,9 +257,9 @@ def annotate(mesh: trimesh.Trimesh, annotation_type: type[HasRootBody]) -> HasRo
     :return: The annotation, alone in a new world.
     """
     world = World()
-    body = Body(name=PrefixedName(annotation_type.__name__.lower()))
+    body = Body(name=PrefixedName(name=annotation_type.__name__.lower()))
     shapes = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mesh, origin=HomogeneousTransformationMatrix(reference_frame=body)
             )
@@ -302,7 +302,11 @@ def test_an_optional_part_the_locator_is_unsure_of_is_left_out():
     mug = annotate(mesh, Mug)
     finder = AnnotationPartFinder(
         locator=KnownPartLocator(
-            parts=[LocatedPart("handle", handle_faces, confidence=0.3)]
+            parts=[
+                LocatedPart(
+                    relationship_name="handle", faces=handle_faces, confidence=0.3
+                )
+            ]
         ),
         minimum_confidence=0.5,
     )

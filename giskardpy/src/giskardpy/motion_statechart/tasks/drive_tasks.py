@@ -236,7 +236,7 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         """
         super().set_up()
         self._parent_T_start_binding = ForwardKinematicsBinding(
-            name=PrefixedName("parent_T_start", str(self.name)),
+            name=PrefixedName(name="parent_T_start", prefix=str(self.name)),
             kinematic_chain=KinematicChain(
                 root=self.drive_parent, tip=self.driven_body
             ),

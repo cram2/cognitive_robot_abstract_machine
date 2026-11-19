@@ -321,8 +321,8 @@ def _box_in(world: World) -> Milk:
     A graspable box with collision geometry, standing away from the robot.
     """
     body = Body(
-        name=PrefixedName("box"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.2))]),
+        name=PrefixedName(name="box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.2))]),
     )
     graspable = Milk(root=body)
     with world.modify_world():

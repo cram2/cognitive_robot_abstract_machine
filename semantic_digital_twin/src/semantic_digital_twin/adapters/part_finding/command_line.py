@@ -62,7 +62,7 @@ class CommandLineOption(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingCommandLine:
     """
     The settings of a part finding server started from the command line.

@@ -28,7 +28,7 @@ except ImportError:
 SAPIEN_ACCESS_TOKEN_ENVIRONMENT_VARIABLE_NAME = "SAPIEN_ACCESS_TOKEN"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartNetMobilityDatasetLoader:
     """
     Loader for articulated assets from the PartNet-Mobility dataset (https://sapien.ucsd.edu/browse).
@@ -204,7 +204,7 @@ class PartNetMobilityDatasetLoader:
         return [int(directory.name) for directory in self.directory.glob("*")]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartNetLabelClassDescription:
     """
     Class description for a PartNet label.

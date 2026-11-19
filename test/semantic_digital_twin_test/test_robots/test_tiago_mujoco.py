@@ -46,8 +46,8 @@ pytestmark = pytest.mark.skipif(
 def mounted_tiago() -> TiagoMujoco:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    return RobotSpecification(TiagoMujoco).spawn(world)
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    return RobotSpecification(semantic_annotation_type=TiagoMujoco).spawn(world)
 
 
 # %% reading the description
@@ -107,7 +107,7 @@ def test_a_servo_keeps_the_joint_dynamics_its_description_states(mounted_tiago):
     An MJCF states each joint's own damping and friction, so declaring a servo on that
     joint leaves them alone rather than replacing them with the servo's own.
     """
-    as_described = MJCFParser(TiagoMujoco.get_ros_file_path()).create_world()
+    as_described = MJCFParser(file_path=TiagoMujoco.get_ros_file_path()).create_world()
 
     for connection in mounted_tiago.connections:
         if not isinstance(connection, ActiveConnection1DOF):
@@ -302,7 +302,7 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_turning_base_back(
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
     with world.modify_world():
         Floor.create_with_new_body_from_polytope_in_world(
             name="floor",
@@ -314,7 +314,9 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_turning_base_back(
                 Point3(-3, 3, 0),
             ],
         )
-    tiago_on_the_floor = RobotSpecification(TiagoMujoco).spawn(world)
+    tiago_on_the_floor = RobotSpecification(semantic_annotation_type=TiagoMujoco).spawn(
+        world
+    )
 
     reached_without_a_floor = _drive_at(mounted_tiago, 0.0, 0.3, timedelta(seconds=2))
     reached_on_the_floor = _drive_at(tiago_on_the_floor, 0.0, 0.3, timedelta(seconds=2))

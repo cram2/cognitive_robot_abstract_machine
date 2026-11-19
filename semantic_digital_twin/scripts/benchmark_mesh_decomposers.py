@@ -30,7 +30,7 @@ def load_non_convex_mesh():
     :return: The collision mesh of the jeroen cup.
     """
     stl_path = "package://iai_objects/objects/jeroen_cup.stl"
-    body: Body = STLParser(stl_path).create_world().root
+    body: Body = STLParser(file_path=stl_path).create_world().root
     return body.collision[0]
 
 

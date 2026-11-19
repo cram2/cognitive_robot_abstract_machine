@@ -98,7 +98,7 @@ class DAiSyJoint(JointName):
     RIGHT_GRIPPER_RIGHT_FINGER = "right_gripper_right_finger_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -120,7 +120,7 @@ class DAiSyLeftGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftGripperRightFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -142,7 +142,7 @@ class DAiSyLeftGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -164,7 +164,7 @@ class DAiSyRightGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightGripperRightFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -186,7 +186,7 @@ class DAiSyRightGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftGripper(
     GriplinkGripper,
     HasTwoFingers[DAiSyLeftGripperLeftFinger, DAiSyLeftGripperRightFinger],
@@ -227,13 +227,13 @@ class DAiSyLeftGripper(
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_open", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_close", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.028])),
             state_type=GripperState.CLOSE,
         )
@@ -261,7 +261,7 @@ class DAiSyLeftGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightGripper(
     GriplinkGripper,
     HasTwoFingers[DAiSyRightGripperLeftFinger, DAiSyRightGripperRightFinger],
@@ -302,13 +302,13 @@ class DAiSyRightGripper(
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_open", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_close", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.028])),
             state_type=GripperState.CLOSE,
         )
@@ -337,7 +337,7 @@ class DAiSyRightGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -345,7 +345,7 @@ class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     connections,
@@ -377,7 +377,7 @@ class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightArm(Arm[DAiSyRightGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -385,7 +385,7 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     connections,
@@ -417,7 +417,7 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
     """
     DAiSy does not currently have a dedicated camera.
@@ -449,7 +449,7 @@ class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
     """
     Represents two UR5 Arms mounted on a table.

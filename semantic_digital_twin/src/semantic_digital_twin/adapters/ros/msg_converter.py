@@ -20,7 +20,7 @@ OutputType = TypeVar("OutputType")
 # %% finding the converter for a message
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MessageConverter(ABC, Generic[InputType, OutputType]):
     """
     Base class for converters between ROS2 messages and their semDT representation.
@@ -77,7 +77,7 @@ class MessageConverter(ABC, Generic[InputType, OutputType]):
         raise cls.conversion_error()(data_type=type(input_obj))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Ros2ToSemDTConverter(MessageConverter[InputType, OutputType], ABC):
     """
     Base class for converters that convert ROS2 messages to their semDT representation.
@@ -99,7 +99,7 @@ class Ros2ToSemDTConverter(MessageConverter[InputType, OutputType], ABC):
         return cls.get_to_converter(data).convert(data, world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemDTToRos2Converter(MessageConverter[InputType, OutputType], ABC):
     """
     Base class for converters that convert semDT objects to their ROS2 message

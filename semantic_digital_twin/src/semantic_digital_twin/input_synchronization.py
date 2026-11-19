@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # %% base classes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputSynchronizer(ABC):
     """
     Writes an external source of truth, e.g. a robot's joint states, into the world
@@ -54,7 +54,7 @@ class InputSynchronizer(ABC):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateInputs:
     """
     All inputs that one loop applies before it computes anything.

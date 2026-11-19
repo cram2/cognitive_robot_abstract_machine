@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # %% grasp candidates
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GraspCandidate:
     """
     A grasp an object offers, together with the object offering it.
@@ -64,7 +64,7 @@ class GraspCandidate:
         :param graspable: The annotation of the object to be grasped.
         :return: A grasp at that object's origin.
         """
-        return cls(graspable, Pose(reference_frame=graspable.root))
+        return cls(graspable=graspable, grasp_pose=Pose(reference_frame=graspable.root))
 
     @property
     def width_along_closing_axis(self) -> float:
@@ -79,7 +79,7 @@ class GraspCandidate:
         """
         body = self.graspable.root
         if not body.has_collision():
-            raise ObjectHasNoWidthWithoutCollision(body.name)
+            raise ObjectHasNoWidthWithoutCollision(object_name=body.name)
         bounding_box = body.collision.as_bounding_box_collection_in_frame(
             body
         ).bounding_box()

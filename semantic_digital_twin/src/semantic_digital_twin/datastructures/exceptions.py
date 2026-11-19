@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 # %% joint states
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionNotInJointStateError(UsageError):
     """
     Raised when a joint state is asked for the target value of a connection it sets no

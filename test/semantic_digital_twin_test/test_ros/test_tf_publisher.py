@@ -90,7 +90,7 @@ def test_clear(rclpy_node, pr2_world_copy):
 
 def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_copy):
     with pr2_world_copy.modify_world():
-        box = Body(name=PrefixedName("box"))
+        box = Body(name=PrefixedName(name="box"))
         c = FixedConnection(parent=pr2_world_copy.root, child=box)
         pr2_world_copy.add_connection(c)
     tf_wrapper = TFWrapper(node=rclpy_node)
@@ -227,7 +227,7 @@ def test_tf_publisher_with_Regions(rclpy_node, pr2_world_state_reset):
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
-    region = Region(name=PrefixedName("region"))
+    region = Region(name=PrefixedName(name="region"))
     connection = FixedConnection(parent=pr2_world_state_reset.root, child=region)
     with pr2_world_state_reset.modify_world():
         pr2_world_state_reset.add_region(region)
@@ -253,11 +253,11 @@ def test_empty_world(rclpy_node):
 def test_static_world(rclpy_node):
     world = World()
     with world.modify_world():
-        body1 = Body(name=PrefixedName("body1"))
-        body2 = Body(name=PrefixedName("body2"))
-        body3 = Body(name=PrefixedName("body3"))
-        body4 = Body(name=PrefixedName("body4"))
-        body5 = Body(name=PrefixedName("body5"))
+        body1 = Body(name=PrefixedName(name="body1"))
+        body2 = Body(name=PrefixedName(name="body2"))
+        body3 = Body(name=PrefixedName(name="body3"))
+        body4 = Body(name=PrefixedName(name="body4"))
+        body5 = Body(name=PrefixedName(name="body5"))
 
         body1_C_body2 = FixedConnection(parent=body1, child=body2)
         world.add_connection(body1_C_body2)
@@ -312,8 +312,8 @@ def test_static_world(rclpy_node):
 def test_static_world2(rclpy_node):
     world = World()
     with world.modify_world():
-        body1 = Body(name=PrefixedName("body1"))
-        body2 = Body(name=PrefixedName("body2"))
+        body1 = Body(name=PrefixedName(name="body1"))
+        body2 = Body(name=PrefixedName(name="body2"))
 
         body1_C_body2 = FixedConnection(parent=body1, child=body2)
         world.add_connection(body1_C_body2)
@@ -398,7 +398,7 @@ def world_with_a_fixed_and_a_moving_body() -> tuple[World, Body, Body]:
     connection with degrees of freedom.
     """
     world, (fixed,) = world_with_bodies("table")
-    moving = Body(name=PrefixedName("cup"))
+    moving = Body(name=PrefixedName(name="cup"))
     with world.modify_world():
         world.add_connection(
             Connection6DoF.create_with_dofs(
@@ -464,8 +464,8 @@ def world_with_bodies(*names: str) -> tuple[World, list[Body]]:
     Build a world whose root carries one body per given name.
     """
     world = World()
-    root = Body(name=PrefixedName("map"))
-    bodies = [Body(name=PrefixedName(name)) for name in names]
+    root = Body(name=PrefixedName(name="map"))
+    bodies = [Body(name=PrefixedName(name=name)) for name in names]
     with world.modify_world():
         world.add_body(root)
         for body in bodies:
@@ -474,7 +474,7 @@ def world_with_bodies(*names: str) -> tuple[World, list[Body]]:
 
 
 def attach_body(world: World, name: str) -> Body:
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     with world.modify_world():
         world.add_connection(FixedConnection(parent=world.root, child=body))
     return body
@@ -627,8 +627,10 @@ def test_a_body_named_after_a_path_keeps_its_slashes_in_its_frame(
     """
     world = World()
     with world.modify_world():
-        scene = Body(name=PrefixedName("scene", "clinic"))
-        chair = Body(name=PrefixedName("Meshes/Assets/Chair/Actor_0003", "clinic"))
+        scene = Body(name=PrefixedName(name="scene", prefix="clinic"))
+        chair = Body(
+            name=PrefixedName(name="Meshes/Assets/Chair/Actor_0003", prefix="clinic")
+        )
         world.add_connection(FixedConnection(parent=scene, child=chair))
     ros_publishers.adopt(TFPublisher(node=rclpy_node, _world=world))
 

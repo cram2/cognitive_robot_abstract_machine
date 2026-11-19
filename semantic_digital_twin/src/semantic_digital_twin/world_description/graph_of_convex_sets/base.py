@@ -31,7 +31,7 @@ a three-dimensional :class:`BoundingBoxCollection` or its planar counterpart.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphOfConvexSets(Generic[PointT, SearchSpaceT], SubClassSafeGeneric, ABC):
     """
     Abstract base for planning graphs whose nodes are convex sets of free space.
@@ -165,7 +165,7 @@ def create_reference_frame_with_only_yaw_from_body(body: Body) -> Body:
     with world.modify_world():
         world.add_body(reference_frame)
         reference_frame_C_world = FixedConnection(
-            world.root,
+            parent=world.root,
             child=reference_frame,
             parent_T_connection_expression=reference_frame_T_world,
         )

@@ -33,9 +33,10 @@ BOX_SIZE = (0.2, 0.2, 0.1)
 @pytest.fixture
 def box_body():
     world = World()
-    shape_collection = ShapeCollection([Box(scale=Scale(*BOX_SIZE))])
+    x, y, z = BOX_SIZE
+    shape_collection = ShapeCollection(shapes=[Box(scale=Scale(x=x, y=y, z=z))])
     body = Body(
-        name=PrefixedName("tool_path_test_box"),
+        name=PrefixedName(name="tool_path_test_box"),
         collision=shape_collection,
         visual=shape_collection,
     )

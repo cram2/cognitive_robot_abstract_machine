@@ -32,9 +32,13 @@ class PipelineTestCase(unittest.TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.dummy_world = World()
-        b1 = Body(name=PrefixedName("body1", "krrood_test"))
-        b2 = Body(name=PrefixedName("body2", "krrood_test"))
-        c1 = FixedConnection(b1, b2, HomogeneousTransformationMatrix())
+        b1 = Body(name=PrefixedName(name="body1", prefix="krrood_test"))
+        b2 = Body(name=PrefixedName(name="body2", prefix="krrood_test"))
+        c1 = FixedConnection(
+            parent=b1,
+            child=b2,
+            parent_T_connection_expression=HomogeneousTransformationMatrix(),
+        )
         with cls.dummy_world.modify_world():
             cls.dummy_world.add_body(b1)
             cls.dummy_world.add_body(b2)
@@ -49,7 +53,7 @@ class PipelineTestCase(unittest.TestCase):
 
     def test_pipeline_and_step(self):
 
-        @dataclass
+        @dataclass(kw_only=True)
         class TestStep(Step):
             body_name: PrefixedName
 
@@ -59,7 +63,7 @@ class PipelineTestCase(unittest.TestCase):
                 return world
 
         pipeline = Pipeline(
-            steps=[TestStep(body_name=PrefixedName("body1", "krrood_test"))]
+            steps=[TestStep(body_name=PrefixedName(name="body1", prefix="krrood_test"))]
         )
 
         dummy_world = World()
@@ -67,20 +71,30 @@ class PipelineTestCase(unittest.TestCase):
         dummy_world = pipeline.apply(dummy_world)
 
         self.assertEqual(len(dummy_world.bodies), 1)
-        self.assertEqual(dummy_world.root.name, PrefixedName("body1", "krrood_test"))
+        self.assertEqual(
+            dummy_world.root.name, PrefixedName(name="body1", prefix="krrood_test")
+        )
 
     def test_body_filter(self):
 
         pipeline = Pipeline(
-            steps=[BodyFilter(lambda x: x.name == PrefixedName("body1", "krrood_test"))]
+            steps=[
+                BodyFilter(
+                    condition=lambda x: (
+                        x.name == PrefixedName(name="body1", prefix="krrood_test")
+                    )
+                )
+            ]
         )
 
         filtered_world = pipeline.apply(self.dummy_world)
         self.assertEqual(len(filtered_world.bodies), 1)
-        self.assertEqual(filtered_world.root.name, PrefixedName("body1", "krrood_test"))
+        self.assertEqual(
+            filtered_world.root.name, PrefixedName(name="body1", prefix="krrood_test")
+        )
 
     def test_center_local_geometry_and_preserve_world_pose(self):
-        world = FBXParser(self.fbx_path).create_world()
+        world = FBXParser(file_path=self.fbx_path).create_world()
 
         original_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
@@ -117,14 +131,14 @@ class PipelineTestCase(unittest.TestCase):
 
     def test_body_replace(self):
         dresser_pattern = re.compile(r"^.*dresser_(?!drawer\b).*$", re.IGNORECASE)
-        world = FBXParser(self.fbx_path).create_world()
+        world = FBXParser(file_path=self.fbx_path).create_world()
 
         self.assertIsNotNone(world.get_body_by_name("dresser_205"))
         self.assertIsNotNone(world.get_body_by_name("dresser_217"))
         self.assertFalse(world.semantic_annotations)
 
         procthor_replace_pipeline = Pipeline(
-            [
+            steps=[
                 BodyFactoryReplace(
                     body_condition=lambda b: (
                         bool(dresser_pattern.fullmatch(b.name.name))
@@ -152,7 +166,7 @@ class PipelineTestCase(unittest.TestCase):
         )
 
     def test_dresser_from_body(self):
-        world = FBXParser(self.fbx_path).create_world()
+        world = FBXParser(file_path=self.fbx_path).create_world()
 
         self.assertIsNotNone(dresser := world.get_body_by_name("dresser_205"))
 
@@ -161,7 +175,7 @@ class PipelineTestCase(unittest.TestCase):
         self.assertEqual(dresser.name.name, "dresser_205")
 
     def test_drawer_from_body(self):
-        world = FBXParser(self.fbx_path).create_world()
+        world = FBXParser(file_path=self.fbx_path).create_world()
 
         self.assertIsNotNone(drawer := world.get_body_by_name("dresser_drawer_205_1"))
 
@@ -170,7 +184,7 @@ class PipelineTestCase(unittest.TestCase):
         self.assertEqual(drawer.name.name, "dresser_drawer_205_1")
 
     def test_door_from_body(self):
-        world = FBXParser(self.fbx_path).create_world()
+        world = FBXParser(file_path=self.fbx_path).create_world()
 
         self.assertIsNotNone(door := world.get_body_by_name("dresser_door_217_1"))
 

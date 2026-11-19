@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LidarReading:
     """
     One sweep of a lidar, laid out like ``sensor_msgs/LaserScan``.
@@ -32,8 +32,8 @@ class LidarReading:
 
     ranges: npt.NDArray[np.float64]
     """
-    The distance each beam travelled before it hit a surface, in meters, ordered like the
-    beams of :attr:`scan_pattern`.
+    The distance each beam travelled before it hit a surface, in meters, ordered like
+    the beams of :attr:`scan_pattern`.
 
     A beam that hit nothing within the scan pattern's range measures ``math.inf``.
     """

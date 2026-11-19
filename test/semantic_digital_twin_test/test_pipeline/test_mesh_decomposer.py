@@ -27,8 +27,10 @@ def jeroen_cup_world_fixture():
     """
     :return: A world of the jeroen cup whose root is named ``root``.
     """
-    world = STLParser("package://iai_objects/objects/jeroen_cup.stl").create_world()
-    world.root.name = PrefixedName("root")
+    world = STLParser(
+        file_path="package://iai_objects/objects/jeroen_cup.stl"
+    ).create_world()
+    world.root.name = PrefixedName(name="root")
     return world
 
 
@@ -36,7 +38,7 @@ def test_coacd(jeroen_cup_world_fixture):
     [cup] = jeroen_cup_world_fixture.bodies
     old_collision_length = len(cup.collision.shapes)
 
-    pipeline = Pipeline([COACDMeshDecomposer(threshold=0.2)])
+    pipeline = Pipeline(steps=[COACDMeshDecomposer(threshold=0.2)])
     pipeline.apply(jeroen_cup_world_fixture)
 
     assert len(cup.collision.shapes) > old_collision_length
@@ -46,7 +48,7 @@ def test_vhacd(jeroen_cup_world_fixture):
     [cup] = jeroen_cup_world_fixture.bodies
     old_collision_length = len(cup.collision.shapes)
 
-    pipeline = Pipeline([VHACDMeshDecomposer(max_convex_hulls=10)])
+    pipeline = Pipeline(steps=[VHACDMeshDecomposer(max_convex_hulls=10)])
     pipeline.apply(jeroen_cup_world_fixture)
 
     assert len(cup.collision.shapes) > old_collision_length
@@ -56,7 +58,7 @@ def test_box_decomposer(jeroen_cup_world_fixture):
     [cup] = jeroen_cup_world_fixture.bodies
     old_collision_length = len(cup.collision.shapes)
 
-    pipeline = Pipeline([BoxDecomposer()])
+    pipeline = Pipeline(steps=[BoxDecomposer()])
 
     pipeline.apply(jeroen_cup_world_fixture)
 

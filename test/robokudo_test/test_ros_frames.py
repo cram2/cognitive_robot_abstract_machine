@@ -44,7 +44,7 @@ def world_with_bodies(*names: PrefixedName) -> World:
     :return: A world holding one body per name, each fixed below a common root.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     with world.modify_world():
         world.add_body(root)
         for name in names:
@@ -56,8 +56,10 @@ def test_frame_names_the_body_of_its_full_name() -> None:
     """
     A frame given with the prefix names the body of that prefix and name.
     """
-    full_name = PrefixedName("camera", prefix="robot")
-    world = world_with_bodies(full_name, PrefixedName("camera", prefix="other_robot"))
+    full_name = PrefixedName(name="camera", prefix="robot")
+    world = world_with_bodies(
+        full_name, PrefixedName(name="camera", prefix="other_robot")
+    )
 
     assert find_bodies_for_ros_frame(world, str(full_name)) == [
         world.get_body_by_name(full_name)
@@ -69,7 +71,7 @@ def test_frame_without_a_prefix_names_the_prefixed_body_of_that_name() -> None:
     A frame without a prefix, as robot drivers publish it, names the body of that name
     that a robot loaded from its description prefixes.
     """
-    full_name = PrefixedName("camera", prefix="robot")
+    full_name = PrefixedName(name="camera", prefix="robot")
     world = world_with_bodies(full_name)
 
     assert find_bodies_for_ros_frame(world, full_name.name) == [
@@ -82,8 +84,8 @@ def test_frame_names_the_body_of_its_full_name_before_prefixed_ones() -> None:
     A frame without a prefix names the body without a prefix, not prefixed bodies of the
     same name.
     """
-    unprefixed_name = PrefixedName("map")
-    world = world_with_bodies(unprefixed_name, PrefixedName("map", prefix="robot"))
+    unprefixed_name = PrefixedName(name="map")
+    world = world_with_bodies(unprefixed_name, PrefixedName(name="map", prefix="robot"))
 
     assert find_bodies_for_ros_frame(world, unprefixed_name.name) == [
         world.get_body_by_name(unprefixed_name)
@@ -96,8 +98,8 @@ def test_frame_without_a_prefix_names_every_prefixed_body_of_that_name() -> None
     ambiguity to the caller.
     """
     names = [
-        PrefixedName("camera", prefix="robot"),
-        PrefixedName("camera", prefix="other"),
+        PrefixedName(name="camera", prefix="robot"),
+        PrefixedName(name="camera", prefix="other"),
     ]
     world = world_with_bodies(*names)
 

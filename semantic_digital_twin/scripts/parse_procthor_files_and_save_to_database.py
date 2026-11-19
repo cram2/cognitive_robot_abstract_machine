@@ -85,7 +85,7 @@ def replace_dresser_meshes_with_factories(
     :return: List of World objects with dresser meshes replaced by factories.
     """
     procthor_replace_pipeline = Pipeline(
-        [
+        steps=[
             BodyFactoryReplace(
                 body_condition=lambda b: (
                     bool(dresser_pattern.fullmatch(b.name.name))
@@ -108,21 +108,21 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> list[WorldMappin
     dresser_pattern = re.compile(r"^.*dresser_(?!drawer\b).*$", re.IGNORECASE)
 
     pipeline = Pipeline(
-        [
+        steps=[
             CenterLocalGeometryAndPreserveWorldPose(),
-            BodyFilter(lambda x: not x.name.name.startswith("PS_")),
-            BodyFilter(lambda x: not x.name.name.endswith("slice")),
+            BodyFilter(condition=lambda x: not x.name.name.startswith("PS_")),
+            BodyFilter(condition=lambda x: not x.name.name.endswith("slice")),
         ]
     )
 
-    parser = FBXParser(fbx_file_path)
+    parser = FBXParser(file_path=fbx_file_path)
     world = parser.create_world()
     world = pipeline.apply(world)
 
     worlds = remove_root_and_move_children_into_new_worlds(world)
 
     worlds = replace_dresser_meshes_with_factories(worlds, dresser_pattern)
-    resolver = ProcthorResolver(*[recursive_subclasses(HasRootBody)])
+    resolver = ProcthorResolver(classes=recursive_subclasses(HasRootBody))
     for world in worlds:
         resolved = resolver.resolve(world.name)
         if resolved:

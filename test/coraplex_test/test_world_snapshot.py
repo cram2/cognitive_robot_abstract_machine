@@ -9,7 +9,7 @@ def test_restore_removes_a_body_added_after_capture(simple_pr2_world_setup):
     world, _, _ = simple_pr2_world_setup
     bodies_before = list(world.bodies)
     snapshot = WorldSnapshot.capture(world=world)
-    body = Body(name=PrefixedName("snapshot_test_body"))
+    body = Body(name=PrefixedName(name="snapshot_test_body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_connection(FixedConnection(parent=world.root, child=body))

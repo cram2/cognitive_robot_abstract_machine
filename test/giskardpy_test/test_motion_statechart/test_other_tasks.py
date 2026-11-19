@@ -704,7 +704,7 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     base = world.get_kinematic_structure_entity_by_name("base_link")
     head = world.get_kinematic_structure_entity_by_name("head_tilt_link")
     with world.modify_world():
-        region = Body(name=PrefixedName("region"))
+        region = Body(name=PrefixedName(name="region"))
         world.add_kinematic_structure_entity(region)
         region_joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -908,7 +908,7 @@ def test_keep_held_body_upright_turns_the_body_upright(pr2_world_state_reset: Wo
     """
     world = pr2_world_state_reset
     tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
-    held_body = Body(name=PrefixedName("held_body"))
+    held_body = Body(name=PrefixedName(name="held_body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(held_body)
         world.add_connection(
@@ -1316,7 +1316,7 @@ class TestArticulateGraspedMechanism:
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.77, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
-                scale=Scale(0.2, 0.06, 0.06),
+                scale=Scale(x=0.2, y=0.06, z=0.06),
             )
 
             bottle_cap = BottleCap.create_with_new_body_in_world(
@@ -1325,7 +1325,7 @@ class TestArticulateGraspedMechanism:
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.65, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
-                scale=Scale(0.02, 0.04, 0.04),
+                scale=Scale(x=0.02, y=0.04, z=0.04),
                 # The thread axis points from the bottle out through the cap, here
                 # towards the robot, so unscrewing moves the cap away from the bottle.
                 parent_connection_specification=ScrewAxisConnectionSpecification(

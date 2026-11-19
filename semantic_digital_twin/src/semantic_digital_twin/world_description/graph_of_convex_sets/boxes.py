@@ -62,7 +62,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoundingBoxAdjacency(Generic[BoxT]):
     """
     Edge payload connecting two adjacent bounding boxes in a
@@ -83,7 +83,7 @@ class BoundingBoxAdjacency(Generic[BoxT]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphOfBoundingBoxes(
     Generic[BoxT, PointT],
     GraphOfConvexSets[PointT, BoundingBoxCollection[BoxT, PointT]],
@@ -138,7 +138,7 @@ class GraphOfBoundingBoxes(
         :param nodes: The nodes to include in the subgraph.
         :return: The subgraph.
         """
-        subgraph = type(self)(self.world, self.search_space)
+        subgraph = type(self)(world=self.world, search_space=self.search_space)
         subgraph.graph = self.graph.subgraph(nodes)
         subgraph.box_to_index_map = {
             box: index for box, index in self.box_to_index_map.items() if index in nodes
@@ -212,7 +212,9 @@ class GraphOfBoundingBoxes(
                 u = self.box_to_index_map[node_list[i]]
                 v = self.box_to_index_map[node_list[j]]
 
-                self.graph.add_edge(u, v, BoundingBoxAdjacency(box, distance))
+                self.graph.add_edge(
+                    u, v, BoundingBoxAdjacency(intersection=box, distance=distance)
+                )
 
     def draw(self):
         import rustworkx.visualization
@@ -273,10 +275,12 @@ class GraphOfBoundingBoxes(
             its free-space nodes.
         """
         if not self.search_space.contains(point):
-            raise PointOutsideSearchSpaceError(point, self.search_space.bounding_box())
+            raise PointOutsideSearchSpaceError(
+                point=point, search_space=self.search_space.bounding_box()
+            )
         node = self._node_of_point(point)
         if node is None:
-            raise PointOccupiedError(point)
+            raise PointOccupiedError(point=point)
         return node
 
     def is_free(self, *, point: PointT) -> bool:
@@ -542,11 +546,13 @@ class GraphOfBoundingBoxes(
             return None
         selected_variable_count = len(root._selected_variables_)
         if selected_variable_count != 1:
-            raise AmbiguousSelectedVariableError(root, selected_variable_count)
+            raise AmbiguousSelectedVariableError(
+                query=root, selected_variable_count=selected_variable_count
+            )
         return root._selected_variables_[0]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VolumetricGraphOfBoundingBoxes(
     GraphOfBoundingBoxes[VolumetricBoundingBox, Point3]
 ):
@@ -724,7 +730,7 @@ class VolumetricGraphOfBoundingBoxes(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes, partitioning

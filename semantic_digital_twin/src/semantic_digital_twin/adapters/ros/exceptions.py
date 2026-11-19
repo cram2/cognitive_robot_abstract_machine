@@ -13,14 +13,14 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import UsageError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROS2ConversionError(DataclassException):
     """
     Base class for errors that occur during ROS2 message conversion.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CannotConvertSemDTToRos2Error(ROS2ConversionError):
     """
     Raised when a semDT object cannot be converted to a ROS2 message.
@@ -38,7 +38,7 @@ class CannotConvertSemDTToRos2Error(ROS2ConversionError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CannotConvertRos2ToSemDTError(ROS2ConversionError):
     """
     Raised when a ROS2 message cannot be converted to a semDT object.
@@ -56,7 +56,7 @@ class CannotConvertRos2ToSemDTError(ROS2ConversionError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LaserScanBeamCountMismatch(ROS2ConversionError):
     """
     Raised when a laser scan holds a different number of measurements than the beams its
@@ -129,7 +129,7 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
 # %% services
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServiceUnavailableError(DataclassException):
     """
     Raised when a service does not become available in time.
@@ -150,7 +150,7 @@ class ServiceUnavailableError(DataclassException):
 # %% topics and messages
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TopicNotFoundError(DataclassException):
     """
     Raised when no topic of a message type is found on the ROS 2 graph.
@@ -182,7 +182,7 @@ class TopicNotFoundError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousTopicError(DataclassException):
     """
     Raised when a single topic of a message type was expected but several were found.
@@ -209,7 +209,7 @@ class AmbiguousTopicError(DataclassException):
         return "Name the topic explicitly."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoMessageReceivedError(DataclassException):
     """
     Raised when no message arrives on a topic in time.

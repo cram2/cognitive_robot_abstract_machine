@@ -365,8 +365,8 @@ def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    hsrb = RobotSpecification(HSRB).spawn(world)
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    hsrb = RobotSpecification(semantic_annotation_type=HSRB).spawn(world)
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     yield hsrb, simulation

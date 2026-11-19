@@ -134,7 +134,7 @@ def test_a_body_whose_inertia_nobody_described_has_no_inertial():
     A placeholder mass would be taken for a real one, for instance by a physical
     simulation that would otherwise work it out from the body's shapes.
     """
-    assert Body(name=PrefixedName("undescribed")).inertial is None
+    assert Body(name=PrefixedName(name="undescribed")).inertial is None
 
 
 # %% data the inertial properties reject

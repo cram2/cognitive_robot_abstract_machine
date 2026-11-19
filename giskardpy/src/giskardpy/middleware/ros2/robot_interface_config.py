@@ -176,7 +176,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         """
         if odometry_topic is None:
             odometry_topic = RosGraph(
-                background_node.get_node()
+                node=background_node.get_node()
             ).unique_publisher_of_type(Odometry)
         assert isinstance(joint, (OmniDrive, DifferentialDrive))
         synchronizer = OdometrySynchronizer(
@@ -280,7 +280,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         command_format = command_format or TwistFormat()
         if command_topic is None:
             command_topic = RosGraph(
-                background_node.get_node()
+                node=background_node.get_node()
             ).unique_subscriber_of_type(command_format.message_type())
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
@@ -353,7 +353,8 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param whitelist: The names of the controllers to consider, all if ``None``.
         """
         controller_manager = ControllerManager(
-            name=controller_manager_name, ros_graph=RosGraph(background_node.get_node())
+            name=controller_manager_name,
+            ros_graph=RosGraph(node=background_node.get_node()),
         )
         for controller in controller_manager.active_controllers(whitelist=whitelist):
             match controller.type:

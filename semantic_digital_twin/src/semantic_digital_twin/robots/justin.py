@@ -105,7 +105,7 @@ class JustinJoint(JointName):
     RIGHT_RING_3 = "right_4ring3_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinLeftThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -127,7 +127,7 @@ class JustinLeftThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinLeftIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -147,7 +147,7 @@ class JustinLeftIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinLeftMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -169,7 +169,7 @@ class JustinLeftMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinLeftRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -189,7 +189,7 @@ class JustinLeftRingFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinRightThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -211,7 +211,7 @@ class JustinRightThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinRightIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -231,7 +231,7 @@ class JustinRightIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinRightMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -253,7 +253,7 @@ class JustinRightMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinRightRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -275,7 +275,7 @@ class JustinRightRingFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinLeftHand(
     EndEffector,
     HasFingers[
@@ -292,13 +292,13 @@ class JustinLeftHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [1.0] * len(gripper_joints))),
             state_type=GripperState.CLOSE,
         )
@@ -325,7 +325,7 @@ class JustinLeftHand(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinRightHand(
     EndEffector,
     HasFingers[
@@ -342,13 +342,13 @@ class JustinRightHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [1.0] * len(gripper_joints))),
             state_type=GripperState.CLOSE,
         )
@@ -375,14 +375,14 @@ class JustinRightHand(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinLeftArm(Arm[JustinLeftHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -400,14 +400,14 @@ class JustinLeftArm(Arm[JustinLeftHand]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinRightArm(Arm[JustinRightHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -425,7 +425,7 @@ class JustinRightArm(Arm[JustinRightHand]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinCamera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -453,7 +453,7 @@ class JustinCamera(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinNeck(Neck[JustinCamera]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -471,7 +471,7 @@ class JustinNeck(Neck[JustinCamera]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinTorso(
     Torso, HasLeftRightArm[JustinLeftArm, JustinRightArm], HasNeck[JustinNeck]
 ):
@@ -491,7 +491,7 @@ class JustinTorso(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -512,7 +512,7 @@ class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Justin(AbstractRobot, HasMobileBase[JustinMobileBase]):
     """
     The Justin robot built by the DLR.

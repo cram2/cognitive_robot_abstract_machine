@@ -47,8 +47,8 @@ pytestmark = [
 def parked_tracy() -> Tracy:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    robot = RobotSpecification(Tracy).spawn(world)
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    robot = RobotSpecification(semantic_annotation_type=Tracy).spawn(world)
     for arm in robot.all_arms:
         arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
     world.notify_state_change()

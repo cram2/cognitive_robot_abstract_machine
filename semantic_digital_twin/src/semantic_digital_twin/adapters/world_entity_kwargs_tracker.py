@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityReference(ObjectReference):
     """
     How a serialized object points at a world entity.
@@ -36,7 +36,7 @@ class WorldEntityReference(ObjectReference):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityWithIDKwargsTracker(
     # A string, because world_entity imports this module and cannot be imported back.
     DeserializedObjectTracker[UUID, "WorldEntityWithID"],

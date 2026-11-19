@@ -11,7 +11,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaApplianceNotFoundError(DataclassException, LookupError):
     """
     Raised when no configured RoboCasa fixture matching a requested appliance category
@@ -33,7 +33,7 @@ class RoboCasaApplianceNotFoundError(DataclassException, LookupError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaTaskNotFoundError(DataclassException, LookupError):
     """
     Raised when a requested task name does not correspond to a registered RoboCasa
@@ -57,7 +57,7 @@ class RoboCasaTaskNotFoundError(DataclassException, LookupError):
         return f"Choose one of the registered tasks: {', '.join(self.available_task_names)}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaObjectAssetsNotFoundError(DataclassException, FileNotFoundError):
     """
     Raised when no downloaded asset files can be found for a requested RoboCasa object
@@ -89,7 +89,7 @@ class RoboCasaObjectAssetsNotFoundError(DataclassException, FileNotFoundError):
         return "Run 'python -m robocasa.scripts.download_kitchen_assets' first."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaObjectInstanceIndexError(DataclassException, IndexError):
     """
     Raised when a requested object instance index exceeds the number of downloaded
@@ -132,7 +132,7 @@ class RoboCasaObjectInstanceIndexError(DataclassException, IndexError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaObjectHasNoCollisionError(DataclassException, ValueError):
     """
     Raised when a loaded RoboCasa object world contains no body with collision geometry

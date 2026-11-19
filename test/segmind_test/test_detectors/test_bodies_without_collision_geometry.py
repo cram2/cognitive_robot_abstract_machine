@@ -27,7 +27,7 @@ def box_in_the_tray_beside_an_outlet(box_and_trays) -> tuple:
         box, and an outlet without collision geometry free to move in the world.
     """
     world = box_and_trays.world
-    outlet = Body(name=PrefixedName("outlet"))
+    outlet = Body(name=PrefixedName(name="outlet"))
     with world.modify_world():
         world.add_connection(
             Connection6DoF.create_with_dofs(

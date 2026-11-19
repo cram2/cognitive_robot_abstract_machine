@@ -105,9 +105,11 @@ def setup_world() -> World:
     apartment_world = URDFParser.from_file(
         "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
-    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+    milk_world = STLParser(
+        file_path="package://iai_objects/objects/milk.stl"
+    ).create_world()
     cereal_world = STLParser(
-        "package://iai_objects/objects/breakfast_cereal.stl"
+        file_path="package://iai_objects/objects/breakfast_cereal.stl"
     ).create_world()
     # apartment_world.merge_world(pr2_sem_world)
     apartment_world.merge_world(milk_world)

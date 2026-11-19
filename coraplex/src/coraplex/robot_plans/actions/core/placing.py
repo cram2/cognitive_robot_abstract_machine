@@ -157,8 +157,8 @@ class PlaceAction(
         super().on_start()
         end_effector = self.arm.end_effector
         grasp = GraspCandidate(
-            self.graspable,
-            end_effector.body_T_grasp(
+            graspable=self.graspable,
+            grasp_pose=end_effector.body_T_grasp(
                 body=self.graspable.root,
                 tool_P_grasp=end_effector.tool_P_grasp_when_closed,
             ),

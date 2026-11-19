@@ -8,7 +8,7 @@ from krrood.patterns.field_metadata import FieldMetadata
 from semantic_digital_twin.exceptions import DuplicateSimulatorPropertyError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatorAttributeName(FieldMetadata):
     """
     Marks a field of a simulator property whose attribute the simulator spells
@@ -21,7 +21,7 @@ class SimulatorAttributeName(FieldMetadata):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatorAdditionalProperty:
     """
     Class representing an additional property for a simulator.
@@ -50,7 +50,7 @@ class SimulatorAdditionalProperty:
         return field_name if renamed is None else renamed.attribute_name
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UniqueSimulatorProperty(SimulatorAdditionalProperty):
     """
     A simulator property an entity carries at most one of, such as the physical
@@ -73,7 +73,7 @@ rather than the base class.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasSimulatorProperties:
     """
     Mixin class to add simulator additional properties to a data class.
@@ -116,7 +116,7 @@ class HasSimulatorProperties:
             return
         property_type = type(simulator_property)
         if self.get_simulator_property_of_type(property_type) is not None:
-            raise DuplicateSimulatorPropertyError(property_type)
+            raise DuplicateSimulatorPropertyError(property_type=property_type)
 
     def get_simulator_property_of_type(
         self, property_type: type[TUniqueSimulatorProperty]

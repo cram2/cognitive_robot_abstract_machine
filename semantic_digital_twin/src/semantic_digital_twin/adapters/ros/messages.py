@@ -33,7 +33,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateUpdate(Message):
     """
     Class describing the updates to the free variables of a world state.
@@ -46,7 +46,7 @@ class WorldStateUpdate(Message):
     """The states of the changed free variables."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModificationBlock(Message):
     """
     Message describing the modifications done to a world.
@@ -56,7 +56,7 @@ class ModificationBlock(Message):
     """The modifications done to a world."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdate(Message):
     """
     Combined model and state update published on a single ordered ROS topic.
@@ -90,7 +90,7 @@ class WorldUpdate(Message):
         return key
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LoadModel(Message):
     """
     Message for requesting the loading of a model identified by its primary key.
@@ -177,7 +177,7 @@ class SnapshotField(StrEnum):
     """How far the snapshot caught up with each publisher."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelSnapshot(SubclassJSONSerializer):
     """
     Snapshot containing the complete modification history and the latest world state.

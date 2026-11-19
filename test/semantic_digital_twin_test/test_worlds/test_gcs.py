@@ -67,7 +67,7 @@ MJCF_DIR = os.path.join(
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VolumetricGraphOfBoundingBoxesFixture:
     """
     Data class for Graph of Convex Sets test fixture.
@@ -86,9 +86,17 @@ def graph_of_convex_sets_unit_box() -> VolumetricGraphOfBoundingBoxesFixture:
     with world.modify_world():
         world.add_kinematic_structure_entity(Body())
 
-    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(world)
+    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(world=world)
 
-    obstacle = VolumetricBoundingBox(0, 0, 0, 1, 1, 1, world.root.global_pose)
+    obstacle = VolumetricBoundingBox(
+        min_x=0,
+        min_y=0,
+        min_z=0,
+        max_x=1,
+        max_y=1,
+        max_z=1,
+        origin=world.root.global_pose,
+    )
 
     z_lim = SimpleInterval.from_data(lower=0.45, upper=0.55)
     x_lim = SimpleInterval.from_data(lower=-2, upper=3)
@@ -109,7 +117,9 @@ def graph_of_convex_sets_unit_box() -> VolumetricGraphOfBoundingBoxesFixture:
         graph_of_convex_sets.add_node(bounding_box)
 
     graph_of_convex_sets.calculate_connectivity()
-    return VolumetricGraphOfBoundingBoxesFixture(world, graph_of_convex_sets)
+    return VolumetricGraphOfBoundingBoxesFixture(
+        world=world, graph_of_convex_sets=graph_of_convex_sets
+    )
 
 
 def test_reachability(
@@ -152,7 +162,7 @@ def test_from_world(table_world: World):
     Verify the generation of a connectivity graph from a world.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-5,
                 max_x=-2,
@@ -165,7 +175,7 @@ def test_from_world(table_world: World):
                 ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
         world=table_world, search_space=search_space
@@ -194,7 +204,7 @@ def test_a_body_left_out_of_the_obstacles_leaves_its_space_free(table_world: Wor
     obstacles, so that the space it fills counts as free.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-5,
                 max_x=-2,
@@ -207,7 +217,7 @@ def test_a_body_left_out_of_the_obstacles_leaves_its_space_free(table_world: Wor
                 ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     top = table_world.get_body_by_name("top")
     inside_the_top = (
@@ -235,18 +245,20 @@ def test_constrain_to_free_space_requires_floatlike_fields(table_world: World):
     field that does not actually exist on the queried type.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -1,
-                -1,
-                0,
-                1,
-                1,
-                1,
-                HomogeneousTransformationMatrix(reference_frame=table_world.root),
+                min_x=-1,
+                min_y=-1,
+                min_z=0,
+                max_x=1,
+                max_y=1,
+                max_z=1,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=table_world.root
+                ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
         world=table_world, search_space=search_space
@@ -267,18 +279,20 @@ def test_constrain_to_free_space_adds_a_where_condition(table_world: World):
     ``UnderspecifiedParameters``' behaviour for a bare top-level selection.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -1,
-                -1,
-                0,
-                1,
-                1,
-                1,
-                HomogeneousTransformationMatrix(reference_frame=table_world.root),
+                min_x=-1,
+                min_y=-1,
+                min_z=0,
+                max_x=1,
+                max_y=1,
+                max_z=1,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=table_world.root
+                ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
         world=table_world, search_space=search_space
@@ -301,18 +315,20 @@ def test_constrain_to_free_space_rejects_a_query_selecting_multiple_variables(
     variables' fields regardless.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -1,
-                -1,
-                0,
-                1,
-                1,
-                1,
-                HomogeneousTransformationMatrix(reference_frame=table_world.root),
+                min_x=-1,
+                min_y=-1,
+                min_z=0,
+                max_x=1,
+                max_y=1,
+                max_z=1,
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=table_world.root
+                ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
         world=table_world, search_space=search_space
@@ -329,7 +345,7 @@ def test_navigation_map_from_world(table_world: World):
     Verify the generation of a navigation map from a world.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-5,
                 max_x=-2,
@@ -342,7 +358,7 @@ def test_navigation_map_from_world(table_world: World):
                 ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     graph_of_convex_sets = PlanarGraphOfBoundingBoxes.navigation_map_from_world(
         table_world, search_space=search_space
@@ -369,7 +385,7 @@ def test_navigation_map_path_returns_point2_waypoints(table_world: World):
     interior waypoints (portals between boxes) carry no meaningful orientation.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-5,
                 max_x=-2,
@@ -382,7 +398,7 @@ def test_navigation_map_path_returns_point2_waypoints(table_world: World):
                 ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     graph_of_convex_sets = PlanarGraphOfBoundingBoxes.navigation_map_from_world(
         table_world, search_space=search_space
@@ -405,21 +421,21 @@ def test_from_world_with_rotated_box():
     """
     world = World()
     with world.modify_world():
-        root_body = Body(name=PrefixedName("map"))
+        root_body = Body(name=PrefixedName(name="map"))
         world.add_kinematic_structure_entity(root_body)
 
         # Box 1: at origin
-        axis_aligned_box_body = Body(name=PrefixedName("box_one"))
+        axis_aligned_box_body = Body(name=PrefixedName(name="box_one"))
         world.add_connection(
             FixedConnection.create_with_dofs(
                 world=world, parent=root_body, child=axis_aligned_box_body
             )
         )
-        axis_aligned_box = Box(scale=Scale(1, 1, 1))
+        axis_aligned_box = Box(scale=Scale(x=1, y=1, z=1))
         axis_aligned_box_body.collision.append(axis_aligned_box)
 
         # Box 2: at (2, 0, 0) rotated 45 deg around Z
-        rotated_box_body = Body(name=PrefixedName("box_two"))
+        rotated_box_body = Body(name=PrefixedName(name="box_two"))
         rotated_box_body_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
             2, 0, 0, 0, np.pi / 4, np.pi / 4, reference_frame=root_body
         )
@@ -431,7 +447,7 @@ def test_from_world_with_rotated_box():
                 parent_T_connection_expression=rotated_box_body_pose,
             )
         )
-        rotated_box = Box(scale=Scale(1, 1, 1))
+        rotated_box = Box(scale=Scale(x=1, y=1, z=1))
         rotated_box_body.collision.append(rotated_box)
 
     vertical_stabilized_base = create_reference_frame_with_only_yaw_from_body(
@@ -439,7 +455,7 @@ def test_from_world_with_rotated_box():
     )
 
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-5,
                 max_x=5,
@@ -493,25 +509,38 @@ def test_path_from_to_prefers_shorter_distance_over_fewer_hops():
     with world.modify_world():
         world.add_kinematic_structure_entity(Body())
 
-    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(world)
+    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(world=world)
 
     origin = world.root.global_pose
-    start_box = VolumetricBoundingBox(0, 0, 0, 1, 1, 1, origin)
-    goal_box = VolumetricBoundingBox(10, 0, 0, 11, 1, 1, origin)
+    start_box = VolumetricBoundingBox(
+        min_x=0, min_y=0, min_z=0, max_x=1, max_y=1, max_z=1, origin=origin
+    )
+    goal_box = VolumetricBoundingBox(
+        min_x=10, min_y=0, min_z=0, max_x=11, max_y=1, max_z=1, origin=origin
+    )
     # No boxes exist at y=[0, 1] between start_box and goal_box - a "wall" that rules
     # out a direct line of sight, so reaching goal_box always requires a detour.
 
     # Short way: hop over the wall through a chain of ten small boxes.
     over_the_wall = [
-        VolumetricBoundingBox(i, 1, 0, i + 1, 2, 1, origin) for i in range(10)
+        VolumetricBoundingBox(
+            min_x=i, min_y=1, min_z=0, max_x=i + 1, max_y=2, max_z=1, origin=origin
+        )
+        for i in range(10)
     ]
 
     # Long way: dip far below the wall and back up through three huge boxes. Costs
     # only four hops overall, but each hop's center-to-center distance is huge.
     below_the_wall = [
-        VolumetricBoundingBox(0, -100, 0, 1, 1, 1, origin),
-        VolumetricBoundingBox(0, -100, 0, 11, -99, 1, origin),
-        VolumetricBoundingBox(10, -100, 0, 11, 1, 1, origin),
+        VolumetricBoundingBox(
+            min_x=0, min_y=-100, min_z=0, max_x=1, max_y=1, max_z=1, origin=origin
+        ),
+        VolumetricBoundingBox(
+            min_x=0, min_y=-100, min_z=0, max_x=11, max_y=-99, max_z=1, origin=origin
+        ),
+        VolumetricBoundingBox(
+            min_x=10, min_y=-100, min_z=0, max_x=11, max_y=1, max_z=1, origin=origin
+        ),
     ]
 
     for box in [start_box, goal_box, *over_the_wall, *below_the_wall]:
@@ -542,13 +571,22 @@ def test_path_from_to_shortcuts_redundant_waypoints():
     with world.modify_world():
         world.add_kinematic_structure_entity(Body())
 
-    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(world)
+    graph_of_convex_sets = VolumetricGraphOfBoundingBoxes(world=world)
 
     origin = world.root.global_pose
-    start_box = VolumetricBoundingBox(0, 0, 0, 1, 1, 1, origin)
+    start_box = VolumetricBoundingBox(
+        min_x=0, min_y=0, min_z=0, max_x=1, max_y=1, max_z=1, origin=origin
+    )
     # Ten boxes tiling one straight, unobstructed corridor from start_box to goal_box.
-    chain = [VolumetricBoundingBox(i, 0, 0, i + 1, 1, 1, origin) for i in range(1, 10)]
-    goal_box = VolumetricBoundingBox(10, 0, 0, 11, 1, 1, origin)
+    chain = [
+        VolumetricBoundingBox(
+            min_x=i, min_y=0, min_z=0, max_x=i + 1, max_y=1, max_z=1, origin=origin
+        )
+        for i in range(1, 10)
+    ]
+    goal_box = VolumetricBoundingBox(
+        min_x=10, min_y=0, min_z=0, max_x=11, max_y=1, max_z=1, origin=origin
+    )
 
     for box in [start_box, *chain, goal_box]:
         graph_of_convex_sets.add_node(box)
@@ -574,9 +612,11 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
 
     It now runs a single-source Dijkstra search instead.
     """
-    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).create_world()
+    world = MJCFParser(
+        file_path=os.path.join(MJCF_DIR, "iai_apartment.xml")
+    ).create_world()
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-0.2,
                 max_x=3.0,
@@ -587,7 +627,7 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
                 origin=HomogeneousTransformationMatrix(reference_frame=world.root),
             )
         ],
-        world.root,
+        reference_frame=world.root,
     )
     graph_of_convex_sets = VolumetricGraphOfBoundingBoxes.free_space_from_world(
         world=world, search_space=search_space, bloat_obstacles=0.06
@@ -618,9 +658,9 @@ def _floor_with_an_obstacle_standing_on_it() -> Floor:
     world = World.create_with_root_body("root")
     with world.modify_world():
         floor = Floor.create_with_new_body_in_world(
-            name="floor", world=world, scale=Scale(4, 4, 0.01)
+            name="floor", world=world, scale=Scale(x=4, y=4, z=0.01)
         )
-        obstacle = Body(name=PrefixedName("obstacle"))
+        obstacle = Body(name=PrefixedName(name="obstacle"))
         world.add_connection(
             FixedConnection.create_with_dofs(
                 world=world,
@@ -631,7 +671,7 @@ def _floor_with_an_obstacle_standing_on_it() -> Floor:
                 ),
             )
         )
-        obstacle.collision.append(Box(scale=Scale(0.4, 0.4, 1.0)))
+        obstacle.collision.append(Box(scale=Scale(x=0.4, y=0.4, z=1.0)))
     return floor
 
 
@@ -682,9 +722,9 @@ def test_planar_free_space_uses_the_supporting_surface_as_search_space():
     world = floor._world
     with world.modify_world():
         surface = Region.from_shape_collection(
-            PrefixedName("floor_surface"),
+            PrefixedName(name="floor_surface"),
             ShapeCollection(
-                [Box(scale=Scale(4, 4, 0.001))], reference_frame=floor.root
+                shapes=[Box(scale=Scale(x=4, y=4, z=0.001))], reference_frame=floor.root
             ),
         )
         world.add_region(surface)
@@ -754,7 +794,7 @@ def test_planar_free_space_rejects_an_annotation_without_any_surface():
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        body = Body(name=PrefixedName("floor"))
+        body = Body(name=PrefixedName(name="floor"))
         world.add_connection(FixedConnection(parent=world.root, child=body))
         floor = Floor(root=body)
         world.add_semantic_annotation(floor)
@@ -779,12 +819,12 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
         floor = Floor.create_with_new_body_in_world(
             name="floor",
             world=world,
-            scale=Scale(6, 6, 0.01),
+            scale=Scale(x=6, y=6, z=0.01),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 10.0, 0.0, 0.0, reference_frame=world.root
             ),
         )
-        wall = Body(name=PrefixedName("wall"))
+        wall = Body(name=PrefixedName(name="wall"))
         world.add_connection(
             FixedConnection.create_with_dofs(
                 world=world,
@@ -795,7 +835,7 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
                 ),
             )
         )
-        wall.collision.append(Box(scale=Scale(0.4, 4.0, 1.0)))
+        wall.collision.append(Box(scale=Scale(x=0.4, y=4.0, z=1.0)))
 
     graph = floor.planar_free_space(max_height=1.0)
 
@@ -825,7 +865,7 @@ def _navigation_map_around_the_table(
     :return: The navigation map.
     """
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-5,
                 max_x=-2,
@@ -838,7 +878,7 @@ def _navigation_map_around_the_table(
                 ),
             )
         ],
-        table_world.root,
+        reference_frame=table_world.root,
     )
     return PlanarGraphOfBoundingBoxes.navigation_map_from_world(
         table_world, search_space=search_space
@@ -1075,17 +1115,17 @@ def test_free_space_from_world_keeps_the_given_height_clearance_off_obstacles():
     """
     world = World()
     with world.modify_world():
-        root_body = Body(name=PrefixedName("map"))
+        root_body = Body(name=PrefixedName(name="map"))
         world.add_kinematic_structure_entity(root_body)
-        box_body = Body(name=PrefixedName("box"))
+        box_body = Body(name=PrefixedName(name="box"))
         world.add_connection(
             FixedConnection.create_with_dofs(
                 world=world, parent=root_body, child=box_body
             )
         )
-        box_body.collision.append(Box(scale=Scale(1, 1, 1)))
+        box_body.collision.append(Box(scale=Scale(x=1, y=1, z=1)))
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-2,
                 max_x=2,

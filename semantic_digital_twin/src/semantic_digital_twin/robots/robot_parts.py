@@ -150,7 +150,7 @@ else:
 logger = logging.getLogger("semantic_digital_twin")
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRobotParts(ABC):
     """
     Mixin for semantic annotations that have robot parts assigned to them.
@@ -269,7 +269,7 @@ class HasRobotParts(ABC):
                 part.setup_robot_part_semantic_annotations()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     """
     Abstract base class for all robot parts.
@@ -340,7 +340,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         for j in self.joint_states:
             if j.state_type == state_type:
                 return j
-        raise NoJointStateWithType(state_type)
+        raise NoJointStateWithType(joint_state=state_type)
 
     def has_joint_state_of_type(self, state_type: JointStateType) -> bool:
         """
@@ -457,7 +457,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         self._add_servo(
             PositionServo(
                 name=PrefixedName(
-                    f"{connection.raw_dof.name.name}_servo",
+                    name=f"{connection.raw_dof.name.name}_servo",
                     prefix=connection.raw_dof.name.prefix,
                 ),
                 gains=servo.gains,
@@ -493,7 +493,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
             compensation.fraction = 1.0
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ServoedRobotPart(AbstractRobotPart, ABC):
     """
     A robot part whose joints are each driven by a :class:`JointDrive` in a physical
@@ -523,7 +523,7 @@ class ServoedRobotPart(AbstractRobotPart, ABC):
             self._compensate_gravity()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasGripperActionServers(AbstractRobotPart, ABC):
     """
     A gripper whose real hardware moves through ROS actions its driver serves, rather
@@ -539,7 +539,7 @@ class HasGripperActionServers(AbstractRobotPart, ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotKinematicChain(
     AbstractRobotPart, HasInputSource[JointPositionSource], KinematicChain, ABC
 ):
@@ -644,7 +644,7 @@ class RobotKinematicChain(
         return length
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Sensor(HasRootBody, ABC):
     """
     A sensor rooted at the body from which it perceives the environment.
@@ -658,7 +658,7 @@ Projection model accepted by a camera.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Camera(Sensor, Generic[TCameraModel], SubClassSafeGeneric):
     """
     An image sensor rooted at its optical frame.
@@ -730,7 +730,7 @@ A kind of camera.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel], ABC):
     """
     An optical-frame-rooted camera that participates in robot-part lifecycle handling.
@@ -786,7 +786,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
         return optical_root
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Finger(RobotKinematicChain, ABC):
     """
     A finger is a kinematic chain attached to a gripper to manipulate objects.
@@ -800,7 +800,7 @@ class Finger(RobotKinematicChain, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EndEffector(AbstractRobotPart, ABC):
     """
     Abstract base class of robot end effector.
@@ -838,7 +838,7 @@ class EndEffector(AbstractRobotPart, ABC):
         approach = self.approach_axis.to_np()[:3]
         closing = self.closing_axis.to_np()[:3]
         if not np.isclose(float(approach @ closing), 0.0, atol=1e-6):
-            raise GripperAxesNotPerpendicular(self)
+            raise GripperAxesNotPerpendicular(end_effector=self)
 
     @property
     @abstractmethod
@@ -922,7 +922,7 @@ class EndEffector(AbstractRobotPart, ABC):
         if not children:
             return None
         if len(children) > 1:
-            raise MoreThanOneBodyHeld(self, children)
+            raise MoreThanOneBodyHeld(end_effector=self, held_bodies=children)
         return children[0]
 
     def held_body_T_grasp_at(self, tool_P_point: Point3) -> Pose:
@@ -937,7 +937,7 @@ class EndEffector(AbstractRobotPart, ABC):
         """
         body = self.held_body
         if body is None:
-            raise NothingHeld(self)
+            raise NothingHeld(end_effector=self)
         return self.body_T_grasp(body=body, tool_P_grasp=tool_P_point)
 
     def body_T_grasp(self, *, body: Body, tool_P_grasp: Point3) -> Pose:
@@ -973,7 +973,7 @@ class EndEffector(AbstractRobotPart, ABC):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Torso(RobotKinematicChain, ABC):
     """
     The torso of a robot, which is a kinematic chain providing additional shared degrees
@@ -981,14 +981,14 @@ class Torso(RobotKinematicChain, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Arm(RobotKinematicChain, HasEndEffector[TGenericEndEffector], ABC):
     """
     An arm is a kinematic chain that has an end effector attached to it.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Neck(
     RobotKinematicChain,
     HasSensors[Unpack[TGenericSensors]],
@@ -1002,7 +1002,7 @@ class Neck(
 TGenericDrive = TypeVar("TGenericDrive", bound=WheeledDrive)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MountingTable(Table, AbstractRobotPart, ABC):
     """
     The table a stationary robot is bolted onto: the robot's base and, at the same
@@ -1023,7 +1023,7 @@ class MountingTable(Table, AbstractRobotPart, ABC):
         return cls(root=robot_root)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MobileBase(
     AbstractRobotPart, Generic[TGenericDrive], HasInputSource[BasePoseSource], ABC
 ):
@@ -1156,7 +1156,7 @@ class MobileBase(
             self._add_servo(
                 VelocityServo(
                     name=PrefixedName(
-                        f"{drive.name.name}_{degree_of_freedom.name.name}_servo",
+                        name=f"{drive.name.name}_{degree_of_freedom.name.name}_servo",
                         prefix=degree_of_freedom.name.prefix,
                     ),
                     gains=(
@@ -1218,7 +1218,7 @@ class MobileBase(
         return (self.bounding_box.depth / 2 + self.bounding_box.width / 2) / 2
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AbstractRobot(Agent, HasRobotParts, ABC):
     """
     This implementation was initially introduced in https://github.com/cram2/cognitive_robot_abstract_machine/pull/290
@@ -1552,10 +1552,16 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         for connection in self._one_dof_connections:
             connection.raw_dof._overwrite_dof_limits(
                 new_lower_limits=DerivativeMap(
-                    None, -new_limits[connection], None, None
+                    position=None,
+                    velocity=-new_limits[connection],
+                    acceleration=None,
+                    jerk=None,
                 ),
                 new_upper_limits=DerivativeMap(
-                    None, new_limits[connection], None, None
+                    position=None,
+                    velocity=new_limits[connection],
+                    acceleration=None,
+                    jerk=None,
                 ),
             )
 
@@ -1592,8 +1598,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         for connection, current_velocity in connections_with_velocity_limits:
             scaled_limit = current_velocity * scale_factor
             connection.raw_dof._overwrite_dof_limits(
-                new_lower_limits=DerivativeMap(None, -scaled_limit, None, None),
-                new_upper_limits=DerivativeMap(None, scaled_limit, None, None),
+                new_lower_limits=DerivativeMap(
+                    position=None, velocity=-scaled_limit, acceleration=None, jerk=None
+                ),
+                new_upper_limits=DerivativeMap(
+                    position=None, velocity=scaled_limit, acceleration=None, jerk=None
+                ),
             )
 
     @property
@@ -1703,7 +1713,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         for robot_part in self._robot_parts:
             if isinstance(robot_part, RobotCamera) and robot_part.default_camera:
                 return robot_part
-        raise MissingDefaultCameraError(type(self))
+        raise MissingDefaultCameraError(robot=type(self))
 
     @abstractmethod
     def _setup_collision_rules(self) -> None:

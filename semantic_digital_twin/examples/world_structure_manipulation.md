@@ -47,8 +47,8 @@ world = World()
 
 # Create some bodies
 root = Body(name=PrefixedName(name="root", prefix="world"))
-base = Body(name=PrefixedName("base"))
-link = Body(name=PrefixedName("link"))
+base = Body(name=PrefixedName(name="base"))
+link = Body(name=PrefixedName(name="link"))
 
 # Group structural modifications so validation happens after the block
 with world.modify_world():
@@ -62,7 +62,7 @@ with world.modify_world():
     #    from base -> link around the Z axis of the base frame.
     #    We add the DoF first, then reference it from the connection so the
     #    world's DoF set and the connection's DoFs match.
-    dof = DegreeOfFreedom(name=PrefixedName("joint_z"))
+    dof = DegreeOfFreedom(name=PrefixedName(name="joint_z"))
     world.add_degree_of_freedom(dof)
     c_base_link = ScrewAxisConnection(
         screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z(reference_frame=base)),
@@ -97,7 +97,7 @@ If you ever feel the need to manage a degree of freedom manually you can do it l
 
 ```{code-cell} ipython3
 with world.modify_world():
-    dof = DegreeOfFreedom(name=PrefixedName("my_dof"))
+    dof = DegreeOfFreedom(name=PrefixedName(name="my_dof"))
     world.add_degree_of_freedom(dof)
     world.remove_degree_of_freedom(dof)
 ```

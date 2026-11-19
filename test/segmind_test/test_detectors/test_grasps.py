@@ -95,8 +95,8 @@ def _box_at(
     :param size: The box's edge length.
     """
     box = Body(
-        name=PrefixedName("held_box"),
-        collision=ShapeCollection([Box(scale=Scale(size, size, size))]),
+        name=PrefixedName(name="held_box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=size, y=size, z=size))]),
     )
     with world.modify_world():
         world.add_connection(
@@ -301,9 +301,9 @@ def _surface_under(world: World, box: Body, aside: float = 0.0) -> Body:
         reaches it only once it is moved that far.
     """
     surface = Body(
-        name=PrefixedName("surface"),
+        name=PrefixedName(name="surface"),
         collision=ShapeCollection(
-            [Box(scale=Scale(TABLE_SIZE, TABLE_SIZE, TABLE_SIZE))]
+            shapes=[Box(scale=Scale(x=TABLE_SIZE, y=TABLE_SIZE, z=TABLE_SIZE))]
         ),
     )
     x, y, _ = box.global_pose.position.to_np()[:3]

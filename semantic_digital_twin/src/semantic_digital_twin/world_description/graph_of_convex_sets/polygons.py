@@ -50,56 +50,56 @@ logger = logging.getLogger(__name__)
 # krrood.class_diagrams.mocking.MockedClass.
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedConvexSet(MockedClass):
     """
     Mocked class for ConvexSet in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedHPolyhedron(MockedClass):
     """
     Mocked class for HPolyhedron in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedIris(MockedClass):
     """
     Mocked class for the Iris function in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedIrisOptions(MockedClass):
     """
     Mocked class for IrisOptions in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedPoint(MockedClass):
     """
     Mocked class for Point in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedVPolytope(MockedClass):
     """
     Mocked class for VPolytope in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedGcsTrajectoryOptimization(MockedClass):
     """
     Mocked class for GcsTrajectoryOptimization in pydrake.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MockedSubgraph(MockedClass):
     """
     Mocked class for GcsTrajectoryOptimization.Subgraph in pydrake.
@@ -152,7 +152,7 @@ def _default_iris_options() -> IrisOptions:
     return options
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IrisSeedingSettings:
     """
     Settings controlling how many IRIS regions :class:`GraphOfConvexPolygons` grows, and
@@ -283,7 +283,7 @@ def _shape_to_convex_set(
     return HPolyhedron.MakeBox(bounds.lower, bounds.upper)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphOfConvexPolygons(
     GraphOfConvexSets[Point3, BoundingBoxCollection[VolumetricBoundingBox, Point3]]
 ):
@@ -370,7 +370,7 @@ class GraphOfConvexPolygons(
             even if the grid would otherwise miss them.
         :return: A graph ready to answer repeated :meth:`path_from_to` queries.
         """
-        result = cls(world, search_space)
+        result = cls(world=world, search_space=search_space)
         settings = seeding_settings or IrisSeedingSettings()
         domain = _validate_and_convert_domain(result.search_space)
 
@@ -423,9 +423,9 @@ class GraphOfConvexPolygons(
         goal_array = self.world.transform(goal, self.world.root).to_np()[:3]
 
         if any(obstacle.PointInSet(start_array) for obstacle in self.obstacles):
-            raise PointOccupiedError(start)
+            raise PointOccupiedError(point=start)
         if any(obstacle.PointInSet(goal_array) for obstacle in self.obstacles):
-            raise PointOccupiedError(goal)
+            raise PointOccupiedError(point=goal)
 
         self._clear_previous_query()
         source_subgraph = self._trajectory_optimization.AddRegions(

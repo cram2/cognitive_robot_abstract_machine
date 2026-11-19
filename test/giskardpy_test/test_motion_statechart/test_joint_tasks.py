@@ -136,12 +136,12 @@ def test_joint_goal(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        tip = Body(name=PrefixedName("tip"))
-        tip2 = Body(name=PrefixedName("tip2"))
+        root = Body(name=PrefixedName(name="root"))
+        tip = Body(name=PrefixedName(name="tip"))
+        tip2 = Body(name=PrefixedName(name="tip2"))
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1)
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "a"),
+            name=PrefixedName(name="dof", prefix="a"),
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
@@ -154,7 +154,7 @@ def test_joint_goal(tmp_path):
         world.add_connection(root_C_tip)
 
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "b"),
+            name=PrefixedName(name="dof", prefix="b"),
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
@@ -454,10 +454,10 @@ def world_with_revolute_joints(
     world = World()
     joints = []
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         for index, maximum_speed in enumerate(maximum_speeds):
             dof = DegreeOfFreedom(
-                name=PrefixedName(f"dof_{index}"),
+                name=PrefixedName(name=f"dof_{index}"),
                 limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=maximum_speed
                 ),
@@ -468,7 +468,7 @@ def world_with_revolute_joints(
                     axis=Vector3.Z()
                 ),
                 parent=root,
-                child=Body(name=PrefixedName(f"tip_{index}")),
+                child=Body(name=PrefixedName(name=f"tip_{index}")),
                 raw_dof=dof,
             )
             world.add_connection(joint)

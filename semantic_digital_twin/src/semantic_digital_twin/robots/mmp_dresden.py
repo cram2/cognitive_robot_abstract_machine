@@ -69,7 +69,7 @@ class MMPDresdenJoint(JointName):
     GRIPPER_LEFT_KNUCKLE = "arm_0_gripper_robotiq_85_left_knuckle_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -91,7 +91,7 @@ class MMPDresdenThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -113,7 +113,7 @@ class MMPDresdenIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenGripper(
     EndEffector, HasTwoFingers[MMPDresdenThumb, MMPDresdenIndexFinger]
 ):
@@ -131,13 +131,13 @@ class MMPDresdenGripper(
         limits = knuckle.raw_dof.limits
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping={knuckle: limits.lower.position},
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping={knuckle: limits.upper.position},
             state_type=GripperState.CLOSE,
         )
@@ -166,7 +166,7 @@ class MMPDresdenGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenCamera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -191,19 +191,19 @@ class MMPDresdenCamera(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenArm(Arm[MMPDresdenGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping=dict(zip(self.active_connections, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
             state_type=StaticJointState.PARK,
         )
         arm_both = JointState.from_mapping(
-            name=PrefixedName("arm_both", prefix=self.name.name),
+            name=PrefixedName(name="arm_both", prefix=self.name.name),
             mapping=dict(
                 zip(
                     self.active_connections,
@@ -228,7 +228,7 @@ class MMPDresdenArm(Arm[MMPDresdenGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCamera]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -248,7 +248,7 @@ class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCame
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -269,7 +269,7 @@ class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresden(AbstractRobot, HasMobileBase[MMPDresdenMobileBase]):
     """
     The  Mobile Manipulation Platform (MMP) Dresden version.

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldOfView:
     """
     Represents the field of view of a camera sensor, defined by the vertical and

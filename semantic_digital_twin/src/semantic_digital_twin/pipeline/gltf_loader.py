@@ -16,14 +16,16 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from ..datastructures.prefixed_name import PrefixedName
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeProcessingResult:
     """
     Result of processing a single node in the scene graph.
     """
 
     body: Body
-    """The Body object created from the node's geometry."""
+    """
+    The Body object created from the node's geometry.
+    """
 
     visited_nodes: set[str]
     """
@@ -31,10 +33,12 @@ class NodeProcessingResult:
     """
 
     children_to_visit: set[str]
-    """Set of child node names that need to be processed next."""
+    """
+    Set of child node names that need to be processed next.
+    """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GLTFLoader(Step):
     """
     Load GLTF/GLB files into a World.
@@ -47,7 +51,9 @@ class GLTFLoader(Step):
     """
 
     file_path: str
-    """Path to the GLTF/GLB file."""
+    """
+    Path to the GLTF/GLB file.
+    """
 
     max_grouping_iterations: int = 10000
     """
@@ -97,15 +103,15 @@ class GLTFLoader(Step):
         triangle_mesh = Mesh.from_trimesh(
             mesh=mesh,
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(),  # Identity transform
-            scale=Scale(1.0, 1.0, 1.0),  # No scaling
+            scale=Scale(x=1.0, y=1.0, z=1.0),  # No scaling
         )
 
         # Create ShapeCollection for collision and visual
-        shape_collection = ShapeCollection([triangle_mesh])
+        shape_collection = ShapeCollection(shapes=[triangle_mesh])
 
         # Create Body
         body = Body(
-            name=PrefixedName(name),
+            name=PrefixedName(name=name),
             collision=shape_collection,
             visual=shape_collection,  # Use same for both collision and visual
         )
@@ -203,7 +209,7 @@ class GLTFLoader(Step):
             parent=parent_body,
             child=child_body,
             parent_T_connection_expression=relative_transform,
-            name=PrefixedName(f"{parent_node}_{child_node}"),
+            name=PrefixedName(name=f"{parent_node}_{child_node}"),
         )
         world.add_connection(conn)
 
@@ -234,7 +240,7 @@ class GLTFLoader(Step):
                 parent_T_connection_expression=HomogeneousTransformationMatrix(
                     root_transform
                 ),
-                name=PrefixedName(f"object_root_{object_root}"),
+                name=PrefixedName(name=f"object_root_{object_root}"),
             )
             world.add_connection(conn)
 
@@ -252,7 +258,7 @@ class GLTFLoader(Step):
         """
         Generate a body instance without any geometry.
         """
-        return Body(name=PrefixedName(name))
+        return Body(name=PrefixedName(name=name))
 
     def _process_node(
         self, node: str, body_parent: str, visited_nodes: set[str]
@@ -324,8 +330,8 @@ class GLTFLoader(Step):
             merged_collision = list(existing_body.collision.shapes) + list(
                 body.collision.shapes
             )
-            existing_body.visual = ShapeCollection(merged_shapes)
-            existing_body.collision = ShapeCollection(merged_collision)
+            existing_body.visual = ShapeCollection(shapes=merged_shapes)
+            existing_body.collision = ShapeCollection(shapes=merged_collision)
             # Map the new node to the existing body for connection tracking
             world_elements[node] = existing_body
         else:

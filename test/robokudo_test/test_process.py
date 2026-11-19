@@ -312,7 +312,7 @@ class TestJoiningSharedWorld:
             shared_world.world.add_connection(
                 Connection6DoF.create_with_dofs(
                     parent=shared_world.world.root,
-                    child=Body(name=PrefixedName("table")),
+                    child=Body(name=PrefixedName(name="table")),
                     world=shared_world.world,
                 )
             )
@@ -327,7 +327,7 @@ class TestJoiningSharedWorld:
     def test_changes_of_the_shared_world_reach_perception(
         self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        table = Body(name=PrefixedName("table"))
+        table = Body(name=PrefixedName(name="table"))
         with shared_world.world.modify_world():
             shared_world.world.add_connection(
                 Connection6DoF.create_with_dofs(
@@ -586,7 +586,7 @@ class TestDiscoveringASharedWorld:
     ) -> None:
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+            world.add_body(Body(name=PrefixedName(name=FrameName.WORLD)))
         served_worlds = []
         serving = Timer(
             1.0,

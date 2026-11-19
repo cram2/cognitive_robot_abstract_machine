@@ -174,7 +174,7 @@ class GarmiJoint(JointName):
         return [cls.LIFT_LOWER, cls.LIFT_UPPER]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiCamera(RobotCamera[FieldOfViewCameraModel]):
     """
     The head camera of the GARMI robot.
@@ -218,7 +218,7 @@ class GarmiCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiNeck(Neck[GarmiCamera]):
     """
     The pan/tilt neck of the GARMI robot.
@@ -252,7 +252,7 @@ class GarmiNeck(Neck[GarmiCamera]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiLeftGripperLeftFinger(Finger):
     """
     The left finger of the left gripper.
@@ -286,7 +286,7 @@ class GarmiLeftGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiLeftGripperRightFinger(Finger):
     """
     The right finger of the left gripper.
@@ -320,7 +320,7 @@ class GarmiLeftGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiRightGripperLeftFinger(Finger):
     """
     The left finger of the right gripper.
@@ -354,7 +354,7 @@ class GarmiRightGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiRightGripperRightFinger(Finger):
     """
     The right finger of the right gripper.
@@ -388,7 +388,7 @@ class GarmiRightGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiLeftGripper(
     EndEffector, HasTwoFingers[GarmiLeftGripperLeftFinger, GarmiLeftGripperRightFinger]
 ):
@@ -411,12 +411,12 @@ class GarmiLeftGripper(
         """
         gripper_joints = self.active_connections
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.04, 0.04])),
             state_type=GripperState.OPEN,
         )
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0, 0.0])),
             state_type=GripperState.CLOSE,
         )
@@ -447,7 +447,7 @@ class GarmiLeftGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiRightGripper(
     EndEffector,
     HasTwoFingers[GarmiRightGripperLeftFinger, GarmiRightGripperRightFinger],
@@ -471,12 +471,12 @@ class GarmiRightGripper(
         """
         gripper_joints = self.active_connections
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.04, 0.04])),
             state_type=GripperState.OPEN,
         )
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0, 0.0])),
             state_type=GripperState.CLOSE,
         )
@@ -507,7 +507,7 @@ class GarmiRightGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiLeftArm(Arm[GarmiLeftGripper]):
     """
     The left Franka FR3 arm.
@@ -537,7 +537,7 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
         }
 
         arm_park = JointState.from_mapping(
-            name=PrefixedName("park", prefix=self.name.name),
+            name=PrefixedName(name="park", prefix=self.name.name),
             mapping={
                 self._world.get_connection_by_name(joint_name): position
                 for joint_name, position in park_configuration.items()
@@ -563,7 +563,7 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiRightArm(Arm[GarmiRightGripper]):
     """
     The right Franka FR3 arm.
@@ -593,7 +593,7 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
         }
 
         arm_park = JointState.from_mapping(
-            name=PrefixedName("park", prefix=self.name.name),
+            name=PrefixedName(name="park", prefix=self.name.name),
             mapping={
                 self._world.get_connection_by_name(joint_name): position
                 for joint_name, position in park_configuration.items()
@@ -619,7 +619,7 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiTorso(
     Torso, HasLeftRightArm[GarmiLeftArm, GarmiRightArm], HasNeck[GarmiNeck]
 ):
@@ -651,7 +651,7 @@ class GarmiTorso(
         )
         return [
             JointState.from_mapping(
-                name=PrefixedName(name, prefix=self.name.name),
+                name=PrefixedName(name=name, prefix=self.name.name),
                 mapping=dict(zip(lift_joints, positions)),
                 state_type=state_type,
             )
@@ -675,7 +675,7 @@ class GarmiTorso(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
     """
     The mecanum mobile base of the GARMI robot.
@@ -723,7 +723,7 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
     """
     Semantic annotation for GARMI, a mobile service robot with a mecanum base, lift, two

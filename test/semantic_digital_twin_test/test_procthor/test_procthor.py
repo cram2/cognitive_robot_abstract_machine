@@ -51,7 +51,7 @@ class ProcTHORTestCase(unittest.TestCase):
             cls.house_json = json.load(f)
 
         cls.world = World(name="TestWorld")
-        world_root = Body(name=PrefixedName("TestWorldRoot"))
+        world_root = Body(name=PrefixedName(name="TestWorldRoot"))
         with cls.world.modify_world():
             cls.world.add_kinematic_structure_entity(world_root)
 
@@ -176,7 +176,7 @@ class ProcTHORTestCase(unittest.TestCase):
         )
 
         scale = procthor_door.scale
-        expected_scale = Scale(0.03, 2.0, 2.1)
+        expected_scale = Scale(x=0.03, y=2.0, z=2.1)
         self.assertEqual(expected_scale, scale)
 
     def test_wall_T_door(self):
@@ -269,7 +269,7 @@ class ProcTHORTestCase(unittest.TestCase):
             wall_dicts=walls, door_dicts=doors, wall_thickness=0.05
         )
 
-        self.assertEqual(procthor_wall.scale, Scale(0.05, 3.6, 4.2))
+        self.assertEqual(procthor_wall.scale, Scale(x=0.05, y=3.6, z=4.2))
 
     def test_world_T_wall(self):
         doors = self.house_json["doors"]
@@ -356,7 +356,7 @@ class ProcTHORTestCase(unittest.TestCase):
         obj_world = procthor_object.get_world()
 
         world = ProcTHORParser(
-            "test_house", house=self.house_json, session=session
+            name="test_house", house=self.house_json, session=session
         ).create_world()
 
         world.merge_world(obj_world)

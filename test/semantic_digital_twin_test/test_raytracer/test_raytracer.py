@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% Ray tracing tests
 def test_create_segmentation_mask(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    rt = RayTracer(world)
+    rt = RayTracer(world=world)
     rt.update_scene()
 
     camera_pose = np.array(
@@ -62,7 +62,7 @@ def test_create_segmentation_mask(ray_test_world):
 
 def test_create_depth_map(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    rt = RayTracer(world)
+    rt = RayTracer(world=world)
     rt.update_scene()
 
     camera_pose = np.array(
@@ -88,7 +88,7 @@ def test_create_depth_map(ray_test_world):
 
 def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
     world, *_ = ray_test_world
-    ray_tracer = RayTracer(world)
+    ray_tracer = RayTracer(world=world)
 
     camera_pose = np.eye(4, dtype=float)
     camera_pose[:3, 3] = [-2.5, 0.0, 0.0]
@@ -111,7 +111,7 @@ def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
 
 def test_create_segmentation_mask_with_rectangular_resolution(ray_test_world):
     world, *_ = ray_test_world
-    ray_tracer = RayTracer(world)
+    ray_tracer = RayTracer(world=world)
 
     camera_pose = np.array(
         [
@@ -133,7 +133,7 @@ def test_create_segmentation_mask_with_rectangular_resolution(ray_test_world):
 
 def test_create_depth_map_with_rectangular_resolution(ray_test_world):
     world, *_ = ray_test_world
-    ray_tracer = RayTracer(world)
+    ray_tracer = RayTracer(world=world)
 
     camera_pose = np.array(
         [
@@ -170,7 +170,7 @@ def test_non_positive_camera_resolution_raises_domain_exception(width, height):
 
 def test_ray_test(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    rt = RayTracer(world)
+    rt = RayTracer(world=world)
     rt.update_scene()
 
     ray_intersections = rt.ray_test(np.array([1, 0, 0.1]), np.array([-1, 0, 0.1]))
@@ -205,7 +205,7 @@ def test_ray_test_batch(ray_test_world):
         child_frame=body2,
     )
 
-    rt = RayTracer(world)
+    rt = RayTracer(world=world)
     rt.update_scene()
 
     rays = np.array([[1, 1, 0.1], [-1, 1, 0.1]])
@@ -239,7 +239,7 @@ def test_min_distance(ray_test_world):
         child_frame=body2,
     )
 
-    rt = RayTracer(world)
+    rt = RayTracer(world=world)
     rt.update_scene()
 
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
@@ -267,7 +267,7 @@ def test_max_distance(ray_test_world):
         child_frame=body2,
     )
 
-    rt = RayTracer(world)
+    rt = RayTracer(world=world)
     rt.update_scene()
 
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
@@ -301,7 +301,7 @@ def _textured_box_body(name: str, seed: int) -> Body:
     :return: A body whose collision mesh is a unit box painted with a texture of its
         own.
     """
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     box = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     generator = np.random.default_rng(seed)
     box.visual = TextureVisuals(
@@ -315,7 +315,7 @@ def _textured_box_body(name: str, seed: int) -> Body:
         ),
     )
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=box,
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -334,7 +334,7 @@ def textured_world() -> World:
     :return: A world of two textured boxes standing 2 m apart along x.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         for index in range(2):
@@ -352,7 +352,7 @@ def textured_world() -> World:
 
 
 def test_a_ray_hits_the_textured_box_it_points_at(textured_world):
-    ray_tracer = RayTracer(textured_world)
+    ray_tracer = RayTracer(world=textured_world)
 
     ray_intersections = ray_tracer.ray_test(
         np.array([2.0, 0.0, 2.0]), np.array([2.0, 0.0, -2.0])
@@ -365,7 +365,7 @@ def test_casting_rays_does_not_decode_the_textures_of_the_world(textured_world):
     """
     A ray only meets geometry, so casting it must not unpack a texture.
     """
-    ray_tracer = RayTracer(textured_world)
+    ray_tracer = RayTracer(world=textured_world)
     origins = np.array([[x, 0.0, 2.0] for x in np.linspace(-1.0, 3.0, 50)])
     targets = origins - np.array([0.0, 0.0, 4.0])
 

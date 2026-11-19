@@ -320,7 +320,7 @@ def _reasoned_apartment_setup(
     SymbolGraph.clear_instance()
     SymbolGraph(_class_diagram=_session_class_diagram)
     apartment = deepcopy(_apartment_world_setup)
-    WorldReasoner(apartment).infer_semantic_annotations()
+    WorldReasoner(world=apartment).infer_semantic_annotations()
     return apartment
 
 
@@ -539,7 +539,7 @@ def test_a_robot_in_the_apartment_is_left_alone(pr2_apartment_world: World):
         connection.name.name for connection in pr2_apartment_world.connections
     }
 
-    inferred = WorldReasoner(pr2_apartment_world).infer_semantic_annotations()
+    inferred = WorldReasoner(world=pr2_apartment_world).infer_semantic_annotations()
 
     claimed = {
         annotation.root.name.name

@@ -103,7 +103,7 @@ class SdfJointType(StrEnum):
         return ScrewAxisConnection.create_revolute_screw_axis(axis=direction)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GazeboParser(WorldModelParser):
     """
     Parses Gazebo SDF model and world descriptions into worlds.
@@ -217,7 +217,7 @@ class GazeboParser(WorldModelParser):
             os.path.normpath(os.path.join(directory, "..", "..")),
         ]
         return CompositePathResolver(
-            [
+            resolvers=[
                 ModelUriResolver(
                     model_directories=[
                         os.path.join(root, "models") for root in root_directories
@@ -266,7 +266,9 @@ class GazeboParser(WorldModelParser):
         world = World()
         world.name = world_name
         with world.modify_world():
-            world.add_kinematic_structure_entity(Body(name=PrefixedName(world_name)))
+            world.add_kinematic_structure_entity(
+                Body(name=PrefixedName(name=world_name))
+            )
 
         self.attach_contained_models(world, element)
         return world
@@ -372,7 +374,7 @@ class GazeboParser(WorldModelParser):
             return
 
         root_connection = FixedConnection(
-            name=PrefixedName("root", sub_world.root.name.prefix),
+            name=PrefixedName(name="root", prefix=sub_world.root.name.prefix),
             parent=world.root,
             child=sub_world.root,
             parent_T_connection_expression=pose,
@@ -523,7 +525,7 @@ class GazeboParser(WorldModelParser):
         for link_name, body in bodies.items():
             if link_name not in child_link_names:
                 return body
-        return Body(name=PrefixedName(instance_name))
+        return Body(name=PrefixedName(name=instance_name))
 
     def attach_unjointed_link(
         self,
@@ -548,7 +550,7 @@ class GazeboParser(WorldModelParser):
         if is_static:
             world.add_connection(
                 FixedConnection(
-                    name=PrefixedName(body.name.name, body.name.prefix),
+                    name=PrefixedName(name=body.name.name, prefix=body.name.prefix),
                     parent=root_body,
                     child=body,
                     parent_T_connection_expression=root_T_link,
@@ -591,7 +593,7 @@ class GazeboParser(WorldModelParser):
         :param prefix: The prefix of the name of the body.
         :return: The body describing the link.
         """
-        body = Body(name=PrefixedName(element.get("name"), prefix))
+        body = Body(name=PrefixedName(name=element.get("name"), prefix=prefix))
         body.visual = self.parse_shapes(element.findall("visual"), body)
         body.collision = self.parse_shapes(element.findall("collision"), body)
 
@@ -657,7 +659,7 @@ class GazeboParser(WorldModelParser):
             for element in elements
             if element.find("geometry") is not None
         ]
-        return ShapeCollection(shapes, reference_frame=body)
+        return ShapeCollection(shapes=shapes, reference_frame=body)
 
     def parse_geometry(
         self,
@@ -675,8 +677,8 @@ class GazeboParser(WorldModelParser):
         """
         box_element = element.find("box")
         if box_element is not None:
-            size = self.parse_vector(box_element.findtext("size"))
-            return Box(origin=origin, scale=Scale(*size), color=color)
+            x, y, z = self.parse_vector(box_element.findtext("size"))
+            return Box(origin=origin, scale=Scale(x=x, y=y, z=z), color=color)
 
         sphere_element = element.find("sphere")
         if sphere_element is not None:
@@ -696,12 +698,16 @@ class GazeboParser(WorldModelParser):
         mesh_element = element.find("mesh")
         if mesh_element is not None:
             scale = mesh_element.findtext("scale")
+            mesh_scale = Scale()
+            if scale:
+                x, y, z = self.parse_vector(scale)
+                mesh_scale = Scale(x=x, y=y, z=z)
             return Mesh(
                 origin=origin,
                 filename=self.path_resolver.resolve(
                     mesh_element.findtext("uri").strip()
                 ),
-                scale=Scale(*self.parse_vector(scale)) if scale else Scale(),
+                scale=mesh_scale,
                 color=color,
             )
 
@@ -963,7 +969,7 @@ class GazeboParser(WorldModelParser):
         return float(text) if text is not None else None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingRootElement(ParsingError):
     """
     Raised when a description file contains none of the expected root elements.
@@ -981,7 +987,7 @@ class MissingRootElement(ParsingError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MalformedPose(ParsingError):
     """
     Raised when a pose does not consist of a position and roll-pitch-yaw triple.
@@ -999,7 +1005,7 @@ class MalformedPose(ParsingError):
         return "Write the pose as 'x y z roll pitch yaw'."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedJointType(ParsingError):
     """
     Raised when a parsed joint uses a type that has no connection counterpart.
@@ -1029,7 +1035,7 @@ class UnsupportedJointType(ParsingError):
         return f"Use one of the supported types: {', '.join(sorted(self.supported_types))}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedGeometryType(ParsingError):
     """
     Raised when a parsed geometry uses a shape that has no counterpart.
@@ -1054,7 +1060,7 @@ class UnsupportedGeometryType(ParsingError):
         return f"Use one of the supported types: {', '.join(sorted(self.supported_types))}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedPoseReference(ParsingError):
     """
     Raised when a pose is expressed relative to a named frame.
@@ -1083,7 +1089,7 @@ class UnsupportedPoseReference(ParsingError):
         return f"Express the pose in its default frame and drop the '{self.attribute}' attribute."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedAxisReference(ParsingError):
     """
     Raised when a joint axis is expressed in a frame other than the joint frame.

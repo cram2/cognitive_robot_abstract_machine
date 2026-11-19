@@ -54,7 +54,7 @@ class MockDatasetFileRequestHandler(SimpleHTTPRequestHandler):
 # %% standing in for the machine holding the dataset
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockDatasetFileServer:
     """
     Serves a directory tree over http on the loopback interface, answering a directory

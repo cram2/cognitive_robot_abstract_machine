@@ -72,7 +72,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver):
     """
     Abstract synchronizer to manage world synchronizations between processes running
@@ -306,7 +306,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
             self.publisher = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModelReloadSynchronizer(Synchronizer):
     """
     Synchronizes the model reloading process across different systems using ROS
@@ -411,7 +411,7 @@ class ModelReloadSynchronizer(Synchronizer):
             )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     """
     Single ``/world_sync`` topic synchronizer for ordered model + state delivery.
@@ -497,7 +497,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             publish.
         """
         if publish_changes is None:
-            raise MissingPublishChangesKWARG(kwargs)
+            raise MissingPublishChangesKWARG(kwargs=kwargs)
         if not publish_changes:
             return
 
@@ -535,7 +535,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             publish.
         """
         if publish_changes is None:
-            raise MissingPublishChangesKWARG(kwargs)
+            raise MissingPublishChangesKWARG(kwargs=kwargs)
         if not publish_changes:
             return
 

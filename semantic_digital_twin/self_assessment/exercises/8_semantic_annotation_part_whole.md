@@ -72,11 +72,11 @@ Your goal:
 world = World.create_with_root_body()
 with world.modify_world():
     dresser = Dresser.create_with_new_body_in_world(
-        name="dresser", scale=Scale(0.31, 0.31, 0.21), world=world
+        name="dresser", scale=Scale(x=0.31, y=0.31, z=0.21), world=world
     )
     drawer = Drawer.create_with_new_body_in_world(
         name="drawer",
-        scale=Scale(0.3, 0.3, 0.2),
+        scale=Scale(x=0.3, y=0.3, z=0.2),
         world=world,
         parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X())),
     )
@@ -93,11 +93,11 @@ with world.modify_world():
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if drawer.handle is not handle: raise ExerciseVerificationFailed("The handle should be routed to drawer.handle.")
-if not (isinstance(drawer.movable_joint, ScrewAxisConnection) and drawer.movable_joint.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("The drawer should slide on a prismatic connection.")
-if drawer.movable_joint.parent is not dresser.root: raise ExerciseVerificationFailed("The drawer should keep sliding once it is part of the dresser.")
-if drawer not in dresser.drawers: raise ExerciseVerificationFailed("The drawer should be appended to dresser.drawers.")
-if handle.root.parent_connection.parent is not drawer.root: raise ExerciseVerificationFailed("The handle should be a kinematic child of the drawer.")
+if drawer.handle is not handle: raise ExerciseVerificationFailed(requirement="The handle should be routed to drawer.handle.")
+if not (isinstance(drawer.movable_joint, ScrewAxisConnection) and drawer.movable_joint.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed(requirement="The drawer should slide on a prismatic connection.")
+if drawer.movable_joint.parent is not dresser.root: raise ExerciseVerificationFailed(requirement="The drawer should keep sliding once it is part of the dresser.")
+if drawer not in dresser.drawers: raise ExerciseVerificationFailed(requirement="The drawer should be appended to dresser.drawers.")
+if handle.root.parent_connection.parent is not drawer.root: raise ExerciseVerificationFailed(requirement="The handle should be a kinematic child of the drawer.")
 ```
 
 ## 2. Reuse a mixin, declare a field only for a new part kind
@@ -159,11 +159,11 @@ class ToolRack(HasHandle):
 
 with world.modify_world():
     rack = ToolRack.create_with_new_body_in_world(
-        name="rack", scale=Scale(0.4, 0.1, 0.3), world=world
+        name="rack", scale=Scale(x=0.4, y=0.1, z=0.3), world=world
     )
     rack_handle = Handle.create_with_new_body_in_world(name="rack_handle", world=world)
     rack_latch = SafetyLatch.create_with_new_body_in_world(
-        name="rack_latch", world=world, scale=Scale(0.02, 0.02, 0.02)
+        name="rack_latch", world=world, scale=Scale(x=0.02, y=0.02, z=0.02)
     )
     rack.add(part=rack_handle)
     rack.add(part=rack_latch)
@@ -171,10 +171,10 @@ with world.modify_world():
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if ToolRack.__dataclass_fields__["handle"] is not HasHandle.__dataclass_fields__["handle"]: raise ExerciseVerificationFailed("The handle field must come from the HasHandle mixin, not be re-declared.")
-if rack.handle is not rack_handle: raise ExerciseVerificationFailed("The handle should be routed to the inherited rack.handle field.")
-if rack.latch is not rack_latch: raise ExerciseVerificationFailed("The latch should be routed to rack.latch.")
-if rack.label is not None: raise ExerciseVerificationFailed("add must not touch plain fields.")
-if rack_handle.root.parent_connection.parent is not rack.root: raise ExerciseVerificationFailed("The handle should be a kinematic child of the rack.")
-if rack_latch.root.parent_connection.parent is not rack.root: raise ExerciseVerificationFailed("The latch should be a kinematic child of the rack.")
+if ToolRack.__dataclass_fields__["handle"] is not HasHandle.__dataclass_fields__["handle"]: raise ExerciseVerificationFailed(requirement="The handle field must come from the HasHandle mixin, not be re-declared.")
+if rack.handle is not rack_handle: raise ExerciseVerificationFailed(requirement="The handle should be routed to the inherited rack.handle field.")
+if rack.latch is not rack_latch: raise ExerciseVerificationFailed(requirement="The latch should be routed to rack.latch.")
+if rack.label is not None: raise ExerciseVerificationFailed(requirement="add must not touch plain fields.")
+if rack_handle.root.parent_connection.parent is not rack.root: raise ExerciseVerificationFailed(requirement="The handle should be a kinematic child of the rack.")
+if rack_latch.root.parent_connection.parent is not rack.root: raise ExerciseVerificationFailed(requirement="The latch should be a kinematic child of the rack.")
 ```

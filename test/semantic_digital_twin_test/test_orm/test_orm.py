@@ -133,10 +133,10 @@ def test_insert(session):
     from semantic_digital_twin.orm.ormatic_interface import BodyDAO, BoxDAO, ShapeDAO
 
     origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
-    scale = Scale(1.0, 1.0, 1.0)
+    scale = Scale(x=1.0, y=1.0, z=1.0)
     color = Color.from_rgba(red=0.0, green=1.0, blue=1.0)
     shape1 = Box(origin=origin, scale=scale, color=color)
-    b1 = Body(name=PrefixedName("b1"), collision=ShapeCollection([shape1]))
+    b1 = Body(name=PrefixedName(name="b1"), collision=ShapeCollection(shapes=[shape1]))
 
     dao: BodyDAO = to_dao(b1)
     assert dao.collision.shapes[0].target.origin is not None
@@ -245,7 +245,7 @@ def test_part_whole_relationship_field_survives_deepcopy():
         world = World.create_with_root_body("root")
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
-                name="door", scale=Scale(0.03, 1, 2), world=world
+                name="door", scale=Scale(x=0.03, y=1, z=2), world=world
             )
             handle = Handle.create_with_new_body_in_world(name="handle", world=world)
             door.add(part=handle)
@@ -325,7 +325,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     world = World.create_with_root_body("root")
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
         door.add(part=handle)
@@ -372,7 +372,7 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     with world.modify_world():
         Door.create_with_new_body_in_world(
             name="door",
-            scale=Scale(0.03, 1, 2),
+            scale=Scale(x=0.03, y=1, z=2),
             world=world,
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
@@ -467,8 +467,8 @@ def world_with_box() -> World:
     """
     world = World()
     box = Body(
-        name=PrefixedName("box"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.2, 0.3))]),
+        name=PrefixedName(name="box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.2, z=0.3))]),
         inertial=Inertial(
             mass=2.0,
             inertia=InertiaTensor.from_values(
@@ -533,8 +533,8 @@ def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
     it was stored.
     """
     box = world_with_box.get_body_by_name("box")
-    arm = Body(name=PrefixedName("arm"))
-    actuator = Actuator(name=PrefixedName("servo"))
+    arm = Body(name=PrefixedName(name="arm"))
+    actuator = Actuator(name=PrefixedName(name="servo"))
     with world_with_box.modify_world():
         world_with_box.add_kinematic_structure_entity(arm)
         joint = ScrewAxisConnection.create_with_dofs(

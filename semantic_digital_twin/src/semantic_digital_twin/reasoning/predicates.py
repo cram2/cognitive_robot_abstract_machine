@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InContactWith(Triple[TBody, TBody]):
     """
     Whether two bodies are touching, by how close their collision geometry comes.
@@ -151,7 +151,7 @@ def compute_euclidean_planar_distance(
     return body1_position.euclidean_distance(body2_position)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SupportedBy(Triple[TBody, TBody]):
     """
     Whether one body rests on another.
@@ -248,7 +248,7 @@ class SupportedBy(Triple[TBody, TBody]):
         return -touch.distance < self.maximum_intersection_height
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Supports(Predicate):
     """
     Whether anything in the world rests on a body.
@@ -295,7 +295,7 @@ class Supports(Predicate):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InsideRegion(Triple[TBody, TRegion]):
     """
     Whether a body lies in a region, by what fraction of its collision volume falls
@@ -373,7 +373,7 @@ class InsideRegion(Triple[TBody, TRegion]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class KinematicStructureEntitySpatialRelation(Predicate, ABC):
     """
     Base class for spatial relations between two KinematicStructureEntity instances.
@@ -393,7 +393,7 @@ class KinematicStructureEntitySpatialRelation(Predicate, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PointSpatialRelation(Predicate, ABC):
     """
     Check if the point is spatially related to the other point.
@@ -410,7 +410,7 @@ class PointSpatialRelation(Predicate, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
     A spatial relation between two points, read from somewhere in particular.
@@ -476,7 +476,7 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
         return (s_body - s_other).compile()()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class LeftOf(ViewDependentSpatialRelation):
     """
     The "left" direction is taken as the -Y axis of the given point of
@@ -488,7 +488,7 @@ class LeftOf(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RightOf(ViewDependentSpatialRelation):
     """
     The "right" direction is taken as the +Y axis of the given point of
@@ -500,7 +500,7 @@ class RightOf(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Above(ViewDependentSpatialRelation):
     """
     The "above" direction is taken as the +Z axis of the given point of
@@ -512,7 +512,7 @@ class Above(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Below(ViewDependentSpatialRelation):
     """
     The "below" direction is taken as the -Z axis of the given point of
@@ -524,7 +524,7 @@ class Below(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Behind(ViewDependentSpatialRelation):
     """
     The "behind" direction is defined as the -X axis of the given point of semantic
@@ -536,7 +536,7 @@ class Behind(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InFrontOf(ViewDependentSpatialRelation):
     """
     The "in front of" direction is defined as the +X axis of the given point of semantic
@@ -548,7 +548,7 @@ class InFrontOf(ViewDependentSpatialRelation):
         return self.result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InsideOf(KinematicStructureEntitySpatialRelation):
     """
     Whether one thing lies inside another, by what fraction of its volume falls within
@@ -625,7 +625,7 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContainsType(Predicate):
     """
     Predicate that checks if any object in the iterable is of the given type.
@@ -655,7 +655,7 @@ class ContainsType(Predicate):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PlaceIsOccupied(Predicate):
     """
     Whether anything already stands in a stretch of the world.

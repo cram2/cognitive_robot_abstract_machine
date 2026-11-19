@@ -329,7 +329,7 @@ class TestCameraPoseOfAFrame:
     ) -> None:
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName("root_of_another_world")))
+            world.add_body(Body(name=PrefixedName(name="root_of_another_world")))
         pipeline = pipeline_reading(fixed_camera_at(camera_pose()))
         pipeline.world = world
         [reader] = pipeline.children

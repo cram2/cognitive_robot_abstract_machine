@@ -310,7 +310,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         The furniture is annotated first, so the reasoner describes the apartment the
         plan navigates rather than the objects the plan already knows.
         """
-        world_reasoner = WorldReasoner(world)
+        world_reasoner = WorldReasoner(world=world)
         inferred = world_reasoner.infer_semantic_annotations()
         with world.modify_world():
             world.add_semantic_annotations(inferred)

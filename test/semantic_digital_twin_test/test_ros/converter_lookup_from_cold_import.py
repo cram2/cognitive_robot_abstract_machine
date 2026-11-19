@@ -23,7 +23,9 @@ def main() -> None:
     """
     print(Ros2ToSemDTConverter.get_to_converter(LaserScan()).__name__)
     print(
-        SemDTToRos2Converter.get_to_converter(Box(scale=Scale(1.0, 1.0, 1.0))).__name__
+        SemDTToRos2Converter.get_to_converter(
+            Box(scale=Scale(x=1.0, y=1.0, z=1.0))
+        ).__name__
     )
 
 

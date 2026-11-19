@@ -1778,7 +1778,7 @@ def test_an_object_without_collision_is_still_held_by_shutting_the_gripper(
     """
     world, view, extensions = pr2_apartment_context
     with world.modify_world():
-        body = Body(name=PrefixedName("shapeless_milk"))
+        body = Body(name=PrefixedName(name="shapeless_milk"))
         world.add_connection(FixedConnection(parent=world.root, child=body))
         shapeless = Milk(root=body)
         world.add_semantic_annotation(shapeless)

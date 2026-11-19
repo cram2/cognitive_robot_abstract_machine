@@ -123,7 +123,7 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
     own constant offsets.
     """
     world, parent, child = world_with_two_bodies
-    grandparent = Body(name=PrefixedName("grandparent"))
+    grandparent = Body(name=PrefixedName(name="grandparent"))
     grandparent_T_parent = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, y=1.0)
     with world.modify_world():
         world.add_connection(
@@ -374,7 +374,7 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
     screw_pitch = 0.01
     connection = _add_screw_connection(world_with_two_bodies, screw_pitch=screw_pitch)
 
-    new_parent = Body(name=PrefixedName("new_parent"))
+    new_parent = Body(name=PrefixedName(name="new_parent"))
     copied_connection = connection.copy_with_new_parent(
         new_parent, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1)
     )
@@ -429,13 +429,13 @@ def test_copy_with_new_parent_keeps_name(
             world=world,
             parent=parent,
             child=child,
-            name=PrefixedName("named_connection"),
+            name=PrefixedName(name="named_connection"),
             **additional_arguments,
         )
         world.add_connection(connection)
 
     copied_connection = connection.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName(name="new_parent")), HomogeneousTransformationMatrix()
     )
 
     assert copied_connection.name == connection.name

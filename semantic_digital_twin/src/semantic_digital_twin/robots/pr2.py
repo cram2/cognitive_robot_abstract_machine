@@ -124,7 +124,7 @@ class PR2Joint(JointName):
     RIGHT_GRIPPER_RIGHT_FINGER = "r_gripper_r_finger_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2KinectV1(RobotCamera[FieldOfViewCameraModel]):
     """
     Kinect V1 camera attached to its RGB optical frame.
@@ -161,7 +161,7 @@ class PR2KinectV1(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2BaseLidar(Lidar):
     """
     The Hokuyo scanner sweeping the floor in front of the PR2's base.
@@ -186,7 +186,7 @@ class PR2BaseLidar(Lidar):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2RightGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -208,7 +208,7 @@ class PR2RightGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2RightGripperRightFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -230,7 +230,7 @@ class PR2RightGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2LeftGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -252,7 +252,7 @@ class PR2LeftGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2LeftGripperRightFinger(Finger):
     def setup_hardware_interfaces(self):
         return
@@ -274,7 +274,7 @@ class PR2LeftGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2Gripper(
     EndEffector,
     HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],
@@ -304,7 +304,7 @@ class PR2Gripper(
         }
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2RightGripper(
     PR2Gripper[PR2RightGripperLeftFinger, PR2RightGripperRightFinger]
 ):
@@ -312,13 +312,13 @@ class PR2RightGripper(
         right_gripper_joints = self.active_connections
 
         right_gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_open", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.548, 0.548])),
             state_type=GripperState.OPEN,
         )
 
         right_gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_close", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.0, 0.0])),
             state_type=GripperState.CLOSE,
         )
@@ -350,18 +350,18 @@ class PR2RightGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFinger]):
     def setup_joint_states(self) -> list[JointState]:
         left_gripper_joints = self.active_connections
         left_gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_open", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.548, 0.548])),
             state_type=GripperState.OPEN,
         )
 
         left_gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_close", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.0, 0.0])),
             state_type=GripperState.CLOSE,
         )
@@ -393,7 +393,7 @@ class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFin
         return
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
     def setup_hardware_interfaces(self):
 
@@ -437,7 +437,7 @@ class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2Arm(
     Arm[TGenericEndEffector], ServoedRobotPart, Generic[TGenericEndEffector], ABC
 ):
@@ -476,7 +476,7 @@ class PR2Arm(
         }
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2LeftArm(PR2Arm[PR2LeftGripper]):
     def setup_hardware_interfaces(self):
         controlled_joints = [
@@ -496,7 +496,7 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
 
     def setup_joint_states(self) -> list[JointState]:
         left_arm_park = JointState.from_mapping(
-            name=PrefixedName("left_park", prefix=self.name.name),
+            name=PrefixedName(name="left_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     [c for c in self.active_connections],
@@ -530,7 +530,7 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2RightArm(PR2Arm[PR2RightGripper]):
     def setup_hardware_interfaces(self):
         controlled_joints = [
@@ -550,7 +550,7 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
 
     def setup_joint_states(self) -> list[JointState]:
         right_arm_park = JointState.from_mapping(
-            name=PrefixedName("right_park", prefix=self.name.name),
+            name=PrefixedName(name="right_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     [c for c in self.active_connections],
@@ -576,7 +576,7 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2Torso(
     Torso,
     HasLeftRightArm[PR2LeftArm, PR2RightArm],
@@ -607,19 +607,19 @@ class PR2Torso(
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.0115])),
             state_type=TorsoState.LOW,
         )
 
         torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
+            name=PrefixedName(name="torso_mid", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.15])),
             state_type=TorsoState.MID,
         )
 
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.3])),
             state_type=TorsoState.HIGH,
         )
@@ -641,7 +641,7 @@ class PR2Torso(
         }
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseLidar]):
     @classproperty
     def odometry_body_name(cls) -> str:
@@ -696,7 +696,7 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseL
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
     """
     The PR2 robot built by Willow Garage.
@@ -781,13 +781,13 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
         self._world.collision_manager.extend_max_avoided_bodies_rules(
             [
                 MaxAvoidedCollisionsOverride(
-                    2,
+                    value=2,
                     bodies={
                         self._world.get_body_in_branch_by_name(self.root, "base_link")
                     },
                 ),
                 MaxAvoidedCollisionsOverride(
-                    4,
+                    value=4,
                     bodies=set(
                         self._world.get_direct_child_bodies_with_collision(
                             self._world.get_body_in_branch_by_name(

@@ -24,7 +24,7 @@ from semantic_digital_twin.adapters.package_resolver import (
 # %% where a mesh file is read from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshFileSources(metaclass=SingletonMeta):
     """
     The sources this process reads mesh files from. Each source claims the mesh
@@ -75,7 +75,7 @@ class ProcessLiveness(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RunningProcessLiveness(ProcessLiveness):
     """
     Answers from the process table of the machine this runs on.
@@ -85,7 +85,7 @@ class RunningProcessLiveness(ProcessLiveness):
         return psutil.pid_exists(process_id)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshFileStorage(metaclass=SingletonMeta):
     """
     The place this process writes exported mesh files to.

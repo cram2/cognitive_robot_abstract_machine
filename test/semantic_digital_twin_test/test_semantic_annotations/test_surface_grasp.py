@@ -54,9 +54,9 @@ def carton() -> Milk:
     """
     A box-shaped carton standing on its base, its middle at the origin.
     """
-    body = Body(name=PrefixedName("carton", prefix="surface_grasp"))
+    body = Body(name=PrefixedName(name="carton", prefix="surface_grasp"))
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=trimesh.creation.box(extents=CARTON_EXTENTS),
                 origin=HomogeneousTransformationMatrix(reference_frame=body),

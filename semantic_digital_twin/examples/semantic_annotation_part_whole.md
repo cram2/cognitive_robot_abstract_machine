@@ -61,13 +61,13 @@ world = World.create_with_root_body()
 with world.modify_world():
     dresser = Dresser.create_with_new_body_in_world(
         name="dresser",
-        scale=Scale(0.31, 0.31, 0.21),
+        scale=Scale(x=0.31, y=0.31, z=0.21),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
     )
     drawer = Drawer.create_with_new_body_in_world(
         name="drawer",
-        scale=Scale(0.3, 0.3, 0.2),
+        scale=Scale(x=0.3, y=0.3, z=0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
         parent_connection_specification=ScrewAxisConnectionSpecification(
@@ -94,7 +94,7 @@ print("drawer.handle:", drawer.handle)
 print("drawer.movable_joint:", drawer.movable_joint)
 print("dresser.drawers:", dresser.drawers)
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -149,7 +149,7 @@ Now we can build a `ControlPanel` and add its parts exactly like the built-in an
 with world.modify_world():
     panel = ControlPanel.create_with_new_body_in_world(
         name="panel",
-        scale=Scale(0.3, 0.2, 0.02),
+        scale=Scale(x=0.3, y=0.2, z=0.02),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5),
     )
@@ -159,13 +159,13 @@ with world.modify_world():
             x=0.1, z=0.5, roll=np.pi / 2
         ),
         world=world,
-        scale=Scale(0.05, 0.02, 0.1),
+        scale=Scale(x=0.05, y=0.02, z=0.1),
     )
     panel_button = EmergencyButton.create_with_new_body_in_world(
         name="panel_button",
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1, z=0.5),
         world=world,
-        scale=Scale(0.03, 0.03, 0.02),
+        scale=Scale(x=0.03, y=0.03, z=0.02),
     )
     panel.add(part=panel_handle)
     panel.add(part=panel_button)
@@ -187,7 +187,7 @@ from semantic_digital_twin.exceptions import NoFieldAcceptsEntity
 with world.modify_world():
     stray_drawer = Drawer.create_with_new_body_in_world(
         name="stray_drawer",
-        scale=Scale(0.2, 0.2, 0.2),
+        scale=Scale(x=0.2, y=0.2, z=0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.6),
     )

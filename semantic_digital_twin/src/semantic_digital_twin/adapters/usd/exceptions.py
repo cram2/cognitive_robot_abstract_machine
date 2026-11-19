@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from semantic_digital_twin.exceptions import ParsingError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedUSDPhysicsJointTypeError(ParsingError):
     """
     Raised when a stage contains a physics joint of a type this parser does not build a
@@ -43,7 +43,7 @@ class UnsupportedUSDPhysicsJointTypeError(ParsingError):
         return f"Use one of the supported types: {', '.join(sorted(self.supported_types))}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class USDPhysicsJointMissingChildBodyError(ParsingError):
     """
     Raised when a physics joint's ``body1`` relationship (its child link) has no target.
@@ -69,7 +69,7 @@ class USDPhysicsJointMissingChildBodyError(ParsingError):
         return "Inspect the joint prim's body1 relationship on the stage."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedUSDGeometryTypeError(ParsingError):
     """
     Raised when a stage contains a renderable geometric primitive

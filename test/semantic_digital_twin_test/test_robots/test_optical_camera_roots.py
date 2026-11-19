@@ -32,7 +32,7 @@ def test_camera_root_defines_optical_forward_direction(table_world: World) -> No
     A camera needs no separate viewing axis or optical offset.
     """
     camera = Camera(
-        name=PrefixedName("camera"),
+        name=PrefixedName(name="camera"),
         root=table_world.root,
         camera_model=PinholeCameraModel.from_field_of_view(
             resolution=CameraResolution(), field_of_view=FieldOfView()

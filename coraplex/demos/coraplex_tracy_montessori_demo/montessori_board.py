@@ -85,11 +85,11 @@ class HoleOutline:
             self.points.max(axis=0),
         )
         return PlanarBoundingBox(
-            float(minimum_x),
-            float(minimum_y),
-            float(maximum_x),
-            float(maximum_y),
-            HomogeneousTransformationMatrix(),
+            min_x=float(minimum_x),
+            min_y=float(minimum_y),
+            max_x=float(maximum_x),
+            max_y=float(maximum_y),
+            origin=HomogeneousTransformationMatrix(),
         )
 
     @property
@@ -395,7 +395,7 @@ class ShapeSortingBoard:
     compartment.
     """
 
-    handle_scale: Scale = field(default_factory=lambda: Scale(0.015, 0.03, 0.015))
+    handle_scale: Scale = field(default_factory=lambda: Scale(x=0.015, y=0.03, z=0.015))
     """
     Size of a drawer's handle.
     """
@@ -415,12 +415,14 @@ class ShapeSortingBoard:
         return Body(
             name=name,
             visual=ShapeCollection(
-                [Mesh.from_file(str(BoardResource.MESH.value), color=self.color)]
+                shapes=[Mesh.from_file(str(BoardResource.MESH.value), color=self.color)]
                 + drawer_fronts
                 + self.handles()
             ),
             collision=ShapeCollection(
-                [self.box_around(part=part) for part in self.geometry.solid_parts]
+                shapes=[
+                    self.box_around(part=part) for part in self.geometry.solid_parts
+                ]
                 + self.lid_around_its_holes()
                 + [self.copy_of(box=front) for front in drawer_fronts]
             ),
@@ -432,8 +434,9 @@ class ShapeSortingBoard:
         :return: That box.
         """
         minimum, maximum = part.bounds
+        x, y, z = part.extents
         return Box(
-            scale=Scale(*part.extents),
+            scale=Scale(x=x, y=y, z=z),
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                 *(minimum + maximum) / 2
             ),
@@ -462,7 +465,13 @@ class ShapeSortingBoard:
             | {hole.bounds.max_y for hole in holes}
         )
         cells = [
-            PlanarBoundingBox(x0, y0, x1, y1, HomogeneousTransformationMatrix())
+            PlanarBoundingBox(
+                min_x=x0,
+                min_y=y0,
+                max_x=x1,
+                max_y=y1,
+                origin=HomogeneousTransformationMatrix(),
+            )
             for x0, x1 in zip(x_edges, x_edges[1:])
             if x1 - x0 >= self.minimum_cell_size
             for y0, y1 in zip(y_edges, y_edges[1:])
@@ -470,7 +479,7 @@ class ShapeSortingBoard:
         ]
         return [
             Box(
-                scale=Scale(cell.depth, cell.width, top - bottom),
+                scale=Scale(x=cell.depth, y=cell.width, z=top - bottom),
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     cell.center.x, cell.center.y, (top + bottom) / 2
                 ),
@@ -493,9 +502,9 @@ class ShapeSortingBoard:
         return [
             Box(
                 scale=Scale(
-                    self.drawer_front_thickness,
-                    compartment.size,
-                    self.geometry.lid_bottom - base_top,
+                    x=self.drawer_front_thickness,
+                    y=compartment.size,
+                    z=self.geometry.lid_bottom - base_top,
                 ),
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     self.geometry.front + self.drawer_front_thickness / 2,

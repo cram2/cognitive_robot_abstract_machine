@@ -9,8 +9,8 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 def test_post_init_transformation():
     w = World()
-    root = Body(name=PrefixedName("root"))
-    b1 = Body(name=PrefixedName("b1"))
+    root = Body(name=PrefixedName(name="root"))
+    b1 = Body(name=PrefixedName(name="b1"))
 
     with w.modify_world():
         w.add_connection(

@@ -312,7 +312,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             placed_object.spawn(world=world)
 
         with world.modify_world():
-            WorldReasoner(world).reason()
+            WorldReasoner(world=world).reason()
 
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [

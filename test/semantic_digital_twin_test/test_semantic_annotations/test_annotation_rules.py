@@ -40,7 +40,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% building small worlds
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FurnitureUnderTest:
     """
     A world holding just enough furniture to exercise one rule, and the bodies of it by
@@ -63,10 +63,10 @@ class FurnitureUnderTest:
         Start a world holding nothing but a root body.
         """
         world = World()
-        root = Body(name=PrefixedName("root", prefix="rules"))
+        root = Body(name=PrefixedName(name="root", prefix="rules"))
         with world.modify_world():
             world.add_kinematic_structure_entity(root)
-        return cls(world, {"root": root})
+        return cls(world=world, bodies={"root": root})
 
     def add(self, name: str, parent: str, connection_type, **connection_kwargs) -> Self:
         """
@@ -95,10 +95,10 @@ class FurnitureUnderTest:
         with_geometry: bool,
         **connection_kwargs,
     ) -> Self:
-        body = Body(name=PrefixedName(name, prefix="rules"))
+        body = Body(name=PrefixedName(name=name, prefix="rules"))
         if with_geometry:
             body.collision = ShapeCollection(
-                [Box(scale=Scale(0.1, 0.1, 0.1))], reference_frame=body
+                shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))], reference_frame=body
             )
         parent_body = self.bodies[parent]
         with self.world.modify_world():

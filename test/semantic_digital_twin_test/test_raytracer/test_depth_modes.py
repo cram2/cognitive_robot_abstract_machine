@@ -96,7 +96,7 @@ def test_optical_axis_depth_rejects_hits_outside_forward_half_space() -> None:
 
 
 # %% Custom depth convention
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class WorldPlaneDepthMode(DepthMode):
     """
     Measure signed distance from a plane perpendicular to the world's x axis.

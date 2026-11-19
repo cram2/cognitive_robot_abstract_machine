@@ -105,7 +105,9 @@ class ShapeSortingPieceSet:
         return {
             HoleShape.SQUARE: Box(
                 scale=Scale(
-                    self.cube_edge_length, self.cube_edge_length, self.piece_height
+                    x=self.cube_edge_length,
+                    y=self.cube_edge_length,
+                    z=self.piece_height,
                 ),
                 color=Color.CYAN(),
             ),
@@ -116,9 +118,9 @@ class ShapeSortingPieceSet:
             ),
             HoleShape.RECTANGLE: Box(
                 scale=Scale(
-                    self.rectangular_prism_width,
-                    self.rectangular_prism_length,
-                    self.piece_height,
+                    x=self.rectangular_prism_width,
+                    y=self.rectangular_prism_length,
+                    z=self.piece_height,
                 ),
                 color=Color.YELLOW(),
             ),
@@ -343,7 +345,7 @@ class MontessoriScene:
             for index, (hole, shape) in enumerate(self.pieces.shapes().items()):
                 piece = self._stand_piece(
                     world=world,
-                    name=PrefixedName(f"{hole}_piece"),
+                    name=PrefixedName(name=f"{hole}_piece"),
                     shape=shape,
                     row_y=self.piece_row_start_y + index * self.piece_row_spacing,
                     grasp_height=grasp_height,
@@ -357,7 +359,7 @@ class MontessoriScene:
         :param world: The world being built, already open for modification.
         """
         self.board = self.shape_sorting_board.body(
-            name=PrefixedName("shape_sorting_board")
+            name=PrefixedName(name="shape_sorting_board")
         )
         self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
             [self.board]
@@ -368,7 +370,7 @@ class MontessoriScene:
                 world=world,
                 parent=world.root,
                 child=self.board,
-                name=PrefixedName("shape_sorting_board_connection"),
+                name=PrefixedName(name="shape_sorting_board_connection"),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     self.board_x,
                     self.board_y,
@@ -398,15 +400,17 @@ class MontessoriScene:
         """
         body = Body(name=name)
         shape.origin = HomogeneousTransformationMatrix(reference_frame=body)
-        body.collision = ShapeCollection([shape], reference_frame=body)
-        body.visual = ShapeCollection([copy.deepcopy(shape)], reference_frame=body)
+        body.collision = ShapeCollection(shapes=[shape], reference_frame=body)
+        body.visual = ShapeCollection(
+            shapes=[copy.deepcopy(shape)], reference_frame=body
+        )
         world.add_kinematic_structure_entity(body)
         world.add_connection(
             Connection6DoF.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=body,
-                name=PrefixedName(f"{name.name}_connection"),
+                name=PrefixedName(name=f"{name.name}_connection"),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     self.piece_row_x,
                     row_y,

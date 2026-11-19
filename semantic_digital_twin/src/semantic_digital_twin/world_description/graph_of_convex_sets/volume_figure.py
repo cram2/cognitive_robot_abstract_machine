@@ -69,7 +69,7 @@ def polyline_trace(
 # %% the layers a panel is drawn from
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class VolumeLayer(ABC):
     """
     One kind of geometry a panel draws, so that panels differ in what they compose
@@ -88,7 +88,7 @@ class VolumeLayer(ABC):
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SearchSpaceVolumeLayer(VolumeLayer):
     """
     Draws the volume the graph of convex sets was built in, as a wireframe so that
@@ -123,7 +123,7 @@ class ObstacleEmphasis(float, enum.Enum):
     CONTEXT = 0.2
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ObstacleVolumeLayer(VolumeLayer):
     """
     Draws the environment's collision geometry as boxes.
@@ -149,7 +149,7 @@ class ObstacleVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetVolumeLayer(VolumeLayer):
     """
     Draws the convex sets partitioning free space, translucent enough to see the sets
@@ -177,7 +177,7 @@ class ConvexSetVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AdjacencyVolumeLayer(VolumeLayer):
     """
     Draws the graph over the convex sets: a node at every set's center and an edge
@@ -217,7 +217,7 @@ class AdjacencyVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PathVolumeLayer(VolumeLayer):
     """
     Draws the optimal path and the waypoints it turns at.
@@ -242,7 +242,7 @@ class PathVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EndpointsVolumeLayer(VolumeLayer):
     """
     Draws the start and the goal of the path, each labelled beside its marker so that
@@ -286,7 +286,7 @@ class EndpointsVolumeLayer(VolumeLayer):
 # %% the panels of the figure
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class VolumePanel(ABC):
     """
     One sub-plot of the figure, defined by the layers it composes and the statistic it
@@ -329,7 +329,7 @@ class VolumePanel(ABC):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EnvironmentVolumePanel(VolumePanel):
     """
     Shows what the planner is given: the collision geometry of a world and the volume
@@ -352,7 +352,7 @@ class EnvironmentVolumePanel(VolumePanel):
         return (SearchSpaceVolumeLayer(), ObstacleVolumeLayer())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetsVolumePanel(VolumePanel):
     """
     Shows what the planner builds: free space partitioned into convex sets in all three
@@ -373,7 +373,7 @@ class ConvexSetsVolumePanel(VolumePanel):
         return (ConvexSetVolumeLayer(), AdjacencyVolumeLayer())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class OptimalPathVolumePanel(VolumePanel):
     """
     Shows what the planner returns: the minimum-distance path between the queried start
@@ -395,7 +395,7 @@ class OptimalPathVolumePanel(VolumePanel):
 
     def layers(self) -> Sequence[VolumeLayer]:
         return (
-            ObstacleVolumeLayer(ObstacleEmphasis.CONTEXT),
+            ObstacleVolumeLayer(emphasis=ObstacleEmphasis.CONTEXT),
             PathVolumeLayer(),
             EndpointsVolumeLayer(),
         )
@@ -404,7 +404,7 @@ class OptimalPathVolumePanel(VolumePanel):
 # %% the figure
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SceneCamera:
     """
     Where every panel is looked at from, shared by all of them so the three read against
@@ -426,7 +426,7 @@ class SceneCamera:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphOfConvexSetsVolumeFigure:
     """
     The three-panel volume figure of a scene: its environment, its graph of convex sets,

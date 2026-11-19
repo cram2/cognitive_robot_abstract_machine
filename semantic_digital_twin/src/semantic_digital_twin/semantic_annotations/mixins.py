@@ -110,7 +110,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsPerceivable:
     """
     A mixin class for semantic annotations that can be perceived.
@@ -127,7 +127,7 @@ TKinematicStructureEntity = TypeVar(
 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRootKinematicStructureEntity(
     SemanticAnnotation, Generic[TKinematicStructureEntity], SubClassSafeGeneric, Mixin
 ):
@@ -176,9 +176,8 @@ class HasRootKinematicStructureEntity(
 
     @property
     def scale(self) -> Scale:
-        return Scale(
-            *(self.root.combined_mesh.bounds[1] - self.root.combined_mesh.bounds[0])
-        )
+        x, y, z = self.root.combined_mesh.bounds[1] - self.root.combined_mesh.bounds[0]
+        return Scale(x=x, y=y, z=z)
 
     @property
     def min_max_points(self) -> tuple[Point3, Point3]:
@@ -322,7 +321,7 @@ class HasRootKinematicStructureEntity(
         return self._world.get_kinematic_structure_entities_of_branch(self.root)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, Mixin):
     """
     Abstract base class for all objects which have a unambiguous root reference frame.
@@ -396,7 +395,7 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, 
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsGraspable(HasRootBody, Mixin):
     """
     A mixin class for semantic annotations that state where they may be grasped, by
@@ -447,8 +446,8 @@ class IsGraspable(HasRootBody, Mixin):
         """
         return [
             GraspCandidate(
-                self,
-                Pose(
+                graspable=self,
+                grasp_pose=Pose(
                     orientation=RotationMatrix.from_rpy(yaw=yaw).quaternion,
                     reference_frame=self.root,
                 ),
@@ -501,7 +500,7 @@ class IsGraspable(HasRootBody, Mixin):
                 )
             surfaces.append(surface)
         if not surfaces:
-            raise NoGraspGeometry(self)
+            raise NoGraspGeometry(graspable=self)
         return trimesh.util.concatenate(surfaces)
 
     def grasp_axis(self) -> LineSegment3:
@@ -528,7 +527,7 @@ class IsGraspable(HasRootBody, Mixin):
         return self
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasDrawnGraspsByDefault(IsGraspable, Mixin):
     """
     A mixin class for semantic annotations whose shape is known well enough that, while
@@ -543,7 +542,7 @@ class HasDrawnGraspsByDefault(IsGraspable, Mixin):
         return self.drawn_grasp_candidates()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
     """
     A mixin class for semantic annotations that have a region.
@@ -610,7 +609,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasMovableJoint(HasRootBody, Mixin, ABC):
     """
     A mixin class for semantic annotations whose root moves relative to its parent, such
@@ -640,7 +639,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         lower limit, where a door or drawer stands closed, and ``1`` at its upper limit.
         """
         if self.movable_joint is None:
-            raise MissingMovableJointError(self)
+            raise MissingMovableJointError(semantic_annotation=self)
         limits = self.movable_joint.dof.limits
         return (self.movable_joint.position - limits.lower.position) / (
             limits.upper.position - limits.lower.position
@@ -685,7 +684,7 @@ A type variable for HasRootBody.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
     """
     A mixin class for semantic annotations that represent storage spaces.
@@ -723,7 +722,7 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
         return [obj for obj in self.objects if isinstance(obj, object_type)]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasSupportingSurface(IsStorageSpace, Mixin):
     """
     A semantic annotation that represents a supporting surface.
@@ -816,8 +815,8 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         ]
         supporting_surface = Region.from_3d_points(
             name=PrefixedName(
-                f"{self.root.name.name}_supporting_surface_region",
-                self.root.name.prefix,
+                name=f"{self.root.name.name}_supporting_surface_region",
+                prefix=self.root.name.prefix,
             ),
             points_3d=points_3d,
         )
@@ -1076,7 +1075,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         :return: The region.
         """
         if name is None:
-            name = PrefixedName("region")
+            name = PrefixedName(name="region")
         if color is None:
             color = Color.from_rgba(red=0.5, green=1.0, blue=0.5, opacity=0.5)
 
@@ -1137,7 +1136,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         if self.supporting_surface is None:
             with world.modify_world():
                 if self.calculate_supporting_surface() is None:
-                    raise NoSupportingSurfaceError(self)
+                    raise NoSupportingSurfaceError(annotation=self)
 
         # The surface's own frame lies on its top, so the free space and the paths
         # through it are expressed relative to what stands on it.
@@ -1150,18 +1149,18 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
         surface_top = surface_box.max_z + 2 * obstacle_height_clearance
         search_space = BoundingBoxCollection(
-            [
+            shapes=[
                 VolumetricBoundingBox(
-                    surface_box.min_x,
-                    surface_box.min_y,
-                    surface_top,
-                    surface_box.max_x,
-                    surface_box.max_y,
-                    surface_top + max_height,
-                    origin,
+                    min_x=surface_box.min_x,
+                    min_y=surface_box.min_y,
+                    min_z=surface_top,
+                    max_x=surface_box.max_x,
+                    max_y=surface_box.max_y,
+                    max_z=surface_top + max_height,
+                    origin=origin,
                 )
             ],
-            self.supporting_surface,
+            reference_frame=self.supporting_surface,
         )
 
         semantic_obstacle_annotation = SemanticEnvironmentAnnotation(
@@ -1179,7 +1178,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasCaseAsRootBody(HasSupportingSurface, Mixin):
     """
     A mixin class for semantic annotations that have a case as root body.
@@ -1221,9 +1220,9 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
         """
         outer_box = scale.to_simple_event()
         inner_box = Scale(
-            scale.x - wall_thickness,
-            scale.y - wall_thickness,
-            scale.z - wall_thickness,
+            x=scale.x - wall_thickness,
+            y=scale.y - wall_thickness,
+            z=scale.z - wall_thickness,
         ).to_simple_event(cls._hole_direction_axis, wall_thickness)
 
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()

@@ -25,7 +25,7 @@ class PackageLocator(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmentPackageLocator(PackageLocator):
     """
     Resolves packages using ament.
@@ -42,7 +42,7 @@ class AmentPackageLocator(PackageLocator):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSPackagePathLocator(PackageLocator):
     """
     Resolves packages using ROS_PACKAGE_PATH.
@@ -60,7 +60,7 @@ class ROSPackagePathLocator(PackageLocator):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrefixPathPackageLocator(PackageLocator):
     """
     Resolves packages by searching install prefixes directly on disk, without any ROS
@@ -121,7 +121,7 @@ class PrefixPathPackageLocator(PackageLocator):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSPackageLocator(PackageLocator):
     """
     Tries multiple package locators in order.
@@ -165,7 +165,7 @@ class PathResolver(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PackageUriResolver(PathResolver):
     """
     Resolves package:// URIs.
@@ -186,7 +186,7 @@ class PackageUriResolver(PathResolver):
         return os.path.join(base, relative_path)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FileUriResolver(PathResolver):
     """
     Resolves file:// URIs and plain filesystem paths.
@@ -215,7 +215,7 @@ class FileUriResolver(PathResolver):
         return os.path.abspath(path)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SearchPathFileResolver(PathResolver):
     """
     Resolves relative paths and relative ``file://`` URIs against several root
@@ -250,7 +250,7 @@ class SearchPathFileResolver(PathResolver):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModelUriResolver(PathResolver):
     """
     Resolves ``model://`` URIs against Gazebo model directories.
@@ -295,7 +295,7 @@ class ModelUriResolver(PathResolver):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CompositePathResolver(PathResolver):
     """
     Tries multiple path resolvers in order.

@@ -60,10 +60,12 @@ class TestExternalCollisionExpressionManager:
             ]
         )
         collision_manager.max_avoided_bodies_rules.append(
-            MaxAvoidedCollisionsOverride(2, {robot.root})
+            MaxAvoidedCollisionsOverride(value=2, bodies={robot.root})
         )
         collision_manager.add_collision_consumer(
-            external_collisions := ExternalCollisionVariableManager(float_variable_data)
+            external_collisions := ExternalCollisionVariableManager(
+                float_variable_data=float_variable_data
+            )
         )
         external_collisions.register_group_of_body(robot.root)
         collision_manager.update_collision_matrix()
@@ -163,10 +165,12 @@ class TestSelfCollisionExpressionManager:
             ]
         )
         collision_manager.max_avoided_bodies_rules.append(
-            MaxAvoidedCollisionsOverride(2, {robot.root})
+            MaxAvoidedCollisionsOverride(value=2, bodies={robot.root})
         )
         collision_manager.add_collision_consumer(
-            self_collisions := SelfCollisionVariableManager(float_variable_data)
+            self_collisions := SelfCollisionVariableManager(
+                float_variable_data=float_variable_data
+            )
         )
         self_collisions.register_groups_of_body_combination(l_tip, r_tip)
         assert len(self_collisions.registered_group_combinations) == 1
@@ -254,10 +258,12 @@ class TestSelfCollisionExpressionManager:
             ]
         )
         collision_manager.max_avoided_bodies_rules.append(
-            MaxAvoidedCollisionsOverride(2, {robot.root})
+            MaxAvoidedCollisionsOverride(value=2, bodies={robot.root})
         )
         collision_manager.add_collision_consumer(
-            self_collisions := SelfCollisionVariableManager(float_variable_data)
+            self_collisions := SelfCollisionVariableManager(
+                float_variable_data=float_variable_data
+            )
         )
         self_collisions.register_groups_of_body_combination(root, r_tip)
         # insert a variable between the collision entries to possibly mess with the internal indexing
@@ -542,7 +548,7 @@ def test_robot_close_to_itself_is_not_within_an_external_buffer_zone(
 # %% consumers stay out of the serialized model
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConsumerHoldingSomethingUnserializable(CollisionConsumer):
     """
     A consumer carrying a value no JSON serializer knows, as a live ROS publisher does.

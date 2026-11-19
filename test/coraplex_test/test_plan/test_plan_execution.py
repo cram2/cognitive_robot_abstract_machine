@@ -468,7 +468,8 @@ def tiago_world_with_a_stretch(_tiago_world_setup) -> World:
     """
     world = deepcopy(_tiago_world_setup)
     RobotSpecification(
-        Stretch, localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
+        semantic_annotation_type=Stretch,
+        localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3),
     ).spawn(world)
     return world
 

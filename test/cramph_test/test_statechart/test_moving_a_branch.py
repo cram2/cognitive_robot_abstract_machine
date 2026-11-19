@@ -54,9 +54,9 @@ class SlidingWorld:
 @pytest.fixture()
 def sliding_world() -> SlidingWorld:
     world = World()
-    root = Body(name=PrefixedName("root"))
-    slider = Body(name=PrefixedName("slider"))
-    box = Body(name=PrefixedName("box"))
+    root = Body(name=PrefixedName(name="root"))
+    slider = Body(name=PrefixedName(name="slider"))
+    box = Body(name=PrefixedName(name="box"))
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         slider_connection = ScrewAxisConnection.create_with_dofs(

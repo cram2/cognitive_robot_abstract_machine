@@ -35,7 +35,7 @@ def test_a_carry_runs_against_a_controller_in_another_process(
     stretch = world.get_semantic_annotations_by_type(Stretch)[0]
     arm = stretch.all_arms[0]
     tool_frame = arm.end_effector.tool_frame
-    held_body = Body(name=PrefixedName("held_body"))
+    held_body = Body(name=PrefixedName(name="held_body"))
     with world.modify_world():
         world.add_kinematic_structure_entity(held_body)
         world.add_connection(

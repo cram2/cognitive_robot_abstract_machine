@@ -12,7 +12,7 @@ from semantic_digital_twin.world_description.geometry import Mesh
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BulletVHACDMeshDecomposer(MeshDecomposer):
     """
     Decompose meshes using Voxelized Hierarchical Approximate Convex Decomposition via

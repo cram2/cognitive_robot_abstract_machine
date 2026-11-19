@@ -129,8 +129,8 @@ class GiskardTester(ABC):
             target_frame=parent_link,
         )
         with self.api.world.modify_world():
-            box = Body(name=PrefixedName(name))
-            box_shape = Box(scale=Scale(*size))
+            box = Body(name=PrefixedName(name=name))
+            box_shape = Box(scale=Scale(x=size[0], y=size[1], z=size[2]))
             box.collision.append(box_shape)
             box.visual.append(box_shape)
 

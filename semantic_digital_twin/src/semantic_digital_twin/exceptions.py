@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoJointStateWithType(DataclassException):
     """
     Raised when a JointState type is search which is not defined.
@@ -79,7 +79,7 @@ class NoJointStateWithType(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MalformedHexColor(DataclassException):
     """
     Raised when a string meant to name a color is not written as hex digits.
@@ -101,7 +101,7 @@ class MalformedHexColor(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownWorldModification(DataclassException):
     """
     Raised when an unknown world modification is attempted.
@@ -122,7 +122,7 @@ class UnknownWorldModification(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingIDsInWorldModification(DataclassException):
     """
     Raised when the UUIDs of a world modification during application are not consistent
@@ -155,7 +155,7 @@ class MismatchingIDsInWorldModification(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LogicalError(DataclassException):
     """
     An error that happens due to mistake in the logical operation or usage of the API
@@ -163,7 +163,7 @@ class LogicalError(DataclassException):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NegativeConnectionVelocity(DataclassException):
     """
     An error that happens when a negative velocity limit is provided for a connection.
@@ -186,7 +186,7 @@ class NegativeConnectionVelocity(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DofNotInWorldStateError(DataclassException, KeyError):
     """
     An exception raised when a degree of freedom is not found in the world's state
@@ -206,7 +206,7 @@ class DofNotInWorldStateError(DataclassException, KeyError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
     """
     An exception raised when the shape of a value in the world's state dictionary is
@@ -224,7 +224,7 @@ class IncorrectWorldStateValueShapeError(DataclassException, ValueError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrongWorldModelVersion(LogicalError):
     """
     Raised when a specific world model version is required.
@@ -244,7 +244,7 @@ class WrongWorldModelVersion(LogicalError):
         return "recreate whatever was derived from the old world model."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonMonotonicTimeError(LogicalError):
     """
     Raised when attempting to append a world state with a time that is not strictly
@@ -261,7 +261,7 @@ class NonMonotonicTimeError(LogicalError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingCommandLengthError(DataclassException, ValueError):
     """
     An exception raised when the length of a command does not match the expected length.
@@ -277,14 +277,14 @@ class MismatchingCommandLengthError(DataclassException, ValueError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UsageError(LogicalError):
     """
     An exception raised when an incorrect usage of the API is encountered.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCameraResolutionError(UsageError):
     """
     Raised when a camera resolution cannot describe an image.
@@ -310,7 +310,7 @@ class InvalidCameraResolutionError(UsageError):
         return "provide positive width and height values."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCameraFieldOfViewError(UsageError):
     """
     Raised when camera viewing angles cannot describe a projection.
@@ -336,7 +336,7 @@ class InvalidCameraFieldOfViewError(UsageError):
         return "provide positive viewing angles smaller than pi radians."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCameraDistortionError(UsageError):
     """
     Raised when distortion coefficients do not match their model.
@@ -359,7 +359,7 @@ class InvalidCameraDistortionError(UsageError):
         return "provide finite coefficients defined by the distortion model."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidPinholeCameraModelError(UsageError):
     """
     Raised when pinhole calibration parameters cannot describe an image.
@@ -377,7 +377,7 @@ class InvalidPinholeCameraModelError(UsageError):
         return "provide positive focal lengths and a principal point within the image."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCameraRangeError(UsageError):
     """
     Raised when a camera distance interval is empty or negative.
@@ -403,7 +403,7 @@ class InvalidCameraRangeError(UsageError):
         return "provide an ordered, non-negative distance interval."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSNodeNotRegisteredError(UsageError, RuntimeError):
     """
     Raised when shared ROS node access is requested before registration.
@@ -419,7 +419,7 @@ class ROSNodeNotRegisteredError(UsageError, RuntimeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldValidationError(LogicalError):
     """
     Raised when the world fails validation, e.g., when the kinematic structure is not a
@@ -432,7 +432,7 @@ class WorldValidationError(LogicalError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldIsNotATreeError(WorldValidationError):
     """
     Raised when the kinematic structure of the world is not a tree during validation.
@@ -448,7 +448,7 @@ class WorldIsNotATreeError(WorldValidationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartiallyAppliedWorldModificationError(WorldValidationError):
     """
     Raised when an exception escapes a modification block after the block already
@@ -499,7 +499,7 @@ class PartiallyAppliedWorldModificationError(WorldValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InsufficientModificationHistoryError(WorldValidationError):
     """
     Raised when attempting to roll back more modification blocks than the world's
@@ -526,7 +526,7 @@ class InsufficientModificationHistoryError(WorldValidationError):
         return "reduce the requested count to at most the number of available modification blocks."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidRollbackVersionError(WorldValidationError):
     """
     Raised when attempting to roll back to a version the world has not (yet) reached.
@@ -598,7 +598,7 @@ class WorldMergedWithItselfError(UsageError):
         return "merge another world, or a copy of this one."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
     """
     Raised when the kinematic structure of the world contains orphaned degrees of
@@ -620,7 +620,7 @@ class WorldContainsOrphanedDegreeOfFreedom(WorldValidationError):
         return "did you forget to call self.delete_orphaned_dofs()?"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityWithIDBelongsToAnotherWorld(WorldValidationError):
     """
     Raised when looking an id up in a world answers with an entity that reports
@@ -651,7 +651,7 @@ class WorldEntityWithIDBelongsToAnotherWorld(WorldValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldHasNoUniqueRootError(WorldValidationError):
     """
     Raised when a non-empty world has none or more than one root.
@@ -672,7 +672,7 @@ class WorldHasNoUniqueRootError(WorldValidationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CopiedWorldDiffersFromOriginalError(WorldValidationError):
     """
     Raised when deepcopying a world does not reproduce the original world's entities.
@@ -694,7 +694,7 @@ class CopiedWorldDiffersFromOriginalError(WorldValidationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoControlledConnectionInChainError(UsageError):
     """
     Raised when the kinematic chain between two entities contains no controlled
@@ -721,7 +721,7 @@ class NoControlledConnectionInChainError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotPartBelongsToAnotherRobotError(UsageError):
     """
     Raised when a robot part refers to a robot other than the one that holds it.
@@ -744,7 +744,7 @@ class RobotPartBelongsToAnotherRobotError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidConnectionLimits(UsageError):
     """
     Raised when the lower limit is not less than the upper limit for a degree of
@@ -768,7 +768,7 @@ class InvalidConnectionLimits(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingPositionLimits(UsageError):
     """
     Raised when a target position must be derived from the limits of a degree of freedom
@@ -795,7 +795,7 @@ class MissingPositionLimits(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingConnectionParentError(UsageError):
     """
     Raised when a connection is spawned without a parent kinematic structure entity.
@@ -868,7 +868,7 @@ class ScrewAxisWithoutTranslationError(UsageError):
         return "give the rotation as a position in radians instead."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingURDFJointAxisError(UsageError):
     """
     Raised when a movable URDF joint declares no axis to move along.
@@ -893,7 +893,7 @@ class MissingURDFJointAxisError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ZeroLengthURDFJointAxisError(UsageError):
     """
     Raised when a URDF joint declares an axis of zero length, which names no direction.
@@ -911,7 +911,7 @@ class ZeroLengthURDFJointAxisError(UsageError):
         return "declare a non-zero axis for the joint."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MimicDofLimitOverwriteError(UsageError):
     """
     Raised when trying to overwrite the limits of a mimic degree of freedom.
@@ -932,7 +932,7 @@ class MimicDofLimitOverwriteError(UsageError):
         return "use .raw_dof._overwrite_dof_limits instead."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingWorld(UsageError):
     """
     Raised when two entities belong to different worlds.
@@ -1078,7 +1078,7 @@ class SeveralFieldsAcceptEntity(UsageError):
         return f"Pass field_name to choose one of {', '.join(self.field_names)}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionDiffersFromVisualError(UsageError):
     """
     Raised when a part is split off a body whose collision shapes are not its visual
@@ -1104,7 +1104,7 @@ class CollisionDiffersFromVisualError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSinglePartWholeRelationshipField(UsageError):
     """
     Raised when the part-whole relationship field a part goes to is chosen by the part's
@@ -1138,7 +1138,7 @@ class NoSinglePartWholeRelationshipField(UsageError):
         return "name the field the part goes to."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartWholeCardinalityError(UsageError):
     """
     Raised when a part specification supplies a list of parts for a singular (non-to-
@@ -1166,7 +1166,7 @@ class PartWholeCardinalityError(UsageError):
         return "supply a single part specification for this field instead of a list."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartWholeFieldInAnnotationKwargs(UsageError):
     """
     Raised when ``annotation_kwargs`` contains a key that names a part-whole
@@ -1197,7 +1197,7 @@ class PartWholeFieldInAnnotationKwargs(UsageError):
         return "move these entries to part_specifications instead of annotation_kwargs."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MechanicalJointAlreadyMounted(UsageError):
     """
     Raised when a mechanical joint that already connects a child is mounted onto a
@@ -1227,7 +1227,7 @@ class MechanicalJointAlreadyMounted(UsageError):
         return "if you think that you found a case where this error does not apply, please contact @LucaKro"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemanticAnnotationCircularDependencyError(UsageError):
     """
     Raised when a circular dependency between semantic annotations is detected.
@@ -1245,7 +1245,7 @@ class SemanticAnnotationCircularDependencyError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingMovableJointError(UsageError):
     """
     Raised when a part is to be moved, but nothing moves it: its root is fixed to its
@@ -1270,7 +1270,7 @@ class MissingMovableJointError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingSemanticAnnotationError(UsageError):
     """
     Raised when a semantic annotation is required but missing.
@@ -1296,7 +1296,7 @@ class MissingSemanticAnnotationError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidPlaneDimensions(UsageError):
     """
     Raised when the depth of a plane is not less than its width or height.
@@ -1319,7 +1319,7 @@ class InvalidPlaneDimensions(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HandleWiderThanLong(UsageError):
     """
     Raised when a handle scale is wider (y) than it is long (z).
@@ -1343,7 +1343,7 @@ class HandleWiderThanLong(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UselessConceptError(UsageError):
     """
     Used to indicate that the operation the user is trying to perform is not useful in
@@ -1362,7 +1362,7 @@ class UselessConceptError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidHingeActiveAxis(UsageError):
     """
     Raised when an invalid axis is provided.
@@ -1380,7 +1380,7 @@ class InvalidHingeActiveAxis(UsageError):
         return "if you think this is incorrect, consider extending Door.calculate_self_T_movable_joint."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemanticAnnotationNotInWorldError(UsageError):
     semantic_annotation: SemanticAnnotation
 
@@ -1394,7 +1394,7 @@ class SemanticAnnotationNotInWorldError(UsageError):
         return "add it first via world.add_semantic_annotation(annotation)."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingWorldModificationContextError(UsageError):
     function: Callable
 
@@ -1417,7 +1417,7 @@ class MissingWorldModificationContextError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingPublishChangesAttribute(UsageError):
     """
     Raised when trying to enter a nested world modification or state batch context with
@@ -1444,7 +1444,7 @@ class MismatchingPublishChangesAttribute(UsageError):
         return "make sure to not nest contexts with different publish_changes states."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingPublishChangesKWARG(UsageError):
     kwargs: dict[str, Any]
 
@@ -1459,7 +1459,7 @@ class MissingPublishChangesKWARG(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
     """
     Raised when a WorldStateUpdate is received that contains one or more DOF identifiers
@@ -1486,7 +1486,7 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateUpdateContainsNonNumericValuesError(UsageError):
     """
     Raised when a received WorldStateUpdate gives a degree of freedom a value that is
@@ -1508,7 +1508,7 @@ class StateUpdateContainsNonNumericValuesError(UsageError):
         return "publish the positions of degrees of freedom as numbers."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldHasNoSynchronizerError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but the world publishes its
@@ -1527,7 +1527,7 @@ class WorldHasNoSynchronizerError(UsageError):
         return "Create a WorldSynchronizer for this world."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SynchronizerNotConnectedError(UsageError):
     """
     Raised when a synchronizer was created but its topic never became usable, so that
@@ -1554,7 +1554,7 @@ class SynchronizerNotConnectedError(UsageError):
         return "Check that the ros node of the synchronizer is alive and its middleware is running."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldHasMultipleSynchronizersError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but several of them publish
@@ -1581,7 +1581,7 @@ class WorldHasMultipleSynchronizersError(UsageError):
         return "Close all but one of them."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldHasMultipleTfPublishersError(UsageError):
     """
     Raised when the tf publisher of a world is asked for, but several of them publish
@@ -1605,7 +1605,7 @@ class WorldHasMultipleTfPublishersError(UsageError):
         return "Stop all but one of them."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
     """
     Raised when apply_missed_messages is called while a modify_world context is active
@@ -1623,7 +1623,7 @@ class ApplyMissedMessagesWhileWorldIsBeingModifiedError(UsageError):
         return "call apply_missed_messages after the modify_world context has exited."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateWorldEntityError(UsageError):
     world_entities: list[WorldEntity]
 
@@ -1639,7 +1639,7 @@ class DuplicateWorldEntityError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateRobotAssignmentsError(UsageError):
     """
     Raised when a robot part is assigned to multiple robots, which should not happen.
@@ -1665,7 +1665,7 @@ class DuplicateRobotAssignmentsError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParsingError(DataclassException, Exception):
     """
     An error that happens during parsing of files.
@@ -1680,7 +1680,7 @@ class ParsingError(DataclassException, Exception):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PackageResolutionError(ParsingError):
     """
     Raised when a ROS package name cannot be resolved to a directory.
@@ -1706,7 +1706,7 @@ class PackageResolutionError(ParsingError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PathResolutionError(ParsingError):
     """
     Raised when a URI cannot be resolved to a local file path.
@@ -1732,7 +1732,7 @@ class PathResolutionError(ParsingError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DatasetServerError(ParsingError):
     """
     Raised when a dataset server does not answer with what was asked of it.
@@ -1761,7 +1761,7 @@ class DatasetServerError(ParsingError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityNotFoundError(UsageError):
     name_or_hash: str | PrefixedName | int
 
@@ -1784,7 +1784,7 @@ class WorldEntityNotFoundError(UsageError):
         return f"did you mean: {formatted_suggestions}?"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingDefaultCameraError(UsageError):
     """
     Raised when trying to access the default camera of a robot that does not have a
@@ -1803,7 +1803,7 @@ class MissingDefaultCameraError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoLaserScanReceived(UsageError):
     """
     Raised when reading a lidar that has not received a scan yet.
@@ -1821,7 +1821,7 @@ class NoLaserScanReceived(UsageError):
         return f"check that something publishes on '{self.topic_name}' and that the node has been spun since."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputAlreadyAddedError(UsageError):
     """
     Raised when an input is added to a loop that already applies it.
@@ -1839,7 +1839,7 @@ class InputAlreadyAddedError(UsageError):
         return "add every input only once per loop."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AlreadyTrackedByTfFrameError(UsageError):
     """
     Raised when a connection is registered for tf tracking a second time.
@@ -1870,7 +1870,7 @@ class AlreadyTrackedByTfFrameError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundMessageTypeError(UsageError):
     """
     Raised when a topic subscriber does not name the type of its messages.
@@ -1894,7 +1894,7 @@ class UnboundMessageTypeError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionCannotBeTrackedByTfFrameError(UsageError):
     """
     Raised when a connection without 6 degrees of freedom is registered for tf tracking.
@@ -1915,7 +1915,7 @@ class ConnectionCannotBeTrackedByTfFrameError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidBeamCount(UsageError):
     """
     Raised when deriving a scan pattern from a beam count too small to space beams by.
@@ -1933,7 +1933,7 @@ class InvalidBeamCount(UsageError):
         return "give at least two beams, or state the angle increment directly."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidScanPattern(UsageError):
     """
     Raised when a scan pattern describes a sweep a scanner cannot perform.
@@ -1956,7 +1956,7 @@ class InvalidScanPattern(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingWorldError(UsageError):
     """
     Raised when trying to access a world that is None, but a world is required for the
@@ -1970,7 +1970,7 @@ class MissingWorldError(UsageError):
         return "make sure the involved entities have been added to a world before calling this."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityWithIDNotFoundError(WorldEntityNotFoundError):
     name_or_hash: UUID = None
 
@@ -1985,7 +1985,7 @@ class WorldEntityWithIDNotFoundError(WorldEntityNotFoundError):
         return self.name_or_hash
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AlreadyBelongsToAWorldError(UsageError):
     world: World
     type_trying_to_add: type[WorldEntity]
@@ -2000,7 +2000,7 @@ class AlreadyBelongsToAWorldError(UsageError):
         return "to combine two worlds, use world.merge_world(other_world); to reuse an entity, create a fresh copy."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DoesNotBelongToAWorldError(UsageError):
     """
     Raised when trying to use a world entity that does not belong to any world in a
@@ -2023,7 +2023,7 @@ class DoesNotBelongToAWorldError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityWithIDNotInKwargs(UntrackedObjectError):
     """
     Raised when a JSON document refers to a world entity that was neither deserialized
@@ -2069,7 +2069,7 @@ class UnresolvedNameError(ValueError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RootNodeNotFoundError(DataclassException):
     """
     Raised when the root node cannot be found or is ambiguous in a scene graph.
@@ -2087,19 +2087,19 @@ class RootNodeNotFoundError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionCheckingError(DataclassException):
     """
     Base class for errors during collision checking.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCollisionCheckError(CollisionCheckingError):
     collision_check: CollisionCheck
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
     def error_message(self) -> str:
         return f"Distance must be positive, got {self.collision_check.distance}"
@@ -2108,7 +2108,7 @@ class NegativeCollisionCheckingDistanceError(InvalidCollisionCheckError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
     def error_message(self) -> str:
         return f"Body_a and body_b must be different, got {self.collision_check.body_a} and {self.collision_check.body_b}"
@@ -2117,7 +2117,7 @@ class InvalidBodiesInCollisionCheckError(InvalidCollisionCheckError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyHasNoGeometryError(InvalidCollisionCheckError):
     def error_message(self) -> str:
         bodies_without_geometry = [
@@ -2134,7 +2134,7 @@ class BodyHasNoGeometryError(InvalidCollisionCheckError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TemporaryCollisionRulesDependOnOrder(CollisionCheckingError):
     """
     Raised when temporary collision rules are put in force next to others, and which
@@ -2165,7 +2165,7 @@ class TemporaryCollisionRulesDependOnOrder(CollisionCheckingError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AtomicWorldModificationNotAtomic(DataclassException):
     """
     Exception raised when atomic world modifications are overlapping.
@@ -2200,7 +2200,7 @@ class AtomicWorldModificationNotAtomic(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PointOccupiedError(DataclassException):
     """
     Error that is raised when a pose is occupied or not in the search space of a
@@ -2219,14 +2219,14 @@ class PointOccupiedError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultiSimError(DataclassException):
     """
     Base class for all MultiSim-related exceptions.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuaternionConversionError(MultiSimError):
     """
     Raised when a rotation matrix cannot be converted to a quaternion.
@@ -2274,7 +2274,7 @@ class MujocoEntityNotFoundError(MujocoError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VideoRecordingError(MultiSimError):
     """
     Base class for all
@@ -2283,7 +2283,7 @@ class VideoRecordingError(MultiSimError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VideoRecordingAlreadyStartedError(VideoRecordingError):
     """
     Raised when
@@ -2304,7 +2304,7 @@ class VideoRecordingAlreadyStartedError(VideoRecordingError):
         return "call stop() before starting a new recording."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VideoRecordingNotStartedError(VideoRecordingError):
     """
     Raised when
@@ -2325,7 +2325,7 @@ class VideoRecordingNotStartedError(VideoRecordingError):
         return "call start() before stop()."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyWorldVideoRecordingError(VideoRecordingError):
     """
     Raised when a default overview camera cannot be computed because the world has no
@@ -2346,7 +2346,7 @@ class EmptyWorldVideoRecordingError(VideoRecordingError):
         return "add at least one body with geometry to the world, or pass an explicit camera."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyVideoRecordingError(VideoRecordingError):
     """
     Raised when
@@ -2366,7 +2366,7 @@ class EmptyVideoRecordingError(VideoRecordingError):
         return "call start() and let the recorder run for at least one frame period before stop()."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidVideoRecordingRateError(VideoRecordingError):
     """
     Raised when a
@@ -2391,7 +2391,7 @@ class InvalidVideoRecordingRateError(VideoRecordingError):
         return "use a positive integer."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MergedRobotAnnotationNotFound(UsageError):
     """
     Raised when merging a robot into a world produced no semantic annotation for the
@@ -2421,7 +2421,7 @@ class MergedRobotAnnotationNotFound(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionsOutsideEndEffector(UsageError):
     """
     Raised when a gripper specification's joint state moves connections that do not
@@ -2452,7 +2452,7 @@ class ConnectionsOutsideEndEffector(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExerciseVerificationFailed(UsageError):
     """
     Raised when a solution written in a self-assessment exercise does not satisfy one of
@@ -2471,7 +2471,7 @@ class ExerciseVerificationFailed(UsageError):
         return "revisit the task description of this exercise and adjust your solution."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NothingHeld(UsageError):
     """
     Raised when the grasp of a gripper that holds nothing is asked for.
@@ -2492,7 +2492,7 @@ class NothingHeld(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoGraspGeometry(UsageError):
     """
     Raised when an object's grasps are derived from its shape, but its root body has no
@@ -2517,7 +2517,7 @@ class NoGraspGeometry(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspNotOnObjectError(UsageError):
     """
     Raised when a grasp names a place that does not reach the surface of the object.
@@ -2543,7 +2543,7 @@ class GraspNotOnObjectError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GripperAxesNotPerpendicular(UsageError):
     """
     Raised when a gripper's closing axis is not perpendicular to its approach axis, so
@@ -2570,7 +2570,7 @@ class GripperAxesNotPerpendicular(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoreThanOneBodyHeld(UsageError):
     """
     Raised when a gripper's tool frame has more than one body attached to it.
@@ -2600,7 +2600,7 @@ class MoreThanOneBodyHeld(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSupportingSurfaceError(UsageError):
     """
     Raised when an annotation's geometry offers no surface anything could be supported
@@ -2625,7 +2625,7 @@ class NoSupportingSurfaceError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateSimulatorPropertyError(UsageError):
     """
     Raised when an entity carries more than one simulator property of a type of which a
@@ -2650,7 +2650,7 @@ class DuplicateSimulatorPropertyError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationNotStartedError(UsageError):
     """
     Raised when a simulation is advanced before it was started.
@@ -2671,7 +2671,7 @@ class SimulationNotStartedError(UsageError):
         return "Call start() first, or drive the simulation inside a with block."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationAlreadyRunningError(UsageError):
     """
     Raised when a simulation is started while it is already running.
@@ -2717,7 +2717,7 @@ class SnapshotDoesNotFitSimulationError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectHasNoWidthWithoutCollision(UsageError):
     """
     Raised when the width of an object is asked for, while the object carries no

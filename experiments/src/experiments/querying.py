@@ -152,8 +152,10 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     """
     world = setup_world()
 
-    spoon = STLParser("package://iai_objects/objects/spoon.stl").create_world()
-    bowl = STLParser("package://iai_objects/objects/bowl.stl").create_world()
+    spoon = STLParser(
+        file_path="package://iai_objects/objects/spoon.stl"
+    ).create_world()
+    bowl = STLParser(file_path="package://iai_objects/objects/bowl.stl").create_world()
 
     with world.modify_world():
         world.merge_world_at_pose(
@@ -193,7 +195,7 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     )
 
     with world.modify_world():
-        world_reasoner = WorldReasoner(world)
+        world_reasoner = WorldReasoner(world=world)
         world_reasoner.reason()
         bowl_annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
         spoon_annotation = Spoon(root=world.get_body_by_name("spoon.stl"))

@@ -17,12 +17,12 @@ from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
-BODY_SCALE = Scale(0.1, 0.1, 0.1)
+BODY_SCALE = Scale(x=0.1, y=0.1, z=0.1)
 """
 Extents of the door's body.
 """
 
-HANDLE_SCALE = Scale(0.05, 0.1, 0.1)
+HANDLE_SCALE = Scale(x=0.05, y=0.1, z=0.1)
 """
 Extents of the door's handle, half the body's volume.
 """
@@ -37,9 +37,9 @@ def _box_body(name: str, scale: Scale, x: float = 0.0) -> Body:
     """
     :return: A body colliding as a box of ``scale`` centered ``x`` along its x-axis.
     """
-    body = Body(name=PrefixedName(name, prefix="annotation_mass"))
+    body = Body(name=PrefixedName(name=name, prefix="annotation_mass"))
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Box(
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=x, reference_frame=body

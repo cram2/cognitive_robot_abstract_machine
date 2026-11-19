@@ -83,7 +83,7 @@ class CurvedRegion(ABC):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EuclideanDisc(CurvedRegion, Cylinder):
     """
     The region a threshold on a distance taken in a plane describes.
@@ -102,20 +102,20 @@ class EuclideanDisc(CurvedRegion, Cylinder):
         half_height = self.height / 2.0
         return tuple(
             VolumetricBoundingBox(
-                -half_width,
-                lower,
-                -half_height,
-                half_width,
-                upper,
-                half_height,
-                self.origin,
+                min_x=-half_width,
+                min_y=lower,
+                min_z=-half_height,
+                max_x=half_width,
+                max_y=upper,
+                max_z=half_height,
+                origin=self.origin,
             )
             for lower, upper in self.strips(self.radius, subdivisions)
             for half_width in [self.half_width_at(self.radius, lower, upper)]
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EuclideanBall(CurvedRegion, Sphere):
     """
     The region a threshold on a distance taken in space describes.
@@ -133,13 +133,13 @@ class EuclideanBall(CurvedRegion, Sphere):
         """
         return tuple(
             VolumetricBoundingBox(
-                -half_width,
-                strip_lower,
-                slab_lower,
-                half_width,
-                strip_upper,
-                slab_upper,
-                self.origin,
+                min_x=-half_width,
+                min_y=strip_lower,
+                min_z=slab_lower,
+                max_x=half_width,
+                max_y=strip_upper,
+                max_z=slab_upper,
+                origin=self.origin,
             )
             for slab_lower, slab_upper in self.strips(self.radius, subdivisions)
             for slab_radius in [self.half_width_at(self.radius, slab_lower, slab_upper)]

@@ -52,7 +52,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         object_specs = [
             ObjectSpec(
                 name="table",
-                box_scale=Scale(1.20, 0.80, table_thickness),
+                box_scale=Scale(x=1.20, y=0.80, z=table_thickness),
                 color=Color.from_rgba(red=0.65, green=0.58, blue=0.48, opacity=1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.10,
@@ -63,7 +63,7 @@ class WorldDescriptor(BaseWorldDescriptor):
             ),
             ObjectSpec(
                 name="box_red",
-                box_scale=Scale(0.10, 0.08, 0.10),
+                box_scale=Scale(x=0.10, y=0.08, z=0.10),
                 color=Color.from_rgba(red=0.83, green=0.20, blue=0.20, opacity=1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.20,
@@ -74,7 +74,7 @@ class WorldDescriptor(BaseWorldDescriptor):
             ),
             ObjectSpec(
                 name="box_blue",
-                box_scale=Scale(0.08, 0.08, 0.14),
+                box_scale=Scale(x=0.08, y=0.08, z=0.14),
                 color=Color.from_rgba(red=0.22, green=0.37, blue=0.82, opacity=1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.00,
@@ -89,7 +89,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         region_specs = [
             RegionSpec(
                 name="table_surface_region",
-                box_scale=Scale(1.00, 0.60, 0.03),
+                box_scale=Scale(x=1.00, y=0.60, z=0.03),
                 color=Color.from_rgba(red=0.10, green=0.70, blue=0.30, opacity=0.20),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.10,
@@ -117,8 +117,8 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
             cup_body = Body(
                 name=PrefixedName(name="jeroen_cup"),
-                visual=ShapeCollection([cup_visual_mesh]),
-                collision=ShapeCollection([cup_collision_mesh]),
+                visual=ShapeCollection(shapes=[cup_visual_mesh]),
+                collision=ShapeCollection(shapes=[cup_collision_mesh]),
             )
             cup_connection = Connection6DoF.create_with_dofs(
                 parent=root, child=cup_body, world=self.world
@@ -138,8 +138,8 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
             milk_body = Body(
                 name=PrefixedName(name="milk"),
-                visual=ShapeCollection([milk_visual_mesh]),
-                collision=ShapeCollection([milk_collision_mesh]),
+                visual=ShapeCollection(shapes=[milk_visual_mesh]),
+                collision=ShapeCollection(shapes=[milk_collision_mesh]),
             )
             milk_connection = Connection6DoF.create_with_dofs(
                 parent=root, child=milk_body, world=self.world

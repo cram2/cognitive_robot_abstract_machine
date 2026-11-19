@@ -27,10 +27,12 @@ def door_world() -> World:
     A world whose root carries a branch made of a fixed frame and a door hinged to it.
     """
     world = World()
-    branch_root = Body(name=PrefixedName("branch_root"))
+    branch_root = Body(name=PrefixedName(name="branch_root"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(parent=Body(name=PrefixedName("root")), child=branch_root)
+            FixedConnection(
+                parent=Body(name=PrefixedName(name="root")), child=branch_root
+            )
         )
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
@@ -39,7 +41,7 @@ def door_world() -> World:
                 ),
                 world=world,
                 parent=branch_root,
-                child=Body(name=PrefixedName("door")),
+                child=Body(name=PrefixedName(name="door")),
             )
         )
     return world
@@ -92,13 +94,15 @@ def test_branch_moved_to_new_world_keeps_a_floating_body_orientation():
     arriving with the all-zero quaternion, which is not a rotation.
     """
     world = World()
-    branch_root = Body(name=PrefixedName("branch_root"))
+    branch_root = Body(name=PrefixedName(name="branch_root"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(parent=Body(name=PrefixedName("root")), child=branch_root)
+            FixedConnection(
+                parent=Body(name=PrefixedName(name="root")), child=branch_root
+            )
         )
         floating = Connection6DoF.create_with_dofs(
-            world=world, parent=branch_root, child=Body(name=PrefixedName("box"))
+            world=world, parent=branch_root, child=Body(name=PrefixedName(name="box"))
         )
         world.add_connection(floating)
     positions_before_move = [world.state[dof.id].position for dof in floating.dofs]

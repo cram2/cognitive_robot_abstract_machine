@@ -124,7 +124,7 @@ class Device(StrEnum):
 # %% the detector
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QwenBoxDetector(PartBoxDetector):
     """
     Asks Qwen3-VL for boxes around a part, about all views in one batch.
@@ -256,7 +256,7 @@ class QwenBoxDetector(PartBoxDetector):
 # %% the segmenter
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sam2BoxSegmenter(BoxSegmenter):
     """
     Masks the part inside each box with SAM 2, one view at a time.

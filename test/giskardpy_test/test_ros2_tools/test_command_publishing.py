@@ -94,7 +94,7 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     connections: list[ActiveConnection1DOF] = []
     with world.modify_world():
         for index, spec in enumerate(specs):
-            child = Body(name=PrefixedName(f"body_{index}"))
+            child = Body(name=PrefixedName(name=f"body_{index}"))
             connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
@@ -102,7 +102,7 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
                 world=world,
                 parent=parent,
                 child=child,
-                name=PrefixedName(spec.name),
+                name=PrefixedName(name=spec.name),
                 multiplier=spec.multiplier,
             )
             world.add_connection(connection)
@@ -117,7 +117,7 @@ def build_world_with_joints(specs: list[ConnectionSpec]) -> World:
     Build a world holding a chain of connections with their commanded velocities.
     """
     world = World()
-    add_joints(world, Body(name=PrefixedName("base")), specs)
+    add_joints(world, Body(name=PrefixedName(name="base")), specs)
     return world
 
 
@@ -133,8 +133,8 @@ def add_removable_joint(world: World, parent: Body) -> ActiveConnection1DOF:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
-            child=Body(name=PrefixedName("removable_body")),
-            name=PrefixedName("removable_joint"),
+            child=Body(name=PrefixedName(name="removable_body")),
+            name=PrefixedName(name="removable_joint"),
         )
         world.add_connection(connection)
     return connection
@@ -238,8 +238,8 @@ def add_drive(
         drive = drive_type.create_with_dofs(
             world=world,
             parent=parent,
-            child=Body(name=PrefixedName("base_footprint")),
-            name=PrefixedName("brumbrum"),
+            child=Body(name=PrefixedName(name="base_footprint")),
+            name=PrefixedName(name="brumbrum"),
         )
         world.add_connection(drive)
 
@@ -251,7 +251,7 @@ def build_drive_world(
     Build a world whose only connection is a drive.
     """
     world = World()
-    add_drive(world, Body(name=PrefixedName("odom")), drive_type)
+    add_drive(world, Body(name=PrefixedName(name="odom")), drive_type)
     return world
 
 
@@ -414,7 +414,7 @@ def test_group_publisher_follows_its_joints_through_a_model_change(
         ConnectionSpec(name="joint_b", velocity=0.2),
     ]
     world = World()
-    base = Body(name=PrefixedName("base"))
+    base = Body(name=PrefixedName(name="base"))
     removable = add_removable_joint(world, base)
     add_joints(world, base, specs)
     controller = group_publisher_for(world, specs)
@@ -687,7 +687,7 @@ def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
 
 def test_drive_publisher_follows_its_dofs_through_a_model_change(init_background_node):
     world = World()
-    odom = Body(name=PrefixedName("odom"))
+    odom = Body(name=PrefixedName(name="odom"))
     removable = add_removable_joint(world, odom)
     add_drive(world, odom, OmniDrive)
     drive = world.get_connection_by_name("brumbrum")

@@ -50,7 +50,7 @@ from semantic_digital_twin.world import World
 # %% stand-ins for the sources a part can be read from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TopicReadingSource(JointPositionSource):
     """
     A source that stands in for one reading a robot, remembering only the topic it was
@@ -63,7 +63,7 @@ class TopicReadingSource(JointPositionSource):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RewritingSource(JointPositionSource, InputSynchronizer):
     """
     A source that writes what it last read in every cycle, standing in for the reader a
@@ -74,7 +74,7 @@ class RewritingSource(JointPositionSource, InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AppliedSource(JointPositionSource, InputSynchronizer):
     """
     A source a loop has to apply, standing in for one that writes what a robot reports
@@ -88,7 +88,7 @@ class AppliedSource(JointPositionSource, InputSynchronizer):
         return RewritingSource(world=self.world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClosableSource(JointPositionSource):
     """
     A source holding something that has to be released, remembering whether it was.
@@ -106,7 +106,7 @@ class ClosableSource(JointPositionSource):
 # %% stand-ins for the parts that can be told where they are read from
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartReadFromADeclaredTopic(HasInputSource[JointPositionSource]):
     """
     A part whose description names the topic its robot publishes its state on.
@@ -122,7 +122,7 @@ class PartReadFromADeclaredTopic(HasInputSource[JointPositionSource]):
         return TopicReadingSource(topic_name=self.topic_name)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithoutADeclaredTopic(PartReadFromADeclaredTopic):
     """
     A part whose description names no topic.

@@ -24,7 +24,7 @@ def create_giskard(node: Node) -> Giskard:
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    Stretch, urdf=RosGraph(node).robot_description()
+                    Stretch, urdf=RosGraph(node=node).robot_description()
                 )
             ]
         ),

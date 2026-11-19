@@ -18,7 +18,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PiecewiseConstantCurvatureConnection(Connection):
     """
     A continuum connection based on the Piecewise Constant Curvature (PCC) model.
@@ -176,7 +176,7 @@ class PiecewiseConstantCurvatureConnection(Connection):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CosseratRodConnection(Connection):
     """
     A connection implementing Cosserat Rod Theory.

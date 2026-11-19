@@ -32,7 +32,7 @@ def test_load_environment_returns_world():
     """
     world = KitchenEnvironment().create_world()
     assert isinstance(world, World)
-    assert world.root.name == PrefixedName("root")
+    assert world.root.name == PrefixedName(name="root")
 
 
 def test_load_environment_names_are_stringifiable():
@@ -56,7 +56,7 @@ def test_world_reasoner_reason_returns_dicts():
     world = URDFParser.from_file(
         file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     ).create_world()
-    reasoner = WorldReasoner(world)
+    reasoner = WorldReasoner(world=world)
 
     result = reasoner.reason()
 
@@ -70,7 +70,7 @@ def test_each_reasoner_applies_rules_of_its_own():
     """
     world = World()
 
-    assert CaseReasoner(world).rdr is not CaseReasoner(world).rdr
+    assert CaseReasoner(case=world).rdr is not CaseReasoner(case=world).rdr
 
 
 def test_semantic_annotations_on_surfaces(kitchen_environment_fixture):
@@ -265,7 +265,7 @@ def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
         file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     ).create_world()
     connections_before_reasoning = set(world.connections)
-    reasoner = WorldReasoner(world)
+    reasoner = WorldReasoner(world=world)
 
     reasoner.infer_semantic_annotations()
 

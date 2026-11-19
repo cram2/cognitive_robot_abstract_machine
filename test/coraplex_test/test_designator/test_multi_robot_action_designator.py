@@ -463,7 +463,7 @@ def test_reach_action_multi(multiple_robot_apartment_context):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             ReachAction(
-                grasp_candidate=GraspCandidate(milk, grasp_pose),
+                grasp_candidate=GraspCandidate(graspable=milk, grasp_pose=grasp_pose),
                 arm=left_or_only_arm(view),
             ),
         ]
@@ -1061,14 +1061,14 @@ def test_elevator_navigation_needs_doors_that_can_open():
     world = World.create_with_root_body("root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
-            name="elevator", world=world, scale=Scale(2, 2, 2)
+            name="elevator", world=world, scale=Scale(x=2, y=2, z=2)
         )
         door = Door.create_with_new_body_in_world(
-            name="door", world=world, scale=Scale(0.05, 1, 2)
+            name="door", world=world, scale=Scale(x=0.05, y=1, z=2)
         )
         elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
-            name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
+            name="ground_floor", world=world, scale=Scale(x=4, y=4, z=0.1)
         )
     navigation = ElevatorNavigation(elevator=elevator, target_floor=ground_floor)
 
@@ -1083,12 +1083,12 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
     world = World.create_with_root_body("root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
-            name="elevator", world=world, scale=Scale(2, 2, 2)
+            name="elevator", world=world, scale=Scale(x=2, y=2, z=2)
         )
         door = Door.create_with_new_body_in_world(
             name="door",
             world=world,
-            scale=Scale(0.05, 1, 2),
+            scale=Scale(x=0.05, y=1, z=2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                     axis=Vector3.Y()
@@ -1097,7 +1097,7 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
         )
         elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
-            name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
+            name="ground_floor", world=world, scale=Scale(x=4, y=4, z=0.1)
         )
     navigation = ElevatorNavigation(elevator=elevator, target_floor=ground_floor)
 
@@ -1583,7 +1583,9 @@ def test_a_reach_approaches_at_its_tuned_speeds(
     world, robot, extensions = multiple_robot_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     action = ReachAction(
-        grasp_candidate=GraspCandidate(milk, Pose(reference_frame=milk.root)),
+        grasp_candidate=GraspCandidate(
+            graspable=milk, grasp_pose=Pose(reference_frame=milk.root)
+        ),
         arm=left_or_only_arm(robot),
         pre_approach_cruise_linear_velocity=0.05,
         final_approach_cruise_linear_velocity=0.02,
@@ -1924,8 +1926,8 @@ def add_cup(
     :param world_T_cup: Where the cup hovers.
     :return: The annotation of a cup fixed to the root of `world`.
     """
-    shapes = ShapeCollection([Cylinder(width=0.08, height=0.07)])
-    body = Body(name=PrefixedName(name), collision=shapes, visual=shapes)
+    shapes = ShapeCollection(shapes=[Cylinder(width=0.08, height=0.07)])
+    body = Body(name=PrefixedName(name=name), collision=shapes, visual=shapes)
     cup = Cup(root=body)
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
@@ -2011,8 +2013,8 @@ def cup_held_tilted(robot: AbstractRobot) -> Cup:
     """
     world = robot._world
     tool_frame = left_or_only_arm(robot).end_effector.tool_frame
-    shapes = ShapeCollection([Cylinder(width=0.08, height=0.07)])
-    body = Body(name=PrefixedName("held_cup"), collision=shapes, visual=shapes)
+    shapes = ShapeCollection(shapes=[Cylinder(width=0.08, height=0.07)])
+    body = Body(name=PrefixedName(name="held_cup"), collision=shapes, visual=shapes)
     cup = Cup(root=body)
     with world.modify_world():
         world.add_kinematic_structure_entity(body)

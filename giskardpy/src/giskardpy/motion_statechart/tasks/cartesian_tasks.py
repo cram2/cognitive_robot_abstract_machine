@@ -360,7 +360,7 @@ class CartesianPositionTrajectory(
         :param float_variable_data: The data the variable is registered with.
         """
         self.remaining_distance = FloatVariable(
-            str(PrefixedName("remaining_distance", str(self.name)))
+            str(PrefixedName(name="remaining_distance", prefix=str(self.name)))
         )
         float_variable_data.register_expression(expression=self.remaining_distance)
         float_variable_data.set_value(
@@ -568,7 +568,7 @@ class CartesianPositionStraight(
         """
         super().set_up()
         self._line_start_binding = ForwardKinematicsBinding(
-            name=PrefixedName("root_T_line_start", str(self.name)),
+            name=PrefixedName(name="root_T_line_start", prefix=str(self.name)),
             kinematic_chain=self.kinematic_chain,
             float_variable_data=self.context.float_variable_data,
         )
@@ -794,7 +794,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
         """
         super().set_up()
         self._pose_to_keep = ForwardKinematicsBinding(
-            name=PrefixedName("pose_to_keep", str(self.name)),
+            name=PrefixedName(name="pose_to_keep", prefix=str(self.name)),
             kinematic_chain=self.kinematic_chain,
             float_variable_data=self.context.float_variable_data,
         )

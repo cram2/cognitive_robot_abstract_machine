@@ -46,7 +46,7 @@ from semantic_digital_twin.world import World
 
 
 # %% Controlled camera intersections
-@dataclass
+@dataclass(kw_only=True)
 class CameraIntersections:
     """
     A rectangular camera with two hits and remaining background pixels.
@@ -56,6 +56,7 @@ class CameraIntersections:
     """
     Ray tracer operating on the fixture world.
     """
+
     camera: Mock
     """
     Camera providing a projection model, range, and pose.
@@ -65,6 +66,7 @@ class CameraIntersections:
     """
     World body hit by both viewing rays.
     """
+
     query: Mock
     """
     Controlled intersection query used to verify shared rendering.
@@ -85,7 +87,7 @@ def camera_intersections(
     Provide on-axis and off-axis hits at equal optical depth.
     """
     world, body, *_ = ray_test_world
-    ray_tracer = RayTracer(world)
+    ray_tracer = RayTracer(world=world)
     resolution = CameraResolution(width=3, height=2)
     origins = np.zeros((2, 3))
     directions = np.array([[0.0, 0.0, -1.0], [0.6, 0.0, -0.8]])
@@ -121,7 +123,13 @@ def camera_intersections(
     camera.world_T_forward_view = HomogeneousTransformationMatrix()
     camera.root = Mock(global_transform=HomogeneousTransformationMatrix())
     camera.optical_R_forward_view = Camera.optical_R_forward_view
-    return CameraIntersections(ray_tracer, camera, body, query, resolution)
+    return CameraIntersections(
+        ray_tracer=ray_tracer,
+        camera=camera,
+        body=body,
+        query=query,
+        resolution=resolution,
+    )
 
 
 # %% Depth conventions

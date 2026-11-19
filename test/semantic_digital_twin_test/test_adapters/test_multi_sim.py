@@ -122,12 +122,12 @@ def test_urdf_1_world():
 
 @pytest.fixture
 def test_mjcf_1_world():
-    return MJCFParser(TEST_MJCF_1).create_world()
+    return MJCFParser(file_path=TEST_MJCF_1).create_world()
 
 
 @pytest.fixture
 def test_mjcf_2_world():
-    return MJCFParser(TEST_MJCF_2).create_world()
+    return MJCFParser(file_path=TEST_MJCF_2).create_world()
 
 
 def test_every_simulation_saves_its_world_to_a_file_of_its_own(tmp_path):
@@ -226,16 +226,16 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
 
         start_time = time.time()
 
-        new_body = Body(name=PrefixedName("test_body"))
+        new_body = Body(name=PrefixedName(name="test_body"))
         box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0.2, y=0.4, z=3.0, roll=0, pitch=0.5, yaw=0, reference_frame=new_body
         )
         box = Box(
             origin=box_origin,
-            scale=Scale(1.0, 1.5, 0.5),
+            scale=Scale(x=1.0, y=1.5, z=0.5),
             color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
         )
-        new_body.collision = ShapeCollection([box], reference_frame=new_body)
+        new_body.collision = ShapeCollection(shapes=[box], reference_frame=new_body)
 
         logger.debug(f"Time before adding new body: {time.time() - start_time}s")
         with test_urdf_1_world.modify_world():
@@ -252,13 +252,13 @@ def test_world_multi_sim_with_change(test_urdf_1_world):
 
         time.sleep(0.5)
 
-        region = Region(name=PrefixedName("test_region"))
+        region = Region(name=PrefixedName(name="test_region"))
         region_box = Box(
-            scale=Scale(0.1, 0.5, 0.2),
+            scale=Scale(x=0.1, y=0.5, z=0.2),
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=region),
             color=Color.from_rgba(red=0.0, green=1.0, blue=0.0, opacity=0.8),
         )
-        region.area = ShapeCollection([region_box], reference_frame=region)
+        region.area = ShapeCollection(shapes=[region_box], reference_frame=region)
 
         logger.debug(f"Time before add adding region: {time.time() - start_time}s")
         with test_urdf_1_world.modify_world():
@@ -389,14 +389,14 @@ def _build_world_with_two_textured_bodies(
 ) -> MujocoBuilder:
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         for name, mesh_file in [("quad_0", mesh_file_a), ("quad_1", mesh_file_b)]:
-            mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+            mesh_shape = Mesh(filename=mesh_file, scale=Scale(x=1, y=1, z=1))
             body = Body(
-                name=PrefixedName(name),
-                visual=ShapeCollection([mesh_shape]),
-                collision=ShapeCollection([mesh_shape]),
+                name=PrefixedName(name=name),
+                visual=ShapeCollection(shapes=[mesh_shape]),
+                collision=ShapeCollection(shapes=[mesh_shape]),
             )
             world.add_kinematic_structure_entity(body)
             world.add_connection(FixedConnection(parent=root, child=body))
@@ -462,7 +462,7 @@ def test_builder_writes_a_light_attached_to_a_body(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         root.add_simulator_property(
             MujocoLight(
@@ -501,18 +501,18 @@ def test_builder_assigns_material_to_a_textured_primitive_shape(tmp_path):
 
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         box_shape = Box(
-            scale=Scale(1, 1, 1),
+            scale=Scale(x=1, y=1, z=1),
             texture=Texture(
                 file_path=str(texture_file), repeat=(3.0, 3.0), uniform=True
             ),
         )
         counter = Body(
-            name=PrefixedName("counter"),
-            visual=ShapeCollection([box_shape]),
-            collision=ShapeCollection([box_shape]),
+            name=PrefixedName(name="counter"),
+            visual=ShapeCollection(shapes=[box_shape]),
+            collision=ShapeCollection(shapes=[box_shape]),
         )
         world.add_kinematic_structure_entity(counter)
         world.add_connection(FixedConnection(parent=root, child=counter))
@@ -550,18 +550,18 @@ def test_builder_writes_a_geoms_contact_bitmasks(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        box_shape = Box(scale=Scale(1, 1, 1))
+        box_shape = Box(scale=Scale(x=1, y=1, z=1))
         box_shape.add_simulator_property(
             MujocoGeom(
                 contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
             )
         )
         link = Body(
-            name=PrefixedName("link"),
-            visual=ShapeCollection([box_shape]),
-            collision=ShapeCollection([box_shape]),
+            name=PrefixedName(name="link"),
+            visual=ShapeCollection(shapes=[box_shape]),
+            collision=ShapeCollection(shapes=[box_shape]),
         )
         world.add_kinematic_structure_entity(link)
         world.add_connection(FixedConnection(parent=root, child=link))
@@ -585,9 +585,11 @@ def _world_with_one_cylinder(cylinder: Cylinder) -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        link = Body(name=PrefixedName("link"), collision=ShapeCollection([cylinder]))
+        link = Body(
+            name=PrefixedName(name="link"), collision=ShapeCollection(shapes=[cylinder])
+        )
         world.add_kinematic_structure_entity(link)
         world.add_connection(FixedConnection(parent=root, child=link))
     return world
@@ -620,7 +622,7 @@ def test_a_cylinder_keeps_its_size_through_a_round_trip(tmp_path):
         world=_world_with_one_cylinder(cylinder), file_path=str(tmp_path / "scene.xml")
     )
 
-    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).create_world()
+    parsed_world = MJCFParser(file_path=str(tmp_path / "scene.xml")).create_world()
 
     [parsed_cylinder] = parsed_world.get_body_by_name("link").collision.shapes
     assert (parsed_cylinder.width, parsed_cylinder.height) == pytest.approx(
@@ -636,11 +638,14 @@ def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        box_shape = Box(scale=Scale(1, 1, 1))
+        box_shape = Box(scale=Scale(x=1, y=1, z=1))
         contact = ContactParameters.create_for_grasped_object(sliding_friction=0.4)
-        link = Body(name=PrefixedName("link"), collision=ShapeCollection([box_shape]))
+        link = Body(
+            name=PrefixedName(name="link"),
+            collision=ShapeCollection(shapes=[box_shape]),
+        )
         link.add_simulator_property(GravityCompensation(fraction=0.5))
         contact.apply_to([link])
         world.add_kinematic_structure_entity(link)
@@ -648,7 +653,7 @@ def test_contact_declarations_and_gravity_compensation_survive_a_round_trip(tmp_
 
     builder = MujocoBuilder()
     builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
-    parsed_world = MJCFParser(str(tmp_path / "scene.xml")).create_world()
+    parsed_world = MJCFParser(file_path=str(tmp_path / "scene.xml")).create_world()
 
     parsed_link = parsed_world.get_body_by_name("link")
     [parsed_shape] = parsed_link.collision.shapes
@@ -665,11 +670,11 @@ def test_a_shape_with_contact_parameters_resolves_all_of_its_friction(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         link = Body(
-            name=PrefixedName("link"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            name=PrefixedName(name="link"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=1))]),
         )
         ContactParameters.create_for_grasped_object().apply_to([link])
         world.add_kinematic_structure_entity(link)
@@ -696,7 +701,8 @@ def test_a_parsed_geom_resolves_its_contacts_in_the_dimensions_it_declared(tmp_p
     declared = mujoco.MjSpec.from_file(scene)
     builder = MujocoBuilder()
     builder.build_world(
-        world=MJCFParser(scene).create_world(), file_path=str(tmp_path / "scene.xml")
+        world=MJCFParser(file_path=scene).create_world(),
+        file_path=str(tmp_path / "scene.xml"),
     )
 
     assert {
@@ -717,11 +723,11 @@ def test_a_simulated_body_weighs_what_its_inertial_says_not_what_its_shapes_woul
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         link = Body(
-            name=PrefixedName("link"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 1))]),
+            name=PrefixedName(name="link"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=1))]),
             inertial=Inertial(mass=2.0),
         )
         world.add_kinematic_structure_entity(link)
@@ -745,15 +751,17 @@ def test_builder_keeps_a_visual_only_geom_contactless_despite_its_bitmasks(tmp_p
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        box_shape = Box(scale=Scale(1, 1, 1))
+        box_shape = Box(scale=Scale(x=1, y=1, z=1))
         box_shape.add_simulator_property(
             MujocoGeom(
                 contact_type=ContactCategories(2), contact_affinity=ContactCategories(4)
             )
         )
-        link = Body(name=PrefixedName("link"), visual=ShapeCollection([box_shape]))
+        link = Body(
+            name=PrefixedName(name="link"), visual=ShapeCollection(shapes=[box_shape])
+        )
         world.add_kinematic_structure_entity(link)
         world.add_connection(FixedConnection(parent=root, child=link))
 
@@ -779,14 +787,14 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        knuckle = Body(name=PrefixedName("knuckle"))
-        mirrored_knuckle = Body(name=PrefixedName("mirrored_knuckle"))
+        knuckle = Body(name=PrefixedName(name="knuckle"))
+        mirrored_knuckle = Body(name=PrefixedName(name="mirrored_knuckle"))
         world.add_body(knuckle)
         world.add_body(mirrored_knuckle)
         degree_of_freedom = DegreeOfFreedom(
-            name=PrefixedName("knuckle_joint"),
+            name=PrefixedName(name="knuckle_joint"),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.0, upper_position=0.8
             ),
@@ -797,7 +805,7 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z(reference_frame=knuckle)
                 ),
-                name=PrefixedName("knuckle_joint"),
+                name=PrefixedName(name="knuckle_joint"),
                 parent=root,
                 child=knuckle,
                 raw_dof=degree_of_freedom,
@@ -808,7 +816,7 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z(reference_frame=mirrored_knuckle)
                 ),
-                name=PrefixedName("mirrored_knuckle_joint"),
+                name=PrefixedName(name="mirrored_knuckle_joint"),
                 parent=root,
                 child=mirrored_knuckle,
                 raw_dof=degree_of_freedom,
@@ -844,8 +852,8 @@ def test_builder_puts_a_hinge_off_the_connection_origin_on_its_axis(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        door = Body(name=PrefixedName("door"))
+        root = Body(name=PrefixedName(name="root"))
+        door = Body(name=PrefixedName(name="door"))
         world.add_body(root)
         world.add_body(door)
         hinge_point = numpy.array([0.4, 0.0, 0.0])
@@ -853,7 +861,7 @@ def test_builder_puts_a_hinge_off_the_connection_origin_on_its_axis(tmp_path):
             world=world,
             parent=root,
             child=door,
-            name=PrefixedName("door_hinge"),
+            name=PrefixedName(name="door_hinge"),
             connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=0.1, y=0.2
             ),
@@ -903,7 +911,7 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
     A world with a mesh body merged into it can be simulated in MuJoCo.
     """
     milk_path = "package://iai_objects/objects/milk.stl"
-    stl_parser = STLParser(milk_path)
+    stl_parser = STLParser(file_path=milk_path)
     mesh_world = stl_parser.create_world()
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=0.5, reference_frame=test_urdf_1_world.root
@@ -932,16 +940,16 @@ def test_mujocosim_world_with_added_objects(test_urdf_1_world):
 
 def test_spawn_body_with_connections():
     def spawn_robot_body(spawn_world: World) -> Body:
-        spawn_body = Body(name=PrefixedName("robot"))
+        spawn_body = Body(name=PrefixedName(name="robot"))
         box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0, y=0, z=0.5, roll=0, pitch=0, yaw=0, reference_frame=spawn_body
         )
         box = Box(
             origin=box_origin,
-            scale=Scale(0.4, 0.4, 1.0),
+            scale=Scale(x=0.4, y=0.4, z=1.0),
             color=Color.from_rgba(red=0.9, green=0.9, blue=0.9, opacity=1.0),
         )
-        spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
+        spawn_body.collision = ShapeCollection(shapes=[box], reference_frame=spawn_body)
 
         with spawn_world.modify_world():
             spawn_world.add_connection(
@@ -951,16 +959,16 @@ def test_spawn_body_with_connections():
         return spawn_body
 
     def spawn_shoulder_bodies(spawn_world: World, root_body: Body) -> tuple[Body, Body]:
-        spawn_left_shoulder_body = Body(name=PrefixedName("left_shoulder"))
+        spawn_left_shoulder_body = Body(name=PrefixedName(name="left_shoulder"))
         cylinder = Cylinder(
             width=0.2,
             height=0.1,
             color=Color.from_rgba(red=0.9, green=0.1, blue=0.1, opacity=1.0),
         )
         spawn_left_shoulder_body.collision = ShapeCollection(
-            [cylinder], reference_frame=spawn_left_shoulder_body
+            shapes=[cylinder], reference_frame=spawn_left_shoulder_body
         )
-        dof = DegreeOfFreedom(name=PrefixedName("left_shoulder_joint"))
+        dof = DegreeOfFreedom(name=PrefixedName(name="left_shoulder_joint"))
         left_shoulder_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=0,
             pos_y=0.3,
@@ -986,16 +994,16 @@ def test_spawn_body_with_connections():
                 )
             )
 
-        spawn_right_shoulder_body = Body(name=PrefixedName("right_shoulder"))
+        spawn_right_shoulder_body = Body(name=PrefixedName(name="right_shoulder"))
         cylinder = Cylinder(
             width=0.2,
             height=0.1,
             color=Color.from_rgba(red=0.9, green=0.1, blue=0.1, opacity=1.0),
         )
         spawn_right_shoulder_body.collision = ShapeCollection(
-            [cylinder], reference_frame=spawn_right_shoulder_body
+            shapes=[cylinder], reference_frame=spawn_right_shoulder_body
         )
-        dof = DegreeOfFreedom(name=PrefixedName("right_shoulder_joint"))
+        dof = DegreeOfFreedom(name=PrefixedName(name="right_shoulder_joint"))
         right_shoulder_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=0,
             pos_y=-0.3,
@@ -1060,11 +1068,11 @@ def test_body_frame_excludes_joint_state_at_build_time():
     drift away from the world forward kinematics.
     """
     world = World()
-    base_body = Body(name=PrefixedName("base"))
-    rotated_link = Body(name=PrefixedName("rotated_link"))
+    base_body = Body(name=PrefixedName(name="base"))
+    rotated_link = Body(name=PrefixedName(name="rotated_link"))
     # A tip offset from the joint axis, so a rotation actually moves its position
     # (the joint child sits on the axis and would not reveal the bug).
-    tip_link = Body(name=PrefixedName("tip"))
+    tip_link = Body(name=PrefixedName(name="tip"))
     rotated_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=0.3,
         pos_y=0.0,
@@ -1075,7 +1083,7 @@ def test_body_frame_excludes_joint_state_at_build_time():
         quat_z=0.0,
     )
     tip_offset = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, y=0.2, z=0.0)
-    rotated_joint_dof = DegreeOfFreedom(name=PrefixedName("rotated_joint"))
+    rotated_joint_dof = DegreeOfFreedom(name=PrefixedName(name="rotated_joint"))
     with world.modify_world():
         world.add_body(base_body)
         world.add_degree_of_freedom(rotated_joint_dof)
@@ -1139,29 +1147,29 @@ def test_world_sim_state_sync():
     def spawn_state_sync_scene(
         spawn_world: World,
     ) -> tuple[Body, Connection6DoF]:
-        plane_body = Body(name=PrefixedName("ground_plane"))
+        plane_body = Body(name=PrefixedName(name="ground_plane"))
         plane_body.collision = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=plane_body
                     ),
-                    scale=Scale(2.0, 2.0, plane_half_thickness * 2),
+                    scale=Scale(x=2.0, y=2.0, z=plane_half_thickness * 2),
                     color=Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
                 )
             ],
             reference_frame=plane_body,
         )
 
-        falling_box = Body(name=PrefixedName("falling_box"))
+        falling_box = Body(name=PrefixedName(name="falling_box"))
         falling_box.collision = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=falling_box
                     ),
                     scale=Scale(
-                        box_half_size * 2, box_half_size * 2, box_half_size * 2
+                        x=box_half_size * 2, y=box_half_size * 2, z=box_half_size * 2
                     ),
                     color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
                 )
@@ -1260,13 +1268,13 @@ def test_builder_compiles_a_body_with_thin_panel_geometry(tmp_path):
     mesh_file = _write_thin_slab_mesh(tmp_path)
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(x=1, y=1, z=1))
         panel = Body(
-            name=PrefixedName("panel"),
-            visual=ShapeCollection([mesh_shape]),
-            collision=ShapeCollection([mesh_shape]),
+            name=PrefixedName(name="panel"),
+            visual=ShapeCollection(shapes=[mesh_shape]),
+            collision=ShapeCollection(shapes=[mesh_shape]),
         )
         world.add_kinematic_structure_entity(panel)
         world.add_connection(FixedConnection(parent=root, child=panel))
@@ -1305,13 +1313,13 @@ def test_builder_compiles_a_body_with_an_exactly_flat_panel(tmp_path):
     mesh_file = _write_flat_quad_mesh(tmp_path)
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(x=1, y=1, z=1))
         panel = Body(
-            name=PrefixedName("panel"),
-            visual=ShapeCollection([mesh_shape]),
-            collision=ShapeCollection([mesh_shape]),
+            name=PrefixedName(name="panel"),
+            visual=ShapeCollection(shapes=[mesh_shape]),
+            collision=ShapeCollection(shapes=[mesh_shape]),
         )
         world.add_kinematic_structure_entity(panel)
         world.add_connection(FixedConnection(parent=root, child=panel))
@@ -1351,13 +1359,13 @@ def test_builder_compiles_a_body_with_a_large_flat_panel(tmp_path):
     mesh_file = _write_flat_quad_mesh_at_scale(tmp_path, scale=24000.0)
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(x=1, y=1, z=1))
         panel = Body(
-            name=PrefixedName("panel"),
-            visual=ShapeCollection([mesh_shape]),
-            collision=ShapeCollection([mesh_shape]),
+            name=PrefixedName(name="panel"),
+            visual=ShapeCollection(shapes=[mesh_shape]),
+            collision=ShapeCollection(shapes=[mesh_shape]),
         )
         world.add_kinematic_structure_entity(panel)
         world.add_connection(FixedConnection(parent=root, child=panel))
@@ -1383,13 +1391,13 @@ def test_builder_compiles_a_body_with_a_flat_coloured_untextured_mesh(tmp_path):
 
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        mesh_shape = Mesh(filename=mesh_file, scale=Scale(1, 1, 1))
+        mesh_shape = Mesh(filename=mesh_file, scale=Scale(x=1, y=1, z=1))
         panel = Body(
-            name=PrefixedName("panel"),
-            visual=ShapeCollection([mesh_shape]),
-            collision=ShapeCollection([mesh_shape]),
+            name=PrefixedName(name="panel"),
+            visual=ShapeCollection(shapes=[mesh_shape]),
+            collision=ShapeCollection(shapes=[mesh_shape]),
         )
         world.add_kinematic_structure_entity(panel)
         world.add_connection(FixedConnection(parent=root, child=panel))
@@ -1447,13 +1455,15 @@ def _world_with_meshes(visual_file: str, collision_file: str) -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         body = Body(
-            name=PrefixedName("body"),
-            visual=ShapeCollection([Mesh(filename=visual_file, scale=Scale(1, 1, 1))]),
+            name=PrefixedName(name="body"),
+            visual=ShapeCollection(
+                shapes=[Mesh(filename=visual_file, scale=Scale(x=1, y=1, z=1))]
+            ),
             collision=ShapeCollection(
-                [Mesh(filename=collision_file, scale=Scale(1, 1, 1))]
+                shapes=[Mesh(filename=collision_file, scale=Scale(x=1, y=1, z=1))]
             ),
         )
         world.add_kinematic_structure_entity(body)
@@ -1534,7 +1544,7 @@ def test_a_collada_mesh_converted_by_an_earlier_build_is_not_reused_for_another_
     assert _compiled_mesh_extents(builder) == [pytest.approx([0.1] * 3)] * 2
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoxOnPlaneWorld:
     """
     A world holding a ground plane and one free-floating box, together with the pieces
@@ -1565,18 +1575,18 @@ def _build_box_on_plane_world() -> BoxOnPlaneWorld:
     :return: The world and the box handles the caller needs.
     """
     world = World()
-    root = Body(name=PrefixedName("world"))
+    root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
         world.add_body(root)
 
-        ground_plane = Body(name=PrefixedName("ground_plane"))
+        ground_plane = Body(name=PrefixedName(name="ground_plane"))
         ground_plane.collision = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=ground_plane
                     ),
-                    scale=Scale(2.0, 2.0, 0.1),
+                    scale=Scale(x=2.0, y=2.0, z=0.1),
                     color=Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
                 )
             ],
@@ -1584,14 +1594,14 @@ def _build_box_on_plane_world() -> BoxOnPlaneWorld:
         )
         world.add_connection(FixedConnection(parent=root, child=ground_plane))
 
-        box = Body(name=PrefixedName("free_box"))
+        box = Body(name=PrefixedName(name="free_box"))
         box.collision = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=box
                     ),
-                    scale=Scale(0.2, 0.2, 0.2),
+                    scale=Scale(x=0.2, y=0.2, z=0.2),
                     color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
                 )
             ],
@@ -1794,18 +1804,18 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
     }
 
     world = World()
-    root = Body(name=PrefixedName("world"))
+    root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
         world.add_body(root)
 
-        ground_plane = Body(name=PrefixedName("ground_plane"))
+        ground_plane = Body(name=PrefixedName(name="ground_plane"))
         ground_plane.collision = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=ground_plane
                     ),
-                    scale=Scale(2.0, 2.0, 0.1),
+                    scale=Scale(x=2.0, y=2.0, z=0.1),
                     color=Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
                 )
             ],
@@ -1822,15 +1832,17 @@ def test_prebuilt_world_multiple_free_bodies_start_at_authored_poses():
         )
 
         for cube_name, cube_offset in offsets.items():
-            cube = Body(name=PrefixedName(cube_name))
+            cube = Body(name=PrefixedName(name=cube_name))
             cube.collision = ShapeCollection(
-                [
+                shapes=[
                     Box(
                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                             reference_frame=cube
                         ),
                         scale=Scale(
-                            box_half_size * 2, box_half_size * 2, box_half_size * 2
+                            x=box_half_size * 2,
+                            y=box_half_size * 2,
+                            z=box_half_size * 2,
                         ),
                         color=Color.from_rgba(
                             red=0.9, green=0.3, blue=0.3, opacity=1.0
@@ -1938,16 +1950,16 @@ def test_a_textured_mesh_written_as_glb_keeps_its_texture(tmp_path):
 def falling_box_world() -> World:
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        box = Body(name=PrefixedName("box"))
+        box = Body(name=PrefixedName(name="box"))
         geometry = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         reference_frame=box
                     ),
-                    scale=Scale(0.1, 0.1, 0.1),
+                    scale=Scale(x=0.1, y=0.1, z=0.1),
                 )
             ],
             reference_frame=box,

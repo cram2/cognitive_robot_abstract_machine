@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% avoided contacts
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AvoidedContact(ABC):
     """
     A contact that is avoided, named by its rank among the closest contacts of what it
@@ -37,7 +37,7 @@ class AvoidedContact(ABC):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AvoidedExternalContact(AvoidedContact):
     """
     A contact of a registered collision group with the environment that is avoided.
@@ -49,7 +49,7 @@ class AvoidedExternalContact(AvoidedContact):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AvoidedSelfContact(AvoidedContact):
     """
     A contact between two registered collision groups that is avoided.
@@ -61,7 +61,7 @@ class AvoidedSelfContact(AvoidedContact):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ViolatedCollision:
     """
     A contact that came closer than its violated distance.
@@ -81,7 +81,7 @@ class ViolatedCollision:
 # %% collision variable managers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
     """
     Base class for collision variable managers that handles symbolic caching and data
@@ -216,7 +216,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         return violated
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     """
     Transforms collision results for registered groups into local frames convenient for
@@ -452,7 +452,7 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelfCollisionVariableManager(BaseCollisionVariableManager):
     """
     Transforms collision results for registered groups into local frames convenient for

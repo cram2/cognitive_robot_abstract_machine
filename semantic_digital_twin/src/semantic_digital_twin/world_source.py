@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 # %% world source
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldSource(ABC):
     """
     A description of a world that can be created anew whenever it is needed, such as a
@@ -38,7 +38,7 @@ class WorldSource(ABC):
 # %% world model parser
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelParser(WorldSource, ABC):
     """
     Base for every parser that turns a world description format into a

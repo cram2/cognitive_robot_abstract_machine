@@ -21,7 +21,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MarkerArrayRecorder:
     namespace: str
     last_msg: MarkerArray = field(init=False, default=None)

@@ -126,9 +126,9 @@ class EpisodeSceneLoader:
         """
         mesh = Mesh.from_file(str(file))
         new_body = Body(
-            name=PrefixedName(file.stem),
-            visual=ShapeCollection([mesh]),
-            collision=ShapeCollection([mesh]),
+            name=PrefixedName(name=file.stem),
+            visual=ShapeCollection(shapes=[mesh]),
+            collision=ShapeCollection(shapes=[mesh]),
         )
         with self.world.modify_world():
             connection = Connection6DoF.create_with_dofs(

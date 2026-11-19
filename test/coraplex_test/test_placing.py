@@ -115,7 +115,7 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
         extensions,
     )
     end_effector = robot.left_arm.end_effector
-    grasp = GraspCandidate(milk, end_effector.held_body_T_grasp)
+    grasp = GraspCandidate(graspable=milk, grasp_pose=end_effector.held_body_T_grasp)
     poses = place.grasp_pose_sequence(
         reference_T_grasp=grasp.moved_to(target),
         end_effector=end_effector,

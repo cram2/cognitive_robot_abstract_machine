@@ -40,7 +40,7 @@ class PreprocessingMode(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class COACDMeshDecomposer(MeshDecomposer):
     """
     COACDMeshDecomposer is a class for decomposing complex 3D meshes into simpler convex components

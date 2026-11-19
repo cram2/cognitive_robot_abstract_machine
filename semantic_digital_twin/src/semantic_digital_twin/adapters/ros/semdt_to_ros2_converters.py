@@ -32,7 +32,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HomogeneousTransformationMatrixToRos2Converter(
     SemDTToRos2Converter[
         HomogeneousTransformationMatrix, geometry_msgs.TransformStamped
@@ -61,7 +61,7 @@ class HomogeneousTransformationMatrixToRos2Converter(
         return result
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseStamped]):
     @classmethod
     def convert(cls, data: Pose) -> geometry_msgs.PoseStamped:
@@ -82,7 +82,7 @@ class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseSt
         return result
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
     @classmethod
     def convert(cls, data: Pose) -> geometry_msgs.Pose:
@@ -101,7 +101,7 @@ class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
         return result
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Point3ToRos2Converter(SemDTToRos2Converter[Point3, geometry_msgs.PointStamped]):
     @classmethod
     def convert(cls, data: Point3) -> geometry_msgs.PointStamped:
@@ -115,7 +115,7 @@ class Point3ToRos2Converter(SemDTToRos2Converter[Point3, geometry_msgs.PointStam
         return point_stamped
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Vector3ToRos2Converter(
     SemDTToRos2Converter[Vector3, geometry_msgs.Vector3Stamped]
 ):
@@ -131,7 +131,7 @@ class Vector3ToRos2Converter(
         return vector_stamped
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QuaternionToRos2Converter(
     SemDTToRos2Converter[Quaternion, geometry_msgs.QuaternionStamped]
 ):
@@ -147,14 +147,14 @@ class QuaternionToRos2Converter(
         return vector_stamped
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorToRos2Converter(SemDTToRos2Converter[Color, ColorRGBA]):
     @classmethod
     def convert(cls, data: Color) -> ColorRGBA:
         return std_msgs.ColorRGBA(r=data.R, g=data.G, b=data.B, a=data.A)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeToRos2Converter(SemDTToRos2Converter[InputType, Marker]):
     @classmethod
     def convert(cls, data: InputType) -> Marker:
@@ -166,7 +166,7 @@ class ShapeToRos2Converter(SemDTToRos2Converter[InputType, Marker]):
         return marker
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoxToRos2Converter(ShapeToRos2Converter[Box]):
     @classmethod
     def convert(cls, data: Box) -> Marker:
@@ -178,7 +178,7 @@ class BoxToRos2Converter(ShapeToRos2Converter[Box]):
         return marker
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CylinderToRos2Converter(ShapeToRos2Converter[Cylinder]):
     @classmethod
     def convert(cls, data: Cylinder) -> Marker:
@@ -190,7 +190,7 @@ class CylinderToRos2Converter(ShapeToRos2Converter[Cylinder]):
         return marker
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
     @classmethod
     def convert(cls, data: Sphere) -> Marker:
@@ -202,7 +202,7 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
         return marker
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
     """
     Converts a mesh to a marker that draws its file, placed at the mesh's file origin.

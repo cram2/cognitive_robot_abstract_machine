@@ -25,14 +25,16 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VideoResolution:
     """
     Pixel dimensions of a rendered video frame.
     """
 
     width: int
-    """The frame width in pixels."""
+    """
+    The frame width in pixels.
+    """
 
     height: int
     """
@@ -40,14 +42,16 @@ class VideoResolution:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedVideo:
     """
     The raw result of a :class:`MujocoVideoRecorder` session, before encoding.
     """
 
     frames: list[np.ndarray]
-    """The captured RGB frames, in playback order."""
+    """
+    The captured RGB frames, in playback order.
+    """
 
     frames_per_second: int
     """
@@ -83,7 +87,7 @@ class RecordedVideo:
         return output_path
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class _FrameCaptureCallback(StateChangeCallback):
     """
     Sibling callback owned by a :class:`MujocoVideoRecorder`.
@@ -101,7 +105,7 @@ class _FrameCaptureCallback(StateChangeCallback):
         self.recorder._on_world_state_change()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoVideoRecorder:
     """
     Records a video of a :class:`~semantic_digital_twin.world.World` while it is being
@@ -356,7 +360,7 @@ class MujocoVideoRecorder:
 
         :return: The newly attached camera.
         """
-        bounds = RayTracer(self.world).scene.bounds
+        bounds = RayTracer(world=self.world).scene.bounds
         if bounds is None:
             raise EmptyWorldVideoRecordingError(world=self.world)
 

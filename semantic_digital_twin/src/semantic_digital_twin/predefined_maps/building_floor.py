@@ -29,14 +29,14 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SingleDoorRoom:
     """
     World-independent description of a room: a floor with four walls, one of which
     carries a hinged door with a handle, whose entry way cuts a doorway into that wall.
     """
 
-    scale: Scale = field(default_factory=lambda: Scale(2, 2, 2))
+    scale: Scale = field(default_factory=lambda: Scale(x=2, y=2, z=2))
     """
     Floor extents and wall height.
     """
@@ -46,7 +46,7 @@ class SingleDoorRoom:
     Thickness of each wall.
     """
 
-    door_scale: Scale = field(default_factory=lambda: Scale(0.05, 1, 1.8))
+    door_scale: Scale = field(default_factory=lambda: Scale(x=0.05, y=1, z=1.8))
     """
     Extents of the door mounted into the room's last wall.
     """
@@ -96,7 +96,7 @@ class SingleDoorRoom:
             wall = Wall.get_annotation_specification(
                 f"{name}_wall_{i}",
                 Wall.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(self.wall_thickness, self.scale.x, self.scale.z)
+                    scale=Scale(x=self.wall_thickness, y=self.scale.x, z=self.scale.z)
                 ),
             ).spawn(world, parent=floor.root, parent_T_self=wall_pose)
 
@@ -137,14 +137,14 @@ class SingleDoorRoom:
         return floor
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BuildingFloor:
     """
     World-independent description of a building floor: a floor slab carrying a room in
     each of its four corners.
     """
 
-    floor_scale: Scale = field(default_factory=lambda: Scale(8, 8, 0))
+    floor_scale: Scale = field(default_factory=lambda: Scale(x=8, y=8, z=0))
     """
     Extents of the floor slab.
     """

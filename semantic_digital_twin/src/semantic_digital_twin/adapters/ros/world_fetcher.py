@@ -24,7 +24,7 @@ from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FetchWorldServer(HasROS2Node):
     """
     A ros service that allows other processes to fetch the entire world modification
@@ -115,7 +115,7 @@ class FetchWorldServer(HasROS2Node):
             self.service = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoServiceFoundError(Exception):
     service_suffix: str
 
@@ -166,7 +166,7 @@ def fetch_world_snapshot_json(
     deadline = time() + timeout_seconds
     chosen_service = find_world_fetcher_service(node, service_suffix, timeout_seconds)
     if chosen_service is None:
-        raise NoServiceFoundError(service_suffix)
+        raise NoServiceFoundError(service_suffix=service_suffix)
     remaining = deadline - time()
 
     client = node.create_client(Trigger, chosen_service)

@@ -54,8 +54,8 @@ def _build_hsrb_world() -> World:
 
     with world.modify_world():
         old_root = world.root
-        map_body = Body(name=PrefixedName("map"))
-        odom = Body(name=PrefixedName("odom_combined"))
+        map_body = Body(name=PrefixedName(name="map"))
+        odom = Body(name=PrefixedName(name="odom_combined"))
         map_C_odom = Connection6DoF.create_with_dofs(
             world=world, parent=map_body, child=odom
         )

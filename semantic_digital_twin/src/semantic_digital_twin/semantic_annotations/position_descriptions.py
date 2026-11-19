@@ -70,7 +70,7 @@ class VerticalSemanticDirection(SemanticDirection):
     FULLY_TOP = IntervalConstants.ONE
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemanticPositionDescription:
     """
     Describes a position by mapping semantic concepts (RIGHT, CENTER, LEFT, TOP, BOTTOM)

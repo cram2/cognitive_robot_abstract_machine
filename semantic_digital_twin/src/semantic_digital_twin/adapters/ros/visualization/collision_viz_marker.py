@@ -59,7 +59,7 @@ class ContactProximity(IntEnum):
         return ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassifiedContact:
     """
     A contact together with how close its bodies are relative to their collision rule.
@@ -99,7 +99,7 @@ class ClassifiedContact:
 # %% publisher
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
     """
     Publishes the closest-points results of collision checks as an RViz marker.

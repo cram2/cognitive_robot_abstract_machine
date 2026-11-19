@@ -111,7 +111,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
     """
     :return: A box fixed to the root of `world`, half a metre in front of the origin.
     """
-    box = Body(name=PrefixedName("box"))
+    box = Body(name=PrefixedName(name="box"))
     with world.modify_world():
         world.add_connection(
             FixedConnection(

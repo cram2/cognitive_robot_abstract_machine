@@ -42,7 +42,7 @@ def add_body(world: World, name: str) -> None:
     Add a body named ``name`` to ``world``, fixed to its root, in one modification.
     """
     with world.modify_world():
-        body = Body(name=PrefixedName(name))
+        body = Body(name=PrefixedName(name=name))
         world.add_body(body)
         world.add_connection(FixedConnection(parent=world.root, child=body))
 
@@ -65,8 +65,8 @@ def served_world() -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        child = Body(name=PrefixedName("child"))
+        root = Body(name=PrefixedName(name="root"))
+        child = Body(name=PrefixedName(name="child"))
         world.add_body(root)
         world.add_body(child)
         world.add_connection(

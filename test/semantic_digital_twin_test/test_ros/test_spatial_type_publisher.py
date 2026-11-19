@@ -27,7 +27,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FakeMarkerPublisher:
     """
     Captures published marker arrays so tests can assert without a live RViz.

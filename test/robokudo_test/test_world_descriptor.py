@@ -13,23 +13,23 @@ def test_get_predefined_object_bodies():
     root = test_world.root
 
     foobar1_shape = Box(
-        scale=Scale(0.10, 0.06, 0.05),
+        scale=Scale(x=0.10, y=0.06, z=0.05),
         color=Color.from_rgba(red=0.1, green=0.2, blue=0.8, opacity=1.0),
     )
     foobar1_body = Body(
         name=PrefixedName(name="foobar", prefix="transform_example"),
-        visual=ShapeCollection([foobar1_shape]),
-        collision=ShapeCollection([foobar1_shape]),
+        visual=ShapeCollection(shapes=[foobar1_shape]),
+        collision=ShapeCollection(shapes=[foobar1_shape]),
     )
 
     foobar2_shape = Box(
-        scale=Scale(0.10, 0.06, 0.05),
+        scale=Scale(x=0.10, y=0.06, z=0.05),
         color=Color.from_rgba(red=0.1, green=0.2, blue=0.8, opacity=1.0),
     )
     foobar2_body = Body(
         name=PrefixedName(name="foobar2", prefix="transform_example"),
-        visual=ShapeCollection([foobar2_shape]),
-        collision=ShapeCollection([foobar2_shape]),
+        visual=ShapeCollection(shapes=[foobar2_shape]),
+        collision=ShapeCollection(shapes=[foobar2_shape]),
     )
 
     with test_world.modify_world():

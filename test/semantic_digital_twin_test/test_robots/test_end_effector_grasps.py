@@ -88,8 +88,8 @@ def graspable_box(pr2_world_copy) -> Milk:
     grasps.
     """
     body = Body(
-        name=PrefixedName("graspable_box"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.2))]),
+        name=PrefixedName(name="graspable_box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.2))]),
     )
     annotation = Milk(root=body)
     with pr2_world_copy.modify_world():
@@ -115,7 +115,7 @@ def hold_body(end_effector: EndEffector, name: str = "held_body") -> Body:
     :return: The body it now holds.
     """
     world = end_effector._world
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     with world.modify_world():
         world.add_connection(
             FixedConnection(
@@ -130,7 +130,7 @@ def hold_body(end_effector: EndEffector, name: str = "held_body") -> Body:
 # %% the axes a gripper states in its tool frame
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EndEffectorWithSkewedAxes(EndEffector):
     """
     An end effector whose closing axis is not perpendicular to its approach axis.
@@ -195,7 +195,7 @@ def test_the_approach_axis_follows_the_grippers_own_convention(
 def test_a_gripper_whose_axes_are_not_perpendicular_is_refused(pr2_gripper) -> None:
     with pytest.raises(GripperAxesNotPerpendicular):
         EndEffectorWithSkewedAxes(
-            name=PrefixedName("skewed_gripper"),
+            name=PrefixedName(name="skewed_gripper"),
             root=pr2_gripper.root,
             tool_frame=pr2_gripper.tool_frame,
         )
@@ -330,7 +330,7 @@ def test_the_grasp_on_a_body_not_below_the_tool_frame_is_read_the_same(pr2_gripp
     holds it all the same.
     """
     world = pr2_gripper._world
-    carried = Body(name=PrefixedName("carried_body"))
+    carried = Body(name=PrefixedName(name="carried_body"))
     with world.modify_world():
         world.add_connection(
             FixedConnection(

@@ -35,7 +35,7 @@ from semantic_digital_twin.spatial_computations.mesh_rendering import (
 # %% finding the part in each view
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartBoxPrompt:
     """
     The question a vision-language model is asked about each view of a whole.
@@ -113,7 +113,7 @@ class BoxSegmenter(VisionModel):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KnownPartBoxDetector(PartBoxDetector):
     """
     Boxes the faces it is told belong to each part, wherever a view shows them: a stand-
@@ -155,7 +155,7 @@ class KnownPartBoxDetector(PartBoxDetector):
         return [columns.min(), rows.min(), columns.max() + 1, rows.max() + 1]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FilledBoxSegmenter(BoxSegmenter):
     """
     Masks all of the whole inside each box: a stand-in for a model wherever the boxes
@@ -175,7 +175,7 @@ class FilledBoxSegmenter(BoxSegmenter):
 # %% voting on the faces
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewVote:
     """
     Decides which faces of a mesh belong to a part from the masks of the part in views
@@ -250,7 +250,7 @@ class ViewVote:
 # %% the locator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisionLanguagePartLocator(PartLocator):
     """
     Locates parts by rendering the mesh, finding each part in the views with a detector

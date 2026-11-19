@@ -35,7 +35,7 @@ class FillMode(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VHACDMeshDecomposer(MeshDecomposer):
     """
     Decompose meshes using Voxelized Hierarchical Approximate Convex Decomposition.

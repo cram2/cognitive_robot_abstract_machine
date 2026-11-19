@@ -27,7 +27,7 @@ class ListedItemKind(StrEnum):
     DIRECTORY = "directory"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ListedItem:
     """
     One item of a directory listing.
@@ -68,7 +68,7 @@ class DatasetServerVariable(StrEnum):
     CACHE_DIRECTORY = "SEMANTIC_DIGITAL_TWIN_MESH_CACHE"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DatasetServer(PathResolver):
     """
     A dataset that lives on another machine and is read over http.

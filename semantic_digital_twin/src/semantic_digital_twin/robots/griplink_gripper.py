@@ -57,7 +57,7 @@ class GriplinkCommand(StrEnum):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class GriplinkEndpoint:
     """
     A griplink action server endpoint a single gripper is reached on.
@@ -95,7 +95,7 @@ class GriplinkGripPreset(Enum):
 # %% griplink configurations
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GriplinkGripperConfiguration(GripperConfiguration, ABC):
     """
     A configuration for a griplink gripper, carrying the hardware parameters the
@@ -103,7 +103,7 @@ class GriplinkGripperConfiguration(GripperConfiguration, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GriplinkPresetConfiguration(GriplinkGripperConfiguration):
     """
     A griplink gripper motion driven by a stored grip preset, used for ``Grip``/
@@ -136,7 +136,7 @@ class GriplinkPresetConfiguration(GriplinkGripperConfiguration):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
     """
     A griplink gripper motion driven by a commanded opening width, used for
@@ -281,14 +281,14 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
             connections=open_state.connections,
             target_values=target_values,
             state_type=state_type,
-            name=PrefixedName("flexgrip", prefix=end_effector.name.name),
+            name=PrefixedName(name="flexgrip", prefix=end_effector.name.name),
         )
 
 
 # %% griplink end effector
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GriplinkGripper(EndEffector, HasGripperActionServers, ABC):
     """
     An `WEISS WPG gripper <https://weiss-robotics.com/servo-electric/wpg-series/>`_ driven by the Griplink interface.

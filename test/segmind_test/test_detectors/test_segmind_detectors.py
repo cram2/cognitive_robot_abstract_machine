@@ -704,12 +704,12 @@ def _unit_box(name: str) -> Body:
     """
     A body whose collision is a one-metre cube centred on its own frame.
     """
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     collision = Box(
-        scale=Scale(1.0, 1.0, 1.0),
+        scale=Scale(x=1.0, y=1.0, z=1.0),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
     )
-    body.collision = ShapeCollection([collision], reference_frame=body)
+    body.collision = ShapeCollection(shapes=[collision], reference_frame=body)
     return body
 
 

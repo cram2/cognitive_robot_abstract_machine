@@ -83,7 +83,7 @@ from semantic_digital_twin.world_description.world_entity import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MJCFParser(WorldModelParser):
     """
     Class to parse an MJCF file and convert it into a World object.
@@ -186,7 +186,8 @@ class MJCFParser(WorldModelParser):
         with os.fdopen(file_descriptor, "w") as f:
             f.write(xml_string)
         return cls(
-            file_path, use_visual_as_collision_backup=use_visual_as_collision_backup
+            file_path=file_path,
+            use_visual_as_collision_backup=use_visual_as_collision_backup,
         )
 
     def create_world(self) -> World:
@@ -197,7 +198,7 @@ class MJCFParser(WorldModelParser):
             self.parse_equalities()
             self.parse_tendons()
 
-            root = Body(name=PrefixedName(worldbody.name))
+            root = Body(name=PrefixedName(name=worldbody.name))
             self.world.add_body(root)
             self._apply_geoms_to_body(mujoco_body=worldbody, body=root)
 
@@ -291,18 +292,28 @@ class MJCFParser(WorldModelParser):
         for mujoco_geom in mujoco_body.geoms:
             shape = self.parse_geom(mujoco_geom=mujoco_geom)
             shape.origin.reference_frame = body
+            sliding, torsional, rolling = mujoco_geom.friction.tolist()
+            minimum, maximum, width, midpoint, power = mujoco_geom.solimp.tolist()
             shape.add_simulator_property(
                 ContactParameters(
                     friction=MujocoContactDimensionality(
                         mujoco_geom.condim
                     ).acting_friction(
-                        friction=ContactFriction(*mujoco_geom.friction.tolist())
+                        friction=ContactFriction(
+                            sliding=sliding, torsional=torsional, rolling=rolling
+                        )
                     ),
                     stiffness=ContactStiffness(
                         time_constant=timedelta(seconds=mujoco_geom.solref[0]),
                         damping_ratio=mujoco_geom.solref[1],
                     ),
-                    impedance=ContactImpedance(*mujoco_geom.solimp.tolist()),
+                    impedance=ContactImpedance(
+                        minimum=minimum,
+                        maximum=maximum,
+                        width=width,
+                        midpoint=midpoint,
+                        power=power,
+                    ),
                 )
             )
             shape.add_simulator_property(
@@ -336,7 +347,7 @@ class MJCFParser(WorldModelParser):
 
         :param mujoco_body: The Mujoco body to parse.
         """
-        body = Body(name=PrefixedName(mujoco_body.name))
+        body = Body(name=PrefixedName(name=mujoco_body.name))
         self._apply_geoms_to_body(mujoco_body=mujoco_body, body=body)
         body.inertial = self.parse_inertial(mujoco_body=mujoco_body)
         if mujoco_body.gravcomp != 0.0:
@@ -500,14 +511,14 @@ class MJCFParser(WorldModelParser):
             case mujoco.mjtGeom.mjGEOM_PLANE:
                 return Box(
                     origin=origin_transform,
-                    scale=Scale(*size[:2], 0.0),
+                    scale=Scale(x=size[0], y=size[1], z=0.0),
                     color=color,
                     texture=self._resolve_primitive_texture(mujoco_geom),
                 )
             case mujoco.mjtGeom.mjGEOM_BOX:
                 return Box(
                     origin=origin_transform,
-                    scale=Scale(*size),
+                    scale=Scale(x=size[0], y=size[1], z=size[2]),
                     color=color,
                     texture=self._resolve_primitive_texture(mujoco_geom),
                 )
@@ -544,7 +555,11 @@ class MJCFParser(WorldModelParser):
                 mujoco_material: mujoco.MjsMaterial = self.spec.material(
                     mujoco_geom.material
                 )
-                meshscale = Scale(*mujoco_mesh.scale)
+                meshscale = Scale(
+                    x=mujoco_mesh.scale[0],
+                    y=mujoco_mesh.scale[1],
+                    z=mujoco_mesh.scale[2],
+                )
                 reference_orientation = mujoco_mesh.refquat / numpy.linalg.norm(
                     mujoco_mesh.refquat
                 )
@@ -686,7 +701,7 @@ class MJCFParser(WorldModelParser):
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
                 connection = ScrewAxisConnection(
-                    name=PrefixedName(mujoco_joint.name),
+                    name=PrefixedName(name=mujoco_joint.name),
                     parent=parent_body,
                     child=child_body,
                     parent_T_connection_expression=parent_body_to_joint_transform,
@@ -726,11 +741,11 @@ class MJCFParser(WorldModelParser):
                 and mujoco_joint.range[1] == 0
             ):
                 dof = DegreeOfFreedom(
-                    name=PrefixedName(dof_name),
+                    name=PrefixedName(name=dof_name),
                 )
             else:
                 dof = DegreeOfFreedom(
-                    name=PrefixedName(dof_name),
+                    name=PrefixedName(name=dof_name),
                     # MJCF has no velocity limit on a joint, so a default is supplied.
                     limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=float(mujoco_joint.range[0]),
@@ -756,7 +771,7 @@ class MJCFParser(WorldModelParser):
                 f"Warning: Actuator {actuator_name} has trntype {mujoco_actuator.trntype}, which is not supported. Skipping actuator."
             )
             return
-        actuator = Actuator(name=PrefixedName(actuator_name))
+        actuator = Actuator(name=PrefixedName(name=actuator_name))
         if mujoco_actuator.trntype == mujoco.mjtTrn.mjTRN_JOINT:
             joint_name = mujoco_actuator.target
             connection = self.world.get_connection_by_name(joint_name)
@@ -930,7 +945,7 @@ class MJCFParser(WorldModelParser):
                 )
             }
             dof = DegreeOfFreedom(
-                name=PrefixedName(tendon.name),
+                name=PrefixedName(name=tendon.name),
             )
             self.world.add_degree_of_freedom(dof)
             self.world.add_simulator_property(

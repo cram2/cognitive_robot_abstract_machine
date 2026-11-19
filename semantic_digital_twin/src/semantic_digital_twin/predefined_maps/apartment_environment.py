@@ -38,7 +38,7 @@ from semantic_digital_twin.world_source import WorldSource
 # %% apartment
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ApartmentEnvironment(WorldSource):
     """
     The furniture of the apartment: a shelf, a wall, a bedside table, a sofa, the
@@ -82,7 +82,7 @@ class ApartmentEnvironment(WorldSource):
             shelf = Shelf.get_annotation_specification(
                 "shelf",
                 Shelf.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.305, 0.85, 1.9), wall_thickness=0.035
+                    scale=Scale(x=0.305, y=0.85, z=1.9), wall_thickness=0.035
                 ),
             ).spawn(
                 world,
@@ -111,7 +111,7 @@ class ApartmentEnvironment(WorldSource):
                             yaw=-np.pi / 2,
                             reference_frame=world.root,
                         ),
-                        scale=Scale(0.305, 0.85, 0.018),
+                        scale=Scale(x=0.305, y=0.85, z=0.018),
                     )
                 )
 
@@ -128,7 +128,7 @@ class ApartmentEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0, (2.81 / 2), 0, reference_frame=world.root
                 ),
-                scale=Scale(0.03, 2.81, 0.265),
+                scale=Scale(x=0.03, y=2.81, z=0.265),
             )
 
     # %% bedside table

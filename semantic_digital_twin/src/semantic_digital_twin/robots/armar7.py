@@ -89,7 +89,7 @@ class Armar7Joint(JointName):
     RIGHT_HAND_THUMB_FLEXION = "RightHandThumbFlexion"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -111,7 +111,7 @@ class Armar7LeftThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -133,7 +133,7 @@ class Armar7LeftRingFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftPinkyFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -155,7 +155,7 @@ class Armar7LeftPinkyFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -177,7 +177,7 @@ class Armar7LeftMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -199,7 +199,7 @@ class Armar7LeftIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -221,7 +221,7 @@ class Armar7RightThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -243,7 +243,7 @@ class Armar7RightRingFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightPinkyFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -265,7 +265,7 @@ class Armar7RightPinkyFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -287,7 +287,7 @@ class Armar7RightMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -309,7 +309,7 @@ class Armar7RightIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftGripper(
     EndEffector,
     HasFingers[
@@ -327,13 +327,13 @@ class Armar7LeftGripper(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [1.57] * len(gripper_joints))),
             state_type=GripperState.CLOSE,
         )
@@ -362,7 +362,7 @@ class Armar7LeftGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightGripper(
     EndEffector,
     HasFingers[
@@ -380,13 +380,13 @@ class Armar7RightGripper(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [1.57] * len(gripper_joints))),
             state_type=GripperState.CLOSE,
         )
@@ -415,7 +415,7 @@ class Armar7RightGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7LeftArm(Arm[Armar7LeftGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -423,7 +423,7 @@ class Armar7LeftArm(Arm[Armar7LeftGripper]):
     def setup_joint_states(self) -> list[JointState]:
         vals = [0.0, 0.0, 0.25, 0.5, 1.0, 1.0, 0.0, 0.0]
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(zip(self.active_connections, vals)),
             state_type=StaticJointState.PARK,
         )
@@ -443,7 +443,7 @@ class Armar7LeftArm(Arm[Armar7LeftGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7RightArm(Arm[Armar7RightGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -451,7 +451,7 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
     def setup_joint_states(self) -> list[JointState]:
         vals = [0.0, 0.0, 0.25, -0.5, 1.0, -1.0, 0.0, 0.0]
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(zip(self.active_connections, vals)),
             state_type=StaticJointState.PARK,
         )
@@ -471,7 +471,7 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -501,7 +501,7 @@ class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7Neck(Neck[AzureKinectRGB]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -523,7 +523,7 @@ class Armar7Neck(Neck[AzureKinectRGB]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7Torso(
     Torso, HasLeftRightArm[Armar7LeftArm, Armar7RightArm], HasNeck[Armar7Neck]
 ):
@@ -533,17 +533,17 @@ class Armar7Torso(
     def setup_joint_states(self) -> list[JointState]:
         torso_joints = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(torso_joints, [-0.757037, 1.74533, 2.18166 / 2])),
             state_type=TorsoState.LOW,
         )
         torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
+            name=PrefixedName(name="torso_mid", prefix=self.name.name),
             mapping=dict(zip(torso_joints, [-0.757037 / 2, 1.74533 / 2, 2.18166 / 4])),
             state_type=TorsoState.MID,
         )
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(torso_joints, [0.0, 0.0, 0.0])),
             state_type=TorsoState.HIGH,
         )
@@ -563,7 +563,7 @@ class Armar7Torso(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -586,7 +586,7 @@ class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armar7(AbstractRobot, HasMobileBase[Armar7MobileBase]):
     """
     The Armar7 robot built by the KIT.

@@ -56,10 +56,10 @@ from semantic_digital_twin.world_description.world_entity import (
 def _spawn_pr2(odometry_T_robot_start: HomogeneousTransformationMatrix | None) -> PR2:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    return RobotSpecification(PR2, odometry_T_robot_start=odometry_T_robot_start).spawn(
-        world
-    )
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    return RobotSpecification(
+        semantic_annotation_type=PR2, odometry_T_robot_start=odometry_T_robot_start
+    ).spawn(world)
 
 
 @pytest.fixture
@@ -497,9 +497,9 @@ def _spawn_localized_pr2(
 ) -> PR2:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
     return RobotSpecification(
-        PR2,
+        semantic_annotation_type=PR2,
         localization_pose=world_T_odometry,
         odometry_T_robot_start=odometry_T_robot_start,
     ).spawn(world)

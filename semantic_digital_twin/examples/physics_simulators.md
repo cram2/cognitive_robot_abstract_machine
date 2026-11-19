@@ -103,7 +103,7 @@ scene_xml_str = """
 world = MJCFParser.from_xml_string(scene_xml_str).create_world()
 
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

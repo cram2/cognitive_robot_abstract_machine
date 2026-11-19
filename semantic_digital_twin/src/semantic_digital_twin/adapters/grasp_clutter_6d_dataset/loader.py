@@ -76,7 +76,7 @@ class GraspClutter6DSplit(StrEnum):
     TEST = "test"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DDatasetLoader:
     """
     Loader for scenes of the GraspClutter6D dataset

@@ -36,7 +36,7 @@ from ._statements import allowed_intervals
 # %% fixtures
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingPerformer(GraspPerformer):
     """
     Lifts the object by every grasp it performs, and remembers which grasps they were.
@@ -62,9 +62,9 @@ def in_world(annotation_type, shape: trimesh.Trimesh, name: str):
     :return: An annotation of ``annotation_type`` on a body colliding as ``shape``, in
         a world of its own.
     """
-    body = Body(name=PrefixedName(name, prefix="grasp_trials"))
+    body = Body(name=PrefixedName(name=name, prefix="grasp_trials"))
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=shape,
                 origin=HomogeneousTransformationMatrix(reference_frame=body),

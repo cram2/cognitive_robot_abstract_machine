@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 # %% Color representation
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(unsafe_hash=True, kw_only=True)
 class Color:
     """
     A color stored in HSV with RGB channel access and independent opacity.
@@ -219,7 +219,7 @@ class Color:
         """
         digits = hex_color.removeprefix(prefix)
         if re.fullmatch(pattern, digits) is None:
-            raise MalformedHexColor(hex_color)
+            raise MalformedHexColor(hex_color=hex_color)
         return cls.from_list(
             [
                 int(digits[index : index + 2], 16) / 255
@@ -319,7 +319,7 @@ class Color:
         return cls.from_rgba(red=1, green=0.647, blue=0, opacity=1)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Texture:
     """
     A 2D image texture applied to a geometric primitive's surface (for example a MuJoCo
@@ -410,7 +410,7 @@ class MeshFileFormat(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MeshGeometry:
     """
     The geometry a :class:`Mesh` is serialized as, in place of the file it reads.
@@ -444,7 +444,7 @@ class TrimeshMetadataKey(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Scale:
     """
     Dataclass for storing the scale of geometric objects.
@@ -543,10 +543,10 @@ class Scale:
 
     @property
     def xy(self) -> Scale:
-        return Scale(self.x, self.y, 0)
+        return Scale(x=self.x, y=self.y, z=0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     """
     Base class for all shapes in the world.
@@ -706,7 +706,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Mesh(Shape):
     """
     Abstract mesh class.
@@ -1320,7 +1320,7 @@ class Mesh(Shape):
         return cls.add_uv(mesh=mesh, uv=uv)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Sphere(Shape):
     """
     A sphere shape.
@@ -1350,17 +1350,17 @@ class Sphere(Shape):
         Returns the bounding box of the sphere.
         """
         return VolumetricBoundingBox(
-            -self.radius,
-            -self.radius,
-            -self.radius,
-            self.radius,
-            self.radius,
-            self.radius,
-            self.origin,
+            min_x=-self.radius,
+            min_y=-self.radius,
+            min_z=-self.radius,
+            max_x=self.radius,
+            max_y=self.radius,
+            max_z=self.radius,
+            origin=self.origin,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cylinder(Shape):
     """
     A cylinder shape.
@@ -1401,17 +1401,17 @@ class Cylinder(Shape):
         half_width = self.width / 2
         half_height = self.height / 2
         return VolumetricBoundingBox(
-            -half_width,
-            -half_width,
-            -half_height,
-            half_width,
-            half_width,
-            half_height,
-            self.origin,
+            min_x=-half_width,
+            min_y=-half_width,
+            min_z=-half_height,
+            max_x=half_width,
+            max_y=half_width,
+            max_z=half_height,
+            origin=self.origin,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Box(Shape):
     """
     A box shape.
@@ -1447,17 +1447,17 @@ class Box(Shape):
         half_y = self.scale.y / 2
         half_z = self.scale.z / 2
         return VolumetricBoundingBox(
-            -half_x,
-            -half_y,
-            -half_z,
-            half_x,
-            half_y,
-            half_z,
-            self.origin,
+            min_x=-half_x,
+            min_y=-half_y,
+            min_z=-half_z,
+            max_x=half_x,
+            max_y=half_y,
+            max_z=half_z,
+            origin=self.origin,
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
     """
     Bounds whose corners are plain coordinate vectors, one coordinate per axis.
@@ -1512,7 +1512,7 @@ plane.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AxisAlignedBox(BoundsInterface[PointT], ABC):
     """
     Shared behaviour for an axis-aligned box expressed over a fixed set of spatial axes.
@@ -1661,7 +1661,11 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :param origin: The origin of the bounding box.
         :return: The bounding box.
         """
-        return cls(*lower, *upper, origin)
+        return cls(
+            **{f"min_{axis.name}": value for axis, value in zip(cls.axes(), lower)},
+            **{f"max_{axis.name}": value for axis, value in zip(cls.axes(), upper)},
+            origin=origin,
+        )
 
     def transform_to_origin(
         self, reference_T_new_origin: HomogeneousTransformationMatrix
@@ -1725,7 +1729,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         return self.__class__.from_simple_event(result, self.origin)[0]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class VolumetricBoundingBox(AxisAlignedBox[Point3]):
     """
     An axis-aligned box in three-dimensional space.
@@ -1806,7 +1810,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         """
         :return: The scale of the bounding box.
         """
-        return Scale(self.depth, self.width, self.height)
+        return Scale(x=self.depth, y=self.width, z=self.height)
 
     @property
     def depth(self) -> float:
@@ -1858,13 +1862,13 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         :return: New enlarged bounding box
         """
         return self.__class__(
-            self.min_x - x_amount,
-            self.min_y - y_amount,
-            self.min_z - z_amount,
-            self.max_x + x_amount,
-            self.max_y + y_amount,
-            self.max_z + z_amount,
-            self.origin,
+            min_x=self.min_x - x_amount,
+            min_y=self.min_y - y_amount,
+            min_z=self.min_z - z_amount,
+            max_x=self.max_x + x_amount,
+            max_y=self.max_y + y_amount,
+            max_z=self.max_z + z_amount,
+            origin=self.origin,
         )
 
     def contains(self, point: Point3) -> bool:
@@ -1895,7 +1899,15 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             simple_event[SpatialVariables.z.value].simple_sets,
         ):
             result.append(
-                cls(x.lower, y.lower, z.lower, x.upper, y.upper, z.upper, origin)
+                cls(
+                    min_x=x.lower,
+                    min_y=y.lower,
+                    min_z=z.lower,
+                    max_x=x.upper,
+                    max_y=y.upper,
+                    max_z=z.upper,
+                    origin=origin,
+                )
             )
         return result
 
@@ -1949,12 +1961,12 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         """
         bounds = mesh.bounds
         return cls(
-            bounds[0][0],
-            bounds[0][1],
-            bounds[0][2],
-            bounds[1][0],
-            bounds[1][1],
-            bounds[1][2],
+            min_x=bounds[0][0],
+            min_y=bounds[0][1],
+            min_z=bounds[0][2],
+            max_x=bounds[1][0],
+            max_y=bounds[1][1],
+            max_z=bounds[1][2],
             origin=origin,
         )
 
@@ -1987,7 +1999,17 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         assert min_point.reference_frame == max_point.reference_frame, (
             "The reference frames of the minimum and maximum points must be the same."
         )
-        return cls(*min_point.to_np()[:3], *max_point.to_np()[:3], origin=origin)
+        min_x, min_y, min_z = min_point.to_np()[:3]
+        max_x, max_y, max_z = max_point.to_np()[:3]
+        return cls(
+            min_x=min_x,
+            min_y=min_y,
+            min_z=min_z,
+            max_x=max_x,
+            max_y=max_y,
+            max_z=max_z,
+            origin=origin,
+        )
 
     def as_shape(self) -> Box:
         scale = Scale(
@@ -2015,7 +2037,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PlanarBoundingBox(AxisAlignedBox[Point2]):
     """
     An axis-aligned box in the x-y plane, with no z-extent.
@@ -2117,11 +2139,11 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
         :return: New enlarged bounding box
         """
         return self.__class__(
-            self.min_x - x_amount,
-            self.min_y - y_amount,
-            self.max_x + x_amount,
-            self.max_y + y_amount,
-            self.origin,
+            min_x=self.min_x - x_amount,
+            min_y=self.min_y - y_amount,
+            max_x=self.max_x + x_amount,
+            max_y=self.max_y + y_amount,
+            origin=self.origin,
         )
 
     def contains(self, point: Point2) -> bool:
@@ -2143,13 +2165,13 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
         :return: The slab, in the same frame as ``origin``.
         """
         return VolumetricBoundingBox(
-            self.min_x,
-            self.min_y,
-            -half_height,
-            self.max_x,
-            self.max_y,
-            half_height,
-            self.origin,
+            min_x=self.min_x,
+            min_y=self.min_y,
+            min_z=-half_height,
+            max_x=self.max_x,
+            max_y=self.max_y,
+            max_z=half_height,
+            origin=self.origin,
         )
 
     @classmethod
@@ -2168,7 +2190,15 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             simple_event[SpatialVariables.x.value].simple_sets,
             simple_event[SpatialVariables.y.value].simple_sets,
         ):
-            result.append(cls(x.lower, y.lower, x.upper, y.upper, origin))
+            result.append(
+                cls(
+                    min_x=x.lower,
+                    min_y=y.lower,
+                    max_x=x.upper,
+                    max_y=y.upper,
+                    origin=origin,
+                )
+            )
         return result
 
     def get_points(self) -> list[Point2]:

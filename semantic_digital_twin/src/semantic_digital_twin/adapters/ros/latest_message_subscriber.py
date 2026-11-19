@@ -15,7 +15,7 @@ MessageType = TypeVar("MessageType")
 # %% handing one subscription's messages to every reader of a topic
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TopicMessageDistributor:
     """
     The callback of a subscription that several readers of a topic share.
@@ -39,7 +39,7 @@ class TopicMessageDistributor:
 # %% keeping the latest message of a topic
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LatestMessageSubscriber(
     Generic[MessageType], SubClassSafeGeneric, HasROS2Node, ABC
 ):

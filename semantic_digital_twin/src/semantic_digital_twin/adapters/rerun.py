@@ -44,7 +44,7 @@ class RerunMode(StrEnum):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RerunModelCallback(ModelChangeCallback):
     """
     Logs the world's static geometry and compiles the body forward kinematics
@@ -148,7 +148,7 @@ class RerunModelCallback(ModelChangeCallback):
                 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RerunAdapter(StateChangeCallback):
     """
     Logs a world to Rerun and keeps the recording in sync with its state.

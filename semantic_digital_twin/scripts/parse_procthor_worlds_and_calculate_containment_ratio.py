@@ -55,14 +55,16 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
         if index < 5058:
             continue
         try:
-            parser = ProcTHORParser(f"house_{index}", house, semantic_world_session)
+            parser = ProcTHORParser(
+                name=f"house_{index}", house=house, session=semantic_world_session
+            )
             world = parser.create_world()
         except Exception as e:
             logging.error(f"Error parsing house {index}: {e}")
             continue
         # resolve views
         resolver = ProcthorResolver(
-            [
+            classes=[
                 cls
                 for cls in classes_of_module(
                     semantic_digital_twin.adapters.procthor.procthor_resolver

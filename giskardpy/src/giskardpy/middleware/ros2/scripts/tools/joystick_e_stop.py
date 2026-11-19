@@ -70,7 +70,7 @@ def main(args=None):
     """
     background_node.init_node("giskard_e_stop")
 
-    joy_msg = RosGraph(background_node.get_node()).wait_for_message(Joy, "/joy")
+    joy_msg = RosGraph(node=background_node.get_node()).wait_for_message(Joy, "/joy")
     num_buttons = len(joy_msg.buttons)
 
     background_node.get_node().declare_parameter("button_ids", list(range(num_buttons)))

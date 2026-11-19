@@ -31,7 +31,7 @@ except ImportError:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArtVipDatasetLoader:
     """
     Loader for professionally modelled, articulated digital-twin objects from the ArtVIP

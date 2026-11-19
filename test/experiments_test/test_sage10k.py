@@ -43,14 +43,14 @@ def wall_door_handle_world():
         wall = Wall.create_with_new_body_in_world(
             name="wall",
             world=world,
-            scale=Scale(0.1, 4, 2),
+            scale=Scale(x=0.1, y=4, z=2),
         )
         wall.root.visual.dye_shapes(Color.from_rgba(red=0.6, green=0.6, blue=0.6))
 
         door = Door.create_with_new_body_in_world(
             name="door",
             world=world,
-            scale=Scale(0.11, 1, 2),
+            scale=Scale(x=0.11, y=1, z=2),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0),
         )
         door.root.visual.dye_shapes(Color.from_rgba(red=0.55, green=0.27, blue=0.07))
@@ -68,7 +68,7 @@ def wall_door_handle_world():
                 x=0.06,
                 yaw=np.pi,
             ),
-            scale=Scale(0.05, 0.02, 0.2),
+            scale=Scale(x=0.05, y=0.02, z=0.2),
         )
         handle.root.visual.dye_shapes(Color.from_rgba(red=0.8, green=0.8, blue=0.1))
         door.add(part=handle)

@@ -60,7 +60,7 @@ def non_convex_mesh():
     :return: The collision mesh of the jeroen cup.
     """
     stl_path = "package://iai_objects/objects/jeroen_cup.stl"
-    world_with_stl = STLParser(stl_path).create_world()
+    world_with_stl = STLParser(file_path=stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
 
@@ -223,7 +223,7 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
 # %% reading the cache while a mesh is decomposed
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DecomposerWatchingTheCache(MeshDecomposer):
     """
     A decomposer that notes, whenever it decomposes, whether the decomposition's cache
@@ -292,7 +292,9 @@ def test_mesh_in_a_file_bullet_cannot_read_collides_like_the_same_mesh_in_obj(
     monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
     box = trimesh.creation.box(extents=(1.0, 2.0, 3.0))
     meshes = [
-        Mesh.from_trimesh(mesh=box, scale=Scale(2.0, 1.0, 1.0), file_type=file_format)
+        Mesh.from_trimesh(
+            mesh=box, scale=Scale(x=2.0, y=1.0, z=1.0), file_type=file_format
+        )
         for file_format in (MeshFileFormat.GLB, MeshFileFormat.OBJ)
     ]
 
@@ -349,7 +351,7 @@ def test_a_mesh_turned_within_its_file_collides_like_its_turned_vertices(monkeyp
     monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
     unturned = Mesh.from_trimesh(
         mesh=trimesh.creation.box(extents=(1.0, 2.0, 3.0)),
-        scale=Scale(0.5, 0.5, 0.5),
+        scale=Scale(x=0.5, y=0.5, z=0.5),
         file_type=MeshFileFormat.OBJ,
     )
     turned = replace(

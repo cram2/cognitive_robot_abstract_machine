@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionConsumer(ABC):
     """
     Interface for classes that want to be notified about changes in the collision matrix
@@ -77,7 +77,7 @@ class CollisionConsumer(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionManager(ModelChangeCallback):
     """
     This class is intended as the primary interface for collision checking.

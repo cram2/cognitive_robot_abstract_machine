@@ -141,7 +141,7 @@ class ICub3Joint(JointName):
     RIGHT_ANKLE_ROLL = "r_ankle_roll"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -163,7 +163,7 @@ class ICub3LeftThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -185,7 +185,7 @@ class ICub3LeftIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -207,7 +207,7 @@ class ICub3LeftMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -229,7 +229,7 @@ class ICub3LeftRingFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftLittleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -251,7 +251,7 @@ class ICub3LeftLittleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -273,7 +273,7 @@ class ICub3RightThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -295,7 +295,7 @@ class ICub3RightIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -317,7 +317,7 @@ class ICub3RightMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -339,7 +339,7 @@ class ICub3RightRingFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightLittleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -361,7 +361,7 @@ class ICub3RightLittleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftHand(
     EndEffector,
     HasFingers[
@@ -379,7 +379,7 @@ class ICub3LeftHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
@@ -408,7 +408,7 @@ class ICub3LeftHand(
         ]
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, close_vals)),
             state_type=GripperState.CLOSE,
         )
@@ -435,7 +435,7 @@ class ICub3LeftHand(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightHand(
     EndEffector,
     HasFingers[
@@ -453,7 +453,7 @@ class ICub3RightHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
@@ -482,7 +482,7 @@ class ICub3RightHand(
         ]
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, close_vals)),
             state_type=GripperState.CLOSE,
         )
@@ -509,14 +509,14 @@ class ICub3RightHand(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftArm(Arm[ICub3LeftHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -534,14 +534,14 @@ class ICub3LeftArm(Arm[ICub3LeftHand]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightArm(Arm[ICub3RightHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -559,7 +559,7 @@ class ICub3RightArm(Arm[ICub3RightHand]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -587,7 +587,7 @@ class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3Neck(Neck[ICub3Camera]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -605,7 +605,7 @@ class ICub3Neck(Neck[ICub3Camera]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3Torso(
     Torso, HasLeftRightArm[ICub3LeftArm, ICub3RightArm], HasNeck[ICub3Neck]
 ):
@@ -625,7 +625,7 @@ class ICub3Torso(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3MobileBase(MobileBase[OmniDrive]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -646,7 +646,7 @@ class ICub3MobileBase(MobileBase[OmniDrive]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3(AbstractRobot, HasTorso[ICub3Torso], HasMobileBase[ICub3MobileBase]):
     """
     The ICub3 robot built by the Istituto Italiano di Tecnologia.

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 # %% robot specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisualCollisionBackupDisabledError(UsageError):
     """
     Raised when a robot whose description leaves parts without collision geometry is

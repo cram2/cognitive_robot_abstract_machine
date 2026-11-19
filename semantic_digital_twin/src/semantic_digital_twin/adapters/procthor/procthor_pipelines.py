@@ -55,7 +55,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
         world_T_handle = world_T_drawer @ drawer_T_handle
         handle = Handle.create_with_new_body_in_world(
             name=drawer_body.name.name + "_handle",
-            scale=Scale(0.05, 0.02, 0.1),
+            scale=Scale(x=0.05, y=0.02, z=0.1),
             world=world,
             world_root_T_self=world_T_handle,
         )
@@ -99,7 +99,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
 
         handle = Handle.create_with_new_body_in_world(
             name=door_body.name.name + "_handle",
-            scale=Scale(0.05, 0.02, 0.1),
+            scale=Scale(x=0.05, y=0.02, z=0.1),
             world=world,
             world_root_T_self=world_T_handle,
         )

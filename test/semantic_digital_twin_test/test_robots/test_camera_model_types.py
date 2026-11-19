@@ -42,21 +42,21 @@ if TYPE_CHECKING:
 
 
 # %% Projection model bindings
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PinholeProjection(Camera[PinholeCameraModel]):
     """
     A standalone camera with a pinhole projection contract.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AngularProjection(Camera[FieldOfViewCameraModel]):
     """
     A standalone camera with an angular projection contract.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotPinholeProjection(RobotCamera[PinholeCameraModel]):
     """
     A robot camera with a pinhole projection contract.

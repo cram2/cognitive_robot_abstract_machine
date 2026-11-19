@@ -146,8 +146,8 @@ class PickUpAction(
             z-axis.
         """
         grasp = GraspCandidate(
-            graspable,
-            Pose(
+            graspable=graspable,
+            grasp_pose=Pose(
                 orientation=RotationMatrix.from_rpy(pitch=np.pi / 2).quaternion,
                 reference_frame=graspable.root,
             ),

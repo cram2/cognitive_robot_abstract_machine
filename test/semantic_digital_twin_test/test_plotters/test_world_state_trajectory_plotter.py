@@ -105,13 +105,13 @@ def _record_a_few_of_many_joints_moving(
     of which only the last `moving` in name order move.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     degrees_of_freedom = []
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         for index in range(joints):
             degree_of_freedom = DegreeOfFreedom(
-                name=PrefixedName(f"joint_{index:02d}"),
+                name=PrefixedName(name=f"joint_{index:02d}"),
                 limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1
                 ),
@@ -123,7 +123,7 @@ def _record_a_few_of_many_joints_moving(
                         axis=Vector3.X(reference_frame=root)
                     ),
                     parent=root,
-                    child=Body(name=PrefixedName(f"link_{index:02d}")),
+                    child=Body(name=PrefixedName(name=f"link_{index:02d}")),
                     raw_dof=degree_of_freedom,
                 )
             )

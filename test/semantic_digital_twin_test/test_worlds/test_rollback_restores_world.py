@@ -37,9 +37,9 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
     it can be attached to, and an arm joint added after the item.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    item = Body(name=PrefixedName("item"))
-    table = Body(name=PrefixedName("table"))
+    root = Body(name=PrefixedName(name="root"))
+    item = Body(name=PrefixedName(name="item"))
+    table = Body(name=PrefixedName(name="table"))
     with world.modify_world():
         world.add_connection(
             Connection6DoF.create_with_dofs(world=world, parent=root, child=item)
@@ -50,7 +50,7 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=root,
-            child=Body(name=PrefixedName("arm")),
+            child=Body(name=PrefixedName(name="arm")),
         )
         world.add_connection(arm_joint)
     with world.modify_world():
@@ -66,8 +66,8 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
 
 def test_rollback_of_body_removal_reconnects_it():
     world = World()
-    root = Body(name=PrefixedName("root"))
-    leaf = Body(name=PrefixedName("leaf"))
+    root = Body(name=PrefixedName(name="root"))
+    leaf = Body(name=PrefixedName(name="leaf"))
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -145,7 +145,7 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
                 ),
                 world=world,
                 parent=table,
-                child=Body(name=PrefixedName("drawer")),
+                child=Body(name=PrefixedName(name="drawer")),
             )
             world.add_connection(drawer_joint)
         drawer_joint.position = 0.4
@@ -159,7 +159,7 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
 def test_rollback_of_merged_world_adds_nothing_back(mini_world: World):
     other = World()
     with other.modify_world():
-        other.add_kinematic_structure_entity(Body(name=PrefixedName("other_root")))
+        other.add_kinematic_structure_entity(Body(name=PrefixedName(name="other_root")))
     mini_world.merge_world(other)
 
     other.rollback_modification_blocks(len(other.modification_history))
@@ -170,7 +170,9 @@ def test_rollback_of_merged_world_adds_nothing_back(mini_world: World):
 def test_rollback_to_before_replace_with_raises(mini_world: World):
     replacement = World()
     with replacement.modify_world():
-        replacement.add_kinematic_structure_entity(Body(name=PrefixedName("new_root")))
+        replacement.add_kinematic_structure_entity(
+            Body(name=PrefixedName(name="new_root"))
+        )
     version = mini_world.get_world_model_manager().version
 
     mini_world._replace_with(replacement)
@@ -182,14 +184,16 @@ def test_rollback_to_before_replace_with_raises(mini_world: World):
 def test_rollback_after_replace_with_reverts_later_blocks(mini_world: World):
     replacement = World()
     with replacement.modify_world():
-        replacement.add_kinematic_structure_entity(Body(name=PrefixedName("new_root")))
+        replacement.add_kinematic_structure_entity(
+            Body(name=PrefixedName(name="new_root"))
+        )
     mini_world._replace_with(replacement)
     version = mini_world.get_world_model_manager().version
     entities = list(mini_world.kinematic_structure_entities)
     with mini_world.modify_world():
         mini_world.add_connection(
             FixedConnection(
-                parent=mini_world.root, child=Body(name=PrefixedName("later"))
+                parent=mini_world.root, child=Body(name=PrefixedName(name="later"))
             )
         )
 

@@ -29,7 +29,7 @@ TransformableMsg = TypeVar(
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TFWrapper(HasROS2Node):
     """
     A wrapper for ROS2's very beautiful tf library.

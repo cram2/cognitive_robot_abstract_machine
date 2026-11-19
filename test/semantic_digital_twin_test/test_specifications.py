@@ -138,7 +138,7 @@ def empty_world() -> World:
 
 
 def test_body_specification_spawns_fixed(empty_world):
-    body = BodySpecification.box("box", Scale(1, 1, 1)).spawn(empty_world)
+    body = BodySpecification.box("box", Scale(x=1, y=1, z=1)).spawn(empty_world)
     assert isinstance(body, Body)
     assert body in empty_world.bodies
     assert isinstance(body.parent_connection, FixedConnection)
@@ -146,13 +146,13 @@ def test_body_specification_spawns_fixed(empty_world):
 
 
 def test_region_specification_spawns(empty_world):
-    region = RegionSpecification.box("region", Scale(1, 1, 1)).spawn(empty_world)
+    region = RegionSpecification.box("region", Scale(x=1, y=1, z=1)).spawn(empty_world)
     assert isinstance(region, Region)
     assert isinstance(region.parent_connection, FixedConnection)
 
 
 def test_connection_specification_defaults_to_none():
-    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     assert spec.connection_specification is None
 
 
@@ -160,7 +160,7 @@ def test_region_specification_uses_connection_specification(empty_world):
     # The connection now lives on the entity spec, so regions get non-fixed connections too.
     spec = RegionSpecification.box(
         "sliding_region",
-        Scale(1, 1, 1),
+        Scale(x=1, y=1, z=1),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.Z()
@@ -172,16 +172,16 @@ def test_region_specification_uses_connection_specification(empty_world):
 
 
 def test_body_and_connection_pose_and_name_override(empty_world):
-    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
     body = spec.spawn(empty_world, name="renamed")
-    assert body.name == PrefixedName("renamed")
+    assert body.name == PrefixedName(name="renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
     np.testing.assert_allclose(root_T_body.position.to_np()[:3], [1, 2, 3])
 
 
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
-    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     body = spec.spawn(
         empty_world,
@@ -194,7 +194,7 @@ def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
 def test_body_and_connection_active(empty_world):
     spec = BodySpecification.box(
         "drawer",
-        Scale(1, 1, 1),
+        Scale(x=1, y=1, z=1),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.Z()
@@ -206,9 +206,9 @@ def test_body_and_connection_active(empty_world):
 
 
 def test_child_specification_recursion(empty_world):
-    parent_spec = BodySpecification.box("parent", Scale(1, 1, 1))
+    parent_spec = BodySpecification.box("parent", Scale(x=1, y=1, z=1))
     parent_spec.child_specifications.append(
-        BodySpecification.box("child", Scale(1, 1, 1))
+        BodySpecification.box("child", Scale(x=1, y=1, z=1))
     )
     parent_body = parent_spec.spawn(empty_world)
     child = empty_world.get_body_by_name("child")
@@ -218,7 +218,7 @@ def test_child_specification_recursion(empty_world):
 def test_fixed_annotation_spawns(empty_world):
     spec = Milk.get_annotation_specification(
         "milk",
-        BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
+        BodySpecification.box("milk", Scale(x=0.1, y=0.1, z=0.2)),
     )
     annotation = spec.spawn(empty_world)
     assert isinstance(annotation, Milk)
@@ -229,7 +229,7 @@ def test_fixed_annotation_spawns(empty_world):
 def test_active_annotation_spawns(empty_world):
     spec = Drawer.get_annotation_specification(
         "drawer",
-        BodySpecification.box("drawer", Scale(0.4, 0.5, 0.6)),
+        BodySpecification.box("drawer", Scale(x=0.4, y=0.5, z=0.6)),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
@@ -248,7 +248,7 @@ def test_annotation_root_connection_specification_overrides_type(empty_world):
         "milk",
         BodySpecification.box(
             "milk",
-            Scale(0.1, 0.1, 0.2),
+            Scale(x=0.1, y=0.1, z=0.2),
             connection_specification=Connection6DoFSpecification(),
         ),
     )
@@ -272,12 +272,12 @@ def test_nested_annotation_on_non_part_whole_field_raises():
     with pytest.raises(UnknownSemanticRelationshipField):
         Milk.get_annotation_specification(
             "milk",
-            BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
+            BodySpecification.box("milk", Scale(x=0.1, y=0.1, z=0.2)),
             part_specifications={
                 "handle": Handle.get_annotation_specification(
                     "handle",
                     Handle.get_default_root_kinematic_structure_entity_specification(
-                        scale=Scale(0.1, 0.05, 0.05)
+                        scale=Scale(x=0.1, y=0.05, z=0.05)
                     ),
                 )
             },
@@ -290,7 +290,7 @@ def test_nested_annotation_on_non_part_whole_field_raises():
 def test_world_specification_robotless():
     world = WorldSpecification(
         world_source=None,
-        objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+        objects=[BodySpecification.box("obj", Scale(x=1, y=1, z=1))],
     ).create_world()
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
@@ -299,7 +299,7 @@ def test_world_specification_robotless():
 def test_create_world_is_repeatable():
     spec = WorldSpecification(
         world_source=None,
-        objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+        objects=[BodySpecification.box("obj", Scale(x=1, y=1, z=1))],
     )
     first = spec.create_world()
     second = spec.create_world()
@@ -339,7 +339,7 @@ def test_materialized_environments_share_no_entity_ids():
 def test_world_specification_builds_on_a_map_written_in_code():
     specification = WorldSpecification(
         world_source=KitchenEnvironment(),
-        objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+        objects=[BodySpecification.box("obj", Scale(x=1, y=1, z=1))],
     )
     world = specification.create_world()
 
@@ -349,11 +349,11 @@ def test_world_specification_builds_on_a_map_written_in_code():
 
 def test_world_specification_builds_on_another_world_specification():
     inner = WorldSpecification(
-        objects=[BodySpecification.box("inner_obj", Scale(1, 1, 1))]
+        objects=[BodySpecification.box("inner_obj", Scale(x=1, y=1, z=1))]
     )
     world = WorldSpecification(
         world_source=inner,
-        objects=[BodySpecification.box("outer_obj", Scale(1, 1, 1))],
+        objects=[BodySpecification.box("outer_obj", Scale(x=1, y=1, z=1))],
     ).create_world()
 
     assert {body.name.name for body in world.bodies} == {
@@ -408,7 +408,7 @@ def test_world_specification_from_mjcf_collides_every_geom_when_asked():
 def test_world_specification_from_gazebo_environment():
     world = WorldSpecification.from_gazebo(
         os.path.join(RESOURCES, "gazebo", "mini_warehouse", "worlds", "mini.world"),
-        objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+        objects=[BodySpecification.box("obj", Scale(x=1, y=1, z=1))],
     ).create_world()
 
     assert not world.is_empty()
@@ -421,7 +421,7 @@ def test_world_specification_from_gazebo_environment():
 @pytest.mark.parametrize(
     "make_spec",
     [
-        lambda: BodySpecification.box("shape", Scale(1, 1, 1)),
+        lambda: BodySpecification.box("shape", Scale(x=1, y=1, z=1)),
         lambda: BodySpecification.sphere("shape", 0.5),
         lambda: BodySpecification.cylinder("shape", 0.4, 1.0),
         lambda: BodySpecification.mesh(
@@ -440,7 +440,7 @@ def test_shape_constructors_spawn(empty_world, make_spec):
 
 
 def test_from_event_constructor_spawns(empty_world):
-    event = Scale(1, 1, 1).to_simple_event().as_composite_set()
+    event = Scale(x=1, y=1, z=1).to_simple_event().as_composite_set()
     body = BodySpecification.from_event("event_body", event).spawn(empty_world)
     assert isinstance(body, Body)
     assert len(body.collision.shapes) >= 1
@@ -449,7 +449,9 @@ def test_from_event_constructor_spawns(empty_world):
 @pytest.mark.parametrize(
     "make_spec",
     [
-        lambda pose: BodySpecification.box("shape", Scale(1, 1, 1), parent_T_self=pose),
+        lambda pose: BodySpecification.box(
+            "shape", Scale(x=1, y=1, z=1), parent_T_self=pose
+        ),
         lambda pose: BodySpecification.sphere("shape", 0.5, parent_T_self=pose),
         lambda pose: BodySpecification.cylinder("shape", 0.4, 1.0, parent_T_self=pose),
         lambda pose: BodySpecification.mesh(
@@ -457,7 +459,7 @@ def test_from_event_constructor_spawns(empty_world):
         ),
         lambda pose: BodySpecification.from_event(
             "shape",
-            Scale(1, 1, 1).to_simple_event().as_composite_set(),
+            Scale(x=1, y=1, z=1).to_simple_event().as_composite_set(),
             parent_T_self=pose,
         ),
         lambda pose: BodySpecification.from_3d_points(
@@ -466,7 +468,7 @@ def test_from_event_constructor_spawns(empty_world):
             parent_T_self=pose,
         ),
         lambda pose: RegionSpecification.box(
-            "shape", Scale(1, 1, 1), parent_T_self=pose
+            "shape", Scale(x=1, y=1, z=1), parent_T_self=pose
         ),
     ],
 )
@@ -488,7 +490,7 @@ def test_body_specification_from_3d_points_matches_direct_construction():
     name = "polytope"
 
     materialized = BodySpecification.from_3d_points(name, points).to_domain_object(name)
-    directly_built = Body.from_3d_points(name=PrefixedName(name), points_3d=points)
+    directly_built = Body.from_3d_points(name=PrefixedName(name=name), points_3d=points)
 
     assert (
         len(materialized.collision.shapes) == len(directly_built.collision.shapes) == 1
@@ -502,7 +504,7 @@ def test_unset_visual_shapes_are_shared_with_the_collision_shapes():
     """
     A ``None`` visual collection makes the body reuse `shapes` for both purposes.
     """
-    specification = BodySpecification.box("box", Scale(1, 1, 1))
+    specification = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     assert specification.visual_shapes is None
 
     body = specification.to_domain_object()
@@ -514,7 +516,7 @@ def test_empty_visual_shapes_leave_the_body_without_visual_geometry():
     """
     An empty visual collection means no visual geometry, unlike an unset one.
     """
-    specification = BodySpecification.box("box", Scale(1, 1, 1))
+    specification = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     specification.visual_shapes = ShapeCollection(shapes=[])
 
     body = specification.to_domain_object()
@@ -556,8 +558,8 @@ def test_has_root_region_default_specification_without_scale_is_geometryless(
 def test_constructor_child_specification_param(empty_world):
     parent = BodySpecification.box(
         "parent",
-        Scale(1, 1, 1),
-        child_specifications=[BodySpecification.box("child", Scale(1, 1, 1))],
+        Scale(x=1, y=1, z=1),
+        child_specifications=[BodySpecification.box("child", Scale(x=1, y=1, z=1))],
     )
     parent_body = parent.spawn(empty_world)
     child = empty_world.get_body_by_name("child")
@@ -567,8 +569,8 @@ def test_constructor_child_specification_param(empty_world):
 def test_body_specification_distinct_visual_and_inertial(empty_world):
     spec = BodySpecification(
         name="box",
-        shapes=Box(scale=Scale(1, 1, 1)).as_shape_collection(),
-        visual_shapes=ShapeCollection([Box(scale=Scale(2, 2, 2))]),
+        shapes=Box(scale=Scale(x=1, y=1, z=1)).as_shape_collection(),
+        visual_shapes=ShapeCollection(shapes=[Box(scale=Scale(x=2, y=2, z=2))]),
         inertial=Inertial(mass=2.0),
     )
     body = spec.spawn(empty_world)
@@ -578,12 +580,12 @@ def test_body_specification_distinct_visual_and_inertial(empty_world):
 
 
 def test_to_domain_object_is_reusable():
-    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     first = spec.to_domain_object("first")
     second = spec.to_domain_object("second")
     assert first is not second
-    assert first.name == PrefixedName("first")
-    assert second.name == PrefixedName("second")
+    assert first.name == PrefixedName(name="first")
+    assert second.name == PrefixedName(name="second")
     # Shapes are copied, not shared with the spec or between materializations.
     assert first.collision is not second.collision
     assert first.collision is not spec.shapes
@@ -595,7 +597,7 @@ def test_spawn_does_not_alias_or_mutate_stored_pose(empty_world):
     pose, and each materialized connection must own a distinct pose bound to its own
     child.
     """
-    spec = BodySpecification.box("box", Scale(1, 1, 1))
+    spec = BodySpecification.box("box", Scale(x=1, y=1, z=1))
     first = spec.spawn(empty_world, name="first")
 
     assert spec.parent_T_self.reference_frame is None
@@ -612,17 +614,17 @@ def test_spawn_does_not_alias_or_mutate_stored_pose(empty_world):
 
 def test_to_domain_object_generic_resolution():
     assert isinstance(
-        BodySpecification.box("b", Scale(1, 1, 1)).to_domain_object(), Body
+        BodySpecification.box("b", Scale(x=1, y=1, z=1)).to_domain_object(), Body
     )
     assert isinstance(
-        RegionSpecification.box("r", Scale(1, 1, 1)).to_domain_object(), Region
+        RegionSpecification.box("r", Scale(x=1, y=1, z=1)).to_domain_object(), Region
     )
 
 
 def test_body_and_connection_6dof(empty_world):
     spec = BodySpecification.box(
         "free",
-        Scale(1, 1, 1),
+        Scale(x=1, y=1, z=1),
         connection_specification=Connection6DoFSpecification(),
     )
     body = spec.spawn(empty_world)
@@ -630,8 +632,10 @@ def test_body_and_connection_6dof(empty_world):
 
 
 def test_spawn_positional_name(empty_world):
-    body = BodySpecification.box("b", Scale(1, 1, 1)).spawn(empty_world, "renamed")
-    assert body.name == PrefixedName("renamed")
+    body = BodySpecification.box("b", Scale(x=1, y=1, z=1)).spawn(
+        empty_world, "renamed"
+    )
+    assert body.name == PrefixedName(name="renamed")
 
 
 # %% robot specifications
@@ -705,7 +709,7 @@ def test_a_spawned_robot_drives_at_the_velocity_limits_its_mobile_base_declares(
     assert drive.yaw.limits.lower.velocity == -limits.rotation
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotDescribedInCode(MinimalRobot):
     """
     A robot whose description is not a URDF, read by a parser of its own.
@@ -716,7 +720,7 @@ class RobotDescribedInCode(MinimalRobot):
         world = World()
         with world.modify_world():
             world.add_kinematic_structure_entity(
-                Body(name=PrefixedName("chassis", "described_in_code"))
+                Body(name=PrefixedName(name="chassis", prefix="described_in_code"))
             )
         return cls.from_world(world)
 
@@ -897,7 +901,7 @@ def test_a_robot_without_a_description_and_without_a_parser_cannot_be_spawned(
 # %% robot specifications: a robot without a mobile base
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotBelowTheRootOfItsDescription(MinimalRobot):
     """
     A robot whose description places it below a frame that is not part of the robot.
@@ -958,7 +962,7 @@ def test_a_start_pose_is_rejected_for_a_robot_without_a_mobile_base():
 # %% robot specifications: a robot whose description leaves parts without collision
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotWithVisualOnlyCovers(MinimalRobot):
     """
     A robot whose description draws a cover without describing it for contact.
@@ -1071,7 +1075,7 @@ def test_an_odometry_body_is_named_as_its_mobile_base_declares_in_the_namespace_
         pytest.skip(f"PR2 URDF not available: {error}")
 
     assert robot.mobile_base.drive.parent.name == PrefixedName(
-        PR2MobileBase.odometry_body_name, robot.root.name.prefix
+        name=PR2MobileBase.odometry_body_name, prefix=robot.root.name.prefix
     )
 
 
@@ -1114,7 +1118,7 @@ def test_world_specification_annotation_starting_object():
         objects=[
             Milk.get_annotation_specification(
                 "milk",
-                BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
+                BodySpecification.box("milk", Scale(x=0.1, y=0.1, z=0.2)),
             )
         ],
     ).create_world()
@@ -1218,7 +1222,7 @@ def test_connection_specification_is_not_a_spawn_specification():
 
 
 def test_connection_spec_connect_fixed(empty_world):
-    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     connection = FixedConnectionSpecification().connect(
         empty_world, parent=empty_world.root, child=child
     )
@@ -1229,7 +1233,7 @@ def test_connection_spec_connect_fixed(empty_world):
 
 
 def test_connection_spec_connect_defaults_parent_to_root(empty_world):
-    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     connection = Connection6DoFSpecification().connect(empty_world, child=child)
     assert isinstance(connection, Connection6DoF)
     assert connection.parent is empty_world.root
@@ -1237,7 +1241,7 @@ def test_connection_spec_connect_defaults_parent_to_root(empty_world):
 
 def test_connection_spec_connect_active_forwards_kwargs(empty_world):
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.5)
-    child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("slider", Scale(x=1, y=1, z=1)).to_domain_object()
     connection = ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z()),
         dof_limits=limits,
@@ -1266,13 +1270,13 @@ def test_connection_spec_connect_active_forwards_kwargs(empty_world):
 def test_connection_spec_connect_applies_dynamics(
     empty_world, specification: ActiveConnection1DOFSpecification
 ):
-    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     connection = specification.connect(empty_world, child=child)
     assert connection.dynamics == specification.dynamics
 
 
 def test_screw_connection_spec_connect_forwards_pitch(empty_world):
-    child = BodySpecification.box("cap", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("cap", Scale(x=1, y=1, z=1)).to_domain_object()
     connection = ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_helical_screw_axis(
             axis=Vector3.Z(), pitch=0.005
@@ -1285,7 +1289,7 @@ def test_screw_connection_spec_connect_forwards_pitch(empty_world):
 
 
 def test_connection_spec_connect_applies_pose(empty_world):
-    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     FixedConnectionSpecification().connect(
         empty_world,
         parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
@@ -1301,7 +1305,7 @@ def test_connection_spec_connect_without_pose_places_the_child_at_the_parent(
     """
     An omitted ``parent_T_connection`` places the connection at the parent's origin.
     """
-    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     FixedConnectionSpecification().connect(
         empty_world, parent_T_connection=None, child=child
     )
@@ -1319,13 +1323,15 @@ def test_connection_spec_connect_requires_child(empty_world):
 def test_connection_spec_connect_without_name_matches_direct_creation(empty_world):
     # A nameless spec must auto-generate the same connection name as creating the
     # connection directly between an identically-named parent and child.
-    spec_child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    spec_child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     spec_connection = FixedConnectionSpecification().connect(
         empty_world, parent=empty_world.root, child=spec_child
     )
 
     direct_world = _fresh_world()
-    direct_child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    direct_child = BodySpecification.box(
+        "child", Scale(x=1, y=1, z=1)
+    ).to_domain_object()
     with direct_world.modify_world():
         direct_connection = FixedConnection.create_with_dofs(
             world=direct_world, parent=direct_world.root, child=direct_child
@@ -1350,7 +1356,7 @@ def _hinge_T_door() -> HomogeneousTransformationMatrix:
 def _door_on_hinge_specification() -> BodySpecification:
     return BodySpecification.box(
         "door",
-        Scale(0.03, 1, 2),
+        Scale(x=0.03, y=1, z=2),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             connection_T_child=_hinge_T_door(),
@@ -1359,7 +1365,7 @@ def _door_on_hinge_specification() -> BodySpecification:
 
 
 def test_connect_places_the_child_at_its_offset_from_the_connection(empty_world):
-    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    child = BodySpecification.box("child", Scale(x=1, y=1, z=1)).to_domain_object()
     parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
     connection = FixedConnectionSpecification(
         connection_T_child=_hinge_T_door()
@@ -1409,8 +1415,12 @@ def test_child_swings_about_its_connection_frame_not_its_own_origin(empty_world)
 
 def test_connection_T_child_is_not_bound_to_the_children_it_connected(empty_world):
     specification = FixedConnectionSpecification(connection_T_child=_hinge_T_door())
-    first_child = BodySpecification.box("first", Scale(1, 1, 1)).to_domain_object()
-    second_child = BodySpecification.box("second", Scale(1, 1, 1)).to_domain_object()
+    first_child = BodySpecification.box(
+        "first", Scale(x=1, y=1, z=1)
+    ).to_domain_object()
+    second_child = BodySpecification.box(
+        "second", Scale(x=1, y=1, z=1)
+    ).to_domain_object()
 
     first = specification.connect(empty_world, child=first_child)
     second = specification.connect(empty_world, child=second_child)
@@ -1421,9 +1431,9 @@ def test_connection_T_child_is_not_bound_to_the_children_it_connected(empty_worl
 
 
 def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
-    door_specification = BodySpecification.box("door", Scale(0.03, 1, 2))
+    door_specification = BodySpecification.box("door", Scale(x=0.03, y=1, z=2))
     door_specification.child_specifications.append(
-        BodySpecification.box("handle", Scale(0.05, 0.1, 0.02))
+        BodySpecification.box("handle", Scale(x=0.05, y=0.1, z=0.02))
     )
     door = door_specification.spawn(
         empty_world,
@@ -1449,7 +1459,7 @@ def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
 
 
 def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
-    door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
+    door = BodySpecification.box("door", Scale(x=0.03, y=1, z=2)).spawn(empty_world)
     connection = ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         connection_T_child=_hinge_T_door(),
@@ -1492,7 +1502,7 @@ def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
 def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_zero(
     empty_world, joint_specification
 ):
-    door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(
+    door = BodySpecification.box("door", Scale(x=0.03, y=1, z=2)).spawn(
         empty_world,
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
     )
@@ -1509,7 +1519,7 @@ def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_z
 
 
 def test_reconnect_keeps_the_name_of_the_specification(empty_world):
-    door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
+    door = BodySpecification.box("door", Scale(x=0.03, y=1, z=2)).spawn(empty_world)
     specification = ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         name="front_door_hinge",
@@ -1526,7 +1536,7 @@ def test_reconnect_releases_the_degrees_of_freedom_of_the_replaced_connection(
 ):
     drawer = BodySpecification.box(
         "drawer",
-        Scale(0.5, 0.5, 0.2),
+        Scale(x=0.5, y=0.5, z=0.2),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
@@ -1547,7 +1557,7 @@ def test_connection_T_child_survives_orm_round_trip(empty_world):
     specification = Door.get_annotation_specification(
         "door",
         Door.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.03, 1, 2)
+            scale=Scale(x=0.03, y=1, z=2)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -1581,7 +1591,7 @@ def _assert_same_geometry(
 
 
 def test_default_spec_matches_base_body(empty_world):
-    scale = Scale(0.2, 0.3, 0.4)
+    scale = Scale(x=0.2, y=0.3, z=0.4)
     with empty_world.modify_world():
         factory = Milk.create_with_new_body_in_world(
             name="milk", world=empty_world, scale=scale
@@ -1594,7 +1604,7 @@ def test_default_spec_matches_base_body(empty_world):
 
 
 def test_default_spec_matches_case_body(empty_world):
-    scale = Scale(0.3, 0.4, 0.5)
+    scale = Scale(x=0.3, y=0.4, z=0.5)
     with empty_world.modify_world():
         factory = Drawer.create_with_new_body_in_world(
             name="drawer", world=empty_world, scale=scale
@@ -1607,7 +1617,7 @@ def test_default_spec_matches_case_body(empty_world):
 
 
 def test_default_spec_matches_case_body_with_wall_thickness(empty_world):
-    scale = Scale(0.4, 0.5, 0.6)
+    scale = Scale(x=0.4, y=0.5, z=0.6)
     with empty_world.modify_world():
         factory = Drawer.get_annotation_specification(
             "drawer",
@@ -1622,7 +1632,7 @@ def test_default_spec_matches_case_body_with_wall_thickness(empty_world):
 
 
 def test_default_spec_matches_handle(empty_world):
-    scale = Scale(0.1, 0.05, 0.05)
+    scale = Scale(x=0.1, y=0.05, z=0.05)
     with empty_world.modify_world():
         factory = Handle.get_annotation_specification(
             "handle",
@@ -1655,7 +1665,7 @@ def test_default_spec_handle_rejects_width_above_length():
 
 
 def test_default_spec_matches_door(empty_world):
-    scale = Scale(0.03, 1, 2)
+    scale = Scale(x=0.03, y=1, z=2)
     with empty_world.modify_world():
         factory = Door.create_with_new_body_in_world(
             name="door", world=empty_world, scale=scale
@@ -1669,12 +1679,12 @@ def test_default_spec_matches_door(empty_world):
 def test_default_spec_door_validates_plane():
     with pytest.raises(InvalidPlaneDimensions):
         Door.get_default_root_kinematic_structure_entity_specification(
-            "door", Scale(2, 1, 1)
+            "door", Scale(x=2, y=1, z=1)
         )
 
 
 def test_default_spec_matches_floor(empty_world):
-    scale = Scale(2, 2, 0.1)
+    scale = Scale(x=2, y=2, z=0.1)
     with empty_world.modify_world():
         factory = Floor.create_with_new_body_in_world(
             name="floor", world=empty_world, scale=scale
@@ -1686,7 +1696,7 @@ def test_default_spec_matches_floor(empty_world):
 
 
 def test_default_spec_matches_wall(empty_world):
-    scale = Scale(0.1, 4, 2)
+    scale = Scale(x=0.1, y=4, z=2)
     with empty_world.modify_world():
         factory = Wall.create_with_new_body_in_world(
             name="wall", world=empty_world, scale=scale
@@ -1698,7 +1708,7 @@ def test_default_spec_matches_wall(empty_world):
 
 
 def test_default_spec_matches_aperture_region(empty_world):
-    scale = Scale(0.1, 1, 2)
+    scale = Scale(x=0.1, y=1, z=2)
     with empty_world.modify_world():
         factory = Aperture.create_with_new_region_in_world(
             name="aperture", world=empty_world, scale=scale
@@ -1714,7 +1724,7 @@ def test_default_spec_robot_part_raises():
     # so it raises just like its create_with_new_body_in_world override.
     with pytest.raises(UselessConceptError):
         AbstractRobotPart.get_default_root_kinematic_structure_entity_specification(
-            "part", Scale(1, 1, 1)
+            "part", Scale(x=1, y=1, z=1)
         )
 
 
@@ -1725,7 +1735,7 @@ def test_default_spec_robot_part_raises():
 
 
 def test_annotation_spec_base_body(empty_world):
-    scale = Scale(0.2, 0.3, 0.4)
+    scale = Scale(x=0.2, y=0.3, z=0.4)
     spec = Milk.get_annotation_specification(
         "milk",
         Milk.get_default_root_kinematic_structure_entity_specification(scale=scale),
@@ -1751,7 +1761,7 @@ def test_annotation_spec_active_door(empty_world):
     spec = Door.get_annotation_specification(
         "door",
         Door.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.03, 1, 2)
+            scale=Scale(x=0.03, y=1, z=2)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -1763,7 +1773,7 @@ def test_annotation_spec_active_door(empty_world):
 
 
 def test_annotation_spec_aperture_region(empty_world):
-    scale = Scale(0.1, 1, 2)
+    scale = Scale(x=0.1, y=1, z=2)
     spec = Aperture.get_annotation_specification(
         "aperture",
         Aperture.get_default_root_kinematic_structure_entity_specification(scale=scale),
@@ -1785,7 +1795,7 @@ def test_annotation_spec_robot_part_raises():
         AbstractRobotPart.get_annotation_specification(
             "part",
             AbstractRobotPart.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(1, 1, 1)
+                scale=Scale(x=1, y=1, z=1)
             ),
         )
 
@@ -1813,11 +1823,11 @@ def test_nested_handle_attaches_as_child(empty_world):
     handle_part = Handle.get_annotation_specification(
         "handle",
         Handle.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.05, 0.05)
+            scale=Scale(x=0.1, y=0.05, z=0.05)
         ),
     )
     drawer = _spawn_with_parts(
-        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
+        empty_world, Drawer, Scale(x=0.4, y=0.5, z=0.6), {"handle": handle_part}
     )
     assert isinstance(drawer.handle, Handle)
     assert drawer.handle.root.parent_connection.parent is drawer.root
@@ -1833,7 +1843,7 @@ def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
     door_part = Door.get_annotation_specification(
         "door",
         Door.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.03, 1, 2)
+            scale=Scale(x=0.03, y=1, z=2)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -1842,7 +1852,7 @@ def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
     )
 
     cabinet = _spawn_with_parts(
-        empty_world, Cabinet, Scale(0.5, 1, 2), {"doors": door_part}
+        empty_world, Cabinet, Scale(x=0.5, y=1, z=2), {"doors": door_part}
     )
 
     [door] = cabinet.doors
@@ -1862,7 +1872,7 @@ def test_drawer_joint_survives_mounting_the_drawer_as_a_part(empty_world):
     drawer_part = Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.4, 0.5, 0.6)
+            scale=Scale(x=0.4, y=0.5, z=0.6)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -1872,7 +1882,7 @@ def test_drawer_joint_survives_mounting_the_drawer_as_a_part(empty_world):
     )
 
     cabinet = _spawn_with_parts(
-        empty_world, Cabinet, Scale(0.5, 1, 2), {"drawers": drawer_part}
+        empty_world, Cabinet, Scale(x=0.5, y=1, z=2), {"drawers": drawer_part}
     )
 
     [drawer] = cabinet.drawers
@@ -1884,7 +1894,7 @@ def test_nested_aperture_cuts_geometry(empty_world):
     plain_wall = Wall.get_annotation_specification(
         "plain_wall",
         Wall.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 2, 2)
+            scale=Scale(x=0.1, y=2, z=2)
         ),
     ).spawn(empty_world)
     plain_shape_count = len(plain_wall.root.collision.shapes)
@@ -1892,11 +1902,11 @@ def test_nested_aperture_cuts_geometry(empty_world):
     aperture_part = Aperture.get_annotation_specification(
         "hole",
         Aperture.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.5, 0.5)
+            scale=Scale(x=0.1, y=0.5, z=0.5)
         ),
     )
     wall = _spawn_with_parts(
-        empty_world, Wall, Scale(0.1, 2, 2), {"apertures": aperture_part}
+        empty_world, Wall, Scale(x=0.1, y=2, z=2), {"apertures": aperture_part}
     )
     assert len(wall.apertures) == 1
     assert isinstance(wall.apertures[0], Aperture)
@@ -1908,7 +1918,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
     aperture_a = Aperture.get_annotation_specification(
         "hole_a",
         Aperture.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.5, 0.5)
+            scale=Scale(x=0.1, y=0.5, z=0.5)
         ),
     )
     aperture_a.root_specification.parent_T_self = (
@@ -1917,7 +1927,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
     aperture_b = Aperture.get_annotation_specification(
         "hole_b",
         Aperture.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.5, 0.5)
+            scale=Scale(x=0.1, y=0.5, z=0.5)
         ),
     )
     aperture_b.root_specification.parent_T_self = (
@@ -1926,7 +1936,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
     wall = Wall.get_annotation_specification(
         "wall",
         Wall.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 3, 3)
+            scale=Scale(x=0.1, y=3, z=3)
         ),
         part_specifications={"apertures": [aperture_a, aperture_b]},
     ).spawn(empty_world)
@@ -1940,20 +1950,20 @@ def test_list_value_on_singular_part_field_raises():
         Drawer.get_annotation_specification(
             "drawer",
             Drawer.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.4, 0.5, 0.6)
+                scale=Scale(x=0.4, y=0.5, z=0.6)
             ),
             part_specifications={
                 "handle": [
                     Handle.get_annotation_specification(
                         "h1",
                         Handle.get_default_root_kinematic_structure_entity_specification(
-                            scale=Scale(0.1, 0.05, 0.05)
+                            scale=Scale(x=0.1, y=0.05, z=0.05)
                         ),
                     ),
                     Handle.get_annotation_specification(
                         "h2",
                         Handle.get_default_root_kinematic_structure_entity_specification(
-                            scale=Scale(0.1, 0.05, 0.05)
+                            scale=Scale(x=0.1, y=0.05, z=0.05)
                         ),
                     ),
                 ]
@@ -1965,14 +1975,14 @@ def test_nested_part_placement_is_relative_to_whole(empty_world):
     handle_part = Handle.get_annotation_specification(
         "handle",
         Handle.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.05, 0.05)
+            scale=Scale(x=0.1, y=0.05, z=0.05)
         ),
     )
     handle_part.root_specification.parent_T_self = (
         HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
     )
     drawer = _spawn_with_parts(
-        empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
+        empty_world, Drawer, Scale(x=0.4, y=0.5, z=0.6), {"handle": handle_part}
     )
     drawer_T_handle = empty_world.compute_forward_kinematics(
         drawer.root, drawer.handle.root
@@ -1987,7 +1997,7 @@ def test_annotation_connection_limits_threaded(empty_world):
     spec = Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.4, 0.5, 0.6)
+            scale=Scale(x=0.4, y=0.5, z=0.6)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -2005,11 +2015,13 @@ def test_annotation_connection_limits_threaded(empty_world):
 def test_inert_annotation_kwargs_reach_constructor(empty_world):
     # supporting_surface is a plain (non-part-whole) constructor field, so it is allowed in
     # annotation_kwargs and reaches the constructor unchanged.
-    surface = RegionSpecification.box("surface", Scale(1, 1, 0.01)).spawn(empty_world)
+    surface = RegionSpecification.box("surface", Scale(x=1, y=1, z=0.01)).spawn(
+        empty_world
+    )
     table = Table.get_annotation_specification(
         "table",
         Table.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(1, 1, 0.5)
+            scale=Scale(x=1, y=1, z=0.5)
         ),
         annotation_kwargs={"supporting_surface": surface},
     ).spawn(empty_world)
@@ -2023,13 +2035,13 @@ def test_part_whole_field_in_annotation_kwargs_raises():
         Drawer.get_annotation_specification(
             "drawer",
             Drawer.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.4, 0.5, 0.6)
+                scale=Scale(x=0.4, y=0.5, z=0.6)
             ),
             annotation_kwargs={
                 "handle": Handle.get_annotation_specification(
                     "handle",
                     Handle.get_default_root_kinematic_structure_entity_specification(
-                        scale=Scale(0.1, 0.05, 0.05)
+                        scale=Scale(x=0.1, y=0.05, z=0.05)
                     ),
                 )
             },
@@ -2046,11 +2058,11 @@ def test_non_part_whole_field_in_part_specifications_raises():
         Table.get_annotation_specification(
             "table",
             Table.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(1, 1, 0.5)
+                scale=Scale(x=1, y=1, z=0.5)
             ),
             part_specifications={
                 "supporting_surface": RegionSpecification.box(
-                    "surface", Scale(1, 1, 0.01)
+                    "surface", Scale(x=1, y=1, z=0.01)
                 )
             },
         )
@@ -2066,14 +2078,14 @@ def test_storage_objects_in_part_specifications_raises():
         Table.get_annotation_specification(
             "table",
             Table.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(1, 1, 0.5)
+                scale=Scale(x=1, y=1, z=0.5)
             ),
             part_specifications={
                 "objects": [
                     Milk.get_annotation_specification(
                         "milk",
                         Milk.get_default_root_kinematic_structure_entity_specification(
-                            scale=Scale(0.1, 0.1, 0.2)
+                            scale=Scale(x=0.1, y=0.1, z=0.2)
                         ),
                     )
                 ]
@@ -2085,7 +2097,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
     Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.4, 0.5, 0.6)
+            scale=Scale(x=0.4, y=0.5, z=0.6)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -2095,7 +2107,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
             "handle": Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.05, 0.05)
+                    scale=Scale(x=0.1, y=0.05, z=0.05)
                 ),
             ),
         },
@@ -2103,13 +2115,13 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
     Wall.get_annotation_specification(
         "wall",
         Wall.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 2, 2)
+            scale=Scale(x=0.1, y=2, z=2)
         ),
         part_specifications={
             "apertures": Aperture.get_annotation_specification(
                 "hole",
                 Aperture.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.5, 0.5)
+                    scale=Scale(x=0.1, y=0.5, z=0.5)
                 ),
             )
         },
@@ -2117,7 +2129,7 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
     Milk.get_annotation_specification(
         "milk",
         Milk.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.1, 0.2)
+            scale=Scale(x=0.1, y=0.1, z=0.2)
         ),
     ).spawn(empty_world)
 
@@ -2138,8 +2150,8 @@ def test_nested_composite_matches_manual_construction(empty_world):
     A drawer with its handle built from nested specifications matches one built part by
     part.
     """
-    scale = Scale(0.4, 0.5, 0.6)
-    handle_scale = Scale(0.1, 0.05, 0.05)
+    scale = Scale(x=0.4, y=0.5, z=0.6)
+    handle_scale = Scale(x=0.1, y=0.05, z=0.05)
 
     drawer = Drawer.get_annotation_specification(
         "drawer",
@@ -2242,7 +2254,7 @@ def test_default_geometry_builder_takes_a_connection(annotation_type, builder_na
     # Without this, custom geometry would force the connection to be assigned afterwards.
     specification = getattr(annotation_type, builder_name)(
         "entity",
-        Scale(0.1, 0.1, 0.1),
+        Scale(x=0.1, y=0.1, z=0.1),
         connection_specification=Connection6DoFSpecification(),
     )
     assert isinstance(
@@ -2254,7 +2266,7 @@ def test_custom_geometry_and_connection_build_in_one_expression(empty_world):
     annotation = Handle.get_annotation_specification(
         "handle",
         Handle.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.05, 0.05),
+            scale=Scale(x=0.1, y=0.05, z=0.05),
             connection_specification=Connection6DoFSpecification(),
             thickness=0.01,
         ),
@@ -2276,7 +2288,7 @@ def test_entry_way_matches_custom_door_geometry(empty_world):
         door = Door.get_annotation_specification(
             "door",
             Door.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(0.05, 2.0, 2.5)
+                scale=Scale(x=0.05, y=2.0, z=2.5)
             ),
         ).spawn(empty_world)
     door_scale = door.root.collision.scale
@@ -2287,7 +2299,7 @@ def test_entry_way_matches_custom_door_geometry(empty_world):
 
 
 def test_door_keeps_geometry_when_entry_way_is_mounted(empty_world):
-    scale = Scale(0.03, 1, 2)
+    scale = Scale(x=0.03, y=1, z=2)
     with empty_world.modify_world():
         door = Door.create_with_new_body_in_world(
             name="door", world=empty_world, scale=scale
@@ -2305,10 +2317,10 @@ def test_entry_way_still_cuts_a_wall(empty_world):
     """
     with empty_world.modify_world():
         wall = Wall.create_with_new_body_in_world(
-            name="wall", world=empty_world, scale=Scale(0.1, 4, 3)
+            name="wall", world=empty_world, scale=Scale(x=0.1, y=4, z=3)
         )
         door = Door.create_with_new_body_in_world(
-            name="door", world=empty_world, scale=Scale(0.03, 1, 2)
+            name="door", world=empty_world, scale=Scale(x=0.03, y=1, z=2)
         )
     shape_count_before = len(wall.root.collision.shapes)
 
@@ -2332,7 +2344,7 @@ def test_door_spawns_its_entry_way_as_a_part(empty_world):
 def test_entry_way_is_coextensive_with_the_door_leaf(empty_world):
     with empty_world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name="door", world=empty_world, scale=Scale(0.03, 1, 2)
+            name="door", world=empty_world, scale=Scale(x=0.03, y=1, z=2)
         )
     np.testing.assert_allclose(
         door.entry_way.root.area.combined_mesh.bounds,
@@ -2351,7 +2363,7 @@ def test_entry_way_geometry_is_translucent_white(empty_world):
 def test_entry_way_is_named_after_the_door(empty_world):
     with empty_world.modify_world():
         door = Door.create_with_new_body_in_world(name="door", world=empty_world)
-    assert door.entry_way.name == PrefixedName("door_entry_way")
+    assert door.entry_way.name == PrefixedName(name="door_entry_way")
 
 
 def test_door_default_specification_declares_the_entry_way_part():
@@ -2371,7 +2383,7 @@ def test_caller_supplied_entry_way_specification_replaces_the_default(empty_worl
     custom = EntryWay.get_annotation_specification(
         "custom",
         EntryWay.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.03, 0.5, 1)
+            scale=Scale(x=0.03, y=0.5, z=1)
         ),
     )
     door = Door.get_annotation_specification(
@@ -2379,7 +2391,7 @@ def test_caller_supplied_entry_way_specification_replaces_the_default(empty_worl
         Door.get_default_root_kinematic_structure_entity_specification(),
         part_specifications={"entry_way": custom},
     ).spawn(empty_world)
-    assert door.entry_way.name == PrefixedName("custom")
+    assert door.entry_way.name == PrefixedName(name="custom")
     assert len(empty_world.get_semantic_annotations_by_type(EntryWay)) == 1
 
 
@@ -2387,7 +2399,7 @@ def test_caller_supplied_parts_survive_entry_way_injection(empty_world):
     handle_part = Handle.get_annotation_specification(
         "handle",
         Handle.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.1, 0.05, 0.05)
+            scale=Scale(x=0.1, y=0.05, z=0.05)
         ),
     )
     door = Door.get_annotation_specification(
@@ -2450,13 +2462,13 @@ def _drawer_specification_with_handle() -> SemanticAnnotationWithRootSpecificati
     return Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(
-            scale=Scale(0.2, 0.3, 0.2)
+            scale=Scale(x=0.2, y=0.3, z=0.2)
         ),
         part_specifications={
             "handle": Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.05, 0.05)
+                    scale=Scale(x=0.1, y=0.05, z=0.05)
                 ),
             )
         },

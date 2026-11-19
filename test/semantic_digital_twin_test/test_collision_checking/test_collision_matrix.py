@@ -71,10 +71,10 @@ class TestCollisionRules:
     def test_get_distances(self, pr2_world_copy):
         with pr2_world_copy.modify_world():
             env = Body(
-                name=PrefixedName("env"),
-                collision=ShapeCollection([Sphere(radius=0.5)]),
+                name=PrefixedName(name="env"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.5)]),
             )
-            root_C_env = FixedConnection(pr2_world_copy.root, env)
+            root_C_env = FixedConnection(parent=pr2_world_copy.root, child=env)
             pr2_world_copy.add_connection(root_C_env)
 
         base_link = pr2_world_copy.get_body_by_name("base_link")
@@ -300,7 +300,7 @@ class TestCollisionRules:
 
         with pr2_world_copy.modify_world():
             grasped_body = Body(
-                name=PrefixedName("grasped"),
+                name=PrefixedName(name="grasped"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             pr2_world_copy.add_connection(
@@ -325,7 +325,7 @@ class TestCollisionRules:
         end_effector = pr2.right_arm.end_effector
         with pr2_world_copy.modify_world():
             held_body = Body(
-                name=PrefixedName("held"),
+                name=PrefixedName(name="held"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             pr2_world_copy.add_connection(
@@ -384,7 +384,7 @@ class TestCollisionRules:
         rule.update(pr2_apartment_world)
         with pr2_apartment_world.modify_world():
             body = Body(
-                name=PrefixedName("muh"),
+                name=PrefixedName(name="muh"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             connection = FixedConnection(
@@ -449,7 +449,7 @@ class TestCollisionRules:
         base_link = pr2_world_state_reset.get_body_by_name("base_link")
         head_pan_link = pr2_world_state_reset.get_body_by_name("head_pan_link")
         collision_checks = {
-            CollisionCheck(body_a, body_b)
+            CollisionCheck(body_a=body_a, body_b=body_b)
             for body_a, body_b in combinations(
                 pr2_world_state_reset.bodies_with_collision, 2
             )
@@ -486,7 +486,7 @@ class TestCollisionRules:
     def test_AllowAlwaysInCollision(self, pr2_world_state_reset):
         robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
         collision_checks = {
-            CollisionCheck(body_a, body_b)
+            CollisionCheck(body_a=body_a, body_b=body_b)
             for body_a, body_b in combinations(
                 pr2_world_state_reset.bodies_with_collision, 2
             )
@@ -498,7 +498,7 @@ class TestCollisionRules:
     def test_AllowNeverInCollision(self, pr2_world_state_reset):
         robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
         collision_checks = {
-            CollisionCheck(body_a, body_b)
+            CollisionCheck(body_a=body_a, body_b=body_b)
             for body_a, body_b in combinations(
                 pr2_world_state_reset.bodies_with_collision, 2
             )
@@ -544,7 +544,7 @@ class TestCollisionRules:
         # attach an object to the robot, this object should not be checked with gripper tool frame
         with pr2_world_copy.modify_world():
             body = Body(
-                name=PrefixedName("muh"),
+                name=PrefixedName(name="muh"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             connection = FixedConnection(
@@ -589,7 +589,7 @@ class TestCollisionRules:
 
 
 class TestCollisionGroups:
-    @dataclass
+    @dataclass(kw_only=True)
     class MockCollisionGroupConsumer(CollisionGroupConsumer):
         def on_compute_collisions(self, collision_results: CollisionCheckingResult): ...
         def on_collision_matrix_update(self): ...
@@ -661,17 +661,17 @@ class TestCollisionGroups:
         world = World()
         with world.modify_world():
             robot_base = Body(
-                name=PrefixedName("robot_base"),
-                collision=ShapeCollection([Sphere(radius=0.3)]),
+                name=PrefixedName(name="robot_base"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.3)]),
             )
             world.add_body(robot_base)
             MinimalRobot.from_world(world)  # robot.root = robot_base
 
         with world.modify_world():
-            map_body = Body(name=PrefixedName("map"))
+            map_body = Body(name=PrefixedName(name="map"))
             obstacle = Body(
-                name=PrefixedName("obstacle"),
-                collision=ShapeCollection([Sphere(radius=0.1)]),
+                name=PrefixedName(name="obstacle"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             )
             world.add_connection(FixedConnection(parent=map_body, child=robot_base))
             world.add_connection(
@@ -679,7 +679,7 @@ class TestCollisionGroups:
                     world=world,
                     parent=map_body,
                     child=obstacle,
-                    name=PrefixedName("obstacle_conn"),
+                    name=PrefixedName(name="obstacle_conn"),
                 )
             )
 
@@ -799,7 +799,7 @@ class TestCollisionGroups:
             MinimalRobot.from_world(world)
 
         with world.modify_world():
-            map_body = Body(name=PrefixedName("map"))
+            map_body = Body(name=PrefixedName(name="map"))
             obstacle = create_body_with_collision("obstacle")
             world.add_connection(FixedConnection(parent=map_body, child=robot_base))
             world.add_connection(
@@ -807,13 +807,15 @@ class TestCollisionGroups:
                     world=world,
                     parent=map_body,
                     child=obstacle,
-                    name=PrefixedName("obstacle_conn"),
+                    name=PrefixedName(name="obstacle_conn"),
                 )
             )
 
         collision_manager = world.collision_manager
         collision_manager.add_collision_consumer(
-            external_collisions := ExternalCollisionVariableManager(FloatVariableData())
+            external_collisions := ExternalCollisionVariableManager(
+                float_variable_data=FloatVariableData()
+            )
         )
         external_collisions.register_group_of_body(robot_base)
 
@@ -828,7 +830,7 @@ class TestCollisionGroups:
 # %% constructing collision checks
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GeometryInspectionCounter:
     """
     Counts how often the collision geometry of a body was inspected.
@@ -860,7 +862,8 @@ def create_body_with_collision(name: str) -> Body:
     A body whose collision geometry is big enough to be checked.
     """
     return Body(
-        name=PrefixedName(name), collision=ShapeCollection([Sphere(radius=0.1)])
+        name=PrefixedName(name=name),
+        collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
     )
 
 
@@ -897,7 +900,7 @@ class TestCollisionCheckConstruction:
     def test_a_body_without_geometry_is_rejected_when_validated(self):
         with pytest.raises(BodyHasNoGeometryError):
             CollisionCheck.create_and_validate(
-                create_body_with_collision("a"), Body(name=PrefixedName("empty"))
+                create_body_with_collision("a"), Body(name=PrefixedName(name="empty"))
             )
 
     def test_geometry_is_not_inspected_for_bodies_that_were_already_filtered(self):
@@ -906,7 +909,7 @@ class TestCollisionCheckConstruction:
         geometry again would only repeat an answer that is already known.
         """
         body_with_collision = create_body_with_collision("a")
-        body_without_collision = Body(name=PrefixedName("empty"))
+        body_without_collision = Body(name=PrefixedName(name="empty"))
 
         check = CollisionCheck.create_for_bodies_with_collision(
             body_with_collision, body_without_collision
@@ -993,7 +996,7 @@ class TestOverlappingCollisionChecks:
         later_check = CollisionCheck.create_for_bodies_with_collision(
             body_a, body_b, distance=0.5
         )
-        collision_matrix = CollisionMatrix({earlier_check})
+        collision_matrix = CollisionMatrix(collision_checks={earlier_check})
 
         collision_matrix.add_collision_checks({later_check})
 
@@ -1317,7 +1320,7 @@ class TestCollisionRuleEquality:
         """
         robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
         with cylinder_bot_world.modify_world():
-            without_collision = Body(name=PrefixedName("no_collision"))
+            without_collision = Body(name=PrefixedName(name="no_collision"))
             cylinder_bot_world.add_connection(
                 FixedConnection(parent=robot.root, child=without_collision)
             )

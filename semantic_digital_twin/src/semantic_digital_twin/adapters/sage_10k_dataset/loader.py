@@ -28,7 +28,7 @@ except ImportError:
     huggingface_hub = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kDatasetLoader:
     """
     Loader for scenes from the Sage10k dataset.

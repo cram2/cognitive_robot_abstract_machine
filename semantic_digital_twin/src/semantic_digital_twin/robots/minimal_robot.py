@@ -13,7 +13,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MinimalRobot(AbstractRobot):
     """
     Creates the bare minimum semantic annotation.

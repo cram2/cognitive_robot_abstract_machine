@@ -274,7 +274,7 @@ def test_no_frame_id(cylinder_bot_world):
 
 def test_convert_box_shape(cylinder_bot_world):
     box = Box(
-        scale=Scale(1, 2, 3),
+        scale=Scale(x=1, y=2, z=3),
         color=Color(),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 2, 3, reference_frame=cylinder_bot_world.get_body_by_name("map")

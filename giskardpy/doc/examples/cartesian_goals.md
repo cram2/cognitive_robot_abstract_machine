@@ -50,8 +50,8 @@ except Exception as e:
 # Replicate the world structure from world_with_urdf_factory:
 # map -> odom_combined -> base_footprint (robot root)
 with world.modify_world():
-    map_body = Body(name=PrefixedName("map"))
-    localization_body = Body(name=PrefixedName("odom_combined"))
+    map_body = Body(name=PrefixedName(name="map"))
+    localization_body = Body(name=PrefixedName(name="odom_combined"))
 
     map_C_localization = Connection6DoF.create_with_dofs(
         world=world, parent=map_body, child=localization_body

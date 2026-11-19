@@ -29,7 +29,7 @@ from semantic_digital_twin.exceptions import (
 # %% Projection models
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraModel(ABC):
     """
     Describe how a camera maps viewing rays to an image.
@@ -70,7 +70,7 @@ class CameraModel(ABC):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldOfViewCameraModel(CameraModel):
     """
     Describe an ideal camera from its angular extent and image resolution.
@@ -103,7 +103,7 @@ class FieldOfViewCameraModel(CameraModel):
         return self.image_resolution
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PinholeCameraModel(CameraModel):
     """
     Describe a calibrated pinhole projection for one image stream.
@@ -603,7 +603,7 @@ class EquidistantCameraDistortion(CameraDistortion):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraRange:
     """
     Describe the usable distance interval of a camera.

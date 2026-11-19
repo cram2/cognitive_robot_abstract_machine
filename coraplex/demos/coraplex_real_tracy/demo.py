@@ -87,12 +87,12 @@ print("Setup World")
 tracy = world.get_semantic_annotations_by_type(Tracy)[0]
 # Narrower than the 85 mm Tracy's grippers open, so the fingers can close on a box.
 box_edge = 0.06
-box_scale = Scale(box_edge, box_edge, box_edge)
+box_scale = Scale(x=box_edge, y=box_edge, z=box_edge)
 table_top_z = tracy.table.top_z
 # Setup cubes
 with world.modify_world():
     box1 = Body(
-        name=PrefixedName("Box1"),
+        name=PrefixedName(name="Box1"),
         collision=ShapeCollection(shapes=[Box(scale=box_scale)]),
         visual=ShapeCollection(
             shapes=[Box(scale=box_scale, color=Color.from_rgba(red=1, green=0, blue=0))]
@@ -100,7 +100,7 @@ with world.modify_world():
     )
 
     box2 = Body(
-        name=PrefixedName("Box2"),
+        name=PrefixedName(name="Box2"),
         collision=ShapeCollection(shapes=[Box(scale=box_scale)]),
         visual=ShapeCollection(
             shapes=[Box(scale=box_scale, color=Color.from_rgba(red=0, green=1, blue=0))]
@@ -108,7 +108,7 @@ with world.modify_world():
     )
 
     box3 = Body(
-        name=PrefixedName("Box3"),
+        name=PrefixedName(name="Box3"),
         collision=ShapeCollection(shapes=[Box(scale=box_scale)]),
         visual=ShapeCollection(
             shapes=[Box(scale=box_scale, color=Color.from_rgba(red=0, green=0, blue=1))]
@@ -184,8 +184,8 @@ plan = Sequence(
         ParkArmsAction(arms=tracy.all_arms),
         PickUpAction(
             grasp_candidate=GraspCandidate(
-                box2_annotation,
-                Pose.from_xyz_rpy(
+                graspable=box2_annotation,
+                grasp_pose=Pose.from_xyz_rpy(
                     pitch=np.pi / 2, reference_frame=box2_annotation.root
                 ),
             ),
@@ -202,8 +202,8 @@ plan = Sequence(
         ParkArmsAction(arms=tracy.all_arms),
         PickUpAction(
             grasp_candidate=GraspCandidate(
-                box3_annotation,
-                Pose.from_xyz_rpy(
+                graspable=box3_annotation,
+                grasp_pose=Pose.from_xyz_rpy(
                     pitch=np.pi / 2, reference_frame=box3_annotation.root
                 ),
             ),

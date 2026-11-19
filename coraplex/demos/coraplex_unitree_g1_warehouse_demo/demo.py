@@ -63,7 +63,7 @@ ROBOT_START_POSE = Pose.from_xyz_rpy(1.9, 9.1, PELVIS_HEIGHT_ABOVE_FLOOR)
 Where the robot starts, in the aisle south of the two pallet stacks.
 """
 
-PARCEL_SCALE = Scale(0.08, 0.08, 0.14)
+PARCEL_SCALE = Scale(x=0.08, y=0.08, z=0.14)
 """
 The extents of the transported parcel.
 """

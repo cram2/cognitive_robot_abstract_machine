@@ -134,7 +134,7 @@ def urdf_joint_to_limits(
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class URDFParser(WorldModelParser):
     """
     Class to parse URDF files to worlds.
@@ -231,7 +231,7 @@ class URDFParser(WorldModelParser):
 
         prefix = self.parsed.name
         links = [
-            self.parse_link(link, PrefixedName(link.name, prefix))
+            self.parse_link(link, PrefixedName(name=link.name, prefix=prefix))
             for link in self.parsed.links
         ]
         root = [link for link in links if link.name.name == self.parsed.get_root()][0]
@@ -279,7 +279,7 @@ class URDFParser(WorldModelParser):
         :param prefix: The prefix for naming connections and DOFs.
         :return: A connection object representing the parsed joint.
         """
-        connection_name = PrefixedName(joint.name, prefix)
+        connection_name = PrefixedName(name=joint.name, prefix=prefix)
         connection_type = connection_type_map.get(joint.type, Connection)
         translation_offset = getattr(joint.origin, "xyz", [0, 0, 0])
         rotation_offset = getattr(joint.origin, "rpy", [0, 0, 0])
@@ -315,7 +315,7 @@ class URDFParser(WorldModelParser):
                 joint.mimic.multiplier if joint.mimic.multiplier is not None else 1
             )
             offset = joint.mimic.offset if joint.mimic.offset is not None else 0
-            dof_name = PrefixedName(joint.mimic.joint, prefix)
+            dof_name = PrefixedName(name=joint.mimic.joint, prefix=prefix)
 
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
             dof = DegreeOfFreedom(name=dof_name, limits=urdf_joint_to_limits(joint))
@@ -443,7 +443,8 @@ class URDFParser(WorldModelParser):
                 *params, reference_frame=body
             )
             if isinstance(geom.geometry, urdfpy.Box):
-                shape = Box(origin=origin_transform, scale=Scale(*geom.geometry.size))
+                x, y, z = geom.geometry.size
+                shape = Box(origin=origin_transform, scale=Scale(x=x, y=y, z=z))
             elif isinstance(geom.geometry, urdfpy.Sphere):
                 shape = Sphere(origin=origin_transform, radius=geom.geometry.radius)
             elif isinstance(geom.geometry, urdfpy.Cylinder):
@@ -455,10 +456,11 @@ class URDFParser(WorldModelParser):
             elif isinstance(geom.geometry, urdfpy.Mesh):
                 if geom.geometry.filename is None:
                     raise ValueError("Mesh geometry must have a filename.")
+                x, y, z = geom.geometry.scale or (1, 1, 1)
                 shape = Mesh(
                     origin=origin_transform,
                     filename=self.path_resolver.resolve(geom.geometry.filename),
-                    scale=Scale(*(geom.geometry.scale or (1, 1, 1))),
+                    scale=Scale(x=x, y=y, z=z),
                 )
             else:
                 continue
@@ -466,7 +468,7 @@ class URDFParser(WorldModelParser):
             if color is not None:
                 shape.color = color
             res.append(shape)
-        return ShapeCollection(res, reference_frame=body)
+        return ShapeCollection(shapes=res, reference_frame=body)
 
     def color_of(
         self, geometry_element: urdfpy.Visual | urdfpy.Collision, shape: Shape

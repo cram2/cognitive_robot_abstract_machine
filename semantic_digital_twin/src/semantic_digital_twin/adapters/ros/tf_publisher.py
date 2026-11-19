@@ -47,7 +47,7 @@ class TfTopic(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TfFrameNames(UniqueEntityNames):
     """
     Names the tf frame every kinematic structure entity is published under, unique
@@ -70,7 +70,7 @@ class TfFrameNames(UniqueEntityNames):
         return f"{self.prefix}{entity.name}"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
     """
     Publishes the TF tree of the world.
@@ -238,7 +238,7 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
             self._write_pose(p_T_c, pose)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TFPublisher(StateChangeCallback, HasROS2Node):
     """
     On state change, publishes the TF tree of the world.

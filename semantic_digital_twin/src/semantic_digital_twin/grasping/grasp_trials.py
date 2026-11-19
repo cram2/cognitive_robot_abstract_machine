@@ -43,7 +43,7 @@ class GraspPerformer(ABC):
 # %% the trials
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspTrialRecord:
     """
     One tried grasp as it is recorded.
@@ -60,7 +60,7 @@ class GraspTrialRecord:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspTrials:
     """
     Grasps drawn from the statement of where an object's grasped part may be grasped,

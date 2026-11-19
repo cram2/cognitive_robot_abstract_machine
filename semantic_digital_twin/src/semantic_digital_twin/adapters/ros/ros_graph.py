@@ -64,7 +64,7 @@ def wait_for_future_to_complete(future: Future) -> None:
 # %% receiving one message
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _MessageInbox:
     """
     Keeps the first message a subscription receives.
@@ -95,7 +95,7 @@ class _MessageInbox:
 # %% the graph
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RosGraph:
     """
     The ROS 2 graph as seen from one node: its topics, messages, services and

@@ -330,12 +330,12 @@ class MyRobotGripper(
     def setup_joint_states(self) -> List[JointState]:
         joints = self.active_connections
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping=dict(zip(joints, [0.0, 0.0])),
             state_type=GripperState.OPEN,
         )
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping=dict(zip(joints, [0.8, 0.8])),
             state_type=GripperState.CLOSE,
         )
@@ -385,7 +385,7 @@ class MyRobotArm(Arm[MyRobotGripper]):
 
     def setup_joint_states(self) -> List[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -463,12 +463,12 @@ class MyRobotTorso(Torso, HasOneArm[MyRobotArm], HasNeck[MyRobotNeck]):
     def setup_joint_states(self) -> List[JointState]:
         joints = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(joints, [0.0])),
             state_type=TorsoState.LOW,
         )
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(joints, [0.3])),
             state_type=TorsoState.HIGH,
         )

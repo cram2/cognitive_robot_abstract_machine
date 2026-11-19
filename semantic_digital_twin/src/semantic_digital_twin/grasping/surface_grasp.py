@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # %% grasps on an object's surface
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SurfaceGrasp(ObjectRelativeGrasp):
     """
     A grasp placed on the surface of an object around its root body's z-axis.
@@ -88,7 +88,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
             ),
             reference_frame=graspable.root,
         )
-        return GraspCandidate(graspable, root_T_grasp.pose)
+        return GraspCandidate(graspable=graspable, grasp_pose=root_T_grasp.pose)
 
     def reaches_surface_of(self, *, graspable: IsGraspable) -> bool:
         """

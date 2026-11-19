@@ -40,22 +40,22 @@ DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset"
 
 @pytest.fixture
 def table_xml_parser():
-    return MJCFParser(os.path.join(MJCF_DIR, "table.xml"))
+    return MJCFParser(file_path=os.path.join(MJCF_DIR, "table.xml"))
 
 
 @pytest.fixture
 def kitchen_xml_parser():
-    return MJCFParser(os.path.join(MJCF_DIR, "kitchen-small.xml"))
+    return MJCFParser(file_path=os.path.join(MJCF_DIR, "kitchen-small.xml"))
 
 
 @pytest.fixture
 def apartment_xml_parser():
-    return MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml"))
+    return MJCFParser(file_path=os.path.join(MJCF_DIR, "iai_apartment.xml"))
 
 
 @pytest.fixture
 def pr2_xml_parser():
-    return MJCFParser(os.path.join(MJCF_DIR, "pr2_kinematic_tree.xml"))
+    return MJCFParser(file_path=os.path.join(MJCF_DIR, "pr2_kinematic_tree.xml"))
 
 
 def test_from_file_carries_the_parsing_parameters():
@@ -332,7 +332,7 @@ def frame_wrapped_parser():
     Parser for a scene whose geom and child bodies are wrapped in an MJCF
     ``<frame pos="1 2 3" quat="0.7071068 0 0 0.7071068">`` element.
     """
-    return MJCFParser(os.path.join(DATASET_DIR, "frame_wrapped_scene.xml"))
+    return MJCFParser(file_path=os.path.join(DATASET_DIR, "frame_wrapped_scene.xml"))
 
 
 @pytest.fixture
@@ -423,7 +423,7 @@ def test_primitive_box_geom_resolves_its_material_texture(tmp_path):
         TEXTURED_BOX_MJCF_TEMPLATE.format(texture_file_path=texture_file_path)
     )
 
-    world = MJCFParser(str(mjcf_file_path)).create_world()
+    world = MJCFParser(file_path=str(mjcf_file_path)).create_world()
 
     [counter] = [
         body
@@ -450,10 +450,12 @@ def test_a_scene_named_by_a_package_uri_is_read_from_that_package(
     monkeypatch.setenv("ROS_PACKAGE_PATH", str(package_directory))
 
     from_package = MJCFParser(
-        f"package://scene_package/{scene_file_name}"
+        file_path=f"package://scene_package/{scene_file_name}"
     ).create_world()
 
-    from_file = MJCFParser(os.path.join(DATASET_DIR, scene_file_name)).create_world()
+    from_file = MJCFParser(
+        file_path=os.path.join(DATASET_DIR, scene_file_name)
+    ).create_world()
     assert [body.name for body in from_package.kinematic_structure_entities] == [
         body.name for body in from_file.kinematic_structure_entities
     ]
@@ -464,7 +466,9 @@ def test_a_mesh_file_named_by_a_package_uri_is_read_from_that_package():
     A mesh asset of an MJCF scene named by a ``package://`` URI reads the file the URI
     resolves to.
     """
-    world = MJCFParser(os.path.join(MJCF_DIR, "jeroen_cups.xml")).create_world()
+    world = MJCFParser(
+        file_path=os.path.join(MJCF_DIR, "jeroen_cups.xml")
+    ).create_world()
 
     [cup] = [
         body
@@ -490,7 +494,7 @@ def test_a_fixed_tendon_couples_the_joints_with_the_coefficients_mujoco_reads():
         for wrap in wraps
     }
 
-    world = MJCFParser(file_path).create_world()
+    world = MJCFParser(file_path=file_path).create_world()
 
     (parsed,) = [
         simulator_property
@@ -524,7 +528,7 @@ def test_parsing_a_scene_without_tendons_does_not_compile_it(monkeypatch):
     monkeypatch.setattr(mujoco.MjSpec, "to_xml", refuse_to_compile)
     monkeypatch.setattr(mujoco.MjSpec, "compile", refuse_to_compile)
 
-    world = MJCFParser(file_path).create_world()
+    world = MJCFParser(file_path=file_path).create_world()
 
     assert world.root.name.name == root_name
 
@@ -600,7 +604,7 @@ def test_a_mesh_lies_where_its_reference_frame_places_it():
         compile_from_a_clean_mesh_cache(TURNED_MESH_SCENE)
     )
 
-    world = MJCFParser(TURNED_MESH_SCENE).create_world()
+    world = MJCFParser(file_path=TURNED_MESH_SCENE).create_world()
 
     assert world_mesh_vertex_bounds(turned_mesh_of(world)) == pytest.approx(
         expected, abs=1e-6
@@ -617,7 +621,7 @@ def test_the_simulation_places_a_mesh_where_the_world_does(tmp_path, compiled_be
     The world is built for the simulation in the process that compiled the original
     scene, as RoboCasa does, so MuJoCo may reuse that compile's vertices.
     """
-    world = MJCFParser(TURNED_MESH_SCENE).create_world()
+    world = MJCFParser(file_path=TURNED_MESH_SCENE).create_world()
     mujoco.mj_clearCache(mujoco.mj_getCache())
     if compiled_before:
         mujoco.MjModel.from_xml_path(TURNED_MESH_SCENE)

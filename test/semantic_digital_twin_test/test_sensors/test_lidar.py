@@ -73,7 +73,7 @@ def forward_beam_pattern(
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BodyMountedLidar(Lidar):
     """
     A lidar mounted on a body that is already present in the world.
@@ -86,7 +86,7 @@ class BodyMountedLidar(Lidar):
         return cls(root=robot_root, scan_pattern=forward_beam_pattern(), source=source)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConstantLidarSource(LidarSource):
     """
     A source that answers every request with the same prepared reading.
@@ -129,14 +129,16 @@ def world_with_walls(*wall_center_distances: float) -> tuple[World, Body]:
     :return: The world and the body the lidar is mounted on.
     """
     world = World.create_with_root_body("map")
-    mount = Body(name=PrefixedName("lidar_mount"))
+    mount = Body(name=PrefixedName(name="lidar_mount"))
     with world.modify_world():
         world.add_body(mount)
         world.add_connection(FixedConnection(parent=world.root, child=mount))
         for index, distance in enumerate(wall_center_distances):
             wall = Body(
-                name=PrefixedName(f"wall_{index}"),
-                collision=ShapeCollection([Box(scale=Scale(WALL_THICKNESS, 2.0, 2.0))]),
+                name=PrefixedName(name=f"wall_{index}"),
+                collision=ShapeCollection(
+                    shapes=[Box(scale=Scale(x=WALL_THICKNESS, y=2.0, z=2.0))]
+                ),
             )
             world.add_body(wall)
             world.add_connection(

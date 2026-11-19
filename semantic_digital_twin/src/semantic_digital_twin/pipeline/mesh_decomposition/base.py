@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshDecomposer(Step, ABC):
     """
     MeshDecomposer is an abstract base class for decomposing complex 3D meshes into
@@ -71,7 +71,7 @@ class MeshDecomposer(Step, ABC):
             decomposed_shapes = self.apply_to_shape(shape)
             new_geometry.extend(decomposed_shapes)
 
-        body.collision = ShapeCollection(new_geometry)
+        body.collision = ShapeCollection(shapes=new_geometry)
         return body
 
     def _apply(self, world: World) -> World:

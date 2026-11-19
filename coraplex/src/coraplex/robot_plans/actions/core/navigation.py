@@ -363,7 +363,7 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         nodes = []
         for door in self.elevator.doors:
             if door.movable_joint is None:
-                raise MissingMovableJointError(door)
+                raise MissingMovableJointError(semantic_annotation=door)
             nodes.append(
                 JointPositionReached(
                     connection=door.movable_joint,
@@ -373,7 +373,7 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
                 )
             )
         if self.elevator.movable_joint is None:
-            raise MissingMovableJointError(self.elevator)
+            raise MissingMovableJointError(semantic_annotation=self.elevator)
         nodes.append(
             JointPositionReached(
                 connection=self.elevator.movable_joint,

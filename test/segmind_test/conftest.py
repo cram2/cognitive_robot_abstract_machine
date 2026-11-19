@@ -108,11 +108,13 @@ class BoxAndTrays:
 
     def __post_init__(self):
         self.world = World()
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         self.box = Body(
-            name=PrefixedName("box"),
+            name=PrefixedName(name="box"),
             collision=ShapeCollection(
-                [Box(scale=Scale(self.box_size, self.box_size, self.box_size))]
+                shapes=[
+                    Box(scale=Scale(x=self.box_size, y=self.box_size, z=self.box_size))
+                ]
             ),
         )
         with self.world.modify_world():
@@ -189,7 +191,9 @@ class BoxAndTrays:
         walls_across_x = [
             Box(
                 scale=Scale(
-                    self.tray_wall_thickness, self.tray_width, self.tray_wall_height
+                    x=self.tray_wall_thickness,
+                    y=self.tray_width,
+                    z=self.tray_wall_height,
                 ),
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=side * self.tray_width / 2, z=self.tray_wall_height / 2
@@ -200,7 +204,9 @@ class BoxAndTrays:
         walls_across_y = [
             Box(
                 scale=Scale(
-                    self.tray_width, self.tray_wall_thickness, self.tray_wall_height
+                    x=self.tray_width,
+                    y=self.tray_wall_thickness,
+                    z=self.tray_wall_height,
                 ),
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     y=side * self.tray_width / 2, z=self.tray_wall_height / 2
@@ -209,14 +215,16 @@ class BoxAndTrays:
             for side in (-1, 1)
         ]
         floor = Box(
-            scale=Scale(self.tray_width, self.tray_width, self.tray_wall_thickness),
+            scale=Scale(
+                x=self.tray_width, y=self.tray_width, z=self.tray_wall_thickness
+            ),
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=self.tray_wall_thickness / 2
             ),
         )
         tray = Body(
-            name=PrefixedName(name),
-            collision=ShapeCollection([floor, *walls_across_x, *walls_across_y]),
+            name=PrefixedName(name=name),
+            collision=ShapeCollection(shapes=[floor, *walls_across_x, *walls_across_y]),
         )
         self.world.add_connection(
             FixedConnection(

@@ -162,12 +162,12 @@ class BaseWorldDescriptor:
                         self._center_mesh_origin(mesh=mesh)
                     box = mesh.local_frame_bounding_box.as_shape()
                     shapes = [box, mesh]
-                    collision = ShapeCollection([box])
+                    collision = ShapeCollection(shapes=[box])
                 else:
                     if spec.box_scale is not None:
                         box = Box(scale=spec.box_scale, color=spec.color)
                         shapes = [box]
-                        collision = ShapeCollection([box])
+                        collision = ShapeCollection(shapes=[box])
                     elif (
                         spec.cylinder_width is not None
                         and spec.cylinder_height is not None
@@ -178,13 +178,13 @@ class BaseWorldDescriptor:
                             color=spec.color,
                         )
                         shapes = [cylinder]
-                        collision = ShapeCollection([cylinder])
+                        collision = ShapeCollection(shapes=[cylinder])
                     else:
                         raise ObjectGeometryMissing(object_name=spec.name)
 
                 body = Body(
                     name=PrefixedName(name=spec.name),
-                    visual=ShapeCollection(shapes),
+                    visual=ShapeCollection(shapes=shapes),
                     collision=collision,
                 )
                 connection = Connection6DoF.create_with_dofs(

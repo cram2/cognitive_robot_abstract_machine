@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionCheckingResult:
     """
     Result of a collision checking operation.
@@ -48,7 +48,7 @@ class CollisionCheckingResult:
         return len(self.contacts) > 0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClosestPoints:
     """
     Encapsulates the closest points data between two bodies returned by the collision
@@ -115,7 +115,7 @@ class ClosestPoints:
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionDetectorModelUpdater(ModelChangeCallback):
     """
     Updates and compiles the collision detector's collision forward kinematics
@@ -172,7 +172,7 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         return self.compiled_collision_fks.evaluate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionDetectorStateUpdater(StateChangeCallback):
     """
     Updates the collision detector's collision FK cache when the world state changes.
@@ -194,7 +194,7 @@ class CollisionDetectorStateUpdater(StateChangeCallback):
         self.collision_detector.sync_world_state()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     """
     Abstract class for collision detectors.
@@ -257,7 +257,9 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
         """
         collision = self.check_collisions(
             CollisionMatrix(
-                {CollisionCheck.create_and_validate(body_a, body_b, distance)}
+                collision_checks={
+                    CollisionCheck.create_and_validate(body_a, body_b, distance)
+                }
             )
         )
         return collision.contacts[0] if collision.any() else None

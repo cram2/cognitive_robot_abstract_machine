@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateEntryView:
     """
     Returned if you access members in WorldState.
@@ -87,7 +87,7 @@ class WorldStateEntryView:
         self[Derivatives.jerk] = value
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     """
     Tracks the state of all DOF in the world.
@@ -155,7 +155,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def __getitem__(self, dof_id: UUID) -> WorldStateEntryView:
         with self.world_lock:
             if dof_id not in self._index:
-                raise DofNotInWorldStateError(dof_id)
+                raise DofNotInWorldStateError(dof_id=dof_id)
             idx = self._index[dof_id]
             return WorldStateEntryView(
                 data=self._data[:, idx], lock=self._world._world_lock
@@ -166,19 +166,19 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     ) -> None:
         with self.world_lock:
             if dof_id not in self._index:
-                raise DofNotInWorldStateError(dof_id)
+                raise DofNotInWorldStateError(dof_id=dof_id)
             if isinstance(value, WorldStateEntryView):
                 value = value.data
             arr = np.asarray(value, dtype=float)
             if arr.shape != (4,):
-                raise IncorrectWorldStateValueShapeError(dof_id)
+                raise IncorrectWorldStateValueShapeError(dof_id=dof_id)
             idx = self._index[dof_id]
             self._data[:, idx] = arr
 
     def __delitem__(self, dof_id: UUID) -> None:
         with self.world_lock:
             if dof_id not in self._index:
-                raise DofNotInWorldStateError(dof_id)
+                raise DofNotInWorldStateError(dof_id=dof_id)
             idx = self._index.pop(dof_id)
             self._ids.pop(idx)
             # remove column from data
@@ -317,7 +317,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         with self.world_lock:
             for dof in dofs:
                 if dof.id not in self._index:
-                    raise DofNotInWorldStateError(dof.id)
+                    raise DofNotInWorldStateError(dof_id=dof.id)
             return [self._index[dof.id] for dof in dofs]
 
     def get_derivative(self, derivative: Derivatives) -> np.ndarray:
@@ -442,7 +442,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         """
         for dof_id in other:
             if dof_id not in self:
-                raise DofNotInWorldStateError(dof_id)
+                raise DofNotInWorldStateError(dof_id=dof_id)
             self_state_dof = self[dof_id]
             other_state_dof = other[dof_id]
             self_state_dof.position = other_state_dof.position
@@ -451,7 +451,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             self_state_dof.jerk = other_state_dof.jerk
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateView:
     """
     A lightweight view on a single time step of the trajectory that offers the same
@@ -509,7 +509,7 @@ class WorldStateView:
             return self._data[Derivatives.jerk, :]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateTrajectory:
     """
     Represents a trajectory of world states over time in a given world.
@@ -686,7 +686,10 @@ class WorldStateTrajectory:
         with self.world_lock():
             for idx in range(len(self._times)):
                 yield WorldStateView(
-                    self._data[idx], self._ids, self._index, self.world._world_lock
+                    _data=self._data[idx],
+                    _ids=self._ids,
+                    _index=self._index,
+                    lock=self.world._world_lock,
                 )
 
     def items(self) -> Iterator[tuple[float, WorldStateView]]:

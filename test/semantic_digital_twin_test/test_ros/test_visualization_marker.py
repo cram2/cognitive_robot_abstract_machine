@@ -36,7 +36,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Callback:
     last_msg: MarkerArray = field(init=False, default=None)
 
@@ -178,9 +178,13 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world, ros_publishers):
 
 def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_world):
     region = Region(
-        name=PrefixedName("region"),
+        name=PrefixedName(name="region"),
         area=ShapeCollection(
-            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(opacity=1.0))]
+            shapes=[
+                Box(
+                    scale=Scale(x=0.1, y=0.1, z=0.1), color=Color.from_rgba(opacity=1.0)
+                )
+            ]
         ),
     )
     connection = FixedConnection(parent=cylinder_bot_world.root, child=region)
@@ -225,11 +229,11 @@ def test_trimesh(rclpy_node):
     """
     The frame of a body added to a world parsed from an STL file is published.
     """
-    world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+    world = STLParser(file_path="package://iai_objects/objects/milk.stl").create_world()
     visual: Mesh = world.root.visual.shapes[0]
     world.root.visual.shapes[0] = visual
     with world.modify_world():
-        body2 = Body(name=PrefixedName("body2"))
+        body2 = Body(name=PrefixedName(name="body2"))
         body_C_body2 = FixedConnection(parent=world.root, child=body2)
         world.add_connection(body_C_body2)
     tf_wrapper = TFWrapper(node=rclpy_node)
@@ -252,11 +256,11 @@ def world_with_visible_bodies(*names: str) -> tuple[World, list[Body]]:
     Build a world whose root carries one body with a visual shape per given name.
     """
     world = World()
-    root = Body(name=PrefixedName("map"))
+    root = Body(name=PrefixedName(name="map"))
     bodies = [
         Body(
-            name=PrefixedName(name),
-            visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+            name=PrefixedName(name=name),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
         )
         for name in names
     ]
@@ -359,11 +363,11 @@ def test_markers_are_stamped_by_the_tf_publisher_the_marker_publisher_starts(
     a different body for the plain name unless they share one assignment.
     """
     world = World()
-    root = Body(name=PrefixedName("map"))
+    root = Body(name=PrefixedName(name="map"))
     bodies = [
         Body(
-            name=PrefixedName("milk"),
-            visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+            name=PrefixedName(name="milk"),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
         )
         for _ in range(2)
     ]
@@ -388,8 +392,10 @@ def test_a_body_added_later_reaches_both_publishers_under_one_name(rclpy_node):
             FixedConnection(
                 parent=world.root,
                 child=Body(
-                    name=PrefixedName("milk"),
-                    visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+                    name=PrefixedName(name="milk"),
+                    visual=ShapeCollection(
+                        shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]
+                    ),
                 ),
             )
         )
@@ -400,8 +406,8 @@ def test_a_body_added_later_reaches_both_publishers_under_one_name(rclpy_node):
 def test_region_markers_are_stamped_like_the_frames_they_share_a_name_with(rclpy_node):
     world, _ = world_with_visible_bodies("table")
     region = Region(
-        name=PrefixedName("table"),
-        area=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+        name=PrefixedName(name="table"),
+        area=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
     )
     with world.modify_world():
         world.add_region(region)
@@ -483,7 +489,7 @@ def world_showing(mesh: Mesh) -> World:
     world = World()
     with world.modify_world():
         world.add_body(
-            Body(name=PrefixedName("grid"), visual=ShapeCollection(shapes=[mesh]))
+            Body(name=PrefixedName(name="grid"), visual=ShapeCollection(shapes=[mesh]))
         )
     return world
 

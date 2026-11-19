@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # %% Custom color rendering
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ForegroundColorRenderingMode(ColorRenderingMode):
     """
     Color foreground pixels green and background pixels black.

@@ -433,8 +433,8 @@ def add_moving_connection(world: World) -> None:
     velocity limits to decide whether the world has settled.
     """
     with world.modify_world():
-        parent_body = Body(name=PrefixedName("parent"))
-        child_body = Body(name=PrefixedName("child"))
+        parent_body = Body(name=PrefixedName(name="parent"))
+        child_body = Body(name=PrefixedName(name="child"))
         world.add_body(parent_body)
         world.add_body(child_body)
         world.add_connection(
@@ -571,7 +571,7 @@ class TestRealWorldUpdatesDuringAMotion:
         statechart and the quadratic program were compiled against the old structure.
         """
         with control_loop.remote_world.modify_world():
-            late_body = Body(name=PrefixedName("late_body"))
+            late_body = Body(name=PrefixedName(name="late_body"))
             control_loop.remote_world.add_body(late_body)
             control_loop.remote_world.add_connection(
                 FixedConnection(parent=control_loop.remote_world.root, child=late_body)
@@ -676,7 +676,7 @@ class TestModelChangesOfTheMotionItself:
         local_control_loop.command_publishers.append(publisher)
         world = local_control_loop.world
         with world.modify_world():
-            carried_body = Body(name=PrefixedName("carried_body"))
+            carried_body = Body(name=PrefixedName(name="carried_body"))
             world.add_body(carried_body)
             world.add_connection(FixedConnection(parent=world.root, child=carried_body))
 

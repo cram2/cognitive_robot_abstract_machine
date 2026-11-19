@@ -72,7 +72,7 @@ viz = VizMarkerPublisher(_world=world, node=node)
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if viz is ...: raise ExerciseVerificationFailed("Instantiate a VizMarkerPublisher and assign it to `viz`.")
-if not isinstance(tf_publisher, TFPublisher): raise ExerciseVerificationFailed("Make sure you are using the TFPublisher")
-if not isinstance(viz, VizMarkerPublisher): raise ExerciseVerificationFailed("Make sure you are using the VizMarkerPublisher")
+if viz is ...: raise ExerciseVerificationFailed(requirement="Instantiate a VizMarkerPublisher and assign it to `viz`.")
+if not isinstance(tf_publisher, TFPublisher): raise ExerciseVerificationFailed(requirement="Make sure you are using the TFPublisher")
+if not isinstance(viz, VizMarkerPublisher): raise ExerciseVerificationFailed(requirement="Make sure you are using the VizMarkerPublisher")
 ```

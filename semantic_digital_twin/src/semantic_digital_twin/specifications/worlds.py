@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # %% world specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldSpecification(WorldSource):
     """
     World-independent description of a world: an environment, the robots in it, and

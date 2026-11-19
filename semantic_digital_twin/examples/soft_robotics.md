@@ -41,7 +41,7 @@ We build a 3-section uniform robot using the symbolic factory.
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 
 world_pcc = World()
-sections = [SoftTrunkSection(0.3, 0.02, 10)] * 3
+sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
 
 # Build the robot in the world
 trunk_pcc = SoftTrunk.build_piecewise_constant_curvature(world_pcc, sections)

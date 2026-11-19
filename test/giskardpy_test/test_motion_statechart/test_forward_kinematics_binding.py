@@ -32,7 +32,7 @@ def _bound(*, chain: KinematicChain, world: World) -> ForwardKinematicsBinding:
     """
     binding = ForwardKinematicsBinding(
         float_variable_data=FloatVariableData(),
-        name=PrefixedName("binding"),
+        name=PrefixedName(name="binding"),
         kinematic_chain=chain,
     )
     binding.bind(world=world)

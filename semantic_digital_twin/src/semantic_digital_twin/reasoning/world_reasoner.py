@@ -8,7 +8,7 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 from semantic_digital_twin.reasoning.reasoner import CaseReasoner
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldReasoner:
     """
     A utility class that uses CaseReasoner for reasoning on the world concepts.
@@ -18,6 +18,7 @@ class WorldReasoner:
     """
     The world instance to reason on.
     """
+
     _last_world_model_version: int | None = field(init=False, default=None)
     """
     The last world model version of the world used when :py:meth:`reason` was last
@@ -35,7 +36,9 @@ class WorldReasoner:
     """
 
     def __post_init__(self):
-        self.reasoner = CaseReasoner(self.world, model_directory=self.model_directory)
+        self.reasoner = CaseReasoner(
+            case=self.world, model_directory=self.model_directory
+        )
 
     def infer_semantic_annotations(self) -> list[SemanticAnnotation]:
         """

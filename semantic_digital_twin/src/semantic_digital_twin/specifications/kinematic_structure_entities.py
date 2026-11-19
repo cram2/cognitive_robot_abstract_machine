@@ -49,7 +49,7 @@ TKinematicStructureEntity = TypeVar(
 # %% kinematic structure entity specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KinematicStructureEntitySpecification(
     SpawnSpecification[TKinematicStructureEntity],
     SubClassSafeGeneric,
@@ -106,7 +106,8 @@ class KinematicStructureEntitySpecification(
         so a specification can be measured before anything is spawned.
         """
         bounds = self.shapes.combined_mesh.bounds
-        return Scale(*(bounds[1] - bounds[0]))
+        x, y, z = bounds[1] - bounds[0]
+        return Scale(x=x, y=y, z=z)
 
     def to_domain_object(self, name: str | None = None) -> TKinematicStructureEntity:
         """
@@ -242,8 +243,8 @@ class KinematicStructureEntitySpecification(
         :return: The created specification.
         """
         return cls(
-            name,
-            Box(
+            name=name,
+            shapes=Box(
                 scale=scale,
                 origin=(origin or HomogeneousTransformationMatrix()),
                 color=color or Color(),
@@ -281,8 +282,8 @@ class KinematicStructureEntitySpecification(
         :return: The created specification.
         """
         return cls(
-            name,
-            Sphere(
+            name=name,
+            shapes=Sphere(
                 radius=radius,
                 origin=(origin or HomogeneousTransformationMatrix()),
                 color=color or Color(),
@@ -322,8 +323,8 @@ class KinematicStructureEntitySpecification(
         :return: The created specification.
         """
         return cls(
-            name,
-            Cylinder(
+            name=name,
+            shapes=Cylinder(
                 width=width,
                 height=height,
                 origin=(origin or HomogeneousTransformationMatrix()),
@@ -365,8 +366,8 @@ class KinematicStructureEntitySpecification(
         :return: The created specification.
         """
         return cls(
-            name,
-            Mesh(
+            name=name,
+            shapes=Mesh(
                 filename=filename,
                 origin=(origin or HomogeneousTransformationMatrix()),
                 scale=scale or Scale(),
@@ -404,7 +405,7 @@ class KinematicStructureEntitySpecification(
         """
         # BoundingBoxCollection requires a reference frame, so the shapes are
         # built around a throwaway body and unbound again for the specification.
-        anchor = Body(name=PrefixedName("spec_anchor"))
+        anchor = Body(name=PrefixedName(name="spec_anchor"))
         return cls(
             name=name,
             shapes=BoundingBoxCollection.from_event(
@@ -447,7 +448,7 @@ class KinematicStructureEntitySpecification(
         return cls(
             name=name,
             shapes=ShapeCollection(
-                [
+                shapes=[
                     Mesh.from_3d_points(
                         points_3d,
                         minimum_thickness=minimum_thickness,
@@ -461,7 +462,7 @@ class KinematicStructureEntitySpecification(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodySpecification(KinematicStructureEntitySpecification[Body]):
     """
     World-independent description of a
@@ -508,7 +509,7 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
         return body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionSpecification(KinematicStructureEntitySpecification[Region]):
     """
     World-independent description of a

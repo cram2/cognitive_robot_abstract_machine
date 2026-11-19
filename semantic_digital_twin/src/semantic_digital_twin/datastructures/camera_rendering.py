@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # %% Body color assignments
-@dataclass
+@dataclass(kw_only=True)
 class BodyColorAssignment:
     """
     Associate a geometry color with the visible bodies sharing it.
@@ -47,7 +47,7 @@ class BodyColorAssignment:
 
 
 # %% Color rendering conventions
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ColorRenderingMode(ABC):
     """
     Produce aligned BGR images and visible bodies grouped by color.
@@ -83,7 +83,7 @@ class ColorRenderingMode(ABC):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class BodyColorRenderingMode(ColorRenderingMode):
     """
     Color each visible body uniformly with its first collision geometry color.
@@ -129,7 +129,7 @@ class BodyColorRenderingMode(ColorRenderingMode):
         ).astype(np.uint8)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TexturedColorRenderingMode(ColorRenderingMode):
     """
     Render surface textures and materials with a centered, equal-focal-length camera.
@@ -167,7 +167,7 @@ class TexturedColorRenderingMode(ColorRenderingMode):
 
 
 # %% Depth conventions
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class DepthMode(ABC):
     """
     Compute one meter depth per surface hit, using negative values for invalid depths.
@@ -193,7 +193,7 @@ class DepthMode(ABC):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class OpticalAxisDepthMode(DepthMode):
     """
     Measure depth along the rendering camera's negative z axis.
@@ -215,7 +215,7 @@ class OpticalAxisDepthMode(DepthMode):
         return np.where(depths > 0.0, depths, -1.0)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RayDistanceDepthMode(DepthMode):
     """
     Measure depth from each ray origin along its viewing direction.
@@ -232,7 +232,7 @@ class RayDistanceDepthMode(DepthMode):
 
 
 # %% Aligned depth and segmentation
-@dataclass
+@dataclass(kw_only=True)
 class SegmentationDepthFrame:
     """
     Segmentation and meter depths produced by one camera intersection query.
@@ -249,7 +249,7 @@ class SegmentationDepthFrame:
 
 
 # %% Aligned RGB-D products
-@dataclass
+@dataclass(kw_only=True)
 class RenderedRGBDFrame:
     """
     Contain aligned width-first images with their origin at the top-left pixel.
@@ -282,7 +282,7 @@ class RenderedRGBDFrame:
 
 
 # %% Camera rays
-@dataclass
+@dataclass(kw_only=True)
 class CameraRays:
     """
     World-space viewing rays and the image pixels they represent.
@@ -302,7 +302,7 @@ class CameraRays:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RayIntersections:
     """
     Surface intersections and their source rays and world bodies.
@@ -323,7 +323,7 @@ class RayIntersections:
 
 
 # %% Color image products
-@dataclass
+@dataclass(kw_only=True)
 class RenderedColorFrame:
     """
     BGR image values and the associated bodies grouped by color.

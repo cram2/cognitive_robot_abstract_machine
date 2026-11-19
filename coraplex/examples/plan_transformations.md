@@ -153,7 +153,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 spoon = STLParser(
-    "package://iai_objects/objects/spoon.stl"
+    file_path="package://iai_objects/objects/spoon.stl"
 ).create_world()
 
 with world.modify_world():

@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @pytest.fixture
 def body() -> Body:
-    return Body(name=PrefixedName("body"))
+    return Body(name=PrefixedName(name="body"))
 
 
 def test_no_property_of_a_type_is_none(body):

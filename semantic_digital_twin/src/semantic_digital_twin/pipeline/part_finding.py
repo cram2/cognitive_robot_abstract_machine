@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FindParts(Step):
     """
     Gives every annotation of a type the parts its part-whole relationships call for and
@@ -45,7 +45,7 @@ class FindParts(Step):
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SplitPartFromShape(Step):
     """
     Gives every annotation of a type that has no such part yet the part its shape has,

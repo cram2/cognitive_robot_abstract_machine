@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class USDSemanticLabels(HasRootBody):
     """
     The semantic labels a USD prim carries under one ``UsdSemantics.LabelsAPI``

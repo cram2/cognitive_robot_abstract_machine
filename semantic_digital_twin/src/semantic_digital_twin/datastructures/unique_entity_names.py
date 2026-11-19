@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 # %% unique names
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UniqueEntityNames(ABC):
     """
     Names entities for a format that identifies everything by a name no two things

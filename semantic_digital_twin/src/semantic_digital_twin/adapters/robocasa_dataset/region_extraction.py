@@ -35,7 +35,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Region
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PlacementSamplerRegion:
     """
     The rectangle a RoboCasa placement sampler resolves for one object, read from its
@@ -94,7 +94,7 @@ class PlacementSamplerRegion:
             origin=HomogeneousTransformationMatrix.from_point_rotation_matrix(
                 point=self.local_center
             ),
-            scale=Scale(self.width, self.depth, self.thickness),
+            scale=Scale(x=self.width, y=self.depth, z=self.thickness),
         )
         region = Region.from_shape_collection(
             name=self.name, shape_collection=ShapeCollection(shapes=[box])
@@ -115,7 +115,7 @@ class PlacementSamplerRegion:
         return annotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlacementSamplerRegionReader:
     """
     Reads the placement regions a reset RoboCasa environment's samplers resolved.
@@ -174,7 +174,7 @@ class PlacementSamplerRegionReader:
             return None
         world_x, world_y, world_z = (float(value) for value in sampler.reference_pos)
         return PlacementSamplerRegion(
-            name=PrefixedName(object_name, prefix=name_prefix),
+            name=PrefixedName(name=object_name, prefix=name_prefix),
             body_name=body_name,
             local_center=Point3(
                 (x_minimum + x_maximum) / 2.0,
@@ -191,7 +191,7 @@ class PlacementSamplerRegionReader:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class GripperExclusionZoneData:
     """
     A ball around a body's position that a task's success condition requires the gripper
@@ -251,7 +251,7 @@ class GripperExclusionZoneData:
         return annotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GripperExclusionZoneReader:
     """
     Reads a gripper exclusion zone from a reset RoboCasa environment.
@@ -271,7 +271,7 @@ class GripperExclusionZoneReader:
         """
         position = environment.sim.data.body_xpos[environment.obj_body_id[object_name]]
         return GripperExclusionZoneData(
-            name=PrefixedName(object_name, prefix=name_prefix),
+            name=PrefixedName(name=object_name, prefix=name_prefix),
             body_name=environment.objects[object_name].root_body,
             center=Point3(*(float(value) for value in position)),
             radius=radius,

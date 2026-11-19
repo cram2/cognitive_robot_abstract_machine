@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
     """
     Callback is an abstract base class (ABC) reacting to changes in the associated
@@ -102,7 +102,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
         return instance
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StateChangeCallback(Callback, ABC):
     """
     Callback for handling state changes.
@@ -147,7 +147,7 @@ class StateChangeCallback(Callback, ABC):
         self.previous_world_state_data = np.copy(self._world.state.positions)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ModelChangeCallback(Callback, ABC):
     """
     Callback for handling model changes.

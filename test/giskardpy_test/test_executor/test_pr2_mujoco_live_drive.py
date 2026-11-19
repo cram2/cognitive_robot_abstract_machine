@@ -50,8 +50,10 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
     tick_limit = 1000
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    pr2 = RobotSpecification(PR2, localization_pose=world_T_odometry).spawn(world)
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    pr2 = RobotSpecification(
+        semantic_annotation_type=PR2, localization_pose=world_T_odometry
+    ).spawn(world)
     world_T_start = world.compute_forward_kinematics_np(world.root, pr2.root)
     goal = Pose.from_xyz_rpy(
         x=world_T_start[0, 3] + 0.5,

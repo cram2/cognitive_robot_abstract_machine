@@ -40,7 +40,7 @@ from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PlacementArea(HasRootRegion):
     """
     A region a specific object may be placed within or on, as resolved by a RoboCasa
@@ -53,7 +53,7 @@ class PlacementArea(HasRootRegion):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GripperExclusionZone(HasRootRegion):
     """
     A region a RoboCasa task's success condition requires the gripper to stay outside
@@ -137,7 +137,7 @@ def _tokenize_category(category: str) -> set[str]:
     return tokens
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaCategoryResolver:
     """
     Maps a RoboCasa category (a fixture Python class name or an object category string) to the
@@ -184,7 +184,7 @@ class RoboCasaCategoryResolver:
         return best_match
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaKitchenApplianceResolver(RoboCasaCategoryResolver):
     """
     Resolves RoboCasa fixture categories (the module names under
@@ -210,7 +210,7 @@ class RoboCasaKitchenApplianceResolver(RoboCasaCategoryResolver):
     }
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaObjectResolver(RoboCasaCategoryResolver):
     """
     Resolves RoboCasa object categories (the keys of

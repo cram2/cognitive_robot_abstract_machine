@@ -48,7 +48,7 @@ TSemanticAnnotation = TypeVar(
 # %% semantic annotation specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartSpecificationBinding:
     """
     Nested annotation parts together with the part-whole relationship field they fill.
@@ -71,7 +71,7 @@ class PartSpecificationBinding:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnotation]):
     """
     World-independent description of a semantic annotation rooted in a single kinematic

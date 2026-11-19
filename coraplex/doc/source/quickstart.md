@@ -40,7 +40,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
 apartment_world = URDFParser.from_file("package://iai_apartment/urdf/apartment.urdf").create_world()
-milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+milk_world = STLParser(file_path="package://iai_objects/objects/milk.stl").create_world()
 pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 

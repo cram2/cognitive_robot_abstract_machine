@@ -64,8 +64,8 @@ base_C_body: ScrewAxisConnection = ...
 :tags: [example-solution]
 world = World()
 root = Body(name=PrefixedName(name="root", prefix="world"))
-base = Body(name=PrefixedName("base"))
-body = Body(name=PrefixedName("body"))
+base = Body(name=PrefixedName(name="base"))
+body = Body(name=PrefixedName(name="body"))
 
 with world.modify_world():
     root_C_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
@@ -82,8 +82,8 @@ with world.modify_world():
 :tags: [verify-solution, remove-input]
 
 # Check that the world contains the expected entities
-if len(world.bodies) != 3: raise ExerciseVerificationFailed("The world should contain exactly three bodies.")
-if len(world.connections) != 2: raise ExerciseVerificationFailed("The world should contain exactly two connections.")
+if len(world.bodies) != 3: raise ExerciseVerificationFailed(requirement="The world should contain exactly three bodies.")
+if len(world.connections) != 2: raise ExerciseVerificationFailed(requirement="The world should contain exactly two connections.")
 ```
 ## 2. Remove a connection and its child
 Your goal:
@@ -114,6 +114,6 @@ with world.modify_world():
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 # After removal, the body must be gone and only one connection should remain
-if not all(b is not body for b in world.bodies): raise ExerciseVerificationFailed("The child body `body` should be removed.")
-if len(world.connections) != 1: raise ExerciseVerificationFailed("There should be exactly one connection left (root -> base).")
+if not all(b is not body for b in world.bodies): raise ExerciseVerificationFailed(requirement="The child body `body` should be removed.")
+if len(world.connections) != 1: raise ExerciseVerificationFailed(requirement="There should be exactly one connection left (root -> base).")
 ```

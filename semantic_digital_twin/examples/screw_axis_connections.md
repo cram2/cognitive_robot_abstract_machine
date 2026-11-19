@@ -83,14 +83,14 @@ travel = {
 }
 
 world = World()
-root = Body(name=PrefixedName("root"))
+root = Body(name=PrefixedName(name="root"))
 connections = {}
 with world.modify_world():
     for kind, screw_axis in screw_axes.items():
         connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=root,
-            child=Body(name=PrefixedName(kind)),
+            child=Body(name=PrefixedName(name=kind)),
             screw_axis=screw_axis,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=0.2, y=0.1, z=0.15, roll=0.5, pitch=0.3
@@ -282,8 +282,8 @@ cabinet:
 
 ```{code-cell} ipython3
 cabinet_world = World()
-cabinet = Body(name=PrefixedName("cabinet"))
-door = Body(name=PrefixedName("door"))
+cabinet = Body(name=PrefixedName(name="cabinet"))
+door = Body(name=PrefixedName(name="door"))
 with cabinet_world.modify_world():
     door_connection = ScrewAxisConnection.create_with_dofs(
         world=cabinet_world,
@@ -337,8 +337,8 @@ child that far:
 
 ```{code-cell} ipython3
 bottle_world = World()
-bottle = Body(name=PrefixedName("bottle"))
-cap = Body(name=PrefixedName("cap"))
+bottle = Body(name=PrefixedName(name="bottle"))
+cap = Body(name=PrefixedName(name="cap"))
 with bottle_world.modify_world():
     cap_connection = ScrewAxisConnection.create_with_dofs(
         world=bottle_world,
@@ -383,7 +383,7 @@ with world.modify_world():
         pitch_connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=root,
-            child=Body(name=PrefixedName(f"pitch {index}")),
+            child=Body(name=PrefixedName(name=f"pitch {index}")),
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
                 axis=Vector3.Z(), pitch=2 * np.pi * pitch_per_radian
             ),
@@ -636,8 +636,8 @@ hinge:
 from krrood_spatial_math.spatial_types import ScrewAxis
 
 hinge_world = World()
-wall = Body(name=PrefixedName("wall"))
-hinged_door = Body(name=PrefixedName("hinged_door"))
+wall = Body(name=PrefixedName(name="wall"))
+hinged_door = Body(name=PrefixedName(name="hinged_door"))
 hinge_point = np.array([-0.8, 0.0, 0.0])
 with hinge_world.modify_world():
     hinge_world.add_body(wall)

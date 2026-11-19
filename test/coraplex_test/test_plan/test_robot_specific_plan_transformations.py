@@ -143,8 +143,8 @@ def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidat
     """
     world = world_of(extensions)
     box = Body(
-        name=PrefixedName("box"),
-        collision=ShapeCollection([Box(scale=Scale(0.05, 0.05, 0.1))]),
+        name=PrefixedName(name="box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.05, y=0.05, z=0.1))]),
     )
     with world.modify_world():
         world.add_connection(
@@ -160,7 +160,8 @@ def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidat
         graspable = IsGraspable(root=box)
         world.add_semantic_annotations([graspable])
     return GraspCandidate(
-        graspable, Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box)
+        graspable=graspable,
+        grasp_pose=Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box),
     )
 
 
@@ -768,7 +769,9 @@ def stretch_reaching_milk_from(
         extensions=[recording],
     )
     action = ReachAction(
-        grasp_candidate=GraspCandidate(milk, Pose(reference_frame=milk.root)),
+        grasp_candidate=GraspCandidate(
+            graspable=milk, grasp_pose=Pose(reference_frame=milk.root)
+        ),
         arm=robot.all_arms[0],
     )
     executor.compile(statechart=statechart_of(executor, action))

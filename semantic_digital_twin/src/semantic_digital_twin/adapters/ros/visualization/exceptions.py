@@ -6,7 +6,7 @@ from krrood.exceptions import DataclassException
 from krrood_spatial_math.spatial_types import SpatialType
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CannotRenderSpatialTypeError(DataclassException):
     """
     Raised when no renderer can turn a spatial type into RViz markers.
@@ -29,7 +29,7 @@ class CannotRenderSpatialTypeError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldNotResolvableError(DataclassException):
     """
     Raised when no world can be resolved for a spatial type that should be published.

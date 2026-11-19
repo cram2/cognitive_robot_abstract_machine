@@ -6,7 +6,7 @@ from pathlib import Path
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DSceneFilesMissingError(DataclassException, LookupError):
     """
     Raised when a scene's directory does not contain both `scene_camera.json` and
@@ -32,7 +32,7 @@ class GraspClutter6DSceneFilesMissingError(DataclassException, LookupError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DImageNotFoundError(DataclassException, LookupError):
     """
     Raised when a requested frame id is not part of a scene.
@@ -54,7 +54,7 @@ class GraspClutter6DImageNotFoundError(DataclassException, LookupError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DMissingWorldFrameError(DataclassException, ValueError):
     """
     Raised when `GraspClutter6DScene.create_world` is called with
@@ -82,7 +82,7 @@ class GraspClutter6DMissingWorldFrameError(DataclassException, ValueError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DObjectModelNotFoundError(DataclassException, LookupError):
     """
     Raised when an object's mesh file is not found in the given models directory.
@@ -107,7 +107,7 @@ class GraspClutter6DObjectModelNotFoundError(DataclassException, LookupError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DArchiveLayoutError(DataclassException, LookupError):
     """
     Raised when extracting one of the dataset's archives does not produce the top-level
@@ -134,7 +134,7 @@ class GraspClutter6DArchiveLayoutError(DataclassException, LookupError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DSceneNotFoundError(DataclassException, LookupError):
     """
     Raised when a scene id does not resolve to exactly one folder under the extracted

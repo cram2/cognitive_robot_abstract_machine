@@ -31,7 +31,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 # %% driving a gripper through a parallel gripper command server
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasParallelGripperCommandServer(HasGripperActionServers, ABC):
     """
     A gripper whose driver serves a ``control_msgs/ParallelGripperCommand`` action,
@@ -60,7 +60,7 @@ class HasParallelGripperCommandServer(HasGripperActionServers, ABC):
 # %% the Robotiq 2F-85
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Robotiq85Gripper(
     EndEffector,
     HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],

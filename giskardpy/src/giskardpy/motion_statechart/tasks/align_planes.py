@@ -154,7 +154,7 @@ class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
         self.kinematic_chain = KinematicChain(root=self.root_link, tip=tool_frame)
         self.reference_normal = Vector3.Z(reference_frame=self.root_link)
         self._tool_T_held_body = ForwardKinematicsBinding(
-            name=PrefixedName("tool_T_held_body", str(self.name)),
+            name=PrefixedName(name="tool_T_held_body", prefix=str(self.name)),
             kinematic_chain=KinematicChain(root=tool_frame, tip=tool_frame),
             float_variable_data=self.context.float_variable_data,
         )

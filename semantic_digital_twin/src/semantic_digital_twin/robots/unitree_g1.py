@@ -115,7 +115,7 @@ class UnitreeG1Joint(JointName):
     RIGHT_ANKLE_ROLL = "right_ankle_roll_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1LeftThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -137,7 +137,7 @@ class UnitreeG1LeftThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1LeftIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -159,7 +159,7 @@ class UnitreeG1LeftIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1LeftMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -181,7 +181,7 @@ class UnitreeG1LeftMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1RightThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -203,7 +203,7 @@ class UnitreeG1RightThumb(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1RightIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -225,7 +225,7 @@ class UnitreeG1RightIndexFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1RightMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -247,7 +247,7 @@ class UnitreeG1RightMiddleFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1LeftHand(
     EndEffector,
     HasFingers[
@@ -263,13 +263,13 @@ class UnitreeG1LeftHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [1.0] * len(gripper_joints))),
             state_type=GripperState.CLOSE,
         )
@@ -298,7 +298,7 @@ class UnitreeG1LeftHand(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1RightHand(
     EndEffector,
     HasFingers[
@@ -314,13 +314,13 @@ class UnitreeG1RightHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [1.0] * len(gripper_joints))),
             state_type=GripperState.CLOSE,
         )
@@ -349,14 +349,14 @@ class UnitreeG1RightHand(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1LeftArm(Arm[UnitreeG1LeftHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -378,14 +378,14 @@ class UnitreeG1LeftArm(Arm[UnitreeG1LeftHand]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -407,7 +407,7 @@ class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class D435(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -435,7 +435,7 @@ class D435(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1Neck(Neck[D435]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -453,7 +453,7 @@ class UnitreeG1Neck(Neck[D435]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1Torso(
     Torso, HasLeftRightArm[UnitreeG1LeftArm, UnitreeG1RightArm], HasNeck[UnitreeG1Neck]
 ):
@@ -473,7 +473,7 @@ class UnitreeG1Torso(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1MobileBase(MobileBase[OmniDrive]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -494,7 +494,7 @@ class UnitreeG1MobileBase(MobileBase[OmniDrive]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UnitreeG1(
     AbstractRobot, HasMobileBase[UnitreeG1MobileBase], HasTorso[UnitreeG1Torso]
 ):
@@ -539,7 +539,7 @@ class UnitreeG1(
         self._world.collision_manager.extend_max_avoided_bodies_rules(
             [
                 MaxAvoidedCollisionsOverride(
-                    4,
+                    value=4,
                     bodies=set(
                         self._world.get_direct_child_bodies_with_collision(
                             self._world.get_body_in_branch_by_name(

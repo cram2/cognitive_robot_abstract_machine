@@ -53,7 +53,7 @@ from semantic_digital_twin.world_description.shape_collection import (
 # %% palette
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FigurePalette:
     """
     The colors a figure draws with, one field per role rather than per hue, so the same
@@ -185,7 +185,7 @@ class Theme(enum.Enum):
 # %% the scene a figure draws
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Footprint:
     """
     The x-y projection of a bounding box, which is the shape a top-down panel draws for
@@ -261,7 +261,7 @@ class Footprint:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class NavigationPath:
     """
     A solved path through a graph of convex sets.
@@ -347,7 +347,7 @@ class NavigationPath:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetAdjacency:
     """
     One edge of the graph, drawn the way the planner crosses it: from the center of one
@@ -403,7 +403,7 @@ class ConvexSetAdjacency:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NavigationScene:
     """
     An already-built graph of convex sets and the path drawn over it, presented to the
@@ -496,7 +496,7 @@ class NavigationScene:
 # %% the layers a panel is drawn from
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LegendEntry:
     """
     One row of the figure's shared legend.
@@ -513,7 +513,7 @@ class LegendEntry:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SceneLayer(ABC):
     """
     One kind of mark a panel draws, so that panels differ in what they compose rather
@@ -535,7 +535,7 @@ class SceneLayer(ABC):
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SearchSpaceLayer(SceneLayer):
     """
     Draws the outline of every part of the volume the graph of convex sets was built in,
@@ -557,10 +557,10 @@ class SearchSpaceLayer(SceneLayer):
         for outline in outlines:
             outline.set_linestyle((0, (4, 3)))
             axes.add_patch(outline)
-        return [LegendEntry(outlines[0], "search space")]
+        return [LegendEntry(handle=outlines[0], label="search space")]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ObstacleLayer(SceneLayer):
     """
     Draws the environment's obstacle footprints, outlined in a darker tint of their own
@@ -581,7 +581,9 @@ class ObstacleLayer(SceneLayer):
         ]
         for rectangle in rectangles:
             axes.add_patch(rectangle)
-        return [LegendEntry(rectangles[0], "obstacle")] if rectangles else []
+        return (
+            [LegendEntry(handle=rectangles[0], label="obstacle")] if rectangles else []
+        )
 
 
 class ConvexSetEmphasis(enum.Enum):
@@ -615,7 +617,7 @@ class ConvexSetEmphasis(enum.Enum):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetsLayer(SceneLayer):
     """
     Draws the convex sets partitioning free space, outlined in a darker tint of their
@@ -644,10 +646,14 @@ class ConvexSetsLayer(SceneLayer):
             axes.add_patch(rectangle)
         if self.emphasis is ConvexSetEmphasis.CONTEXT:
             return []
-        return [LegendEntry(rectangles[0], "convex set")] if rectangles else []
+        return (
+            [LegendEntry(handle=rectangles[0], label="convex set")]
+            if rectangles
+            else []
+        )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AdjacencyLayer(SceneLayer):
     """
     Draws the graph over the convex sets: a node at every set's center and an edge
@@ -693,10 +699,10 @@ class AdjacencyLayer(SceneLayer):
             marker="o",
             markersize=3.0,
         )
-        return [LegendEntry(sample, "adjacency graph")]
+        return [LegendEntry(handle=sample, label="adjacency graph")]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PathLayer(SceneLayer):
     """
     Draws the optimal path and the waypoints it turns at.
@@ -726,10 +732,10 @@ class PathLayer(SceneLayer):
             markeredgewidth=0.6,
             zorder=7,
         )
-        return [LegendEntry(line[0], "optimal path")]
+        return [LegendEntry(handle=line[0], label="optimal path")]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EndpointsLayer(SceneLayer):
     """
     Draws the start and the goal of the path, each labelled beside its marker so that
@@ -793,13 +799,13 @@ class EndpointsLayer(SceneLayer):
             fontsize=8.0,
             zorder=9,
         )
-        return LegendEntry(drawn[0], label)
+        return LegendEntry(handle=drawn[0], label=label)
 
 
 # %% the panels of the figure
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ScenePanel(ABC):
     """
     One sub-plot of the figure, defined by the layers it composes and the statistic it
@@ -895,7 +901,7 @@ class ScenePanel(ABC):
             spine.set_visible(False)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EnvironmentPanel(ScenePanel):
     """
     Shows what the planner is given: the obstacles of the environment and the search
@@ -917,7 +923,7 @@ class EnvironmentPanel(ScenePanel):
         return (SearchSpaceLayer(), ObstacleLayer())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetsPanel(ScenePanel):
     """
     Shows what the planner builds: free space partitioned into convex sets, and the
@@ -938,7 +944,7 @@ class ConvexSetsPanel(ScenePanel):
         return (ObstacleLayer(), ConvexSetsLayer(), AdjacencyLayer())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class OptimalPathPanel(ScenePanel):
     """
     Shows what the planner returns: the minimum-distance path between the queried start
@@ -955,7 +961,7 @@ class OptimalPathPanel(ScenePanel):
     def layers(self) -> Sequence[SceneLayer]:
         return (
             ObstacleLayer(),
-            ConvexSetsLayer(ConvexSetEmphasis.CONTEXT),
+            ConvexSetsLayer(emphasis=ConvexSetEmphasis.CONTEXT),
             PathLayer(),
             EndpointsLayer(),
         )
@@ -964,7 +970,7 @@ class OptimalPathPanel(ScenePanel):
 # %% the figure
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PanelArrangement:
     """
     How the panels are tiled, chosen so that a wide environment is stacked and a compact
@@ -1055,7 +1061,7 @@ class PanelArrangement:
         return math.ceil(entry_count / rows)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphOfConvexSetsFigure:
     """
     The three-panel figure of a scene: its environment, its graph of convex sets, and

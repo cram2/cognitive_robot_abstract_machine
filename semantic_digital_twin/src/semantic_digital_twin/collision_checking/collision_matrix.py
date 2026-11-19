@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionCheck(SubclassJSONSerializer):
     """
     Represents a collision check between two bodies.
@@ -37,6 +37,7 @@ class CollisionCheck(SubclassJSONSerializer):
     """
     First body in the collision check.
     """
+
     body_b: Body
     """
     Second body in the collision check.
@@ -75,10 +76,10 @@ class CollisionCheck(SubclassJSONSerializer):
         """
         self = cls(body_a=body_a, body_b=body_b, distance=distance)
         if self.distance is not None and self.distance < 0:
-            raise NegativeCollisionCheckingDistanceError(self)
+            raise NegativeCollisionCheckingDistanceError(collision_check=self)
 
         if self.body_a == self.body_b:
-            raise InvalidBodiesInCollisionCheckError(self)
+            raise InvalidBodiesInCollisionCheckError(collision_check=self)
         self.sort_bodies()
         return self
 
@@ -98,10 +99,10 @@ class CollisionCheck(SubclassJSONSerializer):
         """
         self = cls.create_for_bodies_with_collision(body_a, body_b, distance)
         if not self.body_a.has_collision():
-            raise BodyHasNoGeometryError(self)
+            raise BodyHasNoGeometryError(collision_check=self)
 
         if not self.body_b.has_collision():
-            raise BodyHasNoGeometryError(self)
+            raise BodyHasNoGeometryError(collision_check=self)
         return self
 
     def __repr__(self):
@@ -138,7 +139,7 @@ class CollisionCheck(SubclassJSONSerializer):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionMatrix:
     """
     Describes a matrix in sparse format by storing only unique pairs of bodies with
@@ -166,9 +167,11 @@ class CollisionMatrix:
     def apply_buffer(self, buffer: float):
         self.collision_checks = {
             CollisionCheck(
-                check.body_a,
-                check.body_b,
-                check.distance + buffer if check.distance is not None else None,
+                body_a=check.body_a,
+                body_b=check.body_b,
+                distance=check.distance + buffer
+                if check.distance is not None
+                else None,
             )
             for check in self.collision_checks
         }
@@ -213,7 +216,7 @@ class CollisionMatrix:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionRule(ABC):
     """
     Base class for collision rules.
@@ -259,7 +262,7 @@ class CollisionRule(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MaxAvoidedCollisionsRule(ABC):
     """
     Base class for collision rules that define the maximum number of collisions that can
@@ -274,7 +277,7 @@ class MaxAvoidedCollisionsRule(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
     """
     Default implementation of MaxAvoidedCollisionsRule that sets the maximum number of
@@ -285,7 +288,7 @@ class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
         return 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule, SubclassJSONSerializer):
     """
     Implementation of MaxAvoidedCollisionsRule that overrides the maximum number of

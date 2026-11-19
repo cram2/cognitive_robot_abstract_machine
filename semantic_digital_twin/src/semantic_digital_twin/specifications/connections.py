@@ -40,7 +40,7 @@ TConnection = TypeVar("TConnection", bound=Connection)
 # %% connection specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpecification(
     NamedSpecification, Generic[TConnection], SubClassSafeGeneric, ABC
 ):
@@ -232,7 +232,7 @@ class ConnectionSpecification(
         return connection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedConnectionSpecification(ConnectionSpecification[FixedConnection]):
     """
     Declares a rigid
@@ -243,7 +243,7 @@ class FixedConnectionSpecification(ConnectionSpecification[FixedConnection]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection6DoFSpecification(ConnectionSpecification[Connection6DoF]):
     """
     Declares a free-floating
@@ -254,7 +254,7 @@ class Connection6DoFSpecification(ConnectionSpecification[Connection6DoF]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], ABC):
     """
     Specification for a single-DoF active connection.
@@ -305,7 +305,7 @@ class ScrewAxisConnectionSpecification(
 # %% connection specifications with endpoints
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpecificationWithEndpoints:
     """
     A connection specification together with the two bodies it joins and where it sits

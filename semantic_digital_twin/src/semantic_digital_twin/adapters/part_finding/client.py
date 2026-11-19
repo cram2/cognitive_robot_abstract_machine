@@ -35,7 +35,7 @@ from semantic_digital_twin.part_finding.locating import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RemotePartLocator(PartLocator):
     """
     Locates parts by asking a part finding server.

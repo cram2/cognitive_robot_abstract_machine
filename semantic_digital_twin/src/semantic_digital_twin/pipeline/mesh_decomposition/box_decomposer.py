@@ -11,7 +11,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Mesh, Box, Scale
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FrozenBox:
     """
     A frozen non-oriented box optimized for the BoxDecomposer.
@@ -44,7 +44,7 @@ class FrozenBox:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FrozenIndexBox:
     """
     A box defined by voxel indices.
@@ -184,11 +184,17 @@ class FrozenIndexBox:
         :return: The created box.
         """
         if axis == 0:
-            return FrozenIndexBox(start, stop, dim1_min, dim1_max, dim2_min, dim2_max)
+            return FrozenIndexBox(
+                x0=start, x1=stop, y0=dim1_min, y1=dim1_max, z0=dim2_min, z1=dim2_max
+            )
         elif axis == 1:
-            return FrozenIndexBox(dim1_min, dim1_max, start, stop, dim2_min, dim2_max)
+            return FrozenIndexBox(
+                x0=dim1_min, x1=dim1_max, y0=start, y1=stop, z0=dim2_min, z1=dim2_max
+            )
         else:
-            return FrozenIndexBox(dim1_min, dim1_max, dim2_min, dim2_max, start, stop)
+            return FrozenIndexBox(
+                x0=dim1_min, x1=dim1_max, y0=dim2_min, y1=dim2_max, z0=start, z1=stop
+            )
 
 
 def greedy_merge_boxes(
@@ -222,7 +228,7 @@ def greedy_merge_boxes(
 
                 remaining_occupancy[x:x1, y:y1, z:z1] = False
 
-                index_box = FrozenIndexBox(x, x1, y, y1, z, z1)
+                index_box = FrozenIndexBox(x0=x, x1=x1, y0=y, y1=y1, z0=z, z1=z1)
                 boxes.append(index_box.to_frozen_box(pitch, origin))
 
                 x = x1
@@ -546,7 +552,7 @@ def subtract_index_boxes_from_occupancy(
     return remaining_occupancy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoxDecomposer(MeshDecomposer):
     """
     Decompose a mesh into boxes using voxelization.

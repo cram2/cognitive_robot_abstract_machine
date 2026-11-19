@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 RelocatableType = TypeVar("RelocatableType")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityRebinding:
     """
     One rebinding of objects onto the world entities of :attr:`world`.

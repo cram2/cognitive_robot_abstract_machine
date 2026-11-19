@@ -54,7 +54,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kBase(SubclassJSONSerializer):
     """
     Base class for all classes of the Sage 10k dataset.
@@ -71,7 +71,7 @@ class Sage10kBase(SubclassJSONSerializer):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kWithID(Sage10kBase):
     """
     Base class for Sage10k classes that have an id.
@@ -101,7 +101,7 @@ class Sage10kWithID(Sage10kBase):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasXYZ(Sage10kBase):
     """
     Parent for Sage10ks position and orientation to deduplicate the code.
@@ -124,7 +124,7 @@ class HasXYZ(Sage10kBase):
         return cls(x=data["x"], y=data["y"], z=data["z"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kRotation(HasXYZ):
     """
     Rotations in the Sage 10k world.
@@ -141,7 +141,7 @@ class Sage10kRotation(HasXYZ):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kPosition(HasXYZ):
     """
     Position of an entity in a Sage10k scene.
@@ -150,7 +150,7 @@ class Sage10kPosition(HasXYZ):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kSize(Sage10kBase):
     """
     The scale of an object.
@@ -196,7 +196,7 @@ class Sage10kSize(Sage10kBase):
         return cls(height=data["height"], length=data["length"], width=data["width"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
     """
     Parameters for super realistic renderers.
@@ -223,7 +223,7 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
         return cls(metallic=data["metallic"], roughness=data["roughness"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kWall(Sage10kWithID):
     """
     Description of a wall for a room.
@@ -335,7 +335,7 @@ class Sage10kWall(Sage10kWithID):
         wall_length, _ = self.wall_length_and_yaw
 
         geometry_with_texture = ShapeCollection(
-            [
+            shapes=[
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=body),
                     mesh=wall_mesh,
@@ -352,7 +352,7 @@ class Sage10kWall(Sage10kWithID):
         return annotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kObject(Sage10kWithID):
     """
     Like a Body, but from Sage10k.
@@ -452,8 +452,8 @@ class Sage10kObject(Sage10kWithID):
         )
 
         # Create a Body with the loaded mesh as both visual and collision geometry
-        visual = ShapeCollection([mesh], reference_frame=body)
-        collision = ShapeCollection([mesh], reference_frame=body)
+        visual = ShapeCollection(shapes=[mesh], reference_frame=body)
+        collision = ShapeCollection(shapes=[mesh], reference_frame=body)
         body.visual = visual
         body.collision = collision
 
@@ -528,7 +528,7 @@ class Sage10kObject(Sage10kWithID):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kDoor(Sage10kWithID):
     """
     A door of a wall in Sage10k.
@@ -649,7 +649,7 @@ class Sage10kDoor(Sage10kWithID):
         )
 
         geometry_with_texture = ShapeCollection(
-            [
+            shapes=[
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=body),
                     mesh=door_mesh,
@@ -709,7 +709,7 @@ class Sage10kDoor(Sage10kWithID):
                 name=f"{self.id}_handle",
                 world=world,
                 world_root_T_self=world_root_T_handle,
-                scale=Scale(0.05, 0.02, 0.2),
+                scale=Scale(x=0.05, y=0.02, z=0.2),
             )
             door.add(part=handle)
         return handle
@@ -740,7 +740,7 @@ class Sage10kDoor(Sage10kWithID):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kRoom(Sage10kWithID):
     """
     A room of the Sage10k dataset.
@@ -827,7 +827,7 @@ class Sage10kRoom(Sage10kWithID):
         floor_body = floor_annotation.root
 
         floor_geometry_with_texture = ShapeCollection(
-            [
+            shapes=[
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=floor_body),
                     mesh=floor_mesh,
@@ -882,7 +882,7 @@ class Sage10kRoom(Sage10kWithID):
             )
 
             geometry_with_texture = ShapeCollection(
-                [
+                shapes=[
                     Mesh.from_trimesh(
                         origin=HomogeneousTransformationMatrix(reference_frame=body),
                         mesh=wall_mesh,
@@ -941,7 +941,7 @@ class Sage10kRoom(Sage10kWithID):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kScene(Sage10kWithID):
     """
     An entire scene from Sage10k.

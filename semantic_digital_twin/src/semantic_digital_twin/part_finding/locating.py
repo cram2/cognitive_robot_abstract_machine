@@ -28,7 +28,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
 # %% the question and its answer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartQuery:
     """
     The question which faces of a mesh belong to the parts an annotation's part-whole
@@ -101,7 +101,7 @@ class PartQuery:
         return camel_case_to_words(self.whole_type.__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LocatedPart:
     """
     A part found in the mesh of a :class:`PartQuery`.
@@ -138,7 +138,7 @@ class PartLocator(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KnownPartLocator(PartLocator):
     """
     Answers every query with the same parts: a stand-in for a real locator wherever the
@@ -163,7 +163,7 @@ class KnownPartLocator(PartLocator):
 # %% splitting a located part off
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LocatedFacesFinder(PartFinder):
     """
     Finds a part whose faces were located in a mesh before, either in that mesh or in

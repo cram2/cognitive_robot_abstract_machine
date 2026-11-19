@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AvoidCollisionRule(CollisionRule, ABC):
     """
     Base class for collision rules that add collision checks to the collision matrix.
@@ -71,8 +71,9 @@ class AvoidCollisionRule(CollisionRule, ABC):
         Returns True if the rule configures collision distances for the given body.
         """
         return (
-            CollisionCheck(body_a, body_b) in self.added_collision_checks
-            or CollisionCheck(body_b, body_a) in self.added_collision_checks
+            CollisionCheck(body_a=body_a, body_b=body_b) in self.added_collision_checks
+            or CollisionCheck(body_a=body_b, body_b=body_a)
+            in self.added_collision_checks
         )
 
     def buffer_zone_distance_for(self, body_a: Body, body_b: Body) -> float | None:
@@ -91,7 +92,7 @@ class AvoidCollisionRule(CollisionRule, ABC):
         collision_matrix.add_collision_checks(self.added_collision_checks)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionRule(CollisionRule, ABC):
     """
     Base class for collision rules that remove collision checks from the collision matrix.
@@ -126,7 +127,7 @@ class AllowCollisionRule(CollisionRule, ABC):
         super().update(world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AvoidCollisionBetweenGroups(AvoidCollisionRule):
     """
     Adds collision checks between all pairs of bodies in the given groups to the collision matrix.
@@ -153,7 +154,7 @@ class AvoidCollisionBetweenGroups(AvoidCollisionRule):
                 self.added_collision_checks.add(collision_check)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AvoidAllCollisions(AvoidCollisionRule):
     """
     Adds collision checks between all body pairs of the world managed by the rule to the collision matrix.
@@ -168,7 +169,7 @@ class AvoidAllCollisions(AvoidCollisionRule):
             self.added_collision_checks.add(collision_check)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     """
     Adds collision checks between the bodies managed by the rule and all bodies that do
@@ -244,7 +245,7 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AvoidSelfCollisions(AvoidCollisionRule):
     """
     Adds collision checks between all body pairs of the robot managed by the rule.
@@ -264,7 +265,7 @@ class AvoidSelfCollisions(AvoidCollisionRule):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowAllCollisions(AllowCollisionRule):
     """
     Removed all collision checks from the collision matrix.
@@ -274,7 +275,7 @@ class AllowAllCollisions(AllowCollisionRule):
         self.allowed_collision_bodies = set(world.bodies_with_collision)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionForBodies(AllowCollisionRule):
     """
     Removes all collision checks that include one of the given bodies from the collision matrix.
@@ -288,7 +289,7 @@ class AllowCollisionForBodies(AllowCollisionRule):
     def _update(self, world: World): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionBetweenGroups(AllowCollisionRule):
     """
     Allows collision checks between two groups of bodies.
@@ -315,7 +316,7 @@ class AllowCollisionBetweenGroups(AllowCollisionRule):
                 self.allowed_collision_pairs.add(collision_check)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionForEndEffector(AllowCollisionRule):
     """
     Removes all collision checks that include the given end effector, or anything it
@@ -335,7 +336,7 @@ class AllowCollisionForEndEffector(AllowCollisionRule):
         self.allowed_collision_bodies = set(self.end_effector.bodies_with_collision)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionBetweenEndEffectorsAndHeldBodies(AllowCollisionRule):
     """
     Allows collisions between every body an end effector holds and the bodies of that
@@ -360,7 +361,7 @@ class AllowCollisionBetweenEndEffectorsAndHeldBodies(AllowCollisionRule):
         }
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowNonRobotCollisions(AllowCollisionRule):
     """
     Allows collision checks between all bodies that do not belong to any robot.
@@ -386,7 +387,7 @@ class AllowNonRobotCollisions(AllowCollisionRule):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowSelfCollisions(AllowCollisionRule):
     """
     Allows collision checks between all body pairs of the robot managed by the rule.
@@ -404,7 +405,7 @@ class AllowSelfCollisions(AllowCollisionRule):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowDefaultInCollision(AllowCollisionRule):
     """
     Allows collision between robot bodies that are in collision if the robot is in its default state.
@@ -443,7 +444,7 @@ class AllowDefaultInCollision(AllowCollisionRule):
                 )
             )
             self.allowed_collision_pairs = {
-                CollisionCheck(closest_point.body_a, closest_point.body_b)
+                CollisionCheck(body_a=closest_point.body_a, body_b=closest_point.body_b)
                 for closest_point in closest_points.contacts
             }
 
@@ -460,7 +461,7 @@ class AllowDefaultInCollision(AllowCollisionRule):
         world.notify_state_change()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowAlwaysInCollision(AllowCollisionRule):
     """
     Allows collision between robot bodies that are in collision always.
@@ -507,7 +508,7 @@ class AllowAlwaysInCollision(AllowCollisionRule):
                 )
                 for closest_point in closest_points.contacts:
                     collision_check = CollisionCheck(
-                        closest_point.body_a, closest_point.body_b
+                        body_a=closest_point.body_a, body_b=closest_point.body_b
                     )
                     counts[collision_check] += 1
             for collision_check, count in counts.items():
@@ -528,7 +529,7 @@ class AllowAlwaysInCollision(AllowCollisionRule):
         world.notify_state_change()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowNeverInCollision(AllowCollisionRule):
     """
     Allows collision between robot bodies that are never in collision.
@@ -609,7 +610,9 @@ class AllowNeverInCollision(AllowCollisionRule):
     ):
         contact_keys = set()
         for contact in closest_points.contacts:
-            collision_check = CollisionCheck(contact.body_a, contact.body_b)
+            collision_check = CollisionCheck(
+                body_a=contact.body_a, body_b=contact.body_b
+            )
             contact_keys.add(collision_check)
             distance_ranges[collision_check].append(contact.distance)
             if contact.distance < self.distance_threshold_min:
@@ -653,7 +656,7 @@ class AllowNeverInCollision(AllowCollisionRule):
         world.notify_state_change()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionBetweenFingers(AllowCollisionRule):
     """
     Allows collisions between the fingers of every gripper of a robot, which touch each
@@ -693,7 +696,7 @@ class AllowCollisionBetweenFingers(AllowCollisionRule):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AllowCollisionForAdjacentPairs(AllowCollisionRule):
     """
     Allow collision between body pairs of the whole world model that are connected by a chain that has no controllable connection.
@@ -738,7 +741,7 @@ class AllowCollisionForAdjacentPairs(AllowCollisionRule):
         return ancestor
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
     """
     Used to load and manage collision matrices, often represented as SRDF files.

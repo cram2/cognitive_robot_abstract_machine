@@ -351,8 +351,8 @@ def _raised(grasp: GraspCandidate, height: float) -> GraspCandidate:
     """
     root_P_grasp = grasp.grasp_pose.to_np()[:3, 3] + np.array([0.0, 0.0, height])
     return GraspCandidate(
-        grasp.graspable,
-        Pose(
+        graspable=grasp.graspable,
+        grasp_pose=Pose(
             position=Point3.from_iterable(root_P_grasp),
             orientation=grasp.grasp_pose.quaternion,
             reference_frame=grasp.graspable.root,
@@ -369,8 +369,8 @@ def _turned_around(grasp: GraspCandidate, nearer_by: float = 0.0) -> GraspCandid
     grasp_pose = grasp.grasp_pose
     root_P_grasp = grasp_pose.to_np()[:3, 3] - nearer_by * grasp_pose.to_np()[:3, 0]
     return GraspCandidate(
-        grasp.graspable,
-        Pose(
+        graspable=grasp.graspable,
+        grasp_pose=Pose(
             position=Point3.from_iterable(root_P_grasp),
             orientation=(
                 grasp_pose.rotation_matrix @ RotationMatrix.from_rpy(yaw=np.pi)

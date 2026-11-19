@@ -51,12 +51,12 @@ def box_body(name: PrefixedName, x: float = 0.0, z: float = 0.0) -> Body:
     """
     body = Body(name=name)
     geometry = ShapeCollection(
-        [
+        shapes=[
             Box(
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=x, z=z, reference_frame=body
                 ),
-                scale=Scale(0.1, 0.02, 0.02),
+                scale=Scale(x=0.1, y=0.02, z=0.02),
             )
         ],
         reference_frame=body,
@@ -65,7 +65,7 @@ def box_body(name: PrefixedName, x: float = 0.0, z: float = 0.0) -> Body:
     return body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pendulum:
     """
     A servoed hinge with a second hinge mimicking it.
@@ -92,7 +92,7 @@ class Pendulum:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TwinPendulumWorld:
     """
     Two pendulums whose bodies, joints and servos carry the same names.
@@ -117,18 +117,18 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
         pendulums never touch each other.
     :return: The added pendulum, named the same as every other pendulum.
     """
-    base = Body(name=PrefixedName("base"))
+    base = Body(name=PrefixedName(name="base"))
     # the two arms hang at different heights so they never touch each other
-    arm = box_body(PrefixedName("arm"), x=0.1)
-    mirrored_arm = box_body(PrefixedName("mirrored_arm"), x=0.1, z=0.1)
+    arm = box_body(PrefixedName(name="arm"), x=0.1)
+    mirrored_arm = box_body(PrefixedName(name="mirrored_arm"), x=0.1, z=0.1)
     degree_of_freedom = DegreeOfFreedom(
-        name=PrefixedName("hinge"),
+        name=PrefixedName(name="hinge"),
         limits=DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=-1.0, upper_position=1.0
         ),
     )
     servo = PositionServo(
-        name=PrefixedName("hinge_servo"),
+        name=PrefixedName(name="hinge_servo"),
         gains=ServoGains(stiffness=50.0, damping=5.0, torque_limit=2.0),
     )
     servo.add_dof(degree_of_freedom)
@@ -147,7 +147,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=arm)
             ),
-            name=PrefixedName("hinge"),
+            name=PrefixedName(name="hinge"),
             parent=base,
             child=arm,
             raw_dof=degree_of_freedom,
@@ -157,7 +157,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=mirrored_arm)
             ),
-            name=PrefixedName("mirrored_hinge"),
+            name=PrefixedName(name="mirrored_hinge"),
             parent=base,
             child=mirrored_arm,
             raw_dof=degree_of_freedom,
@@ -171,7 +171,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
 @pytest.fixture
 def twin_pendulum_world() -> TwinPendulumWorld:
     world = World()
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     with world.modify_world():
         world.add_body(root)
     pendulums = [
@@ -193,14 +193,14 @@ def built_twin_pendulums(twin_pendulum_world, tmp_path) -> MujocoBuilder:
 
 
 def test_an_element_is_named_after_the_short_name_of_its_entity():
-    handle = Body(name=PrefixedName("handle", "mug"))
+    handle = Body(name=PrefixedName(name="handle", prefix="mug"))
 
     assert SimulatorElementNames().assign(handle) == handle.name.name
 
 
 def test_the_second_of_two_equally_named_entities_is_told_apart_by_its_id():
-    first = Body(name=PrefixedName("handle", "mug_a"))
-    second = Body(name=PrefixedName("handle", "mug_b"))
+    first = Body(name=PrefixedName(name="handle", prefix="mug_a"))
+    second = Body(name=PrefixedName(name="handle", prefix="mug_b"))
     element_names = SimulatorElementNames()
 
     assert element_names.assign(first) == "handle"
@@ -332,7 +332,7 @@ def test_a_second_build_names_its_model_afresh(twin_pendulum_world, tmp_path):
 # %% simulating
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TwinFallingBoxWorld:
     """
     Two equally named boxes falling freely from different heights.
@@ -352,8 +352,8 @@ class TwinFallingBoxWorld:
 @pytest.fixture
 def twin_falling_box_world() -> TwinFallingBoxWorld:
     world = World()
-    root = Body(name=PrefixedName("root"))
-    boxes = [box_body(PrefixedName("box")) for _ in range(2)]
+    root = Body(name=PrefixedName(name="root"))
+    boxes = [box_body(PrefixedName(name="box")) for _ in range(2)]
     with world.modify_world():
         world.add_body(root)
         for box, (sideways_offset, height) in zip(boxes, ((-0.5, 1.0), (0.5, 2.0))):

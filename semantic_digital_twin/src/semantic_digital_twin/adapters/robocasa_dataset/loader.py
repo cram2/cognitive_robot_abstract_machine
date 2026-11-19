@@ -78,7 +78,7 @@ except ImportError:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaTask:
     """
     A RoboCasa manipulation task bound to the
@@ -176,7 +176,7 @@ def _category_from_class_name(class_name: str) -> str:
     return "_".join(token.lower() for token in camel_case_split(class_name))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboCasaDatasetLoader:
     """
     Loader for objects, kitchen appliances, and full kitchen scenes from the RoboCasa dataset
@@ -355,7 +355,9 @@ class RoboCasaDatasetLoader:
             task.
         """
         if task_name not in self._available_task_names():
-            raise RoboCasaTaskNotFoundError(task_name, self._available_task_names())
+            raise RoboCasaTaskNotFoundError(
+                task_name=task_name, available_task_names=self._available_task_names()
+            )
 
         environment = robosuite.make(
             env_name=task_name,
@@ -593,7 +595,7 @@ class RoboCasaDatasetLoader:
                     is target_annotation_class
                 ):
                     return appliance
-        raise RoboCasaApplianceNotFoundError(category)
+        raise RoboCasaApplianceNotFoundError(category=category)
 
     @staticmethod
     def _kitchen_layouts() -> list[LayoutType]:
@@ -632,18 +634,22 @@ class RoboCasaDatasetLoader:
         )
         if not model_files:
             raise RoboCasaObjectAssetsNotFoundError(
-                category, self.self_contained_object_groups, objects_directory
+                category=category,
+                searched_object_groups=self.self_contained_object_groups,
+                objects_directory=objects_directory,
             )
         if instance_index >= len(model_files):
             raise RoboCasaObjectInstanceIndexError(
-                category,
-                instance_index,
-                len(model_files),
-                self.self_contained_object_groups,
-                objects_directory,
+                category=category,
+                requested_instance_index=instance_index,
+                available_instance_count=len(model_files),
+                searched_object_groups=self.self_contained_object_groups,
+                objects_directory=objects_directory,
             )
 
-        world = _parse_robosuite_mjcf(MJCFParser(str(model_files[instance_index])))
+        world = _parse_robosuite_mjcf(
+            MJCFParser(file_path=str(model_files[instance_index]))
+        )
         self._apply_object_semantics(world, category)
         return world
 
@@ -682,7 +688,7 @@ class RoboCasaDatasetLoader:
         """
         bodies_with_collision = world.bodies_with_collision
         if not bodies_with_collision:
-            raise RoboCasaObjectHasNoCollisionError(category)
+            raise RoboCasaObjectHasNoCollisionError(category=category)
         self._attach_semantic_annotation(world, bodies_with_collision[0], category)
 
     def _attach_semantic_annotation(

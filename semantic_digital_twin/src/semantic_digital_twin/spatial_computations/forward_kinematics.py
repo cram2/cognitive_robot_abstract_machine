@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import ModelRevision
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ForwardKinematicsManager(ModelChangeCallback):
     """
     Visitor class for collection various forward kinematics expressions in a world

@@ -46,8 +46,8 @@ from semantic_digital_twin.world_description.world_entity import (
 def hsrb() -> HSRB:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    return RobotSpecification(HSRB).spawn(world)
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    return RobotSpecification(semantic_annotation_type=HSRB).spawn(world)
 
 
 def _simulated_base_pose(
@@ -322,10 +322,10 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
         world.root, hsrb.end_effector.tool_frame
     )[:3, 3]
 
-    support = Body(name=PrefixedName("support"))
-    support_scale = Scale(0.2, 0.2, 0.2)
+    support = Body(name=PrefixedName(name="support"))
+    support_scale = Scale(x=0.2, y=0.2, z=0.2)
     support.collision = ShapeCollection(
-        [
+        shapes=[
             Box(
                 origin=HomogeneousTransformationMatrix(reference_frame=support),
                 scale=support_scale,
@@ -333,9 +333,9 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
         ],
         reference_frame=support,
     )
-    carton = Body(name=PrefixedName("carton"))
+    carton = Body(name=PrefixedName(name="carton"))
     carton.collision = ShapeCollection(
-        [
+        shapes=[
             Box(
                 origin=HomogeneousTransformationMatrix(reference_frame=carton),
                 scale=carton_scale,
@@ -375,7 +375,7 @@ def test_the_closed_hand_keeps_a_carton_while_the_arm_lifts_it(hsrb):
     MuJoCo's default friction cone lets a held object slide out under its own weight, so
     the simulation resolves friction exactly, as a demo carrying objects does.
     """
-    carton = _carton_between_the_open_fingers(hsrb, Scale(0.06, 0.06, 0.2))
+    carton = _carton_between_the_open_fingers(hsrb, Scale(x=0.06, y=0.06, z=0.2))
     lift = 0.15
 
     simulation = MujocoSim(
@@ -458,7 +458,7 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_base_back(hsrb):
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
     with world.modify_world():
         Floor.create_with_new_body_from_polytope_in_world(
             name="floor",
@@ -470,7 +470,7 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_base_back(hsrb):
                 Point3(-3, 3, 0),
             ],
         )
-    hsrb_on_the_floor = RobotSpecification(HSRB).spawn(world)
+    hsrb_on_the_floor = RobotSpecification(semantic_annotation_type=HSRB).spawn(world)
 
     reached = []
     for robot in (hsrb, hsrb_on_the_floor):

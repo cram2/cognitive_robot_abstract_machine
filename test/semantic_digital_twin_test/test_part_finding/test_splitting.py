@@ -111,9 +111,9 @@ def annotated_mug(world: World | None = None) -> Mug:
     :return: A mug, alone in its world, whose handle is still part of its body's shape.
     """
     world = world or World()
-    body = Body(name=PrefixedName("mug"))
+    body = Body(name=PrefixedName(name="mug"))
     shapes = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mug(), origin=HomogeneousTransformationMatrix(reference_frame=body)
             )
@@ -276,7 +276,7 @@ def test_the_pieces_keep_the_colors_of_the_faces_they_were_cut_from():
     split.rest.visual.face_colors = [0, 0, 255, 255]
     mesh = trimesh.util.concatenate([split.part, split.rest])
     shapes = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mesh,
                 origin=HomogeneousTransformationMatrix(reference_frame=annotation.root),
@@ -309,7 +309,7 @@ def test_parts_of_the_same_type_split_off_the_same_body_share_a_name():
 
 def test_shapes_without_a_reference_frame_are_taken_relative_to_the_body():
     annotation = annotated_mug()
-    shapes = ShapeCollection([Mesh.from_trimesh(mesh=mug())])
+    shapes = ShapeCollection(shapes=[Mesh.from_trimesh(mesh=mug())])
 
     with annotation._world.modify_world():
         annotation.root.update_shapes(visual=shapes, collision=shapes)
@@ -325,13 +325,13 @@ def test_the_mesh_pieces_are_cut_from_copies_none_of_the_shapes(monkeypatch):
     Copying a mesh with per-vertex colours makes trimesh convert its colours, which for
     a scanned scene costs seconds and the memory of the whole scan.
     """
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     source = trimesh.creation.box()
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
     shape = Mesh.from_trimesh(
         mesh=source, origin=HomogeneousTransformationMatrix(reference_frame=body)
     )
-    colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
+    colored = ColoredShape(shapes=ShapeCollection(shapes=[shape], reference_frame=body))
     shape.mesh
 
     def copy(mesh: trimesh.Trimesh, **kwargs) -> trimesh.Trimesh:
@@ -345,7 +345,7 @@ def test_the_mesh_pieces_are_cut_from_copies_none_of_the_shapes(monkeypatch):
 def test_the_faces_of_a_textured_shape_take_the_colour_of_its_texture(tmp_path):
     texture_file = tmp_path / "red.png"
     Image.new("RGB", (4, 4), color=(255, 0, 0)).save(texture_file)
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     box = trimesh.creation.box()
     corner_uv = np.tile([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], (len(box.faces), 1))
     shape = Mesh.from_trimesh(
@@ -355,7 +355,7 @@ def test_the_faces_of_a_textured_shape_take_the_colour_of_its_texture(tmp_path):
         origin=HomogeneousTransformationMatrix(reference_frame=body),
     )
 
-    colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
+    colored = ColoredShape(shapes=ShapeCollection(shapes=[shape], reference_frame=body))
 
     assert (colored.mesh.visual.face_colors == [255, 0, 0, 255]).all()
 
@@ -383,7 +383,7 @@ def mug_with_own_collision() -> Mug:
     annotation = annotated_mug()
     body = annotation.root
     hull = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mug().convex_hull,
                 origin=HomogeneousTransformationMatrix(reference_frame=body),

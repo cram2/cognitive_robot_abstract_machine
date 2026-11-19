@@ -24,7 +24,7 @@ TWorldEntity = TypeVar("TWorldEntity", bound=WorldEntity)
 # %% specification base classes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NamedSpecification(ABC):
     """
     Base for every specification: it carries a name and normalizes it.
@@ -59,7 +59,7 @@ class NamedSpecification(ABC):
         return PrefixedName(name=used_name)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
     """
     Specification for a world entity that materializes itself together with the

@@ -90,8 +90,10 @@ def _box_resting_on(
         rather than only their bounding boxes meeting.
     """
     box = Body(
-        name=PrefixedName("resting_box"),
-        collision=ShapeCollection([Box(scale=Scale(BOX_SIZE, BOX_SIZE, BOX_SIZE))]),
+        name=PrefixedName(name="resting_box"),
+        collision=ShapeCollection(
+            shapes=[Box(scale=Scale(x=BOX_SIZE, y=BOX_SIZE, z=BOX_SIZE))]
+        ),
     )
     with world.modify_world():
         world.add_connection(
@@ -213,14 +215,16 @@ def _box_inside(world: World, container: Body) -> Body:
     middle_y = (bounds.min_y + bounds.max_y) / 2
     middle_z = (bounds.min_z + bounds.max_z) / 2
     shelf = Body(
-        name=PrefixedName("shelf"),
+        name=PrefixedName(name="shelf"),
         collision=ShapeCollection(
-            [Box(scale=Scale(SHELF_WIDTH, SHELF_WIDTH, SHELF_THICKNESS))]
+            shapes=[Box(scale=Scale(x=SHELF_WIDTH, y=SHELF_WIDTH, z=SHELF_THICKNESS))]
         ),
     )
     box = Body(
-        name=PrefixedName("contained_box"),
-        collision=ShapeCollection([Box(scale=Scale(BOX_SIZE, BOX_SIZE, BOX_SIZE))]),
+        name=PrefixedName(name="contained_box"),
+        collision=ShapeCollection(
+            shapes=[Box(scale=Scale(x=BOX_SIZE, y=BOX_SIZE, z=BOX_SIZE))]
+        ),
     )
     with world.modify_world():
         world.add_connection(

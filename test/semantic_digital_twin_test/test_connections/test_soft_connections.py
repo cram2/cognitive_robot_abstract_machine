@@ -100,7 +100,7 @@ class TestSoftTrunk:
         Ensures SoftTrunk is correctly registered as a SemanticAnnotation.
         """
         world = World()
-        sections = [SoftTrunkSection(0.5, 0.02, 5)]
+        sections = [SoftTrunkSection(length=0.5, radius=0.02, resolution=5)]
         SoftTrunk.build_piecewise_constant_curvature(world, sections)
 
         # Find by type in the world
@@ -125,9 +125,9 @@ class TestSoftConnectionFactories:
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
         )
-        kappa = DegreeOfFreedom(name=PrefixedName("kappa"), limits=limits)
-        phi = DegreeOfFreedom(name=PrefixedName("phi"), limits=limits)
-        tip = Body(name=PrefixedName("tip"))
+        kappa = DegreeOfFreedom(name=PrefixedName(name="kappa"), limits=limits)
+        phi = DegreeOfFreedom(name=PrefixedName(name="phi"), limits=limits)
+        tip = Body(name=PrefixedName(name="tip"))
 
         with world.modify_world():
             world.add_degree_of_freedom(kappa)
@@ -157,10 +157,10 @@ class TestSoftConnectionFactories:
             lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
         )
         strain_dofs = {
-            name: DegreeOfFreedom(name=PrefixedName(name), limits=limits)
+            name: DegreeOfFreedom(name=PrefixedName(name=name), limits=limits)
             for name in ("bending_x", "bending_y", "torsion", "extension")
         }
-        tip = Body(name=PrefixedName("tip"))
+        tip = Body(name=PrefixedName(name="tip"))
 
         with world.modify_world():
             for dof in strain_dofs.values():
@@ -227,7 +227,8 @@ class TestSoftConnectionRebuilding:
         segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
 
         copied_segment = segment.copy_with_new_parent(
-            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+            Body(name=PrefixedName(name="new_parent")),
+            HomogeneousTransformationMatrix(),
         )
 
         assert copied_segment.name == segment.name
@@ -237,7 +238,8 @@ class TestSoftConnectionRebuilding:
         segment = world.get_connections_by_type(CosseratRodConnection)[0]
 
         copied_segment = segment.copy_with_new_parent(
-            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+            Body(name=PrefixedName(name="new_parent")),
+            HomogeneousTransformationMatrix(),
         )
 
         assert copied_segment.name == segment.name

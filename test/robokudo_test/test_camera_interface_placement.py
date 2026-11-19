@@ -81,7 +81,7 @@ class TestWorldFrame:
         """
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName("root_of_another_world")))
+            world.add_body(Body(name=PrefixedName(name="root_of_another_world")))
         names_before = [body.name for body in world.bodies]
 
         with pytest.raises(UnknownWorldFrameError):
@@ -104,7 +104,7 @@ class TestCameraPerceptionMounts:
         """
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+            world.add_body(Body(name=PrefixedName(name=FrameName.WORLD)))
         bound_pose(world, camera_pose(x=1.0))
         world_T_camera = camera_pose(x=2.0)
 
@@ -298,7 +298,7 @@ def robot_camera_frames() -> list[str]:
     """
     return [
         FrameName.CAMERA,
-        str(PrefixedName(FrameName.CAMERA, prefix=RobotName.ROBOT)),
+        str(PrefixedName(name=FrameName.CAMERA, prefix=RobotName.ROBOT)),
     ]
 
 
@@ -310,7 +310,7 @@ def annotate_robot_camera(world: World) -> Camera:
     :param world: A world from :func:`world_with_a_head_camera` for that robot.
     :return: The camera annotation.
     """
-    camera_name = PrefixedName(FrameName.CAMERA, prefix=RobotName.ROBOT)
+    camera_name = PrefixedName(name=FrameName.CAMERA, prefix=RobotName.ROBOT)
     camera = Camera(
         name=camera_name,
         root=world.get_body_by_name(camera_name),
@@ -349,7 +349,7 @@ class TestCameraOfARobotWhosePartsCarryItsName:
 
         assert [body.id for body in world.bodies] == body_ids_before
         assert cas.camera_observation.camera.root is world.get_body_by_name(
-            PrefixedName(FrameName.CAMERA, prefix=RobotName.ROBOT)
+            PrefixedName(name=FrameName.CAMERA, prefix=RobotName.ROBOT)
         )
 
     @pytest.mark.parametrize("camera_frame", robot_camera_frames())

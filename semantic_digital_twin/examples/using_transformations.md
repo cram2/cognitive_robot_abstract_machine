@@ -48,19 +48,19 @@ world = World()
 root = Body(name=PrefixedName(name="root", prefix="world"))
 
 # Geometry for a square base plate and a "camera" box
-base_plate_shape = Box(scale=Scale(0.6, 0.6, 0.05), color=Color.from_rgba(red=0.3, green=0.3, blue=0.3, opacity=1.0))
-camera_shape = Box(scale=Scale(0.10, 0.06, 0.05), color=Color.from_rgba(red=0.1, green=0.2, blue=0.8, opacity=1.0))
+base_plate_shape = Box(scale=Scale(x=0.6, y=0.6, z=0.05), color=Color.from_rgba(red=0.3, green=0.3, blue=0.3, opacity=1.0))
+camera_shape = Box(scale=Scale(x=0.10, y=0.06, z=0.05), color=Color.from_rgba(red=0.1, green=0.2, blue=0.8, opacity=1.0))
 
 base_body = Body(
     name=PrefixedName(name="base", prefix="transform_example"),
-    visual=ShapeCollection([base_plate_shape]),
-    collision=ShapeCollection([base_plate_shape]),
+    visual=ShapeCollection(shapes=[base_plate_shape]),
+    collision=ShapeCollection(shapes=[base_plate_shape]),
 )
 
 camera_body = Body(
     name=PrefixedName(name="camera", prefix="transform_example"),
-    visual=ShapeCollection([camera_shape]),
-    collision=ShapeCollection([camera_shape]),
+    visual=ShapeCollection(shapes=[camera_shape]),
+    collision=ShapeCollection(shapes=[camera_shape]),
 )
 
 
@@ -89,7 +89,7 @@ with world.modify_world():
     base_C_camera.origin = base_T_camera
 
 # Visualize
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -136,7 +136,7 @@ base_T_camera_moved = base_T_camera @ camera_T_camera_offset
 with world.modify_world():
     base_C_camera.origin = base_T_camera_moved
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -152,7 +152,7 @@ new_world_T_base = world_T_base @ base_T_base_rot
 with world.modify_world():
     world_C_base.origin = new_world_T_base
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

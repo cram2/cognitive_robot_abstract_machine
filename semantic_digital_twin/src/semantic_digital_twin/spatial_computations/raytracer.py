@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 
 # %% World ray tracing
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RayTracer:
     """
     Trace world geometry and render camera segmentation, depth, and color images.

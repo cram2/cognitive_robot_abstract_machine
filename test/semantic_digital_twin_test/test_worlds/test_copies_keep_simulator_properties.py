@@ -60,8 +60,8 @@ def simulated_world() -> World:
     actuator driving a degree of freedom that no connection uses, like a tendon.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    arm = Body(name=PrefixedName("arm"))
+    root = Body(name=PrefixedName(name="root"))
+    arm = Body(name=PrefixedName(name="arm"))
     arm.add_simulator_property(GravityCompensation(fraction=0.5))
     with world.modify_world():
         world.add_simulator_property(MujocoTendon(name="coupling"))
@@ -73,9 +73,9 @@ def simulated_world() -> World:
         )
         hinge.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
         world.add_connection(hinge)
-        tendon = DegreeOfFreedom(name=PrefixedName("tendon"))
+        tendon = DegreeOfFreedom(name=PrefixedName(name="tendon"))
         world.add_degree_of_freedom(tendon)
-        actuator = Actuator(name=PrefixedName("grip"))
+        actuator = Actuator(name=PrefixedName(name="grip"))
         actuator.add_dof(tendon)
         world.add_actuator(actuator)
     return world
@@ -104,7 +104,7 @@ def test_merge_keeps_degree_of_freedom_only_an_actuator_drives(
 ):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
 
     world.merge_world(simulated_world)
 
@@ -116,7 +116,7 @@ def test_removing_a_branch_removes_the_actuators_of_its_joints(
     simulated_world: World,
 ):
     hinge = simulated_world.connections[0]
-    joint_actuator = Actuator(name=PrefixedName("arm_motor"))
+    joint_actuator = Actuator(name=PrefixedName(name="arm_motor"))
     joint_actuator.add_dof(hinge.dof)
     with simulated_world.modify_world():
         simulated_world.add_actuator(joint_actuator)
@@ -159,7 +159,7 @@ def test_merge_keeps_properties_of_world_body_and_connection(simulated_world: Wo
     )
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
 
     world.merge_world(simulated_world)
 
@@ -173,7 +173,7 @@ def test_merge_keeps_properties_of_world_body_and_connection(simulated_world: Wo
 def test_merge_with_unique_property_in_both_worlds_raises(simulated_world: World):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
     with world.modify_world():
         world.add_simulator_property(GravityCompensation(fraction=1.0))
     with simulated_world.modify_world():
@@ -188,7 +188,7 @@ def test_failed_merge_leaves_receiving_world_properties_unchanged(
 ):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
     with world.modify_world():
         world.add_simulator_property(GravityCompensation(fraction=1.0))
     with simulated_world.modify_world():
@@ -204,7 +204,7 @@ def test_failed_merge_leaves_receiving_world_properties_unchanged(
 def test_failed_merge_leaves_merged_world_unchanged(simulated_world: World):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
     with world.modify_world():
         world.add_simulator_property(GravityCompensation(fraction=1.0))
     with simulated_world.modify_world():
@@ -223,7 +223,7 @@ def test_failed_merge_leaves_merged_world_unchanged(simulated_world: World):
 def test_merge_records_moving_the_world_properties(simulated_world: World):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
 
     world.merge_world(simulated_world)
 
@@ -242,7 +242,7 @@ def test_world_property_addition_survives_json(simulated_world: World):
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
     sent = AddWorldSimulatorPropertyModification(
         simulator_property=MujocoTendon(name="coupling")
     )
@@ -403,7 +403,9 @@ def test_copy_keeps_connection_properties(
     world = World()
     with world.modify_world():
         connection = connect(
-            world, Body(name=PrefixedName("parent")), Body(name=PrefixedName("child"))
+            world,
+            Body(name=PrefixedName(name="parent")),
+            Body(name=PrefixedName(name="child")),
         )
         connection.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
         world.add_connection(connection)
@@ -451,7 +453,7 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
     hinge = simulated_world.connections[0]
 
     moved = hinge.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName(name="new_parent")), HomogeneousTransformationMatrix()
     )
 
     assert (
@@ -464,7 +466,7 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
 def test_connection_with_new_child_has_its_own_properties(simulated_world: World):
     hinge = simulated_world.connections[0]
 
-    moved = hinge.copy_with_new_child(Body(name=PrefixedName("new_child")))
+    moved = hinge.copy_with_new_child(Body(name=PrefixedName(name="new_child")))
 
     assert (
         moved.simulator_additional_properties == hinge.simulator_additional_properties

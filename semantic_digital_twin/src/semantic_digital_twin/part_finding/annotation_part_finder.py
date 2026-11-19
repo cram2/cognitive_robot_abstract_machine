@@ -24,7 +24,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnnotationPartFinder:
     """
     Gives an annotation with a root body the parts its part-whole relationships call for

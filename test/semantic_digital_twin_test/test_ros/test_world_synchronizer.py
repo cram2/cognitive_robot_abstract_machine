@@ -114,29 +114,35 @@ def create_dummy_world(w: World | None = None) -> World:
     id2 = deterministic_uuid("id2")
     if w is None:
         w = World()
-    b1 = Body(name=PrefixedName("b1"), id=id1)
-    b2 = Body(name=PrefixedName("b2"), id=id2)
+    b1 = Body(name=PrefixedName(name="b1"), id=id1)
+    b2 = Body(name=PrefixedName(name="b2"), id=id2)
     with w.modify_world():
-        x_dof = DegreeOfFreedom(name=PrefixedName("x"), id=deterministic_uuid("x_dof"))
+        x_dof = DegreeOfFreedom(
+            name=PrefixedName(name="x"), id=deterministic_uuid("x_dof")
+        )
         w.add_degree_of_freedom(x_dof)
-        y_dof = DegreeOfFreedom(name=PrefixedName("y"), id=deterministic_uuid("y_dof"))
+        y_dof = DegreeOfFreedom(
+            name=PrefixedName(name="y"), id=deterministic_uuid("y_dof")
+        )
         w.add_degree_of_freedom(y_dof)
-        z_dof = DegreeOfFreedom(name=PrefixedName("z"), id=deterministic_uuid("z_dof"))
+        z_dof = DegreeOfFreedom(
+            name=PrefixedName(name="z"), id=deterministic_uuid("z_dof")
+        )
         w.add_degree_of_freedom(z_dof)
         qx_dof = DegreeOfFreedom(
-            name=PrefixedName("qx"), id=deterministic_uuid("qx_dof")
+            name=PrefixedName(name="qx"), id=deterministic_uuid("qx_dof")
         )
         w.add_degree_of_freedom(qx_dof)
         qy_dof = DegreeOfFreedom(
-            name=PrefixedName("qy"), id=deterministic_uuid("qy_dof")
+            name=PrefixedName(name="qy"), id=deterministic_uuid("qy_dof")
         )
         w.add_degree_of_freedom(qy_dof)
         qz_dof = DegreeOfFreedom(
-            name=PrefixedName("qz"), id=deterministic_uuid("qz_dof")
+            name=PrefixedName(name="qz"), id=deterministic_uuid("qz_dof")
         )
         w.add_degree_of_freedom(qz_dof)
         qw_dof = DegreeOfFreedom(
-            name=PrefixedName("qw"), id=deterministic_uuid("qw_dof")
+            name=PrefixedName(name="qw"), id=deterministic_uuid("qw_dof")
         )
         w.add_degree_of_freedom(qw_dof)
         w.state[qw_dof.id].position = 1.0
@@ -360,7 +366,7 @@ def test_a_reloaded_world_keeps_the_ones_listening_to_it(
 
     try:
         with publisher_world.modify_world():
-            reloaded_body = Body(name=PrefixedName("reload_keeps_listeners_body"))
+            reloaded_body = Body(name=PrefixedName(name="reload_keeps_listeners_body"))
             publisher_world.add_body(reloaded_body)
             publisher_world.add_connection(
                 FixedConnection(parent=publisher_world.root, child=reloaded_body)
@@ -386,7 +392,7 @@ def test_a_reloaded_world_keeps_the_ones_listening_to_it(
         receiver_synchronizer.close()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PublisherWithAppearingSubscribers:
     """
     Stands in for a publisher whose subscribers turn up one after the other.
@@ -505,7 +511,7 @@ def test_a_world_modified_right_after_its_synchronizer_was_created_is_published(
     try:
         with publisher_world.modify_world():
             publisher_world.add_body(
-                Body(name=PrefixedName("modified_right_after_creation_body"))
+                Body(name=PrefixedName(name="modified_right_after_creation_body"))
             )
 
         assert wait_for_condition(
@@ -536,7 +542,7 @@ def test_model_synchronization_body_only(rclpy_node):
     )
 
     with w1.modify_world():
-        new_body = Body(name=PrefixedName("b3"))
+        new_body = Body(name=PrefixedName(name="b3"))
         b3_id = new_body.id
         w1.add_kinematic_structure_entity(new_body)
 
@@ -565,10 +571,10 @@ def test_model_synchronization_creation_only(rclpy_node):
     )
 
     with w1.modify_world():
-        b2 = Body(name=PrefixedName("b2"))
+        b2 = Body(name=PrefixedName(name="b2"))
         w1.add_kinematic_structure_entity(b2)
 
-        new_body = Body(name=PrefixedName("b3"))
+        new_body = Body(name=PrefixedName(name="b3"))
         w1.add_kinematic_structure_entity(new_body)
 
         c = Connection6DoF.create_with_dofs(parent=b2, child=new_body, world=w1)
@@ -665,10 +671,10 @@ def test_callback_pausing(rclpy_node):
     assert ws2._is_paused
 
     with w1.modify_world():
-        b2 = Body(name=PrefixedName("b2"))
+        b2 = Body(name=PrefixedName(name="b2"))
         w1.add_kinematic_structure_entity(b2)
 
-        new_body = Body(name=PrefixedName("b3"))
+        new_body = Body(name=PrefixedName(name="b3"))
         w1.add_kinematic_structure_entity(new_body)
 
         c = Connection6DoF.create_with_dofs(parent=b2, child=new_body, world=w1)
@@ -705,7 +711,7 @@ def test_synchronizer_keeps_receiving_while_its_world_is_modified(rclpy_node):
 
     with world.modify_world():
         assert not synchronizer._is_paused
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("b1")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="b1")))
 
     assert not synchronizer._is_paused
 
@@ -723,7 +729,7 @@ def test_modify_world_preserves_a_deliberate_pause(rclpy_node):
     synchronizer.pause()
 
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("b1")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="b1")))
 
     assert synchronizer._is_paused
 
@@ -745,11 +751,11 @@ def test_ChangeDifHasHardwareInterface(rclpy_node):
 
     try:
         with w1.modify_world():
-            body1 = Body(name=PrefixedName("b1"))
-            body2 = Body(name=PrefixedName("b2"))
+            body1 = Body(name=PrefixedName(name="b1"))
+            body2 = Body(name=PrefixedName(name="b2"))
             w1.add_kinematic_structure_entity(body1)
             w1.add_kinematic_structure_entity(body2)
-            dof = DegreeOfFreedom(name=PrefixedName("dof"))
+            dof = DegreeOfFreedom(name=PrefixedName(name="dof"))
             w1.add_degree_of_freedom(dof)
             connection = ScrewAxisConnection(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -800,7 +806,7 @@ def test_semantic_annotation_modifications(rclpy_node):
         _world=w2,
     )
 
-    b1 = Body(name=PrefixedName("b1"))
+    b1 = Body(name=PrefixedName(name="b1"))
     v1 = Handle(root=b1)
     v2 = Door(root=b1, handle=v1)
 
@@ -821,7 +827,7 @@ def test_semantic_annotation_modifications_merge_world(rclpy_node):
     synchronized with it.
     """
     w0 = World(name="w0")
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     with w0.modify_world():
         w0.add_body(root)
 
@@ -875,11 +881,11 @@ def test_semantic_annotation_change_parameter_during_same_modification_block(
         node=rclpy_node,
         _world=w2,
     )
-    root = Body(name=PrefixedName("root"))
-    b1 = Body(name=PrefixedName("b1"))
+    root = Body(name=PrefixedName(name="root"))
+    b1 = Body(name=PrefixedName(name="b1"))
     drawer = Drawer(root=b1)
 
-    b2 = Body(name=PrefixedName("b2"))
+    b2 = Body(name=PrefixedName(name="b2"))
     handle = Handle(root=b2)
 
     with w1.modify_world():
@@ -910,8 +916,8 @@ def test_synchronize_6dof(rclpy_node):
     ws1 = WorldSynchronizer(node=rclpy_node, _world=w1)
     ws2 = WorldSynchronizer(node=rclpy_node, _world=w2)
 
-    b1 = Body(name=PrefixedName("b1"))
-    b2 = Body(name=PrefixedName("b2"))
+    b1 = Body(name=PrefixedName(name="b1"))
+    b2 = Body(name=PrefixedName(name="b2"))
 
     with w1.modify_world():
         w1.add_body(b1)
@@ -991,7 +997,7 @@ def test_attribute_updates(rclpy_node):
         _world=world2,
     )
 
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     with world1.modify_world():
         world1.add_body(root)
     time.sleep(1)
@@ -999,7 +1005,7 @@ def test_attribute_updates(rclpy_node):
         fridge = Fridge.create_with_new_body_in_world(
             name="case",
             world=world1,
-            scale=Scale(1, 1, 2.0),
+            scale=Scale(x=1, y=1, z=2.0),
         )
         door = Door.create_with_new_body_in_world(
             name="left_door",
@@ -1023,7 +1029,7 @@ def test_attribute_updates(rclpy_node):
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TestAnnotation(SemanticAnnotation):
     value: str = "default"
     entity: Body | None = None
@@ -1056,9 +1062,9 @@ def test_synchronized_attribute_modification(rclpy_node):
     time.sleep(0.5)
 
     # 1. Add TestAnnotation and some bodies to w1
-    b1 = Body(name=PrefixedName("b1"))
-    b2 = Body(name=PrefixedName("b2"))
-    anno = TestAnnotation(name=PrefixedName("anno"))
+    b1 = Body(name=PrefixedName(name="b1"))
+    b2 = Body(name=PrefixedName(name="b2"))
+    anno = TestAnnotation(name=PrefixedName(name="anno"))
 
     with w1.modify_world():
         w1.add_body(b1)
@@ -1125,8 +1131,8 @@ def test_attribute_update_modification_apply_direct():
     An attribute update applied directly to a world changes the attributes it names.
     """
     w = World(name="w")
-    b1 = Body(name=PrefixedName("b1"))
-    anno = TestAnnotation(name=PrefixedName("anno"))
+    b1 = Body(name=PrefixedName(name="b1"))
+    anno = TestAnnotation(name=PrefixedName(name="anno"))
     with w.modify_world():
         w.add_body(b1)
         w.add_semantic_annotation(anno)
@@ -1190,7 +1196,7 @@ def test_skipping_incorrect_message(rclpy_node):
     )
 
     with w1.modify_world():
-        new_body = Body(name=PrefixedName("b3"))
+        new_body = Body(name=PrefixedName(name="b3"))
         w1.add_kinematic_structure_entity(new_body)
 
     time.sleep(0.2)
@@ -1227,7 +1233,7 @@ def test_world_simultaneous_synchronization_stress_test(
     )
 
     with w1.modify_world():
-        new_body = Body(name=PrefixedName("b3"))
+        new_body = Body(name=PrefixedName(name="b3"))
         w1.add_kinematic_structure_entity(new_body)
 
     w1_ids, w2_ids = wait_for_sync_kse_and_return_ids(w1, w2)
@@ -1268,7 +1274,7 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
     )
 
     with w1.modify_world():
-        new_body = Body(name=PrefixedName("b3"))
+        new_body = Body(name=PrefixedName(name="b3"))
         w1.add_kinematic_structure_entity(new_body)
 
     time.sleep(0.5)
@@ -1307,7 +1313,7 @@ def test_dont_publish_changes(rclpy_node):
     )
 
     with w1.modify_world(publish_changes=False):
-        b1 = Body(name=PrefixedName("b1"))
+        b1 = Body(name=PrefixedName(name="b1"))
         w1.add_body(b1)
 
     assert len(w1.kinematic_structure_entities) - 1 == len(
@@ -1359,8 +1365,8 @@ def test_simultaneous_state_and_model_updates(rclpy_node):
     w1 = World(name="w1")
     w2 = World(name="w2")
 
-    b1 = Body(name=PrefixedName("b1"))
-    b2 = Body(name=PrefixedName("b2"))
+    b1 = Body(name=PrefixedName(name="b1"))
+    b2 = Body(name=PrefixedName(name="b2"))
 
     ws1 = WorldSynchronizer(node=rclpy_node, _world=w1)
     ws2 = WorldSynchronizer(node=rclpy_node, _world=w2)
@@ -1405,7 +1411,7 @@ def test_two_parallel_modify_world_on_same_instance_are_serialized():
 
     # Seed a single root so the world remains a tree.
     with w.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         w.add_body(root)
 
     start_barrier = threading.Barrier(2)
@@ -1415,7 +1421,7 @@ def test_two_parallel_modify_world_on_same_instance_are_serialized():
         start_barrier.wait(timeout=2.0)
         with w.modify_world():
             for i in range(count):
-                b = Body(name=PrefixedName(f"{prefix}_{i}"))
+                b = Body(name=PrefixedName(name=f"{prefix}_{i}"))
                 w.add_body(b)
                 # Keep the graph a tree: attach to root
                 w.add_connection(FixedConnection(parent=root, child=b))
@@ -1459,7 +1465,7 @@ def test_state_changed_inside_a_model_change_arrives_with_the_model(rclpy_node):
         ws2 = WorldSynchronizer(node=receiver_node, _world=w2)
 
         with w1.modify_world():
-            w1.add_body(Body(name=PrefixedName("b")))
+            w1.add_body(Body(name=PrefixedName(name="b")))
             # change the state while still inside the modification to stress ordering
             if len(w1.state) > 0:
                 w1.state._data[0, 0] = 0.5
@@ -1499,7 +1505,7 @@ def test_model_change_arrives_while_state_updates_are_published(rclpy_node):
 
         # Seed a root
         with w1.modify_world():
-            root = Body(name=PrefixedName("seed"))
+            root = Body(name=PrefixedName(name="seed"))
             w1.add_body(root)
 
         time.sleep(0.3)
@@ -1521,7 +1527,7 @@ def test_model_change_arrives_while_state_updates_are_published(rclpy_node):
 
         # Synchronous model update that preserves tree invariant
         with w1.modify_world():
-            new_part = Body(name=PrefixedName("new_part"))
+            new_part = Body(name=PrefixedName(name="new_part"))
             w1.add_body(new_part)
             w1.add_connection(
                 Connection6DoF.create_with_dofs(parent=root, child=new_part, world=w1)
@@ -1547,8 +1553,8 @@ def test_read_operations_inside_modify_world_do_not_deadlock():
     """
     w = World(name="w")
     with w.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
         w.add_body(b1)
         w.add_body(b2)
         w.add_connection(FixedConnection(parent=b1, child=b2))
@@ -1566,8 +1572,8 @@ def test_state_diff_during_concurrent_dof_add_remove_is_consistent(rclpy_node):
     ss = WorldSynchronizer(node=rclpy_node, _world=w)
 
     with w.modify_world():
-        b1 = Body(name=PrefixedName("b1"))
-        b2 = Body(name=PrefixedName("b2"))
+        b1 = Body(name=PrefixedName(name="b1"))
+        b2 = Body(name=PrefixedName(name="b2"))
         w.add_body(b1)
         w.add_body(b2)
         c = Connection6DoF.create_with_dofs(parent=b1, child=b2, world=w)
@@ -1580,7 +1586,7 @@ def test_state_diff_during_concurrent_dof_add_remove_is_consistent(rclpy_node):
         i = 0
         while not stop.is_set() and i < 10:
             with w.modify_world():
-                x = Body(name=PrefixedName(f"x{i}"))
+                x = Body(name=PrefixedName(name=f"x{i}"))
                 w.add_body(x)
                 cc = Connection6DoF.create_with_dofs(parent=b1, child=x, world=w)
                 w.add_connection(cc)
@@ -1622,7 +1628,7 @@ def test_bidirectional_nested_modify_worlds_no_deadlock(rclpy_node):
     ms2 = WorldSynchronizer(node=rclpy_node, _world=w2)
 
     with w1.modify_world():
-        w1.add_body(Body(name=PrefixedName("root1")))
+        w1.add_body(Body(name=PrefixedName(name="root1")))
 
     time.sleep(0.1)
     assert w2.root
@@ -1666,10 +1672,10 @@ def test_reentrant_modify_world_same_thread():
     """
     w = World(name="w")
     with w.modify_world():
-        outer = Body(name=PrefixedName("outer"))
+        outer = Body(name=PrefixedName(name="outer"))
         w.add_body(outer)
         with w.modify_world():
-            inner = Body(name=PrefixedName("inner"))
+            inner = Body(name=PrefixedName(name="inner"))
             w.add_body(inner)
             w.add_connection(FixedConnection(parent=outer, child=inner))
     assert {b.name.name.split("/", 1)[-1] for b in w.kinematic_structure_entities} == {
@@ -1735,8 +1741,8 @@ def test_world_synchronizer_basic_model_sync(rclpy_node):
     ws1 = WorldSynchronizer(node=rclpy_node, _world=w1)
     ws2 = WorldSynchronizer(node=rclpy_node, _world=w2)
 
-    b1 = Body(name=PrefixedName("ws_b1"))
-    b2 = Body(name=PrefixedName("ws_b2"))
+    b1 = Body(name=PrefixedName(name="ws_b1"))
+    b2 = Body(name=PrefixedName(name="ws_b2"))
     with w1.modify_world():
         w1.add_body(b1)
         w1.add_body(b2)
@@ -1779,8 +1785,8 @@ def test_world_synchronizer_ordering_no_key_error_after_model_change(rclpy_node)
 
     ws2._apply_state = catching_apply_state
 
-    b1 = Body(name=PrefixedName("ws_ord_b1"))
-    b2 = Body(name=PrefixedName("ws_ord_b2"))
+    b1 = Body(name=PrefixedName(name="ws_ord_b1"))
+    b2 = Body(name=PrefixedName(name="ws_ord_b2"))
     with w1.modify_world():
         w1.add_body(b1)
         w1.add_body(b2)
@@ -1916,8 +1922,8 @@ def test_apply_missed_messages_interleaved_model_and_state(rclpy_node):
 
     world_synchronizer_2.pause()
 
-    body_1 = Body(name=PrefixedName("interleaved_b1"))
-    body_2 = Body(name=PrefixedName("interleaved_b2"))
+    body_1 = Body(name=PrefixedName(name="interleaved_b1"))
+    body_2 = Body(name=PrefixedName(name="interleaved_b2"))
 
     with world_1.modify_world():
         world_1.add_body(body_1)
@@ -2010,7 +2016,7 @@ def test_apply_missed_messages_inside_modify_world_raises(rclpy_node):
     world_synchronizer_2.pause()
 
     with world_1.modify_world():
-        new_body = Body(name=PrefixedName("body_for_missed_in_modify"))
+        new_body = Body(name=PrefixedName(name="body_for_missed_in_modify"))
         world_1.add_kinematic_structure_entity(new_body)
 
     time.sleep(0.2)
@@ -2052,7 +2058,7 @@ def test_apply_state_does_not_deadlock_when_callback_acquires_world_lock(rclpy_n
         world_synchronizer_1 = WorldSynchronizer(node=rclpy_node, _world=world_1)
         world_synchronizer_2 = WorldSynchronizer(node=receiver_node, _world=world_2)
 
-        @dataclass(eq=False)
+        @dataclass(eq=False, kw_only=True)
         class LockAcquiringStateCallback(StateChangeCallback):
             """
             A state callback that acquires _world_lock from inside on_state_change.
@@ -2109,7 +2115,7 @@ def test_model_publish_does_not_hold_world_lock(rclpy_node):
     ms.publish = probing_publish
 
     with w.modify_world():
-        w.add_body(Body(name=PrefixedName("publish_lock_body")))
+        w.add_body(Body(name=PrefixedName(name="publish_lock_body")))
 
     ms.close()
 
@@ -2183,7 +2189,7 @@ def test_state_change_during_a_modification_is_published_after_its_model_change(
 
     try:
         with world.modify_world():
-            child_body = Body(name=PrefixedName("publication_order_child"))
+            child_body = Body(name=PrefixedName(name="publication_order_child"))
             world.add_body(child_body)
             world.add_connection(
                 Connection6DoF.create_with_dofs(
@@ -2251,7 +2257,7 @@ def test_inbound_message_deserialization_holds_world_lock(rclpy_node):
         WorldEntityWithIDKwargsTracker.from_world = staticmethod(patched_from_world)
 
         with w1.modify_world():
-            race_body = Body(name=PrefixedName("deserialize_race_body"))
+            race_body = Body(name=PrefixedName(name="deserialize_race_body"))
             w1.add_body(race_body)
             w1.add_connection(FixedConnection(parent=w1.root, child=race_body))
 
@@ -2281,7 +2287,7 @@ def test_callback_removal_during_notify_does_not_skip_callbacks():
     """
     world = World()
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class _RecordingModelCallback(ModelChangeCallback):
         fired: int = 0
         remove_self_on_fire: bool = False
@@ -2298,7 +2304,7 @@ def test_callback_removal_during_notify_does_not_skip_callbacks():
     second = _RecordingModelCallback(_world=world)
 
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName("callback_iter_body")))
+        world.add_body(Body(name=PrefixedName(name="callback_iter_body")))
 
     assert first.fired == 1, "the self-removing callback should still have fired once"
     assert second.fired == 1, (
@@ -2326,7 +2332,7 @@ def test_apply_missed_messages_is_atomic_against_concurrent_modify(rclpy_node):
     ms2.pause()
 
     with w1.modify_world():
-        toctou_body = Body(name=PrefixedName("toctou_body"))
+        toctou_body = Body(name=PrefixedName(name="toctou_body"))
         w1.add_body(toctou_body)
         w1.add_connection(FixedConnection(parent=w1.root, child=toctou_body))
 
@@ -2374,7 +2380,7 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
 
     # Build a real model-modification block (adds one DOF) on the source world.
     with source_world.modify_world():
-        new_body = Body(name=PrefixedName("atomic_body"))
+        new_body = Body(name=PrefixedName(name="atomic_body"))
         source_world.add_body(new_body)
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -2435,7 +2441,7 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
 # %% handing updates to a receiver
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdateSender:
     """
     A world whose updates are handed to a receiving synchronizer directly.
@@ -2540,7 +2546,7 @@ class WorldUpdateSender:
 # %% deferring incoming updates without silencing outgoing ones
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DelayedApplyWorldSynchronizer(WorldSynchronizer):
     """
     A synchronizer that applies a single message slowly, so another thread can append to
@@ -2580,8 +2586,8 @@ def create_connected_worlds(
     ), "the synchronizers never discovered each other"
 
     with publisher_world.modify_world():
-        parent_body = Body(name=PrefixedName(f"{name}_parent"))
-        child_body = Body(name=PrefixedName(f"{name}_child"))
+        parent_body = Body(name=PrefixedName(name=f"{name}_parent"))
+        child_body = Body(name=PrefixedName(name=f"{name}_child"))
         publisher_world.add_body(parent_body)
         publisher_world.add_body(child_body)
         publisher_world.add_connection(
@@ -2635,8 +2641,8 @@ def test_deferring_incoming_updates_keeps_outgoing_publishing_alive(rclpy_node):
 
     try:
         with world_1.modify_world():
-            parent_body = Body(name=PrefixedName("one_directional_parent"))
-            child_body = Body(name=PrefixedName("one_directional_child"))
+            parent_body = Body(name=PrefixedName(name="one_directional_parent"))
+            child_body = Body(name=PrefixedName(name="one_directional_child"))
             world_1.add_body(parent_body)
             world_1.add_body(child_body)
             world_1.add_connection(
@@ -2687,8 +2693,8 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
 
     try:
         with publisher_world.modify_world():
-            parent_body = Body(name=PrefixedName("partial_drain_parent"))
-            child_body = Body(name=PrefixedName("partial_drain_child"))
+            parent_body = Body(name=PrefixedName(name="partial_drain_parent"))
+            child_body = Body(name=PrefixedName(name="partial_drain_child"))
             publisher_world.add_body(parent_body)
             publisher_world.add_body(child_body)
             connection = ScrewAxisConnection.create_with_dofs(
@@ -2709,7 +2715,7 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
         # A model modification republishes the full state after its model block, so the
         # modification contributes a state message of its own.
         with publisher_world.modify_world():
-            late_body = Body(name=PrefixedName("partial_drain_late_body"))
+            late_body = Body(name=PrefixedName(name="partial_drain_late_body"))
             publisher_world.add_body(late_body)
             publisher_world.add_connection(
                 FixedConnection(parent=publisher_world.root, child=late_body)
@@ -2771,7 +2777,7 @@ def test_a_model_modification_republishes_the_whole_state(rclpy_node):
         # A fixed connection carries no degree of freedom, so nothing about the state
         # changed and only the republish can account for the state of this message.
         with publisher_world.modify_world():
-            late_body = Body(name=PrefixedName("model_change_republish_late_body"))
+            late_body = Body(name=PrefixedName(name="model_change_republish_late_body"))
             publisher_world.add_body(late_body)
             publisher_world.add_connection(
                 FixedConnection(parent=publisher_world.root, child=late_body)
@@ -3079,7 +3085,7 @@ def _make_simple_world_with_root(name: str) -> World:
     """
     w = World(name=name)
     root_id = uuid.UUID(hashlib.sha1(name.encode()).hexdigest()[:32])
-    root = Body(name=PrefixedName(name), id=root_id)
+    root = Body(name=PrefixedName(name=name), id=root_id)
     with w.modify_world():
         w.add_body(root)
     return w
@@ -3122,7 +3128,7 @@ def test_an_update_referencing_an_entity_this_world_never_received_says_so(rclpy
     )
 
     try:
-        sender_root = Body(name=PrefixedName("robot_root"))
+        sender_root = Body(name=PrefixedName(name="robot_root"))
         with sender_world.modify_world():
             sender_world.add_body(sender_root)
         sender.announce_model_change(receiver_synchronizer)
@@ -3171,7 +3177,7 @@ def test_all_blocks_received_when_subscribed_before_publishing(rclpy_node):
             lambda: sender_synchronizer.publisher.get_subscription_count() >= 2
         ), "the synchronizers never discovered each other"
 
-        sender_root = Body(name=PrefixedName("robot_root"))
+        sender_root = Body(name=PrefixedName(name="robot_root"))
         with sender.modify_world():
             sender.add_body(sender_root)
         assert wait_for_sync_kse_and_return_ids(sender, receiver) == (
@@ -3251,7 +3257,7 @@ def add_prismatic_connection(world: World, name: str) -> ScrewAxisConnection:
     :return: A new prismatic connection moving a new body of `world` along its root.
     """
     with world.modify_world():
-        child_body = Body(name=PrefixedName(name))
+        child_body = Body(name=PrefixedName(name=name))
         world.add_body(child_body)
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -3321,7 +3327,7 @@ def test_updates_published_while_a_receiver_is_busy_are_not_lost(rclpy_node) -> 
         receiver_synchronizer.close()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LoggerRecordingWarnings:
     """
     Stands in for the logger of a ros node, recording every warning it is given.
@@ -3336,7 +3342,7 @@ class LoggerRecordingWarnings:
         self.warnings.append(message)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReceivingSynchronizer:
     """
     A synchronizer of an empty world, on a topic nobody else publishes on, and the
@@ -3479,7 +3485,7 @@ def test_a_body_placed_inside_its_modification_reaches_another_world_at_that_pla
         receiver_synchronizer,
     ) = create_connected_worlds(rclpy_node, "placed_inside_modification")
     try:
-        placed_body = Body(name=PrefixedName("placed_inside_modification_body"))
+        placed_body = Body(name=PrefixedName(name="placed_inside_modification_body"))
         add_placed_body(publisher_world, placed_body)
 
         assert wait_for_condition(
@@ -3514,7 +3520,8 @@ def test_a_modification_leaves_as_one_update_with_the_state_written_in_it(rclpy_
     try:
         sequence_number_before = publisher_synchronizer.published_sequence_number
         add_placed_body(
-            publisher_world, Body(name=PrefixedName("one_update_per_modification_body"))
+            publisher_world,
+            Body(name=PrefixedName(name="one_update_per_modification_body")),
         )
 
         assert (
@@ -3548,7 +3555,7 @@ def test_a_receiving_world_never_shows_a_new_body_away_from_its_place(rclpy_node
         publisher_synchronizer,
         receiver_synchronizer,
     ) = create_connected_worlds(rclpy_node, "never_away_from_its_place")
-    placed_body = Body(name=PrefixedName("never_away_from_its_place_body"))
+    placed_body = Body(name=PrefixedName(name="never_away_from_its_place_body"))
     recorder = BodyTransformRecorder(_world=receiver_world, body_id=placed_body.id)
     try:
         add_placed_body(publisher_world, placed_body)
@@ -3579,7 +3586,7 @@ def test_received_positions_land_on_the_degrees_of_freedom_they_name(rclpy_node)
     """
     world = World(name="rearranged_state")
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName("rearranged_state_root")))
+        world.add_body(Body(name=PrefixedName(name="rearranged_state_root")))
     removed_connection = add_prismatic_connection(world, "rearranged_state_removed")
     kept_connection = add_prismatic_connection(world, "rearranged_state_kept")
     synchronizer = WorldSynchronizer(

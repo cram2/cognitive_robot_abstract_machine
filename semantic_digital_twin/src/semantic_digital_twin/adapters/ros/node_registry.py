@@ -14,7 +14,7 @@ from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
 # %% shared node access
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSNodeRegistry(metaclass=SingletonMeta):
     """
     Stores the shared ROS node borrowed from this process's lifecycle owner.

@@ -93,7 +93,7 @@ class MilkTransportDemonstration(RobotDemonstration):
     floor: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
             SceneBody.FLOOR,
-            Scale(4.0, 4.0, 0.02),
+            Scale(x=4.0, y=4.0, z=0.02),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=-0.01),
         )
     )
@@ -104,7 +104,7 @@ class MilkTransportDemonstration(RobotDemonstration):
     counter: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
             SceneBody.COUNTER,
-            Scale(0.6, 1.0, 0.75),
+            Scale(x=0.6, y=1.0, z=0.75),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, z=0.375),
         )
     )
@@ -115,7 +115,7 @@ class MilkTransportDemonstration(RobotDemonstration):
     table: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
             SceneBody.TABLE,
-            Scale(0.6, 1.0, 0.7),
+            Scale(x=0.6, y=1.0, z=0.7),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0, z=0.35),
         )
     )
@@ -163,7 +163,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         return WorldSpecification(objects=[self.floor, self.counter, self.table])
 
     def robot_specification(self) -> RobotSpecification:
-        return RobotSpecification(self.used_robot)
+        return RobotSpecification(semantic_annotation_type=self.used_robot)
 
     def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(SceneBody.MILK)

@@ -105,7 +105,7 @@ class StretchJoint(JointName):
     RIGHT_WHEEL = "joint_right_wheel"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -127,7 +127,7 @@ class StretchLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchRightFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -149,7 +149,7 @@ class StretchRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightFinger]):
     @classproperty
     def fingers_are_modelled_like_the_real_ones(cls) -> bool:
@@ -162,13 +162,13 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.109, 0.109])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [-0.067, -0.067])),
             state_type=GripperState.CLOSE,
         )
@@ -197,14 +197,14 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchArm(Arm[StretchGripper]):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping={
                 self._world.get_connection_by_name(StretchJoint.LIFT): 0.65,
                 self._world.get_connection_by_name(StretchJoint.ARM_L3): 0.0,
@@ -229,7 +229,7 @@ class StretchArm(Arm[StretchGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraColor(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -266,7 +266,7 @@ class StretchCameraColor(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraDepth(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -302,7 +302,7 @@ class StretchCameraDepth(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraInfra1(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -338,7 +338,7 @@ class StretchCameraInfra1(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraInfra2(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -374,7 +374,7 @@ class StretchCameraInfra2(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchNeck(
     Neck[
         StretchCameraColor,
@@ -401,7 +401,7 @@ class StretchNeck(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -409,19 +409,19 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.0])),
             state_type=TorsoState.LOW,
         )
 
         torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
+            name=PrefixedName(name="torso_mid", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.5])),
             state_type=TorsoState.MID,
         )
 
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [1])),
             state_type=TorsoState.HIGH,
         )
@@ -438,7 +438,7 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchBaseLidar(Lidar):
     """
     The RPLIDAR scanner sweeping the whole floor around the Stretch's base.
@@ -464,7 +464,7 @@ class StretchBaseLidar(Lidar):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchMobileBase(
     MobileBase[DifferentialDrive],
     HasTorso[StretchTorso],
@@ -502,7 +502,7 @@ class StretchMobileBase(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
     """
     The Stretch 2 robot by Hello Robot.

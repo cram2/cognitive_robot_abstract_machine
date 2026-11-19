@@ -43,21 +43,26 @@ def _servoed_rover(start_yaw: float = 0.0) -> DifferentialDrive:
         and inertia.
     """
     world = World()
-    odom = Body(name=PrefixedName("odom", "rover"))
+    odom = Body(name=PrefixedName(name="odom", prefix="rover"))
     base = Body(
-        name=PrefixedName("base", "rover"),
-        collision=ShapeCollection([Box(scale=Scale(0.5, 0.5, 0.3))]),
+        name=PrefixedName(name="base", prefix="rover"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.5, y=0.5, z=0.3))]),
     )
     with world.modify_world():
         world.add_kinematic_structure_entity(odom)
         world.add_kinematic_structure_entity(base)
         drive = DifferentialDrive.create_with_dofs(
-            world=world, parent=odom, child=base, name=PrefixedName("drive", "rover")
+            world=world,
+            parent=odom,
+            child=base,
+            name=PrefixedName(name="drive", prefix="rover"),
         )
         world.add_connection(drive)
         for degree_of_freedom in drive.active_dofs:
             servo = VelocityServo(
-                name=PrefixedName(f"{degree_of_freedom.name.name}_servo", "rover"),
+                name=PrefixedName(
+                    name=f"{degree_of_freedom.name.name}_servo", prefix="rover"
+                ),
                 gains=(
                     VelocityServoGains(damping=50.0, torque_limit=50.0)
                     if degree_of_freedom == drive.yaw

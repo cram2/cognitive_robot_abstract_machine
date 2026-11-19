@@ -129,7 +129,7 @@ def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> list[float]:
     try:
         quat = Rotation.from_matrix(rotation_matrix).as_quat(scalar_first=True)
     except Exception as e:
-        raise QuaternionConversionError(rotation_matrix, str(e))
+        raise QuaternionConversionError(rotation_matrix=rotation_matrix, reason=str(e))
     return [pos[0], pos[1], pos[2], quat[0], quat[1], quat[2], quat[3]]
 
 
@@ -284,7 +284,7 @@ class GeomVisibilityAndCollisionType(IntEnum):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MultiSimCamera(SimulatorAdditionalProperty):
     """
     Additional property representing a camera in MultiSim.
@@ -301,7 +301,7 @@ class MultiSimCamera(SimulatorAdditionalProperty):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MultiSimLight(SimulatorAdditionalProperty):
     """
     Additional property representing a light in MultiSim.
@@ -318,7 +318,7 @@ class MultiSimLight(SimulatorAdditionalProperty):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InertialConverter:
     """
     A converter to convert inertia representations to diagonal form and update the inertia quaternion accordingly.
@@ -374,7 +374,7 @@ class InertialConverter:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityConverter(ABC):
     """
     A converter to convert an entity object (WorldEntity, Shape, Connection) to a dictionary of properties for Multiverse simulator.
@@ -445,7 +445,7 @@ class EntityConverter(ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KinematicStructureEntityConverter(EntityConverter, ABC):
     """
     Converts a KinematicStructureEntity object to a dictionary of body properties for Multiverse simulator.
@@ -491,7 +491,7 @@ class KinematicStructureEntityConverter(EntityConverter, ABC):
         return kinematic_structure_entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyConverter(KinematicStructureEntityConverter, ABC):
     """
     Converts a Body object to a dictionary of body properties for Multiverse simulator.
@@ -557,7 +557,7 @@ class BodyConverter(KinematicStructureEntityConverter, ABC):
         return body_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionConverter(KinematicStructureEntityConverter, ABC):
     """
     Converts a Region object to a dictionary of region properties for Multiverse simulator.
@@ -569,7 +569,7 @@ class RegionConverter(KinematicStructureEntityConverter, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeConverter(EntityConverter, ABC):
     """
     Converts a Shape object to a dictionary of shape properties for Multiverse simulator.
@@ -627,7 +627,7 @@ class ShapeConverter(EntityConverter, ABC):
         return geom_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoxConverter(ShapeConverter, ABC):
     """
     Converts a Box object to a dictionary of box properties for Multiverse simulator.
@@ -636,7 +636,7 @@ class BoxConverter(ShapeConverter, ABC):
     entity_type: ClassVar[type[Box]] = Box
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SphereConverter(ShapeConverter, ABC):
     """
     Converts a Sphere object to a dictionary of sphere properties for Multiverse simulator.
@@ -645,7 +645,7 @@ class SphereConverter(ShapeConverter, ABC):
     entity_type: ClassVar[type[Sphere]] = Sphere
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CylinderConverter(ShapeConverter, ABC):
     """
     Converts a Cylinder object to a dictionary of cylinder properties for Multiverse simulator.
@@ -654,7 +654,7 @@ class CylinderConverter(ShapeConverter, ABC):
     entity_type: ClassVar[type[Cylinder]] = Cylinder
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshConverter(ShapeConverter, ABC):
     """
     Converts a Mesh object to a dictionary of mesh properties for Multiverse simulator.
@@ -663,7 +663,7 @@ class MeshConverter(ShapeConverter, ABC):
     entity_type: ClassVar[type[Mesh]] = Mesh
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionConverter(EntityConverter, ABC):
     """
     Converts a Connection object to a dictionary of joint properties for Multiverse simulator.
@@ -684,7 +684,7 @@ class ConnectionConverter(EntityConverter, ABC):
         return EntityConverter._convert(self, entity=entity)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection1DOFConverter(ConnectionConverter, ABC):
     """
     Converts an ActiveConnection1DOF object to a dictionary of joint properties for Multiverse simulator.
@@ -766,7 +766,7 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         return joint_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionScrewAxisConverter(Connection1DOFConverter, ABC):
     """
     Converts a ScrewAxisConnection object to a dictionary of joint properties for
@@ -803,7 +803,7 @@ class ConnectionScrewAxisConverter(Connection1DOFConverter, ABC):
         return joint_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection6DOFConverter(ConnectionConverter, ABC):
     """
     Converts a Connection6DoF object to a dictionary of 6DoF joint properties for Multiverse simulator.
@@ -826,7 +826,7 @@ class Connection6DOFConverter(ConnectionConverter, ABC):
         return joint_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActuatorConverter(EntityConverter, ABC):
     """
     Converts an Actuator object to a dictionary of actuator properties for Multiverse simulator.
@@ -849,7 +849,7 @@ class ActuatorConverter(EntityConverter, ABC):
         return actuator_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraConverter(EntityConverter, ABC):
     """
     Converts a Camera object to a dictionary of camera properties for Multiverse simulator.
@@ -872,7 +872,7 @@ class CameraConverter(EntityConverter, ABC):
         return camera_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LightConverter(EntityConverter, ABC):
     """
     Converts a Light object to a dictionary of light properties for Multiverse simulator.
@@ -895,7 +895,7 @@ class LightConverter(EntityConverter, ABC):
         return light_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoActuator(UniqueSimulatorProperty):
     """
     Represents a MuJoCo-specific actuator in the world model.
@@ -904,7 +904,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     activation_limited: mujoco.mjtLimited = field(
         default=mujoco.mjtLimited.mjLIMITED_AUTO,
-        metadata=SimulatorAttributeName("actlimited").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="actlimited").as_dict(),
     )
     """
     If mujoco.mjtLimited.mjLIMITED_TRUE, the internal state (activation) associated with this actuator is automatically clamped to actrange at runtime. 
@@ -914,7 +914,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     activation_range: list[float] = field(
         default_factory=lambda: [0.0, 0.0],
-        metadata=SimulatorAttributeName("actrange").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="actrange").as_dict(),
     )
     """
     Range for clamping the activation state. The first value must be no greater than the second value.
@@ -922,7 +922,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     control_limited: mujoco.mjtLimited = field(
         default=mujoco.mjtLimited.mjLIMITED_AUTO,
-        metadata=SimulatorAttributeName("ctrllimited").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="ctrllimited").as_dict(),
     )
     """
     If mujoco.mjtLimited.mjLIMITED_TRUE, the control input to this actuator is automatically clamped to ctrl_range at runtime. 
@@ -932,7 +932,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     control_range: list[float] = field(
         default_factory=lambda: [0.0, 0.0],
-        metadata=SimulatorAttributeName("ctrlrange").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="ctrlrange").as_dict(),
     )
     """
     The range of the control input.
@@ -940,7 +940,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     force_limited: mujoco.mjtLimited = field(
         default=mujoco.mjtLimited.mjLIMITED_AUTO,
-        metadata=SimulatorAttributeName("forcelimited").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="forcelimited").as_dict(),
     )
     """
     If mujoco.mjtLimited.mjLIMITED_TRUE, the force output of this actuator is automatically clamped to force_range at runtime. 
@@ -950,7 +950,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     force_range: list[float] = field(
         default_factory=lambda: [0.0, 0.0],
-        metadata=SimulatorAttributeName("forcerange").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="forcerange").as_dict(),
     )
     """
     Range for clamping the force output. The first value must be no greater than the second value.
@@ -958,7 +958,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     bias_parameters: list[float] = field(
         default_factory=lambda: [0.0] * 10,
-        metadata=SimulatorAttributeName("biasprm").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="biasprm").as_dict(),
     )
     """
     Bias parameters. The affine bias type uses three parameters.
@@ -966,7 +966,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     bias_type: mujoco.mjtBias = field(
         default=mujoco.mjtBias.mjBIAS_NONE,
-        metadata=SimulatorAttributeName("biastype").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="biastype").as_dict(),
     )
     """
     The keywords have the following meaning:
@@ -978,7 +978,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     dynamics_parameters: list[float] = field(
         default_factory=lambda: [1.0] + [0.0] * 9,
-        metadata=SimulatorAttributeName("dynprm").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="dynprm").as_dict(),
     )
     """
     Activation dynamics parameters.
@@ -986,7 +986,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     dynamics_type: mujoco.mjtDyn = field(
         default=mujoco.mjtDyn.mjDYN_NONE,
-        metadata=SimulatorAttributeName("dyntype").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="dyntype").as_dict(),
     )
     """
     Activation dynamics type for the actuator.
@@ -1001,7 +1001,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     gain_parameters: list[float] = field(
         default_factory=lambda: [0.0] * 10,
-        metadata=SimulatorAttributeName("gainprm").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="gainprm").as_dict(),
     )
     """
     Gain parameters.
@@ -1009,7 +1009,7 @@ class MujocoActuator(UniqueSimulatorProperty):
 
     gain_type: mujoco.mjtGain = field(
         default=mujoco.mjtGain.mjGAIN_FIXED,
-        metadata=SimulatorAttributeName("gaintype").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="gaintype").as_dict(),
     )
     """
     The gain and bias together determine the output of the force generation mechanism, which is currently assumed to be affine.
@@ -1071,7 +1071,7 @@ class MujocoActuator(UniqueSimulatorProperty):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoCamera(MultiSimCamera):
     """
     Additional property representing a MuJoCo camera in the world model.
@@ -1200,7 +1200,7 @@ class MujocoCamera(MultiSimCamera):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoLight(MultiSimLight):
     """
     Additional property representing a MuJoCo light in the world model.
@@ -1292,7 +1292,7 @@ class MujocoEnumJSONKey(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoEnumJSONSerializer(ExternalClassJSONSerializer[None]):
     """
     Json serializer for the enums MuJoCo defines, such as :class:`mujoco.mjtLimited`,
@@ -1318,7 +1318,7 @@ class MujocoEnumJSONSerializer(ExternalClassJSONSerializer[None]):
         return clazz.__module__ == mujoco.mjtLimited.__module__
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoEquality(SimulatorAdditionalProperty):
     """
     Additional properties representing a MuJoCo equality constraint in the world model.
@@ -1350,7 +1350,7 @@ class MujocoEquality(SimulatorAdditionalProperty):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoTendon(SimulatorAdditionalProperty):
     """
     Additional properties representing a MuJoCo tendon in the world model.
@@ -1487,7 +1487,7 @@ class ContactCategories(IntFlag):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MujocoGeom(UniqueSimulatorProperty):
     """
     An additional property declaring that a Shape is a MujocoGeom.
@@ -1495,7 +1495,7 @@ class MujocoGeom(UniqueSimulatorProperty):
 
     contact_type: ContactCategories = field(
         default=ContactCategories.DEFAULT,
-        metadata=SimulatorAttributeName("contype").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="contype").as_dict(),
     )
     """
     Which contact categories this geom offers when it presses into another geom;
@@ -1509,7 +1509,7 @@ class MujocoGeom(UniqueSimulatorProperty):
 
     contact_affinity: ContactCategories = field(
         default=ContactCategories.DEFAULT,
-        metadata=SimulatorAttributeName("conaffinity").as_dict(),
+        metadata=SimulatorAttributeName(attribute_name="conaffinity").as_dict(),
     )
     """
     Which contact categories this geom accepts pressing into it; MuJoCo's
@@ -1517,7 +1517,7 @@ class MujocoGeom(UniqueSimulatorProperty):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MujocoJoint(UniqueSimulatorProperty):
     """
     An additional property declaring that a Connection is a MujocoJoint.
@@ -1536,7 +1536,7 @@ class MujocoJoint(UniqueSimulatorProperty):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MujocoBody(UniqueSimulatorProperty):
     """
     Additional properties representing a MuJoCo body in the world model.
@@ -1548,11 +1548,11 @@ class MujocoBody(UniqueSimulatorProperty):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoConverter(EntityConverter, ABC): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoKinematicStructureEntityConverter(
     MujocoConverter, KinematicStructureEntityConverter, ABC
 ):
@@ -1560,7 +1560,7 @@ class MujocoKinematicStructureEntityConverter(
     quat_str: str = "quat"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter):
     """
     Converts a body to the properties of a MuJoCo body.
@@ -1577,7 +1577,7 @@ class MujocoBodyConverter(MujocoKinematicStructureEntityConverter, BodyConverter
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConverter):
     """
     Converts a region to the properties of a MuJoCo body.
@@ -1589,7 +1589,7 @@ class MujocoRegionConverter(MujocoKinematicStructureEntityConverter, RegionConve
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
     """
     Converts a shape to the properties of a MuJoCo geom, visible and collidable
@@ -1624,7 +1624,7 @@ class MujocoGeomConverter(MujocoConverter, ShapeConverter, ABC):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoBoxConverter(MujocoGeomConverter, BoxConverter):
     """
     Converts a box to the properties of a MuJoCo box geom.
@@ -1649,7 +1649,7 @@ class MujocoBoxConverter(MujocoGeomConverter, BoxConverter):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoSphereConverter(MujocoGeomConverter, SphereConverter):
     """
     Converts a sphere to the properties of a MuJoCo sphere geom.
@@ -1672,7 +1672,7 @@ class MujocoSphereConverter(MujocoGeomConverter, SphereConverter):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
     """
     Converts a cylinder to the properties of a MuJoCo cylinder geom.
@@ -1696,7 +1696,7 @@ class MujocoCylinderConverter(MujocoGeomConverter, CylinderConverter):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
     """
     Converts a mesh to the properties of a MuJoCo mesh geom, with its texture file
@@ -1758,7 +1758,7 @@ class MujocoMeshConverter(MujocoGeomConverter, MeshConverter):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoJointConverter(ConnectionConverter, ABC):
     """
     Converts a connection to the properties of a MuJoCo joint of :attr:`type`.
@@ -1778,7 +1778,7 @@ class MujocoJointConverter(ConnectionConverter, ABC):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Mujoco1DOFJointConverter(MujocoJointConverter, Connection1DOFConverter):
     axis_str: str = "axis"
     range_str: str = "range"
@@ -1824,12 +1824,12 @@ class MujocoScrewAxisJointConverter(
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Mujoco6DOFJointConverter(MujocoJointConverter, Connection6DOFConverter):
     type: mujoco.mjtJoint = mujoco.mjtJoint.mjJNT_FREE
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatorElementNames(UniqueEntityNames):
     """
     Names one kind of simulator element, such as every body, unique among that kind.
@@ -1839,7 +1839,7 @@ class SimulatorElementNames(UniqueEntityNames):
         return entity.name.name
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatorModelNames:
     """
     The name every entity of a world is built into a simulator model under.
@@ -1888,7 +1888,7 @@ The type of connection a realisation realises.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoConnectionJoints(Generic[ConnectionType], SubClassSafeGeneric, ABC):
     """
     How a connection is realised by the joints of a MuJoCo model: which joints it is
@@ -1932,7 +1932,7 @@ class MujocoConnectionJoints(Generic[ConnectionType], SubClassSafeGeneric, ABC):
         :return: The realisation for the most specific type the connection is of.
         """
         return cls._realisation_for_type(type(connection))(
-            connection, world, element_names
+            connection=connection, world=world, element_names=element_names
         )
 
     @classmethod
@@ -2010,7 +2010,7 @@ class MujocoConnectionJoints(Generic[ConnectionType], SubClassSafeGeneric, ABC):
         return {}
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoSingleJoint(MujocoConnectionJoints[ConnectionType]):
     """
     A connection built as the one joint :class:`MujocoJointConverter` converts it to,
@@ -2082,14 +2082,14 @@ class MujocoSingleJoint(MujocoConnectionJoints[ConnectionType]):
         return self.element_names.of(self.connection)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoConnectionJoint(MujocoSingleJoint[Connection]):
     """
     A connection no more specific realisation exists for, built as a single joint.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoFreeJoint(MujocoSingleJoint[Connection6DoF]):
     """
     A 6DoF connection, built as a free joint.
@@ -2113,7 +2113,7 @@ class MujocoFreeJoint(MujocoSingleJoint[Connection6DoF]):
         return [x, y, z, quaternion_w, quaternion_x, quaternion_y, quaternion_z]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoNoJoint(MujocoConnectionJoints[ConnectionType]):
     """
     A connection built as no joint at all: in MuJoCo, every body not connected to its
@@ -2133,14 +2133,14 @@ class MujocoNoJoint(MujocoConnectionJoints[ConnectionType]):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoFixedConnectionJoints(MujocoNoJoint[FixedConnection]):
     """
     A fixed connection, built as no joint at all.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveAxis:
     """
     One of the joints a wheeled drive's base moves across the floor with.
@@ -2174,7 +2174,7 @@ The type of wheeled drive a realisation realises.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
     """
     A wheeled drive. If servos drive the degrees of freedom it is commanded with, it is
@@ -2329,7 +2329,7 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         return odom_R_base @ base_velocity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoOmniDriveJoints(MujocoWheeledDriveJoints[OmniDrive]):
     """
     An omnidirectional drive, whose servos drive its velocities along the base's x and
@@ -2389,7 +2389,7 @@ class MujocoOmniDriveJoints(MujocoWheeledDriveJoints[OmniDrive]):
         return float(odom_velocity[0 if degree_of_freedom == drive.x_velocity else 1])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoDifferentialDriveJoints(MujocoWheeledDriveJoints[DifferentialDrive]):
     """
     A differential drive, whose servos drive its velocity along the base's x and its
@@ -2482,12 +2482,12 @@ class MujocoDifferentialDriveJoints(MujocoWheeledDriveJoints[DifferentialDrive])
         return {self.sideways_servo_name: float(self._forward_velocity_in_odom[1])}
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoActuatorConverter(ActuatorConverter, ABC):
     entity_type: ClassVar[type[Actuator]] = Actuator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoGeneralActuatorConverter(MujocoActuatorConverter, ActuatorConverter):
     """
     Converts an actuator to the properties of the MuJoCo actuator its
@@ -2503,7 +2503,7 @@ class MujocoGeneralActuatorConverter(MujocoActuatorConverter, ActuatorConverter)
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoPositionServoConverter(MujocoActuatorConverter):
     """
     Converts a position servo to the properties of the MuJoCo actuator realising it
@@ -2519,7 +2519,7 @@ class MujocoPositionServoConverter(MujocoActuatorConverter):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoVelocityServoConverter(MujocoActuatorConverter):
     """
     Converts a velocity servo to the properties of the MuJoCo actuator realising it
@@ -2535,7 +2535,7 @@ class MujocoVelocityServoConverter(MujocoActuatorConverter):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoCameraConverter(CameraConverter, ABC):
     """
     Converts a camera to the properties of a MuJoCo camera.
@@ -2568,7 +2568,7 @@ class MujocoCameraConverter(CameraConverter, ABC):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoLightConverter(LightConverter, ABC):
     """
     Converts a light to the properties of a MuJoCo light.
@@ -2599,7 +2599,7 @@ class MujocoLightConverter(LightConverter, ABC):
         return entity_props
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MultiSimBuilder(ABC):
     """
     A builder to build a world in the Multiverse simulator.
@@ -2627,7 +2627,7 @@ class MultiSimBuilder(ABC):
         self._world = world
         self._asset_folder_path = os.path.join(os.path.dirname(file_path), "assets")
 
-        root = Body(name=PrefixedName("world"))
+        root = Body(name=PrefixedName(name="world"))
 
         if not os.path.exists(self.asset_folder_path):
             os.makedirs(self.asset_folder_path)
@@ -2814,7 +2814,7 @@ class MultiSimBuilder(ABC):
         return self._world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WavefrontCopy:
     """
     An .obj copy of a mesh file MuJoCo cannot read.
@@ -2832,7 +2832,7 @@ class WavefrontCopy:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoBuilder(MultiSimBuilder):
     """
     A builder to build a world in the Mujoco simulator.
@@ -3583,7 +3583,7 @@ class MujocoBuilder(MultiSimBuilder):
             return self.spec.__getattribute__(f"find_{entity_type_str}")(entity_name)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntitySpawner(ABC):
     """
     A spawner to spawn a WorldEntity object in the Multiverse simulator.
@@ -3637,7 +3637,7 @@ class EntitySpawner(ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KinematicStructureEntitySpawner(EntitySpawner):
     """
     A spawner to spawn a KinematicStructureEntity object in the Multiverse simulator.
@@ -3714,7 +3714,7 @@ class KinematicStructureEntitySpawner(EntitySpawner):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodySpawner(KinematicStructureEntitySpawner, ABC):
     """
     A spawner to spawn a Body object in the Multiverse simulator.
@@ -3740,7 +3740,7 @@ class BodySpawner(KinematicStructureEntitySpawner, ABC):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionSpawner(KinematicStructureEntitySpawner, ABC):
     """
     A spawner to spawn a Region object in the Multiverse simulator.
@@ -3764,7 +3764,7 @@ class RegionSpawner(KinematicStructureEntitySpawner, ABC):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpawner(EntitySpawner):
     """
     A spawner to spawn a Connection object in the simulator.
@@ -3801,7 +3801,7 @@ class ConnectionSpawner(EntitySpawner):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedConnectionSpawner(ConnectionSpawner, ABC):
     """
     A spawner to spawn a FixedConnection object in the simulator.
@@ -3813,7 +3813,7 @@ class FixedConnectionSpawner(ConnectionSpawner, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection1DOFSpawner(ConnectionSpawner, ABC):
     """
     A spawner to spawn an ActiveConnection1DOF object in the simulator.
@@ -3825,7 +3825,7 @@ class Connection1DOFSpawner(ConnectionSpawner, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionScrewAxisSpawner(ConnectionSpawner, ABC):
     """
     A spawner to spawn a ScrewAxisConnection object in the simulator.
@@ -3837,7 +3837,7 @@ class ConnectionScrewAxisSpawner(ConnectionSpawner, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection6DOFSpawner(ConnectionSpawner, ABC):
     """
     A spawner to spawn a Connection6DoF object in the simulator.
@@ -3849,7 +3849,7 @@ class Connection6DOFSpawner(ConnectionSpawner, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActuatorSpawner(EntitySpawner):
     """
     A spawner to spawn an Actuator object in the simulator.
@@ -3884,7 +3884,7 @@ class ActuatorSpawner(EntitySpawner):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoEntitySpawner(EntitySpawner, ABC):
     """
     A spawner to spawn a WorldEntity object in the Mujoco simulator.
@@ -3921,7 +3921,7 @@ class MujocoEntitySpawner(EntitySpawner, ABC):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoKinematicStructureEntitySpawner(
     MujocoEntitySpawner, KinematicStructureEntitySpawner, ABC
 ):
@@ -3968,7 +3968,7 @@ class MujocoKinematicStructureEntitySpawner(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoBodySpawner(MujocoKinematicStructureEntitySpawner, BodySpawner):
     """
     A spawner to spawn a Body object in the Mujoco simulator.
@@ -3977,7 +3977,7 @@ class MujocoBodySpawner(MujocoKinematicStructureEntitySpawner, BodySpawner):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoRegionSpawner(MujocoKinematicStructureEntitySpawner, RegionSpawner):
     """
     A spawner to spawn a Region object in the Mujoco simulator.
@@ -3986,7 +3986,7 @@ class MujocoRegionSpawner(MujocoKinematicStructureEntitySpawner, RegionSpawner):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoConnectionSpawner(MujocoEntitySpawner, ConnectionSpawner):
     """
     A spawner to spawn a Connection object in the Mujoco simulator.
@@ -4008,7 +4008,7 @@ class MujocoConnectionSpawner(MujocoEntitySpawner, ConnectionSpawner):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoFixedConnectionSpawner(MujocoEntitySpawner, FixedConnectionSpawner):
     """
     This spawner does nothing. FixedConnections are implicitly created in Mujoco.
@@ -4020,7 +4020,7 @@ class MujocoFixedConnectionSpawner(MujocoEntitySpawner, FixedConnectionSpawner):
         return True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoScrewAxisJointSpawner(MujocoConnectionSpawner, ConnectionScrewAxisSpawner):
     """
     A spawner to spawn a ScrewAxisConnection object in the MuJoCo simulator.
@@ -4034,7 +4034,7 @@ class MujocoScrewAxisJointSpawner(MujocoConnectionSpawner, ConnectionScrewAxisSp
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoFreejointSpawner(MujocoEntitySpawner, Connection6DOFSpawner):
     """
     A spawner to spawn a Connection6DoF object in the MuJoCo simulator.
@@ -4052,7 +4052,7 @@ class MujocoFreejointSpawner(MujocoEntitySpawner, Connection6DOFSpawner):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
     """
     A spawner to spawn a MujocoActuator object in the MuJoCo simulator.
@@ -4094,7 +4094,7 @@ class MujocoActuatorSpawner(MujocoEntitySpawner, ActuatorSpawner):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class _MultiSimStateCallback(StateChangeCallback):
     """
     Sibling callback owned by a :class:`MultiSimSynchronizer`. Forwards
@@ -4108,7 +4108,7 @@ class _MultiSimStateCallback(StateChangeCallback):
         self.synchronizer._on_state_change()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MultiSimSynchronizer(ModelChangeCallback, ABC):
     """
     A callback to synchronize the world model with the simulator.
@@ -4197,7 +4197,7 @@ class MultiSimSynchronizer(ModelChangeCallback, ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointBackedConnection:
     """
     A connection paired with the MuJoCo joint that backs it.
@@ -4235,7 +4235,7 @@ class MujocoServoCommands:
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MujocoSynchronizer(MultiSimSynchronizer):
     simulator: MujocoSimulator
     entity_converter: type[EntityConverter] = field(default=MujocoConverter)
@@ -5024,7 +5024,7 @@ class MujocoSim(MultiSim):
         :raises SimulationAlreadyRunningError: If the simulation is already running.
         """
         if self.simulator.state == SimulatorState.RUNNING:
-            raise SimulationAlreadyRunningError(self.world.root.name.name)
+            raise SimulationAlreadyRunningError(world_name=self.world.root.name.name)
         self.synchronizer.sync_rate_hz = MujocoSynchronizer.UNTHROTTLED_SYNC_RATE_HZ
         self.simulator.start(simulate_in_thread=False, render_in_thread=False)
         self.synchronizer.command_actuators_from_world_state()
@@ -5038,7 +5038,7 @@ class MujocoSim(MultiSim):
         :raises SimulationNotStartedError: If the simulation is not running.
         """
         if self.simulator.state != SimulatorState.RUNNING:
-            raise SimulationNotStartedError(self.world.root.name.name)
+            raise SimulationNotStartedError(world_name=self.world.root.name.name)
         for _ in range(round(duration.total_seconds() / self.simulator.step_size)):
             self.simulator.step()
         self.simulator.render()

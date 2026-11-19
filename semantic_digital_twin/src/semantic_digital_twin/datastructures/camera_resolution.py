@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from semantic_digital_twin.exceptions import InvalidCameraResolutionError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraResolution:
     """
     Represents the pixel dimensions of a camera image.

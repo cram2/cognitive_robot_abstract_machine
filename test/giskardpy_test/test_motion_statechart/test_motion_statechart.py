@@ -387,11 +387,11 @@ class TestTemplates:
         gripper = hsr_world_state_reset.get_body_by_name("hand_gripper_tool_frame")
         with hsr_world_state_reset.modify_world():
             knife = Body(
-                name=PrefixedName("knife"),
+                name=PrefixedName(name="knife"),
                 visual=ShapeCollection(
-                    [
+                    shapes=[
                         Box(
-                            scale=Scale(0.05, 0.01, 0.15),
+                            scale=Scale(x=0.05, y=0.01, z=0.15),
                             color=Color.from_rgba(red=0.0, green=0.588, blue=0.784),
                         )
                     ]
@@ -407,11 +407,11 @@ class TestTemplates:
                 )
             )
             loaf = Body(
-                name=PrefixedName("loaf"),
+                name=PrefixedName(name="loaf"),
                 visual=ShapeCollection(
-                    [
+                    shapes=[
                         Box(
-                            scale=Scale(0.1, 0.2, 0.06),
+                            scale=Scale(x=0.1, y=0.2, z=0.06),
                             color=Color.from_rgba(red=0.784, green=0.588, blue=0.0),
                         )
                     ]

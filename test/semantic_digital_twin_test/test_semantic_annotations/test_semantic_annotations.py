@@ -58,7 +58,7 @@ except ImportError:
     world_rdr = None
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TestSemanticAnnotation(SemanticAnnotation):
     """
     A Generic semantic annotation for multiple bodies.
@@ -155,9 +155,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
     to the result, bloated by ``bloat_walls``, in addition to the plain obstacles.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    obstacle_body = Body(name=PrefixedName("obstacle"))
-    wall_body = Body(name=PrefixedName("wall"))
+    root = Body(name=PrefixedName(name="root"))
+    obstacle_body = Body(name=PrefixedName(name="obstacle"))
+    wall_body = Body(name=PrefixedName(name="wall"))
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         world.add_connection(
@@ -180,12 +180,17 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
                 ),
             )
         )
-        obstacle_body.collision.append(Box(scale=Scale(0.2, 0.2, 0.2)))
-        wall_body.collision.append(Box(scale=Scale(0.2, 2.0, 0.2)))
+        obstacle_body.collision.append(Box(scale=Scale(x=0.2, y=0.2, z=0.2)))
+        wall_body.collision.append(Box(scale=Scale(x=0.2, y=2.0, z=0.2)))
 
     origin = HomogeneousTransformationMatrix(reference_frame=root)
     search_space = BoundingBoxCollection(
-        [VolumetricBoundingBox(-5, -5, -5, 5, 5, 5, origin)], root
+        shapes=[
+            VolumetricBoundingBox(
+                min_x=-5, min_y=-5, min_z=-5, max_x=5, max_y=5, max_z=5, origin=origin
+            )
+        ],
+        reference_frame=root,
     )
 
     obstacle_annotation = SemanticEnvironmentAnnotation(
@@ -285,7 +290,7 @@ def inferred_handled_drawer(world) -> Drawer:
     """
     return next(
         annotation
-        for annotation in WorldReasoner(world).infer_semantic_annotations()
+        for annotation in WorldReasoner(world=world).infer_semantic_annotations()
         if isinstance(annotation, Drawer)
         and annotation.root.name.name == HANDLED_DRAWER_BODY_NAME
     )
@@ -381,7 +386,7 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
     with world_copy.modify_world():
         MinimalRobot.from_world(world_copy)
         pr2_root = world_copy.root
-        localization_body = Body(name=PrefixedName("odom_combined"))
+        localization_body = Body(name=PrefixedName(name="odom_combined"))
         world_copy.add_kinematic_structure_entity(localization_body)
         c_root_bf = OmniDrive.create_with_dofs(
             parent=localization_body, child=pr2_root, world=world_copy
@@ -399,7 +404,7 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
     A kinematic chain whose root is its tip has no connections.
     """
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class ReviewKinematicChain(RobotKinematicChain):
         """
         Minimal concrete RobotKinematicChain for chain tests.
@@ -418,13 +423,13 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
             raise NotImplementedError
 
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
-    link = Body(name=PrefixedName("link", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
+    link = Body(name=PrefixedName(name="link", prefix="review"))
     collision = Box(
         scale=Scale(),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=link),
     )
-    link.collision = ShapeCollection([collision], reference_frame=link)
+    link.collision = ShapeCollection(shapes=[collision], reference_frame=link)
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(link)
@@ -438,7 +443,7 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
         )
         world.add_connection(joint)
         chain = ReviewKinematicChain(
-            name=PrefixedName("chain", prefix="review"), root=link, tip=link
+            name=PrefixedName(name="chain", prefix="review"), root=link, tip=link
         )
         world.add_semantic_annotation(chain)
 
@@ -447,17 +452,17 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
 
 # %% combined mesh
 
-CASE_SCALE = Scale(0.4, 0.6, 0.2)
+CASE_SCALE = Scale(x=0.4, y=0.6, z=0.2)
 """
 Extents of the drawer case used by the combined mesh tests.
 """
 
-HANDLE_SCALE = Scale(0.02, 0.1, 0.02)
+HANDLE_SCALE = Scale(x=0.02, y=0.1, z=0.02)
 """
 Extents of the drawer handle used by the combined mesh tests.
 """
 
-NEGLIGIBLE_SCALE = Scale(0.01, 0.01, 0.01)
+NEGLIGIBLE_SCALE = Scale(x=0.01, y=0.01, z=0.01)
 """
 Extents of a box that stays below both thresholds of :meth:`Body.has_collision`.
 """
@@ -473,7 +478,7 @@ Distance the handle is slid along the case's x axis.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DrawerWithSlidingHandle:
     """
     A drawer whose handle slides along the case's x axis, together with the world
@@ -509,12 +514,13 @@ class DrawerWithSlidingHandle:
         :param handle_collision: Collision geometry of the handle.
         """
         world = World()
-        root = Body(name=PrefixedName("root", prefix="combined_mesh"))
+        root = Body(name=PrefixedName(name="root", prefix="combined_mesh"))
         case = Body(
-            name=PrefixedName("case", prefix="combined_mesh"), collision=case_collision
+            name=PrefixedName(name="case", prefix="combined_mesh"),
+            collision=case_collision,
         )
         handle_body = Body(
-            name=PrefixedName("handle", prefix="combined_mesh"),
+            name=PrefixedName(name="handle", prefix="combined_mesh"),
             collision=handle_collision,
         )
         handle = Handle(root=handle_body)
@@ -541,7 +547,12 @@ class DrawerWithSlidingHandle:
             world.add_connection(handle_connection)
             world.add_semantic_annotation(handle)
             world.add_semantic_annotation(drawer)
-        return cls(world, drawer, base_connection, handle_connection)
+        return cls(
+            world=world,
+            drawer=drawer,
+            base_connection=base_connection,
+            handle_connection=handle_connection,
+        )
 
     @classmethod
     def with_boxes(cls) -> Self:
@@ -549,8 +560,8 @@ class DrawerWithSlidingHandle:
         Builds the drawer with a case and a handle that both count as collidable.
         """
         return cls.build(
-            ShapeCollection([Box(scale=CASE_SCALE)]),
-            ShapeCollection([Box(scale=HANDLE_SCALE)]),
+            ShapeCollection(shapes=[Box(scale=CASE_SCALE)]),
+            ShapeCollection(shapes=[Box(scale=HANDLE_SCALE)]),
         )
 
     def expected_bounds(self, handle_position: float) -> np.ndarray:
@@ -630,8 +641,8 @@ def test_combined_mesh_skips_bodies_without_collision():
     A body too small to count as collidable contributes nothing to the mesh.
     """
     setup = DrawerWithSlidingHandle.build(
-        ShapeCollection([Box(scale=CASE_SCALE)]),
-        ShapeCollection([Box(scale=NEGLIGIBLE_SCALE)]),
+        ShapeCollection(shapes=[Box(scale=CASE_SCALE)]),
+        ShapeCollection(shapes=[Box(scale=NEGLIGIBLE_SCALE)]),
     )
     assert not setup.drawer.handle.root.has_collision()
 
@@ -724,7 +735,7 @@ def test_unknown_object_keeps_its_class_label_when_sent_to_another_process():
     A perceived object keeps its class label through serialization to another process.
     """
     world = World()
-    body = Body(name=PrefixedName("unknown_object"))
+    body = Body(name=PrefixedName(name="unknown_object"))
     with world.modify_world():
         world.add_body(body)
         unknown_object = UnknownObject(root=body, class_label="fork")
@@ -743,7 +754,7 @@ def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
     A human is a perceivable object and keeps its class label.
     """
     world = World()
-    body = Body(name=PrefixedName("human"))
+    body = Body(name=PrefixedName(name="human"))
     with world.modify_world():
         world.add_body(body)
         human = Human(root=body, class_label="person")

@@ -36,7 +36,7 @@ def test_a_mobile_base_is_moved_by_the_drive_of_its_robot(
 def test_a_mobile_base_of_a_robot_attached_without_a_drive_has_no_drive():
     world = World()
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName("bot")))
+        world.add_body(Body(name=PrefixedName(name="bot")))
     robot = RobotOnADifferentialDrive.from_world(world)
 
     with pytest.raises(MissingDriveConnectionError) as raised:

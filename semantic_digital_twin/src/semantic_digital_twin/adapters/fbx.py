@@ -22,7 +22,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CoordinateAxis(Enum):
     """
     Enum for coordinate axes with direction.
@@ -60,7 +60,7 @@ class CoordinateAxis(Enum):
         return v
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FBXGlobalSettings:
     """
     Class to handle FBX global settings, particularly the coordinate system.
@@ -125,7 +125,7 @@ class FBXGlobalSettings:
         return M
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FBXParser(MeshParser):
     """
     Adapter for FBX files.
@@ -173,7 +173,7 @@ class FBXParser(MeshParser):
         """
         fbx = fbxloader.FBXLoader(self.file_path)
 
-        global_settings = FBXGlobalSettings(fbx)
+        global_settings = FBXGlobalSettings(fbx_loader=fbx)
         semantic_digital_twin_T_fbx = global_settings.get_semantic_digital_twin_T_fbx()
 
         world = World()
@@ -204,9 +204,9 @@ class FBXParser(MeshParser):
 
                             meshes.append(t_mesh)
                     body = Body(
-                        name=PrefixedName(name),
-                        collision=ShapeCollection(meshes),
-                        visual=ShapeCollection(meshes),
+                        name=PrefixedName(name=name),
+                        collision=ShapeCollection(shapes=meshes),
+                        visual=ShapeCollection(shapes=meshes),
                     )
                     world.add_body(body)
 

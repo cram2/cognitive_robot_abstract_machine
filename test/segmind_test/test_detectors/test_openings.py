@@ -100,19 +100,19 @@ def drawer_on_rails(starting_position: float) -> DrawerOnRails:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
         cabinet = Body(
-            name=PrefixedName("cabinet"),
-            collision=ShapeCollection([Box(scale=Scale(0.5, 0.5, 0.5))]),
+            name=PrefixedName(name="cabinet"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.5, y=0.5, z=0.5))]),
         )
         world.add_connection(FixedConnection(parent=root, child=cabinet))
         drawer = Body(
-            name=PrefixedName("drawer"),
-            collision=ShapeCollection([Box(scale=Scale(0.4, 0.4, 0.1))]),
+            name=PrefixedName(name="drawer"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.4, y=0.4, z=0.1))]),
         )
         degree_of_freedom = DegreeOfFreedom(
-            name=PrefixedName("rails"),
+            name=PrefixedName(name="rails"),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.0, upper_position=0.4, maximum_speed=1.0
             ),
@@ -122,7 +122,7 @@ def drawer_on_rails(starting_position: float) -> DrawerOnRails:
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X(reference_frame=drawer)
             ),
-            name=PrefixedName("rails"),
+            name=PrefixedName(name="rails"),
             parent=cabinet,
             child=drawer,
             raw_dof=degree_of_freedom,

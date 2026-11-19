@@ -37,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 # %%
-@dataclass
+@dataclass(kw_only=True)
 class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
     """
     An object on a shelf layer -- position is 2-D since z is determined by the layer.
@@ -108,7 +108,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
             ply_file_path=str(ply_file_path),
             texture_file_path=str(texture_file_path),
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
-            scale=Scale(1.0, 1.0, 1.0),
+            scale=Scale(x=1.0, y=1.0, z=1.0),
         )
         minimum_bound, maximum_bound = mesh.mesh.bounds
         footprint_center_x = (minimum_bound[0] + maximum_bound[0]) / 2
@@ -183,7 +183,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
 
         mesh = self._mesh_centered_on_footprint(ply_file, texture_file, body)
 
-        geometry = ShapeCollection([mesh], reference_frame=body)
+        geometry = ShapeCollection(shapes=[mesh], reference_frame=body)
         body.visual = geometry
         body.collision = geometry
 
@@ -247,11 +247,17 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
             reference_frame=reference_frame,
         )
         return VolumetricBoundingBox(
-            -half_x, -half_y, -math.inf, half_x, half_y, math.inf, origin
+            min_x=-half_x,
+            min_y=-half_y,
+            min_z=-math.inf,
+            max_x=half_x,
+            max_y=half_y,
+            max_z=math.inf,
+            origin=origin,
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
     """
     A shelf layer for environment generation.
@@ -394,7 +400,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
         return layer_annotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
     """
     A shelf and the horizontal layers its contents rest on.

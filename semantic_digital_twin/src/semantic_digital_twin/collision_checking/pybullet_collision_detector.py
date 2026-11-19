@@ -415,7 +415,7 @@ def create_object(
     return out
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BulletCollisionDetector(CollisionDetector):
     """
     Collision detector based on the giskard wrapper for bullet.
@@ -505,7 +505,7 @@ class BulletCollisionDetector(CollisionDetector):
             self.kineverse_world.get_closest_filtered_map_batch(query)
         )
         return CollisionCheckingResult(
-            [
+            contacts=[
                 ClosestPoints(
                     body_a=self._world.get_kinematic_structure_entity_by_id(
                         collision.obj_a.name

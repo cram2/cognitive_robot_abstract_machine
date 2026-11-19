@@ -48,8 +48,8 @@ def create_dummy_world():
     Create a simple world with two bodies and a connection.
     """
     world = World()
-    body_1 = Body(name=PrefixedName("body_1"))
-    body_2 = Body(name=PrefixedName("body_2"))
+    body_1 = Body(name=PrefixedName(name="body_1"))
+    body_2 = Body(name=PrefixedName(name="body_2"))
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
         world.add_kinematic_structure_entity(body_2)
@@ -116,9 +116,9 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
 
     # Make multiple modifications
-    body_1 = Body(name=PrefixedName("body_1"))
-    body_2 = Body(name=PrefixedName("body_2"))
-    body_3 = Body(name=PrefixedName("body_3"))
+    body_1 = Body(name=PrefixedName(name="body_1"))
+    body_2 = Body(name=PrefixedName(name="body_2"))
+    body_3 = Body(name=PrefixedName(name="body_3"))
 
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
@@ -190,7 +190,7 @@ def test_semantic_annotation_modifications(rclpy_node):
     resolves the issue
     """
     w1 = World(name="w1")
-    b1 = Body(name=PrefixedName("b1"))
+    b1 = Body(name=PrefixedName(name="b1"))
     v1 = Handle(root=b1)
     v2 = Door(root=b1, handle=v1)
 
@@ -215,7 +215,7 @@ def test_fetched_world_accepts_new_specification_spawns(rclpy_node):
     A fetched world is replayed from modification blocks rather than parsed, so spawning
     into it afterwards has to work exactly as it does in a directly built world.
     """
-    shelf_scale = Scale(0.305, 0.85, 1.9)
+    shelf_scale = Scale(x=0.305, y=0.85, z=1.9)
     FetchWorldServer(node=rclpy_node, world=create_dummy_world())
 
     fetched_world = fetch_world_from_service(rclpy_node, timeout_seconds=30)
@@ -239,7 +239,7 @@ def test_fetched_world_accepts_new_specification_spawns(rclpy_node):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     1, 0, 0.283, reference_frame=fetched_world.root
                 ),
-                scale=Scale(0.305, 0.85, 0.018),
+                scale=Scale(x=0.305, y=0.85, z=0.018),
             )
         )
 

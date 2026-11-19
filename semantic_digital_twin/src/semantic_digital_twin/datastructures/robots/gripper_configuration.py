@@ -22,7 +22,7 @@ one configuration subclass.
 # %% Base configuration
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GripperConfiguration(SubClassSafeGeneric, ABC, Generic[TGripperConfiguration]):
     """
     A configuration a gripper can be commanded into.
@@ -92,7 +92,7 @@ class GripperConfiguration(SubClassSafeGeneric, ABC, Generic[TGripperConfigurati
 # %% Default configuration
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GripperStateConfiguration(GripperConfiguration):
     """
     The configuration a robot description already declares for a gripper, selected by

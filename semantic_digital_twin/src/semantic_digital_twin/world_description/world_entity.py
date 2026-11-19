@@ -70,7 +70,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World, GenericSemanticAnnotation
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldEntity(Symbol, HasName[PrefixedName]):
     """
     A class representing an entity in the world.
@@ -98,7 +98,7 @@ class WorldEntity(Symbol, HasName[PrefixedName]):
 
     def __post_init__(self):
         if self.name is None:
-            self.name = PrefixedName(f"{self.__class__.__name__}_{hash(self)}")
+            self.name = PrefixedName(name=f"{self.__class__.__name__}_{hash(self)}")
         if self._world is not None:
             self.add_to_world(world=self._world)
 
@@ -141,7 +141,7 @@ class WorldEntity(Symbol, HasName[PrefixedName]):
         self.name = name
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
     """
     A WorldEntity that has a unique identifier.
@@ -310,7 +310,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
         return self.__class__(**result)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReferencedWorldEntity(SubclassJSONSerializer):
     """
     Stands in a JSON document for a world entity that whoever reads the document already
@@ -347,7 +347,7 @@ class ReferencedWorldEntity(SubclassJSONSerializer):
         return tracker.get(key=reference.id, name=reference.name)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityReferenceWriter(ReferenceWriter[WorldEntityWithID]):
     """
     Writes world entities as :class:`ReferencedWorldEntity`, for documents whose reader
@@ -358,7 +358,7 @@ class WorldEntityReferenceWriter(ReferenceWriter[WorldEntityWithID]):
         return ReferencedWorldEntity(id=obj.id, name=obj.name).to_json()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldEntityWithClassBasedID(WorldEntityWithID):
     """
     A WorldEntity that has a unique identifier based on its class name.
@@ -378,14 +378,14 @@ class WorldEntityWithClassBasedID(WorldEntityWithID):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldEntityWithSimulatorProperties(WorldEntityWithID, HasSimulatorProperties):
     """
     A WorldEntity that has properties relevant for simulation.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class KinematicStructureEntity(
     WorldEntityWithSimulatorProperties, CartesianFrame3D[PrefixedName], ABC
 ):
@@ -522,10 +522,10 @@ class KinematicStructureEntity(
             minimum_thickness=minimum_thickness,
             singular_value_ratio_tolerance=singular_value_ratio_tolerance,
         )
-        return cls.from_shape_collection(name, ShapeCollection([area_mesh]))
+        return cls.from_shape_collection(name, ShapeCollection(shapes=[area_mesh]))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GravityCompensation(UniqueSimulatorProperty):
     """
     How much of a body's weight a physical simulation carries for it: a link a servo
@@ -540,7 +540,7 @@ class GravityCompensation(UniqueSimulatorProperty):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Body(KinematicStructureEntity):
     """
     Represents a body in the world.
@@ -575,7 +575,7 @@ class Body(KinematicStructureEntity):
 
     def __post_init__(self):
         if not self.name:
-            self.name = PrefixedName(f"body_{self.id}")
+            self.name = PrefixedName(name=f"body_{self.id}")
 
         self.visual.reference_frame = self
         self.collision.reference_frame = self
@@ -665,7 +665,7 @@ class Body(KinematicStructureEntity):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Region(KinematicStructureEntity):
     """
     Virtual KinematicStructureEntity representing a semantic region in the world.
@@ -726,7 +726,7 @@ A kind of region.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SemanticAnnotation(WorldEntityWithSimulatorProperties):
     """
     Represents a semantic annotation on a set of bodies in the world.
@@ -939,7 +939,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         return dependencies
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Connection(WorldEntityWithSimulatorProperties, ABC):
     """
     Represents a connection between two entities in the world.
@@ -1160,7 +1160,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         cls, parent: KinematicStructureEntity, child: KinematicStructureEntity
     ) -> PrefixedName:
         return PrefixedName(
-            f"{parent.name.name}_T_{child.name.name}", prefix=child.name.prefix
+            name=f"{parent.name.name}_T_{child.name.name}", prefix=child.name.prefix
         )
 
     def __hash__(self):
@@ -1253,7 +1253,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         """
         return replace(
             self,
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
+            name=PrefixedName(name=self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             parent_T_connection_expression=parent_T_connection_expression,
             simulator_additional_properties=deepcopy(
@@ -1368,7 +1368,7 @@ def _attr_values(
             yield v
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Actuator(WorldEntityWithSimulatorProperties):
     """
     Represents an actuator in the world model.
@@ -1411,7 +1411,7 @@ class Actuator(WorldEntityWithSimulatorProperties):
         return float(self._world.state[degree_of_freedom.id].position)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PositionServo(Actuator):
     """
     An actuator that drives its degree of freedom towards a commanded position with a
@@ -1426,7 +1426,7 @@ class PositionServo(Actuator):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class VelocityServo(Actuator):
     """
     An actuator that drives its degree of freedom at a commanded velocity: the velocity

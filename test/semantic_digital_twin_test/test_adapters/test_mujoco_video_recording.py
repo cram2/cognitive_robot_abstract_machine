@@ -317,12 +317,12 @@ def test_a_body_added_while_recording_is_rendered_with_a_new_renderer(
     world, *_ = ray_test_world
     recorder = MujocoVideoRecorder(world=world, frames_per_second=10)
     added_body = Body(
-        name=PrefixedName("added_while_recording", prefix="test"),
+        name=PrefixedName(name="added_while_recording", prefix="test"),
         collision=ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
-                    scale=Scale(0.1, 0.1, 0.1),
+                    scale=Scale(x=0.1, y=0.1, z=0.1),
                 )
             ]
         ),

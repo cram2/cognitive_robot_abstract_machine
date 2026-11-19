@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 # %% where readings come from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LidarSource(InputSource, ABC):
     """
     Where the readings of a lidar come from, either the world or a real scanner.
@@ -43,7 +43,7 @@ class LidarSource(InputSource, ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatedLidarSource(LidarSource):
     """
     A source that measures the world's collision geometry by casting a ray along every
@@ -104,7 +104,7 @@ class SimulatedLidarSource(LidarSource):
 # %% the lidar a robot carries
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
     """
     A lidar is a sensor that measures the distance to the surfaces around it along a fan

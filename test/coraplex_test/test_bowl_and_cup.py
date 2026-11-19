@@ -133,8 +133,8 @@ def add_cylinder(
         fixed to.
     :return: A cylinder fixed to the reference frame of `parent_T_cylinder`.
     """
-    shapes = ShapeCollection([Cylinder(width=2 * radius, height=height)])
-    cylinder = Body(name=PrefixedName(name), collision=shapes, visual=shapes)
+    shapes = ShapeCollection(shapes=[Cylinder(width=2 * radius, height=height)])
+    cylinder = Body(name=PrefixedName(name=name), collision=shapes, visual=shapes)
     with world.modify_world():
         world.add_kinematic_structure_entity(cylinder)
         world.add_connection(

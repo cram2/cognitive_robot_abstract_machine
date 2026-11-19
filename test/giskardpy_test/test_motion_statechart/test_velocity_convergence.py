@@ -42,7 +42,7 @@ def add_degree_of_freedom(
     upper = DerivativeMap()
     upper.velocity = velocity_limit
     degree_of_freedom = DegreeOfFreedom(
-        name=PrefixedName(name),
+        name=PrefixedName(name=name),
         limits=DegreeOfFreedomLimits(lower=DerivativeMap(), upper=upper),
     )
     with world.modify_world():

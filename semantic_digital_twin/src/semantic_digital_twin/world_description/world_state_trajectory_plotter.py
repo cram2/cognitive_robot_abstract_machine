@@ -63,7 +63,7 @@ class TimeAxisTickSpacing(TickSpacing, Enum):
 # %% plotting a trajectory
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateTrajectoryPlotter:
     """
     Plot a trajectory of world states with one subplot per derivative.

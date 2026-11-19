@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 # %% robot specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotSpecification:
     """
     World-independent description of a robot placed into a world.

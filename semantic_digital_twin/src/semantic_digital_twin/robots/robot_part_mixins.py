@@ -85,7 +85,7 @@ TGenericLidar = TypeVar("TGenericLidar")
 TGenericInputSource = TypeVar("TGenericInputSource", bound=InputSource)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotPartMixin(ABC):
     """
     Base mixin class for robot parts.
@@ -104,7 +104,7 @@ class RobotPartMixin(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasFingers(
     Generic[TGenericThumb, Unpack[TGenericFingers]],
     SubClassSafeGeneric,
@@ -149,7 +149,7 @@ class HasFingers(
 # %% the fingertips a gripper closes with
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Fingertips:
     """
     The pair of fingertips a two-finger gripper closes an object between.
@@ -301,7 +301,7 @@ class Fingertips:
         return float(tool_P_point.vector3.dot(self.closing_axis))
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasTwoFingers(
     Generic[TGenericLeftFinger, TGenericRightFinger],
     HasFingers[TGenericLeftFinger, TGenericRightFinger],
@@ -484,7 +484,7 @@ class HasTwoFingers(
         return self.held_body_T_grasp_at(self.tool_P_grasp_when_closed)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasSensors(
     Generic[Unpack[TGenericSensors]], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -506,7 +506,7 @@ class HasSensors(
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasEndEffector(
     Generic[TGenericEndEffector], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -529,7 +529,7 @@ class HasEndEffector(
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
@@ -553,7 +553,7 @@ class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasOneArm(HasArms[TGenericArm], RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have exactly one arm.
@@ -578,7 +578,7 @@ class HasOneArm(HasArms[TGenericArm], RobotPartMixin, ABC):
         return arm
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasLeftRightArm(
     HasArms[TGenericLeftArm, TGenericRightArm],
     SubClassSafeGeneric,
@@ -653,7 +653,7 @@ class HasLeftRightArm(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasMobileBase(
     Generic[TGenericMobileBase], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -675,7 +675,7 @@ class HasMobileBase(
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasMountingTable(
     Generic[TGenericMountingTable], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -692,7 +692,7 @@ class HasMountingTable(
         assert self.table is not None, "Expected table, got None"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasTorso(Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
@@ -712,7 +712,7 @@ class HasTorso(Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC)
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a neck as their direct child.
@@ -732,7 +732,7 @@ class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasLidar(Generic[TGenericLidar], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a lidar as their direct child.
@@ -761,7 +761,7 @@ class HasLidar(Generic[TGenericLidar], SubClassSafeGeneric, RobotPartMixin, ABC)
 # %% where a part is read from
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasInputSource(
     Generic[TGenericInputSource], SubClassSafeGeneric, RobotPartMixin, ABC
 ):

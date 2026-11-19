@@ -80,15 +80,15 @@ def robot_setup(request):
     world = request.getfixturevalue(request.param[0])
 
     box1 = Body(
-        name=PrefixedName("box1"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
-        visual=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+        name=PrefixedName(name="box1"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
+        visual=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
     )
 
     box2 = Body(
-        name=PrefixedName("box2"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
-        visual=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+        name=PrefixedName(name="box2"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
+        visual=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
     )
 
     with world.modify_world():
@@ -114,7 +114,7 @@ def robot_setup(request):
             world=world,
             parent=world.root,
             child=box1,
-            name=PrefixedName("box1_connection"),
+            name=PrefixedName(name="box1_connection"),
             parent_T_connection_expression=box1_transformationmatrix,
         )
 
@@ -122,7 +122,7 @@ def robot_setup(request):
             world=world,
             parent=world.root,
             child=box2,
-            name=PrefixedName("box2_connection"),
+            name=PrefixedName(name="box2_connection"),
             parent_T_connection_expression=box2_transformationmatrix,
         )
 
@@ -162,8 +162,10 @@ def top_down_grasp(
     :return: A grasp reaching down onto ``body``, centred over its origin.
     """
     return GraspCandidate(
-        graspable_annotation(world, body),
-        Pose.from_xyz_rpy(z=height_above_origin, pitch=np.pi / 2, reference_frame=body),
+        graspable=graspable_annotation(world, body),
+        grasp_pose=Pose.from_xyz_rpy(
+            z=height_above_origin, pitch=np.pi / 2, reference_frame=body
+        ),
     )
 
 
@@ -222,7 +224,7 @@ def test_reach_action_multi(stationary_block_context):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             ReachAction(
-                grasp_candidate=GraspCandidate(box, grasp_pose),
+                grasp_candidate=GraspCandidate(graspable=box, grasp_pose=grasp_pose),
                 arm=left_or_only_arm(view),
             ),
         ]
@@ -423,9 +425,9 @@ def physically_simulated_block_context(stationary_block_context):
     # box1 and box2 are wider than the 85 mm Tracy's gripper opens.
     edge = 0.06
     narrow_box = Body(
-        name=PrefixedName("narrow_box"),
-        collision=ShapeCollection([Box(scale=Scale(edge, edge, edge))]),
-        visual=ShapeCollection([Box(scale=Scale(edge, edge, edge))]),
+        name=PrefixedName(name="narrow_box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=edge, y=edge, z=edge))]),
+        visual=ShapeCollection(shapes=[Box(scale=Scale(x=edge, y=edge, z=edge))]),
     )
     with world.modify_world():
         world.add_connection(
@@ -433,7 +435,7 @@ def physically_simulated_block_context(stationary_block_context):
                 world=world,
                 parent=world.root,
                 child=narrow_box,
-                name=PrefixedName("narrow_box_connection"),
+                name=PrefixedName(name="narrow_box_connection"),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.8, 0.3, view.table.top_z + edge / 2
                 ),

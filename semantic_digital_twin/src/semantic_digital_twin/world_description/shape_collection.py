@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeCollection(SubclassJSONSerializer):
     """
     A collection of shapes.
@@ -177,8 +177,8 @@ class ShapeCollection(SubclassJSONSerializer):
             world_bboxes.append(world_bb)
 
         return BoundingBoxCollection(
-            world_bboxes,
-            origin.reference_frame,
+            shapes=world_bboxes,
+            reference_frame=origin.reference_frame,
         )
 
     def as_bounding_box_collection_in_frame(
@@ -251,7 +251,7 @@ class ShapeCollection(SubclassJSONSerializer):
         return Point3.from_iterable(self.combined_mesh.bounds[1], self.reference_frame)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     """
     A collection of axis-aligned bounding boxes, sharing one reference frame.
@@ -330,7 +330,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
             collection in ``collections``.
         :return: The merged collection, empty if ``collections`` is empty.
         """
-        result = cls([], reference_frame)
+        result = cls(shapes=[], reference_frame=reference_frame)
         for collection in collections:
             result = result.merge(collection)
         return result
@@ -379,7 +379,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
             ):
                 continue
             result.append(box)
-        return cls(result, reference_frame)
+        return cls(shapes=result, reference_frame=reference_frame)
 
     @classmethod
     def from_event(
@@ -397,14 +397,14 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         :return: The bounding box collection.
         """
         return cls(
-            [
+            shapes=[
                 box
                 for simple_event in event.simple_sets
                 for box in cls.from_simple_event(
                     box_type, reference_frame, simple_event
                 ).bounding_boxes
             ],
-            reference_frame,
+            reference_frame=reference_frame,
         )
 
     @classmethod
@@ -424,14 +424,14 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
 
         local_bbs = [shape.local_frame_bounding_box for shape in shapes]
         return cls(
-            [bb.transform_to_origin(bb.origin) for bb in local_bbs],
-            shapes.reference_frame,
+            shapes=[bb.transform_to_origin(bb.origin) for bb in local_bbs],
+            reference_frame=shapes.reference_frame,
         )
 
     def as_shapes(self) -> ShapeCollection:
         return ShapeCollection(
-            [box.as_shape() for box in self.bounding_boxes],
-            self.reference_frame,
+            shapes=[box.as_shape() for box in self.bounding_boxes],
+            reference_frame=self.reference_frame,
         )
 
     def bounding_box(self) -> BoxT:

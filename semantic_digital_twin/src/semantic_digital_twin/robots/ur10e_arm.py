@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.connection_properties import (
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UR10eArm(
     Arm[TGenericEndEffector], ServoedRobotPart, Generic[TGenericEndEffector], ABC
 ):

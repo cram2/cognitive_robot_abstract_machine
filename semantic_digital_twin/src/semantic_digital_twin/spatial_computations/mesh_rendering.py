@@ -19,7 +19,7 @@ from krrood_spatial_math.spatial_types import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewDirection:
     """
     Where a camera looks at a mesh from, as seen from the mesh's center: the reference
@@ -47,7 +47,7 @@ class ViewDirection:
             reference direction.
         """
         return [
-            ViewDirection(azimuth, elevation)
+            ViewDirection(azimuth=azimuth, elevation=elevation)
             for azimuth in np.linspace(0.0, 2 * np.pi, perspectives, endpoint=False)
         ]
 
@@ -89,7 +89,7 @@ class ViewDirection:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RenderedViews:
     """
     Gray images of a mesh, each with the face that each of its pixels shows.
@@ -114,7 +114,7 @@ class RenderedViews:
         return self.faces >= 0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraRing:
     """
     Cameras around a mesh that render it as gray images, shaded by how directly each

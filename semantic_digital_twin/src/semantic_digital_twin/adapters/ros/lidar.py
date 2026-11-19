@@ -15,7 +15,7 @@ from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.exceptions import NoLaserScanReceived
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubscribedLidarSource(LatestMessageSubscriber[LaserScan], LidarSource):
     """
     A source that reports what a real scanner publishes on a ROS 2 topic.
@@ -31,7 +31,7 @@ class SubscribedLidarSource(LatestMessageSubscriber[LaserScan], LidarSource):
         :raises NoLaserScanReceived: If no scan has arrived yet.
         """
         if self.latest_message is None:
-            raise NoLaserScanReceived(self.topic_name)
+            raise NoLaserScanReceived(topic_name=self.topic_name)
         return self.latest_message
 
     def get_lidar_reading(self, lidar: Lidar) -> LidarReading:

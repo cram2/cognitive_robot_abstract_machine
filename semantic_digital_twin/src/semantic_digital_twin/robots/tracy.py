@@ -131,7 +131,7 @@ class TracyJoint(JointName):
     RIGHT_GRIPPER_RIGHT_KNUCKLE = "right_robotiq_85_right_knuckle_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftGripperLeftFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -160,7 +160,7 @@ class TracyLeftGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftGripperRightFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -189,7 +189,7 @@ class TracyLeftGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightGripperLeftFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -218,7 +218,7 @@ class TracyRightGripperLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightGripperRightFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -247,7 +247,7 @@ class TracyRightGripperRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftGripper(
     Robotiq85Gripper[TracyLeftGripperLeftFinger, TracyLeftGripperRightFinger],
     HasParallelGripperCommandServer,
@@ -270,13 +270,13 @@ class TracyLeftGripper(
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_open", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.0, 0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_close", prefix=self.name.name),
             mapping=dict(
                 zip(
                     left_gripper_joints,
@@ -312,7 +312,7 @@ class TracyLeftGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightGripper(
     Robotiq85Gripper[TracyRightGripperLeftFinger, TracyRightGripperRightFinger],
     HasParallelGripperCommandServer,
@@ -335,13 +335,13 @@ class TracyRightGripper(
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_open", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.0, 0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_close", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.8, -0.8])),
             state_type=GripperState.CLOSE,
         )
@@ -370,7 +370,7 @@ class TracyRightGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftArm(UR10eArm[TracyLeftGripper]):
     @classproperty
     def topic_name(cls) -> str:
@@ -385,7 +385,7 @@ class TracyLeftArm(UR10eArm[TracyLeftGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(zip(connections, [2.62, -1.035, 1.13, -0.966, -0.88, 2.07])),
             state_type=StaticJointState.PARK,
         )
@@ -403,7 +403,7 @@ class TracyLeftArm(UR10eArm[TracyLeftGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightArm(UR10eArm[TracyRightGripper]):
     @classproperty
     def topic_name(cls) -> str:
@@ -418,7 +418,7 @@ class TracyRightArm(UR10eArm[TracyRightGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(zip(connections, [3.72, -2.07, -1.17, 4.0, 0.82, 0.75])),
             state_type=StaticJointState.PARK,
         )
@@ -436,7 +436,7 @@ class TracyRightArm(UR10eArm[TracyRightGripper]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyCamera(RobotCamera[FieldOfViewCameraModel]):
     """
     Tracy's fixed camera rooted at its calibrated camera link.
@@ -465,7 +465,7 @@ class TracyCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyTable(MountingTable):
     """
     The table Tracy's arms are bolted onto.
@@ -489,7 +489,7 @@ class TracyTable(MountingTable):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Tracy(
     AbstractRobot,
     HasLeftRightArm[TracyLeftArm, TracyRightArm],

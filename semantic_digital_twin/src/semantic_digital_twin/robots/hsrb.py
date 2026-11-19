@@ -113,7 +113,7 @@ class HSRBJoint(JointName):
     HAND_RIGHT_SPRING_PROXIMAL = "hand_r_spring_proximal_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBLeftFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -135,7 +135,7 @@ class HSRBLeftFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBRightFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -157,7 +157,7 @@ class HSRBRightFinger(Finger):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBGripper(
     EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger], ServoedRobotPart
 ):
@@ -208,7 +208,7 @@ class HSRBGripper(
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping={
                 connection: connection.raw_dof.limits.upper.position
                 for connection in [motor, *springs]
@@ -217,7 +217,7 @@ class HSRBGripper(
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping={
                 motor: 0.0,
                 **{spring: spring.raw_dof.limits.lower.position for spring in springs},
@@ -249,7 +249,7 @@ class HSRBGripper(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBHandCamera(RobotCamera[FieldOfViewCameraModel]):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -275,7 +275,7 @@ class HSRBHandCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera], ServoedRobotPart):
     @property
     def drive_of_each_joint(self) -> dict[JointName, JointDrive]:
@@ -307,7 +307,7 @@ class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera], ServoedRobotPart):
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     self.active_connections,
@@ -333,7 +333,7 @@ class HSRBArm(Arm[HSRBGripper], HasSensors[HSRBHandCamera], ServoedRobotPart):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBHeadCenterCamera(RobotCamera[FieldOfViewCameraModel]):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -360,7 +360,7 @@ class HSRBHeadCenterCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBHeadLeftCamera(RobotCamera[FieldOfViewCameraModel]):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -386,7 +386,7 @@ class HSRBHeadLeftCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBHeadRightCamera(RobotCamera[FieldOfViewCameraModel]):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -412,7 +412,7 @@ class HSRBHeadRightCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBHeadRGBDCamera(RobotCamera[FieldOfViewCameraModel]):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -439,7 +439,7 @@ class HSRBHeadRGBDCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBNeck(
     Neck[
         HSRBHeadCenterCamera,
@@ -480,7 +480,7 @@ class HSRBNeck(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck], ServoedRobotPart):
     @property
     def drive_of_each_joint(self) -> dict[JointName, JointDrive]:
@@ -500,19 +500,19 @@ class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck], ServoedRobotPart):
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.0])),
             state_type=TorsoState.LOW,
         )
 
         torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
+            name=PrefixedName(name="torso_mid", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.32 / 2])),
             state_type=TorsoState.MID,
         )
 
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.32])),
             state_type=TorsoState.HIGH,
         )
@@ -531,7 +531,7 @@ class HSRBTorso(Torso, HasOneArm[HSRBArm], HasNeck[HSRBNeck], ServoedRobotPart):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBBaseLidar(Lidar):
     """
     The Hokuyo scanner sweeping the floor around the HSRB's base.
@@ -556,7 +556,7 @@ class HSRBBaseLidar(Lidar):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRBMobileBase(
     MobileBase[OmniDrive], HasTorso[HSRBTorso], HasLidar[HSRBBaseLidar]
 ):
@@ -607,7 +607,7 @@ class HSRBMobileBase(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HSRB(AbstractRobot, HasMobileBase[HSRBMobileBase]):
     """
     The HSRB Robot built by Toyota.
@@ -664,13 +664,13 @@ class HSRB(AbstractRobot, HasMobileBase[HSRBMobileBase]):
 
         self._world.collision_manager.max_avoided_bodies_rules.append(
             MaxAvoidedCollisionsOverride(
-                2,
+                value=2,
                 bodies={self._world.get_body_in_branch_by_name(self.root, "base_link")},
             )
         )
         self._world.collision_manager.max_avoided_bodies_rules.append(
             MaxAvoidedCollisionsOverride(
-                4,
+                value=4,
                 bodies=set(
                     self._world.get_direct_child_bodies_with_collision(
                         self._world.get_body_in_branch_by_name(

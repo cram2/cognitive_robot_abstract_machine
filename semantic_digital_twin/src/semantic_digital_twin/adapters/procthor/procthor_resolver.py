@@ -11,7 +11,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorResolver:
     """
     Central resolver that deterministically maps a ProcTHOR name to exactly one class.

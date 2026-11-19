@@ -74,7 +74,7 @@ def parse_object(stl_file_name: str, color: Color | None = None) -> World:
     :return: A world containing the mesh.
     """
     object_world = STLParser(
-        f"package://iai_objects/objects/{stl_file_name}"
+        file_path=f"package://iai_objects/objects/{stl_file_name}"
     ).create_world()
     if color is not None:
         object_world.root.visual.dye_shapes(color)
@@ -88,10 +88,10 @@ def attach_sponge(world: World, arm: Arm) -> Body:
     :return: The sponge body inside ``world``.
     """
     sponge_body = Body(
-        name=PrefixedName("sponge"),
-        collision=ShapeCollection([Box(scale=Scale(0.05, 0.05, 0.05))]),
+        name=PrefixedName(name="sponge"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.05, y=0.05, z=0.05))]),
         visual=ShapeCollection(
-            [Box(scale=Scale(0.05, 0.05, 0.05), color=SPONGE_COLOR)]
+            shapes=[Box(scale=Scale(x=0.05, y=0.05, z=0.05), color=SPONGE_COLOR)]
         ),
     )
     tool_frame = arm.end_effector.tool_frame

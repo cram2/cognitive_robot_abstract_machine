@@ -179,7 +179,7 @@ def shared_world(other_process_node: Node) -> Iterator[SharedWorld]:
     """
     world = World()
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+        world.add_body(Body(name=PrefixedName(name=FrameName.WORLD)))
     served_world = SharedWorld.served_through(node=other_process_node, world=world)
     yield served_world
     served_world.close()

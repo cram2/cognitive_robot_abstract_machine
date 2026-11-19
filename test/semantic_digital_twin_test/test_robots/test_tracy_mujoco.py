@@ -43,8 +43,8 @@ pytestmark = pytest.mark.skipif(
 def mounted_tracy() -> Tracy:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    return RobotSpecification(Tracy).spawn(world)
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+    return RobotSpecification(semantic_annotation_type=Tracy).spawn(world)
 
 
 def test_a_stationary_robot_stands_at_its_localization_pose():
@@ -55,10 +55,12 @@ def test_a_stationary_robot_stands_at_its_localization_pose():
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
+        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
     localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
 
-    tracy = RobotSpecification(Tracy, localization_pose=localization_pose).spawn(world)
+    tracy = RobotSpecification(
+        semantic_annotation_type=Tracy, localization_pose=localization_pose
+    ).spawn(world)
 
     localization = tracy.root.parent_connection.parent.parent_connection
     assert isinstance(localization, FixedConnection)
@@ -222,7 +224,7 @@ def test_gripper_geometry_names_the_pads_and_the_driving_joint(mounted_tracy):
 # %% an arm swung into a wall
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArmSwungIntoAWall:
     """
     Tracy with its arms parked and a wall standing on its table right next to its left
@@ -262,11 +264,11 @@ class ArmSwungIntoAWall:
         world = tracy._world
         for arm in tracy.all_arms:
             arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
-        wall_scale = Scale(0.4, 0.04, 0.8)
+        wall_scale = Scale(x=0.4, y=0.04, z=0.8)
         wall = Body(
-            name=PrefixedName("wall"),
-            collision=ShapeCollection([Box(scale=wall_scale)]),
-            visual=ShapeCollection([Box(scale=wall_scale)]),
+            name=PrefixedName(name="wall"),
+            collision=ShapeCollection(shapes=[Box(scale=wall_scale)]),
+            visual=ShapeCollection(shapes=[Box(scale=wall_scale)]),
         )
         with world.modify_world():
             world.add_connection(

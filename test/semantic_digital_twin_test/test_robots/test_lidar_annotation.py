@@ -16,7 +16,7 @@ from semantic_digital_twin.robots.tiago import Tiago, TiagoBaseLidar
 # %% the robots carrying a base lidar
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LidarCase:
     """
     One robot's base lidar, as its description mounts it.
@@ -47,10 +47,10 @@ class LidarCase:
 
 
 LIDAR_CASES = [
-    LidarCase(PR2, PR2BaseLidar, "base_laser_link"),
-    LidarCase(HSRB, HSRBBaseLidar, "base_range_sensor_link"),
-    LidarCase(Tiago, TiagoBaseLidar, "base_laser_link"),
-    LidarCase(Stretch, StretchBaseLidar, "laser"),
+    LidarCase(robot=PR2, lidar=PR2BaseLidar, lidar_link="base_laser_link"),
+    LidarCase(robot=HSRB, lidar=HSRBBaseLidar, lidar_link="base_range_sensor_link"),
+    LidarCase(robot=Tiago, lidar=TiagoBaseLidar, lidar_link="base_laser_link"),
+    LidarCase(robot=Stretch, lidar=StretchBaseLidar, lidar_link="laser"),
 ]
 
 

@@ -21,8 +21,10 @@ def test_world_builds_collision_object_for_flat_mesh(
     detector from building a collision object for its body.
     """
     body = Body(
-        name=PrefixedName("wall_strip"),
-        collision=ShapeCollection([Mesh.from_trimesh(mesh=millimetre_wall_strip)]),
+        name=PrefixedName(name="wall_strip"),
+        collision=ShapeCollection(
+            shapes=[Mesh.from_trimesh(mesh=millimetre_wall_strip)]
+        ),
     )
     world = World()
 

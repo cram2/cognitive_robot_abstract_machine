@@ -491,7 +491,7 @@ def test_create_mesh_shape_applies_a_non_uniform_scale():
     stage = build_stage_with_scaled_mesh(scale=(2.0, 3.0, 4.0))
     mesh_prim = stage.GetPrimAtPath("/object/scaled/mesh")
 
-    shape = USDMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(prim=mesh_prim, link_to_world=Gf.Matrix4d(1)).build()
 
     vertices = shape.unscaled_mesh.vertices
     np.testing.assert_allclose(vertices.max(axis=0), [2.0, 3.0, 0.0], atol=1e-5)
@@ -563,7 +563,7 @@ def test_parse_inertial_reads_mass_api_properties():
         mass=2.0, center_of_mass=(0.1, 0.2, 0.3), diagonal_inertia=(1.0, 2.0, 3.0)
     )
     link_prim = stage.GetPrimAtPath("/object/child")
-    body = Body(name=PrefixedName("test_body"))
+    body = Body(name=PrefixedName(name="test_body"))
 
     inertial = USDParser._parse_inertial(link_prim=link_prim, body=body)
 
@@ -577,7 +577,7 @@ def test_parse_inertial_reads_mass_api_properties():
 def test_parse_inertial_is_none_without_mass_api():
     stage = build_single_joint_stage("FixedJoint")
     link_prim = stage.GetPrimAtPath("/object/child")
-    body = Body(name=PrefixedName("test_body"))
+    body = Body(name=PrefixedName(name="test_body"))
 
     assert USDParser._parse_inertial(link_prim=link_prim, body=body) is None
 
@@ -698,7 +698,7 @@ def test_create_mesh_shape_applies_the_bound_texture(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    shape = USDMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(prim=mesh_prim, link_to_world=Gf.Matrix4d(1)).build()
 
     mesh = shape.unscaled_mesh
     assert mesh.visual.kind == "texture"
@@ -712,7 +712,9 @@ def test_create_mesh_shape_has_no_texture_without_a_bound_material(texture_file)
     unbound_mesh.CreateFaceVertexCountsAttr([3])
     unbound_mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
 
-    shape = USDMeshShapeBuilder(unbound_mesh.GetPrim(), Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(
+        prim=unbound_mesh.GetPrim(), link_to_world=Gf.Matrix4d(1)
+    ).build()
 
     assert shape.unscaled_mesh.visual.kind != "texture"
 

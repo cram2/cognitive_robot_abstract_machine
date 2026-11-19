@@ -7,7 +7,7 @@ from enum import StrEnum
 # %% where a robot part is read from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputSource(ABC):
     """
     Where a robot part is read from, either the world it stands in or the robot itself.
@@ -35,14 +35,14 @@ class RobotTopic(StrEnum):
 # %% joint positions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointPositionSource(InputSource, ABC):
     """
     Where the positions of a robot part's joints come from.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatedJointPositionSource(JointPositionSource):
     """
     A source that leaves the joint positions the world already holds, as the simulator
@@ -53,14 +53,14 @@ class SimulatedJointPositionSource(JointPositionSource):
 # %% base pose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BasePoseSource(InputSource, ABC):
     """
     Where the pose of a mobile base comes from.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatedBasePoseSource(BasePoseSource):
     """
     A source that leaves the drive origin the world already holds, as the simulator

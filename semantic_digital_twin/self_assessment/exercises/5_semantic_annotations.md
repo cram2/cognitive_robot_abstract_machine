@@ -42,7 +42,7 @@ from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 world = World()
 
 with world.modify_world():
-    virtual_root = Body(name=PrefixedName("root"))
+    virtual_root = Body(name=PrefixedName(name="root"))
     world.add_body(virtual_root)
 ```
 
@@ -103,17 +103,17 @@ bottle_large_cylinder = Cylinder(width=0.08, height=0.30, origin=HomogeneousTran
 bottle_medium_cylinder = Cylinder(width=0.04, height=0.15, origin=HomogeneousTransformationMatrix())
 
 # ShapeCollections
-cap_shapes = ShapeCollection([cap_cylinder])
-bottle_large_shapes = ShapeCollection([bottle_large_cylinder])
-bottle_medium_shapes = ShapeCollection([bottle_medium_cylinder])
+cap_shapes = ShapeCollection(shapes=[cap_cylinder])
+bottle_large_shapes = ShapeCollection(shapes=[bottle_large_cylinder])
+bottle_medium_shapes = ShapeCollection(shapes=[bottle_medium_cylinder])
 
 # Bodies
-cap_body = Body(name=PrefixedName("cap_body"), collision=cap_shapes, visual=cap_shapes)
+cap_body = Body(name=PrefixedName(name="cap_body"), collision=cap_shapes, visual=cap_shapes)
 bottle_large_body = Body(
-    name=PrefixedName("bottle_large"), collision=bottle_large_shapes, visual=bottle_large_shapes
+    name=PrefixedName(name="bottle_large"), collision=bottle_large_shapes, visual=bottle_large_shapes
 )
 bottle_medium_body = Body(
-    name=PrefixedName("bottle_medium"), collision=bottle_medium_shapes, visual=bottle_medium_shapes
+    name=PrefixedName(name="bottle_medium"), collision=bottle_medium_shapes, visual=bottle_medium_shapes
 )
 
 # Semantic annotations (not added to the world yet)
@@ -125,21 +125,21 @@ bottle_medium = Bottle(body=bottle_medium_body)
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 # Verify local objects exist and have correct relationships
-if not isinstance(cap, Cap): raise ExerciseVerificationFailed("`cap` must be a Cap.")
-if not isinstance(bottle_large, Bottle): raise ExerciseVerificationFailed("`bottle_large` must be a Bottle.")
-if not isinstance(bottle_medium, Bottle): raise ExerciseVerificationFailed("`bottle_medium` must be a Bottle.")
-if bottle_large.cap is not cap: raise ExerciseVerificationFailed("The large bottle should be annotated with the cap.")
-if bottle_medium.cap is not None: raise ExerciseVerificationFailed("The medium bottle should not have a cap.")
+if not isinstance(cap, Cap): raise ExerciseVerificationFailed(requirement="`cap` must be a Cap.")
+if not isinstance(bottle_large, Bottle): raise ExerciseVerificationFailed(requirement="`bottle_large` must be a Bottle.")
+if not isinstance(bottle_medium, Bottle): raise ExerciseVerificationFailed(requirement="`bottle_medium` must be a Bottle.")
+if bottle_large.cap is not cap: raise ExerciseVerificationFailed(requirement="The large bottle should be annotated with the cap.")
+if bottle_medium.cap is not None: raise ExerciseVerificationFailed(requirement="The medium bottle should not have a cap.")
 
 # Verify bodies are attached to annotations
-if cap.body is not cap_body: raise ExerciseVerificationFailed("The cap annotation should hold the cap body.")
-if bottle_large.body is not bottle_large_body: raise ExerciseVerificationFailed("The large bottle annotation should hold the large bottle body.")
-if bottle_medium.body is not bottle_medium_body: raise ExerciseVerificationFailed("The medium bottle annotation should hold the medium bottle body.")
+if cap.body is not cap_body: raise ExerciseVerificationFailed(requirement="The cap annotation should hold the cap body.")
+if bottle_large.body is not bottle_large_body: raise ExerciseVerificationFailed(requirement="The large bottle annotation should hold the large bottle body.")
+if bottle_medium.body is not bottle_medium_body: raise ExerciseVerificationFailed(requirement="The medium bottle annotation should hold the medium bottle body.")
 
 # Verify dimensions were set as requested
-if not (cap_cylinder.width == 0.03 and cap_cylinder.height == 0.02): raise ExerciseVerificationFailed("The cap cylinder should be 0.03 wide and 0.02 high.")
-if not (bottle_large_cylinder.width == 0.08 and bottle_large_cylinder.height == 0.30): raise ExerciseVerificationFailed("The large bottle cylinder should be 0.08 wide and 0.30 high.")
-if not (bottle_medium_cylinder.width == 0.04 and bottle_medium_cylinder.height == 0.15): raise ExerciseVerificationFailed("The medium bottle cylinder should be 0.04 wide and 0.15 high.")
+if not (cap_cylinder.width == 0.03 and cap_cylinder.height == 0.02): raise ExerciseVerificationFailed(requirement="The cap cylinder should be 0.03 wide and 0.02 high.")
+if not (bottle_large_cylinder.width == 0.08 and bottle_large_cylinder.height == 0.30): raise ExerciseVerificationFailed(requirement="The large bottle cylinder should be 0.08 wide and 0.30 high.")
+if not (bottle_medium_cylinder.width == 0.04 and bottle_medium_cylinder.height == 0.15): raise ExerciseVerificationFailed(requirement="The medium bottle cylinder should be 0.04 wide and 0.15 high.")
 ```
 
 ## 2. Connect cap and large bottle under the root and place the cap on top
@@ -185,26 +185,26 @@ con_bottle = world.get_connection(world.root, bottle_large_body)
 con_cap = world.get_connection(bottle_large_body, cap_body)
 con_medium = world.get_connection(world.root, bottle_medium_body)
 
-if not isinstance(con_bottle, Connection6DoF): raise ExerciseVerificationFailed("The large bottle should be connected to the root with a Connection6DoF.")
-if not isinstance(con_cap, Connection6DoF): raise ExerciseVerificationFailed("The cap should be connected to the large bottle with a Connection6DoF.")
-if not isinstance(con_medium, Connection6DoF): raise ExerciseVerificationFailed("The medium bottle should be connected to the root with a Connection6DoF.")
+if not isinstance(con_bottle, Connection6DoF): raise ExerciseVerificationFailed(requirement="The large bottle should be connected to the root with a Connection6DoF.")
+if not isinstance(con_cap, Connection6DoF): raise ExerciseVerificationFailed(requirement="The cap should be connected to the large bottle with a Connection6DoF.")
+if not isinstance(con_medium, Connection6DoF): raise ExerciseVerificationFailed(requirement="The medium bottle should be connected to the root with a Connection6DoF.")
 
 # Bottle at origin, cap at computed z
 import numpy as np
 bottle_T = world.compute_forward_kinematics_np(world.root, bottle_large_body)
 cap_T = world.compute_forward_kinematics_np(world.root, cap_body)
 
-if not np.isclose(bottle_T[2, 3], 0.0): raise ExerciseVerificationFailed("The large bottle should stay at z=0.")
-if not np.isclose(cap_T[2, 3], z_offset): raise ExerciseVerificationFailed("The cap should sit at the computed z offset.")
+if not np.isclose(bottle_T[2, 3], 0.0): raise ExerciseVerificationFailed(requirement="The large bottle should stay at z=0.")
+if not np.isclose(cap_T[2, 3], z_offset): raise ExerciseVerificationFailed(requirement="The cap should sit at the computed z offset.")
 
 # Also verify semantic annotations are in the world now
 bottles = world.get_semantic_annotations_by_type(Bottle)
 caps = world.get_semantic_annotations_by_type(Cap)
-if len(bottles) != 2: raise ExerciseVerificationFailed("The world should contain exactly two Bottle annotations.")
-if len(caps) != 1: raise ExerciseVerificationFailed("The world should contain exactly one Cap annotation.")
+if len(bottles) != 2: raise ExerciseVerificationFailed(requirement="The world should contain exactly two Bottle annotations.")
+if len(caps) != 1: raise ExerciseVerificationFailed(requirement="The world should contain exactly one Cap annotation.")
 
 # Visualize
-rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
+rt = RayTracer(world=world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 
 ## 3. Query with EQL for Bottles that have a Cap
@@ -235,8 +235,8 @@ print(query_result)
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if query_result is ...: raise ExerciseVerificationFailed("The query result should be stored in a variable.")
-if len(query_result) != 1: raise ExerciseVerificationFailed("There should be exactly one Bottle with a Cap returned by the query.")
+if query_result is ...: raise ExerciseVerificationFailed(requirement="The query result should be stored in a variable.")
+if len(query_result) != 1: raise ExerciseVerificationFailed(requirement="There should be exactly one Bottle with a Cap returned by the query.")
 # And it should be the large bottle we annotated with the cap
-if query_result[0] is not bottle_large: raise ExerciseVerificationFailed("The query should return the large bottle.")
+if query_result[0] is not bottle_large: raise ExerciseVerificationFailed(requirement="The query should return the large bottle.")
 ```

@@ -210,9 +210,9 @@ def world_with_a_head_camera(robot_name: str | None = None) -> World:
         world frame.
     """
     world = World()
-    world_body = Body(name=PrefixedName(FrameName.WORLD))
-    head_body = Body(name=PrefixedName(FrameName.HEAD, prefix=robot_name))
-    camera_body = Body(name=PrefixedName(FrameName.CAMERA, prefix=robot_name))
+    world_body = Body(name=PrefixedName(name=FrameName.WORLD))
+    head_body = Body(name=PrefixedName(name=FrameName.HEAD, prefix=robot_name))
+    camera_body = Body(name=PrefixedName(name=FrameName.CAMERA, prefix=robot_name))
     with world.modify_world():
         world.add_body(world_body)
         world.add_connection(

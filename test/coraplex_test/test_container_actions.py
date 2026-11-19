@@ -143,7 +143,9 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
         ),
         handle.root,
     )
-    action = OpenAction(grasp_candidate=GraspCandidate(handle, grasp_pose), arm=arm)
+    action = OpenAction(
+        grasp_candidate=GraspCandidate(graspable=handle, grasp_pose=grasp_pose), arm=arm
+    )
 
     tool_goal = world.transform(
         arm.end_effector.tool_frame_goal_for_grasp(grasp_pose), world.root

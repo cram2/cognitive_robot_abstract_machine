@@ -207,7 +207,7 @@ def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
     A transform is decoded with the frames of the world it is decoded against.
     """
     world = World()
-    world_body = Body(name=PrefixedName("map"))
+    world_body = Body(name=PrefixedName(name="map"))
     with world.modify_world():
         world.add_body(world_body)
     transform = HomogeneousTransformationMatrix.from_xyz_rpy(

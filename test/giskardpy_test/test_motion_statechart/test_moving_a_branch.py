@@ -45,7 +45,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
     """
     :return: A box fixed to the root of `world`, half a metre in front of the origin.
     """
-    box = Body(name=PrefixedName("box"))
+    box = Body(name=PrefixedName(name="box"))
     with world.modify_world():
         world.add_connection(
             FixedConnection(
@@ -236,7 +236,7 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
     """
     world = cylinder_bot_world
     robot = world.get_kinematic_structure_entity_by_name("bot")
-    free_box = Body(name=PrefixedName("free_box"))
+    free_box = Body(name=PrefixedName(name="free_box"))
     with world.modify_world():
         world.add_connection(
             free_connection := Connection6DoF.create_with_dofs(

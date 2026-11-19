@@ -134,7 +134,7 @@ The topic the subscribed sources below listen on.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RootMountedLidar(Lidar):
     """
     A lidar mounted on the world's root body, sweeping :data:`DECLARED_PATTERN` until a

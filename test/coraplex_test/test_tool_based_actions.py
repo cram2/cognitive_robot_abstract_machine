@@ -71,9 +71,12 @@ from ..plan_running import (
 
 
 def _add_box_body(world, name, size, position):
-    shape_collection = ShapeCollection([Box(scale=Scale(*size))])
+    x, y, z = size
+    shape_collection = ShapeCollection(shapes=[Box(scale=Scale(x=x, y=y, z=z))])
     body = Body(
-        name=PrefixedName(name), collision=shape_collection, visual=shape_collection
+        name=PrefixedName(name=name),
+        collision=shape_collection,
+        visual=shape_collection,
     )
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
@@ -285,9 +288,12 @@ def test_pouring_pours_to_the_side_of_its_arm_unless_told_otherwise(
 
 
 def _attach_box_to_gripper(world, robot, name, size, mount_z):
-    shape_collection = ShapeCollection([Box(scale=Scale(*size))])
+    x, y, z = size
+    shape_collection = ShapeCollection(shapes=[Box(scale=Scale(x=x, y=y, z=z))])
     body = Body(
-        name=PrefixedName(name), collision=shape_collection, visual=shape_collection
+        name=PrefixedName(name=name),
+        collision=shape_collection,
+        visual=shape_collection,
     )
     tool_frame = robot.right_arm.end_effector.tool_frame
     with world.modify_world():

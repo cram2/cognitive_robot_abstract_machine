@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from krrood.entity_query_language.predicate import Symbol
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrefixedName(Symbol):
     name: str
     """

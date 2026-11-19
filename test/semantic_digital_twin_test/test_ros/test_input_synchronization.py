@@ -49,7 +49,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% mimics and helpers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnparameterizedTopicSynchronizer(TopicInputSynchronizer):
     """
     A topic synchronizer that never bound the type of its messages.
@@ -59,7 +59,7 @@ class UnparameterizedTopicSynchronizer(TopicInputSynchronizer):
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedTransformLookup:
     """
     Answers every lookup with one recorded transform, standing in for tf.
@@ -143,8 +143,8 @@ def omni_drive_world() -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        base = Body(name=PrefixedName("base"))
+        root = Body(name=PrefixedName(name="root"))
+        base = Body(name=PrefixedName(name="base"))
         world.add_connection(
             OmniDrive.create_with_dofs(world=world, parent=root, child=base)
         )
@@ -161,9 +161,9 @@ def world_with_two_connections() -> tuple[
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        part_body = Body(name=PrefixedName("part_body"))
-        other_body = Body(name=PrefixedName("other_body"))
+        root = Body(name=PrefixedName(name="root"))
+        part_body = Body(name=PrefixedName(name="part_body"))
+        other_body = Body(name=PrefixedName(name="other_body"))
         part_connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
@@ -229,9 +229,9 @@ def world_with_mimic_joint() -> tuple[
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        driving_body = Body(name=PrefixedName("driving_body"))
-        mimicking_body = Body(name=PrefixedName("mimicking_body"))
+        root = Body(name=PrefixedName(name="root"))
+        driving_body = Body(name=PrefixedName(name="driving_body"))
+        mimicking_body = Body(name=PrefixedName(name="mimicking_body"))
         driving_connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
@@ -240,7 +240,7 @@ def world_with_mimic_joint() -> tuple[
         )
         mimic_connection = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
-            name=PrefixedName("mimic_connection"),
+            name=PrefixedName(name="mimic_connection"),
             parent=root,
             child=mimicking_body,
             multiplier=2.0,

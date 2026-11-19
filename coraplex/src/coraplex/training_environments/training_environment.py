@@ -191,8 +191,8 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
 
         with world_with_urdf.modify_world():
             old_root = world_with_urdf.root
-            map = Body(name=PrefixedName("map"))
-            localization_body = Body(name=PrefixedName("odom_combined"))
+            map = Body(name=PrefixedName(name="map"))
+            localization_body = Body(name=PrefixedName(name="odom_combined"))
 
             map_C_localization = Connection6DoF.create_with_dofs(
                 world=world_with_urdf, parent=map, child=localization_body

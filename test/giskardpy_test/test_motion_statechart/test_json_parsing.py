@@ -110,12 +110,12 @@ def test_executing_json_parsed_statechart(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        tip = Body(name=PrefixedName("tip"))
-        tip2 = Body(name=PrefixedName("tip2"))
+        root = Body(name=PrefixedName(name="root"))
+        tip = Body(name=PrefixedName(name="tip"))
+        tip2 = Body(name=PrefixedName(name="tip2"))
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1)
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "a"),
+            name=PrefixedName(name="dof", prefix="a"),
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
@@ -128,7 +128,7 @@ def test_executing_json_parsed_statechart(tmp_path):
         world.add_connection(root_C_tip)
 
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "b"),
+            name=PrefixedName(name="dof", prefix="b"),
             limits=limits,
         )
         world.add_degree_of_freedom(dof)

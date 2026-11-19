@@ -10,7 +10,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError, UsageError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedFBXAxis(ParsingError):
     """
     Raised when the global settings of an FBX file name an axis that does not exist.
@@ -33,7 +33,7 @@ class UnsupportedFBXAxis(ParsingError):
         return "Use an axis index of 0, 1 or 2 and a sign of 1 or -1."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnexpectedArrayShape(ParsingError):
     """
     Raised when an array does not have the shape its use requires.

@@ -50,12 +50,12 @@ from semantic_digital_twin.world_description.world_entity import (
 def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
     gains = ServoGains(stiffness=100.0, damping=10.0, torque_limit=5.0)
     degree_of_freedom = DegreeOfFreedom(
-        name=PrefixedName("hinge"),
+        name=PrefixedName(name="hinge"),
         limits=DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=-1.0, upper_position=1.0
         ),
     )
-    servo = PositionServo(name=PrefixedName("hinge_servo"), gains=gains)
+    servo = PositionServo(name=PrefixedName(name="hinge_servo"), gains=gains)
     servo.add_dof(degree_of_freedom)
 
     actuator = MujocoActuator.create_servo(servo)
@@ -70,8 +70,8 @@ def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
 
 def test_the_velocity_servo_actuator_pushes_against_the_velocity_error():
     gains = VelocityServoGains(damping=10.0, torque_limit=5.0)
-    servo = VelocityServo(name=PrefixedName("wheel_servo"), gains=gains)
-    servo.add_dof(DegreeOfFreedom(name=PrefixedName("wheel")))
+    servo = VelocityServo(name=PrefixedName(name="wheel_servo"), gains=gains)
+    servo.add_dof(DegreeOfFreedom(name=PrefixedName(name="wheel")))
 
     actuator = MujocoActuator.create_velocity_servo(servo)
 
@@ -86,7 +86,7 @@ def test_the_velocity_servo_actuator_pushes_against_the_velocity_error():
 # %% a servoed pendulum
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PendulumWorld:
     """
     A world with one hinge, and the handles a test needs.
@@ -112,27 +112,27 @@ class PendulumWorld:
 def _pendulum_world() -> PendulumWorld:
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         world.add_body(root)
-        base = Body(name=PrefixedName("base"))
+        base = Body(name=PrefixedName(name="base"))
         world.add_connection(FixedConnection(parent=root, child=base))
-        arm = Body(name=PrefixedName("arm"))
-        mirrored_arm = Body(name=PrefixedName("mirrored_arm"))
+        arm = Body(name=PrefixedName(name="arm"))
+        mirrored_arm = Body(name=PrefixedName(name="mirrored_arm"))
         # the two arms hang at different heights so they never touch each other
         for body, height in ((arm, 0.0), (mirrored_arm, 0.1)):
             body.collision = ShapeCollection(
-                [
+                shapes=[
                     Box(
                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                             x=0.1, z=height, reference_frame=body
                         ),
-                        scale=Scale(0.2, 0.02, 0.02),
+                        scale=Scale(x=0.2, y=0.02, z=0.02),
                     )
                 ],
                 reference_frame=body,
             )
         degree_of_freedom = DegreeOfFreedom(
-            name=PrefixedName("hinge"),
+            name=PrefixedName(name="hinge"),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=-1.0, upper_position=1.0
             ),
@@ -142,7 +142,7 @@ def _pendulum_world() -> PendulumWorld:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=arm)
             ),
-            name=PrefixedName("hinge"),
+            name=PrefixedName(name="hinge"),
             parent=base,
             child=arm,
             raw_dof=degree_of_freedom,
@@ -152,7 +152,7 @@ def _pendulum_world() -> PendulumWorld:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=mirrored_arm)
             ),
-            name=PrefixedName("mirrored_hinge"),
+            name=PrefixedName(name="mirrored_hinge"),
             parent=base,
             child=mirrored_arm,
             raw_dof=degree_of_freedom,
@@ -165,7 +165,7 @@ def _pendulum_world() -> PendulumWorld:
 def _servoed_pendulum_world() -> PendulumWorld:
     pendulum = _pendulum_world()
     servo = PositionServo(
-        name=PrefixedName("hinge_servo"),
+        name=PrefixedName(name="hinge_servo"),
         gains=ServoGains(stiffness=50.0, damping=5.0, torque_limit=2.0),
     )
     servo.add_dof(pendulum.hinge.raw_dof)
@@ -191,9 +191,9 @@ def test_a_position_servo_becomes_a_servo_actuator_on_the_degree_of_freedoms_joi
 
 
 def test_the_servo_of_a_joint_without_position_limits_leaves_its_control_unclamped():
-    degree_of_freedom = DegreeOfFreedom(name=PrefixedName("continuous_hinge"))
+    degree_of_freedom = DegreeOfFreedom(name=PrefixedName(name="continuous_hinge"))
     servo = PositionServo(
-        name=PrefixedName("continuous_hinge_servo"),
+        name=PrefixedName(name="continuous_hinge_servo"),
         gains=ServoGains(stiffness=100.0, damping=10.0, torque_limit=5.0),
     )
     servo.add_dof(degree_of_freedom)
@@ -321,9 +321,9 @@ def _blocked_servoed_pendulum_world() -> PendulumWorld:
     world = pendulum.world
     base = pendulum.hinge.parent
     with world.modify_world():
-        post = Body(name=PrefixedName("post"))
+        post = Body(name=PrefixedName(name="post"))
         post.collision = ShapeCollection(
-            [Box(scale=Scale(0.02, 0.02, 0.04))], reference_frame=post
+            shapes=[Box(scale=Scale(x=0.02, y=0.02, z=0.04))], reference_frame=post
         )
         world.add_connection(
             FixedConnection(

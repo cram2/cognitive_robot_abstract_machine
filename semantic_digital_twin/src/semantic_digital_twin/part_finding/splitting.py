@@ -37,7 +37,7 @@ T = TypeVar("T")
 # %% splitting a mesh
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshSplit:
     """
     A mesh cut into a part and the rest of it.
@@ -114,7 +114,7 @@ class PartFinder(ABC):
 # %% splitting a part off a body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartSplitter:
     """
     Splits a part off the shape of a body into a new body fixed to it, optionally
@@ -215,7 +215,7 @@ class PartSplitter:
             return None
         has_own_collision = self._has_own_collision(body)
         if has_own_collision and self.decomposer is None:
-            raise CollisionDiffersFromVisualError(body.name)
+            raise CollisionDiffersFromVisualError(body_name=body.name)
         colored = ColoredShape(shapes=shapes)
         split = self.finder.split(colored.mesh)
         if split is None:
@@ -258,7 +258,7 @@ class PartSplitter:
         :return: The collision shapes :attr:`decomposer` makes of them.
         """
         return ShapeCollection(
-            [
+            shapes=[
                 convex
                 for shape in shapes
                 for convex in self.decomposer.apply_to_shape(shape)
@@ -271,10 +271,10 @@ class PartSplitter:
         :param body: The body the part is split off.
         :return: The part's type, under the body's name.
         """
-        return PrefixedName(self.part_type.__name__.lower(), str(body.name))
+        return PrefixedName(name=self.part_type.__name__.lower(), prefix=str(body.name))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CutBody:
     """
     A body's shape cut into the part's body and the rest, to be applied to the world.
@@ -315,7 +315,7 @@ class CutBody:
         return self.part
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColoredShape:
     """
     The shapes of a body as one mesh whose faces keep the colors of the shapes, so that
@@ -422,7 +422,7 @@ class ColoredShape:
         shape.simulator_additional_properties = list(
             self.shared(lambda shape: shape.simulator_additional_properties) or []
         )
-        return ShapeCollection([shape], reference_frame=body)
+        return ShapeCollection(shapes=[shape], reference_frame=body)
 
     def shared(self, attribute: Callable[[Shape], T]) -> T | None:
         """

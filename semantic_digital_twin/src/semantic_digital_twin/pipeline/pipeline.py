@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Step(ABC):
     """
     A Step is a transformation that takes a World as input and produces a modified World
@@ -38,7 +38,7 @@ class Step(ABC):
             return self._apply(world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pipeline:
     """
     A Pipeline is a sequence of Steps that are applied to a World in order.
@@ -58,7 +58,7 @@ class Pipeline:
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyFilter(Step):
     """
     Filters bodies in the world based on a given condition.
@@ -73,7 +73,7 @@ class BodyFilter(Step):
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CenterLocalGeometryAndPreserveWorldPose(Step):
     """
     Adjusts the vertices of the collision meshes of each body in the world so that the
@@ -139,7 +139,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyFactoryReplace(Step):
     """
     Replace bodies in the world that match a given condition with new structures created

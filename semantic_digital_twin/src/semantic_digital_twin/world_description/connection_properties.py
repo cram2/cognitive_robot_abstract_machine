@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointDynamics:
     r"""
     Represents the dynamic properties of a joint.
@@ -54,7 +54,7 @@ class JointDynamics:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ServoGains:
     r"""
     How hard a position servo pulls its joint towards the position it was given.
@@ -84,7 +84,7 @@ class ServoGains:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointServo:
     """
     What a robot part declares for one of its joints to be driven by a position servo
@@ -106,7 +106,7 @@ class JointServo:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointDrive:
     """
     What drives one joint in a physical simulation: a position servo, and the motor
@@ -145,7 +145,7 @@ class JointDrive:
         return JointServo(gains=self.gains, dynamics=dynamics)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VelocityServoGains:
     r"""
     How hard a velocity servo pushes its joint towards the velocity it was given.
@@ -170,7 +170,7 @@ class VelocityServoGains:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveServos:
     """
     What a mobile base declares for its drive to be moved across the floor by velocity
@@ -192,7 +192,7 @@ class DriveServos:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveVelocityLimits:
     """
     How fast a drive may move a mobile base across the floor.
