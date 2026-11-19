@@ -1,3 +1,8 @@
+"""
+Tasks that act on joints directly: moving them to goal positions and limiting their
+velocity.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

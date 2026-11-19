@@ -1,3 +1,8 @@
+"""
+Actions that take hold of an object: reaching for it, grasping it, picking it up and
+holding it in place.
+"""
+
 from __future__ import annotations
 
 import logging

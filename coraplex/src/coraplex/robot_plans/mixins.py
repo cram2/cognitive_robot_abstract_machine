@@ -1,3 +1,10 @@
+"""
+Mixins that give actions shared tuning parameters and shared behaviour, such as moving
+the tool center point, operating a gripper or reaching through a sequence of grasp poses.
+"""
+
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 

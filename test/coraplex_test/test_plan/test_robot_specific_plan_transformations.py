@@ -1,3 +1,8 @@
+"""
+Tests that a plan is adapted to the robot executing it, such as driving a differential
+drive, closing a container or moving the tool center point in a straight line.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy

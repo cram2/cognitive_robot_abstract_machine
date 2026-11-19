@@ -1,3 +1,7 @@
+"""
+The action that puts a held object down at a target pose.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

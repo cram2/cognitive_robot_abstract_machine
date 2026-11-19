@@ -1,3 +1,10 @@
+"""
+Tests that goals composed of other nodes arrange them as intended, either in parallel or
+in a sequence.
+"""
+
+from __future__ import annotations
+
 from cramph.composites import Parallel, Sequence
 from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValue

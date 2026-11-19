@@ -947,6 +947,11 @@ class TestTaskAtItsGoal:
 
 
 class TestNothingToConverge:
+    """
+    A node with nothing beneath it that approaches a goal is judged by the stall timeout
+    alone.
+    """
+
     def test_a_node_that_never_converges_stalls_after_the_timeout(
         self, *, cylinder_bot_world: World
     ):

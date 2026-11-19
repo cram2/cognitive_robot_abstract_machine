@@ -1,3 +1,7 @@
+"""
+Actions that use a held tool on something: mixing, cutting, wiping and pouring.
+"""
+
 from __future__ import annotations
 
 import math
