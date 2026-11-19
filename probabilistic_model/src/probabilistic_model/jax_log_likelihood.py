@@ -6,7 +6,8 @@ into one program for every shape of events.
 from __future__ import annotations
 
 # %% imports
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from functools import cached_property
 
 import jax
 from typing_extensions import Callable
@@ -33,16 +34,12 @@ class CompiledLogLikelihood:
     The circuit, with jax parameters.
     """
 
-    compiled: Callable[..., jax.Array] = field(init=False, repr=False)
-    """
-    :meth:`log_likelihood_under_parameters`, compiled.
-    """
-
-    def __post_init__(self) -> None:
+    @cached_property
+    def compiled(self) -> Callable[..., jax.Array]:
         """
-        Compile :meth:`log_likelihood_under_parameters`.
+        :meth:`log_likelihood_under_parameters`, compiled.
         """
-        self.compiled = jax.jit(self.log_likelihood_under_parameters)
+        return jax.jit(self.log_likelihood_under_parameters)
 
     def log_likelihood_under_parameters(
         self, *, parameters: list[jax.Array], encoded_events: jax.Array

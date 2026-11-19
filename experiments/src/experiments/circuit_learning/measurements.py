@@ -9,6 +9,7 @@ from __future__ import annotations
 # %% imports
 import time
 from dataclasses import dataclass, field
+from functools import cached_property
 from datetime import timedelta
 
 import jax
@@ -77,23 +78,15 @@ class ChunkedLogLikelihoodEvaluation:
     The number of rows evaluated at once.
     """
 
-    compiled_log_likelihood: CompiledLogLikelihood | None = field(
-        init=False, repr=False
-    )
-    """
-    The compiled log-likelihood of a circuit with jax parameters, ``None`` for any other
-    backend.
-    """
-
-    def __post_init__(self) -> None:
+    @cached_property
+    def compiled_log_likelihood(self) -> CompiledLogLikelihood | None:
         """
-        Compile the log-likelihood of a circuit with jax parameters.
+        The compiled log-likelihood of a circuit with jax parameters, ``None`` for any
+        other backend.
         """
-        self.compiled_log_likelihood = (
-            CompiledLogLikelihood(circuit=self.circuit)
-            if is_jax_array(self.circuit.parameters[0])
-            else None
-        )
+        if not is_jax_array(self.circuit.parameters[0]):
+            return None
+        return CompiledLogLikelihood(circuit=self.circuit)
 
     def compute_log_likelihoods(self, *, rows: np.ndarray) -> np.ndarray:
         """
