@@ -112,6 +112,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
@@ -539,13 +540,12 @@ class HasGripperActionServers(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class RobotKinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC):
+class RobotKinematicChain(
+    AbstractRobotPart, HasInputSource[JointPositionSource], KinematicChain, ABC
+):
     """
     A robot part that consists of the chain of bodies and connections from its root body
-    to its tip body.
-
-    .. note:: A chain between any two entities of a world that is not a robot part is a
-        :class:`~semantic_digital_twin.world_description.kinematic_chain.KinematicChain`.
+    to its tip body, so it can stand wherever a :class:`KinematicChain` is taken.
     """
 
     tip: Body = field(kw_only=True)

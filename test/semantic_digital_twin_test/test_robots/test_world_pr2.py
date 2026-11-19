@@ -37,6 +37,7 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     UnreachableException,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -484,6 +485,17 @@ def test_kinematic_chains(pr2_world_state_reset):
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root
         assert chain.tip
+
+
+def test_a_robot_kinematic_chain_is_a_kinematic_chain(pr2_world_state_reset):
+    """
+    An arm stands wherever a chain from a root to a tip is taken, and stays usable as a
+    key while doing so.
+    """
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    assert isinstance(pr2.left_arm, KinematicChain)
+    assert {pr2.left_arm, pr2.right_arm} == {pr2.right_arm, pr2.left_arm}
 
 
 def test_tracy_semantic_annotation(tracy_world):
