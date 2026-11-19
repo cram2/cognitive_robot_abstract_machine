@@ -1,16 +1,7 @@
 """
-Pipeline implementation for RoboKudo.
-
-This module provides the Pipeline class, which is a specialized version of py_trees'
-Sequence behavior. A Pipeline manages its own Common Analysis Structure (CAS) and
-provides visualization capabilities for its annotators.
-
-Key features:
-
-* Automatic CAS management for each pipeline iteration
-* Visualization support through annotator outputs
-* Helper methods for accessing annotators and CAS
-* Nested pipeline support with proper scoping
+The RoboKudo :class:`Pipeline`, a py_trees sequence of annotators that owns a Common
+Analysis Structure (CAS) for each iteration and the world its annotators perceive into,
+visualizes the outputs of its annotators and can be nested.
 """
 
 from __future__ import annotations
@@ -22,6 +13,7 @@ from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
+from semantic_digital_twin.world import World
 from typing_extensions import Any
 
 import robokudo.annotators.core
@@ -44,17 +36,21 @@ class Pipeline(Sequence):
         self,
         name: str = "Sequence",
         children: list[Behaviour] | None = None,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(name, memory=True, children=children)
         """
         Initialize the pipeline.
 
         :param name: Name of the pipeline, defaults to "Sequence"
         :param children: List of child behaviors, defaults to None
         """
-        self.cas: cas.CAS = None
+        super().__init__(name, memory=True, children=children)
+        self._world: World = World()
+        """
+        The world of this pipeline, used unless it is nested in another pipeline; an
+        empty world of its own until another is set through :attr:`world`.
+        """
+        self.cas: cas.CAS | None = None
         """
         The Common Analysis Structure for this pipeline.
         """
@@ -62,7 +58,7 @@ class Pipeline(Sequence):
         """
         Monotonic CAS counter that is local to this pipeline instance.
         """
-        self.cas_start_timer: timeit.default_timer = None
+        self.cas_start_timer: float | None = None
         """
         Timer for measuring pipeline execution time.
         """
@@ -106,6 +102,22 @@ class Pipeline(Sequence):
             a.add_self_to_annotator_output_struct()
         annotator_output_pipeline_map_buffer.map[self.name].redraw = True
         return True
+
+    @property
+    def world(self) -> World:
+        """
+        The world the annotators of this pipeline perceive into.
+
+        A pipeline nested in another one perceives into the world of the outer pipeline.
+        """
+        outer_pipeline = robokudo.utils.tree.find_parent_of_type(self, Pipeline)
+        if outer_pipeline is not None:
+            return outer_pipeline.world
+        return self._world
+
+    @world.setter
+    def world(self, world: World) -> None:
+        self._world = world
 
     def get_cas(self) -> cas.CAS:
         """

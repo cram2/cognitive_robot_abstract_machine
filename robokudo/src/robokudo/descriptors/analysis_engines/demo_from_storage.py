@@ -1,5 +1,3 @@
-from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
-
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -15,8 +13,6 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
-from robokudo.world import world_instance
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -45,10 +41,6 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for tabletop segmentation
         """
-        tf_publisher = TFPublisher(
-            _world=world_instance(), node=ROSNodeRegistry().get()
-        )
-
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         seq = Pipeline("StoragePipeline")

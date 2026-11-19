@@ -1174,6 +1174,13 @@ class SaltContainer(Container, IsPerceivable):
     """
 
 
+@dataclass(eq=False, kw_only=True)
+class UnknownObject(HasRootBody, IsPerceivable):
+    """
+    An object perception found that no more specific semantic annotation describes.
+    """
+
+
 @dataclass(eq=False)
 class Produce(Food):
     """
@@ -1588,7 +1595,7 @@ class Agent(HasRootBody):
 
 
 @dataclass(eq=False)
-class Human(Agent):
+class Human(Agent, IsPerceivable):
     """
     Represents a human agent in the environment.
 
