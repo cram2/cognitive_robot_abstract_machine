@@ -42,6 +42,11 @@ jobs:
       run:
         shell: bash
     steps:
+      # Some test files' paths are longer than Windows allows by default.
+      - name: Allow long paths on Windows
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -50,14 +55,20 @@ jobs:
         with:
           python-version: '3.12'
 
-      # The krrood-* distributions pin each other to this release, which is not on PyPI
-      # until it is published, so every workspace package is built first.
+      # PyPI may already hold this release's version of a workspace package, built from
+      # older source, so every workspace name is constrained to the wheel built here.
       - name: Build the workspace's wheels
         run: |
           pip install build
           for directory in krrood/krrood-*/ random_events probabilistic_model domain_models/*/; do
             python -m build --wheel "$directory" --outdir wheels/
           done
+          python - > constraints.txt <<'EOF'
+          import pathlib
+          for wheel in sorted(pathlib.Path("wheels").glob("*.whl")):
+              print(f"{wheel.name.split('-')[0]} @ {wheel.resolve().as_uri()}")
+          EOF
+          cat constraints.txt
 
       - name: Install ${{ matrix.distribution }} alone
         run: |
@@ -68,7 +79,7 @@ jobs:
             interpreter=alone/bin/python
           fi
           echo "INTERPRETER=$interpreter" >> "$GITHUB_ENV"
-          "$interpreter" -m pip install --find-links wheels/ "./krrood/${{ matrix.distribution }}"
+          "$interpreter" -m pip install --constraint constraints.txt "${{ matrix.distribution }}"
 
       - name: Import every module of ${{ matrix.distribution }}
         run: |
