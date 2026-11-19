@@ -8,6 +8,7 @@ sends the nodes it chose instead.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 
 import pytest
@@ -55,6 +56,11 @@ from coraplex.robot_plans.actions.core.pick_up import (
     ReachAction,
 )
 from coraplex.robot_plans.actions.core.placing import PlaceAction
+from coraplex.robot_plans.actions.core.screwing import (
+    InsertScrewAction,
+    ScrewJointAction,
+    ScrewThreadAction,
+)
 from coraplex.robot_plans.actions.core.robot_body import (
     FollowToolCenterPointPathAction,
     MoveManipulatorAction,
@@ -68,8 +74,10 @@ from cramph.context import ContextExtension, StatechartContext
 from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Bolt,
     CuttingKnife,
     Door,
     Elevator,
@@ -85,15 +93,18 @@ from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
+    ScrewConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.geometry import (
+    Box,
     Scale,
     VolumetricBoundingBox,
 )
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -149,6 +160,42 @@ def _handle(world: World) -> Handle:
 
 def _container(world: World) -> Body:
     return _add_box_body(world, "container", (0.2, 0.2, 0.1), (2.4, 2.2, 1.0))
+
+
+def _screw_body(world: World) -> Bolt:
+    """
+    :return: A threaded bolt in `world`, reusing an existing one if already added.
+    """
+    existing = world.get_semantic_annotations_by_type(Bolt)
+    if existing:
+        return existing[0]
+    shape_collection = ShapeCollection([Box(scale=Scale(0.02, 0.02, 0.05))])
+    body = Body(
+        name=PrefixedName("bolt"),
+        collision=shape_collection,
+        visual=shape_collection,
+    )
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+        ScrewConnectionSpecification(
+            axis=Vector3.X(),
+            screw_pitch=0.002,
+            dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-2.0 * math.pi,
+                upper_position=0.0,
+                maximum_speed=1.0,
+            ),
+        ).connect(
+            world,
+            child=body,
+            parent=world.root,
+            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=2.4, y=2.2, z=1.0
+            ),
+        )
+        bolt = Bolt(root=body)
+        world.add_semantic_annotations([bolt])
+    return bolt
 
 
 def _tool_body(world: World) -> Body:
@@ -362,6 +409,9 @@ def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
 
 
 def _manipulation_cases() -> list[ActionRoundTripCase]:
+    """
+    :return: The cases of the manipulation actions.
+    """
     return [
         ActionRoundTripCase(
             ReachAction,
@@ -391,6 +441,37 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             CloseAction,
             lambda world: [
                 CloseAction(grasp=_handle(world).grasp_candidates()[0], arm=_arm(world))
+            ],
+        ),
+        ActionRoundTripCase(
+            ScrewJointAction,
+            lambda world: [
+                ScrewJointAction(
+                    arm=_arm(world),
+                    screw_body=_screw_body(world).root,
+                    turns=0.5,
+                )
+            ],
+        ),
+        ActionRoundTripCase(
+            ScrewThreadAction,
+            lambda world: [
+                ScrewThreadAction(
+                    arm=_arm(world),
+                    screw_body=_screw_body(world).root,
+                    turns=0.5,
+                )
+            ],
+        ),
+        ActionRoundTripCase(
+            InsertScrewAction,
+            lambda world: [
+                InsertScrewAction(
+                    arm=_arm(world),
+                    grasp=_screw_body(world).grasp_candidates()[0],
+                    counterpart=_container(world),
+                    target_location=_pose(world),
+                )
             ],
         ),
         ActionRoundTripCase(

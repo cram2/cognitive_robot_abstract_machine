@@ -12,6 +12,7 @@ from typing_extensions import Iterable, Iterator, Self, TYPE_CHECKING
 
 import numpy as np
 
+from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
@@ -1576,6 +1577,38 @@ class BottleCap(HasMovableJoint):
         return HomogeneousTransformationMatrix()
 
 
+@dataclass(eq=False, kw_only=True)
+class Bolt(HasGraspCandidates):
+    """
+    A threaded bolt offering a top-down grasp along its axis.
+    """
+
+    head_offset: float = 0.025
+    """
+    Distance in metres along local +X to the bolt head where a gripper takes hold.
+    """
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        Differs from
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.default_grasp_candidates`
+        by returning the single top-down grasp at :attr:`head_offset` along local +X.
+        """
+        rotation = RotationMatrix.from_vectors(x=Vector3(-1, 0, 0), y=Vector3(0, 1, 0))
+        return [
+            GraspCandidate(
+                graspable=self,
+                grasp_pose=Pose(
+                    position=Point3(
+                        self.head_offset, 0.0, 0.0, reference_frame=self.root
+                    ),
+                    orientation=rotation.quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+        ]
+
+
 @dataclass(eq=False)
 class Agent(HasRootBody):
     """
@@ -1912,6 +1945,48 @@ class Sponge(Tool):
             rotation @ np.array([0.0, 0.0, 1.0]),
             reference_frame=reference_frame,
         )
+
+
+@dataclass(eq=False, kw_only=True)
+class Screwdriver(Tool):
+    """
+    A handheld screwdriver tool for driving threaded fasteners.
+    """
+
+    grasp_height: float = 0.025
+    """
+    Height in metres along local +Z where a gripper grasps the handle.
+    """
+
+    @called_positionally
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+        tip_body = self.get_tool_frame()
+        target_frame = target if isinstance(target, Body) else target.reference_frame
+        return [
+            AlignmentPair(
+                tip_normal=Vector3(0, 0, 1, reference_frame=tip_body),
+                goal_normal=Vector3(0, 0, 1, reference_frame=target_frame),
+            )
+        ]
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        Differs from
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.default_grasp_candidates`
+        by returning the grasp on the handle at :attr:`grasp_height` along local -Z.
+        """
+        return [
+            GraspCandidate(
+                graspable=self,
+                grasp_pose=Pose(
+                    position=Point3(
+                        0.0, 0.0, self.grasp_height, reference_frame=self.root
+                    ),
+                    orientation=RotationMatrix.from_rpy(pitch=np.pi / 2).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+        ]
 
 
 @dataclass(eq=False)
