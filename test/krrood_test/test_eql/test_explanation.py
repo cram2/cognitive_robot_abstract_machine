@@ -1,3 +1,7 @@
+"""
+Tests of the explanations EQL records for the instances a query infers.
+"""
+
 import gc
 import operator
 from copy import deepcopy
@@ -24,12 +28,24 @@ from krrood.entity_query_language.factories import (
     variable,
     a,
     an,
+    exists,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
-from krrood.entity_query_language.operators.core_logical_operators import AND, OR
+from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    OR,
+    Not,
+)
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.query_graph import QueryGraph
 from krrood.symbol_graph.symbol_graph import Symbol
+from ..dataset.rule_tree_domains import (
+    Birth,
+    Child,
+    ChildLabel,
+    Verdict,
+    Voter,
+)
 from ..dataset.semantic_world_like_classes import (
     Handle,
     PrismaticConnection,
@@ -970,6 +986,10 @@ def test_explanation_condition_graph_and_visualize():
 
 
 def test_nested_rule_explanation(drawer_rule):
+    """
+    The explanation of a drawer lists the comparisons its rule satisfied, each with the
+    values it held for.
+    """
     found_drawers = drawer_rule.tolist()
     explanation = explain_inference(found_drawers[0])
     assert explanation is not None
@@ -994,9 +1014,12 @@ def test_nested_rule_explanation(drawer_rule):
             assert condition.left._attribute_name_ == "child"
             assert condition.left._child_._type_ is FixedConnection
             assert isinstance(bindings[condition.left._child_._id_], FixedConnection)
+    container = found_drawers[0].container
+    handle = found_drawers[0].handle
     assert explanation.get_satisfied_conditions_as_string() == (
-        "(FixedConnection.parent == PrismaticConnection.child)"
-        "\nAND (FixedConnection.child == Handle)"
+        f"((FixedConnection.parent = {container!r}) == "
+        f"(PrismaticConnection.child = {container!r}))"
+        f"\nAND ((FixedConnection.child = {handle!r}) == (Handle = {handle!r}))"
     )
     explanation.condition_graph().visualize(filename="drawer_explanation.pdf")
 
@@ -1085,3 +1108,41 @@ def test_a_copy_of_an_inferred_instance_shares_its_explanation():
     assert copied_bob is not bob
     assert copied_bob == bob
     assert explain_inference(copied_bob) is explain_inference(bob)
+
+
+# %% values and negations in the satisfied conditions
+
+
+def test_a_satisfied_comparison_is_shown_with_the_values_it_held_for():
+    """
+    A satisfied comparison is shown with the value each of its operands held.
+    """
+    child = variable(Child, domain=[Child(name="a", age=30)])
+    labels = an(
+        entity(inference(ChildLabel)(child=child, text="adult")).where(child.age >= 18)
+    ).tolist()
+
+    assert (
+        explain_inference(labels[0]).get_satisfied_conditions_as_string()
+        == "((Child.age = 30) >= 18)"
+    )
+
+
+def test_a_satisfied_negated_exists_is_part_of_the_satisfied_conditions():
+    """
+    A negated exists that held is listed among the satisfied conditions.
+    """
+    alice, bob = Voter(name="alice"), Voter(name="bob")
+    voter = variable(Voter, domain=[alice, bob])
+    birth = variable(Birth, domain=[Birth(voter=bob)])
+    negation = not_(exists(birth, birth.voter == voter))
+    verdicts = an(
+        entity(inference(Verdict)(voter=voter, approves=True)).where(negation)
+    ).tolist()
+
+    satisfied = explain_inference(
+        verdicts[0]
+    ).get_satisfied_conditions_and_their_bindings()
+
+    assert [verdict.voter for verdict in verdicts] == [alice]
+    assert [type(condition.condition) for condition in satisfied] == [Not]

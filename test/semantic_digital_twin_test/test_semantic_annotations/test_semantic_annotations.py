@@ -293,20 +293,22 @@ def inferred_handled_drawer(world) -> Drawer:
 @pytest.mark.order("second_to_last")
 def test_explain_inferred_semantic_annotations(apartment_world_copy):
     """
-    The listing names the conditions that held.
-
-    The rule's negated condition - that the body is no part of a robot - is not among
-    them: what held is the negation, and a logical operator names no condition of its
-    own. It is still stated in the verbalization of the same query.
+    The listing names the conditions that held, each comparison with the values it held
+    for, and the rule's negated condition as the sentence it states.
     """
     drawer = inferred_handled_drawer(apartment_world_copy)
     explanation = explain_inference(drawer)
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
+    drawer_body = drawer.root
+    handle_body = drawer.handle.root
     assert explanation.get_satisfied_conditions_as_string() == (
         "HasCollisionGeometry (PrismaticConnection.child)"
-        "\nAND (FixedConnection.parent == PrismaticConnection.child)"
-        "\nAND (FixedConnection.child == Handle.root)"
+        "\nAND the child of a PrismaticConnection is not part of a robot"
+        f"\nAND ((FixedConnection.parent = {drawer_body!r}) == "
+        f"(PrismaticConnection.child = {drawer_body!r}))"
+        f"\nAND ((FixedConnection.child = {handle_body!r}) == "
+        f"(Handle.root = {handle_body!r}))"
     )
     visualize = False
     if visualize:

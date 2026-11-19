@@ -175,7 +175,9 @@ class StackFrame:
         :return: The constructed :class:`StackFrame`.
         """
         instance = frame.f_locals.get("self", None)
-        owner_class: type | None = frame.f_locals.get("cls", None)
+        owner_class = frame.f_locals.get("cls", None)
+        if not isinstance(owner_class, type):
+            owner_class = None
         if owner_class is None and instance is not None:
             owner_class = type(instance)
         resolved_function: Callable | None = frame.f_globals.get(function_name, None)
