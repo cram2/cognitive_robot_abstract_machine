@@ -2649,6 +2649,126 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
 
 @dataclass(eq=False, init=False, repr=False)
+class ScrewAxis(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    How a rigid body's pose changes per unit of a position that moves it along a screw
+    axis: the axis's line, the pitch along it and the unit of the position (Lynch and
+    Park, *Modern Robotics*, Definition 3.24). Unlike a :class:`Twist`, it is not a
+    velocity: it describes the motion whatever the speed of the position.
+    """
+
+    def __init__(
+        self,
+        rotation_per_unit_position: Vector3 | None = None,
+        translation_per_unit_position: Vector3 | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+    ):
+        """
+        :param rotation_per_unit_position: The axis the body turns around, scaled by the
+            angle it turns by per unit of position, in radians. Defaults to no turning.
+        :param translation_per_unit_position: How far the point of the body at the
+            origin of the reference frame moves per unit of position, in meters.
+            Defaults to no moving.
+        :param reference_frame: The frame along whose axes both parts are given.
+        """
+        if rotation_per_unit_position is None:
+            rotation_per_unit_position = Vector3()
+        if translation_per_unit_position is None:
+            translation_per_unit_position = Vector3()
+        self.casadi_sx = sm.to_sx(
+            [
+                rotation_per_unit_position.x,
+                rotation_per_unit_position.y,
+                rotation_per_unit_position.z,
+                translation_per_unit_position.x,
+                translation_per_unit_position.y,
+                translation_per_unit_position.z,
+            ]
+        )
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (6, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            rotation_per_unit_position=Vector3(*data["rotation_per_unit_position"]),
+            translation_per_unit_position=Vector3(
+                *data["translation_per_unit_position"]
+            ),
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            "rotation_per_unit_position": self.rotation_per_unit_position.to_np()[
+                :3
+            ].tolist(),
+            "translation_per_unit_position": self.translation_per_unit_position.to_np()[
+                :3
+            ].tolist(),
+        }
+
+    @property
+    def rotation_per_unit_position(self) -> Vector3:
+        """
+        :return: The axis the body turns around, scaled by the angle it turns by per
+            unit of position, in radians.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def translation_per_unit_position(self) -> Vector3:
+        """
+        :return: How far the point of the body at the origin of the reference frame
+            moves per unit of position, in meters.
+        """
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
+
+    @property
+    def unit_direction(self) -> Vector3:
+        """
+        :return: The unit vector along the axis: that of the rotation, or of the
+            translation for an axis that does not turn the body (Lynch and Park,
+            *Modern Robotics*, section 3.3.2.2). The zero vector for a zero screw axis.
+        """
+        rotation = self.rotation_per_unit_position
+        translation = self.translation_per_unit_position
+        angle_per_unit_position = rotation.norm()
+        result = sm.if_greater_zero(
+            angle_per_unit_position,
+            rotation.safe_division(other=angle_per_unit_position),
+            translation.safe_division(other=translation.norm()),
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
+    def to_twist(self, *, position_velocity: sm.ScalarData) -> Twist:
+        """
+        :param position_velocity: How fast the position changes, per unit of the
+            parameter the twist is taken with respect to, usually time.
+        :return: The twist of the body while its position changes that fast.
+        """
+        return Twist(
+            angular_velocity=self.rotation_per_unit_position * position_velocity,
+            linear_velocity=self.translation_per_unit_position * position_velocity,
+            reference_frame=self.reference_frame,
+        )
+
+
+@dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def __init__(
         self,
