@@ -33,7 +33,7 @@ from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
     CartesianPositionTrajectory,
-    CartesianPositionVelocityLimit,
+    HoldOrientation,
 )
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.robots.robot_parts import MobileBase
@@ -982,21 +982,24 @@ class TestNothingToConverge:
         self, *, cylinder_bot_world: World
     ):
         """
-        A velocity limit enforces an invariant rather than closing on a goal, so nothing
-        beneath it can approach one and the timeout alone decides when to give up on it.
+        Holding an orientation enforces an invariant rather than closing on a goal, so
+        nothing beneath it can approach one and the timeout alone decides when to give
+        up on it.
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-        limit = CartesianPositionVelocityLimit(
+        hold_orientation = HoldOrientation(
             root_link=cylinder_bot_world.root, tip_link=bot
         )
-        progressing = StillProgressing(monitored_node=limit, timeout=STALL_TIMEOUT)
+        progressing = StillProgressing(
+            monitored_node=hold_orientation, timeout=STALL_TIMEOUT
+        )
         motion_control = MotionControl()
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
             extensions=[motion_control],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_node(node=limit)
+        motion_statechart.add_node(node=hold_orientation)
         motion_statechart.add_node(node=progressing)
         motion_statechart.add_node(node=EndMotion())
 
