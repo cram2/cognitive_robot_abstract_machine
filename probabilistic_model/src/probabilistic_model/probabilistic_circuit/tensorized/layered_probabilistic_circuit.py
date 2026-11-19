@@ -45,6 +45,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,
     Layer,
@@ -787,6 +788,15 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         self.root = new_root
         self.variables = kept_variables
         return self
+
+    def folded(self) -> Self:
+        """
+        :return: A copy of this circuit whose layers of one type at one height are one
+            layer each, see :class:`LayerFolding`; it answers every query as this one.
+        """
+        self.raise_if_parameters_are_not_on_host()
+        root = LayerFolding(root=copy.deepcopy(self.root)).folded_root()
+        return self.__class__(self.variables, root)
 
     def simplify(self) -> Self:
         """
