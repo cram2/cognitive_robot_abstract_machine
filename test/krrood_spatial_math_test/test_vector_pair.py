@@ -29,7 +29,8 @@ def test_a_vector_pair_stores_its_vectors_under_their_names(
     Each vector is given to the constructor by its name and read back in the json under
     that name, first vector first.
     """
-    first_name, second_name = vector_pair_type.vector_names
+    first_name = vector_pair_type.first_vector_name
+    second_name = vector_pair_type.second_vector_name
     vector_pair = vector_pair_type(
         **{first_name: Vector3(1.0, 2.0, 3.0), second_name: Vector3(4.0, 5.0, 6.0)}
     )
