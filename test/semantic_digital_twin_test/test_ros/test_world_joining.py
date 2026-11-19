@@ -14,10 +14,9 @@ import pytest
 from rclpy.node import Node
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.messages import (
-    MetaData,
     SnapshotField,
-    StreamPosition,
     WorldModelSnapshot,
 )
 from semantic_digital_twin.adapters.ros.world_fetcher import (
@@ -174,7 +173,7 @@ def caught_up(joined_world: World, serving_process: ServingProcess) -> bool:
     :return: Whether ``joined_world`` applied everything the serving process published.
     """
     return WorldSynchronizer.of_world(joined_world).has_applied(
-        serving_process.synchronizer.latest_published_position
+        position=serving_process.synchronizer.latest_published_position
     )
 
 
@@ -285,7 +284,8 @@ class TestSnapshotStreamPositions:
         The stream positions survive serializing the snapshot.
         """
         position = StreamPosition(
-            origin=MetaData(node_name="publisher", process_id=1), sequence_number=3
+            origin=MessageOrigin(sender=Sender(node_name="publisher", process_id=1)),
+            sequence_number=3,
         )
         snapshot = WorldModelSnapshot(
             modifications=[], ids=[], states=[], stream_positions=[position]

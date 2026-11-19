@@ -63,6 +63,7 @@ dependencies = [
     "giskardpy_bullet_bindings==1.0.1",
     "krrood>=26.10.0",
     "krrood_spatial_math[casadi]>=26.10.0",
+    "krrood_synchronization>=26.10.0",
     "physics_simulators>=26.10.0",
 ]
 license = "LGPL-3.0-only"
@@ -89,6 +90,7 @@ version = {attr = "semantic_digital_twin._version.__version__"}
 workspace = [
     "krrood",
     "krrood_spatial_math",
+    "krrood_synchronization",
     "physics_simulators",
     "probabilistic_model",
     "random_events",

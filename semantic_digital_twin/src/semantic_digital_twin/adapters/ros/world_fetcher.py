@@ -226,11 +226,10 @@ def join_shared_world(
         )
         synchronizer.update_previous_world_state()
         synchronizer.resume()
-        synchronizer.record_contained_positions(
-            positions=WorldModelSnapshot.stream_positions_from_json(
-                json_data=snapshot_json
-            )
-        )
+        for position in WorldModelSnapshot.stream_positions_from_json(
+            json_data=snapshot_json
+        ):
+            synchronizer.record_applied(position=position)
         synchronizer.stop_deferring_incoming_updates()
         closing_on_failure.pop_all()
     return world

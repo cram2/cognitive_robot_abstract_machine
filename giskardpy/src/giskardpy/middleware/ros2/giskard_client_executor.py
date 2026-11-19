@@ -39,7 +39,7 @@ from rclpy import Context, Parameter, Future
 from action_msgs.msg import GoalStatus
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from krrood_synchronization.messages import Sender
 from semantic_digital_twin.adapters.ros.world_fetcher import join_shared_world
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -140,11 +140,11 @@ class GiskardClientExecutor(Executor):
         return []
 
     @property
-    def client(self) -> MetaData:
+    def client(self) -> Sender:
         """
         Who this client is, as it names itself in its goals and its heartbeats.
         """
-        return self.world_updates.world_synchronizer.meta_data
+        return self.world_updates.world_synchronizer.origin.sender
 
     def announce_presence(self) -> None:
         """
