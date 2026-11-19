@@ -247,6 +247,33 @@ def test_the_displacement_agrees_with_the_matrix_exponential(position: float):
     )
 
 
+@pytest.mark.parametrize("scale", [0.5, 2.0, 3.0])
+def test_a_scaled_screw_axis_moves_the_body_as_the_axis_does_over_the_scaled_position(
+    scale: float,
+):
+    """
+    A screw axis need not have a unit rotation: scaling it by a factor moves the body as
+    the original axis does over that factor times the position.
+    """
+    rotation = Vector3(0.0, 0.6, 0.8)
+    translation = Vector3(0.3, -0.2, 0.1)
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=rotation, translation_per_unit_position=translation
+    )
+    scaled_screw_axis = ScrewAxis(
+        rotation_per_unit_position=rotation * scale,
+        translation_per_unit_position=translation * scale,
+    )
+
+    displacement = scaled_screw_axis.to_displacement(position=0.7)
+
+    np.testing.assert_allclose(
+        displacement.to_np(),
+        screw_axis.to_displacement(position=0.7 * scale).to_np(),
+        atol=1e-12,
+    )
+
+
 def test_the_displacement_of_a_symbolic_screw_axis_is_finite_where_it_stops_turning():
     """
     Evaluated where its rotation is zero, the displacement of a symbolic screw axis and
