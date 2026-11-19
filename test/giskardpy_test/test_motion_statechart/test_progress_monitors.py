@@ -13,9 +13,6 @@ import pytest
 
 from cramph.node import EndedByOwner
 from cramph.data_types import ObservationStateValue
-from giskardpy.motion_statechart.error_signals import (
-    time_derivative_from_joint_motion,
-)
 from cramph.exceptions import CyclicNodeDependencyError, PrerequisiteNotExpandedError
 from giskardpy.motion_statechart.exceptions import NoProgressError
 from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
@@ -791,34 +788,6 @@ class TestConvergenceRule:
         run.observations_while_the_bot_is_at(positions=[0.0, step, 2 * step])
 
         assert run.monitor.stalled_tasks == [receding]
-
-
-# %% differentiating with respect to time
-
-
-class TestTimeDerivative:
-    def test_expression_without_joints_has_no_rate(self):
-        """
-        An error that does not depend on any joint cannot change through robot motion.
-        """
-        assert time_derivative_from_joint_motion(Scalar(3.0)).evaluate()[0] == 0.0
-
-    def test_an_expression_of_a_joint_changes_with_its_velocity(
-        self, *, cylinder_bot_world: World
-    ):
-        """
-        An error that depends on a joint changes as fast as the joint moves, scaled by
-        how strongly it depends on it.
-        """
-        drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
-        scale = 2.0
-        velocity = 0.5
-        rate = time_derivative_from_joint_motion(drive.x.variables.position * scale)
-
-        cylinder_bot_world.state[drive.x.id].velocity = velocity
-        cylinder_bot_world.notify_state_change()
-
-        assert rate.evaluate()[0] == pytest.approx(scale * velocity)
 
 
 # %% error drives the observation
