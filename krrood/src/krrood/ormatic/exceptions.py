@@ -70,32 +70,6 @@ class QueryCannotBePersisted(DataclassException, TypeError):
 
 
 @dataclass(kw_only=True)
-class MissingPartClassError(DataclassException, TypeError):
-    """
-    Raised when a class inherits a class of a dependency's ORM interface next to its
-    primary base, but the dependency generated no part class holding rows of that
-    class's table for other classes.
-    """
-
-    dao_class: type
-    """
-    The DAO class of the dependency's table.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{self.dao_class.__name__} has no part class, so no other class can inherit "
-            f"its class next to its primary base."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Make the class an interface, or let a class of the dependency inherit it next "
-            "to its primary base, and regenerate the dependency's ORM interface."
-        )
-
-
-@dataclass(kw_only=True)
 class NoDAOFoundForTypeError(NoDAOFoundError):
     """
     Raised when no DAO class is found for a domain *type* rather than for a concrete

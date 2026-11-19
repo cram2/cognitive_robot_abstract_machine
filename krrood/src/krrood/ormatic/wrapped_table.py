@@ -20,7 +20,6 @@ from krrood.ormatic.data_access_objects.dao import (
     RelationshipInformationKey,
     StoredObjectDAO,
 )
-from krrood.ormatic.exceptions import MissingPartClassError
 from krrood.patterns.interface import Interface
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,
@@ -308,6 +307,73 @@ class ExternalTable(TableLike):
     @property
     def own_attribute_names(self) -> set[str]:
         return self.mapped_field_names
+
+    @property
+    def part_class_name(self) -> str:
+        """
+        :return: The name of a part class a dependent interface generates for this
+            table.
+        """
+        return f"{self.dao_class.__name__}Part"
+
+    @property
+    def domain_class_reference(self) -> str:
+        """
+        :return: The qualified name of the class the table's DAO maps.
+        """
+        return module_and_class_name(self.dao_class.original_class())
+
+    @property
+    def part_relationships(self) -> list[ColumnConstructor]:
+        """
+        :return: The relationships this table's own DAO class declares, as a part class
+            of the table declares them.
+        """
+        mapper = sqlalchemy.inspect(self.dao_class)
+        dao_reference = self.qualified_reference
+        result = []
+        for relationship in mapper.relationships:
+            if relationship.parent is not mapper or relationship.info.get(
+                RelationshipInformationKey.PART, False
+            ):
+                continue
+            target = relationship.mapper.class_
+            target_reference = module_and_class_name(target)
+            if relationship.uselist:
+                [association_column] = relationship.remote_side
+                arguments = (
+                    f"{target_reference}, "
+                    f"collection_class={module_and_class_name(relationship.collection_class)}, "
+                    f"cascade='all, delete-orphan', "
+                    f"foreign_keys=lambda: [{target_reference}.{association_column.key}], "
+                    f"lazy='selectin'"
+                )
+            else:
+                own_foreign_key = (
+                    f"{dao_reference}.{next(iter(relationship.local_columns)).key}"
+                )
+                arguments = (
+                    f"{target_reference}, uselist=False, "
+                    f"foreign_keys=lambda: [{own_foreign_key}], post_update=True"
+                )
+                declared_type = relationship.info.get(
+                    RelationshipInformationKey.DECLARED_TYPE
+                )
+                if declared_type is not None:
+                    arguments += (
+                        f", primaryjoin=lambda: {own_foreign_key} == "
+                        f"{target_reference}.database_id, "
+                        f"info={{{_information_key(RelationshipInformationKey.DECLARED_TYPE)}: "
+                        f"{module_and_class_name(declared_type)}}}"
+                    )
+            result.append(
+                ColumnConstructor(
+                    name=relationship.key,
+                    type=f"Mapped[{target_reference}]",
+                    constructor=f"relationship({arguments}, overlaps='{relationship.key}')",
+                )
+            )
+        return result
 
 
 @dataclass(kw_only=True)

@@ -41,6 +41,20 @@ class {{ assoc_table.name }}(Base, AssociationDataAccessObject):
 {% endfor %}
 
 
+# Part classes of dependencies' tables that classes of this interface inherit next to
+# their primary base
+{% for table in ormatic.external_tables_needing_part_classes %}
+class {{ table.part_class_name }}(Base, PartDataAccessObject[{{ table.domain_class_reference }}]):
+
+    __table__ = {{ table.qualified_reference }}.__table__
+
+    {% for column in table.part_relationships %}
+    {{ column }}
+    {% endfor %}
+
+{% endfor %}
+
+
 {% for table in ormatic.wrapped_tables.values() %}
 class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{table.wrapped_clazz.name_with_entire_path}}]):
 

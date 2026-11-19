@@ -1,3 +1,7 @@
+"""
+Reads which classes, mappings and type mappings generated ORM interfaces hold.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,7 +13,11 @@ import sqlalchemy
 
 from krrood.ormatic.base import Base
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.data_access_objects.dao import (
+    DataAccessObject,
+    PartDataAccessObject,
+    StoredObjectDAO,
+)
 from krrood.ormatic.utils import classes_of_module
 
 # %% what an interface holds
@@ -93,12 +101,15 @@ class OrmaticInterfaceChain:
     @cached_property
     def data_access_objects(self) -> list[type[DataAccessObject]]:
         """
-        :return: The data access objects of the interfaces in the chain.
+        :return: The data access objects of the interfaces in the chain that objects are
+            converted to, leaving out part classes and the table of every stored object.
         """
         return [
             mapper.class_
             for mapper in Base.registry.mappers
             if issubclass(mapper.class_, DataAccessObject)
+            and not issubclass(mapper.class_, PartDataAccessObject)
+            and mapper.class_ is not StoredObjectDAO
             and mapper.class_.__module__ in self.module_names
         ]
 
@@ -132,7 +143,10 @@ def get_classes_of_ormatic_interface(
     classes_of_ormatic_interface = classes_of_module(interface)
 
     for cls in filter(
-        lambda x: issubclass(x, DataAccessObject), classes_of_ormatic_interface
+        lambda x: (
+            issubclass(x, DataAccessObject) and not issubclass(x, PartDataAccessObject)
+        ),
+        classes_of_ormatic_interface,
     ):
         original_class = cls.original_class()
 

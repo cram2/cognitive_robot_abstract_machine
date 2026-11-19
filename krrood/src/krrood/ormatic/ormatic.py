@@ -5,7 +5,6 @@ Generates the SQLAlchemy ORM interface that stores a set of dataclasses.
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass, field, is_dataclass
 from functools import cached_property
 from inspect import isclass
@@ -25,12 +24,12 @@ from sortedcontainers import SortedSet
 from typing_extensions import Optional, TextIO
 
 from krrood.ormatic.default_type_mappings import DefaultTypeMapping
-from krrood.ormatic.exceptions import MissingPartClassError
 from krrood.ormatic.field_storage import FieldClassifier
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     PartDataAccessObject,
+    RelationshipInformationKey,
     StoredObjectDAO,
 )
 from krrood.patterns.interface import Interface
@@ -168,6 +167,23 @@ class ORMatic:
         # externally-mapped classes may live further up the chain than the immediate dependency
         for external_table in self.external_tables.values():
             self.imported_modules.add(get_module_of_type(external_table.dao_class))
+
+        # part classes generated for dependencies' tables name their relationships' types
+        for external_table in self.external_tables_needing_part_classes:
+            self.imported_modules.add(
+                get_module_of_type(external_table.dao_class.original_class())
+            )
+            for relationship in sqlalchemy.inspect(
+                external_table.dao_class
+            ).relationships:
+                self.imported_modules.add(
+                    get_module_of_type(relationship.mapper.class_)
+                )
+                declared_type = relationship.info.get(
+                    RelationshipInformationKey.DECLARED_TYPE
+                )
+                if declared_type is not None:
+                    self.imported_modules.add(get_module_of_type(declared_type))
 
     @property
     def alternative_mappings(self) -> list[type[AlternativeMapping]]:
@@ -433,15 +449,13 @@ class ORMatic:
         """
         :param table: The table of an open class.
         :return: The reference to the part class of the table in the generated
-            interface.
-        :raises MissingPartClassError: If a dependency maps the table without a part
-            class.
+            interface, which generates it for a dependency's table without one.
         """
         if isinstance(table, WrappedTable):
             return table.part_class_name
         part_class = self.part_class_of_external_table(external_table=table)
         if part_class is None:
-            raise MissingPartClassError(dao_class=table.dao_class)
+            return table.part_class_name
         return module_and_class_name(part_class)
 
     @staticmethod
@@ -450,13 +464,35 @@ class ORMatic:
     ) -> type[PartDataAccessObject] | None:
         """
         :param external_table: A table a dependency maps.
-        :return: The part class the dependency generated for it, if any.
+        :return: A part class an interface already generated for the table, if any.
         """
-        dao_module = sys.modules[external_table.dao_class.__module__]
-        part_class = vars(dao_module).get(f"{external_table.dao_class.__name__}Part")
-        if part_class is None or not issubclass(part_class, PartDataAccessObject):
-            return None
-        return part_class
+        table = external_table.dao_class.__table__
+        return next(
+            (
+                part_class
+                for part_class in recursive_subclasses(PartDataAccessObject)
+                if part_class.__dict__.get("__table__") is table
+            ),
+            None,
+        )
+
+    @property
+    def external_tables_needing_part_classes(self) -> list[ExternalTable]:
+        """
+        :return: The tables of dependencies that a class of this interface inherits next
+            to its primary base, but that no interface generated a part class for yet;
+            this interface generates them.
+        """
+        result = []
+        for wrapped_table in self.wrapped_tables.values():
+            for table in wrapped_table.secondary_base_tables:
+                if (
+                    isinstance(table, ExternalTable)
+                    and self.part_class_of_external_table(external_table=table) is None
+                    and not any(table is known for known in result)
+                ):
+                    result.append(table)
+        return result
 
     @property
     def mapped_classes(self) -> list[type]:
