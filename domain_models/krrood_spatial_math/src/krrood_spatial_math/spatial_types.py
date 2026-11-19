@@ -2679,8 +2679,8 @@ class RigidMotionRate(VectorPair, ABC):
         :param parameter_change: How much the parameter of the rate changed.
         :return: The displacement of the body while it did, at this constant rate.
         """
-        rotation = self._first_vector * parameter_change
-        translation = self._second_vector * parameter_change
+        rotation = self._rotational_part * parameter_change
+        translation = self._translational_part * parameter_change
         return Displacement(
             rotation_vector=rotation,
             translation=self._apply_left_jacobian(
