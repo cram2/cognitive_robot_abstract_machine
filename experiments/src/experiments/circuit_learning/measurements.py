@@ -14,7 +14,7 @@ from datetime import timedelta
 import jax
 import numpy as np
 import torch
-from array_api_compat import array_namespace, device
+from array_api_compat import array_namespace, device, is_jax_array
 from random_events.interval import closed_open
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Symbolic
@@ -44,6 +44,7 @@ from experiments.experiment_definitions import (
     MeanAndStandardDeviation,
     Unit,
 )
+from probabilistic_model.jax_log_likelihood import CompiledLogLikelihood
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )
@@ -76,6 +77,24 @@ class ChunkedLogLikelihoodEvaluation:
     The number of rows evaluated at once.
     """
 
+    compiled_log_likelihood: CompiledLogLikelihood | None = field(
+        init=False, repr=False
+    )
+    """
+    The compiled log-likelihood of a circuit with jax parameters, ``None`` for any other
+    backend.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Compile the log-likelihood of a circuit with jax parameters.
+        """
+        self.compiled_log_likelihood = (
+            CompiledLogLikelihood(circuit=self.circuit)
+            if is_jax_array(self.circuit.parameters[0])
+            else None
+        )
+
     def compute_log_likelihoods(self, *, rows: np.ndarray) -> np.ndarray:
         """
         :param rows: Rows whose symbolic values are hashes of domain elements.
@@ -93,19 +112,27 @@ class ChunkedLogLikelihoodEvaluation:
     def compute_chunk_log_likelihoods(self, *, chunk: np.ndarray) -> np.ndarray:
         """
         :param chunk: At most :attr:`chunk_rows` rows.
-        :return: Their log-likelihoods, on the host.
+        :return: Their log-likelihoods, on the host. A circuit with jax parameters
+            computes them with :attr:`compiled_log_likelihood`, on the chunk padded to
+            :attr:`chunk_rows` rows so that every chunk reuses one compiled program.
         """
         parameter = self.circuit.parameters[0]
-        data = array_namespace(parameter).asarray(
-            self.circuit.encoded(chunk),
-            dtype=parameter.dtype,
-            device=device(parameter),
-        )
-        return np.asarray(
-            HasParameterArrays.host_copy(
-                self.circuit.root.log_likelihood_of_nodes(data)[:, 0]
+        encoded = self.circuit.encoded(chunk)
+        if self.compiled_log_likelihood is None:
+            data = array_namespace(parameter).asarray(
+                encoded, dtype=parameter.dtype, device=device(parameter)
             )
+            return np.asarray(
+                HasParameterArrays.host_copy(
+                    self.circuit.root.log_likelihood_of_nodes(data)[:, 0]
+                )
+            )
+        padded = np.pad(encoded, ((0, self.chunk_rows - len(chunk)), (0, 0)), "edge")
+        data = jax.device_put(padded.astype(parameter.dtype), device(parameter))
+        log_likelihoods = self.compiled_log_likelihood.log_likelihood(
+            encoded_events=data
         )
+        return np.asarray(log_likelihoods)[: len(chunk)]
 
 
 # %% training
