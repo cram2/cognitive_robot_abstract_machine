@@ -1,3 +1,8 @@
+"""
+Tests that the ray tracing camera configuration selects the rendering camera and its
+pose.
+"""
+
 from __future__ import annotations
 from unittest.mock import Mock
 
@@ -66,6 +71,9 @@ def test_resolver_rejects_world_without_camera_annotation() -> None:
 
 
 def test_resolver_uses_runtime_robots_default_camera() -> None:
+    """
+    Without a camera name, the camera is the default camera of the robot in the world.
+    """
     world = Mock(spec=World)
     robot = Mock(spec=AbstractRobot)
     camera = Mock(spec=RobotCamera)
@@ -84,6 +92,9 @@ def test_resolver_uses_runtime_robots_default_camera() -> None:
 
 
 def test_resolver_retries_runtime_lookup_after_world_becomes_available() -> None:
+    """
+    A robot that appears in the world after a failed lookup is found by the next lookup.
+    """
     unavailable_world = Mock(spec=World)
     unavailable_world.get_semantic_annotations_by_type.return_value = []
     available_world = Mock(spec=World)

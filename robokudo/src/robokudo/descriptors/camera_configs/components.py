@@ -1,3 +1,8 @@
+"""
+The components a camera configuration combines: depth and color settings, the source of
+the camera pose and the world descriptor of a camera.
+"""
+
 from __future__ import annotations
 
 # %% Imports

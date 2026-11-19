@@ -43,6 +43,10 @@ class TestLatestAnnotationOfType:
 
 
 class TestClassLabel:
+    """
+    The class label of an object hypothesis.
+    """
+
     def test_is_the_class_name_of_the_latest_classification(self) -> None:
         latest = Classification(classname="cup")
         hypothesis = ObjectHypothesis(

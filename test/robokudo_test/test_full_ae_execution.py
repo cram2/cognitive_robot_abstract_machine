@@ -1,3 +1,7 @@
+"""
+Tests that a complete analysis engine runs on recorded RGB-D frames.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -42,6 +46,10 @@ from ._perception_process import EngineRunningABehaviour, robokudo_of_its_own
 
 
 class TestFullAEExecution(object):
+    """
+    A complete analysis engine run on recorded RGB-D frames.
+    """
+
     def test_run_simple_ae_successfully(
         self, node, cup_on_counter_directory: Path
     ) -> None:
@@ -125,6 +133,10 @@ class TestFullAEExecution(object):
         body_ids_after_each_successful_cas = []
 
         def assert_current_cas_keeps_a_single_object(cas):
+            """
+            Assert that ``cas`` holds a single object hypothesis, which reaches the
+            world once perception updates it.
+            """
             object_hypotheses = cas.filter_annotations_by_type(
                 robokudo.types.scene.ObjectHypothesis
             )

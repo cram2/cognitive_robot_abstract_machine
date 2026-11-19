@@ -256,13 +256,8 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
     def set_data(self, *, cas: CAS, world: World) -> None:
         """
-        Update the Common Analysis Structure with latest camera data.
-
-        This method:
-        * Applies any configured image rotation
-        * Updates camera intrinsics accordingly
-        * Sets the RGB image and camera observation in the CAS
-        * Handles thread synchronization
+        Put the latest color image and camera observation into the CAS, rotating the
+        image and adapting the camera intrinsics if a rotation is configured.
 
         :param cas: Common Analysis Structure to update
         :param world: The world perception perceives into

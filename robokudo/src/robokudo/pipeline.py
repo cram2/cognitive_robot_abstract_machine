@@ -1,17 +1,7 @@
 """
-Pipeline implementation for RoboKudo.
-
-This module provides the Pipeline class, which is a specialized version of py_trees'
-Sequence behavior. A Pipeline manages its own Common Analysis Structure (CAS) and
-provides visualization capabilities for its annotators.
-
-Key features:
-
-* Automatic CAS management for each pipeline iteration
-* Visualization support through annotator outputs
-* Helper methods for accessing annotators and CAS
-* Nested pipeline support with proper scoping
-* The world its annotators perceive into
+The RoboKudo :class:`Pipeline`, a py_trees sequence of annotators that owns a Common
+Analysis Structure (CAS) for each iteration and the world its annotators perceive into,
+visualizes the outputs of its annotators and can be nested.
 """
 
 from __future__ import annotations

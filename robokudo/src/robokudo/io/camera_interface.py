@@ -391,13 +391,10 @@ class CameraInterface(object):
 
     def set_data(self, *, cas: CAS, world: World) -> None:
         """
-        This method is supposed to read in, convert (if needed) and put the data into
-        the CAS. If you are running a CameraInterface which is getting data via callback
-        methods, please make sure to keep callbacks light and do the main conversion
-        work here! Callbacks should be short.
+        Read in and convert the latest data and put it into the CAS, placing the camera
+        in ``world`` where it was when it recorded the data, if that is known.
 
-        The camera is placed in ``world`` where it was when it recorded the data, if
-        that is known.
+        .. note:: Keep data callbacks light and do the conversion here.
 
         :param cas: The CAS where the data should be placed in
         :param world: The world perception perceives into

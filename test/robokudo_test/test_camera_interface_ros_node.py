@@ -1,3 +1,9 @@
+"""
+Tests that a ROS camera interface uses the ROS node registered for its process.
+"""
+
+from __future__ import annotations
+
 from collections.abc import Iterator
 from dataclasses import dataclass
 

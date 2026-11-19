@@ -1063,6 +1063,9 @@ class TestConcurrentChanges:
         def add_to_world_facing_a_concurrent_change(
             belief: PerceptionBelief, *, world: World
         ) -> None:
+            """
+            Add ``belief`` to ``world`` once the concurrent change has happened.
+            """
             concurrent_change.start_and_wait()
             add_to_world(belief, world=world)
 
@@ -1086,6 +1089,10 @@ class TestConcurrentChanges:
         def update_known_object_facing_a_concurrent_change(
             belief: PerceptionBelief, *, known_object: IsPerceivable, world: World
         ) -> None:
+            """
+            Update ``known_object`` with ``belief`` once the concurrent change has
+            happened.
+            """
             concurrent_change.start_and_wait()
             update_known_object(belief, known_object=known_object, world=world)
 

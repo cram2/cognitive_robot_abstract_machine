@@ -21,7 +21,7 @@ from robokudo.types.scene import ObjectHypothesis
 # %% analysis engines
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EngineRunningABehaviour:
     """
     An analysis engine whose pipeline runs a single behaviour.

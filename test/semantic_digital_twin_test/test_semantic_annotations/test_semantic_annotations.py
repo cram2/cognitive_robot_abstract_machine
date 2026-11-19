@@ -705,6 +705,9 @@ def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
 
 
 def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
+    """
+    A perceived object keeps its class label through serialization to another process.
+    """
     world = World()
     body = Body(name=PrefixedName("perceived_object"))
     with world.modify_world():
@@ -721,6 +724,9 @@ def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
 
 
 def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
+    """
+    A human is a perceivable object and keeps its class label.
+    """
     world = World()
     body = Body(name=PrefixedName("human"))
     with world.modify_world():

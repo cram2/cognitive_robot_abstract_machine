@@ -1,3 +1,10 @@
+"""
+Tests that the world descriptor bootstrap annotator puts the objects and regions of a
+world descriptor into the world, keeping the frames already in it.
+"""
+
+from __future__ import annotations
+
 from py_trees.common import Status
 
 from robokudo.annotators.world_descriptor_bootstrap import (
@@ -25,6 +32,10 @@ def in_pipeline_of(
 
 
 class TestWorldDescriptorBootstrapAnnotator:
+    """
+    The world descriptor bootstrap annotator.
+    """
+
     def test_augment_world_keeps_existing_frame_references(self):
         runtime_world = World()
         camera_interface().bind_world_T_camera(

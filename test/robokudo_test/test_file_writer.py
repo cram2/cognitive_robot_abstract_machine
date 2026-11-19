@@ -1,3 +1,7 @@
+"""
+Tests that the file writer records camera observations the file reader reads back.
+"""
+
 from __future__ import annotations
 
 # %% Imports

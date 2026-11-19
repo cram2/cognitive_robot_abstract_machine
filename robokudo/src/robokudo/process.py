@@ -2,10 +2,8 @@
 The RoboKudo perception process.
 
 A :class:`RoboKudo` runs one analysis engine on the semantic digital twin perception
-perceives into. That world is the world other processes, such as the one executing robot
-motions, share, if one of them serves it; a shared world receives their changes and
-every change perception makes is published to them. Without one, perception keeps an
-empty world of its own.
+perceives into: the world another process serves, kept in sync with it in both
+directions, or else an empty world of its own.
 """
 
 from __future__ import annotations
@@ -147,13 +145,10 @@ class RoboKudo:
     def __post_init__(self) -> None:
         """
         Serve :attr:`node` in the background and join the world a process serves,
-        keeping it in sync in both directions: changes of the other processes are applied
-        to it and changes perception makes are published. Without such a process,
-        perceive into an empty world of its own.
+        keeping it in sync in both directions, or else perceive into an empty world of
+        its own. If joining fails, :attr:`node` is no longer served.
 
         .. note:: No other executor may serve :attr:`node`.
-
-        If joining fails, :attr:`node` is no longer served.
 
         :raises TimeoutError: If the process serving a shared world does not send it
             within :attr:`world_fetch_timeout`.

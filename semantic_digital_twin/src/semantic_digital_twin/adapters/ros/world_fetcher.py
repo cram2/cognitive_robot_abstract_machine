@@ -1,3 +1,10 @@
+"""
+Serving a world to other processes through a ROS service, and finding and fetching a
+world another process serves.
+"""
+
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass, field
 from time import time, sleep

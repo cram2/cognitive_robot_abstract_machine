@@ -1,3 +1,7 @@
+"""
+Tests that a pipeline and its annotators perceive into the world the pipeline is given.
+"""
+
 from __future__ import annotations
 
 from py_trees.common import Status
@@ -33,6 +37,10 @@ def pipeline_perceiving_into(world: World) -> Pipeline:
 
 
 class TestWorldOfAPipeline:
+    """
+    The world a pipeline perceives into.
+    """
+
     def test_pipeline_without_a_world_perceives_into_an_empty_world_of_its_own(
         self,
     ) -> None:
@@ -59,6 +67,10 @@ class TestWorldOfAPipeline:
 
 
 class TestWorldOfAnAnnotator:
+    """
+    The world an annotator perceives into.
+    """
+
     def test_annotator_perceives_into_the_world_of_its_pipeline(self) -> None:
         world = World()
         annotator = ReadsItsWorld()

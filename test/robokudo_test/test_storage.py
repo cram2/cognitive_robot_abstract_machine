@@ -3,6 +3,8 @@ Tests of storing CAS documents in MongoDB and loading them back through
 :class:`Storage`.
 """
 
+from __future__ import annotations
+
 # %% Imports
 
 import os

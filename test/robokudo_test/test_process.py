@@ -34,6 +34,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     PerceivedObject,
 )
 from krrood.exceptions import DataclassException
+from krrood.patterns.called_positionally import called_positionally
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -67,7 +68,7 @@ from ._perception_world import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EngineWithoutPipeline:
     """
     An analysis engine whose tree is a plain behaviour rather than a pipeline.
@@ -101,7 +102,7 @@ class FindsAnObjectInView(BaseAnnotator):
         return self.outcome
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EngineFindingAnObject:
     """
     An analysis engine whose pipeline finds one object per pass.
@@ -145,6 +146,9 @@ def perceived_body_id(world: World) -> UUID:
 
 @pytest.fixture
 def engine() -> EngineRunningABehaviour:
+    """
+    An engine running a behaviour that is always successful.
+    """
     return EngineRunningABehaviour()
 
 
@@ -184,6 +188,9 @@ def lock_is_free_for_another_thread(
     acquired = []
 
     def acquire_and_release() -> None:
+        """
+        Note whether this thread acquires ``lock`` within ``timeout``.
+        """
         if lock.acquire(timeout=timeout.total_seconds()):
             acquired.append(True)
             lock.release()
@@ -205,6 +212,7 @@ class WorldFetchAnsweredTooLate:
     How long the service takes to answer a request.
     """
 
+    @called_positionally
     def answer(
         self, request: Trigger.Request, response: Trigger.Response
     ) -> Trigger.Response:
@@ -234,6 +242,9 @@ def world_fetch_answered_too_late(
 def joined_robokudo(
     node: Node, shared_world: SharedWorld, engine: EngineRunningABehaviour
 ) -> Iterator[RoboKudo]:
+    """
+    A started RoboKudo that joined :func:`shared_world`.
+    """
     robokudo = robokudo_joining_a_shared_world(node, engine)
     yield robokudo
     robokudo.close()
@@ -243,6 +254,9 @@ def joined_robokudo(
 def robokudo_joined_to_a_robot(
     node: Node, shared_world_with_a_robot: SharedWorld, engine: EngineRunningABehaviour
 ) -> Iterator[RoboKudo]:
+    """
+    A started RoboKudo that joined :func:`shared_world_with_a_robot`.
+    """
     robokudo = robokudo_joining_a_shared_world(node, engine)
     yield robokudo
     robokudo.close()
@@ -252,7 +266,11 @@ def robokudo_joined_to_a_robot(
 
 
 class TestPerceptionWorld:
-    def test_pipeline_perceives_into_the_world_of_robokudo(self, node: Node) -> None:
+    """
+    The world a RoboKudo perceives into.
+    """
+
+    def test_pipeline_perceives_into_the_world_of_robokudo(self, *, node: Node) -> None:
         robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
 
         robokudo.start(include_gui=False)
@@ -262,7 +280,7 @@ class TestPerceptionWorld:
         robokudo.close()
 
     def test_without_a_shared_world_perceives_into_an_empty_world_of_its_own(
-        self, node: Node
+        self, *, node: Node
     ) -> None:
         robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
 
@@ -272,7 +290,9 @@ class TestPerceptionWorld:
         assert robokudo.world.is_empty()
         robokudo.close()
 
-    def test_engine_whose_root_is_not_a_pipeline_cannot_start(self, node: Node) -> None:
+    def test_engine_whose_root_is_not_a_pipeline_cannot_start(
+        self, *, node: Node
+    ) -> None:
         robokudo = robokudo_of_its_own(node, EngineWithoutPipeline())
 
         with pytest.raises(EngineRootIsNotAPipelineError):
@@ -282,7 +302,7 @@ class TestPerceptionWorld:
         robokudo.close()
 
     def test_world_of_its_own_is_not_shared(
-        self, node: Node, engine: EngineRunningABehaviour
+        self, *, node: Node, engine: EngineRunningABehaviour
     ) -> None:
         robokudo = robokudo_of_its_own(node, engine)
 
@@ -298,8 +318,12 @@ class TestPerceptionWorld:
 
 
 class TestJoiningSharedWorld:
+    """
+    A RoboKudo that joined the world another process shares.
+    """
+
     def test_starts_from_the_shared_world(
-        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+        self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         assert WorldSynchronizer.all_callbacks_of_this_type_from_world(
             joined_robokudo.world
@@ -309,7 +333,7 @@ class TestJoiningSharedWorld:
         ]
 
     def test_changes_of_the_shared_world_reach_perception(
-        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+        self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         table = Body(name=PrefixedName("table"))
         with shared_world.world.modify_world():
@@ -326,7 +350,7 @@ class TestJoiningSharedWorld:
         )
 
     def test_objects_of_a_pass_are_published_once_the_world_is_released(
-        self, joined_robokudo: RoboKudo, monkeypatch: pytest.MonkeyPatch
+        self, *, joined_robokudo: RoboKudo, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """
         Every update about the objects of a pass leaves RoboKudo only while no thread
@@ -338,6 +362,10 @@ class TestJoiningSharedWorld:
         publish = synchronizer.publish
 
         def publish_noting_the_world_lock(update: WorldUpdate) -> None:
+            """
+            Note whether the world is released when ``update`` is published, then
+            publish it.
+            """
             world_released_during_publish.append(
                 lock_is_free_for_another_thread(world_lock)
             )
@@ -357,7 +385,7 @@ class TestJoiningSharedWorld:
         )
 
     def test_perceived_object_reaches_the_shared_world_at_its_pose(
-        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+        self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         put_pass_into_world(
             joined_robokudo,
@@ -388,7 +416,7 @@ class TestJoiningSharedWorld:
         ]
 
     def test_perceived_object_reaches_the_shared_world_with_its_class_label(
-        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+        self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         class_label = "fork"
         put_pass_into_world(
@@ -413,7 +441,7 @@ class TestJoiningSharedWorld:
         )
 
     def test_classified_object_reaches_the_shared_world_as_its_semantic_annotation(
-        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+        self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         put_pass_into_world(
             joined_robokudo,
@@ -442,7 +470,7 @@ class TestJoiningSharedWorld:
         )
 
     def test_perceiving_adds_no_camera_to_the_shared_world(
-        self, shared_world: SharedWorld, joined_robokudo: RoboKudo
+        self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         put_pass_into_world(
             joined_robokudo,
@@ -457,7 +485,7 @@ class TestJoiningSharedWorld:
         assert shared_world.world.get_bodies_by_name(FrameName.CAMERA) == []
 
     def test_closed_robokudo_no_longer_shares_its_world(
-        self, joined_robokudo: RoboKudo
+        self, *, joined_robokudo: RoboKudo
     ) -> None:
         joined_robokudo.close()
 
@@ -480,6 +508,7 @@ class TestJoiningAWorldWithARobot:
 
     def test_frame_is_placed_where_tf_located_the_camera_of_the_moved_head(
         self,
+        *,
         shared_world_with_a_robot: SharedWorld,
         robokudo_joined_to_a_robot: RoboKudo,
     ) -> None:
@@ -509,6 +538,7 @@ class TestJoiningAWorldWithARobot:
 
     def test_perceived_object_reaches_the_shared_world_where_the_robot_saw_it(
         self,
+        *,
         shared_world_with_a_robot: SharedWorld,
         robokudo_joined_to_a_robot: RoboKudo,
     ) -> None:
@@ -555,8 +585,12 @@ class TestJoiningAWorldWithARobot:
 
 
 class TestDiscoveringASharedWorld:
+    """
+    A RoboKudo looking for the world another process serves.
+    """
+
     def test_joins_a_world_served_while_it_is_still_looking(
-        self, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
+        self, *, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         world = World()
         with world.modify_world():
@@ -565,7 +599,7 @@ class TestDiscoveringASharedWorld:
         serving = Timer(
             1.0,
             lambda: served_worlds.append(
-                SharedWorld.served_through(other_process_node, world)
+                SharedWorld.served_through(node=other_process_node, world=world)
             ),
         )
         serving.start()
@@ -582,6 +616,7 @@ class TestDiscoveringASharedWorld:
 
     def test_stops_serving_its_node_when_the_shared_world_arrives_too_late(
         self,
+        *,
         node: Node,
         engine: EngineRunningABehaviour,
         world_fetch_answered_too_late: WorldFetchAnsweredTooLate,
@@ -604,6 +639,7 @@ class TestDiscoveringASharedWorld:
 
     def test_stops_serving_its_node_when_the_shared_world_cannot_be_synchronized(
         self,
+        *,
         node: Node,
         engine: EngineRunningABehaviour,
         shared_world: SharedWorld,
@@ -616,6 +652,9 @@ class TestDiscoveringASharedWorld:
         threads_before = set(threading.enumerate())
 
         def unavailable_synchronizer(**kwargs: object) -> WorldSynchronizer:
+            """
+            Refuse to create a synchronizer, as the network may.
+            """
             raise SynchronizerUnavailableError()
 
         monkeypatch.setattr(
@@ -628,7 +667,7 @@ class TestDiscoveringASharedWorld:
         assert wait_until(lambda: set(threading.enumerate()) <= threads_before)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SynchronizerUnavailableError(DataclassException):
     """
     Raised in place of creating a synchronizer, as when the network refuses one.
@@ -650,7 +689,7 @@ class TestOneRoboKudoPerProcess:
     """
 
     def test_second_robokudo_cannot_start(
-        self, node: Node, following_node: Node, engine: EngineRunningABehaviour
+        self, *, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         running = robokudo_of_its_own(node, engine)
         running.start(include_gui=False)
@@ -662,7 +701,7 @@ class TestOneRoboKudoPerProcess:
         running.close()
 
     def test_closed_robokudo_makes_room_for_the_next(
-        self, node: Node, following_node: Node, engine: EngineRunningABehaviour
+        self, *, node: Node, following_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         closed = robokudo_of_its_own(node, engine)
         closed.start(include_gui=False)
@@ -679,8 +718,12 @@ class TestOneRoboKudoPerProcess:
 
 
 class TestServingItsNode:
+    """
+    The node a RoboKudo serves in the background.
+    """
+
     def test_requests_to_its_node_are_answered(
-        self, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
+        self, *, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         node.create_service(Trigger, "trigger_robokudo", answer_trigger)
         robokudo = robokudo_of_its_own(node, engine)
@@ -693,7 +736,7 @@ class TestServingItsNode:
         robokudo.close()
 
     def test_closed_robokudo_no_longer_answers_requests_to_its_node(
-        self, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
+        self, *, node: Node, other_process_node: Node, engine: EngineRunningABehaviour
     ) -> None:
         node.create_service(Trigger, "trigger_robokudo", answer_trigger)
         robokudo_of_its_own(node, engine).close()
@@ -709,7 +752,11 @@ class TestServingItsNode:
 
 
 class TestTicking:
-    def test_runs_until_the_engine_fails(self, node: Node) -> None:
+    """
+    RoboKudo ticking its analysis engine.
+    """
+
+    def test_runs_until_the_engine_fails(self, *, node: Node) -> None:
         failing_behaviour = Failure(name="Fail")
         robokudo = robokudo_of_its_own(
             node, EngineRunningABehaviour(behaviour=failing_behaviour)
@@ -747,7 +794,11 @@ class TestTicking:
 
 
 class TestObjectsOfAFinishedPass:
-    def test_objects_of_a_finished_pass_reach_the_world(self, node: Node) -> None:
+    """
+    The objects a pass of the analysis engine finds.
+    """
+
+    def test_objects_of_a_finished_pass_reach_the_world(self, *, node: Node) -> None:
         robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
         robokudo.start(include_gui=False)
 
@@ -759,7 +810,7 @@ class TestObjectsOfAFinishedPass:
         assert perceived_object.root in robokudo.world.bodies
         robokudo.close()
 
-    def test_failed_pass_puts_nothing_into_the_world(self, node: Node) -> None:
+    def test_failed_pass_puts_nothing_into_the_world(self, *, node: Node) -> None:
         robokudo = robokudo_of_its_own(
             node, EngineFindingAnObject(outcome=Status.FAILURE)
         )

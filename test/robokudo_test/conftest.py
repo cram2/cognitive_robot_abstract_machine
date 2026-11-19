@@ -1,3 +1,8 @@
+"""
+Fixtures of the RoboKudo tests: ROS nodes, shared worlds, a clean blackboard and Mongo
+storage, and recorded RGB-D frames.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -175,7 +180,7 @@ def shared_world(other_process_node: Node) -> Iterator[SharedWorld]:
     world = World()
     with world.modify_world():
         world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
-    served_world = SharedWorld.served_through(other_process_node, world)
+    served_world = SharedWorld.served_through(node=other_process_node, world=world)
     yield served_world
     served_world.close()
 
@@ -187,7 +192,7 @@ def shared_world_with_a_robot(other_process_node: Node) -> Iterator[SharedWorld]
     below its head, which that process moves.
     """
     served_world = SharedWorld.served_through(
-        other_process_node, world_with_a_head_camera()
+        node=other_process_node, world=world_with_a_head_camera()
     )
     yield served_world
     served_world.close()

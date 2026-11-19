@@ -230,7 +230,7 @@ def world_with_a_head_camera(robot_name: str | None = None) -> World:
 # %% shared world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SharedWorld:
     """
     The world another process serves and keeps synchronized, such as the world of the
@@ -253,7 +253,7 @@ class SharedWorld:
     """
 
     @classmethod
-    def served_through(cls, node: Node, world: World) -> SharedWorld:
+    def served_through(cls, *, node: Node, world: World) -> SharedWorld:
         """
         :param node: The node of the process serving ``world``.
         :param world: The world to serve.

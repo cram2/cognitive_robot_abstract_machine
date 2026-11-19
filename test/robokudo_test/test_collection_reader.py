@@ -244,6 +244,10 @@ def pipeline_reading(camera_interface: CameraInterface) -> Pipeline:
 
 
 class TestCameraPoseOfAFrame:
+    """
+    Where the collection reader places the camera of the frame it reads.
+    """
+
     def test_camera_is_placed_in_the_world_of_the_pipeline(self) -> None:
         camera_interface = fixed_camera_at(camera_pose(x=1.0))
         pipeline = pipeline_reading(camera_interface)
@@ -275,6 +279,10 @@ class TestCameraPoseOfAFrame:
 
 
 class TestCameraWithoutAFixedPose:
+    """
+    A camera whose configuration fixes no pose.
+    """
+
     def test_camera_whose_configuration_fixes_no_pose_has_no_pose(self) -> None:
         camera_interface = PlacesItsFixedCamera(camera_config=FileReaderCameraConfig())
         cas = CAS()
