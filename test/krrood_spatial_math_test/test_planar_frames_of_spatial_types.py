@@ -9,8 +9,8 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood_spatial_math.point import MetricPoint
-from krrood_spatial_math.vector import GenericVector, MetricVector
+from krrood_spatial_math.point import CartesianPoint
+from krrood_spatial_math.vector import GenericVector, CartesianVector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.coordinate_system import (
@@ -34,6 +34,7 @@ from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
+    EmbeddedPlaneProjection,
     HomogeneousTransformationMatrix2Dimensional,
     CartesianPoint2Dimensional,
     Pose2Dimensional,
@@ -194,6 +195,40 @@ def test_the_plane_of_a_frame_in_no_space_is_not_known_to_be_any_other(floor_fra
     )
 
 
+# %% the normal of a frame's plane
+
+
+def test_a_frame_states_its_z_axis_in_itself(floor_frame):
+    """
+    A frame gives its own z-axis as the unit vector along z, in its own coordinates.
+    """
+    z_axis = floor_frame.z_axis
+
+    assert z_axis.reference_frame is floor_frame
+    np.testing.assert_array_equal(z_axis.to_np()[:3], [0, 0, 1])
+
+
+def test_the_normal_of_a_frames_plane_is_the_frames_z_axis(floor_frame):
+    """
+    The plane a frame spans has that frame's z-axis as its normal.
+    """
+    normal = EmbeddedPlane(frame_3_dimensional=floor_frame).normal
+
+    assert normal.reference_frame is floor_frame
+    np.testing.assert_array_equal(normal.to_np(), floor_frame.z_axis.to_np())
+
+
+def test_a_projection_onto_a_frames_plane_runs_along_the_planes_normal(floor_frame):
+    """
+    A projection onto a frame's plane lifts points along that plane's normal.
+    """
+    projection = EmbeddedPlaneProjection(plane_frame=floor_frame)
+    normal = EmbeddedPlane(frame_3_dimensional=floor_frame).normal
+
+    assert projection.plane_normal.reference_frame is normal.reference_frame
+    np.testing.assert_array_equal(projection.plane_normal.to_np(), normal.to_np())
+
+
 # %% the frame a plane's values are given in
 
 
@@ -282,7 +317,10 @@ def test_a_two_dimensional_point_is_given_in_a_two_dimensional_cartesian_frame()
 
 
 def test_a_two_dimensional_point_is_a_cartesian_point():
-    assert issubclass(CartesianPoint2Dimensional, MetricPoint)
+    """
+    A point on a plane measures distances, since its frame on the plane is Cartesian.
+    """
+    assert issubclass(CartesianPoint2Dimensional, CartesianPoint)
 
 
 def test_the_euclidean_distance_between_two_dimensional_points_is_measured_on_their_plane():
@@ -314,7 +352,10 @@ def test_a_two_dimensional_point_is_moved_by_a_two_dimensional_vector():
 
 
 def test_a_two_dimensional_vector_is_a_cartesian_vector_of_a_two_dimensional_frame():
-    assert issubclass(Vector2Dimensional, MetricVector)
+    """
+    A vector on a plane measures lengths and is given in a 2D Cartesian frame.
+    """
+    assert issubclass(Vector2Dimensional, CartesianVector)
     assert (
         Vector2Dimensional.get_type_of_generic_parameter(
             parameter=GenericCoordinateSystem

@@ -17,6 +17,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 from krrood_spatial_math.coordinate_system import GenericCoordinateRepresentation
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 
 # %% a space frames chart
 
@@ -61,6 +62,10 @@ class NamedFrame(CartesianFrame3Dimensional[str]):
                 expected_frame=self, actual_frame=value.reference_frame
             )
         return value
+
+    @property
+    def z_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self)
 
     def compare_embedded_plane_in_own_space(
         self, *, frame: CartesianFrame3Dimensional

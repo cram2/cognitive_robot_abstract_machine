@@ -39,7 +39,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from typing_extensions import Iterable, Sequence, Self
 
-from krrood_spatial_math.point import MetricPoint
+from krrood_spatial_math.point import CartesianPoint
 from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
 from krrood_spatial_math.spatial_types_2_dimensional import (
     CartesianPoint2Dimensional,
@@ -271,7 +271,7 @@ class NavigationPath:
     """
     A solved path through a graph of convex sets.
 
-    Kept as a class rather than a plain ``list[MetricPoint]``: :attr:`length`,
+    Kept as a class rather than a plain ``list[CartesianPoint]``: :attr:`length`,
     :attr:`vertical_travel` and :attr:`spatial_coordinates` are each read from panels
     in both this module and
     :mod:`~semantic_digital_twin.world_description.graph_of_convex_sets.volume_figure`,
@@ -279,7 +279,7 @@ class NavigationPath:
     instead of recomputing it from a bare list.
     """
 
-    waypoints: list[MetricPoint]
+    waypoints: list[CartesianPoint]
     """
     The points to navigate to, starting at the query's start and ending at its goal.
     """
@@ -335,23 +335,23 @@ class ConvexSetAdjacency:
     convex set, through the portal the two sets share, to the center of the other.
     """
 
-    source_center: MetricPoint
+    source_center: CartesianPoint
     """
     The center of the convex set the edge starts at.
     """
 
-    portal_center: MetricPoint
+    portal_center: CartesianPoint
     """
     The center of the region where the two convex sets overlap.
     """
 
-    target_center: MetricPoint
+    target_center: CartesianPoint
     """
     The center of the convex set the edge ends at.
     """
 
     @property
-    def points(self) -> tuple[MetricPoint, MetricPoint, MetricPoint]:
+    def points(self) -> tuple[CartesianPoint, CartesianPoint, CartesianPoint]:
         """
         :return: The points the edge is drawn through, from source through portal to
             target.
@@ -381,7 +381,9 @@ class FloorPlan:
     The projection of 3D points onto the plane.
     """
 
-    def project_onto_plane(self, *, point: MetricPoint) -> CartesianPoint2Dimensional:
+    def project_onto_plane(
+        self, *, point: CartesianPoint
+    ) -> CartesianPoint2Dimensional:
         """
         :param point: A point on the plane, or a 3D point in any frame of its world.
         :return: The point on the plane, a 3D point projected onto it.
@@ -390,7 +392,7 @@ class FloorPlan:
             return self.projection.project(point)
         return point
 
-    def coordinates(self, points: Iterable[MetricPoint]) -> np.ndarray:
+    def coordinates(self, points: Iterable[CartesianPoint]) -> np.ndarray:
         """
         :param points: Points on the plane, or 3D points in any frame of its world.
         :return: The points' coordinates on the plane as an array of x-y rows, in the

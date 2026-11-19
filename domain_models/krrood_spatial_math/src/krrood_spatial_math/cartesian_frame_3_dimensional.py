@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from uuid import UUID
 
-from typing_extensions import Any
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.adapters.json_serializer import from_json
 from krrood.adapters.object_reference import ObjectReference
@@ -27,6 +27,9 @@ from krrood_spatial_math.exceptions import (
     MissingReferenceFrameError,
 )
 from krrood_spatial_math.space import EuclideanSpace3Dimensional
+
+if TYPE_CHECKING:
+    from krrood_spatial_math.vector import Vector
 
 # %% how the embedded planes of two frames lie
 
@@ -112,6 +115,14 @@ class CartesianFrame3Dimensional(
         """
         :param value: A value given in a frame of the same space as this frame.
         :return: The same value, given in this frame.
+        """
+
+    @property
+    @abstractmethod
+    def z_axis(self) -> Vector:
+        """
+        The unit vector along this frame's z-axis, given in this frame, which is the
+        normal of the plane its x- and y-axes span.
         """
 
     def compare_embedded_plane(

@@ -37,8 +37,8 @@ from krrood_spatial_math.coordinate_system import (
     RigidCoordinateChange,
 )
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import MetricPoint
-from krrood_spatial_math.vector import MetricVector
+from krrood_spatial_math.point import CartesianPoint
+from krrood_spatial_math.vector import CartesianVector
 from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
     ReferenceFrameMismatchError,
@@ -299,7 +299,11 @@ the value a frame expresses in its own coordinates.
 
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialChange(
-    SymbolicSpatialType, RigidCoordinateChange[GenericCartesianFrame], ABC
+    sm.SymbolicMathType,
+    SymbolicSpatialType,
+    RigidCoordinateChange[GenericCartesianFrame],
+    SubclassJSONSerializer,
+    ABC,
 ):
     """
     A rigid change, as a symbolic matrix, of coordinates given in a frame derived from
@@ -350,7 +354,11 @@ class SymbolicSpatialChange(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue3Dimensional(
-    SymbolicSpatialType, CoordinateRepresentation[CartesianFrame3Dimensional], ABC
+    sm.SymbolicMathType,
+    SymbolicSpatialType,
+    CoordinateRepresentation[CartesianFrame3Dimensional],
+    SubclassJSONSerializer,
+    ABC,
 ):
     """
     A value, as a symbolic matrix, such as a point or a pose, given in its
@@ -459,9 +467,7 @@ class Orientation(SpecialEuclideanGroupAction, Mixin):
 
 @dataclass(eq=False, init=False, repr=False)
 class HomogeneousTransformationMatrix3Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialChange[CartesianFrame3Dimensional],
-    SubclassJSONSerializer,
     SpecialEuclideanGroupAction,
 ):
     """
@@ -900,10 +906,8 @@ class HomogeneousTransformationMatrix3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class RotationMatrix(
-    sm.SymbolicMathType,
     SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
-    SubclassJSONSerializer,
 ):
     """
     Class to represent a 4x4 symbolic rotation matrix tied to kinematic references.
@@ -1302,11 +1306,9 @@ class RotationMatrix(
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
-    SubclassJSONSerializer,
-    MetricVector[CartesianFrame3Dimensional, sm.Scalar],
+    CartesianVector[CartesianFrame3Dimensional, sm.Scalar],
 ):
     """
     Representation of a 3D vector with reference frame support for homogenous
@@ -1701,11 +1703,9 @@ class Vector3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class CartesianPoint3Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
-    SubclassJSONSerializer,
-    MetricPoint[CartesianFrame3Dimensional, sm.Scalar, Vector3Dimensional],
+    CartesianPoint[CartesianFrame3Dimensional, Vector3Dimensional, sm.Scalar],
 ):
     """
     Represents a 3D point with reference frame handling.
@@ -2037,9 +2037,7 @@ class LineSegment3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Quaternion(
-    sm.SymbolicMathType,
     SymbolicSpatialValue3Dimensional,
-    SubclassJSONSerializer,
     Orientation,
 ):
     """
@@ -2396,9 +2394,7 @@ class Quaternion(
 
 @dataclass(eq=False, init=False, repr=False)
 class AxisAngle(
-    sm.SymbolicMathType,
     SymbolicSpatialValue3Dimensional,
-    SubclassJSONSerializer,
     Orientation,
 ):
     """
@@ -2570,7 +2566,8 @@ class AxisAngle(
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class VectorPair(
-    sm.SymbolicMathType, SymbolicSpatialValue3Dimensional, SubclassJSONSerializer, ABC
+    SymbolicSpatialValue3Dimensional,
+    ABC,
 ):
     """
     Six numbers made of two vectors given along the axes of the same reference frame:
@@ -2870,10 +2867,8 @@ class ScrewAxis(VectorPair):
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose3Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialValue3Dimensional,
     HomogeneousCoordinates,
-    SubclassJSONSerializer,
 ):
     """
     A position and an orientation, both given in one reference frame.

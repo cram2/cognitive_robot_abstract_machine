@@ -5,6 +5,7 @@ Vectors of an affine space: the translations that move its points.
 from __future__ import annotations
 
 from abc import abstractmethod
+from dataclasses import dataclass
 
 from typing_extensions import Generic, Self, TypeVar
 
@@ -16,8 +17,8 @@ from krrood_spatial_math.coordinate_system import (
     GenericCartesianFrame,
     CoordinateRepresentation,
     GenericCoordinate,
+    StoredCoordinateRepresentation,
 )
-from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 
 # %% vectors given in an affine frame
 
@@ -32,6 +33,10 @@ class Vector(
     frame.
 
     A vector has no position: a change of frame turns its axes but never shifts it.
+
+    .. note::
+        The type parameters are, in order, the kind of frame and the coordinate type,
+        which is :class:`float` unless given.
     """
 
     coordinates: tuple[GenericCoordinate, ...]
@@ -70,7 +75,7 @@ The kind of vector the points of an affine space are moved by.
 # %% vectors whose frame kind measures them
 
 
-class MetricVector(Vector[GenericCartesianFrame, GenericCoordinate], Mixin):
+class CartesianVector(Vector[GenericCartesianFrame, GenericCoordinate], Mixin):
     """
     A vector given in a Cartesian frame, whose length and angles the kind of that frame
     measures.
@@ -98,15 +103,52 @@ class MetricVector(Vector[GenericCartesianFrame, GenericCoordinate], Mixin):
         """
         if not isinstance(other, type(self)):
             raise UnsupportedOperationError(operation="dot", left=self, right=other)
-        if (
-            self.coordinate_system is not None
-            and other.coordinate_system is not None
-            and other.coordinate_system.id != self.coordinate_system.id
-        ):
-            raise ReferenceFrameMismatchError(
-                expected_frame=self.coordinate_system,
-                actual_frame=other.coordinate_system,
-                context="the multiplied vector",
-            )
+        self.ensure_same_coordinate_system(other=other, context="the multiplied vector")
         frame_kind = self.get_type_of_generic_parameter(parameter=GenericCartesianFrame)
         return frame_kind.inner_product(first=self, second=other)
+
+
+# %% vectors whose coordinates are the fields their class declares
+
+
+@dataclass(kw_only=True)
+class StoredVector(
+    StoredCoordinateRepresentation[GenericAffineFrame],
+    Vector[GenericAffineFrame, GenericCoordinate],
+):
+    """
+    A vector whose coordinates are the fields its class declares, such as ``u`` and
+    ``v``, with sums, differences and stretching done coordinate by coordinate.
+    """
+
+    def __add__(self, other: Self) -> Self:
+        """
+        :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
+        """
+        self.ensure_same_coordinate_system(other=other, context="the added vector")
+        return self.from_coordinates(
+            coordinates=tuple(
+                own + others
+                for own, others in zip(self.coordinates, other.coordinates, strict=True)
+            ),
+            coordinate_system=self.coordinate_system,
+        )
+
+    def __sub__(self, other: Self) -> Self:
+        """
+        :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
+        """
+        self.ensure_same_coordinate_system(other=other, context="the subtracted vector")
+        return self.from_coordinates(
+            coordinates=tuple(
+                own - others
+                for own, others in zip(self.coordinates, other.coordinates, strict=True)
+            ),
+            coordinate_system=self.coordinate_system,
+        )
+
+    def __mul__(self, factor: GenericCoordinate) -> Self:
+        return self.from_coordinates(
+            coordinates=tuple(coordinate * factor for coordinate in self.coordinates),
+            coordinate_system=self.coordinate_system,
+        )

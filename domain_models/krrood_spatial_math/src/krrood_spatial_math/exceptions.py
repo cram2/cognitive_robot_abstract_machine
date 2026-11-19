@@ -101,6 +101,47 @@ class ReferenceFrameMismatchError(SpatialTypesError):
         )
 
 
+@dataclass(kw_only=True)
+class PointAndVectorFramesDifferError(SpatialTypesError):
+    """
+    Raised when a point type is declared to be moved by a vector type given in another
+    kind of frame, so the difference of two of its points could not be that vector.
+    """
+
+    point_type: type
+    """
+    The point type being declared.
+    """
+
+    point_frame_type: type
+    """
+    The kind of frame the point type is given in.
+    """
+
+    vector_type: type
+    """
+    The vector type the point type is declared to be moved by.
+    """
+
+    vector_frame_type: type
+    """
+    The kind of frame the vector type is given in.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.point_type.__name__} is given in a {self.point_frame_type.__name__}, "
+            f"but its vector type {self.vector_type.__name__} is given in a "
+            f"{self.vector_frame_type.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"bind {self.point_type.__name__} to a vector type given in a "
+            f"{self.point_frame_type.__name__}."
+        )
+
+
 @dataclass
 class MissingReferenceFrameError(SpatialTypesError):
     """

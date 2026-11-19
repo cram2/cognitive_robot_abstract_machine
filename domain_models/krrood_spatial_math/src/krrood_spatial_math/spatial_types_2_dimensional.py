@@ -25,8 +25,9 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
 )
-from krrood_spatial_math.point import MetricPoint
-from krrood_spatial_math.vector import MetricVector
+from krrood_spatial_math.point import CartesianPoint
+from krrood_spatial_math.vector import CartesianVector
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import (
     FramesOnDifferentPlanesError,
     MirroredPlaneFramesError,
@@ -82,7 +83,11 @@ The kind of value or change on a plane a planar transformation is applied to.
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue2Dimensional(
-    SymbolicSpatialType, CoordinateRepresentation[CartesianFrame2Dimensional], ABC
+    sm.SymbolicMathType,
+    SymbolicSpatialType,
+    CoordinateRepresentation[CartesianFrame2Dimensional],
+    SubclassJSONSerializer,
+    ABC,
 ):
     """
     A value, as a symbolic matrix, such as a point or a pose, on the x-y plane of its
@@ -104,10 +109,8 @@ class SymbolicSpatialValue2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialValue2Dimensional,
-    SubclassJSONSerializer,
-    MetricVector[CartesianFrame2Dimensional, sm.Scalar],
+    CartesianVector[CartesianFrame2Dimensional, sm.Scalar],
     PlanarSpecialEuclideanGroupAction,
 ):
     """
@@ -234,10 +237,8 @@ class Vector2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class CartesianPoint2Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialValue2Dimensional,
-    SubclassJSONSerializer,
-    MetricPoint[CartesianFrame2Dimensional, sm.Scalar, Vector2Dimensional],
+    CartesianPoint[CartesianFrame2Dimensional, Vector2Dimensional, sm.Scalar],
     PlanarSpecialEuclideanGroupAction,
 ):
     """
@@ -459,7 +460,13 @@ class EmbeddedPlaneProjection(
 
     @property
     def plane_normal(self) -> Vector3Dimensional:
-        return Vector3Dimensional.Z(reference_frame=self.plane_frame)
+        """
+        The :attr:`~krrood_spatial_math.embedded_plane.EmbeddedPlane.normal` of the plane
+        of :attr:`plane_frame`; the z-axis of no frame when there is none.
+        """
+        if self.plane_frame is None:
+            return Vector3Dimensional.Z(reference_frame=None)
+        return EmbeddedPlane(frame_3_dimensional=self.plane_frame).normal
 
     def embed_planar_point(
         self, *, point: CartesianPoint2Dimensional
@@ -483,9 +490,7 @@ class EmbeddedPlaneProjection(
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose2Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialValue2Dimensional,
-    SubclassJSONSerializer,
     PlanarSpecialEuclideanGroupAction,
 ):
     """
@@ -714,9 +719,7 @@ class Pose2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class HomogeneousTransformationMatrix2Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialChange[CartesianFrame2Dimensional],
-    SubclassJSONSerializer,
     PlanarSpecialEuclideanGroupAction,
 ):
     """

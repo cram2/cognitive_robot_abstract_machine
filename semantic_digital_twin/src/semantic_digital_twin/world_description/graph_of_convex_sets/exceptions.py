@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 from semantic_digital_twin.exceptions import UsageError
-from krrood_spatial_math.point import MetricPoint
+from krrood_spatial_math.point import CartesianPoint
 from semantic_digital_twin.world_description.geometry import AxisAlignedBox
 
 
@@ -44,12 +44,12 @@ class UnreachableGoalError(UsageError):
     goal.
     """
 
-    start: MetricPoint
+    start: CartesianPoint
     """
     Where the queried path was supposed to begin.
     """
 
-    goal: MetricPoint
+    goal: CartesianPoint
     """
     Where the queried path was supposed to end.
     """
@@ -141,7 +141,7 @@ class PointOutsideSearchSpaceError(UsageError):
     over, so nothing is known about whether it is free.
     """
 
-    point: MetricPoint
+    point: CartesianPoint
     """
     The point that lies outside the search space.
     """
@@ -170,7 +170,7 @@ class NoFreeSpaceError(UsageError):
     at all.
     """
 
-    point: MetricPoint
+    point: CartesianPoint
     """
     The point a free point was asked for.
     """

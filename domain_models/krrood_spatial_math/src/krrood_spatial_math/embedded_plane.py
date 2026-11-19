@@ -6,10 +6,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import TYPE_CHECKING
+
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
 )
 from krrood_spatial_math.space import EuclideanSpace2Dimensional
+
+if TYPE_CHECKING:
+    from krrood_spatial_math.vector import Vector
 
 # %% planes in three-dimensional space
 
@@ -18,7 +23,7 @@ from krrood_spatial_math.space import EuclideanSpace2Dimensional
 class EmbeddedPlane(EuclideanSpace2Dimensional):
     """
     A plane lying in a known three-dimensional Euclidean space: the x-y plane of
-    :attr:`frame_3_dimensional`, whose normal is that frame's z-axis.
+    :attr:`frame_3_dimensional`, whose :attr:`normal` is that frame's z-axis.
 
     Every plane is the x-y plane of some frame, so a vertical or tilted plane is the x-y
     plane of a frame turned to lie in it. Two planes are equal when they lie in one
@@ -29,6 +34,17 @@ class EmbeddedPlane(EuclideanSpace2Dimensional):
     """
     The frame whose origin lies on this plane and whose x- and y-axes span it.
     """
+
+    @property
+    def normal(self) -> Vector:
+        """
+        The unit vector perpendicular to this plane: the z-axis of
+        :attr:`frame_3_dimensional`, given in that frame.
+
+        A plane with another normal is the x-y plane of a frame whose z-axis is that
+        normal.
+        """
+        return self.frame_3_dimensional.z_axis
 
     def __eq__(self, other: object) -> bool:
         """

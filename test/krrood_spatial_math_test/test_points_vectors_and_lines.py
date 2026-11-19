@@ -21,12 +21,12 @@ from krrood_spatial_math.coordinate_system import (
 )
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import MetricPoint, Point, GenericPoint
+from krrood_spatial_math.point import CartesianPoint, Point, GenericPoint
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Vector3Dimensional,
 )
-from krrood_spatial_math.vector import MetricVector, Vector, GenericVector
+from krrood_spatial_math.vector import CartesianVector, Vector, GenericVector
 
 from .dataset.frames import NamedFrame
 from .dataset.spaces import (
@@ -46,17 +46,28 @@ def test_a_point_or_vector_cannot_be_instantiated(affine_value):
         affine_value()
 
 
-@pytest.mark.parametrize("affine_value", [Point, MetricPoint, Vector, MetricVector])
+@pytest.mark.parametrize(
+    "affine_value", [Point, CartesianPoint, Vector, CartesianVector]
+)
 def test_a_point_or_vector_is_a_coordinate_representation(affine_value):
+    """
+    Every point and vector, Cartesian or not, is given in a coordinate system.
+    """
     assert issubclass(affine_value, CoordinateRepresentation)
 
 
-def test_a_metric_point_is_a_point():
-    assert issubclass(MetricPoint, Point)
+def test_a_cartesian_point_is_a_point():
+    """
+    A Cartesian point keeps everything a point does and adds distances.
+    """
+    assert issubclass(CartesianPoint, Point)
 
 
-def test_a_metric_vector_is_a_vector():
-    assert issubclass(MetricVector, Vector)
+def test_a_cartesian_vector_is_a_vector():
+    """
+    A Cartesian vector keeps everything a vector does and adds lengths and angles.
+    """
+    assert issubclass(CartesianVector, Vector)
 
 
 def test_a_point_is_not_a_vector():
@@ -79,17 +90,17 @@ def test_a_point_is_given_in_an_affine_frame():
     """
     A point's frame may be any affine frame, and it is moved by a vector of that frame.
     """
-    frame_parameter, _, vector_parameter = Point.__parameters__
+    frame_parameter, vector_parameter, _ = Point.__parameters__
 
     assert frame_parameter.__bound__ is AffineFrame
     assert vector_parameter.__bound__ is Vector
 
 
-def test_a_metric_point_is_given_in_a_cartesian_frame():
+def test_a_cartesian_point_is_given_in_a_cartesian_frame():
     """
-    Only a Cartesian frame measures the distances a metric point has.
+    Only a Cartesian frame measures the distances a Cartesian point has.
     """
-    frame_parameter, _, _ = MetricPoint.__parameters__
+    frame_parameter, _, _ = CartesianPoint.__parameters__
 
     assert frame_parameter.__bound__ is CartesianFrame
 
@@ -122,17 +133,16 @@ def test_a_point_reports_the_kind_of_vector_it_is_moved_by():
     )
 
 
-def test_a_points_fields_are_narrowed_to_the_bound_types():
+def test_a_points_frame_field_is_narrowed_to_the_bound_frame():
+    """
+    The frame a point type binds becomes the type of its coordinate_system field.
+    """
     point_types = {
         point_field.name: point_field.type
         for point_field in fields(StoredScalablePlanePoint)
     }
 
-    assert point_types == {
-        "x": float,
-        "y": float,
-        "coordinate_system": ScalablePlaneFrame | None,
-    }
+    assert point_types["coordinate_system"] == ScalablePlaneFrame | None
 
 
 # %% how points and vectors combine

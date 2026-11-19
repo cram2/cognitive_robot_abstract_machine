@@ -12,8 +12,8 @@ import pytest
 from krrood.adapters.json_serializer import from_json, to_json
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.line import Line
-from krrood_spatial_math.point import GenericPoint, MetricPoint
-from krrood_spatial_math.vector import GenericVector, MetricVector
+from krrood_spatial_math.point import GenericPoint, CartesianPoint
+from krrood_spatial_math.vector import GenericVector, CartesianVector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
@@ -123,7 +123,10 @@ def test_a_three_dimensional_point_is_given_in_a_three_dimensional_cartesian_fra
 
 
 def test_a_three_dimensional_point_is_a_cartesian_point():
-    assert issubclass(CartesianPoint3Dimensional, MetricPoint)
+    """
+    A 3D point measures distances, since its frame is Cartesian.
+    """
+    assert issubclass(CartesianPoint3Dimensional, CartesianPoint)
 
 
 def test_a_three_dimensional_point_stores_its_coordinates_as_symbolic_scalars():
@@ -148,7 +151,10 @@ def test_a_three_dimensional_point_is_moved_by_a_three_dimensional_vector():
 
 
 def test_a_three_dimensional_vector_is_a_cartesian_vector_of_a_three_dimensional_frame():
-    assert issubclass(Vector3Dimensional, MetricVector)
+    """
+    A 3D vector measures lengths and is given in a 3D Cartesian frame.
+    """
+    assert issubclass(Vector3Dimensional, CartesianVector)
     assert (
         Vector3Dimensional.get_type_of_generic_parameter(
             parameter=GenericCoordinateSystem

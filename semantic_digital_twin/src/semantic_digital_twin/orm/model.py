@@ -17,7 +17,7 @@ from sqlalchemy import TypeDecorator, types
 from typing_extensions import Self
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-from krrood_spatial_math.point import MetricPoint
+from krrood_spatial_math.point import CartesianPoint
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood_spatial_math.spatial_types import (
     RotationMatrix,
@@ -134,7 +134,7 @@ class Vector3DimensionalMapping(AlternativeMapping[Vector3Dimensional]):
 
 
 @dataclass(eq=False)
-class MetricPointMapping(AlternativeMapping[MetricPoint], ABC):
+class CartesianPointMapping(AlternativeMapping[CartesianPoint], ABC):
     """
     What every stored point given in a Cartesian frame keeps, whatever its dimension.
     """
@@ -147,7 +147,7 @@ class MetricPointMapping(AlternativeMapping[MetricPoint], ABC):
 
 @dataclass(eq=False)
 class CartesianPoint3DimensionalMapping(
-    MetricPointMapping, AlternativeMapping[CartesianPoint3Dimensional]
+    CartesianPointMapping, AlternativeMapping[CartesianPoint3Dimensional]
 ):
     """
     A stored point given by three coordinates in its reference frame.
@@ -457,7 +457,7 @@ class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
 
 @dataclass(eq=False)
 class CartesianPoint2DimensionalMapping(
-    MetricPointMapping, AlternativeMapping[CartesianPoint2Dimensional]
+    CartesianPointMapping, AlternativeMapping[CartesianPoint2Dimensional]
 ):
     """
     A stored point given by two coordinates on the x-y plane of its reference frame.

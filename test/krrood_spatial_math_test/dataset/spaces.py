@@ -5,20 +5,17 @@ interface tests run against.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from typing_extensions import Self
+from dataclasses import dataclass, field
+from uuid import UUID, uuid4
 
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.point import Point, GenericPoint
-from krrood_spatial_math.vector import Vector, GenericVector
+from krrood_spatial_math.point import GenericPoint, StoredPoint
+from krrood_spatial_math.vector import GenericVector, StoredVector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
     AffineFrame,
-    GenericAffineFrame,
-    GenericCoordinate,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.space import Space
@@ -39,110 +36,67 @@ class ScalablePlaneFrame(AffineFrame[ScalablePlane, str], Interface):
     """
 
 
+# %% a frame of a scalable plane
+
+
+@dataclass(eq=False, kw_only=True)
+class NamedScalablePlaneFrame(ScalablePlaneFrame):
+    """
+    A frame on a scalable plane that only has a name, on no known plane.
+    """
+
+    name: str
+    """
+    What the frame is called.
+    """
+
+    space: ScalablePlane | None = None
+    """
+    The plane the frame charts.
+    """
+
+    id: UUID = field(default_factory=uuid4)
+    """
+    The identifier that tells the frame apart from every other frame.
+    """
+
+
 # %% points and vectors that store their coordinates
 
 
 @dataclass(kw_only=True)
-class StoredVector(Vector[GenericAffineFrame, GenericCoordinate]):
-    """
-    A vector that stores its two coordinates and frame as given.
-    """
-
-    x: GenericCoordinate
-    """
-    The amount along the first axis.
-    """
-
-    y: GenericCoordinate
-    """
-    The amount along the second axis.
-    """
-
-    coordinate_system: GenericAffineFrame | None
-    """
-    The frame the coordinates are given in.
-    """
-
-    @property
-    def coordinates(self) -> tuple[GenericCoordinate, GenericCoordinate]:
-        return self.x, self.y
-
-    def __add__(self, other: Self) -> Self:
-        return type(self)(
-            x=self.x + other.x,
-            y=self.y + other.y,
-            coordinate_system=self.coordinate_system,
-        )
-
-    def __sub__(self, other: Self) -> Self:
-        return type(self)(
-            x=self.x - other.x,
-            y=self.y - other.y,
-            coordinate_system=self.coordinate_system,
-        )
-
-    def __mul__(self, factor: GenericCoordinate) -> Self:
-        return type(self)(
-            x=self.x * factor,
-            y=self.y * factor,
-            coordinate_system=self.coordinate_system,
-        )
-
-
-@dataclass(kw_only=True)
-class StoredScalablePlaneVector(StoredVector[ScalablePlaneFrame, float]):
+class StoredScalablePlaneVector(StoredVector[ScalablePlaneFrame]):
     """
     A vector on a scalable plane that stores its coordinates as given.
     """
 
-
-@dataclass(kw_only=True)
-class StoredPoint(Point[GenericAffineFrame, GenericCoordinate, GenericVector]):
+    x: float
     """
-    A point that stores its two coordinates and frame as given.
+    The amount along the first axis.
     """
 
-    x: GenericCoordinate
+    y: float
     """
-    The first coordinate.
+    The amount along the second axis.
     """
-
-    y: GenericCoordinate
-    """
-    The second coordinate.
-    """
-
-    coordinate_system: GenericAffineFrame | None
-    """
-    The frame the coordinates are given in.
-    """
-
-    @property
-    def coordinates(self) -> tuple[GenericCoordinate, GenericCoordinate]:
-        return self.x, self.y
-
-    def __sub__(self, other: Self) -> GenericVector:
-        vector_type = self.get_type_of_generic_parameter(parameter=GenericVector)
-        return vector_type(
-            x=self.x - other.x,
-            y=self.y - other.y,
-            coordinate_system=self.coordinate_system,
-        )
-
-    def __add__(self, vector: GenericVector) -> Self:
-        return type(self)(
-            x=self.x + vector.x,
-            y=self.y + vector.y,
-            coordinate_system=self.coordinate_system,
-        )
 
 
 @dataclass(kw_only=True)
 class StoredScalablePlanePoint(
-    StoredPoint[ScalablePlaneFrame, float, StoredScalablePlaneVector]
+    StoredPoint[ScalablePlaneFrame, StoredScalablePlaneVector]
 ):
     """
     A point on a scalable plane that stores its coordinates as given.
+    """
+
+    x: float
+    """
+    The first coordinate.
+    """
+
+    y: float
+    """
+    The second coordinate.
     """
 
 

@@ -644,6 +644,20 @@ def test_bodies_of_two_worlds_span_two_planes(world_setup):
     )
 
 
+def test_a_body_states_its_z_axis_in_itself(world_setup):
+    """
+    The normal of a body's x-y plane is the body's own z-axis, whatever its pose.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    z_axis = l2.z_axis
+
+    assert z_axis.reference_frame is l2
+    np.testing.assert_array_equal(
+        z_axis.to_np(), Vector3Dimensional.Z(reference_frame=l2).to_np()
+    )
+
+
 def test_transform_a_pose_2d(world_setup):
     """
     A Pose2Dimensional carries no z, roll or pitch, so transforming one answers with the

@@ -1,12 +1,20 @@
+"""
+Coordinate systems on a space, the values given in them, and the changes between
+coordinate systems of one space.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod
+from dataclasses import dataclass, fields
 
-from typing_extensions import TYPE_CHECKING, Generic, Self, TypeVar
+from typing_extensions import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
+from krrood.patterns.mixin import Mixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.space import EuclideanSpace, Space
 
 if TYPE_CHECKING:
@@ -100,10 +108,10 @@ class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
 
 # %% values given in a coordinate system
 
-GenericCoordinate = TypeVar("GenericCoordinate")
+GenericCoordinate = TypeVar("GenericCoordinate", default=float)
 """
 The type a coordinate's real value is stored as, such as a float, or a symbolic
-expression standing for a real number.
+expression standing for a real number; a float unless a class binds another type.
 """
 
 GenericCoordinateSystem = TypeVar("GenericCoordinateSystem", bound=CoordinateSystem)
@@ -130,6 +138,27 @@ class CoordinateRepresentation(
     The coordinate system the coordinates are given in; ``None`` where it is not known.
     """
 
+    def ensure_same_coordinate_system(
+        self, *, other: CoordinateRepresentation, context: str
+    ) -> None:
+        """
+        :param other: A value combined with this one, whose coordinates must be given in
+            the same coordinate system.
+        :param context: What ``other`` is to the operation, for the error message.
+        :raises ReferenceFrameMismatchError: If both values are given in a coordinate
+            system and the two differ.
+        """
+        if (
+            self.coordinate_system is not None
+            and other.coordinate_system is not None
+            and other.coordinate_system.id != self.coordinate_system.id
+        ):
+            raise ReferenceFrameMismatchError(
+                expected_frame=self.coordinate_system,
+                actual_frame=other.coordinate_system,
+                context=context,
+            )
+
 
 GenericCoordinateRepresentation = TypeVar(
     "GenericCoordinateRepresentation", bound=CoordinateRepresentation
@@ -137,6 +166,63 @@ GenericCoordinateRepresentation = TypeVar(
 """
 The kind of value given in a coordinate system.
 """
+
+
+# %% values whose coordinates are the fields their class declares
+
+
+@dataclass(kw_only=True)
+class StoredCoordinateRepresentation(
+    CoordinateRepresentation[GenericCoordinateSystem], Mixin
+):
+    """
+    A value whose coordinates are the fields its class declares besides
+    :attr:`coordinate_system`, in the order they are declared.
+    """
+
+    coordinate_system: GenericCoordinateSystem | None
+    """
+    The coordinate system the coordinates are given in; ``None`` where it is not known.
+    """
+
+    @property
+    def coordinates(self) -> tuple[Any, ...]:
+        """
+        The values of the coordinate fields, in the order they are declared.
+        """
+        return tuple(getattr(self, name) for name in self._coordinate_field_names())
+
+    @classmethod
+    def from_coordinates(
+        cls,
+        *,
+        coordinates: tuple[Any, ...],
+        coordinate_system: GenericCoordinateSystem | None,
+    ) -> Self:
+        """
+        :param coordinates: One value per coordinate field, in the order they are
+            declared.
+        :param coordinate_system: The coordinate system the coordinates are given in.
+        :return: The value with these coordinates.
+        """
+        return cls(
+            **dict(zip(cls._coordinate_field_names(), coordinates, strict=True)),
+            coordinate_system=coordinate_system,
+        )
+
+    @classmethod
+    def _coordinate_field_names(cls) -> tuple[str, ...]:
+        """
+        :return: The names of the fields this class declares as coordinates, in order.
+        """
+        own_field_names = {
+            own_field.name for own_field in fields(StoredCoordinateRepresentation)
+        }
+        return tuple(
+            coordinate_field.name
+            for coordinate_field in fields(cls)
+            if coordinate_field.name not in own_field_names
+        )
 
 
 # %% changing coordinates within one space

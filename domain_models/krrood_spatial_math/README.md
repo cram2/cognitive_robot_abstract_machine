@@ -25,20 +25,22 @@ coordinate system. Its base depends on `krrood` alone.
   Cartesian frame of physical space that positions and directions are expressed in,
   and how serialized values refer to one.
 - `krrood_spatial_math.embedded_plane`: `EmbeddedPlane`, a plane lying in a known
-  three-dimensional space: the x-y plane of a `CartesianFrame3Dimensional`. Every plane
-  is the x-y plane of some frame.
+  three-dimensional space: the x-y plane of a `CartesianFrame3Dimensional`, whose
+  `normal` is that frame's `z_axis`. A plane with another normal is the x-y plane of a
+  frame whose z-axis is that normal.
 - `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the
   right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
   with that frame's origin, x-axis and y-axis, that values on the plane are given in.
-- `krrood_spatial_math.point`: `Point`, a point of an affine space given by its
-  coordinates in an affine frame, and `MetricPoint`, one given in a Cartesian frame,
-  whose distance to another point its frame kind measures. Each implementation binds
-  the kind of frame, what its coordinates are stored as and the kind of vector that
-  moves it; the frame's space fixes how many coordinates it has.
-- `krrood_spatial_math.vector`: `Vector`, a translation of an affine space, and
-  `MetricVector`, one given in a Cartesian frame, whose length and inner product its
-  frame kind measures. The difference of two points is a vector, and a point moved by
-  a vector is a point.
+- `krrood_spatial_math.point`: `Point[frame, vector]`, a point of an affine space given
+  by its coordinates in an affine frame, and `CartesianPoint`, one given in a Cartesian
+  frame, whose distance to another point its frame kind measures. A third parameter
+  names the coordinate type when it is not `float`. `StoredPoint` is a point whose
+  coordinates are the fields its class declares.
+- `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space, and
+  `CartesianVector`, one given in a Cartesian frame, whose length and inner product its
+  frame kind measures. `StoredVector` is a vector whose coordinates are the fields its
+  class declares. The difference of two points is a vector, and a point moved by a
+  vector is a point.
 - `krrood_spatial_math.line`: `Line`, the points `point + direction * t` for every
   number `t`.
 - `krrood_spatial_math.space_map`: `SpaceMap`, a map from the points of one space to
@@ -68,6 +70,59 @@ coordinate system. Its base depends on `krrood` alone.
 
 Other domain models add their own spaces on these interfaces; `krrood_image`, for
 example, adds image planes, whose pixel frames are affine and related by affine changes.
+
+## Adding a space
+
+A new space needs a space, a kind of frame on it with a frame of that kind, and a
+point and vector type given in that kind of frame. `StoredPoint` and `StoredVector` do the arithmetic and refuse values
+of two frames, so the point and vector only declare their coordinates:
+
+```python
+from dataclasses import dataclass, field
+from uuid import UUID, uuid4
+
+from krrood.patterns.interface import Interface
+from krrood_spatial_math.coordinate_system import AffineFrame
+from krrood_spatial_math.point import StoredPoint
+from krrood_spatial_math.space import EuclideanSpace2Dimensional
+from krrood_spatial_math.vector import StoredVector
+
+
+class ImagePlane(EuclideanSpace2Dimensional):
+    """The plane a camera's images lie on."""
+
+
+class PixelFrame(AffineFrame[ImagePlane, str], Interface):
+    """Pixel coordinates on an image plane, whose axes may differ in length."""
+
+
+@dataclass(eq=False, kw_only=True)
+class CameraPixels(PixelFrame):
+    """The pixels of one camera's images."""
+
+    name: str
+    space: ImagePlane | None = None
+    id: UUID = field(default_factory=uuid4)
+
+
+@dataclass(kw_only=True)
+class PixelVector(StoredVector[PixelFrame]):
+    u: float
+    v: float
+
+
+@dataclass(kw_only=True)
+class PixelPoint(StoredPoint[PixelFrame, PixelVector]):
+    u: float
+    v: float
+```
+
+With `frame = CameraPixels(name="camera")`,
+`PixelPoint(u=4, v=2, coordinate_system=frame) - PixelPoint(u=1, v=1, coordinate_system=frame)`
+is `PixelVector(u=3, v=1, coordinate_system=frame)`. Combining values of two frames
+raises `ReferenceFrameMismatchError`, and binding a point to a vector of another kind
+of frame raises `PointAndVectorFramesDifferError` when the class is defined. A change
+between two pixel frames implements `AffineCoordinateChange[PixelFrame]`.
 
 Points of two spaces, such as a body and an image of it, relate only through a map
 between the spaces, such as a camera, never through a coordinate change.

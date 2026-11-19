@@ -59,6 +59,7 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     Pose3Dimensional,
     SymbolicSpatialType,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -428,6 +429,10 @@ class KinematicStructureEntity(
         self, *, value: GenericSpatialType
     ) -> GenericSpatialType:
         return self._world.transform(value, self)
+
+    @property
+    def z_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self)
 
     def compare_embedded_plane_in_own_space(
         self, *, frame: CartesianFrame3Dimensional
