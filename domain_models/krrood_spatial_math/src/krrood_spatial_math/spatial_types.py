@@ -81,16 +81,11 @@ class SpatialFrameKey(StrEnum):
 
 
 @dataclass(eq=False, repr=False)
-class SymbolicSpatialType(ABC):
+class SymbolicSpatialType(sm.SymbolicMathType, SubclassJSONSerializer, ABC):
     """
     A symbolic matrix of spatial mathematics, given relative to a
     :class:`~krrood_spatial_math.cartesian_frame_3_dimensional.CartesianFrame3Dimensional`: a value given in
     that frame, or a change into it.
-    """
-
-    casadi_sx: ca.SX
-    """
-    Implement Symbolic Math protocol.
     """
 
     reference_frame: CartesianFrame3Dimensional | None = field(
@@ -299,10 +294,8 @@ the value a frame expresses in its own coordinates.
 
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialChange(
-    sm.SymbolicMathType,
     SymbolicSpatialType,
     RigidCoordinateChange[GenericCartesianFrame],
-    SubclassJSONSerializer,
     ABC,
 ):
     """
@@ -354,10 +347,8 @@ class SymbolicSpatialChange(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue3Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialType,
     CoordinateRepresentation[CartesianFrame3Dimensional],
-    SubclassJSONSerializer,
     ABC,
 ):
     """

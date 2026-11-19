@@ -11,7 +11,6 @@ import casadi as ca
 import numpy as np
 from typing_extensions import Any, Self, TypeVar
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.patterns.interface import Interface
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
@@ -83,10 +82,8 @@ The kind of value or change on a plane a planar transformation is applied to.
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue2Dimensional(
-    sm.SymbolicMathType,
     SymbolicSpatialType,
     CoordinateRepresentation[CartesianFrame2Dimensional],
-    SubclassJSONSerializer,
     ABC,
 ):
     """
