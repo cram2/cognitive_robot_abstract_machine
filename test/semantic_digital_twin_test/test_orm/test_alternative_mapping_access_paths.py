@@ -142,8 +142,8 @@ def test_a_vector_pair_survives_being_stored(mapping, vector_pair_type):
         world.add_kinematic_structure_entity(root)
     vector_pair = vector_pair_type(
         **{
-            vector_pair_type._first_vector_name: Vector3(0.0, 0.4, 0.0),
-            vector_pair_type._second_vector_name: Vector3(0.1, 0.0, -0.2),
+            vector_pair_type._rotational_part_name: Vector3(0.0, 0.4, 0.0),
+            vector_pair_type._translational_part_name: Vector3(0.1, 0.0, -0.2),
         },
         reference_frame=root,
     )
