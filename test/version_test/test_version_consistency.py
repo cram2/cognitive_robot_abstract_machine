@@ -28,7 +28,11 @@ PACKAGES = [
 VERSION_FILE = Path(__file__).parents[2] / "VERSION"
 
 
-def test_all_package_versions_match_root_version():
+def test_all_package_versions_match_root_version() -> None:
+    """
+    Every workspace package reports the version written in the repository's ``VERSION``
+    file.
+    """
     expected = VERSION_FILE.read_text().strip()
 
     for package_name in PACKAGES:

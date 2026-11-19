@@ -1,3 +1,7 @@
+"""
+Generic classes whose field types narrow to the concrete types a subclass binds.
+"""
+
 from __future__ import annotations
 
 from abc import ABC

@@ -1,3 +1,8 @@
+"""
+Example dataclasses the krrood tests build class diagrams, queries and ORM interfaces
+from.
+"""
+
 from __future__ import annotations
 
 import importlib

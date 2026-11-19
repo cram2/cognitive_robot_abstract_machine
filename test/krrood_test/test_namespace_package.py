@@ -18,17 +18,26 @@ import krrood
 
 
 # %% namespace package
-def test_krrood_is_a_namespace_package():
+def test_krrood_is_a_namespace_package() -> None:
+    """
+    :mod:`krrood` is found without an initializer, so every distribution adds to it.
+    """
     assert importlib.util.find_spec("krrood").origin is None
 
 
-def test_krrood_ships_no_package_initializer():
+def test_krrood_ships_no_package_initializer() -> None:
+    """
+    No distribution ships ``krrood/__init__.py``, which would end the namespace package.
+    """
     initializers = [Path(entry) / "__init__.py" for entry in krrood.__path__]
     assert not any(initializer.exists() for initializer in initializers)
 
 
 # %% version
-def test_distribution_version_matches_root_version():
+def test_distribution_version_matches_root_version() -> None:
+    """
+    The installed ``krrood`` distribution has the version of the repository.
+    """
     root_version = (Path(__file__).parents[2] / "VERSION").read_text().strip()
     assert importlib.metadata.version("krrood") == root_version
 

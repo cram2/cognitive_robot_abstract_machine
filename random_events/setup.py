@@ -1,3 +1,9 @@
+"""
+Builds random_events with its C++ extension, compiled by pybind11.
+"""
+
+from __future__ import annotations
+
 import ast
 import sys
 

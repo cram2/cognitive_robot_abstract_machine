@@ -1,3 +1,10 @@
+"""
+Tests of the entity query language's aggregations: counting, summing, averaging,
+extremes and grouping.
+"""
+
+from __future__ import annotations
+
 from collections import defaultdict
 from dataclasses import dataclass
 from types import NoneType
