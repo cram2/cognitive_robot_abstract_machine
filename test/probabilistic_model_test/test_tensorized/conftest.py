@@ -18,6 +18,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    BlockEdgeMatrix,
     DenseEdgeMatrix,
     EdgeMatrix,
     SparseEdgeMatrix,
@@ -65,7 +66,10 @@ def uneven_rows() -> SparseEdgeMatrix:
     )
 
 
-@pytest.fixture(params=[SparseEdgeMatrix, DenseEdgeMatrix], ids=["sparse", "dense"])
+@pytest.fixture(
+    params=[SparseEdgeMatrix, DenseEdgeMatrix, BlockEdgeMatrix],
+    ids=["sparse", "dense", "block"],
+)
 def edge_matrix_type(request) -> type[EdgeMatrix]:
     """
     Every type of edge matrix.
