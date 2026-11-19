@@ -6,7 +6,6 @@ import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from sqlalchemy import TypeDecorator, types
-from typing_extensions import Self
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from semantic_digital_twin.mixin import HasSimulatorProperties
@@ -28,7 +27,6 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.inertial_properties import InertiaTensor
 from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
     KinematicStructureEntity,
@@ -98,31 +96,6 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
             _data=np.array(self.data, dtype=np.float64).reshape((4, len(self.ids))),
             _ids=self.ids,
             _index={name: idx for idx, name in enumerate(self.ids)},
-        )
-
-
-@dataclass(eq=False, kw_only=True)
-class InertiaTensorMapping(AlternativeMapping[InertiaTensor]):
-    """
-    An inertia tensor as the nine elements of its matrix, row after row.
-    """
-
-    elements: list[float]
-    """
-    The elements of the matrix, row after row; empty for a tensor without a matrix.
-    """
-
-    @classmethod
-    def from_domain_object(cls, *, obj: InertiaTensor) -> Self:
-        if obj.data is None:
-            return cls(elements=[])
-        return cls(elements=obj.data.ravel().tolist())
-
-    def to_domain_object(self) -> InertiaTensor:
-        if not self.elements:
-            return InertiaTensor()
-        return InertiaTensor(
-            data=np.array(self.elements, dtype=np.float64).reshape((3, 3))
         )
 
 

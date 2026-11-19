@@ -23,3 +23,65 @@ class InvalidColorChannelCount(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Supply three RGB channels or four RGBA channels."
+
+
+# %% Inertial properties
+
+
+@dataclass(kw_only=True)
+class ArrayShapeError(DataclassException, ValueError):
+    """
+    An array does not have the shape of the vector or matrix it is meant to be.
+    """
+
+    expected_shape: tuple[int, ...]
+    """
+    The shape the array must have.
+    """
+
+    shape: tuple[int, ...]
+    """
+    The shape the array has.
+    """
+
+    def error_message(self) -> str:
+        return f"An array of shape {self.shape} was given where {self.expected_shape} is required."
+
+    def suggest_correction(self) -> str:
+        return f"Give an array of shape {self.expected_shape}."
+
+
+@dataclass(kw_only=True)
+class NegativeMomentOfInertiaError(DataclassException, ValueError):
+    """
+    An inertia tensor has a negative moment of inertia on its diagonal.
+    """
+
+    moments: list[float]
+    """
+    The moments of inertia about the x, y and z axes.
+    """
+
+    def error_message(self) -> str:
+        return f"The moments of inertia {self.moments} include a negative one."
+
+    def suggest_correction(self) -> str:
+        return "Give non-negative moments of inertia about each axis."
+
+
+@dataclass(kw_only=True)
+class AsymmetricInertiaTensorError(DataclassException, ValueError):
+    """
+    The matrix of an inertia tensor is not symmetric.
+    """
+
+    matrix: list[list[float]]
+    """
+    The rows of the matrix.
+    """
+
+    def error_message(self) -> str:
+        return f"The inertia tensor {self.matrix} is not symmetric."
+
+    def suggest_correction(self) -> str:
+        return "Give equal products of inertia above and below the diagonal."

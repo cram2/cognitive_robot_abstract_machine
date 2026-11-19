@@ -3,19 +3,31 @@ from dataclasses import dataclass, field
 from typing_extensions import Self, TypeVar, Any
 
 import numpy as np
-from numpy._typing import NDArray
+from numpy.typing import NDArray
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood_spatial_math.spatial_types import Point3, RotationMatrix
+from semantic_digital_twin.world_description.exceptions import (
+    ArrayShapeError,
+    AsymmetricInertiaTensorError,
+    NegativeMomentOfInertiaError,
+)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NPMatrix3x3(SubclassJSONSerializer):
-    data: NDArray | None = None
+    """
+    A 3x3 matrix of numbers.
+    """
 
-    def __post_init__(self):
-        if self.data is not None:
-            assert self.data.shape == (3, 3), "Matrix must be 3x3"
+    data: np.ndarray
+    """
+    The elements of the matrix.
+    """
+
+    def __post_init__(self) -> None:
+        if self.data.shape != (3, 3):
+            raise ArrayShapeError(expected_shape=(3, 3), shape=self.data.shape)
 
     def __matmul__(self, other: GenericMatrix3x3Type) -> GenericMatrix3x3Type:
         return NPMatrix3x3(data=self.data @ other.data)
@@ -31,13 +43,20 @@ class NPMatrix3x3(SubclassJSONSerializer):
 GenericMatrix3x3Type = TypeVar("GenericMatrix3x3Type", bound=NPMatrix3x3)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NPVector3(SubclassJSONSerializer):
-    data: NDArray | None = None
+    """
+    A vector of three numbers.
+    """
 
-    def __post_init__(self):
-        if self.data is not None:
-            assert self.data.shape == (3,), "Vector must be 3-dimensional"
+    data: np.ndarray
+    """
+    The elements of the vector.
+    """
+
+    def __post_init__(self) -> None:
+        if self.data.shape != (3,):
+            raise ArrayShapeError(expected_shape=(3,), shape=self.data.shape)
 
     @classmethod
     def from_values(cls, x: float, y: float, z: float) -> Self:
@@ -133,17 +152,13 @@ class InertiaTensor(NPMatrix3x3):
     https://en.wikipedia.org/wiki/Moment_of_inertia#Definition_2
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
-        if self.data is None:
-            return
-        diag = np.diag(self.data)
-        assert np.all(diag >= 0.0), (
-            "Diagonal elements of inertia tensor must be non-negative"
-        )
-        assert np.allclose(self.data, self.data.T, atol=1e-10), (
-            "Inertia tensor must be symmetric"
-        )
+        moments = np.diag(self.data)
+        if np.any(moments < 0.0):
+            raise NegativeMomentOfInertiaError(moments=moments.tolist())
+        if not np.allclose(self.data, self.data.T, atol=1e-10):
+            raise AsymmetricInertiaTensorError(matrix=self.data.tolist())
 
     @classmethod
     def from_values(
