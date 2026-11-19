@@ -9,7 +9,7 @@ import json
 import os
 import threading
 import time
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
@@ -30,22 +30,29 @@ from sqlalchemy.orm import Session
 from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.helper import to_dao
-from semantic_digital_twin.adapters.ros.messages import (
-    MessageField,
-    MetaData,
-    WorldStateUpdate,
+from krrood_synchronization.exceptions import DivergedFromPublisherError
+from krrood_synchronization.messages import (
     Message,
+    MessageOrigin,
+    Sender,
+    StreamPosition,
+)
+from krrood_synchronization.stream_participants import (
+    LostMessages,
+    StreamPublisher,
+    StreamReceiver,
+)
+from semantic_digital_twin.adapters.ros.messages import (
+    WorldStateUpdate,
     ModificationBlock,
     LoadModel,
     ReceivedMessage,
-    StreamPosition,
     WorldUpdate,
 )
 from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
-from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
 from semantic_digital_twin.exceptions import (
     StateUpdateContainsNonNumericValuesError,
     SynchronizerNotConnectedError,
@@ -65,33 +72,8 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-class PublicationProgress(ABC):
-    """
-    Reports how far its own changes were published to the other processes.
-
-    Whoever hands out a :class:`StreamPosition` of its own stream tells others what they
-    have to catch up with before they may read the world it publishes.
-    """
-
-    @property
-    @abstractmethod
-    def published_sequence_number(self) -> int:
-        """
-        Position of the message that was published last.
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def latest_published_position(self) -> StreamPosition:
-        """
-        The position of the last published message, together with its publisher.
-        """
-        raise NotImplementedError
-
-
 @dataclass
-class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
+class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver):
     """
     Abstract synchronizer to manage world synchronizations between processes running
     semantic digital twin.
@@ -154,43 +136,6 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     The type of the message that is sent and received.
     """
 
-    _published_sequence_number: int = field(default=0, init=False, repr=False)
-    """
-    Position of the message this synchronizer published last.
-    """
-
-    _applied_sequence_numbers: dict[MetaData, int] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    """
-    The highest position applied so far, per publisher.
-    """
-
-    _received_sequence_numbers: dict[MetaData, int] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    """
-    The position of the message received last, per publisher.
-    """
-
-    _divergences: dict[MetaData, SynchronizerDivergedError] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    """
-    The first failure to apply a message of a publisher, per publisher this world may
-    differ from since.
-    """
-
-    _sequence_number_lock: threading.Lock = field(
-        default_factory=threading.Lock, init=False, repr=False
-    )
-    """
-    Guards the published and applied positions.
-
-    Messages are published and applied on different threads, and both positions are read
-    by whoever waits for one of them.
-    """
-
     def __post_init__(self):
         self.subscriber = self.node.create_subscription(
             std_msgs.msg.String,
@@ -239,15 +184,10 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         )
 
     @cached_property
-    def meta_data(self) -> MetaData:
-        """
-        The metadata of the synchronizer which can be used to compare origins of
-        messages.
-        """
-        return MetaData(
-            world_id=self._world._id,
-            node_name=self.node.get_name(),
-            process_id=os.getpid(),
+    def origin(self) -> MessageOrigin:
+        return MessageOrigin(
+            sender=Sender(node_name=self.node.get_name(), process_id=os.getpid()),
+            model_id=self._world._id,
         )
 
     def subscription_callback(self, message: std_msgs.msg.String) -> None:
@@ -258,10 +198,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         :param message: The incoming ROS string message containing a serialized
             synchronization message.
         """
-        received = ReceivedMessage.from_json(json.loads(message.data))
-        if received.publisher == self.meta_data:
+        received = ReceivedMessage.from_json(content=json.loads(message.data))
+        if received.position.origin == self.origin:
             return
-        self._notice_lost_messages(received)
+        lost = self.record_received(position=received.position)
+        if lost is not None:
+            self._warn_about_lost_messages(lost=lost)
         self._handle_reporting_divergence(
             received=received, handle=self._subscription_callback
         )
@@ -288,123 +230,33 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         try:
             handle(received)
         except DataclassException as error:
-            divergence = SynchronizerDivergedError(
-                publisher=received.publisher,
-                sequence_number=received.sequence_number,
-                raised_from=error,
+            divergence = DivergedFromPublisherError(
+                position=received.position, raised_from=error
             )
-            with self._sequence_number_lock:
-                self._divergences.setdefault(received.publisher, divergence)
+            self.record_divergence(divergence=divergence)
             self.node.get_logger().error(
                 f"{divergence.error_message()} Cause: {error}",
                 throttle_duration_sec=error_throttle_period,
             )
 
-    def divergence_from(
-        self, *, publisher: MetaData
-    ) -> SynchronizerDivergedError | None:
-        """
-        :param publisher: Another synchronizer.
-        :return: The first failure to apply a message of ``publisher`` since this world
-            last caught up with it in full, or ``None`` if every message was applied.
-        """
-        with self._sequence_number_lock:
-            return self._divergences.get(publisher)
-
-    def forget_divergence_from(self, *, publisher: MetaData) -> None:
-        """
-        Count ``publisher`` as caught up with again, once this world was made equal to
-        its world, for example by fetching or reloading it.
-
-        :param publisher: The synchronizer whose world this world now equals.
-        """
-        with self._sequence_number_lock:
-            self._divergences.pop(publisher, None)
-
-    def forget_divergences_from_same_world(self, *, publisher: MetaData) -> None:
-        """
-        Count every synchronizer of the world ``publisher`` belongs to, in its process,
-        as caught up with again, once this world was replaced by that world.
-
-        The synchronizers of one world, such as its reloads and its updates, publish
-        under different nodes, so they are told apart by process and world, not node.
-
-        :param publisher: A synchronizer of the world this world now equals.
-        """
-        with self._sequence_number_lock:
-            caught_up = [
-                diverged
-                for diverged in self._divergences
-                if diverged.process_id == publisher.process_id
-                and diverged.world_id == publisher.world_id
-            ]
-            for diverged in caught_up:
-                del self._divergences[diverged]
-
-    def _notice_lost_messages(
-        self, message: ReceivedMessage, warning_throttle_period: float = 1.0
+    def _warn_about_lost_messages(
+        self, *, lost: LostMessages, warning_throttle_period: float = 1.0
     ) -> None:
         """
-        Warn that messages of the publisher of `message` were lost if `message` does not
-        follow the one received from it before.
+        Warn that messages of another synchronizer were lost.
 
         Only what changed is published, so the world may differ from the publisher's in
         what the lost messages carried.
 
-        :param message: A message just received from another synchronizer.
+        :param lost: The messages that never arrived.
         :param warning_throttle_period: The fewest seconds between two warnings.
         """
-        publisher = message.publisher
-        with self._sequence_number_lock:
-            last_received = self._received_sequence_numbers.get(publisher)
-            self._received_sequence_numbers[publisher] = message.sequence_number
-        if last_received is None or message.sequence_number == last_received + 1:
-            return
         self.node.get_logger().warning(
-            f"Updates #{last_received + 1} to #{message.sequence_number - 1} of "
-            f"'{publisher.node_name}' were lost, so this world may differ from the one "
-            f"of the publisher.",
+            f"Updates #{lost.first_sequence_number} to #{lost.last_sequence_number} of "
+            f"'{lost.publisher.sender.node_name}' were lost, so this world may differ from the "
+            f"one of the publisher.",
             throttle_duration_sec=warning_throttle_period,
         )
-
-    @property
-    def published_sequence_number(self) -> int:
-        with self._sequence_number_lock:
-            return self._published_sequence_number
-
-    @property
-    def latest_published_position(self) -> StreamPosition:
-        return StreamPosition(
-            origin=self.meta_data, sequence_number=self.published_sequence_number
-        )
-
-    def has_applied(self, position: StreamPosition) -> bool:
-        """
-        Whether everything up to ``position`` was applied to this world.
-
-        A publisher this world never heard from is treated as being at the start of its
-        stream, so its first message is still awaited. A publisher a message of which
-        could not be applied is not caught up with, see :meth:`divergence_from`.
-        """
-        with self._sequence_number_lock:
-            if position.origin in self._divergences:
-                return False
-            applied = self._applied_sequence_numbers.get(position.origin, 0)
-        return applied >= position.sequence_number
-
-    def record_applied(self, message: Message):
-        """
-        Remember how far this world caught up with the publisher of ``message``.
-
-        Called when a message is applied rather than when it is received, so that a
-        buffered message does not count as caught up with.
-        """
-        position = message.position
-        with self._sequence_number_lock:
-            self._applied_sequence_numbers[position.origin] = max(
-                self._applied_sequence_numbers.get(position.origin, 0),
-                position.sequence_number,
-            )
 
     @abstractmethod
     def _subscription_callback(self, message: ReceivedMessage) -> None:
@@ -426,9 +278,7 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         :param msg: The message to publish.
         """
         with self._world.get_world_model_manager().publishing_in_order():
-            with self._sequence_number_lock:
-                self._published_sequence_number += 1
-                msg.sequence_number = self._published_sequence_number
+            self.assign_next_sequence_number(message=msg)
             self.publisher.publish(std_msgs.msg.String(data=json.dumps(to_json(msg))))
 
     def close(self):
@@ -504,7 +354,9 @@ class ModelReloadSynchronizer(Synchronizer):
         dao = to_dao(self._world)
         self.session.add(dao)
         self.session.commit()
-        message = LoadModel(primary_key=dao.database_id, meta_data=self.meta_data)
+        message = LoadModel(
+            primary_key=dao.database_id, position=StreamPosition(origin=self.origin)
+        )
         self.publish(message)
 
     def _subscription_callback(self, message: ReceivedMessage) -> None:
@@ -537,12 +389,14 @@ class ModelReloadSynchronizer(Synchronizer):
         )
         new_world = self.session.scalars(query).one().from_dao()
         self._world._replace_with(new_world)
-        self.record_applied(msg)
+        self.record_applied(position=msg.position)
         for synchronizer in [
             self,
             *WorldSynchronizer.all_callbacks_of_this_type_from_world(self._world),
         ]:
-            synchronizer.forget_divergences_from_same_world(publisher=msg.meta_data)
+            synchronizer.forget_divergences_from_same_model(
+                publisher=msg.position.origin
+            )
 
 
 @dataclass(eq=False)
@@ -636,19 +490,19 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             return
 
         model_block = ModificationBlock(
-            meta_data=self.meta_data,
+            position=StreamPosition(origin=self.origin),
             modifications=self._world.get_world_model_manager().model_modification_blocks[
                 -1
             ],
         )
         positions = self._world.state.to_uuid_position_dict()
         state_message = WorldStateUpdate(
-            meta_data=self.meta_data,
+            position=StreamPosition(origin=self.origin),
             ids=list(positions.keys()),
             states=list(positions.values()),
         )
         update = WorldUpdate(
-            meta_data=self.meta_data,
+            position=StreamPosition(origin=self.origin),
             modification_block=model_block,
             state_update=state_message,
         )
@@ -678,11 +532,13 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             return
 
         state_message = WorldStateUpdate(
-            meta_data=self.meta_data,
+            position=StreamPosition(origin=self.origin),
             ids=list(changes.keys()),
             states=list(changes.values()),
         )
-        update = WorldUpdate(meta_data=self.meta_data, state_update=state_message)
+        update = WorldUpdate(
+            position=StreamPosition(origin=self.origin), state_update=state_message
+        )
         self._publish_or_defer(update)
         self.update_previous_world_state()
 
@@ -765,7 +621,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                 self._apply_model(message.modification_block)
             if message.state_update is not None:
                 self._apply_state(message.state_update)
-        self.record_applied(message)
+        self.record_applied(position=message.position)
 
     def _apply_model(self, modification_block_message: ModificationBlock):
         """

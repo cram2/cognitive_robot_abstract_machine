@@ -50,7 +50,7 @@ from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
-from semantic_digital_twin.adapters.ros.messages import StreamPosition
+from krrood_synchronization.messages import StreamPosition
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -292,8 +292,8 @@ class MotionServer:
             )
             if divergence is not None:
                 raise RequiredWorldUpdateNotAppliedError(
-                    publisher_name=required_position.origin.node_name,
-                    failed_sequence_number=divergence.sequence_number,
+                    publisher_name=required_position.origin.sender.node_name,
+                    failed_sequence_number=divergence.position.sequence_number,
                     awaited_sequence_number=required_position.sequence_number,
                     raised_from=divergence,
                 )
@@ -302,7 +302,7 @@ class MotionServer:
             if time.monotonic() >= deadline:
                 raise RequiredWorldUpdateNotReceivedError(
                     current_sequence_number=self.outgoing_world_updates.world_synchronizer.published_sequence_number,
-                    publisher_name=required_position.origin.node_name,
+                    publisher_name=required_position.origin.sender.node_name,
                     awaited_sequence_number=required_position.sequence_number,
                     timeout=self.world_update_timeout,
                 )
