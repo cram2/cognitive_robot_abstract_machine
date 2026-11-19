@@ -17,7 +17,6 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     HomogeneousCoordinates,
     HomogeneousTransformationMatrix3Dimensional,
-    HomogeneousTransformationMatrix2Dimensional,
     Orientation,
     Pose3Dimensional,
     Quaternion,
@@ -27,6 +26,9 @@ from krrood_spatial_math.spatial_types import (
     SymbolicSpatialChange,
     SymbolicSpatialValue3Dimensional,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    HomogeneousTransformationMatrix2Dimensional,
 )
 
 # %% the rotation group is a subgroup of the rigid motion group

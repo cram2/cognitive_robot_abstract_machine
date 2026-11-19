@@ -4,11 +4,13 @@ import pytest
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     Line3Dimensional,
-    EmbeddedPlaneProjection,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    EmbeddedPlaneProjection,
+    CartesianPoint2Dimensional,
 )
 from .dataset.frames import NamedFrame
 

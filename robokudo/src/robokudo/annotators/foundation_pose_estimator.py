@@ -16,9 +16,9 @@ import numpy
 from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint2Dimensional,
     Pose3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from robokudo_foundation_pose_tensorrt import FoundationPose, ensure_engines
 from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,

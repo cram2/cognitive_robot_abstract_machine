@@ -31,11 +31,13 @@ from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint2Dimensional,
     Pose3Dimensional,
-    Pose2Dimensional,
     RotationMatrix,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
+    Pose2Dimensional,
 )
 
 # %% rotated instances of every spatial type that stores its rotation as an axis angle

@@ -6,10 +6,12 @@ import pytest
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.spatial_types import (
-    EmbeddedPlaneProjection,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    EmbeddedPlaneProjection,
+    CartesianPoint2Dimensional,
 )
 from .dataset.frames import NamedFrame
 
@@ -31,8 +33,8 @@ class TestCartesianPoint2DimensionalConstruction:
 
     def test_has_no_z(self):
         """
-        A 2D point has no height of its own -- unlike ``CartesianPoint3Dimensional``, ``CartesianPoint2Dimensional`` does not
-        carry a ``z`` attribute at all.
+        A 2D point has no height of its own -- unlike ``CartesianPoint3Dimensional``,
+        ``CartesianPoint2Dimensional`` does not carry a ``z`` attribute at all.
         """
         point = CartesianPoint2Dimensional(x=1, y=2)
         with pytest.raises(AttributeError):

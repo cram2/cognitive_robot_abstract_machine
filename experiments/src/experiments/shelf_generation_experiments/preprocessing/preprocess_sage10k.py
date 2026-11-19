@@ -38,8 +38,10 @@ from experiments.shelf_generation_experiments.shelf_schema import (
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint2Dimensional,
     Pose3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world_description.geometry import (

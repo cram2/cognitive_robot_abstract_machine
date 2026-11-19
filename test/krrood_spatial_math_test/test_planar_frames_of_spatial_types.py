@@ -30,10 +30,12 @@ from krrood_spatial_math.space import EuclideanSpace2Dimensional
 from krrood_spatial_math.spatial_types import (
     SymbolicSpatialValue3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
-    HomogeneousTransformationMatrix2Dimensional,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    HomogeneousTransformationMatrix2Dimensional,
+    CartesianPoint2Dimensional,
     Pose2Dimensional,
     Vector2Dimensional,
 )

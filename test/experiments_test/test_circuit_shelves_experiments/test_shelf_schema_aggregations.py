@@ -12,7 +12,7 @@ from experiments.shelf_generation_experiments.shelf_schema_aggregations import (
     RelationalCircuitExperimentShelfAggregations,
     RelationalCircuitExperimentShelfLayerAggregations,
 )
-from krrood_spatial_math.spatial_types import Pose2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.geometry import Scale
 
 

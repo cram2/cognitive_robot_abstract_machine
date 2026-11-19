@@ -29,10 +29,10 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )

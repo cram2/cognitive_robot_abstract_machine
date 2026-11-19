@@ -50,9 +50,11 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.robots.pr2 import PR2
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
     Pose2Dimensional,
 )
 from semantic_digital_twin.world import World

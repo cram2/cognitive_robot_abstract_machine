@@ -7,10 +7,8 @@ from typing_extensions import get_args
 
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from krrood_spatial_math.spatial_types import (
-    CartesianPoint2Dimensional,
-    CartesianPoint3Dimensional,
-)
+from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
     PointT,

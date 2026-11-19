@@ -19,7 +19,7 @@ from krrood_spatial_math.space_map import (
     SpaceMap,
     GenericTargetPoint,
 )
-from krrood_spatial_math.spatial_types import (
+from krrood_spatial_math.spatial_types_2_dimensional import (
     CartesianPoint2Dimensional,
     EmbeddedPlaneProjection,
 )

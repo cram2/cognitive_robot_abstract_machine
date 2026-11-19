@@ -27,7 +27,7 @@ from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.pipeline import Pipeline
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

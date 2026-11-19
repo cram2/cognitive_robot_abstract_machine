@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from PIL import Image, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,
     PlumbBobCameraDistortion,

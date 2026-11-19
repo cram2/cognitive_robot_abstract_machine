@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.camera_rendering import RayIntersections

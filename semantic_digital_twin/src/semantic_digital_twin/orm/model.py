@@ -28,13 +28,15 @@ from krrood_spatial_math.spatial_types import (
 from krrood_spatial_math.spatial_types import (
     Quaternion,
     Pose3Dimensional,
-    CartesianPoint2Dimensional,
-    Pose2Dimensional,
     AxisAngle,
     SymbolicSpatialType,
     Displacement,
     ScrewAxis,
     Twist,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
+    Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection

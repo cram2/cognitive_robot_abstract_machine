@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 from krrood.patterns.classproperty import classproperty
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 from robokudo.annotators.core import BaseAnnotator

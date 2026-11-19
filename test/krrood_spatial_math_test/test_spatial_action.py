@@ -13,12 +13,14 @@ import pytest
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
-    HomogeneousTransformationMatrix2Dimensional,
     RotationMatrix,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
+    HomogeneousTransformationMatrix2Dimensional,
 )
 
 

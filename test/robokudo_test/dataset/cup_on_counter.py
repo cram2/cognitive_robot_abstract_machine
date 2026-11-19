@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from krrood.adapters.json_serializer import to_json
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from robokudo.cas import CASViews
 from semantic_digital_twin.datastructures.camera_model import (
     PinholeCameraModel,

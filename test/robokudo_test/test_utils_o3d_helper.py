@@ -21,7 +21,7 @@ from robokudo.utils.o3d_helper import (
     create_line_for_visualization,
     create_sphere_from_translation,
 )
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 

@@ -21,8 +21,8 @@ from random_events.interval import Bound, SimpleInterval
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint2Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Color,

@@ -17,7 +17,7 @@ from robokudo.descriptors.camera_configs.config_filereader_playback import (
 )
 from robokudo.io.file_reader_interface import RGBDFileReaderInterface
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

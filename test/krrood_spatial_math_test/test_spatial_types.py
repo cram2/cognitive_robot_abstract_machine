@@ -27,8 +27,8 @@ from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
 )
-from krrood_spatial_math.spatial_types import (
-    Pose3Dimensional,
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import (
     CartesianPoint2Dimensional,
     Pose2Dimensional,
 )

@@ -10,12 +10,14 @@ import numpy as np
 import pytest
 
 from krrood_spatial_math.spatial_types import (
-    EmbeddedPlaneProjection,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
-    Pose2Dimensional,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    EmbeddedPlaneProjection,
+    CartesianPoint2Dimensional,
+    Pose2Dimensional,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World

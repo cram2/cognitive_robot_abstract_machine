@@ -30,7 +30,7 @@ from robokudo.utils.annotator_helper import (
     resize_mask,
     generate_source_name,
 )
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )

@@ -40,9 +40,9 @@ from matplotlib.patches import Rectangle
 from typing_extensions import Iterable, Sequence, Self
 
 from krrood_spatial_math.point import MetricPoint
-from krrood_spatial_math.spatial_types import (
+from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import (
     CartesianPoint2Dimensional,
-    CartesianPoint3Dimensional,
     EmbeddedPlaneProjection,
 )
 from semantic_digital_twin.world_description.geometry import (

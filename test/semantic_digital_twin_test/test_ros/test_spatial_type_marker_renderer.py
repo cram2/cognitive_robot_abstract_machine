@@ -18,11 +18,13 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
-    Pose2Dimensional,
     Quaternion,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
+    Pose2Dimensional,
 )
 from krrood_spatial_math.spatial_types import RotationMatrix, SymbolicSpatialType
 from semantic_digital_twin.world_description.world_entity import Body

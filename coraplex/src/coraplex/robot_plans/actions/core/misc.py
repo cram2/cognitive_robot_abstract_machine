@@ -29,8 +29,8 @@ from krrood_spatial_math.spatial_types import (
 from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
     CartesianPoint3Dimensional,
-    Pose2Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation

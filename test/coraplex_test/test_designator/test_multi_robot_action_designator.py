@@ -87,11 +87,11 @@ from krrood.entity_query_language.factories import a
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
-    Pose2Dimensional,
     Pose3Dimensional,
     Quaternion,
     Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from krrood_spatial_math.testing.orientation_comparison import (
     assert_same_axis_angle,
     assert_same_orientation,

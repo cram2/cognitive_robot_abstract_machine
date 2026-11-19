@@ -9,11 +9,13 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import (
-    CartesianPoint2Dimensional,
-    Pose2Dimensional,
     Pose3Dimensional,
     CartesianPoint3Dimensional,
     Quaternion,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    CartesianPoint2Dimensional,
+    Pose2Dimensional,
 )
 from krrood_spatial_math.spatial_types import RotationMatrix
 from krrood_spatial_math.testing.orientation_comparison import assert_same_orientation
@@ -37,8 +39,8 @@ class TestPose2DimensionalConstruction:
 
     def test_has_no_height_or_tilt(self):
         """
-        A 2D pose has no height or tilt of its own, so :class:`Pose2Dimensional` does not carry
-        ``z``, ``roll`` or ``pitch`` at all.
+        A 2D pose has no height or tilt of its own, so :class:`Pose2Dimensional` does
+        not carry ``z``, ``roll`` or ``pitch`` at all.
         """
         p = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.5)
         with pytest.raises(AttributeError):

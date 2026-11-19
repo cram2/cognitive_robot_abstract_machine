@@ -15,7 +15,7 @@ from robokudo.io.camera_model_adapters import (
     Open3DCameraModelAdapter,
     RosCameraModelAdapter,
 )
-from krrood_spatial_math.spatial_types import CartesianPoint2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortionModel,
     NoCameraDistortion,

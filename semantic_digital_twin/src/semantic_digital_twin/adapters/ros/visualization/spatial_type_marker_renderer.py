@@ -32,12 +32,12 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
     CartesianPoint3Dimensional,
     Pose3Dimensional,
-    Pose2Dimensional,
     Quaternion,
     RotationMatrix,
     SymbolicSpatialType,
     Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.geometry import Color
 
 SpatialTypeInput = TypeVar("SpatialTypeInput", bound=SymbolicSpatialType)

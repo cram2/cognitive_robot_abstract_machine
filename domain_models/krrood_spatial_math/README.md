@@ -46,16 +46,20 @@ coordinate system. Its base depends on `krrood` alone.
   its unit normal, which derives its projection lines and `unproject` from that normal
   and from where a point of the plane lies in the source space.
 - `krrood_spatial_math.spatial_types`, with the extra `krrood_spatial_math[casadi]`:
-  `CartesianPoint2Dimensional`, `CartesianPoint3Dimensional`, `Vector2Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
-  `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`, `Pose3Dimensional`
-  and `Pose2Dimensional`, as symbolic expressions that can also hold plain numbers. The 2D values
-  lie on the x-y plane of their reference frame, an `EmbeddedPlane`, and are given in its
-  `CartesianFrame2Dimensional`; `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two
-  frames on one plane, and `EmbeddedPlaneProjection` the orthogonal projection onto a
-  frame's plane. Values derive from `SymbolicSpatialValue3Dimensional` (or `SymbolicSpatialValue2Dimensional`)
+  `CartesianPoint3Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
+  `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`,
+  `Pose3Dimensional`, `Displacement`, `Twist` and `ScrewAxis`, as symbolic expressions
+  that can also hold plain numbers. Values derive from `SymbolicSpatialValue3Dimensional`
   and changes from `SymbolicSpatialChange`; a value names the group that acts on it:
-  `SpecialEuclideanGroupAction` (SE(3)), `SpecialOrthogonalGroupAction` (SO(3)) or
-  `PlanarSpecialEuclideanGroupAction` (SE(2)).
+  `SpecialEuclideanGroupAction` (SE(3)) or `SpecialOrthogonalGroupAction` (SO(3)).
+- `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
+  counterparts on a plane, `CartesianPoint2Dimensional`, `Vector2Dimensional` and
+  `Pose2Dimensional`, which lie on the x-y plane of their reference frame, an
+  `EmbeddedPlane`, and are given in its `CartesianFrame2Dimensional`.
+  `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two frames
+  on one plane, and `EmbeddedPlaneProjection` the orthogonal projection onto a frame's
+  plane. Values derive from `SymbolicSpatialValue2Dimensional`, and SE(2) acts on them
+  as `PlanarSpecialEuclideanGroupAction`.
 
 | Space | Frame | Coordinate change | Kept by the change |
 |---|---|---|---|

@@ -32,14 +32,16 @@ from krrood_spatial_math.spatial_types import (
     SymbolicSpatialValue3Dimensional,
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,
-    EmbeddedPlaneProjection,
     CartesianPoint3Dimensional,
     Line3Dimensional,
     Pose3Dimensional,
-    Pose2Dimensional,
     Quaternion,
     RotationMatrix,
     Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    EmbeddedPlaneProjection,
+    Pose2Dimensional,
 )
 
 from .dataset.frames import KnownFrames, NamedFrame, Room

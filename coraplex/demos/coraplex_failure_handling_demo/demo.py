@@ -49,9 +49,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood.patterns.path_enumeration import PathEnumeration
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    Pose2Dimensional,
     Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.reasoning.robot_predicates import bodies_in_gripper
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.specifications.connections import (

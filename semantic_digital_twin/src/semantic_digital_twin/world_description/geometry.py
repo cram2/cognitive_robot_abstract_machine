@@ -38,10 +38,10 @@ from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    CartesianPoint2Dimensional,
     CartesianPoint3Dimensional,
     Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import CartesianPoint2Dimensional
 from semantic_digital_twin.world_description.exceptions import InvalidColorChannelCount
 from semantic_digital_twin.world_description.mesh_file_storage import (
     MeshFileSources,
@@ -1442,7 +1442,7 @@ PointT = TypeVar("PointT", bound=MetricPoint)
 """
 The point type an :class:`AxisAlignedBox` subclass is asked about --
 :class:`~krrood_spatial_math.spatial_types.CartesianPoint3Dimensional` for a box expressed over
-three axes, :class:`~krrood_spatial_math.spatial_types.CartesianPoint2Dimensional` for one
+three axes, :class:`~krrood_spatial_math.spatial_types_2_dimensional.CartesianPoint2Dimensional` for one
 expressed over a plane.
 """
 

@@ -16,9 +16,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from krrood_spatial_math.spatial_types import (
+from krrood_spatial_math.spatial_types import CartesianPoint3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import (
     CartesianPoint2Dimensional,
-    CartesianPoint3Dimensional,
     EmbeddedPlaneProjection,
 )
 from krrood_spatial_math.spatial_types import (
