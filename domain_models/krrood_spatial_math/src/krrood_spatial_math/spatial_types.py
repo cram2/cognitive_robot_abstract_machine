@@ -2530,7 +2530,7 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
 
     @classproperty
     @abstractmethod
-    def first_vector_name(cls) -> StrEnum:
+    def _first_vector_name(cls) -> StrEnum:
         """
         :return: The name of the vector in the upper three entries, which is both its
             keyword in the constructor and its key in the json.
@@ -2538,7 +2538,7 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
 
     @classproperty
     @abstractmethod
-    def second_vector_name(cls) -> StrEnum:
+    def _second_vector_name(cls) -> StrEnum:
         """
         :return: The name of the vector in the lower three entries, which is both its
             keyword in the constructor and its key in the json.
@@ -2557,16 +2557,16 @@ class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
         )
         return cls(
             **{
-                cls.first_vector_name: Vector3(*data[cls.first_vector_name]),
-                cls.second_vector_name: Vector3(*data[cls.second_vector_name]),
+                cls._first_vector_name: Vector3(*data[cls._first_vector_name]),
+                cls._second_vector_name: Vector3(*data[cls._second_vector_name]),
             },
             reference_frame=reference_frame,
         )
 
     def _constant_to_json(self) -> dict[str, Any]:
         return {
-            self.first_vector_name: self._first_vector.to_np()[:3].tolist(),
-            self.second_vector_name: self._second_vector.to_np()[:3].tolist(),
+            self._first_vector_name: self._first_vector.to_np()[:3].tolist(),
+            self._second_vector_name: self._second_vector.to_np()[:3].tolist(),
         }
 
     @property
@@ -2627,11 +2627,11 @@ class Displacement(VectorPair):
         )
 
     @classproperty
-    def first_vector_name(cls) -> DisplacementVector:
+    def _first_vector_name(cls) -> DisplacementVector:
         return DisplacementVector.TRANSLATION
 
     @classproperty
-    def second_vector_name(cls) -> DisplacementVector:
+    def _second_vector_name(cls) -> DisplacementVector:
         return DisplacementVector.ROTATION_VECTOR
 
     @property
@@ -2691,11 +2691,11 @@ class Twist(VectorPair):
         )
 
     @classproperty
-    def first_vector_name(cls) -> TwistVector:
+    def _first_vector_name(cls) -> TwistVector:
         return TwistVector.ANGULAR_VELOCITY
 
     @classproperty
-    def second_vector_name(cls) -> TwistVector:
+    def _second_vector_name(cls) -> TwistVector:
         return TwistVector.LINEAR_VELOCITY
 
     @property
@@ -2755,11 +2755,11 @@ class ScrewAxis(VectorPair):
         )
 
     @classproperty
-    def first_vector_name(cls) -> ScrewAxisVector:
+    def _first_vector_name(cls) -> ScrewAxisVector:
         return ScrewAxisVector.ROTATION_PER_UNIT_POSITION
 
     @classproperty
-    def second_vector_name(cls) -> ScrewAxisVector:
+    def _second_vector_name(cls) -> ScrewAxisVector:
         return ScrewAxisVector.TRANSLATION_PER_UNIT_POSITION
 
     @property
