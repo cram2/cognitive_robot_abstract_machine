@@ -311,7 +311,7 @@ def test_inertia_tensor_is_expressed_in_the_link_frame(table_parser):
     inertial = table_parser.parse_inertial(link, body)
     inertia_rotated_by_ninety_degrees_around_z = np.diag([0.003, 0.002, 0.004])
     assert np.allclose(
-        inertial.inertia.data, inertia_rotated_by_ninety_degrees_around_z, atol=1e-12
+        inertial.inertia.matrix, inertia_rotated_by_ninety_degrees_around_z, atol=1e-12
     )
 
 

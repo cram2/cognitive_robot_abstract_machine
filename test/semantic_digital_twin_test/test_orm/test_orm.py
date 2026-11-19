@@ -421,7 +421,7 @@ def test_the_inertia_tensor_of_a_body_survives_a_round_trip(session, world_with_
     loaded = load_after_storing(world_with_box, session)
 
     loaded_box = loaded.get_body_by_name("box")
-    assert np.array_equal(loaded_box.inertial.inertia.data, box.inertial.inertia.data)
+    assert loaded_box.inertial.inertia.data == box.inertial.inertia.data
 
 
 def test_a_camera_keeps_the_body_it_is_attached_to_through_a_round_trip(

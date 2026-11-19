@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 from scipy.spatial.transform import Rotation as R
 
@@ -9,6 +10,11 @@ from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,
     PrincipalMoments,
     PrincipalAxes,
+)
+from semantic_digital_twin.world_description.exceptions import (
+    AsymmetricInertiaTensorError,
+    InertiaTensorElementCountError,
+    NegativeMomentOfInertiaError,
 )
 
 moments_and_axes_values = [
@@ -91,7 +97,7 @@ class TestComponentsAndAssembly:
             )
 
             for each_tensor in [tensor_from_principal, tensor_from_values]:
-                assert_allclose(each_tensor.data, expected_tensor, atol=1e-12)
+                assert_allclose(each_tensor.matrix, expected_tensor, atol=1e-12)
 
                 ixx_out, iyy_out, izz_out, ixy_out, ixz_out, iyz_out = (
                     each_tensor.to_values()
@@ -120,3 +126,21 @@ def test_a_body_whose_inertia_nobody_described_has_no_inertial():
     simulation that would otherwise work it out from the body's shapes.
     """
     assert Body(name=PrefixedName("undescribed")).inertial is None
+
+
+# %% elements an inertia tensor rejects
+
+
+def test_an_inertia_tensor_rejects_elements_that_are_not_a_3x3_matrix():
+    with pytest.raises(InertiaTensorElementCountError):
+        InertiaTensor(data=[1.0, 0.0, 0.0, 1.0])
+
+
+def test_an_inertia_tensor_rejects_a_negative_moment_of_inertia():
+    with pytest.raises(NegativeMomentOfInertiaError):
+        InertiaTensor.from_values(ixx=-1.0, iyy=1.0, izz=1.0, ixy=0.0, ixz=0.0, iyz=0.0)
+
+
+def test_an_inertia_tensor_rejects_an_asymmetric_matrix():
+    with pytest.raises(AsymmetricInertiaTensorError):
+        InertiaTensor(data=[1.0, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])

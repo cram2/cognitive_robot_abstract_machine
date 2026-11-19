@@ -405,8 +405,8 @@ class URDFParser(WorldModelParser):
             iyz=urdf_inertia.iyz,
         )
         link_R_inertial = RotationMatrix.from_rpy(*roll_pitch_yaw).to_np()[:3, :3]
-        inertia = link_R_inertial @ inertia_in_inertial_frame.data @ link_R_inertial.T
-        inertia_in_link_frame = InertiaTensor(data=inertia)
+        inertia = link_R_inertial @ inertia_in_inertial_frame.matrix @ link_R_inertial.T
+        inertia_in_link_frame = InertiaTensor.from_matrix(matrix=inertia)
 
         return Inertial(
             mass=link.inertial.mass,
