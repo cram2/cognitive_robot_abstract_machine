@@ -1,3 +1,7 @@
+"""
+Compiling a statechart, and the callbacks told whenever it compiles again.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

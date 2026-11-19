@@ -1,3 +1,8 @@
+"""
+Tests for adding nodes to a statechart after it compiled, and for a
+:meth:`~cramph.statechart.Statechart.modify` block that raises.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
