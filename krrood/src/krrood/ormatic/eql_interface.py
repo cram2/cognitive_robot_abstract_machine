@@ -21,7 +21,7 @@ from sqlalchemy import (
     not_ as sa_not,
     exists as sqlalchemy_exists,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from krrood.entity_query_language.query.query import (
     Query,
@@ -54,7 +54,14 @@ from krrood.entity_query_language.operators.aggregators import (
 
 from krrood.entity_query_language.operators.conditionals import CaseWhen
 from krrood.exceptions import DataclassException
-from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
+from krrood.ormatic.data_access_objects.dao import (
+    RelationshipInformationKey,
+    StoredObjectDAO,
+)
+from krrood.ormatic.data_access_objects.helper import (
+    get_data_access_object_class,
+    get_part_class,
+)
 from krrood.ormatic.exceptions import (
     NoDAOFoundForTypeError,
     NoDAOFoundForSelectionError,
@@ -680,9 +687,16 @@ class EQLTranslator:
         elif isinstance(selected, Attribute):
             self._translate_entity_from_attribute(attribute=selected)
         else:
-            self.sql_query = select(
-                self._require_dao_class(domain_type=selected._type_)
-            )
+            selected_dao = self._require_dao_class(domain_type=selected._type_)
+            self.sql_query = select(selected_dao)
+            self._apply_clauses()
+            # objects of an open class may be primarily another class, which only the
+            # table of every stored object can load
+            if get_part_class(selected._type_) is not None:
+                self.sql_query = self.sql_query.with_only_columns(
+                    StoredObjectDAO, maintain_column_froms=True
+                )
+            return
         self._apply_clauses()
 
     def _translate_entity_from_selected_query(self, *, query: Entity) -> None:
@@ -1407,6 +1421,9 @@ class EQLTranslator:
         rel_resolver = RelationshipResolver()
 
         for index, name in enumerate(names):
+            current_dao = self._join_part_holding(
+                dao_class=current_dao, attribute_name=name
+            )
             mapper = sqlalchemy.inspection.inspect(current_dao)
             relationship = rel_resolver._find_relationship(
                 mapper=mapper, attribute_name=name
@@ -1422,7 +1439,10 @@ class EQLTranslator:
                     attribute_name=name,
                     relationship=relationship,
                 )
-                current_dao = alias or relationship.entity.class_
+                current_dao = self._join_declared_type(
+                    joined_object=alias or relationship.entity.class_,
+                    relationship=relationship,
+                )
                 continue
 
             if index != len(names) - 1:
@@ -1436,6 +1456,57 @@ class EQLTranslator:
             return getattr(current_dao, name)
 
         raise EmptyAttributeChainError(dao_class=current_dao, attribute_names=names)
+
+    def _join_part_holding(self, *, dao_class: Any, attribute_name: str) -> Any:
+        """
+        :param dao_class: A DAO class, or an alias of one, an attribute is read from.
+        :param attribute_name: The attribute.
+        :return: The alias of the part of *dao_class* holding the attribute, joined to
+            the query, if a secondary base class of *dao_class* declares the attribute;
+            *dao_class* itself otherwise.
+        """
+        mapper = sqlalchemy.inspection.inspect(dao_class).mapper
+        if attribute_name in mapper.attrs:
+            return dao_class
+        for relationship in mapper.relationships:
+            if not relationship.info.get(RelationshipInformationKey.PART, False):
+                continue
+            if attribute_name in relationship.mapper.attrs:
+                return self._apply_relationship_join(
+                    dao_class=dao_class,
+                    attribute_name=relationship.key,
+                    relationship=relationship,
+                )
+        return dao_class
+
+    def _join_declared_type(self, *, joined_object: Any, relationship: Any) -> Any:
+        """
+        :param joined_object: The alias of the objects a relationship was joined to.
+        :param relationship: The relationship.
+        :return: The alias of the DAO of the type the relationship's field is declared
+            with, joined to the query on the objects' ids, if the relationship refers to
+            the table of every stored object; *joined_object* otherwise.
+        """
+        declared_type = relationship.info.get(RelationshipInformationKey.DECLARED_TYPE)
+        if declared_type is None:
+            return joined_object
+        path = RelationshipInformationKey.DECLARED_TYPE.value
+        if self.join_manager.is_path_joined(
+            dao_class=joined_object, attribute_name=path
+        ):
+            return self.join_manager.get_alias_for_path(
+                dao_class=joined_object, attribute_name=path
+            )
+        declared_dao = aliased(
+            self._require_dao_class(domain_type=declared_type), flat=True
+        )
+        self.sql_query = self.sql_query.join(
+            declared_dao, declared_dao.database_id == joined_object.database_id
+        )
+        self.join_manager.add_path_join(
+            dao_class=joined_object, attribute_name=path, alias=declared_dao
+        )
+        return declared_dao
 
     def _apply_relationship_join(
         self, *, dao_class: type, attribute_name: str, relationship: Any

@@ -9,7 +9,7 @@ import {{ import }}
 {% endfor %}
 
 
-from krrood.ormatic.data_access_objects.dao import DataAccessObject, AssociationDataAccessObject
+from krrood.ormatic.data_access_objects.dao import DataAccessObject, AssociationDataAccessObject, PartDataAccessObject, RelationshipInformationKey
 from krrood.ormatic.custom_types import TypeType
 
 Base = krrood.ormatic.base.Base
@@ -65,6 +65,10 @@ class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{tabl
     {{ column }}
     {% endfor %}
 
+    {% for column in table.secondary_base_part_relationships %}
+    {{ column }}
+    {% endfor %}
+
     {% if table.mapper_args %}
     __mapper_args__ = {
     {% for key, value in table.mapper_args.items() %}
@@ -73,4 +77,14 @@ class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{tabl
     }
     {% endif %}
 
+{% if table.has_part_class %}
+class {{ table.part_class_name }}(Base, PartDataAccessObject[{{table.wrapped_clazz.name_with_entire_path}}]):
+
+    __table__ = {{ table.tablename }}.__table__
+
+    {% for column in table.part_relationships %}
+    {{ column }}
+    {% endfor %}
+
+{% endif %}
 {% endfor %}

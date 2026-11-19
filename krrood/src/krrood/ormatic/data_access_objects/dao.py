@@ -14,8 +14,10 @@ from functools import lru_cache
 
 import sqlalchemy.inspection
 import sqlalchemy.orm
-from sqlalchemy import event
+from sqlalchemy import Integer, String, event
 from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
     MANYTOONE,
     MANYTOMANY,
     ONETOMANY,
@@ -28,6 +30,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
 from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.entity_query_language._monitoring import monitored
+from krrood.ormatic.base import Base
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.from_dao import (
     FromDataAccessObjectWorkItem,
@@ -76,6 +79,51 @@ class AssociationDataAccessObject:
         :param value: The target Data Access Object of this association.
         """
         raise NotImplementedError
+
+
+class RelationshipInformationKey(StrEnum):
+    """
+    Keys of the information a generated relationship carries for the conversion between
+    DAOs and domain objects.
+    """
+
+    PART = "krrood_part"
+    """
+    Marks the relationship from a DAO to the part holding its row in the table of a
+    base class outside its primary chain; no field of the domain object stands behind it.
+    """
+
+    DECLARED_TYPE = "krrood_declared_type"
+    """
+    The type a field is declared with, for a relationship that targets
+    :class:`StoredObjectDAO` because objects of that type may lie outside the type's
+    table hierarchy.
+    """
+
+
+@dataclass(kw_only=True, frozen=True)
+class SecondaryBasePart:
+    """
+    The relationship from a DAO to the part holding its row in the table of a base class
+    outside its primary chain.
+    """
+
+    key: str
+    """The attribute name of the relationship on the DAO."""
+
+    part_class: type[PartDataAccessObject]
+    """The DAO class of the part."""
+
+
+def _declared_type(relationship: RelationshipProperty) -> type:
+    """
+    :param relationship: A relationship of a DAO class.
+    :return: The domain type of the objects the relationship holds.
+    """
+    declared_type = relationship.info.get(RelationshipInformationKey.DECLARED_TYPE)
+    if declared_type is not None:
+        return declared_type
+    return relationship.mapper.class_.original_class()
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -155,6 +203,11 @@ class DataAccessObjectSchema:
     The keys of all relationships of the DAO class.
     """
 
+    parts: tuple[SecondaryBasePart, ...]
+    """
+    The parts holding the rows of the DAO's object in the tables of its secondary bases.
+    """
+
     alternative_base: type | None
     """
     The first base class of the DAO that maps to an AlternativeMapping, if any.
@@ -212,12 +265,17 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
 
     single_relationships = []
     collection_relationships = []
+    parts = []
     for relationship in mapper.relationships:
-        if DataAccessObject._is_single_relationship(relationship=relationship):
-            single_relationships.append(
-                _build_single_relationship(
-                    relationship, relationship.mapper.class_.original_class()
+        if relationship.info.get(RelationshipInformationKey.PART, False):
+            parts.append(
+                SecondaryBasePart(
+                    key=relationship.key, part_class=relationship.mapper.class_
                 )
+            )
+        elif DataAccessObject._is_single_relationship(relationship=relationship):
+            single_relationships.append(
+                _build_single_relationship(relationship, _declared_type(relationship))
             )
         elif relationship.direction in (ONETOMANY, MANYTOMANY):
             target_dao_clazz = relationship.mapper.class_
@@ -225,7 +283,7 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
                 target_relationship = sqlalchemy.inspection.inspect(
                     target_dao_clazz
                 ).relationships["target"]
-                domain_type = target_relationship.mapper.class_.original_class()
+                domain_type = _declared_type(target_relationship)
                 collection_relationships.append(
                     CollectionRelationship(
                         key=relationship.key,
@@ -254,6 +312,7 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
         relationship_keys=tuple(
             relationship.key for relationship in mapper.relationships
         ),
+        parts=tuple(parts),
         alternative_base=dao_class._find_alternative_mapping_base(),
         uses_alternative_mapping=_uses_alternative_mapping(dao_class),
     )
@@ -652,6 +711,27 @@ class DataAccessObject(HasGeneric[T]):
             collection_relationships=plan.collection_relationships,
             state=state,
         )
+        self._fill_parts(source_object=source_object, parts=plan.parts, state=state)
+
+    def _fill_parts(
+        self,
+        *,
+        source_object: T,
+        parts: tuple[SecondaryBasePart, ...],
+        state: ToDataAccessObjectState,
+    ) -> None:
+        """
+        Give this DAO the parts holding its object's rows in the tables of its secondary
+        bases, filled from the source object.
+
+        :param source_object: The source object.
+        :param parts: The parts to fill.
+        :param state: The conversion state.
+        """
+        for part in parts:
+            part_dao = part.part_class()
+            part_dao.fill_dao_default(source_object=source_object, state=state)
+            setattr(self, part.key, part_dao)
 
     def fill_dao_if_subclass_of_alternative_mapping(
         self,
@@ -702,6 +782,11 @@ class DataAccessObject(HasGeneric[T]):
             source_object=source_object,
             single_relationships=partition.own_single_relationships,
             collection_relationships=partition.own_collection_relationships,
+            state=state,
+        )
+        self._fill_parts(
+            source_object=source_object,
+            parts=get_dao_schema(type(self)).parts,
             state=state,
         )
 
@@ -1068,6 +1153,14 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         """
         plan = get_dao_schema(type(self))
+        for part_dao, part_plan in self._parts_and_their_plans(plan=plan):
+            part_dao._populate_from_columns_and_relationships(
+                domain_object=domain_object,
+                data_column_names=part_plan.data_column_names,
+                single_relationships=part_plan.single_relationships,
+                collection_relationships=part_plan.collection_relationships,
+                state=state,
+            )
         alternative_parent = self._alternative_parent(state=state)
         if alternative_parent is None:
             self._populate_from_columns_and_relationships(
@@ -1170,7 +1263,35 @@ class DataAccessObject(HasGeneric[T]):
         :return: The domain object.
         """
         plan = get_dao_schema(type(self))
+        self._discover_related_objects(plan=plan, state=state)
+        for part_dao, part_plan in self._parts_and_their_plans(plan=plan):
+            part_dao._discover_related_objects(plan=part_plan, state=state)
 
+        self._alternative_parent(state=state)
+        return domain_object
+
+    def _parts_and_their_plans(
+        self, *, plan: DataAccessObjectSchema
+    ) -> list[tuple[PartDataAccessObject, DataAccessObjectSchema]]:
+        """
+        :param plan: The conversion plan of this DAO's class.
+        :return: The parts this DAO holds, each with the conversion plan of its class.
+        """
+        return [
+            (part_dao, get_dao_schema(part.part_class))
+            for part in plan.parts
+            if (part_dao := getattr(self, part.key)) is not None
+        ]
+
+    def _discover_related_objects(
+        self, *, plan: DataAccessObjectSchema, state: FromDataAccessObjectState
+    ) -> None:
+        """
+        Register every object this DAO's relationships refer to for conversion.
+
+        :param plan: The conversion plan of this DAO's class.
+        :param state: The conversion state.
+        """
         for relationship in plan.single_relationships:
             value = _read_single_relationship(self, relationship)
             if value is not None:
@@ -1189,9 +1310,6 @@ class DataAccessObject(HasGeneric[T]):
             else:
                 for item in value:
                     item.from_dao(state=state)
-
-        self._alternative_parent(state=state)
-        return domain_object
 
     def _populate_single_relationship(
         self,
@@ -1354,6 +1472,42 @@ class DataAccessObject(HasGeneric[T]):
             return f"{self.__class__.__name__}({', '.join(representations)})"
         finally:
             _repr_thread_local.seen.remove(id(self))
+
+
+class StoredObjectDAO(Base, DataAccessObject[object]):
+    """
+    The row every stored object has, whatever its class.
+
+    Every table ORMatic generates inherits this one, so an object has the same id in the
+    tables of all its mapped base classes, and :attr:`polymorphic_type` names the DAO
+    class it is loaded as.
+    """
+
+    __tablename__ = "StoredObjectDAO"
+
+    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    """
+    The id of the object, which its rows in all other tables share.
+    """
+
+    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    """
+    The name of the DAO class the object is loaded as.
+    """
+
+    __mapper_args__ = {
+        "polymorphic_on": "polymorphic_type",
+        "polymorphic_identity": "StoredObjectDAO",
+    }
+
+
+class PartDataAccessObject(DataAccessObject[T]):
+    """
+    The row of an object in the table of a base class outside the object's primary
+    chain, mapped to that base class's table and held by the object's own DAO.
+
+    It is never the DAO an object is converted to or loaded as.
+    """
 
 
 @contextmanager

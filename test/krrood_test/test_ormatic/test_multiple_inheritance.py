@@ -1,0 +1,266 @@
+"""
+An object of a class with several mapped base classes has one row, under one id, in the
+table of every one of them, and comes back through a field typed with any of them.
+"""
+
+from __future__ import annotations
+
+from sqlalchemy import func, select
+
+from krrood.entity_query_language.factories import an, entity, variable
+from krrood.ormatic.data_access_objects.dao import StoredObjectDAO
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.eql_interface import eql_to_sql
+from ..dataset.multiple_inheritance import (
+    FramedFurnishing,
+    HasHinges,
+    Hinge,
+    InspectedCloset,
+    Inventory,
+    LandmarkFrame,
+    TaggedFurnishing,
+    WalkInCloset,
+    Closet,
+)
+
+# %% generated schema
+
+
+def test_every_table_inherits_the_table_of_every_stored_object():
+    """
+    A class without mapped base classes still inherits the root table, which holds the
+    ids of all stored objects.
+    """
+    from ..dataset.ormatic_interface import HingeDAO, InventoryItemDAO
+
+    assert issubclass(InventoryItemDAO, StoredObjectDAO)
+    assert issubclass(HingeDAO, StoredObjectDAO)
+
+
+def test_fields_of_a_base_class_live_in_its_own_table():
+    """
+    A field a secondary base class declares is a column of that class's table only.
+    """
+    from ..dataset.ormatic_interface import HasHingesDAO, ClosetDAO
+
+    assert "hinge_count" in HasHingesDAO.__table__.columns
+    assert "hinge_count" not in ClosetDAO.__table__.columns
+
+
+def test_an_interface_is_a_table_without_fields():
+    """
+    An interface a field is typed with gets a table holding only its key.
+    """
+    from ..dataset.ormatic_interface import ReferenceFrameDAO, TaggedFrameDAO
+
+    assert list(ReferenceFrameDAO.__table__.columns.keys()) == ["database_id"]
+    assert list(TaggedFrameDAO.__table__.columns.keys()) == ["database_id"]
+
+
+# %% one row per base class
+
+
+def test_an_object_has_one_row_in_the_table_of_every_base_class(session, database):
+    """
+    The rows of an object in the tables of all its mapped base classes share its id, and
+    the ancestor two of its bases share has one row of it.
+    """
+    from ..dataset.ormatic_interface import (
+        HasHingesDAO,
+        InspectedDAO,
+        InventoryItemDAO,
+        ClosetDAO,
+    )
+
+    closet = InspectedCloset(label="hall", leg_count=4, shelf_count=2, inspector="Ada")
+    dao = to_dao(closet)
+    session.add(dao)
+    session.commit()
+
+    tables = [InventoryItemDAO, HasHingesDAO, InspectedDAO, ClosetDAO]
+    ids = {
+        table.__name__: session.scalars(select(table.__table__.c.database_id)).all()
+        for table in tables
+    }
+
+    assert ids == {table.__name__: [dao.database_id] for table in tables}
+
+
+# %% round trip
+
+
+def test_fields_typed_with_any_base_class_round_trip(session, database):
+    """
+    Fields typed with a secondary base class, a mixin without mapped ancestors, a plain
+    interface and a generic interface hold objects of classes that are primarily
+    something else, and give them back.
+    """
+    from ..dataset.ormatic_interface import InventoryDAO
+
+    furnishing_frame = FramedFurnishing(label="desk", leg_count=4)
+    inventory = Inventory(
+        hinged=Closet(
+            label="bedroom",
+            leg_count=4,
+            shelf_count=3,
+            hinge_count=4,
+            hinges=[Hinge(stiffness=1.5), Hinge(stiffness=2.0)],
+        ),
+        inspected=[
+            InspectedCloset(label="hall", leg_count=4, shelf_count=2, inspector="Ada")
+        ],
+        frame=furnishing_frame,
+        frames=[LandmarkFrame(landmark_name="door"), furnishing_frame],
+        tagged_frame=TaggedFurnishing(label="shelf", leg_count=2),
+    )
+
+    session.add(to_dao(inventory))
+    session.commit()
+    session.expunge_all()
+
+    reconstructed = session.scalars(select(InventoryDAO)).one().from_dao()
+
+    assert reconstructed == inventory
+    assert reconstructed.frames[1] is reconstructed.frame
+
+
+def test_a_subclass_inherits_the_rows_of_its_parents_secondary_bases(session, database):
+    """
+    A subclass of a class with a secondary base class keeps the fields of that base.
+    """
+    from ..dataset.ormatic_interface import WalkInClosetDAO
+
+    closet = WalkInCloset(
+        label="master",
+        leg_count=0,
+        shelf_count=6,
+        floor_area=4.5,
+        hinge_count=2,
+        hinges=[Hinge(stiffness=3.0)],
+    )
+
+    session.add(to_dao(closet))
+    session.commit()
+    session.expunge_all()
+
+    reconstructed = session.scalars(select(WalkInClosetDAO)).one().from_dao()
+
+    assert reconstructed == closet
+
+
+def test_the_row_of_every_stored_object_loads_the_object(session, database):
+    """
+    Loading an object by its id from the root table gives back the object of its own
+    class.
+    """
+    closet = InspectedCloset(label="hall", leg_count=4, shelf_count=2, inspector="Ada")
+    dao = to_dao(closet)
+    session.add(dao)
+    session.commit()
+    database_id = dao.database_id
+    session.expunge_all()
+
+    reconstructed = session.get(StoredObjectDAO, database_id).from_dao()
+
+    assert reconstructed == closet
+
+
+def test_only_one_row_is_kept_per_object_of_the_root_table(session, database):
+    """
+    Storing an inventory stores one root row per object, however many fields refer to
+    it.
+    """
+    furnishing_frame = FramedFurnishing(label="desk", leg_count=4)
+    inventory = Inventory(frame=furnishing_frame, frames=[furnishing_frame])
+
+    session.add(to_dao(inventory))
+    session.commit()
+
+    assert session.scalar(select(func.count()).select_from(StoredObjectDAO)) == 2
+
+
+# %% queries
+
+
+def store_closets_and_plain_hinged_items(session) -> None:
+    """
+    Store a closet with four hinges in an inventory, and a hinged item that is nothing
+    else with one hinge.
+
+    :param session: The session to store them with.
+    """
+    session.add(
+        to_dao(
+            Inventory(
+                hinged=Closet(
+                    label="bedroom", leg_count=4, shelf_count=3, hinge_count=4
+                )
+            )
+        )
+    )
+    session.add(to_dao(HasHinges(label="gate", hinge_count=1)))
+    session.commit()
+
+
+def test_a_query_for_a_base_class_finds_objects_of_other_primary_classes(
+    session, database
+):
+    """
+    Selecting the objects of a secondary base class finds those whose primary class is
+    another one, loaded as their own class.
+    """
+    store_closets_and_plain_hinged_items(session)
+    hinged = variable(HasHinges, domain=None)
+    query = an(entity(hinged).where(hinged.hinge_count > 1))
+
+    result = eql_to_sql(query, session).evaluate()
+
+    assert [dao.from_dao() for dao in result] == [
+        Closet(label="bedroom", leg_count=4, shelf_count=3, hinge_count=4)
+    ]
+
+
+def test_a_query_reads_a_field_a_secondary_base_class_declares(session, database):
+    """
+    A condition on a field of a secondary base class reads it from that class's table.
+    """
+    store_closets_and_plain_hinged_items(session)
+    closet = variable(Closet, domain=None)
+    query = an(entity(closet).where(closet.hinge_count > 1))
+
+    result = eql_to_sql(query, session).evaluate()
+
+    assert [dao.label for dao in result] == ["bedroom"]
+
+
+def test_a_query_follows_a_field_typed_with_a_secondary_base_class(session, database):
+    """
+    A condition on a field reached through a field typed with a secondary base class
+    reads the declared class's table.
+    """
+    store_closets_and_plain_hinged_items(session)
+    inventory = variable(Inventory, domain=None)
+    query = an(entity(inventory).where(inventory.hinged.hinge_count > 1))
+
+    result = eql_to_sql(query, session).evaluate()
+
+    assert [dao.from_dao().hinged.label for dao in result] == ["bedroom"]
+
+
+def test_conditions_on_one_path_share_its_join(session, database):
+    """
+    Two conditions on fields reached through the same field typed with a secondary base
+    class read the same row of the declared class's table.
+    """
+    store_closets_and_plain_hinged_items(session)
+    inventory = variable(Inventory, domain=None)
+    query = an(
+        entity(inventory).where(
+            inventory.hinged.hinge_count > 1, inventory.hinged.label == "bedroom"
+        )
+    )
+
+    translator = eql_to_sql(query, session)
+
+    assert str(translator.sql_query).count('"HasHingesDAO" AS') == 1
+    assert [dao.from_dao().hinged.label for dao in translator.evaluate()] == ["bedroom"]
