@@ -234,7 +234,7 @@ def test_a_hinge_off_the_origin_swings_the_body_on_a_circle(
     )
 
 
-@pytest.mark.parametrize("position", [1e-9, 1e-4, 0.05, 0.07, 0.08, 1.0, 3.0])
+@pytest.mark.parametrize("position", [1e-9, 1e-4, 0.04, 0.042, 0.045, 1.0, 3.0])
 def test_the_displacement_agrees_with_the_matrix_exponential(position: float):
     """
     For a helical axis off the origin, the displacement equals the exponential of the

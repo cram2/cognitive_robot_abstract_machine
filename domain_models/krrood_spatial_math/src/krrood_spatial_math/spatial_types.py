@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 
 import math
+import sys
 
 import casadi as ca
 import numpy as np
@@ -2786,11 +2787,12 @@ class ScrewAxis(VectorPair):
     @classproperty
     def _series_rotation_angle(cls) -> float:
         """
-        The rotation angle in radians below which :meth:`to_displacement` evaluates its
-        coefficients by their series: below it, the closed forms lose more digits to
-        cancellation in double precision than three series terms lose to truncation.
+        The rotation angle in radians, about 0.042, below which :meth:`to_displacement`
+        evaluates its coefficients by three terms of their series: where the series'
+        truncation error, ``2 φ⁶ / 8!`` relative, equals the closed forms' cancellation
+        error in double precision, ``2 ε / φ²``, both about ``2e-13``.
         """
-        return 0.07
+        return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
 
     def to_displacement(self, *, position: sm.ScalarData) -> Displacement:
         """
