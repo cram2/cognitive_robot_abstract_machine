@@ -308,10 +308,9 @@ def test_training_a_categorical_layer_learns_the_frequencies_of_its_data():
     data = np.repeat([[0.0], [1.0]], (frequencies * 100).astype(int), axis=0)
     with jax.enable_x64(True):
         layer = SymbolicLayer(
-            0,
+            np.zeros(1, dtype=np.int64),
             np.arange(2),
             DenseProbabilityTable(jnp.log(jnp.full((1, 2), 0.5))),
-            np.arange(2),
         )
         trained = JaxGradientDescent(
             layer, AverageNegativeLogLikelihood(), optax.adam(5e-2)
