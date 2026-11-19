@@ -1,3 +1,9 @@
+"""
+Tests of the guard that stops a rule from concluding on an unfamiliar instance.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 

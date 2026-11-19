@@ -1,3 +1,10 @@
+"""
+Loads the ProcTHOR worlds from the database and saves which of their objects lie inside
+which others.
+"""
+
+from __future__ import annotations
+
 import itertools
 import logging
 import os
@@ -19,6 +26,10 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 
 
 def parse_procthor_worlds_and_calculate_containment_ratio():
+    """
+    Parse every ProcTHOR house into a world and save the world, together with which of
+    its objects lie inside which others, to the experiments database.
+    """
     import semantic_digital_twin.orm.ormatic_interface  # noqa: F401
 
     semantic_world_database_uri = os.environ.get("SEMANTIC_DIGITAL_TWIN_DATABASE_URI")

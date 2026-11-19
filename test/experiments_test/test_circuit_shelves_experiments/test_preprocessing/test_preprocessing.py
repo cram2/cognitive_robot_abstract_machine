@@ -1,3 +1,7 @@
+"""
+Tests of preprocessing Sage10k scenes into shelves, layers and the objects on them.
+"""
+
 from __future__ import annotations
 
 from typing_extensions import TYPE_CHECKING
@@ -380,6 +384,10 @@ def _sage10k_object(
     source_id: str = "book_src",
     place_id: str = "room_1_shelf_1",
 ) -> Sage10kObjectDAO:
+    """
+    :return: A raw Sage10k object as the database stores it, a book on a shelf unless the
+        arguments say otherwise.
+    """
     from semantic_digital_twin.orm.ormatic_interface import (
         Sage10kObjectDAO,
         Sage10kPhysicallyBasedRenderingDAO,
@@ -1132,6 +1140,10 @@ def test_partition_round_robin_leaves_extra_partitions_empty() -> None:
 
 
 def _populated_sqlite_engine(tmp_path: Path, objects: list[Sage10kObjectDAO]):
+    """
+    :return: An engine on a file database in *tmp_path* that holds the raw Sage10k tables
+        and *objects*.
+    """
     from experiments.orm.ormatic_interface import Base
 
     engine = create_engine(f"sqlite:///{tmp_path}/raw.db")

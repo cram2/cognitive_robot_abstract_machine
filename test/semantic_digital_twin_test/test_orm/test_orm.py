@@ -1,3 +1,9 @@
+"""
+Tests of storing worlds, their robots and semantic annotations in a database.
+"""
+
+from __future__ import annotations
+
 from typing_extensions import TYPE_CHECKING
 import dataclasses
 import os
@@ -53,6 +59,10 @@ def engine():
 
 @pytest.fixture
 def session(engine):
+    """
+    :return: A session on *engine* holding semantic_digital_twin's tables, which are dropped
+        again after the test.
+    """
     from semantic_digital_twin.orm.ormatic_interface import Base
 
     session = Session(engine)
@@ -63,6 +73,10 @@ def session(engine):
 
 
 def test_table_world(session, table_world):
+    """
+    A stored world keeps all its bodies and comes back with the state and kinematics of
+    its revolute connection.
+    """
     from semantic_digital_twin.orm.ormatic_interface import (
         KinematicStructureEntityDAO,
         WorldMappingDAO,
@@ -101,6 +115,10 @@ def test_table_world(session, table_world):
 
 
 def test_insert(session):
+    """
+    A body keeps the origin of its collision shapes in the database, and comes back as
+    the reference frame of that origin.
+    """
     from semantic_digital_twin.orm.ormatic_interface import BodyDAO, BoxDAO, ShapeDAO
 
     origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
@@ -149,6 +167,10 @@ def test_degree_of_freedom_limits(session):
 
 
 def test_pr2_world(pr2_world_state_reset, session):
+    """
+    The PR2's world can be stored, read back and copied, and its revolute connections
+    are stored as rows.
+    """
     from semantic_digital_twin.orm.ormatic_interface import (
         RevoluteConnectionDAO,
         WorldMappingDAO,

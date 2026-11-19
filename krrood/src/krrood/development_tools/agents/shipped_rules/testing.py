@@ -9,6 +9,12 @@ import unittest
 import pytest
 
 from krrood.development_tools.agents.rule import CodeReference, Section
+from krrood.development_tools.agents.ruff_rules import (
+    CheckedModules,
+    RuffRule,
+    RuffRuleChecker,
+    RuffSetting,
+)
 from krrood.patterns.classproperty import classproperty
 
 
@@ -29,9 +35,23 @@ class WritingTestsRules(Section):
 
     WRITE_TESTS_WITH_PYTEST = (
         "Write tests with pytest: plain test functions or classes, pytest "
-        f"fixtures, {CodeReference(target=pytest.raises, public_module=pytest).path} and plain `assert`; "
-        f"never {CodeReference(target=unittest.TestCase, public_module=unittest).path} "
-        "or its assertion methods"
+        f"fixtures, {CodeReference(target=pytest.raises, public_module=pytest).path} and plain `assert`"
+    )
+
+    NO_UNITTEST_TEST_CASES = (
+        "Never write a test on "
+        f"{CodeReference(target=unittest.TestCase, public_module=unittest).path} or "
+        "with its assertion methods",
+        (),
+        RuffRuleChecker(
+            lint_rules=(
+                RuffRule.BANNED_API,
+                RuffRule.PYTEST_UNITTEST_ASSERTION,
+                RuffRule.PYTEST_UNITTEST_RAISES_ASSERTION,
+            ),
+            settings=(RuffSetting.UNITTEST_TEST_CASE_BANNED,),
+            modules=CheckedModules.TESTS,
+        ),
     )
 
     REUSE_FIXTURES = "Reuse the existing fixtures in `conftest.py`"

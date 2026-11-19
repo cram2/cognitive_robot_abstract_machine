@@ -1,3 +1,10 @@
+"""
+Fixtures shared by the semantic_digital_twin tests: worlds, a mesh and database
+sessions.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every

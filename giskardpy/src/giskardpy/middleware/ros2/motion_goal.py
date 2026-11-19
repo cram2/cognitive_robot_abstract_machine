@@ -10,7 +10,7 @@ from typing_extensions import Self, Any
 
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood_synchronization.messages import Sender, StreamPosition
 
 from cramph.statechart import Statechart
 
@@ -78,7 +78,7 @@ class MotionGoal(SubclassJSONSerializer):
     The motion statechart to execute, as json.
     """
 
-    client: MetaData
+    client: Sender
     """
     Who is waiting for this goal.
 
@@ -107,7 +107,7 @@ class MotionGoal(SubclassJSONSerializer):
         cls,
         *,
         motion_statechart: Statechart,
-        client: MetaData,
+        client: Sender,
         required_position: StreamPosition | None = None,
         debug_output: DebugOutput = DebugOutput(),
     ) -> MotionGoal:

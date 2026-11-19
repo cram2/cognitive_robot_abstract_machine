@@ -1,3 +1,9 @@
+"""
+Tests of generating familiar kitchen objects from an underspecified query.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 

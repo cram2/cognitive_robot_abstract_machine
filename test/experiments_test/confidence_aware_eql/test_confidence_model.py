@@ -1,3 +1,9 @@
+"""
+Tests of the model scoring how familiar an object's features are.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
