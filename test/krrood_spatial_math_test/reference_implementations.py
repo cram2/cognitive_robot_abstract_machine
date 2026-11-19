@@ -1,3 +1,10 @@
+"""
+Plain numpy implementations of spatial math that the tests compare the symbolic spatial
+types against.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 
 
@@ -249,3 +256,21 @@ def quaternion_slerp(q1, q2, t):
     if 0.001 > abs(sin_half_theta):
         return 0.5 * q1 + 0.5 * q2
     return ratio_a * q1 + ratio_b * q2
+
+
+def matrix_exponential(matrix: np.ndarray) -> np.ndarray:
+    """
+    The exponential of a square matrix, by scaling it down until a truncated Taylor
+    series is exact in double precision and squaring the result back up.
+    """
+    norm = np.linalg.norm(matrix, ord=1)
+    squarings = int(np.ceil(np.log2(norm))) + 1 if norm > 1 else 0
+    scaled = matrix / 2**squarings
+    term = np.eye(len(matrix))
+    result = np.eye(len(matrix))
+    for order in range(1, 30):
+        term = term @ scaled / order
+        result = result + term
+    for _ in range(squarings):
+        result = result @ result
+    return result

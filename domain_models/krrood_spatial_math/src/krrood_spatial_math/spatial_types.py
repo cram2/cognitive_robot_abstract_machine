@@ -11,6 +11,8 @@ from copy import deepcopy, copy
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 
+import math
+
 import casadi as ca
 import numpy as np
 from typing_extensions import Any, overload, Self, Callable, TypeVar
@@ -2778,6 +2780,55 @@ class ScrewAxis(VectorPair):
         return Twist(
             angular_velocity=self.rotation_per_unit_position * position_velocity,
             linear_velocity=self.translation_per_unit_position * position_velocity,
+            reference_frame=self.reference_frame,
+        )
+
+    @classproperty
+    def _series_rotation_angle(cls) -> float:
+        """
+        The rotation angle in radians below which :meth:`to_displacement` evaluates its
+        coefficients by their series: below it, the closed forms lose more digits to
+        cancellation in double precision than three series terms lose to truncation.
+        """
+        return 0.07
+
+    def to_displacement(self, *, position: sm.ScalarData) -> Displacement:
+        """
+        The exponential of the screw axis times ``position`` (Lynch and Park, *Modern
+        Robotics*, section 3.3.3), for any axis and pitch, and free of NaN where the
+        body does not turn, also in its derivatives.
+
+        :param position: How far the body moved along the screw axis, from zero.
+        :return: The displacement of the body after that move.
+        """
+        rotation = self.rotation_per_unit_position * position
+        translation = self.translation_per_unit_position * position
+        angle_squared = rotation.dot(rotation)
+        series_angle_squared = self._series_rotation_angle**2
+        angle = sm.sqrt(angle_squared)
+        first_order_coefficient = sm.if_less(
+            angle_squared,
+            series_angle_squared,
+            1 / math.factorial(2)
+            - angle_squared / math.factorial(4)
+            + angle_squared**2 / math.factorial(6),
+            (1 - sm.cos(angle)) / angle_squared,
+        )
+        second_order_coefficient = sm.if_less(
+            angle_squared,
+            series_angle_squared,
+            1 / math.factorial(3)
+            - angle_squared / math.factorial(5)
+            + angle_squared**2 / math.factorial(7),
+            (angle - sm.sin(angle)) / (angle_squared * angle),
+        )
+        first_order = rotation.cross(translation)
+        second_order = rotation.cross(first_order)
+        return Displacement(
+            translation=translation
+            + first_order * first_order_coefficient
+            + second_order * second_order_coefficient,
+            rotation_vector=rotation,
             reference_frame=self.reference_frame,
         )
 

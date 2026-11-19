@@ -7,12 +7,15 @@ from __future__ import annotations
 import json
 
 import numpy as np
+import pytest
 
+import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
 from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
 
 from .dataset.frames import KnownFrames
+from .reference_implementations import matrix_exponential
 
 # %% the parts of a screw axis
 
@@ -156,3 +159,125 @@ def test_the_twist_of_a_screw_axis_scales_both_parts_by_the_position_velocity(
     assert type(twist) is Twist
     assert twist.reference_frame is table_frame
     np.testing.assert_allclose(twist.to_np(), 2.0 * screw_axis.to_np())
+
+
+# %% the displacement after moving along the axis
+
+
+def screw_axis_matrix(screw_axis: ScrewAxis) -> np.ndarray:
+    """
+    :return: The 4x4 matrix form of a constant screw axis, whose exponential times a
+        position is the transformation after moving by that position.
+    """
+    rotation = screw_axis.rotation_per_unit_position.to_np()[:3]
+    matrix = np.zeros((4, 4))
+    matrix[:3, :3] = [
+        [0.0, -rotation[2], rotation[1]],
+        [rotation[2], 0.0, -rotation[0]],
+        [-rotation[1], rotation[0], 0.0],
+    ]
+    matrix[:3, 3] = screw_axis.translation_per_unit_position.to_np()[:3]
+    return matrix
+
+
+def test_a_screw_axis_through_the_origin_turns_the_body_in_place():
+    """
+    A revolute axis through the frame's origin rotates the body about its origin and
+    does not move it.
+    """
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3(0.0, 0.0, 1.0))
+
+    displacement = screw_axis.to_displacement(position=0.8)
+
+    np.testing.assert_allclose(displacement.translation.to_np()[:3], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(
+        displacement.rotation_vector.to_np()[:3], [0.0, 0.0, 0.8]
+    )
+
+
+def test_a_screw_axis_that_does_not_turn_slides_the_body():
+    """
+    Without rotation, the body moves along the translation scaled by the position.
+    """
+    screw_axis = ScrewAxis(translation_per_unit_position=Vector3(0.0, 0.6, 0.8))
+
+    displacement = screw_axis.to_displacement(position=2.0)
+
+    np.testing.assert_allclose(displacement.translation.to_np()[:3], [0.0, 1.2, 1.6])
+    np.testing.assert_allclose(
+        displacement.rotation_vector.to_np()[:3], [0.0, 0.0, 0.0]
+    )
+
+
+@pytest.mark.parametrize(
+    "position, expected_translation",
+    [(np.pi / 2, [0.5, -0.5, 0.0]), (np.pi, [1.0, 0.0, 0.0])],
+)
+def test_a_hinge_off_the_origin_swings_the_body_on_a_circle(
+    position: float, expected_translation: list[float]
+):
+    """
+    A hinge through (0.5, 0, 0) moves the body's origin on a circle around it, which no
+    displacement linear in the position could do.
+    """
+    hinge = Vector3(0.5, 0.0, 0.0)
+    rotation = Vector3(0.0, 0.0, 1.0)
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=rotation,
+        translation_per_unit_position=-rotation.cross(hinge),
+    )
+
+    displacement = screw_axis.to_displacement(position=position)
+
+    np.testing.assert_allclose(
+        displacement.translation.to_np()[:3], expected_translation, atol=1e-12
+    )
+
+
+@pytest.mark.parametrize("position", [1e-9, 1e-4, 0.05, 0.07, 0.08, 1.0, 3.0])
+def test_the_displacement_agrees_with_the_matrix_exponential(position: float):
+    """
+    For a helical axis off the origin, the displacement equals the exponential of the
+    screw axis's matrix times the position, on both sides of the switch to the series.
+    """
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(0.0, 0.6, 0.8),
+        translation_per_unit_position=Vector3(0.3, -0.2, 0.1),
+    )
+    expected = matrix_exponential(screw_axis_matrix(screw_axis) * position)
+
+    displacement = screw_axis.to_displacement(position=position)
+
+    np.testing.assert_allclose(
+        displacement.translation.to_np()[:3], expected[:3, 3], rtol=1e-12, atol=1e-15
+    )
+    np.testing.assert_allclose(
+        displacement.rotation_vector.to_np()[:3],
+        screw_axis.rotation_per_unit_position.to_np()[:3] * position,
+    )
+
+
+def test_the_displacement_of_a_symbolic_screw_axis_is_finite_where_it_stops_turning():
+    """
+    Evaluated where its rotation is zero, the displacement of a symbolic screw axis and
+    its derivative by the rotation are finite, so a branch not taken leaks no NaN.
+    """
+    angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position),
+        translation_per_unit_position=Vector3(0.3, 0.0, 0.0),
+    )
+    translation = screw_axis.to_displacement(position=2.0).translation
+
+    value = translation.substitute(
+        old_variables=[angle_per_unit_position], new_variables=[0.0]
+    ).to_np()
+    derivative = (
+        translation[:3]
+        .jacobian(variables=[angle_per_unit_position])
+        .substitute(old_variables=[angle_per_unit_position], new_variables=[0.0])
+        .to_np()
+    )
+
+    np.testing.assert_allclose(value[:3], [0.6, 0.0, 0.0])
+    assert np.isfinite(derivative).all()
