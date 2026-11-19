@@ -1009,7 +1009,11 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         cache = QueryCache()
         self.root = self.root.marginal(kept, cache=cache)
         return [
-            LayerNode(cache.result_of(ProductLayer.marginal, node.layer), node.node)
+            LayerNode(
+                cache.result_of(ProductLayer.marginal, node.layer),
+                int(np.cumsum(node.layer.nodes_over(kept=kept, cache=cache))[node.node])
+                - 1,
+            )
             for node in nodes
         ]
 

@@ -18,7 +18,6 @@ from sortedcontainers import SortedSet
 
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     LayerOverSeveralVariablesError,
-    PartialMarginalOfLeafLayerError,
     UnsortedNodeVariablesError,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
@@ -301,11 +300,42 @@ def test_samples_of_mixed_leaves_follow_the_circuit(mixture):
     )
 
 
-def test_a_marginal_that_splits_a_mixed_leaf_layer_raises(mixture):
+def test_a_marginal_that_splits_mixed_leaf_layers(mixture, samples):
     """
-    Marginalizing a variable that a leaf layer shares with a kept one raises, since it
-    would remove nodes its parents point to.
+    Marginalizing variables that leaf layers share with kept ones gives the marginal of
+    the separate circuit.
     """
-    _, y, letter, mark = mixture.variables
-    with pytest.raises(PartialMarginalOfLeafLayerError):
-        mixture.mixed.marginal([y, letter, mark])
+    _, y, letter, _ = mixture.variables
+    mixed = mixture.mixed.marginal([y, letter])
+    separate = mixture.separate.marginal([y, letter])
+    np.testing.assert_allclose(
+        mixed.log_likelihood(samples[:, [1, 2]]),
+        separate.log_likelihood(samples[:, [1, 2]]),
+    )
+
+
+def test_conditioning_on_some_variables_of_mixed_leaf_layers(mixture, samples):
+    """
+    Conditioning on one variable of each mixed leaf layer gives the likelihood and the
+    conditional distribution of the separate circuit.
+    """
+    x, _, letter, _ = mixture.variables
+    point = {x: 0.3, letter: "b"}
+    mixed = mixture.mixed.log_conditional(point)
+    separate = mixture.separate.log_conditional(point)
+    assert mixed.log_likelihood == pytest.approx(separate.log_likelihood)
+    conditioned_samples = samples.copy()
+    conditioned_samples[:, 0] = 0.3
+    conditioned_samples[:, 2] = hash("b")
+    np.testing.assert_allclose(
+        mixed.distribution.log_likelihood(conditioned_samples),
+        separate.distribution.log_likelihood(conditioned_samples),
+    )
+
+
+def test_products_of_factors_from_one_mixed_leaf_layer_are_decomposable(mixture):
+    """
+    A product whose factors come from the same leaf layer but are over different
+    variables is decomposable.
+    """
+    assert mixture.mixed.is_decomposable()

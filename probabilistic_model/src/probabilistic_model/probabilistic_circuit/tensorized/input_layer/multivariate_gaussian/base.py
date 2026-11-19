@@ -20,6 +20,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
     NodeMask,
     NodeScopeValues,
+    NodeVariableMask,
     SampleArray,
     SampleScopeValues,
     ScopeValues,
@@ -435,6 +436,14 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         if not alive.any():
             return None
         return self.select_nodes(alive)
+
+    @memoized
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        result = np.zeros((self.number_of_nodes, width), dtype=bool)
+        result[:, self.scope] = True
+        return result
 
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None

@@ -261,7 +261,11 @@ class SumLayer(HasParameterArrays, InnerLayer):
     @property
     def variables(self) -> VariableIndices:
         if self._variables_cache is None:
-            self._variables_cache = self.child_layers[0].variables
+            self._variables_cache = np.unique(
+                np.concatenate(
+                    [child_layer.variables for child_layer in self.child_layers]
+                )
+            )
         return self._variables_cache
 
     @property
@@ -853,22 +857,27 @@ class SumLayer(HasParameterArrays, InnerLayer):
             marginal_child = child_layer.marginal(kept, cache=cache)
             if marginal_child is None:
                 continue
+            kept_child_nodes = child_layer.nodes_over(kept=kept, cache=cache)
             of_child = edges.child_layer_indices == child_layer_index
+            of_child[of_child] = kept_child_nodes[edges.child_nodes[of_child]]
             offset = sum(layer.number_of_nodes for layer in new_child_layers)
-            new_columns[of_child] = offset + edges.child_nodes[of_child]
+            new_columns[of_child] = (
+                offset + (np.cumsum(kept_child_nodes) - 1)[edges.child_nodes[of_child]]
+            )
             kept_edges |= of_child
             new_child_layers.append(marginal_child)
 
         if not new_child_layers:
             return None
+        kept_nodes = self.nodes_over(kept=kept, cache=cache)
         return self.from_entries(
             new_child_layers,
             SparseEntries(
                 self.edge_log_weights[kept_edges],
-                self.edges.rows[kept_edges],
+                (np.cumsum(kept_nodes) - 1)[self.edges.rows[kept_edges]],
                 new_columns[kept_edges],
             ),
-            self.number_of_nodes,
+            int(kept_nodes.sum()),
             type(self.edges),
         )
 

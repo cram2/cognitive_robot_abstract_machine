@@ -209,33 +209,3 @@ class UnsortedNodeVariablesError(ProbabilisticModelException, ValueError):
             "Order the nodes of the layer by their variable, and the edges of its "
             "parents with them."
         )
-
-
-@dataclass(kw_only=True)
-class PartialMarginalOfLeafLayerError(ProbabilisticModelException, ValueError):
-    """
-    Exception raised when a marginal keeps some but not all variables of the nodes of a
-    leaf layer, which would remove nodes its parents point to.
-    """
-
-    kept_variables: np.ndarray
-    """
-    The variables of the layer the marginal keeps.
-    """
-
-    removed_variables: np.ndarray
-    """
-    The variables of the layer the marginal removes.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"The marginal keeps the variables {self.kept_variables.tolist()} of a "
-            f"leaf layer and removes its variables {self.removed_variables.tolist()}."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Marginalize a circuit whose leaf layers are each over one variable, or "
-            "keep every variable of the layer."
-        )

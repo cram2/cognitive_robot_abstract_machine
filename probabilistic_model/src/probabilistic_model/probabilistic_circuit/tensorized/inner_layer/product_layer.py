@@ -198,44 +198,32 @@ class ProductLayer(InnerLayer):
         # the edges of a product layer are structure, not parameters
         return 0
 
+    @property
+    def scope_width(self) -> int:
+        """
+        :return: The number of variables up to the largest index in the scope of this
+            layer, the width of the scopes it compares.
+        """
+        return int(self.variables.max()) + 1 if len(self.variables) else 0
+
     def is_decomposable_of_nodes(self) -> NodeMask:
         """
         A product node is decomposable if no variable is in the scope of more than one
         of its factors.
         """
-        edges = self.inner_layer_edges
-        factors_of_node = np.zeros(
-            (len(self.child_layers), self.number_of_nodes), dtype=np.int64
-        )
-        np.add.at(factors_of_node, (edges.child_layer_indices, edges.nodes), 1)
-        scope_of_child_layer = np.array(
-            [
-                np.isin(self.variables, child_layer.variables)
-                for child_layer in self.child_layers
-            ],
-            dtype=np.int64,
-        )
         # how many factors of every node have every variable in their scope
-        occurrences = factors_of_node.T @ scope_of_child_layer
+        occurrences = np.zeros((self.number_of_nodes, self.scope_width), dtype=np.int64)
+        np.add.at(
+            occurrences,
+            self.inner_layer_edges.nodes,
+            self.scopes_of_edges(width=self.scope_width),
+        )
         return occurrences.max(axis=1, initial=0) <= 1
 
     def products_over(self, variables: VariableIndices) -> NodeMask:
-        edges = self.inner_layer_edges
-        result = np.ones(self.number_of_nodes, dtype=bool)
-        for variable in variables:
-            child_layer_models_variable = np.array(
-                [
-                    variable in child_layer.variables
-                    for child_layer in self.child_layers
-                ],
-                dtype=bool,
-            )
-            models_variable = np.zeros(self.number_of_nodes, dtype=bool)
-            models_variable[
-                edges.nodes[child_layer_models_variable[edges.child_layer_indices]]
-            ] = True
-            result &= models_variable
-        return result
+        variables = np.asarray(variables, dtype=np.int64)
+        width = max(self.scope_width, int(variables.max(initial=-1)) + 1)
+        return self.node_scopes(width=width)[:, variables].all(axis=1)
 
     # %% queries
 
@@ -552,12 +540,14 @@ class ProductLayer(InnerLayer):
             marginal_child = child_layer.marginal(kept, cache=cache)
             if marginal_child is None:
                 continue
-            mask = edges.child_layer_indices == child_layer_index
+            kept_child_nodes = child_layer.nodes_over(kept=kept, cache=cache)
+            of_child = edges.child_layer_indices == child_layer_index
+            of_child[of_child] = kept_child_nodes[edges.child_nodes[of_child]]
             new_edges.append(
                 InnerLayerEdges(
-                    edges.nodes[mask],
-                    np.full(mask.sum(), len(new_child_layers), dtype=np.int64),
-                    edges.child_nodes[mask],
+                    edges.nodes[of_child],
+                    np.full(of_child.sum(), len(new_child_layers), dtype=np.int64),
+                    (np.cumsum(kept_child_nodes) - 1)[edges.child_nodes[of_child]],
                 )
             )
             new_child_layers.append(marginal_child)
@@ -565,10 +555,16 @@ class ProductLayer(InnerLayer):
         if not new_child_layers:
             return None
 
+        kept_nodes = self.nodes_over(kept=kept, cache=cache)
+        joined = InnerLayerEdges.concatenate(new_edges)
         return self.from_edges(
             new_child_layers,
-            InnerLayerEdges.concatenate(new_edges),
-            self.number_of_nodes,
+            InnerLayerEdges(
+                (np.cumsum(kept_nodes) - 1)[joined.nodes],
+                joined.child_layer_indices,
+                joined.child_nodes,
+            ),
+            int(kept_nodes.sum()),
             type(self.edges),
         )
 

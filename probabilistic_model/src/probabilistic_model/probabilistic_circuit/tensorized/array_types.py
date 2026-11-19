@@ -147,6 +147,11 @@ VariableValues: TypeAlias = npt.NDArray[np.number]
 One number per variable of a circuit, shape (#variables of the circuit,).
 """
 
+NodeVariableMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per node of a layer and variable of a circuit, shape (#nodes, #variables).
+"""
+
 VariableMask: TypeAlias = npt.NDArray[np.bool_]
 """
 One flag per variable of a circuit, shape (#variables of the circuit,).

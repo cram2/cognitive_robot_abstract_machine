@@ -19,6 +19,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
     NodeMask,
     NodeValues,
+    NodeVariableMask,
     NodeVariableValues,
     SampleArray,
     SampleColumn,
@@ -29,7 +30,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     LayerOverSeveralVariablesError,
-    PartialMarginalOfLeafLayerError,
     UnsortedNodeVariablesError,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
@@ -495,22 +495,23 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             return None
         return self.select_nodes(alive)
 
+    @memoized
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        result = np.zeros((self.number_of_nodes, width), dtype=bool)
+        result[np.arange(self.number_of_nodes), self.node_variables] = True
+        return result
+
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
     ) -> Layer | None:
-        """
-        :raises PartialMarginalOfLeafLayerError: If the marginal keeps some but not all
-            variables of the nodes.
-        """
-        kept_of_layer = np.asarray(kept)[self.variables]
-        if not kept_of_layer.any():
+        over_kept = np.asarray(kept)[self.node_variables]
+        if not over_kept.any():
             return None
-        if not kept_of_layer.all():
-            raise PartialMarginalOfLeafLayerError(
-                kept_variables=self.variables[kept_of_layer],
-                removed_variables=self.variables[~kept_of_layer],
-            )
-        return copy.deepcopy(self)
+        if over_kept.all():
+            return copy.deepcopy(self)
+        return self.select_nodes(over_kept)
 
 
 @dataclass(eq=False, repr=False)
