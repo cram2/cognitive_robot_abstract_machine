@@ -1,16 +1,7 @@
 """
-Scene representation types for Robokudo.
-
-This module provides types for representing and analyzing elements in a scene.
-It includes types for:
-
-* Analyzable scene elements
-* Object and human hypotheses
-* Region definitions
-* Part-whole relationships
-* Occupancy annotations
-
-The types support 3D point clouds, image ROIs, and nested annotations.
+Types for the elements of a scene that RoboKudo analyzes: object, human, region and part
+hypotheses and occupancy annotations, each with its point cloud, image region and nested
+annotations.
 """
 
 from __future__ import annotations
@@ -132,16 +123,9 @@ class HumanHypothesis(ObjectHypothesis):
     """
     Hypothesis about a human in the scene.
 
-    In contrast to ObjectHypothesis, we have many different aspects on a Object to annotate.
-    Therefore, the semantics of self.points, self.centroid and self.roi on this Hypothesis are a bit different.
-    These variables should always contain the maximum region of the person we have been able to detect so far.
-    Examples:
-      - When running only a face detection, they should be adjusted to the ROI for the face.
-      - When running a full body detection + face detection,
-        they should be adjusted to everything the full body detection and the face recognition was able to see.
-        Basically a Union over the ROIs generated for both.
-    In general, PersonHypotheses should rely more on Annotations and also annotate the individual detected features,
-    like body parts or activities.
+    Its :attr:`points` and :attr:`roi` cover the largest region of the person detected
+    so far, such as the union of a face and a full body detection. Detected features
+    such as body parts or activities are annotated individually.
     """
 
     goal: Any = None
@@ -169,10 +153,8 @@ class RegionHypothesis(AnalyzableAnnotation, Nameable):
     """
     Hypothesis about a region in the scene.
 
-    A region in the scene. It doesn't necessarily focus on one specific object, but is
-    rather used as a data structure to analyze a specific part of the 3d space.
-    Examples: A region above a sofa for free seat estimation, the space of a sink to
-    check if it is filled with water, etc.
+    A part of the 3D space to analyze that is not necessarily one object, such as the
+    region above a sofa for free seat estimation or a sink checked for water.
     """
 
     ...
@@ -181,16 +163,11 @@ class RegionHypothesis(AnalyzableAnnotation, Nameable):
 @dataclass
 class ParthoodHypothesis(AnalyzableAnnotation, Nameable):
     """
-    Base class for part-whole relationships in objects.
+    Hypothesis about a part of an object: a feature, such as a logo, or a component,
+    such as the control unit of an electrical device.
 
-    This annotation can be used to represent parts of an object. We mainly refer to
-    'features' and 'components'. A logo at a specific place on an object would be a
-    feature, while a control unit on an electrical device is a component.
-
-    Parthood Annotations are still a Hypothesis, because due to bad pose estimation we
-    might actually not refer to the correct region of the parthood. Example: Pose
-    estimation is off by 180 degrees around the up-axis and you are referring to a
-    feature on the front face of an object.
+    An inaccurate object pose can place the part on the wrong region, for example on the
+    front face when the pose is off by 180 degrees around the up axis.
     """
 
 
@@ -201,14 +178,8 @@ class ParthoodComponentHypothesis(ParthoodHypothesis): ...
 @dataclass
 class ParthoodFeatureHypothesis(ParthoodHypothesis):
     """
-    Hypothesis about a feature part of an object.
-
-    Represents surface or visual features like:
-
-    * Logos
-    * Text
-    * Decorative elements
-    * Surface patterns
+    Hypothesis about a surface or visual feature of an object, such as a logo, text, a
+    decorative element or a surface pattern.
     """
 
     ...

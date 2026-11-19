@@ -121,11 +121,17 @@ class CameraFrameIsReferenceFrame(InvalidCameraObservation):
     """
 
     def __post_init__(self) -> None:
+        """
+        Name the camera frame the pose is measured against.
+        """
         self.reason = (
             f"the camera pose is measured against its own frame '{self.frame}'"
         )
 
     def suggest_correction(self) -> str:
+        """
+        Point to the frames of the world to measure the camera pose against.
+        """
         return "Measure the camera pose against a frame of the world, such as its root."
 
 
@@ -151,9 +157,15 @@ class FrameNamesSeveralBodies(InvalidCameraObservation):
     """
 
     def __post_init__(self) -> None:
+        """
+        Name the ambiguous frame and the bodies it names.
+        """
         self.reason = f"the frame '{self.frame}' names the bodies {self.body_names}"
 
     def suggest_correction(self) -> str:
+        """
+        Ask for unique or full body names.
+        """
         return "Give the bodies of the world unique names, or use their full names."
 
 
