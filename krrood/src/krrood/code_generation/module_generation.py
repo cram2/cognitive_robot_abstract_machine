@@ -101,7 +101,7 @@ class ModuleRenderer:
 
         :param path: The path to write the module to.
         """
-        template_dir = os.path.join(os.path.dirname(__file__), "..", "jinja_templates")
+        template_dir = os.path.join(os.path.dirname(__file__), "templates")
         env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_dir),
             trim_blocks=True,

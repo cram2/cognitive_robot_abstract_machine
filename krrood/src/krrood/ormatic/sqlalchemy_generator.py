@@ -1,3 +1,7 @@
+"""
+Write the SQLAlchemy declarative mappings ORMatic built as a Python module.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -32,11 +36,12 @@ class SQLAlchemyGenerator:
 
     _generator: CodeGenerator = field(init=False, default=None)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """
+        Render from the templates shipped beside this module.
+        """
         self._generator = CodeGenerator(
-            template_directory=os.path.join(
-                os.path.dirname(__file__), "..", "jinja_templates"
-            ),
+            template_directory=os.path.join(os.path.dirname(__file__), "templates"),
         )
 
     def to_sqlalchemy_file(self, *, file: TextIO):
