@@ -660,8 +660,8 @@ class TestObjectsSeenAgain:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [known_object] = perceivable_objects(world)
-        body = known_object.root
+        [object_in_world] = perceivable_objects(world)
+        body = object_in_world.root
         rotation_before = body.global_transform.to_np()[:3, :3]
         scales_before = [shape.scale for shape in body.visual.shapes]
         translation = (0.03, 0.0, 1.0)
@@ -686,7 +686,7 @@ class TestObjectsSeenAgain:
             cas_seen_from(world, camera_pose()),
             make_object_hypothesis(translation=translation),
         )
-        [known_object] = perceivable_objects(world)
+        [object_in_world] = perceivable_objects(world)
         # Same world pose as before, seen from a camera one meter further along x.
         same_object = make_object_hypothesis(
             roi=(10, 10, 12, 12), translation=(-1.0, 0.0, 1.0)
@@ -704,8 +704,8 @@ class TestObjectsSeenAgain:
 
         bodies = [annotation.root for annotation in perceivable_objects(world)]
         assert len(bodies) == 2
-        assert known_object.root in bodies
-        assert np.allclose(position_of(known_object.root), translation)
+        assert object_in_world.root in bodies
+        assert np.allclose(position_of(object_in_world.root), translation)
 
     def test_object_another_process_attached_rigidly_stays_where_it_is(
         self, *, robokudo: RoboKudo, world: World
@@ -713,8 +713,8 @@ class TestObjectsSeenAgain:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [known_object] = perceivable_objects(world)
-        body = known_object.root
+        [object_in_world] = perceivable_objects(world)
+        body = object_in_world.root
         parent = body.parent_connection.parent
         parent_T_body = body.parent_connection.origin
         with world.modify_world():
@@ -772,7 +772,7 @@ class TestMatching:
             cas_seen_from(world, camera_pose()),
             make_object_hypothesis(class_label="cup"),
         )
-        [known_object] = perceivable_objects(world)
+        [object_in_world] = perceivable_objects(world)
 
         put_pass_into_world(
             robokudo,
@@ -781,7 +781,7 @@ class TestMatching:
         )
 
         assert [annotation.root for annotation in perceivable_objects(world)] == [
-            known_object.root
+            object_in_world.root
         ]
 
     def test_object_is_taken_as_the_nearby_object_of_its_own_class(
@@ -877,7 +877,7 @@ class TestClassificationOfObjectsSeenAgain:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [known_object] = perceivable_objects(world)
+        [object_in_world] = perceivable_objects(world)
 
         put_pass_into_world(
             robokudo,
@@ -886,7 +886,7 @@ class TestClassificationOfObjectsSeenAgain:
         )
 
         [annotation] = perceivable_objects(world)
-        assert annotation.root is known_object.root
+        assert annotation.root is object_in_world.root
         assert type(annotation) is Cup
         assert annotation.class_label == class_label
 
@@ -1084,22 +1084,22 @@ class TestConcurrentChanges:
         cas = cas_seen_from(world, camera_pose())
         add_perceivable_object(world, position=(0.0, 0.0, 1.0))
         concurrent_change = ConcurrentChange(changed_world=world)
-        update_known_object = PerceptionBelief.update_known_object
+        update_object_in_world = PerceptionBelief.update_object_in_world
 
-        def update_known_object_facing_a_concurrent_change(
-            belief: PerceptionBelief, *, known_object: IsPerceivable, world: World
+        def update_object_in_world_facing_a_concurrent_change(
+            belief: PerceptionBelief, *, object_in_world: IsPerceivable, world: World
         ) -> None:
             """
-            Update ``known_object`` with ``belief`` once the concurrent change has
+            Update ``object_in_world`` with ``belief`` once the concurrent change has
             happened.
             """
             concurrent_change.start_and_wait()
-            update_known_object(belief, known_object=known_object, world=world)
+            update_object_in_world(belief, object_in_world=object_in_world, world=world)
 
         monkeypatch.setattr(
             PerceptionBelief,
-            "update_known_object",
-            update_known_object_facing_a_concurrent_change,
+            "update_object_in_world",
+            update_object_in_world_facing_a_concurrent_change,
         )
 
         put_pass_into_world(

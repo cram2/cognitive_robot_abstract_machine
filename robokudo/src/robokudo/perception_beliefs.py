@@ -225,24 +225,26 @@ class PerceptionBelief:
             )
             self.body.parent_connection.origin = self.pose
 
-    def update_known_object(self, *, known_object: IsPerceivable, world: World) -> None:
+    def update_object_in_world(
+        self, *, object_in_world: IsPerceivable, world: World
+    ) -> None:
         """
-        Move ``known_object`` to where the object was seen, keeping its orientation and
-        shape. An :class:`UnknownObject` becomes an annotation of
+        Move ``object_in_world`` to where the object was seen, keeping its orientation
+        and shape. An :class:`UnknownObject` becomes an annotation of
         :attr:`believed_class`; any other semantic annotation keeps its class.
 
-        :param known_object: The object of ``world`` the belief was matched to.
-        :param world: The world ``known_object`` belongs to.
+        :param object_in_world: The object of ``world`` the belief was matched to.
+        :param world: The world ``object_in_world`` belongs to.
         """
-        self._move(body=known_object.root, world=world)
-        if isinstance(known_object, UnknownObject):
-            self._replace_unknown_object(unknown_object=known_object, world=world)
+        self._move(body=object_in_world.root, world=world)
+        if isinstance(object_in_world, UnknownObject):
+            self._replace_unknown_object(unknown_object=object_in_world, world=world)
             return
         if self.believed_class is not UnknownObject and not isinstance(
-            known_object, self.believed_class
+            object_in_world, self.believed_class
         ):
             logging.getLogger(PACKAGE_NAME).info(
-                f"Keeping {type(known_object).__name__} {known_object.root.name} "
+                f"Keeping {type(object_in_world).__name__} {object_in_world.root.name} "
                 f"although it was classified as {self.believed_class.__name__}."
             )
 
@@ -329,11 +331,14 @@ class ObjectMatcher:
         :return: The object each matched belief is about. No object is taken by more
             than one belief.
         """
-        known_objects = self._perceivable_objects(world=world)
-        if not beliefs or not known_objects:
+        objects_in_world = self._perceivable_objects(world=world)
+        if not beliefs or not objects_in_world:
             return {}
 
-        centers = [self.visual_center(body=known.root) for known in known_objects]
+        centers = [
+            self.visual_center(body=object_in_world.root)
+            for object_in_world in objects_in_world
+        ]
         distances = np.array(
             [
                 [float(belief.center.euclidean_distance(center)) for center in centers]
@@ -343,8 +348,8 @@ class ObjectMatcher:
         admissible = (distances <= self.maximum_match_distance) & np.array(
             [
                 [
-                    self._agree_in_size(belief=belief, body=known.root)
-                    for known in known_objects
+                    self._agree_in_size(belief=belief, body=object_in_world.root)
+                    for object_in_world in objects_in_world
                 ]
                 for belief in beliefs
             ]
@@ -354,10 +359,12 @@ class ObjectMatcher:
                 [
                     (
                         self.class_mismatch_penalty
-                        if self._differ_in_class(belief=belief, known_object=known)
+                        if self._differ_in_class(
+                            belief=belief, object_in_world=object_in_world
+                        )
                         else 0.0
                     )
-                    for known in known_objects
+                    for object_in_world in objects_in_world
                 ]
                 for belief in beliefs
             ]
@@ -367,15 +374,15 @@ class ObjectMatcher:
         inadmissible_cost = (
             self.maximum_match_distance + self.class_mismatch_penalty
         ) * (min(distances.shape) + 1)
-        belief_indices, known_object_indices = linear_sum_assignment(
+        belief_indices, object_in_world_indices = linear_sum_assignment(
             np.where(admissible, distances + class_penalties, inadmissible_cost)
         )
         return {
-            beliefs[belief_index]: known_objects[known_object_index]
-            for belief_index, known_object_index in zip(
-                belief_indices, known_object_indices
+            beliefs[belief_index]: objects_in_world[object_in_world_index]
+            for belief_index, object_in_world_index in zip(
+                belief_indices, object_in_world_indices
             )
-            if admissible[belief_index, known_object_index]
+            if admissible[belief_index, object_in_world_index]
         }
 
     @staticmethod
@@ -417,31 +424,31 @@ class ObjectMatcher:
         """
         if not body.visual.shapes:
             return True
-        known_scale = body.visual.scale
+        body_scale = body.visual.scale
         belief_edge = max(belief.scale.x, belief.scale.y, belief.scale.z)
-        known_edge = max(known_scale.x, known_scale.y, known_scale.z)
-        return max(belief_edge, known_edge) <= self.maximum_match_size_ratio * min(
-            belief_edge, known_edge
+        body_edge = max(body_scale.x, body_scale.y, body_scale.z)
+        return max(belief_edge, body_edge) <= self.maximum_match_size_ratio * min(
+            belief_edge, body_edge
         )
 
     @staticmethod
     def _differ_in_class(
-        *, belief: PerceptionBelief, known_object: IsPerceivable
+        *, belief: PerceptionBelief, object_in_world: IsPerceivable
     ) -> bool:
         """
         :param belief: The belief.
-        :param known_object: The object.
+        :param object_in_world: The object.
         :return: Whether the object of ``belief`` was classified as something
-            ``known_object`` is not: another semantic annotation, or, for a
+            ``object_in_world`` is not: another semantic annotation, or, for a
             :class:`UnknownObject`, another class label.
         """
         class_label = belief.hypothesis.class_label
         if class_label is None:
             return False
-        if isinstance(known_object, UnknownObject):
+        if isinstance(object_in_world, UnknownObject):
             return (
-                known_object.class_label is not None
-                and known_object.class_label != class_label
+                object_in_world.class_label is not None
+                and object_in_world.class_label != class_label
             )
         semantic_class = belief.hypothesis.semantic_class
-        return semantic_class is None or not isinstance(known_object, semantic_class)
+        return semantic_class is None or not isinstance(object_in_world, semantic_class)
