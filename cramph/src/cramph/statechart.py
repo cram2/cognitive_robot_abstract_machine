@@ -85,8 +85,9 @@ class StatechartModification:
     """
     Batches changes to a statechart, which the outermost of any nested modifications
     closes into a :class:`~cramph.statechart_changes.StatechartChangeBlock` and a
-    compiled statechart compiles once. A block that raises breaks the statechart, which
-    stays as the block left it, see :meth:`Statechart.check_not_broken`.
+    compiled statechart compiles once. A block that raises after it changed the
+    structure breaks the statechart, which stays as the block left it, see
+    :meth:`Statechart.check_not_broken`; one that raises before leaves it usable.
     """
 
     statechart: Statechart
@@ -100,12 +101,20 @@ class StatechartModification:
     block.
     """
 
+    _recorded_change_count_at_start: int = field(init=False, default=0)
+    """
+    How often the statechart had recorded a change when this block started.
+    """
+
     def __enter__(self) -> Self:
         """
         :raises StatechartBrokenByFailedModificationError: If a block of the statechart
             raised before.
         """
         self.statechart.check_not_broken()
+        self._recorded_change_count_at_start = (
+            self.statechart.structure_change_recorder.recorded_change_count
+        )
         self.statechart._open_modifications += 1
         if self.rewrites_compiled_nodes:
             self.statechart._open_rewriting_modifications += 1
@@ -118,8 +127,9 @@ class StatechartModification:
         traceback: TracebackType | None,
     ) -> None:
         """
-        Breaks the statechart if the block raised. Otherwise the outermost block closes
-        its changes into a block and compiles a compiled statechart that changed.
+        Breaks the statechart if the block raised after it changed the structure.
+        Otherwise the outermost block closes its changes into a block and compiles a
+        compiled statechart that changed.
 
         :raises StatechartBrokenByFailedModificationError: If a block nested in this one
             raised and this one did not.
@@ -129,7 +139,11 @@ class StatechartModification:
         if self.rewrites_compiled_nodes:
             statechart._open_rewriting_modifications -= 1
         if exception is not None:
-            if statechart._modification_error is None:
+            changed_structure = (
+                statechart.structure_change_recorder.recorded_change_count
+                != self._recorded_change_count_at_start
+            )
+            if changed_structure and statechart._modification_error is None:
                 statechart._modification_error = exception
             return
         statechart.check_not_broken()
@@ -265,7 +279,7 @@ class Statechart(SubclassJSONSerializer):
     )
     """
     The error with which a :meth:`modify` block broke this statechart, or None while no
-    block raised.
+    block raised after it changed the structure.
     """
 
     _nodes: list[StatechartNode] = field(default_factory=list, init=False, repr=False)
@@ -420,7 +434,8 @@ class Statechart(SubclassJSONSerializer):
     def check_not_broken(self) -> None:
         """
         :raises StatechartBrokenByFailedModificationError: If a :meth:`modify` block
-            raised, so the statechart stays as that block left it, half changed.
+            raised after it changed the structure, so the statechart stays as that
+            block left it, half changed.
         """
         if self._modification_error is None:
             return
@@ -490,21 +505,32 @@ class Statechart(SubclassJSONSerializer):
         :param node: The node to add.
         :raises PrerequisiteNotExpandedError: If `node` is a composite node that reads a
             composite node which has not joined this statechart yet.
+        :raises NodesMissingContextExtensionsError: If :attr:`context` lacks an
+            extension `node` requires to expand.
         """
+        self._check_can_join(node=node)
         with self.modify():
             self._register_node(node=node)
             if isinstance(node, CompositeNode):
                 self._expand(node=node)
 
-    def _expand(self, *, node: CompositeNode) -> None:
+    def _check_can_join(
+        self, *, node: StatechartNode, taken_over: StatechartNode | None = None
+    ) -> None:
         """
-        Expands `node` in :attr:`context`, once every composite node it reads while
-        expanding has joined this statechart.
+        Rejects `node` before it changes this statechart, so that a rejected node leaves
+        it usable; a child created while `node` expands is checked once it joins.
 
-        :param node: The composite node that just joined this statechart.
+        :param node: The node about to join.
+        :param taken_over: A child `node` was handed that it takes over before it
+            adopts its children, see :meth:`~cramph.node.CompositeNode.take_over`.
+        :raises PrerequisiteNotExpandedError: If `node` is a composite node that reads a
+            composite node which has not joined this statechart yet.
         :raises NodesMissingContextExtensionsError: If :attr:`context` lacks an
             extension `node` requires to expand.
         """
+        if not isinstance(node, CompositeNode):
+            return
         for prerequisite in node.prerequisite_nodes:
             if isinstance(prerequisite, CompositeNode) and (
                 prerequisite._statechart is not self
@@ -516,6 +542,15 @@ class Statechart(SubclassJSONSerializer):
                 expanding_node.context_extensions_required_to_expand
             ),
         )
+        node.check_handed_children(taken_over=taken_over)
+
+    def _expand(self, *, node: CompositeNode) -> None:
+        """
+        Expands `node` in :attr:`context`.
+
+        :param node: The composite node that just joined this statechart, checked by
+            :meth:`_check_can_join`.
+        """
         node.adopt_handed_children()
         node.expand()
 
@@ -526,6 +561,7 @@ class Statechart(SubclassJSONSerializer):
 
         :param node: The node to add.
         """
+        self.structure_change_recorder.record_change(change=NodeAddition(node=node))
         node.statechart = self
         node.index = self.rx_graph.add_node(node)
         self.life_cycle_state.append_default_value()
@@ -539,7 +575,6 @@ class Statechart(SubclassJSONSerializer):
             self._end_nodes.append(node)
         if isinstance(node, CompositeNodeChoosingItsChild):
             self._choosing_nodes.append(node)
-        self.structure_change_recorder.record_change(change=NodeAddition(node=node))
         self.structure_change_recorder.record_joined_node(node=node)
 
     def apply_change_block_from_json(
@@ -585,6 +620,7 @@ class Statechart(SubclassJSONSerializer):
         kept_nodes = [kept for kept in self._nodes if kept not in removed_nodes]
         self._check_not_referenced(removed_nodes=removed_nodes, kept_nodes=kept_nodes)
         with self.modify():
+            self.structure_change_recorder.record_change(change=NodeRemoval(node=node))
             parent_node = node.parent_node
             if parent_node is not None and node in parent_node.nodes:
                 parent_node.remove_child(child=node)
@@ -598,7 +634,6 @@ class Statechart(SubclassJSONSerializer):
                 removed_node._statechart = None
                 removed_node.index = None
                 removed_node.parent_node_index = None
-            self.structure_change_recorder.record_change(change=NodeRemoval(node=node))
 
     def replace(
         self, *, node: StatechartNode, replacement: StatechartNode | Match
@@ -632,6 +667,7 @@ class Statechart(SubclassJSONSerializer):
         holds_node = isinstance(replacement, CompositeNode) and any(
             child is node for child in replacement.nodes
         )
+        self._check_can_join(node=replacement, taken_over=node if holds_node else None)
         with self.modify():
             self._register_node(node=replacement)
             replacement.parent_node = holder

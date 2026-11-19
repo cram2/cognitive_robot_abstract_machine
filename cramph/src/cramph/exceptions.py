@@ -898,8 +898,8 @@ class RemovedNodeStillReferencedError(StatechartError):
 class StatechartBrokenByFailedModificationError(StatechartError):
     """
     Raised when a statechart is used after a
-    :meth:`~cramph.statechart.Statechart.modify` block of it raised, which left it
-    half changed.
+    :meth:`~cramph.statechart.Statechart.modify` block of it raised once it had changed
+    the structure, which left the statechart half changed.
     """
 
     modification_error: BaseException

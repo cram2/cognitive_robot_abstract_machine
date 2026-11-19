@@ -227,10 +227,24 @@ class ControlStructureNode(CompositeNode, ABC):
         them.
         """
         self._check_accepts_children()
+        self.check_handed_children()
         for node in list(self.nodes):
-            self._check_can_be_a_child(node=node)
             self._add_listed_child_to_statechart(node=node)
         self._wire_children()
+
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects every handed child :meth:`_check_can_be_a_child` or
+        :meth:`~cramph.node.CompositeNode._add_node_sanity_check` rejects, see
+        :meth:`~cramph.node.CompositeNode.check_handed_children`.
+        """
+        for node in self.nodes:
+            if node is taken_over:
+                continue
+            self._check_can_be_a_child(node=node)
+            self._add_node_sanity_check(node=node)
 
     def check_children(self) -> None:
         """
