@@ -27,6 +27,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     Layer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    SymbolicLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
 )
@@ -295,6 +298,27 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
         for layer in trained_root.all_layers()
         if isinstance(layer, GaussianLayer)
     )
+
+
+def test_training_a_categorical_layer_learns_the_frequencies_of_its_data():
+    """
+    Gradient descent with Adam moves a uniform categorical layer to the frequencies of
+    the states in its data.
+    """
+    frequencies = np.array([0.2, 0.8])
+    data = np.repeat([[0.0], [1.0]], (frequencies * 100).astype(int), axis=0)
+    with jax.enable_x64(True):
+        layer = SymbolicLayer(
+            0,
+            np.arange(2),
+            DenseProbabilityTable(jnp.log(jnp.full((1, 2), 0.5))),
+            np.arange(2),
+        )
+        trained = JaxGradientDescent(
+            layer, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+        ).minimize(300, jnp.asarray(data))
+        probabilities = np.exp(np.asarray(trained.table.log_probabilities))
+    np.testing.assert_allclose(probabilities, [frequencies], atol=1e-2)
 
 
 def test_training_with_weight_decay_keeps_zero_probability_weights(
