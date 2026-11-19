@@ -274,3 +274,23 @@ def matrix_exponential(matrix: np.ndarray) -> np.ndarray:
     for _ in range(squarings):
         result = result @ result
     return result
+
+
+def rigid_motion_rate_matrix(
+    *, rotation: np.ndarray, translation: np.ndarray
+) -> np.ndarray:
+    """
+    :param rotation: How a body turns per unit of a parameter.
+    :param translation: How the point of the body at the frame's origin moves per unit
+        of that parameter.
+    :return: The 4x4 matrix whose exponential times a change of the parameter is the
+        transformation of the body over that change.
+    """
+    matrix = np.zeros((4, 4))
+    matrix[:3, :3] = [
+        [0.0, -rotation[2], rotation[1]],
+        [rotation[2], 0.0, -rotation[0]],
+        [-rotation[1], rotation[0], 0.0],
+    ]
+    matrix[:3, 3] = translation
+    return matrix

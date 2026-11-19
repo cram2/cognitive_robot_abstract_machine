@@ -2646,7 +2646,66 @@ class Displacement(VectorPair):
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
-class Twist(VectorPair):
+class RigidMotionRate(VectorPair, ABC):
+    """
+    How a rigid body moves per unit of a parameter: how it turns, in the first vector,
+    and how the point of the body at the origin of the reference frame moves, in the
+    second, both along that frame's axes.
+    """
+
+    @classproperty
+    def _series_rotation_angle(cls) -> float:
+        """
+        The rotation angle in radians, about 0.042, below which :meth:`_integrate`
+        evaluates its coefficients by three terms of their series: where the series'
+        truncation error, ``2 φ⁶ / 8!`` relative, equals the closed forms' cancellation
+        error in double precision, ``2 ε / φ²``, both about ``2e-13``.
+        """
+        return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
+
+    def _integrate(self, *, parameter_change: sm.ScalarData) -> Displacement:
+        """
+        The exponential of this rate times ``parameter_change`` (Lynch and Park,
+        *Modern Robotics*, section 3.3.3), for any axis and pitch, and free of NaN where
+        the body does not turn, also in its derivatives.
+
+        :param parameter_change: How much the parameter of the rate changed.
+        :return: The displacement of the body while it did, at this constant rate.
+        """
+        rotation = self._first_vector * parameter_change
+        translation = self._second_vector * parameter_change
+        angle_squared = rotation.dot(rotation)
+        series_angle_squared = self._series_rotation_angle**2
+        angle = sm.sqrt(angle_squared)
+        first_order_coefficient = sm.if_less(
+            angle_squared,
+            series_angle_squared,
+            1 / math.factorial(2)
+            - angle_squared / math.factorial(4)
+            + angle_squared**2 / math.factorial(6),
+            (1 - sm.cos(angle)) / angle_squared,
+        )
+        second_order_coefficient = sm.if_less(
+            angle_squared,
+            series_angle_squared,
+            1 / math.factorial(3)
+            - angle_squared / math.factorial(5)
+            + angle_squared**2 / math.factorial(7),
+            (angle - sm.sin(angle)) / (angle_squared * angle),
+        )
+        first_order = rotation.cross(translation)
+        second_order = rotation.cross(first_order)
+        return Displacement(
+            translation=translation
+            + first_order * first_order_coefficient
+            + second_order * second_order_coefficient,
+            rotation_vector=rotation,
+            reference_frame=self.reference_frame,
+        )
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class Twist(RigidMotionRate):
     """
     A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
     at the origin of the reference frame moves, both along that frame's axes and per
@@ -2699,9 +2758,19 @@ class Twist(VectorPair):
         """
         return self._second_vector
 
+    def to_displacement(self, *, duration: sm.ScalarData) -> Displacement:
+        """
+        :param duration: How long the body moved at this constant twist, in units of
+            the parameter the twist is taken with respect to.
+        :return: The displacement of the body after moving that long: the exponential
+            of the twist times ``duration`` (Lynch and Park, *Modern Robotics*, section
+            3.3.3), free of NaN where the body does not turn.
+        """
+        return self._integrate(parameter_change=duration)
+
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
-class ScrewAxis(VectorPair):
+class ScrewAxis(RigidMotionRate):
     """
     How a rigid body's pose changes per unit of a position that moves it along a screw
     axis: the axis's line, the pitch along it and the unit of the position. It need not
@@ -2784,55 +2853,14 @@ class ScrewAxis(VectorPair):
             reference_frame=self.reference_frame,
         )
 
-    @classproperty
-    def _series_rotation_angle(cls) -> float:
-        """
-        The rotation angle in radians, about 0.042, below which :meth:`to_displacement`
-        evaluates its coefficients by three terms of their series: where the series'
-        truncation error, ``2 φ⁶ / 8!`` relative, equals the closed forms' cancellation
-        error in double precision, ``2 ε / φ²``, both about ``2e-13``.
-        """
-        return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
-
     def to_displacement(self, *, position: sm.ScalarData) -> Displacement:
         """
-        The exponential of the screw axis times ``position`` (Lynch and Park, *Modern
-        Robotics*, section 3.3.3), for any axis and pitch, and free of NaN where the
-        body does not turn, also in its derivatives.
-
         :param position: How far the body moved along the screw axis, from zero.
-        :return: The displacement of the body after that move.
+        :return: The displacement of the body after that move: the exponential of the
+            screw axis times ``position`` (Lynch and Park, *Modern Robotics*, section
+            3.3.3), free of NaN where the body does not turn.
         """
-        rotation = self.rotation_per_unit_position * position
-        translation = self.translation_per_unit_position * position
-        angle_squared = rotation.dot(rotation)
-        series_angle_squared = self._series_rotation_angle**2
-        angle = sm.sqrt(angle_squared)
-        first_order_coefficient = sm.if_less(
-            angle_squared,
-            series_angle_squared,
-            1 / math.factorial(2)
-            - angle_squared / math.factorial(4)
-            + angle_squared**2 / math.factorial(6),
-            (1 - sm.cos(angle)) / angle_squared,
-        )
-        second_order_coefficient = sm.if_less(
-            angle_squared,
-            series_angle_squared,
-            1 / math.factorial(3)
-            - angle_squared / math.factorial(5)
-            + angle_squared**2 / math.factorial(7),
-            (angle - sm.sin(angle)) / (angle_squared * angle),
-        )
-        first_order = rotation.cross(translation)
-        second_order = rotation.cross(first_order)
-        return Displacement(
-            translation=translation
-            + first_order * first_order_coefficient
-            + second_order * second_order_coefficient,
-            rotation_vector=rotation,
-            reference_frame=self.reference_frame,
-        )
+        return self._integrate(parameter_change=position)
 
 
 @dataclass(eq=False, init=False, repr=False)

@@ -15,7 +15,7 @@ from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
 from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
 
 from .dataset.frames import KnownFrames
-from .reference_implementations import matrix_exponential
+from .reference_implementations import matrix_exponential, rigid_motion_rate_matrix
 
 # %% the parts of a screw axis
 
@@ -164,22 +164,6 @@ def test_the_twist_of_a_screw_axis_scales_both_parts_by_the_position_velocity(
 # %% the displacement after moving along the axis
 
 
-def screw_axis_matrix(screw_axis: ScrewAxis) -> np.ndarray:
-    """
-    :return: The 4x4 matrix form of a constant screw axis, whose exponential times a
-        position is the transformation after moving by that position.
-    """
-    rotation = screw_axis.rotation_per_unit_position.to_np()[:3]
-    matrix = np.zeros((4, 4))
-    matrix[:3, :3] = [
-        [0.0, -rotation[2], rotation[1]],
-        [rotation[2], 0.0, -rotation[0]],
-        [-rotation[1], rotation[0], 0.0],
-    ]
-    matrix[:3, 3] = screw_axis.translation_per_unit_position.to_np()[:3]
-    return matrix
-
-
 def test_a_screw_axis_through_the_origin_turns_the_body_in_place():
     """
     A revolute axis through the frame's origin rotates the body about its origin and
@@ -244,7 +228,13 @@ def test_the_displacement_agrees_with_the_matrix_exponential(position: float):
         rotation_per_unit_position=Vector3(0.0, 0.6, 0.8),
         translation_per_unit_position=Vector3(0.3, -0.2, 0.1),
     )
-    expected = matrix_exponential(screw_axis_matrix(screw_axis) * position)
+    expected = matrix_exponential(
+        rigid_motion_rate_matrix(
+            rotation=screw_axis.rotation_per_unit_position.to_np()[:3],
+            translation=screw_axis.translation_per_unit_position.to_np()[:3],
+        )
+        * position
+    )
 
     displacement = screw_axis.to_displacement(position=position)
 
