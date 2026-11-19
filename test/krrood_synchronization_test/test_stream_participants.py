@@ -244,6 +244,63 @@ def test_streams_of_different_publishers_are_kept_apart(sender, receiver):
     assert not receiver.has_applied(position=other.read_counter(reading=1).position)
 
 
+def test_nothing_is_applied_at_first(receiver):
+    """
+    A receiver that applied nothing names no applied position.
+    """
+    assert receiver.applied_positions == []
+
+
+def test_applied_positions_name_the_highest_position_of_each_publisher(
+    sender, receiver
+):
+    """
+    Each publisher is named once, at the highest position applied of its stream.
+    """
+    first = sender.read_counter(reading=1)
+    second = sender.read_counter(reading=2)
+    receiver.record_applied(position=second.position)
+    receiver.record_applied(position=first.position)
+
+    assert receiver.applied_positions == [second.position]
+
+
+# %% contained changes
+
+
+def test_applied_change_is_contained(sender, receiver):
+    """
+    A change applied, or taken in otherwise and recorded as applied, is contained.
+    """
+    reading = sender.read_counter(reading=1)
+    receiver.record_applied(position=reading.position)
+
+    assert receiver.contains(position=reading.position)
+
+
+def test_change_not_applied_yet_is_not_contained(sender, receiver):
+    """
+    A change after the highest applied position of its publisher is not contained.
+    """
+    receiver.record_applied(position=sender.read_counter(reading=1).position)
+
+    assert not receiver.contains(position=sender.read_counter(reading=2).position)
+
+
+def test_applied_change_of_a_diverged_publisher_stays_contained(sender, receiver):
+    """
+    A change applied before its publisher diverged is still held, so it must not be
+    applied again, although the publisher is not caught up with.
+    """
+    reading = sender.read_counter(reading=1)
+    receiver.record_applied(position=reading.position)
+    receiver.record_divergence(
+        divergence=DivergedFromPublisherError(position=reading.position)
+    )
+
+    assert receiver.contains(position=reading.position)
+
+
 # %% divergences
 
 

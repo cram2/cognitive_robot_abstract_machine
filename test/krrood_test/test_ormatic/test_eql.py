@@ -5,6 +5,7 @@ Tests of translating entity queries over mapped classes into SQL.
 from __future__ import annotations
 
 import pytest
+from typing_extensions import TYPE_CHECKING
 
 from sqlalchemy import select, func, case
 from sqlalchemy.exc import MultipleResultsFound
@@ -24,6 +25,7 @@ from ..dataset.semantic_world_like_classes import (
     GraspConfig,
 )
 from krrood.entity_query_language.factories import (
+    a,
     entity,
     variable,
     and_,
@@ -44,8 +46,15 @@ from krrood.entity_query_language.factories import (
     exists,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
-from krrood.ormatic.eql_interface import eql_to_sql
+from krrood.ormatic.eql_interface import (
+    eql_to_sql,
+    UnsupportedNestedQueryError,
+    UnsupportedQueryTypeError,
+)
 from krrood.entity_query_language.query.query import UnificationDict
+
+if TYPE_CHECKING:
+    from ..dataset.ormatic_interface import NestedActionDAO
 
 
 def test_translate_simple_greater(session, database):
@@ -1364,9 +1373,7 @@ def test_cte_from_eql(session, database):
 
     b = variable(type_=Body, domain=[])
     inner_query = an(entity(b).where(b.size > 5))
-    large_bodies = eql_to_sql(
-        inner_query, session, as_common_table_expression="large_bodies"
-    )
+    large_bodies = eql_to_sql(inner_query, session).sql_query.cte("large_bodies")
 
     c = variable(type_=Container, domain=[])
     outer_translator = eql_to_sql(an(entity(c)), session)
@@ -1684,3 +1691,122 @@ def test_exists_in_where_clause(session, database):
     assert len(results) == 2
     result_robot_xs = {r.robot_x for r in results}
     assert result_robot_xs == {1.0, 2.0}
+
+
+# %% match patterns
+
+
+@pytest.fixture
+def nested_actions_at_two_heights(session, database) -> dict[float, NestedActionDAO]:
+    """
+    Store two nested actions on one body whose poses differ only in the height of their
+    position.
+
+    :return: The stored actions, keyed by the height of their position.
+    """
+    from ..dataset.ormatic_interface import (
+        BodyDAO,
+        KRROODOrientationDAO,
+        KRROODPoseDAO,
+        KRROODPositionDAO,
+        NestedActionDAO,
+    )
+
+    body = BodyDAO(name="TestBody", size=1)
+    actions = {
+        height: NestedActionDAO(
+            obj=body,
+            pose=KRROODPoseDAO(
+                position=KRROODPositionDAO(x=0.0, y=0.0, z=height),
+                orientation=KRROODOrientationDAO(x=0.0, y=0.0, z=0.0, w=1.0),
+            ),
+        )
+        for height in (3.0, 30.0)
+    }
+    session.add_all(actions.values())
+    session.commit()
+    return actions
+
+
+def test_match_selects_only_objects_with_stated_values(
+    session, nested_actions_at_two_heights
+):
+    """
+    A match selects only the objects whose nested attributes have the values it states.
+    """
+    query = a(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=30.0)))
+
+    results = eql_to_sql(query, session).evaluate()
+
+    assert results == [nested_actions_at_two_heights[30.0]]
+
+
+def test_match_selects_nothing_for_unstored_values(
+    session, nested_actions_at_two_heights
+):
+    """
+    A match whose stated values no stored object has selects nothing.
+    """
+    query = a(NestedAction)(
+        obj=a(Body)(name="TestBody"),
+        pose=a(KRROODPose)(position=a(KRROODPosition)(z=4.0)),
+    )
+
+    assert eql_to_sql(query, session).evaluate() == []
+
+
+def test_match_keeps_its_quantifier(session, nested_actions_at_two_heights):
+    """
+    A match built with :func:`the` evaluates to its single object.
+    """
+    query = the(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=3.0)))
+
+    results = eql_to_sql(query, session).evaluate()
+
+    assert results == [nested_actions_at_two_heights[3.0]]
+
+
+def test_match_keeps_its_limit(session, nested_actions_at_two_heights):
+    """
+    A match keeps the limit stated on it.
+    """
+    query = a(NestedAction)(obj=a(Body)(name="TestBody")).limit(n=1)
+
+    assert len(eql_to_sql(query, session).evaluate()) == 1
+
+
+def test_match_wrapped_in_entity_keeps_its_conditions(
+    session, nested_actions_at_two_heights
+):
+    """
+    A match wrapped in :func:`entity` selects what the match on its own selects.
+    """
+    query = an(
+        entity(a(NestedAction)(pose=a(KRROODPose)(position=a(KRROODPosition)(z=30.0))))
+    )
+
+    results = eql_to_sql(query, session).evaluate()
+
+    assert results == [nested_actions_at_two_heights[30.0]]
+
+
+def test_match_with_limit_wrapped_in_entity_raises(
+    session, nested_actions_at_two_heights
+):
+    """
+    A match wrapped in :func:`entity` whose own modifiers the translation cannot keep
+    raises instead of selecting more than the match does.
+    """
+    query = an(entity(a(KRROODPosition)(x=0.0).limit(n=1)))
+
+    with pytest.raises(UnsupportedNestedQueryError):
+        eql_to_sql(query, session)
+
+
+def test_expression_that_is_not_a_query_raises(session):
+    """
+    An expression that is not a query, such as a variable on its own, has no
+    translation.
+    """
+    with pytest.raises(UnsupportedQueryTypeError):
+        eql_to_sql(variable(NestedAction, domain=[]), session)
