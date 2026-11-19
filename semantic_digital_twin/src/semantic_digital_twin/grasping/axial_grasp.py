@@ -78,7 +78,7 @@ class AxialGrasp(ObjectRelativeGrasp):
         ) * math.sin(self.angle)
         root_T_grasp = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                point=axis.start + (axis.end - axis.start) * self.position,
+                point=axis.line.point_at_position(position_along_line=self.position),
                 rotation_matrix=RotationMatrix.from_vectors(
                     x=root_V_approach, y=root_V_axis.cross(root_V_approach)
                 ),

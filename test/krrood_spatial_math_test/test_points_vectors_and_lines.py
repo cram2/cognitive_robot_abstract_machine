@@ -20,7 +20,7 @@ from krrood_spatial_math.coordinate_system import (
     CoordinateT,
 )
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
-from krrood_spatial_math.line import Line
+from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.point import MetricPoint, Point, PointT
 from krrood_spatial_math.spatial_types import (
     CartesianPoint3Dimensional,
@@ -32,6 +32,7 @@ from .dataset.frames import NamedFrame
 from .dataset.spaces import (
     ScalablePlaneFrame,
     StoredScalablePlaneLine,
+    StoredScalablePlaneLineSegment,
     StoredScalablePlanePoint,
     StoredScalablePlaneVector,
 )
@@ -178,6 +179,54 @@ def test_a_lines_fields_are_narrowed_to_the_bound_types():
         "point": StoredScalablePlanePoint,
         "direction": StoredScalablePlaneVector,
     }
+
+
+@pytest.mark.parametrize(
+    "position_along_line, expected_x, expected_y",
+    [(0.0, 1.0, 2.0), (1.0, 4.0, 6.0), (0.5, 2.5, 4.0), (-1.0, -2.0, -2.0)],
+)
+def test_a_line_reaches_the_point_at_a_position_along_it(
+    position_along_line, expected_x, expected_y
+):
+    """
+    A line's point at a position is its point moved by its direction that many times,
+    behind it for a negative position.
+    """
+    line = StoredScalablePlaneLine(
+        point=StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None),
+        direction=StoredScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None),
+    )
+
+    assert line.point_at_position(
+        position_along_line=position_along_line
+    ) == StoredScalablePlanePoint(x=expected_x, y=expected_y, coordinate_system=None)
+
+
+# %% straight lines between two points
+
+
+def test_a_line_segment_cannot_be_instantiated():
+    """
+    The segment interface needs an implementation that binds its point and line types.
+    """
+    with pytest.raises(InterfaceInstantiationError):
+        LineSegment()
+
+
+def test_a_line_segment_lies_on_the_line_from_its_start_to_its_end():
+    """
+    A segment's line passes through its start along the vector to its end, reaching the
+    end at position 1.
+    """
+    start = StoredScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
+    end = StoredScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
+
+    line = StoredScalablePlaneLineSegment(start=start, end=end).line
+
+    assert (line, line.point_at_position(position_along_line=1.0)) == (
+        StoredScalablePlaneLine(point=start, direction=end - start),
+        end,
+    )
 
 
 # %% the metric of a Cartesian frame kind

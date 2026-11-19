@@ -35,7 +35,7 @@ from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
     RigidCoordinateChange,
 )
-from krrood_spatial_math.line import Line
+from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.point import MetricPoint
 from krrood_spatial_math.vector import MetricVector
 from krrood_spatial_math.exceptions import (
@@ -2362,10 +2362,12 @@ class Line3Dimensional(Line[CartesianPoint3Dimensional, Vector3Dimensional]):
     """
 
 
-@dataclass(eq=False)
-class LineSegment3Dimensional:
+@dataclass(eq=False, kw_only=True)
+class LineSegment3Dimensional(
+    LineSegment[CartesianPoint3Dimensional, Line3Dimensional]
+):
     """
-    A straight line in 3D space between two points.
+    The part of a straight line in 3D space between two points.
     """
 
     start: CartesianPoint3Dimensional

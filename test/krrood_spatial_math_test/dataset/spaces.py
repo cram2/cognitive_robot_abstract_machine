@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing_extensions import Self
 
 from krrood.patterns.interface import Interface
-from krrood_spatial_math.line import Line
+from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.point import Point, PointT
 from krrood_spatial_math.vector import Vector, VectorT
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
@@ -172,6 +172,28 @@ class StoredScalablePlaneLine(
 ):
     """
     A line on a scalable plane that stores its point and direction as given.
+    """
+
+
+# %% segments that store their ends
+
+
+@dataclass(kw_only=True)
+class StoredScalablePlaneLineSegment(
+    LineSegment[StoredScalablePlanePoint, StoredScalablePlaneLine]
+):
+    """
+    A segment on a scalable plane that stores its ends as given.
+    """
+
+    start: StoredScalablePlanePoint
+    """
+    The point the segment runs from.
+    """
+
+    end: StoredScalablePlanePoint
+    """
+    The point the segment runs to.
     """
 
 
