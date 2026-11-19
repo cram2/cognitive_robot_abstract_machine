@@ -398,16 +398,24 @@ class EvaluationContext:
             _evaluation_context_var.reset(context_token)
 
     @classmethod
-    def current_value_of_term(cls, *, term: GroundTerm) -> TermValue | None:
+    def current_term_reader(cls) -> TermReader:
         """
-        :param term: The ground term to read.
-        :return: The value of *term* as the current evaluation context's
-            :attr:`term_reader` reads it, or its live value outside an evaluation.
+        :return: The current evaluation context's :attr:`term_reader`, or a
+            :class:`~krrood.entity_query_language.ground_term.LiveTermReader` outside an
+            evaluation.
         """
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
-            return term.live_term_value()
-        return evaluation_context.term_reader.value_of_term(term=term)
+            return LiveTermReader()
+        return evaluation_context.term_reader
+
+    @classmethod
+    def current_value_of_term(cls, *, term: GroundTerm) -> TermValue | None:
+        """
+        :param term: The ground term to read.
+        :return: The value of *term* as :meth:`current_term_reader` reads it.
+        """
+        return cls.current_term_reader().value_of_term(term=term)
 
     @classmethod
     def iterate_reading_from(

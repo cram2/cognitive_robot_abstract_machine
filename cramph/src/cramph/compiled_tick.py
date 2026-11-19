@@ -13,7 +13,7 @@ from typing_extensions import (
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import VariableParameters
 from cramph.data_types import (
-    LifeCycleValues,
+    LifeCycleValue,
     LifeCyclePredicate,
 )
 from cramph.exceptions import (
@@ -60,7 +60,7 @@ class PassInputKind(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PassInput:
     """
     One value per node of a statechart that a pass reads, together with the
@@ -78,7 +78,7 @@ class PassInput:
     """
 
     @classmethod
-    def create(cls, kind: PassInputKind, nodes: list[StatechartNode]) -> Self:
+    def create(cls, *, kind: PassInputKind, nodes: list[StatechartNode]) -> Self:
         """
         :param kind: What the values stand for.
         :param nodes: The nodes to hold a value for, in node order.
@@ -93,7 +93,7 @@ class PassInput:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LifeCycleChange:
     """
     One node changing its life cycle state during a pass.
@@ -104,12 +104,12 @@ class LifeCycleChange:
     The node whose life cycle state changed.
     """
 
-    previous_state: LifeCycleValues
+    previous_state: LifeCycleValue
     """
     The life cycle state before the change.
     """
 
-    new_state: LifeCycleValues
+    new_state: LifeCycleValue
     """
     The life cycle state after the change.
     """
@@ -123,25 +123,25 @@ class LifeCycleChange:
         nothing.
         """
         match (self.previous_state, self.new_state):
-            case (_, LifeCycleValues.NOT_STARTED):
+            case (_, LifeCycleValue.NOT_STARTED):
                 self.node.on_reset()
-            case (LifeCycleValues.NOT_STARTED, LifeCycleValues.RUNNING):
+            case (LifeCycleValue.NOT_STARTED, LifeCycleValue.RUNNING):
                 self.node.on_start()
-            case (LifeCycleValues.NOT_STARTED, LifeCycleValues.PAUSED):
+            case (LifeCycleValue.NOT_STARTED, LifeCycleValue.PAUSED):
                 self.node.on_start()
                 self.node.on_pause()
-            case (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED):
+            case (LifeCycleValue.RUNNING, LifeCycleValue.PAUSED):
                 self.node.on_pause()
-            case (LifeCycleValues.PAUSED, LifeCycleValues.RUNNING):
+            case (LifeCycleValue.PAUSED, LifeCycleValue.RUNNING):
                 self.node.on_unpause()
             case (
-                (LifeCycleValues.RUNNING | LifeCycleValues.PAUSED),
+                (LifeCycleValue.RUNNING | LifeCycleValue.PAUSED),
                 _,
             ) if self.new_state.is_terminal:
                 self.node.on_end()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CompiledTick:
     """
     Brings every node of a statechart to the state it reaches in one tick.
@@ -243,16 +243,16 @@ class CompiledTick:
             + self.statechart.passes_per_nesting_level * deepest_nesting
         )
         self._life_cycle_at_cycle_start = PassInput.create(
-            PassInputKind.LIFE_CYCLE_AT_CYCLE_START, self._nodes
+            kind=PassInputKind.LIFE_CYCLE_AT_CYCLE_START, nodes=self._nodes
         )
         self._tick_observation = PassInput.create(
-            PassInputKind.TICK_OBSERVATION, self._nodes
+            kind=PassInputKind.TICK_OBSERVATION, nodes=self._nodes
         )
         self._has_tick_observation = PassInput.create(
-            PassInputKind.HAS_TICK_OBSERVATION, self._nodes
+            kind=PassInputKind.HAS_TICK_OBSERVATION, nodes=self._nodes
         )
         self._own_transition_taken = PassInput.create(
-            PassInputKind.OWN_TRANSITION_TAKEN, self._nodes
+            kind=PassInputKind.OWN_TRANSITION_TAKEN, nodes=self._nodes
         )
         self._compile_pass()
 
@@ -313,17 +313,17 @@ class CompiledTick:
             order.
         """
         observations = [
-            self._create_observation(node, index)
+            self._create_observation(node=node, index=index)
             for index, node in enumerate(self._nodes)
         ]
         last_observations = [
             sm.if_else(
                 condition=sm.logic_or(
                     node.life_cycle_predicate_expression(
-                        LifeCyclePredicate.IS_TERMINATED
+                        predicate=LifeCyclePredicate.IS_TERMINATED
                     ),
                     LifeCyclePredicate.IS_TERMINATED.expression(
-                        self._life_cycle_at_cycle_start.variables[index]
+                        life_cycle=self._life_cycle_at_cycle_start.variables[index]
                     ),
                 ),
                 if_result=node.last_observation,
@@ -333,7 +333,7 @@ class CompiledTick:
         ]
         next_life_cycles, forced_life_cycles = self._create_next_life_cycles()
         life_cycles = self._read_this_pass_observations(
-            sm.Vector(next_life_cycles + forced_life_cycles),
+            life_cycles=sm.Vector(next_life_cycles + forced_life_cycles),
             observations=observations,
             last_observations=last_observations,
         )
@@ -351,7 +351,7 @@ class CompiledTick:
             observations + last_observations + next_life_cycles + own_transitions_taken
         )
 
-    def _create_observation(self, node: StatechartNode, index: int) -> sm.Scalar:
+    def _create_observation(self, *, node: StatechartNode, index: int) -> sm.Scalar:
         """
         :param node: The node to build the observation for.
         :param index: The index of `node`.
@@ -361,19 +361,23 @@ class CompiledTick:
             condition=self._has_tick_observation.variables[index],
             if_result=self._tick_observation.variables[index],
             else_result=DerivedConditionVariable.substitute_in(
-                node._observation_expression
+                expression=node._observation_expression
             ),
         )
         life_cycle_at_cycle_start = self._life_cycle_at_cycle_start.variables[index]
         ran_at_cycle_start = LifeCyclePredicate.IS_RUNNING.expression(
-            life_cycle_at_cycle_start
+            life_cycle=life_cycle_at_cycle_start
         )
         paused_at_cycle_start = LifeCyclePredicate.IS_PAUSED.expression(
-            life_cycle_at_cycle_start
+            life_cycle=life_cycle_at_cycle_start
         )
         still_running_or_paused = sm.logic_or(
-            node.life_cycle_predicate_expression(LifeCyclePredicate.IS_RUNNING),
-            node.life_cycle_predicate_expression(LifeCyclePredicate.IS_PAUSED),
+            node.life_cycle_predicate_expression(
+                predicate=LifeCyclePredicate.IS_RUNNING
+            ),
+            node.life_cycle_predicate_expression(
+                predicate=LifeCyclePredicate.IS_PAUSED
+            ),
         )
         return sm.if_cases(
             cases=[
@@ -412,7 +416,7 @@ class CompiledTick:
             life_cycles = sm.Vector(
                 [
                     self._create_next_life_cycle(
-                        node,
+                        node=node,
                         own_transitions_allowed=sm.logic_not(
                             self._own_transition_taken.variables[node.index]
                         ),
@@ -430,7 +434,7 @@ class CompiledTick:
 
     @staticmethod
     def _create_next_life_cycle(
-        node: StatechartNode, own_transitions_allowed: sm.Scalar
+        *, node: StatechartNode, own_transitions_allowed: sm.Scalar
     ) -> sm.Scalar:
         """
         :param node: The node to build the life cycle state for.
@@ -441,13 +445,14 @@ class CompiledTick:
         return sm.if_eq_cases(
             a=node.life_cycle_variable,
             b_result_cases=node.create_lifecycle_transitions(
-                own_transitions_allowed
+                own_transitions_allowed=own_transitions_allowed
             ).as_cases(),
             else_result=node.life_cycle_variable,
         )
 
     def _read_this_pass_observations(
         self,
+        *,
         life_cycles: sm.Vector,
         observations: list[sm.Scalar],
         last_observations: list[sm.Scalar],
@@ -459,7 +464,7 @@ class CompiledTick:
         :return: `life_cycles` with every predicate replaced by what it reads, and every
             observation read in the state this pass computes.
         """
-        life_cycles = DerivedConditionVariable.substitute_in(life_cycles)
+        life_cycles = DerivedConditionVariable.substitute_in(expression=life_cycles)
         return life_cycles.substitute(
             old_variables=[node.observation_variable for node in self._nodes]
             + [node.last_observation for node in self._nodes],
@@ -468,21 +473,28 @@ class CompiledTick:
 
     def settle(self) -> list[LifeCycleChange]:
         """
-        Runs passes until neither a life cycle state nor an observation changes, writing
-        the result of every pass into the statechart.
+        Puts every node a reset was requested for back to not started, see
+        :meth:`~cramph.statechart.Statechart.request_reset`, then runs passes until
+        neither a life cycle state nor an observation changes, writing the result of
+        every pass into the statechart.
+
+        A node reset this way counts as having taken its own transition, so it starts on
+        the next tick at the earliest.
 
         :return: Every life cycle change, in the order it happened.
         :raises TickDoesNotSettleError: If a pass returns the statechart
             to a state it already had in this tick, which it would then never
             leave, or if more passes than :attr:`_pass_budget` change it.
         """
+        nodes_to_reset = self.statechart.take_requested_resets()
+        changes = self._reset_nodes(nodes=nodes_to_reset)
         np.copyto(
             self._life_cycle_at_cycle_start.data,
             self.statechart.life_cycle_state.data,
         )
         self._own_transition_taken.data.fill(0)
+        self._own_transition_taken.data[[node.index for node in nodes_to_reset]] = 1
         self._collect_tick_observations()
-        changes: list[LifeCycleChange] = []
         visited_states = set()
         self._compiled_pass.evaluate()
         for passes_taken in range(self._pass_budget):
@@ -490,13 +502,34 @@ class CompiledTick:
                 return changes
             visited_states.add(self._current_state())
             if self._state_after_latest_pass() in visited_states:
-                self._raise_does_not_settle(passes_taken + 1)
+                self._raise_does_not_settle(passes_taken=passes_taken + 1)
             changes.extend(self._life_cycle_changes_of_latest_pass())
             self._take_over_latest_pass()
             self._compiled_pass.evaluate()
-        self._raise_does_not_settle(self._pass_budget)
+        self._raise_does_not_settle(passes_taken=self._pass_budget)
 
-    def _raise_does_not_settle(self, passes_taken: int) -> None:
+    def _reset_nodes(self, *, nodes: list[StatechartNode]) -> list[LifeCycleChange]:
+        """
+        Writes not started as the life cycle state of `nodes`.
+
+        :param nodes: The nodes to reset.
+        :return: The change of every node of `nodes` that had started.
+        """
+        life_cycle_state = self.statechart.life_cycle_state
+        changes = [
+            LifeCycleChange(
+                node=node,
+                previous_state=life_cycle_state[node],
+                new_state=LifeCycleValue.NOT_STARTED,
+            )
+            for node in nodes
+            if life_cycle_state[node] != LifeCycleValue.NOT_STARTED
+        ]
+        for node in nodes:
+            life_cycle_state[node] = LifeCycleValue.NOT_STARTED
+        return changes
+
+    def _raise_does_not_settle(self, *, passes_taken: int) -> None:
         """
         :param passes_taken: The passes that changed the statechart so far.
         :raises TickDoesNotSettleError: Always, naming the nodes the latest pass
@@ -586,7 +619,7 @@ class CompiledTick:
         """
         self._has_tick_observation.data.fill(0)
         running_indices = np.flatnonzero(
-            self._life_cycle_at_cycle_start.data == float(LifeCycleValues.RUNNING)
+            self._life_cycle_at_cycle_start.data == float(LifeCycleValue.RUNNING)
         )
         for index in running_indices:
             tick_observation = self._nodes[index].on_tick()
@@ -603,8 +636,8 @@ class CompiledTick:
         return [
             LifeCycleChange(
                 node=self._nodes[index],
-                previous_state=LifeCycleValues(int(life_cycle[index])),
-                new_state=LifeCycleValues(int(self._next_life_cycle[index])),
+                previous_state=LifeCycleValue(int(life_cycle[index])),
+                new_state=LifeCycleValue(int(self._next_life_cycle[index])),
             )
             for index in np.flatnonzero(self._next_life_cycle != life_cycle)
         ]

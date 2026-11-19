@@ -1,3 +1,8 @@
+"""
+Motion statechart tasks that keep a robot clear of collisions with itself and its
+environment, and the nodes that update the collision rules they follow.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field, dataclass
@@ -8,10 +13,10 @@ from itertools import combinations
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
@@ -93,7 +98,7 @@ class _CollisionAvoidanceTask(ABC, Task):
         return super().required_context_extensions + (MotionControlContext,)
 
     @staticmethod
-    def _weight_while_close(contact_normal: Vector3) -> Scalar:
+    def _weight_while_close(*, contact_normal: Vector3) -> Scalar:
         """
         :param contact_normal: The contact normal of one avoided collision, zero while no
             collision data was computed for it.
@@ -162,7 +167,7 @@ class _CancelBecauseCollisionViolated(CancelStatechart):
             violated_collisions=[
                 violation
                 for task in self.tasks
-                if task.observation_state == ObservationStateValues.FALSE
+                if task.observation_state == ObservationStateValue.FALSE
                 for violation in task.collision_variable_manager.violated_collisions(
                     task.avoided_contacts
                 )
@@ -216,8 +221,8 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         reads from then on.
         """
         self.collision_variable_manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_external_collision_manager(self.context)
+            extension_type=MotionControlContext
+        ).get_or_create_external_collision_manager(context=self.context)
         self.avoided_contacts = []
         for group in self._groups_avoiding_external_collisions():
             self.collision_variable_manager.register_group_of_body(group.root)
@@ -259,7 +264,9 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
-                quadratic_weight=self._weight_while_close(root_V_contact_normal),
+                quadratic_weight=self._weight_while_close(
+                    contact_normal=root_V_contact_normal
+                ),
                 # the position distance is not accurate, but the derivative is still correct
                 task_expression=root_V_contact_normal @ root_V_point_on_group,
             )
@@ -330,10 +337,10 @@ class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(task)
+        self._add_child_to_statechart(node=task)
         if self.cancel_if_collision_violated:
             self._add_child_to_statechart(
-                _CancelBecauseExternalCollisionViolated(
+                node=_CancelBecauseExternalCollisionViolated(
                     tasks=[task],
                     name="External Collision Violated",
                 )
@@ -357,7 +364,7 @@ class UpdateTemporaryCollisionRules(EndedByOwner, MotionStatechartNode):
 
     @classmethod
     def for_end_effector(
-        cls, end_effector: EndEffector
+        cls, *, end_effector: EndEffector
     ) -> UpdateTemporaryCollisionRules:
         """
         :param end_effector: The end effector that may touch its surroundings.
@@ -484,8 +491,8 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
         :attr:`context`, which this node reads from then on.
         """
         self.collision_variable_manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_self_collision_manager(self.context)
+            extension_type=MotionControlContext
+        ).get_or_create_self_collision_manager(context=self.context)
         collision_matrix = self.create_self_collision_matrix()
         kinematic_structure_entities = self.robot.kinematic_structure_entities
         self.checked_combinations = []
@@ -547,7 +554,9 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
-                quadratic_weight=self._weight_while_close(group_b_V_contact_normal),
+                quadratic_weight=self._weight_while_close(
+                    contact_normal=group_b_V_contact_normal
+                ),
                 task_expression=group_b_V_contact_normal
                 @ group_b_V_point_on_b_to_point_on_a,
             )
@@ -618,10 +627,10 @@ class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(task)
+        self._add_child_to_statechart(node=task)
         if self.cancel_if_collision_violated:
             self._add_child_to_statechart(
-                _CancelBecauseSelfCollisionViolated(
+                node=_CancelBecauseSelfCollisionViolated(
                     name="self collision violated", tasks=[task]
                 )
             )

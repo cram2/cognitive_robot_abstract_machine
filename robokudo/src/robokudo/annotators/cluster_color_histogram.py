@@ -27,7 +27,7 @@ from timeit import default_timer
 
 import cv2
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING

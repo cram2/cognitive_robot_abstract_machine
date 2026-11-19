@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator

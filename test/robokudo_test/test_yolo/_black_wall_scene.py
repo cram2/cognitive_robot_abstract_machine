@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 

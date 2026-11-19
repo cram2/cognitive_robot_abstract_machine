@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 

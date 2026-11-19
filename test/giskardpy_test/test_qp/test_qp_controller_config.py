@@ -165,14 +165,14 @@ def _peak_acceleration_of_a_joint_goal(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        JointPositionList(goal_state=JointState.from_mapping({connection: 1.5}))
+        node=JointPositionList(goal_state=JointState.from_mapping({connection: 1.5}))
     )
     executor.compile(statechart=statechart)
     accelerations = []
     for _ in range(int(3 * config.target_frequency)):
         executor.tick()
         accelerations.append(world.state[connection.dof.id].acceleration)
-    MotionControl.set_velocity_acceleration_jerk_to_zero(world)
+    MotionControl.set_velocity_acceleration_jerk_to_zero(world=world)
     return float(np.max(np.abs(accelerations)))
 
 

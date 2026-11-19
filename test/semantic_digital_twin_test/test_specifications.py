@@ -1,3 +1,8 @@
+"""
+Tests of spawning bodies, regions and connections into a world from their
+specifications.
+"""
+
 import copy
 from dataclasses import dataclass
 import inspect
@@ -9,7 +14,7 @@ import numpy as np
 import pytest
 from typing_extensions import Self
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.connections import (
@@ -41,7 +46,6 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 )
 from semantic_digital_twin.world_source import WorldSource
 from krrood.ormatic.data_access_objects.helper import to_dao
-import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao looks up
 
 from .test_adapters.test_mjcf import VISUAL_ONLY_GEOM_SCENE
 from .test_adapters.test_urdf import VISUAL_ONLY_LINK_URDF

@@ -12,7 +12,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import Scalar
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoundCap(ABC):
     """
     Limits the bound of an equality constraint to the largest change that may be
@@ -21,7 +21,7 @@ class BoundCap(ABC):
     """
 
     @abstractmethod
-    def kept_fraction(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+    def kept_fraction(self, *, bound: Scalar, reachable_change: Scalar) -> Scalar:
         """
         :param bound: The bound of one constraint.
         :param reachable_change: The largest change of the constraint's expression that
@@ -30,29 +30,31 @@ class BoundCap(ABC):
             within reach.
         """
 
-    def cap_bound(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+    def cap_bound(self, *, bound: Scalar, reachable_change: Scalar) -> Scalar:
         """
         :param bound: The bound of one constraint.
         :param reachable_change: The largest change of the constraint's expression that
             may be demanded within the control horizon.
         :return: The bound, limited to the reachable change.
         """
-        return bound * self.kept_fraction(bound, reachable_change)
+        return bound * self.kept_fraction(
+            bound=bound, reachable_change=reachable_change
+        )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScalarBoundCap(BoundCap):
     """
     Caps a bound on its own, independently of any other constraint.
     """
 
-    def kept_fraction(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+    def kept_fraction(self, *, bound: Scalar, reachable_change: Scalar) -> Scalar:
         return sm.min(
             1, sm.Scalar(reachable_change).safe_division(other=sm.abs(bound), if_nan=1)
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VectorBoundCap(BoundCap):
     """
     Caps the bounds of the constraints that together describe one vector, such as the
@@ -66,13 +68,13 @@ class VectorBoundCap(BoundCap):
     The bounds of all constraints that make up the vector.
     """
 
-    def kept_fraction(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+    def kept_fraction(self, *, bound: Scalar, reachable_change: Scalar) -> Scalar:
         return sm.min(
             1, reachable_change.safe_division(other=self.vector_bounds.norm(), if_nan=1)
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RotationBoundCap(BoundCap):
     """
     Caps the three constraints of a rotation goal by the rotation angle, so the angle
@@ -84,7 +86,7 @@ class RotationBoundCap(BoundCap):
     The bounds of the three constraints, the vector part of the quaternion error.
     """
 
-    def kept_fraction(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+    def kept_fraction(self, *, bound: Scalar, reachable_change: Scalar) -> Scalar:
         sine_of_half_angle = self.quaternion_error_bounds.norm()
         cosine_of_half_angle = sm.max(0, 1 - sine_of_half_angle**2) ** 0.5
         angle = 2 * sm.atan2(sine_of_half_angle, cosine_of_half_angle)

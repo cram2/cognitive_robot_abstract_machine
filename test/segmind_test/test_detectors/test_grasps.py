@@ -131,7 +131,9 @@ def _executor_for(
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
-    executor.compile(DetectorStatechartBuilder(detectors).build(executor.context))
+    executor.compile(
+        statechart=DetectorStatechartBuilder(detectors).build(executor.context)
+    )
     return executor
 
 
@@ -148,7 +150,7 @@ def _events_of(
     events = [
         event
         for event in executor.context.require_extension(
-            SegmindContext
+            extension_type=SegmindContext
         ).logger.get_events()
         if type(event) is event_type and event.tracked_object is body
     ]
@@ -217,7 +219,9 @@ def test_a_grasp_is_read_from_the_contacts_found_with_the_hand(pr2_world_copy):
     gripper = _left_gripper(pr2_world_copy)
     box = _box_at(pr2_world_copy, (CARRIED_AWAY, CARRIED_AWAY, CARRIED_AWAY))
     executor = _executor_for(pr2_world_copy, [GraspDetector(tracked_object=box)])
-    executor.context.require_extension(SegmindContext).latest_contact_bodies[box] = {
+    executor.context.require_extension(
+        extension_type=SegmindContext
+    ).latest_contact_bodies[box] = {
         gripper.thumb.tip,
         gripper.finger.tip,
     }
@@ -239,9 +243,9 @@ def test_a_hand_touching_a_body_is_recorded_as_touching_it(pr2_world_copy):
 
     executor.tick()
 
-    touching = executor.context.require_extension(SegmindContext).latest_contact_bodies[
-        box
-    ]
+    touching = executor.context.require_extension(
+        extension_type=SegmindContext
+    ).latest_contact_bodies[box]
     assert touching & set(gripper.thumb.bodies) and touching & set(
         gripper.finger.bodies
     )

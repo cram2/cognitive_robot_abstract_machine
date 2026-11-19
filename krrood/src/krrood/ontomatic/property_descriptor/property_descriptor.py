@@ -18,7 +18,7 @@ from krrood.ontomatic.property_descriptor.monitored_container import (
 from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
     PropertyDescriptorRelation,
 )
-from krrood.ontomatic.failures import UnMonitoredContainerTypeForDescriptor
+from krrood.ontomatic.exceptions import UnMonitoredContainerTypeForDescriptor
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,
     Association,

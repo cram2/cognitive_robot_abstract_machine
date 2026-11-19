@@ -43,13 +43,13 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.variable import Integer
 
-from krrood.class_diagrams.causal_relation import (
+from krrood.parametrization.causal_relation import (
     AttributeEndpoint,
     CausalRelation,
     CausalRelationsOfClass,
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.exceptions import (
     EffectNotIdentified,
     NoCauseVariablesForRanking,

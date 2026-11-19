@@ -25,7 +25,7 @@ from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter

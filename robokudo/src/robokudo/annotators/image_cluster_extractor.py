@@ -11,7 +11,7 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Color

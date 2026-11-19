@@ -24,7 +24,7 @@ from ..conftest import _make_prismatic_world, _symmetric_prismatic_limits
 # %% helpers
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class FarAwayFloor(Task):
     """
     Keeps a joint above a floor so far below it that the floor never comes into reach.
@@ -60,7 +60,7 @@ class FarAwayFloor(Task):
         return artifacts
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Ceiling(Task):
     """
     Keeps a joint below a ceiling, as a constraint that outweighs a goal.
@@ -120,10 +120,10 @@ def control_cycles_to_reach_joint_goal(world: World, with_floor: bool) -> int:
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping({connection: 0.9})
     )
-    motion_statechart.add_node(joint_goal)
+    motion_statechart.add_node(node=joint_goal)
     if with_floor:
-        motion_statechart.add_node(FarAwayFloor(degree_of_freedom=connection.dof))
-    motion_statechart.add_node(EndMotion.when_true(joint_goal))
+        motion_statechart.add_node(node=FarAwayFloor(degree_of_freedom=connection.dof))
+    motion_statechart.add_node(node=EndMotion.when_true(node=joint_goal))
 
     executor.compile(statechart=motion_statechart)
     executor.tick_until_end()
@@ -168,7 +168,7 @@ def cruise_speed_of_a_far_joint_goal(
     )
     motion_statechart = Statechart(context=executor.context)
     motion_statechart.add_node(
-        JointPositionList(
+        node=JointPositionList(
             goal_state=JointState.from_mapping({connection: 500.0}),
             cruise_velocity=cruise_velocity,
         )
@@ -247,7 +247,7 @@ def penetration_into_ceiling(
     motion_statechart = Statechart(context=executor.context)
     ceiling_position = 0.3
     motion_statechart.add_node(
-        JointPositionList(
+        node=JointPositionList(
             goal_state=JointState.from_mapping(
                 {connection: ceiling_position + goal_above_ceiling}
             ),
@@ -255,7 +255,7 @@ def penetration_into_ceiling(
         )
     )
     motion_statechart.add_node(
-        Ceiling(
+        node=Ceiling(
             degree_of_freedom=connection.dof,
             ceiling_position=ceiling_position,
             cruise_velocity=ceiling_cruise_velocity,

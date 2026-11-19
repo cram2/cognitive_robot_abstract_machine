@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 

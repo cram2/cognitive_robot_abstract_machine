@@ -7,7 +7,7 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from typing_extensions import Any
 
 from robokudo.annotators.collection_reader import (

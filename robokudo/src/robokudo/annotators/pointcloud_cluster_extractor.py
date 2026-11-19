@@ -24,7 +24,7 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from scipy.spatial.transform import Rotation as R

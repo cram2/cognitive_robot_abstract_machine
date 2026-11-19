@@ -1,9 +1,13 @@
+"""
+The Universal Robots UR10e arm.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from typing_extensions import Generic
 
 from semantic_digital_twin.robots.robot_part_mixins import TGenericEndEffector

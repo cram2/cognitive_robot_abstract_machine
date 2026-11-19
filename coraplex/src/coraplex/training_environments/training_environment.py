@@ -1,3 +1,7 @@
+"""
+Environments that generate the data an action's parametrization is learned from.
+"""
+
 import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
@@ -5,7 +9,7 @@ from pathlib import Path
 from typing_extensions import Any, Generic, TypeVar
 
 from krrood.adapters.json_serializer import from_json
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import DictRegistry
@@ -151,9 +155,9 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
 
         executor = episode.executor
         statechart = Statechart(context=executor.context)
-        statechart.add_node(episode.action)
+        statechart.add_node(node=episode.action)
         try:
-            executor.compile(statechart)
+            executor.compile(statechart=statechart)
             executor.execute()
         except EmptyUnderspecified:
             # No working solution found in this episode
@@ -196,7 +200,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             localization_body = Body(name=PrefixedName("odom_combined"))
 
             map_C_localization = Connection6DoF.create_with_dofs(
-                world_with_urdf, map, localization_body
+                world=world_with_urdf, parent=map, child=localization_body
             )
             world_with_urdf.add_connection(map_C_localization)
 
@@ -206,7 +210,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
                 world=world_with_urdf,
             )
             world_with_urdf.add_connection(c_root_bf)
-            c_root_bf.has_hardware_interface = True
+            world_with_urdf.set_dofs_has_hardware_interface(c_root_bf.active_dofs, True)
 
         return world_with_urdf
 
@@ -241,10 +245,10 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             query_backend = self.setup_backend(move_to_reach)
 
         executor = KinematicallySimulatedPlanExecutor(
-            StatechartContext.with_extensions(
-                world,
-                [
-                    RobotAccess(robot),
+            context=StatechartContext.with_extensions(
+                world=world,
+                extensions=[
+                    RobotAccess(robot=robot),
                     StatementGrounding(query_backend=query_backend),
                 ],
             ),

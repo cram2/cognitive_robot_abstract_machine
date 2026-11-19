@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import faiss
 import numpy as np
 import torch
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 from typing_extensions import TYPE_CHECKING

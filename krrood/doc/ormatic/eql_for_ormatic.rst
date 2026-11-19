@@ -59,7 +59,7 @@ Notes on the EQL translator:
 - ``exists(x, condition)`` becomes ``EXISTS (SELECT 1 FROM <DAO of x's type> WHERE <condition>)``. The subquery is
   correlated with the outer query only through the condition's own comparisons with outer columns (foreign key to
   primary key). Membership of ``x`` in an outer variable's collection is not translated, so an ``exists`` over
-  ``flat_variable(outer.collection)`` is not correlated with ``outer`` in SQL and does not match the in-memory
+  ``variable_from(outer.collection)`` is not correlated with ``outer`` in SQL and does not match the in-memory
   evaluation, which evaluates it per binding of ``outer``.
 - ``for_all`` is not translated; it raises :py:class:`~krrood.ormatic.eql_interface.UnsupportedQueryTypeError`.
 - EQL translation is not complete; feel free to extend it.

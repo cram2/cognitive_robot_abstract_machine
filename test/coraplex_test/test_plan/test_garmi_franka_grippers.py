@@ -42,7 +42,9 @@ def real_garmi_executor(extensions: list[ContextExtension]) -> RealGarmiPlanExec
     :return: An executor sending plans to the real GARMI.
     """
     return RealGarmiPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions)
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        )
     )
 
 

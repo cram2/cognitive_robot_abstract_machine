@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 from uuid import UUID
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from typing_extensions import Any
 

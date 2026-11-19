@@ -26,9 +26,14 @@ except ImportError:
 DOOR_OBJECT_NAME = "EKET_Cabinet_with_door_brown_walnut_effect_35x35x35cm"
 DRAWERS_OBJECT_NAME = "EKET_Cabinet_with_2_drawers_white_70x35x35cm"
 
-pytestmark = pytest.mark.skipif(
-    not PXR_AVAILABLE, reason="usd-core (pxr) not installed"
-)
+pytestmark = [
+    pytest.mark.skipif(not PXR_AVAILABLE, reason="usd-core (pxr) not installed"),
+    pytest.mark.skipif(
+        os.getenv("CI") == "true",
+        reason="downloads ArtVIP objects from Hugging Face; test_build_world.py "
+        "covers loading an object without the download",
+    ),
+]
 
 
 def get_artvip_object(name: str) -> ArtVipObject | None:

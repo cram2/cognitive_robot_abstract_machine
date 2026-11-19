@@ -27,7 +27,7 @@ from datetime import timedelta
 from time import perf_counter
 from uuid import UUID
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,

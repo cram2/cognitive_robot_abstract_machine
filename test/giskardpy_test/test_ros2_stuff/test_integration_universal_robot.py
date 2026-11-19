@@ -40,7 +40,7 @@ controller_manager_services = pytest.importorskip("controller_manager_msgs.srv")
 # %% the mock robot
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockRobotDriver:
     """
     The Universal Robots driver running a UR5e on mock hardware.
@@ -174,7 +174,7 @@ def test_discovery_commands_the_joints_of_the_active_velocity_controller(
 # %% goal convergence
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControllerManagerRobotTester(GiskardTester):
     """
     A closed-loop Giskard commanding a robot through its controller manager.
@@ -201,14 +201,17 @@ def test_a_joint_goal_moves_the_mock_robot(robot: ControllerManagerRobotTester) 
 
     motion_statechart = Statechart(context=robot.api.context)
     motion_statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                {UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal}, robot.api.world
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    {UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal},
+                    robot.api.world,
+                )
             )
         )
     )
-    motion_statechart.add_node(EndMotion.when_true(joint_goal))
-    robot.api.compile(motion_statechart)
+    motion_statechart.add_node(node=EndMotion.when_true(node=joint_goal))
+    robot.api.compile(statechart=motion_statechart)
     robot.api.execute()
 
     np.testing.assert_allclose(shoulder_pan.position, shoulder_pan_goal, atol=1e-2)

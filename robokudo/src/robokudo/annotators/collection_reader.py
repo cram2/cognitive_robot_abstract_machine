@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree

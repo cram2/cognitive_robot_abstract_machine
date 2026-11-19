@@ -1,3 +1,7 @@
+"""
+The base classes of segmind's event detectors and the context extension they share.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
@@ -5,10 +9,10 @@ from dataclasses import dataclass, field
 from typing_extensions import TypeVar, Any, Sequence
 
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from krrood.entity_query_language.predicate import Triple
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
@@ -31,7 +35,7 @@ A relation whose subject and object are both bodies.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SegmindContext(ContextExtension):
     """
     Context object shared across the statechart detectors.
@@ -128,7 +132,7 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
     def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
         return super().required_context_extensions + (SegmindContext,)
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         """
         Executes one update cycle of the detector.
 
@@ -136,10 +140,12 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         computes new contact relationships, and triggers events if
         contact changes are detected.
 
-        :return: ObservationStateValues.TRUE if events were triggered,
-        otherwise ObservationStateValues.FALSE.
+        :return: ObservationStateValue.TRUE if events were triggered,
+        otherwise ObservationStateValue.FALSE.
         """
-        segmind_context_extension = self.context.require_extension(SegmindContext)
+        segmind_context_extension = self.context.require_extension(
+            extension_type=SegmindContext
+        )
 
         objects_to_check = (
             [self.tracked_object]
@@ -157,7 +163,7 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
             segmind_context_extension.logger.log_event(
                 event, segmind_context_extension.tracker_registry
             )
-        return ObservationStateValues.TRUE if events else ObservationStateValues.FALSE
+        return ObservationStateValue.TRUE if events else ObservationStateValue.FALSE
 
     @classmethod
     def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
@@ -280,7 +286,8 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         :param candidates: The bodies a tracked object may be related to; every
             collidable body of the world when not given. The bodies
             :meth:`bodies_left_out` names are left out of them.
-        :return: Dictionary mapping bodies to sets of related bodies.
+        :return: Dictionary mapping bodies to sets of related bodies; a tracked body
+            without collision geometry is related to none.
         """
 
         related_bodies: dict[Body, set[Body]] = {}
@@ -289,6 +296,8 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         left_out = self.bodies_left_out(self.context.world)
         candidates = [body for body in candidates if body not in left_out]
         for tracked_object in tracked_objects:
+            if not tracked_object.has_collision():
+                continue
             for body in candidates:
                 if body is tracked_object:
                     continue

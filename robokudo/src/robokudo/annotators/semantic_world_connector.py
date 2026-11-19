@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from rclpy.time import Time
 from scipy.optimize import linear_sum_assignment

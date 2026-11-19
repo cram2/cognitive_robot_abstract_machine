@@ -13,7 +13,7 @@ from timeit import default_timer
 import numpy as np
 import open3d
 import py_trees
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 import robokudo.annotators.core

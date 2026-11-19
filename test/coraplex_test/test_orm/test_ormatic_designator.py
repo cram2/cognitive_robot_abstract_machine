@@ -10,7 +10,6 @@ from krrood.ormatic.data_access_objects.helper import (
 )
 from sqlalchemy import select
 from krrood.ormatic.exceptions import QueryCannotBePersisted
-from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.composite.transporting import (
     MoveAndPickUpAction,
@@ -63,7 +62,7 @@ def _executed(plan: StatechartNode, extensions: list[ContextExtension]) -> None:
     Execute `plan` in simulation.
     """
     executor = simulated_executor(extensions)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
 

@@ -1,3 +1,7 @@
+"""
+Heartbeats by which Giskard tells whether the client of a goal is still there.
+"""
+
 from __future__ import annotations
 
 import json
@@ -17,12 +21,13 @@ from rclpy.timer import Timer
 
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from krrood_synchronization.messages import Sender
+from krrood.patterns.called_positionally import called_positionally
 
 # %% where heartbeats are sent and received
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HeartbeatNode:
     """
     A node that carries nothing but heartbeats and is spun by a thread of its own.
@@ -82,7 +87,7 @@ class HeartbeatNode:
 # %% the heartbeat a client sends
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientHeartbeatPublisher:
     """
     Announces that a client is still there, so that Giskard can stop a motion whose
@@ -94,7 +99,7 @@ class ClientHeartbeatPublisher:
     Node of the client that announces itself.
     """
 
-    client: MetaData
+    client: Sender
     """
     Identity of that client, the same one its goals name.
     """
@@ -146,7 +151,7 @@ class ClientHeartbeatPublisher:
         self.heartbeat_node = HeartbeatNode(owner=self.node)
         self.publisher = self.heartbeat_node.node.create_publisher(
             std_msgs.msg.String,
-            topic=self.topic_name(self.giskard_node_name),
+            topic=self.topic_name(giskard_node_name=self.giskard_node_name),
             qos_profile=10,
         )
         self.timer = self.heartbeat_node.node.create_timer(
@@ -154,7 +159,7 @@ class ClientHeartbeatPublisher:
         )
 
     @staticmethod
-    def topic_name(giskard_node_name: str) -> str:
+    def topic_name(*, giskard_node_name: str) -> str:
         """
         The topic the clients of the given Giskard announce themselves on.
         """
@@ -188,7 +193,7 @@ class ClientHeartbeatPublisher:
 # %% whether a client is still there
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HeartbeatPresence:
     """
     Reads the heartbeats of the clients and considers one gone once its heartbeats stop
@@ -220,12 +225,12 @@ class HeartbeatPresence:
     deterministically instead of sleeping in real time.
     """
 
-    watched_client: MetaData | None = field(init=False, default=None)
+    watched_client: Sender | None = field(init=False, default=None)
     """
     The client this check reports on, or ``None`` while no goal is running.
     """
 
-    last_heartbeat: dict[MetaData, float] = field(init=False, default_factory=dict)
+    last_heartbeat: dict[Sender, float] = field(init=False, default_factory=dict)
     """
     When each client announced itself last.
     """
@@ -241,7 +246,7 @@ class HeartbeatPresence:
     """
 
     @property
-    def client(self) -> MetaData:
+    def client(self) -> Sender:
         """
         The client that is being watched.
 
@@ -261,7 +266,9 @@ class HeartbeatPresence:
         self.heartbeat_node = HeartbeatNode(owner=self.node)
         self.subscription = self.heartbeat_node.node.create_subscription(
             std_msgs.msg.String,
-            topic=ClientHeartbeatPublisher.topic_name(self.node.get_name()),
+            topic=ClientHeartbeatPublisher.topic_name(
+                giskard_node_name=self.node.get_name()
+            ),
             callback=self.receive_heartbeat,
             qos_profile=10,
         )
@@ -274,6 +281,7 @@ class HeartbeatPresence:
         """
         self.heartbeat_node.stop()
 
+    @called_positionally
     def receive_heartbeat(self, message: std_msgs.msg.String) -> None:
         """
         Note that the client that sent this heartbeat is still there.
@@ -281,7 +289,7 @@ class HeartbeatPresence:
         client = from_json(json.loads(message.data))
         self.last_heartbeat[client] = self.clock()
 
-    def has_recent_heartbeat(self, client: MetaData) -> bool:
+    def has_recent_heartbeat(self, *, client: Sender) -> bool:
         """
         Whether the given client announced itself within ``timeout``.
         """
@@ -290,20 +298,25 @@ class HeartbeatPresence:
             return False
         return self.clock() - last_heartbeat <= self.timeout.total_seconds()
 
-    def start_watching(self, client: MetaData) -> bool:
-        if not self.has_recent_heartbeat(client):
+    def start_watching(self, *, client: Sender) -> bool:
+        """
+        Watch ``client`` from now on, provided it announced itself within ``timeout``.
+
+        :return: Whether ``client`` is watched now.
+        """
+        if not self.has_recent_heartbeat(client=client):
             return False
         self.watched_client = client
         return True
 
     def is_client_present(self) -> bool:
-        return self.has_recent_heartbeat(self.client)
+        return self.has_recent_heartbeat(client=self.client)
 
 
 # %% watching the client of a goal
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientWatchdog:
     """
     Watches the client of the running goal and reports when it is gone.
@@ -317,13 +330,13 @@ class ClientWatchdog:
     The check that reports on the client's continued presence.
     """
 
-    goal_client: MetaData | None = field(init=False, default=None)
+    goal_client: Sender | None = field(init=False, default=None)
     """
     The client of the running goal, or ``None`` while no goal is running.
     """
 
     @property
-    def client(self) -> MetaData:
+    def client(self) -> Sender:
         """
         The client of the running goal.
 
@@ -333,7 +346,7 @@ class ClientWatchdog:
             raise NoWatchedClientError(check_type=type(self))
         return self.presence.client
 
-    def watch(self, client: MetaData) -> None:
+    def watch(self, *, client: Sender) -> None:
         """
         Watch the client of a goal from the moment the presence check recognizes it.
 
@@ -344,7 +357,7 @@ class ClientWatchdog:
         waiting for.
         """
         self.goal_client = client
-        self.presence.start_watching(client)
+        self.presence.start_watching(client=client)
 
     def stop_watching(self) -> None:
         """
@@ -360,7 +373,7 @@ class ClientWatchdog:
         Whether the client of the running goal disconnected.
         """
         if self.presence.watched_client is None and self.goal_client is not None:
-            self.presence.start_watching(self.goal_client)
+            self.presence.start_watching(client=self.goal_client)
         if self.presence.watched_client is None:
             return False
         return not self.presence.is_client_present()

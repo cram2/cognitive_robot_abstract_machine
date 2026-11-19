@@ -1,13 +1,21 @@
+"""
+Probabilistic circuits whose nodes are grouped into layers that store their parameters
+as arrays of any Array API backend, and the queries they answer.
+"""
+
 from __future__ import annotations
+
+from types import ModuleType
 
 import copy
 from dataclasses import dataclass
 
 import numpy as np
+from array_api_compat import array_namespace, is_numpy_array
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Iterable, Self
+from typing_extensions import TYPE_CHECKING, Any, Iterable, Self
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.distributions import (
@@ -18,15 +26,27 @@ from probabilistic_model.distributions.distributions import (
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     DenseEdgeValues,
     NodeMask,
     SampleArray,
     SampleValues,
 )
+from probabilistic_model.learning.gradient_descent import (
+    AverageNegativeLogLikelihood,
+    Loss,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
+    HostOnlyQueryError,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    InnerLayer,
     Layer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
@@ -59,8 +79,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import QueryCache
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    EdgeMatrix,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -87,6 +107,9 @@ from probabilistic_model.probabilistic_model import (
     PartialPointType,
 )
 from probabilistic_model.utils import logsumexp
+
+if TYPE_CHECKING:
+    import optax
 
 
 @dataclass
@@ -211,11 +234,12 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         :param events: Events whose symbolic values are hashes of domain elements.
         :return: The events with every symbolic value replaced by the position of its
-            element in the domain, which the symbolic layers read.
+            element in the domain, which the symbolic layers read, as a numpy array.
+            Without symbolic variables, the events themselves, of their own backend.
         """
         encodings = self.symbolic_encodings
         if not encodings:
-            return np.asarray(events)
+            return events
         events = np.array(events, dtype=float)
         for column, encoding in encodings.items():
             events[:, column] = encoding.indices_of_hashes(events[:, column])
@@ -266,6 +290,107 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
                 layer.table = table_type.of(layer.table)
         return self
 
+    # %% parameters
+
+    @property
+    def parameters(self) -> list[BackendArray]:
+        """
+        :return: The parameter arrays of every layer, the layers in the order of
+            :meth:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base.Layer.all_layers`.
+        """
+        return self.root.circuit_parameters
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`parameters`, which may be traced by :func:`jax.jit`.
+        :return: A copy of this circuit with these parameter arrays, sharing its
+            structure.
+        """
+        return self.__class__(
+            self.variables, self.root.copy_with_circuit_parameters(parameters)
+        )
+
+    def to_namespace(
+        self,
+        namespace: ModuleType,
+        device: Any = None,
+        floating_point_type: Any = None,
+    ) -> Self:
+        """
+        :param namespace: The Array API namespace to store the parameters in.
+        :param device: The device of that namespace to store them on, its default if
+            ``None``.
+        :param floating_point_type: The floating point type to store them in, which
+            the numeric queries then compute in; float64 if ``None``.
+        :return: A copy of this circuit whose parameters are arrays of that namespace.
+        """
+        return self.copy_with_parameters(
+            [
+                namespace.asarray(
+                    HasParameterArrays.host_copy(parameter),
+                    dtype=(
+                        namespace.float64
+                        if floating_point_type is None
+                        else floating_point_type
+                    ),
+                    device=device,
+                )
+                for parameter in self.parameters
+            ]
+        )
+
+    def fit(
+        self,
+        *,
+        data: SampleArray,
+        epochs: int = 100,
+        optimizer: optax.GradientTransformation | None = None,
+        loss: Loss | None = None,
+    ) -> Self:
+        """
+        Minimize a loss of the circuit on the data by gradient descent with jax, in
+        place.
+
+        :param data: The data, whose symbolic values are hashes of domain elements.
+        :param epochs: The number of full batch steps.
+        :param optimizer: The optimizer, Adam with a learning rate of 1e-3 if ``None``.
+        :param loss: The loss of the circuit on the encoded data, the average negative
+            log-likelihood if ``None``.
+        :return: This circuit.
+        """
+        # jax is optional, see the core boundary in pyproject.toml
+        from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+
+        self.root = JaxGradientDescent(
+            self.root,
+            AverageNegativeLogLikelihood() if loss is None else loss,
+            optimizer,
+        ).minimize(epochs, self.encoded(data))
+        return self
+
+    def raise_if_parameters_are_not_on_host(self):
+        """
+        :raises HostOnlyQueryError: If a parameter of the circuit is not a numpy array.
+        """
+        for parameter in self.parameters:
+            if not is_numpy_array(parameter):
+                raise HostOnlyQueryError(array_namespace(parameter).__name__)
+
+    def store_edges_as(self, edge_matrix_type: type[EdgeMatrix]) -> Self:
+        """
+        Store the edges of every inner layer in a matrix of the given type, in place.
+
+        :param edge_matrix_type: The type of edge matrix, for instance
+            :class:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix.DenseEdgeMatrix`
+            for layers whose nodes are connected to most child nodes.
+        :return: This circuit.
+        """
+        for layer in self.layers:
+            if isinstance(layer, InnerLayer):
+                layer.store_edges_as(edge_matrix_type)
+        return self
+
     # %% queries
 
     def log_likelihood(self, events: SampleArray) -> SampleValues:
@@ -281,15 +406,18 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     @property
     def support(self) -> Event:
+        self.raise_if_parameters_are_not_on_host()
         return self.root.support_of_nodes(self.variables)[0]
 
     def log_mode(self, check_determinism: bool = True) -> LogMode:
+        self.raise_if_parameters_are_not_on_host()
         if check_determinism and not self.is_deterministic():
             raise IntractableError(self)
         modes, values = self.root.log_mode_of_nodes(self.variables)
         return LogMode(modes[0], float(values[0]))
 
     def sample(self, amount: int) -> SampleArray:
+        self.raise_if_parameters_are_not_on_host()
         order = self.root.all_layers()
         assignment = ForwardSampleAssignment.for_layers(order)
 
@@ -317,6 +445,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :return: Whether every sum node of this circuit has children with pairwise
             disjoint supports.
         """
+        self.raise_if_parameters_are_not_on_host()
         return self.root.is_deterministic(self.variables)
 
     def is_decomposable(self) -> bool:
@@ -348,6 +477,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param singleton_allowed: Whether singletons are allowed in the event.
         :return: This circuit and the log-probability of the event.
         """
+        self.raise_if_parameters_are_not_on_host()
         if event.is_empty():
             return LogTruncation.impossible()
 
@@ -473,16 +603,14 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         # mix the copy of the root that belongs to each event by the probability of that
         # event, which turns the replicated root into the single root of the result
         number_of_copies = len(node_log_probabilities)
-        mixture = SumLayer(
+        mixture = SumLayer.from_entries(
             [replicated.layer],
-            RowGroupedSparseArray.from_entries(
-                SparseEntries(
-                    node_log_probabilities,
-                    np.zeros(number_of_copies, dtype=np.int64),
-                    np.arange(number_of_copies),
-                ),
-                (1, number_of_copies),
+            SparseEntries(
+                node_log_probabilities,
+                np.zeros(number_of_copies, dtype=np.int64),
+                np.arange(number_of_copies),
             ),
+            1,
         )
         query.log_probabilities.record(
             LayerWithLogProbabilities(mixture, np.array([total_log_probability]))
@@ -529,6 +657,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param point: The partial point.
         :return: This circuit and the log-density at the point.
         """
+        self.raise_if_parameters_are_not_on_host()
         query = StructuralQuery(self.variables)
         conditioned = self.root.log_conditional_of_point(
             self.encoded_point(point), query, cache=QueryCache()
@@ -635,6 +764,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param variables: The variables to keep.
         :return: This circuit, or ``None`` if it models none of the variables.
         """
+        self.raise_if_parameters_are_not_on_host()
         requested = set(variables)
         kept_variables = SortedSet(
             variable for variable in self.variables if variable in requested
@@ -664,6 +794,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
         :return: This circuit.
         """
+        self.raise_if_parameters_are_not_on_host()
         self.root = self.root.simplify()
         return self
 

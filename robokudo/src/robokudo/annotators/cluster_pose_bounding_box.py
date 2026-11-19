@@ -29,7 +29,7 @@ from timeit import default_timer
 import cv2
 import numpy.linalg
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 

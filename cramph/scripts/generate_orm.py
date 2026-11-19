@@ -1,9 +1,5 @@
 """
 Generate the ORM interface of the cramph package.
-
-.. warning:: Do not import giskardpy or coraplex here. Alternative mappings are collected
-    through a global subclass scan, so importing a downstream package leaks its mappings
-    into this interface.
 """
 
 import logging
@@ -16,8 +12,9 @@ import semantic_digital_twin.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.custom_types import NumpyType
 from krrood.ormatic.ormatic import ORMatic
+from cramph.visualization import RvizVisualization
 
-ignored_classes = {SubclassJSONSerializer}
+ignored_classes = {SubclassJSONSerializer, RvizVisualization}
 
 dependencies = [semantic_digital_twin.orm.ormatic_interface]
 

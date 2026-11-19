@@ -13,7 +13,7 @@ import cv2
 import numpy
 import py_trees
 import torch
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.world_description.geometry import Color
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 from typing_extensions import TYPE_CHECKING

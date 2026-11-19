@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 

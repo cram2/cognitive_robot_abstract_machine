@@ -29,7 +29,7 @@ from threading import Event
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.action import CancelResponse, GoalResponse

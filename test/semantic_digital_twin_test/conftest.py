@@ -1,17 +1,28 @@
+"""
+Fixtures shared by the semantic_digital_twin tests: worlds, a mesh and database
+sessions.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
 
 import os
 
+import numpy as np
 import pytest
 import sqlalchemy
+import trimesh
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
@@ -69,3 +80,38 @@ def table_world():
     table_path = os.path.join(urdf_dir, "table.urdf")
 
     return URDFParser.from_file(file_path=table_path).create_world()
+
+
+# %% flat meshes
+
+
+@pytest.fixture
+def millimetre_wall_strip() -> trimesh.Trimesh:
+    """
+    A flat, zero-volume quad one millimetre wide and 2.8 metres tall, as architectural
+    USD scenes contain, in which V-HACD finds no convex parts.
+    """
+    return trimesh.Trimesh(
+        vertices=np.array(
+            [
+                [0.001, 0.0, 2.8],
+                [0.0, 0.0, 2.8],
+                [0.001, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+        ),
+        faces=np.array([[2, 1, 0], [1, 2, 3]]),
+        process=False,
+    )
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load semantic_digital_twin's ORM interface, whose import registers the mappers of it
+    and the interfaces it builds on for every test.
+    """
+    import semantic_digital_twin.orm.ormatic_interface  # noqa: F401

@@ -66,47 +66,13 @@ class PiecewiseConstantCurvatureConnection(Connection):
             segment_length=data["segment_length"],
         )
 
-    def copy_for_world(self, world: World) -> Self:
-        (
-            parent,
-            child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-        return self.__class__(
-            parent=parent,
-            child=child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            kappa_dof_id=self.kappa_dof_id,
-            phi_dof_id=self.phi_dof_id,
-            segment_length=self.segment_length,
-        )
-
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            kappa_dof_id=self.kappa_dof_id,
-            phi_dof_id=self.phi_dof_id,
-            segment_length=self.segment_length,
-        )
-
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -147,11 +113,11 @@ class PiecewiseConstantCurvatureConnection(Connection):
             segment_length=segment_length,
         )
 
-    def add_to_world(self, world: World):
+    def add_to_world(self, *, world: World):
         """
         Defines the symbolic transformation matrix for the PCC segment.
         """
-        super().add_to_world(world)
+        super().add_to_world(world=world)
 
         # Access DOFs through the world using the stored UUIDs
         kappa_dof = world.get_degree_of_freedom_by_id(self.kappa_dof_id)
@@ -274,51 +240,13 @@ class CosseratRodConnection(Connection):
             segment_length=data["segment_length"],
         )
 
-    def copy_for_world(self, world: World) -> Self:
-        (
-            parent,
-            child,
-            parent_T_connection_expression,
-            connection_T_child_expression,
-        ) = self._find_references_in_world(world)
-        return self.__class__(
-            parent=parent,
-            child=child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=connection_T_child_expression,
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            bending_x_dof_id=self.bending_x_dof_id,
-            bending_y_dof_id=self.bending_y_dof_id,
-            torsion_dof_id=self.torsion_dof_id,
-            extension_dof_id=self.extension_dof_id,
-            segment_length=self.segment_length,
-        )
-
-    def copy_with_new_parent(
-        self,
-        new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
-    ) -> Self:
-        return self.__class__(
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent=new_parent,
-            child=self.child,
-            parent_T_connection_expression=parent_T_connection_expression,
-            connection_T_child_expression=self.connection_T_child_expression,
-            bending_x_dof_id=self.bending_x_dof_id,
-            bending_y_dof_id=self.bending_y_dof_id,
-            torsion_dof_id=self.torsion_dof_id,
-            extension_dof_id=self.extension_dof_id,
-            segment_length=self.segment_length,
-        )
-
     @classmethod
     def create_with_dofs(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
-        *,
         name: PrefixedName | None = None,
         parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
         connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
@@ -369,12 +297,12 @@ class CosseratRodConnection(Connection):
             segment_length=segment_length,
         )
 
-    def add_to_world(self, world: World):
+    def add_to_world(self, *, world: World):
         """
         Integrates the Cosserat differential equations along the length of the segment
         to compute the child's pose relative to the parent.
         """
-        super().add_to_world(world)
+        super().add_to_world(world=world)
 
         bending_x_dof = world.get_degree_of_freedom_by_id(self.bending_x_dof_id)
         bending_y_dof = world.get_degree_of_freedom_by_id(self.bending_y_dof_id)

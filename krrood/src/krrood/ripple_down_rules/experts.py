@@ -1,3 +1,8 @@
+"""
+The experts that answer a ripple down rules tree's questions about a case: a human, an
+AI model or an oracle.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -30,7 +35,7 @@ from krrood.ripple_down_rules.exceptions import (
 from krrood.ripple_down_rules.user_interface.template_file_creator import (
     TemplateFileCreator,
 )
-from krrood.code_generation.source_extraction_utils import (
+from krrood.source_analysis.source_extraction import (
     extract_class_source,
     extract_function_source,
 )
@@ -40,7 +45,7 @@ from krrood.ripple_down_rules.utils import (
     get_class_file_path,
     row_to_dict,
 )
-from krrood.utils import get_scope_from_imports
+from krrood.source_analysis.import_scope import get_scope_from_imports
 
 from krrood.ripple_down_rules.user_interface.prompt import UserPrompt
 

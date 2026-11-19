@@ -10,14 +10,14 @@ from dataclasses import dataclass, field, fields
 
 from typing_extensions import TYPE_CHECKING, Self
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
 )
-from krrood_spatial_math.spatial_types import Twist, Vector3
+from krrood_spatial_math.spatial_types import Displacement, Vector3
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 
 if TYPE_CHECKING:
@@ -42,13 +42,13 @@ class GraspResult:
     Whether the robot went through every step of the pick-up within its time limit.
     """
 
-    object_displacement: Twist
+    object_displacement: Displacement
     """
     How the object moved from where it rested to where it was held at the end, along
     the world's axes.
     """
 
-    slip: Twist
+    slip: Displacement
     """
     How the object moved relative to the grasp while it was lifted and held, along the
     grasp's axes.
@@ -72,16 +72,16 @@ class GraspResult:
         return a(cls)(
             object_raised=True,
             motion_completed=True,
-            object_displacement=_any_twist(),
-            slip=_any_twist(),
+            object_displacement=_any_displacement(),
+            slip=_any_displacement(),
         )
 
 
-def _any_twist() -> Match[Twist]:
+def _any_displacement() -> Match[Displacement]:
     """
-    :return: A pattern of a twist with every component left free.
+    :return: A pattern of a displacement with every component left free.
     """
-    return a(Twist)(
+    return a(Displacement)(
         translation=a(Vector3)(x=..., y=..., z=...),
         rotation_vector=a(Vector3)(x=..., y=..., z=...),
     )

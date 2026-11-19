@@ -16,14 +16,14 @@ if TYPE_CHECKING:
     from cramph.node import NodeStateVariable, StatechartNode, TransitionCondition
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartError(DataclassException, ABC):
     """
     Base class for errors in a statechart.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeInitializationError(StatechartError, ABC):
     """
     Base class for errors that a single node raises while it is set up or built.
@@ -35,7 +35,7 @@ class NodeInitializationError(StatechartError, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyStatechartError(StatechartError):
     """
     Raised when a statechart without any node is executed.
@@ -48,7 +48,7 @@ class EmptyStatechartError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeAlreadyBelongsToDifferentNodeError(NodeInitializationError):
     """
     Raised when a node that is already part of the statechart is added a second time.
@@ -70,7 +70,7 @@ class NodeAlreadyBelongsToDifferentNodeError(NodeInitializationError):
         return "Create a copy of the node or remove it from its current parent first."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EndInCompositeNodeError(NodeInitializationError):
     """
     Raised when a node that ends the statechart is added as a child of a composite
@@ -84,7 +84,7 @@ class EndInCompositeNodeError(NodeInitializationError):
         return "Use a different node type or move the EndStatechart node outside the CompositeNode."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildCannotFailError(NodeInitializationError):
     """
     Raised when a template that only moves on once a child failed is handed a child that
@@ -109,7 +109,7 @@ class ChildCannotFailError(NodeInitializationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChildTransitionAlreadyWiredError(NodeInitializationError):
     """
     Raised when a child handed to a template already has one of its life cycle
@@ -140,7 +140,7 @@ class ChildTransitionAlreadyWiredError(NodeInitializationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransitionHasNoOutcomeError(StatechartError):
     """
     Raised when the outcome of a transition that does not end a node is asked for.
@@ -161,7 +161,7 @@ class TransitionHasNoOutcomeError(StatechartError):
         return "Only ask the transitions that end a node for their outcome."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownTransitionKindError(StatechartError):
     """
     Raised when a node is asked for a transition of a kind it does not have.
@@ -179,7 +179,7 @@ class UnknownTransitionKindError(StatechartError):
         return "Pass a member of TransitionKind."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CompositeNodeWithoutChildrenError(NodeInitializationError):
     """
     Raised when a composite node that exists to hold child nodes is built without any.
@@ -192,7 +192,7 @@ class CompositeNodeWithoutChildrenError(NodeInitializationError):
         return "Pass at least one node to it, or leave it out entirely."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeNotBuiltError(NodeInitializationError):
     """
     Raised when the build artifacts of a node are read before it has been built.
@@ -205,7 +205,7 @@ class NodeNotBuiltError(NodeInitializationError):
         return "Compile the statechart before reading a node's build artifacts."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CyclicNodeDependencyError(NodeInitializationError):
     """
     Raised when nodes depend on each other in a cycle, so no build order exists.
@@ -224,7 +224,7 @@ class CyclicNodeDependencyError(NodeInitializationError):
         return "Break the cycle so the nodes can be expanded and built in some order."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TickDoesNotSettleError(StatechartError):
     """
     Raised when passes through a statechart return it to a state it already had within
@@ -260,7 +260,7 @@ class TickDoesNotSettleError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeNotFoundError(StatechartError):
     """
     Raised when a node is looked up by name and the statechart has no such node.
@@ -278,7 +278,7 @@ class NodeNotFoundError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownConditionVariableError(StatechartError):
     """
     Raised when a rendered condition names a variable that no node offers.
@@ -299,7 +299,7 @@ class UnknownConditionVariableError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedConditionSyntaxError(StatechartError):
     """
     Raised when a rendered condition contains syntax that has no meaning as a condition.
@@ -322,7 +322,7 @@ class UnsupportedConditionSyntaxError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotInStatechartError(StatechartError):
     """
     Raised when an operation that requires a surrounding statechart is performed on a
@@ -341,7 +341,7 @@ class NotInStatechartError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidConditionError(StatechartError):
     """
     Base class for errors raised when a condition is set to an unusable expression.
@@ -370,7 +370,7 @@ class InvalidConditionError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputNotExpressionError(InvalidConditionError):
     """
     Raised when a condition is set to something that is not a symbolic expression.
@@ -383,7 +383,7 @@ class InputNotExpressionError(InvalidConditionError):
         return "did you forget '.observes_true'?"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelfInStartConditionError(InvalidConditionError):
     """
     Raised when the start condition of a node references the node itself.
@@ -393,7 +393,7 @@ class SelfInStartConditionError(InvalidConditionError):
         return "Start condition cannot contain the node itself."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedConditionVariableError(InvalidConditionError):
     """
     Raised when a condition contains a variable that is not a two-valued predicate of a
@@ -417,7 +417,7 @@ class UnsupportedConditionVariableError(InvalidConditionError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConditionScopeError(InvalidConditionError):
     """
     Raised when a condition references a node from a different scope level.
@@ -432,8 +432,8 @@ class ConditionScopeError(InvalidConditionError):
     """
 
     def reason(self) -> str:
-        owner_scope = self._scope_name(self.condition.owner)
-        dependency_scope = self._scope_name(self.dependency)
+        owner_scope = self._scope_name(node=self.condition.owner)
+        dependency_scope = self._scope_name(node=self.dependency)
         return (
             f'References "{self.dependency.unique_name}" from scope "{dependency_scope}", '
             f'but the condition\'s owner lives in scope "{owner_scope}". '
@@ -444,7 +444,7 @@ class ConditionScopeError(InvalidConditionError):
         return "Reference a sibling of the owning node instead, e.g. the template node that contains the dependency."
 
     @staticmethod
-    def _scope_name(node: StatechartNode) -> str:
+    def _scope_name(*, node: StatechartNode) -> str:
         """
         Returns the name of the scope level that a node belongs to.
 
@@ -456,7 +456,7 @@ class ConditionScopeError(InvalidConditionError):
         return parent_node.unique_name
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TerminalNodeInConditionError(InvalidConditionError):
     """
     Raised when a condition references a node that ends the statechart.
@@ -480,7 +480,7 @@ class TerminalNodeInConditionError(InvalidConditionError):
         return "Reference the node that makes it true instead."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingContextExtensionError(StatechartError):
     """
     Raised when a context extension is requested that was never added to the context.
@@ -498,7 +498,7 @@ class MissingContextExtensionError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateContextExtensionError(StatechartError):
     """
     Raised when an extension is added to a context that already holds one of that type.
@@ -516,7 +516,7 @@ class DuplicateContextExtensionError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousContextExtensionError(StatechartError):
     """
     Raised when a context extension is requested by a type that several extensions of
@@ -546,7 +546,7 @@ class AmbiguousContextExtensionError(StatechartError):
         return "Request one of them by its own type, or add only one of them."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodesMissingContextExtensionsError(StatechartError):
     """
     Raised when a statechart compiles nodes that require context extensions its context
@@ -573,7 +573,7 @@ class NodesMissingContextExtensionsError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonPositiveRealTimeFactorError(StatechartError):
     """
     Raised when a simulation is configured to run at a non positive speed.
@@ -591,7 +591,7 @@ class NonPositiveRealTimeFactorError(StatechartError):
         return "Use a positive factor, or NoPacing to run as fast as possible."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TickDurationUnknownError(StatechartError):
     """
     Raised when something needs to know how long a tick lasts, but the context does not
@@ -605,7 +605,7 @@ class TickDurationUnknownError(StatechartError):
         return "Pass a tick_duration to the StatechartContext."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConflictingTickDurationError(StatechartError):
     """
     Raised when a context is told a tick lasts a different time than it already knows.
@@ -631,7 +631,7 @@ class ConflictingTickDurationError(StatechartError):
         return "Configure everything that sets the tick duration with the same value."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TickLimitReachedError(StatechartError):
     """
     Raised when a statechart has not ended after the most ticks it was given.
@@ -652,7 +652,7 @@ class TickLimitReachedError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingExecutorExtensionError(StatechartError):
     """
     Raised when an executor extension is requested that the executor was not given.
@@ -670,7 +670,7 @@ class MissingExecutorExtensionError(StatechartError):
         return "Pass an instance of it in the extensions of the StatechartExecutor."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartOfDifferentContextError(StatechartError):
     """
     Raised when an executor is handed a statechart that was built in a context other
@@ -684,7 +684,7 @@ class StatechartOfDifferentContextError(StatechartError):
         return "Create the statechart with the context of the executor that runs it."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoChildChooserForNodeError(StatechartError):
     """
     Raised when a node choosing its child finds no chooser of its kind of node in its
@@ -715,7 +715,7 @@ class NoChildChooserForNodeError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SeveralChildChoosersForNodeError(StatechartError):
     """
     Raised when a node choosing its child finds more than one chooser for the most
@@ -745,7 +745,7 @@ class SeveralChildChoosersForNodeError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StatechartAlreadyCompiledError(StatechartError):
     """
     Raised when a compiled part of a statechart is changed: a node is removed, or a node
@@ -762,7 +762,7 @@ class StatechartAlreadyCompiledError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrerequisiteNotExpandedError(NodeInitializationError):
     """
     Raised when a composite node joins a statechart before a composite node it reads
@@ -786,7 +786,7 @@ class PrerequisiteNotExpandedError(NodeInitializationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeIsNotAChildError(NodeInitializationError):
     """
     Raised when a composite node is asked about a node that is not its child.
@@ -804,7 +804,7 @@ class NodeIsNotAChildError(NodeInitializationError):
         return f"Refer to one of the children of {self.node.name}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeAlreadyAChildError(NodeInitializationError):
     """
     Raised when a composite node is handed a node that is its child already.
@@ -822,7 +822,7 @@ class NodeAlreadyAChildError(NodeInitializationError):
         return "Hand the composite node a node that is not its child yet."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoControlStructureNodeAboveError(NodeInitializationError):
     """
     Raised when the closest control structure node above a node is asked for, but there
@@ -839,7 +839,7 @@ class NoControlStructureNodeAboveError(NodeInitializationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotHeldByControlStructureNodeError(NodeInitializationError):
     """
     Raised when a node is to be replaced whose parent is not a control structure node,
@@ -864,7 +864,7 @@ class NotHeldByControlStructureNodeError(NodeInitializationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RemovedNodeStillReferencedError(StatechartError):
     """
     Raised when a node is removed from a statechart while a node that stays still refers
@@ -894,7 +894,7 @@ class RemovedNodeStillReferencedError(StatechartError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeStateVariableNotSerializableError(JSONSerializationError):
     """
     Raised when a node state variable is serialized to JSON, which has no way to refer
@@ -919,7 +919,7 @@ class NodeStateVariableNotSerializableError(JSONSerializationError):
 # %% a statechart that ran but did not reach its goal
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExecutionFailure(DataclassException):
     """
     Raised when a statechart was run but did not reach its goal, as opposed to an error
@@ -935,7 +935,7 @@ class ExecutionFailure(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RepetitionsExhausted(ExecutionFailure):
     """
     Raised when a repeating node ran out of attempts.
@@ -964,7 +964,7 @@ class RepetitionsExhausted(ExecutionFailure):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CancelledByNode(ExecutionFailure, ABC):
     """
     Raised when a :class:`~cramph.node.CancelStatechart` given no exception of its own
@@ -980,7 +980,7 @@ class CancelledByNode(ExecutionFailure, ABC):
         return "Give the cancelling node an exception that says why it cancels."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CancelledByNodeReachingItsGoal(CancelledByNode):
     """
     Raised when the watched node observed True or succeeded.
@@ -990,7 +990,7 @@ class CancelledByNodeReachingItsGoal(CancelledByNode):
         return f"Cancelled because {self.node.unique_name} reached its goal."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CancelledByNodeFailing(CancelledByNode):
     """
     Raised when the watched node failed.
@@ -1000,7 +1000,7 @@ class CancelledByNodeFailing(CancelledByNode):
         return f"Cancelled because {self.node.unique_name} failed."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanCancelled(ExecutionFailure):
     """
     Raised when a monitor cancelled the part of a plan it was watching.
@@ -1024,7 +1024,7 @@ class PlanCancelled(ExecutionFailure):
 # %% visualization
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RvizUnavailableError(DataclassException):
     """
     Raised when the world is to be shown in RViz without ROS installed.

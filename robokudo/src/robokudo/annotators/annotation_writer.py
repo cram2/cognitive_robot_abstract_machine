@@ -12,7 +12,7 @@ import shutil
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from rclpy.publisher import Publisher
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry

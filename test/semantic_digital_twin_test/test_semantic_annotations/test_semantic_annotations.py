@@ -1,3 +1,7 @@
+"""
+Tests of the semantic annotations of an environment and how they are found in a world.
+"""
+
 import logging
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -157,9 +161,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         world.add_kinematic_structure_entity(root)
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root,
-                obstacle_body,
+                world=world,
+                parent=root,
+                child=obstacle_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     -2.0, 0.0, 0.0, reference_frame=root
                 ),
@@ -167,9 +171,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root,
-                wall_body,
+                world=world,
+                parent=root,
+                child=wall_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     2.0, 0.0, 0.0, reference_frame=root
                 ),
@@ -189,7 +193,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
     wall_annotation = Wall(root=wall_body, _world=world)
 
     result = obstacle_annotation.build_bloated_obstacle_collection(
-        search_space, semantic_wall_annotation=wall_annotation, bloat_walls=0.5
+        search_space=search_space,
+        semantic_wall_annotation=wall_annotation,
+        bloat_walls=0.5,
     )
 
     assert len(result.bounding_boxes) == 2

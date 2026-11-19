@@ -1,9 +1,13 @@
+"""
+The Robotiq 2F-85 gripper.
+"""
+
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from typing_extensions import Generic
 
 from semantic_digital_twin.robots.robot_part_mixins import (
@@ -11,12 +15,49 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     TGenericLeftFinger,
     TGenericRightFinger,
 )
-from semantic_digital_twin.robots.robot_parts import EndEffector, ServoedRobotPart
+from semantic_digital_twin.datastructures.definitions import JointStateType
+from semantic_digital_twin.robots.robot_parts import (
+    EndEffector,
+    HasGripperActionServers,
+    ServoedRobotPart,
+)
 from semantic_digital_twin.world_description.connection_properties import (
     JointDrive,
     ServoGains,
 )
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
+
+
+# %% driving a gripper through a parallel gripper command server
+
+
+@dataclass(eq=False)
+class HasParallelGripperCommandServer(HasGripperActionServers, ABC):
+    """
+    A gripper whose driver serves a ``control_msgs/ParallelGripperCommand`` action,
+    which brings the real gripper into every state.
+    """
+
+    @classproperty
+    @abstractmethod
+    def parallel_gripper_command_topic(cls) -> str:
+        """
+        The name the driver serves the parallel gripper command action under.
+        """
+
+    @property
+    @abstractmethod
+    def commanded_connection(self) -> ActiveConnection1DOF:
+        """
+        The connection the driver's controller commands, whose position, in its own
+        units, a goal of the parallel gripper command action gives.
+        """
+
+    def action_topic_serving(self, state_type: JointStateType | None) -> str:
+        return self.parallel_gripper_command_topic
+
+
+# %% the Robotiq 2F-85
 
 
 @dataclass(eq=False)

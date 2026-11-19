@@ -5,7 +5,7 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from typing_extensions import Generic, TypeVar
 

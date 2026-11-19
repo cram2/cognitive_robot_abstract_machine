@@ -29,7 +29,7 @@ from timeit import default_timer
 
 import cv2
 from krrood.adapters.json_serializer import to_json
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
