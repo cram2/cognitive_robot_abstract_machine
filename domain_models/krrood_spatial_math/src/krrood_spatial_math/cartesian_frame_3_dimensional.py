@@ -14,9 +14,11 @@ from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.adapters.json_serializer import from_json
 from krrood.adapters.object_reference import ObjectReference
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.identifier_and_name import NameT
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.coordinate_system import (
+    FrameAxis,
     CartesianFrame,
     GenericCoordinateRepresentation,
 )
@@ -84,6 +86,10 @@ class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interfac
     A right-handed Cartesian frame on a three-dimensional Euclidean space, in metres,
     such as the frame of a robot's body.
     """
+
+    @classproperty
+    def axes(cls) -> tuple[FrameAxis, ...]:
+        return (FrameAxis.X, FrameAxis.Y, FrameAxis.Z)
 
     @classmethod
     def cross_product(cls, *, first: Vector, second: Vector) -> Vector:

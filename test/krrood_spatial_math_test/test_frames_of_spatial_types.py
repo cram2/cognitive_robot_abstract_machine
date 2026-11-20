@@ -15,8 +15,10 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.line import Line
 from krrood_spatial_math.point import GenericPoint, Point
 from krrood_spatial_math.vector import GenericVector, Vector
+from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
+    FrameAxis,
     CoordinateRepresentation,
     GenericCoordinateSystem,
     GenericCoordinate,
@@ -502,22 +504,41 @@ def test_a_point_without_a_frame_is_read_without_a_resolver():
 # %% building a symbolic value from its coordinates
 
 
+def test_a_three_dimensional_cartesian_frame_kind_has_the_x_y_and_z_axes():
+    """
+    The values of a 3D Cartesian frame hold their coordinates under x, y and z.
+    """
+    assert CartesianFrame3Dimensional.axes == (
+        FrameAxis.X,
+        FrameAxis.Y,
+        FrameAxis.Z,
+    )
+
+
+def test_a_planar_cartesian_frame_kind_has_the_x_and_y_axes():
+    """
+    The values of a planar Cartesian frame hold their coordinates under x and y.
+    """
+    assert CartesianFrame2Dimensional.axes == (FrameAxis.X, FrameAxis.Y)
+
+
 @pytest.mark.parametrize(
-    "value_type, coordinate_names",
-    [
-        (Vector3Dimensional, ("x", "y", "z")),
-        (Point3Dimensional, ("x", "y", "z")),
-        (Vector2Dimensional, ("x", "y")),
-        (Point2Dimensional, ("x", "y")),
-    ],
+    "value_type",
+    [Vector3Dimensional, Point3Dimensional, Vector2Dimensional, Point2Dimensional],
 )
-def test_a_symbolic_value_names_the_coordinates_it_is_built_from(
-    value_type, coordinate_names
+def test_a_symbolic_value_reads_its_coordinates_along_its_frame_kinds_axes(
+    value_type,
 ):
     """
-    The names a symbolic value's constructor takes its coordinates under, in axis order.
+    A symbolic point or vector holds one coordinate per axis of its kind of frame.
     """
-    assert value_type.coordinate_names == coordinate_names
+    coordinates = tuple(
+        float(position) for position in range(1, len(value_type.frame_kind.axes) + 1)
+    )
+
+    value = value_type.from_coordinates(coordinates=coordinates, coordinate_system=None)
+
+    assert tuple(float(coordinate) for coordinate in value.coordinates) == coordinates
 
 
 def test_a_symbolic_value_is_placed_in_a_coordinate_system_by_its_reference_frame(

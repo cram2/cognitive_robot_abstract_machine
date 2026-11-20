@@ -26,8 +26,7 @@ class Point(AxisCoordinates, Generic[GenericVector]):
     """
     A point of the affine space its vector type translates: the difference of two points
     is such a vector, and adding one moves the point. It is given by its amounts along
-    an affine frame's axes, the fields a subclass marks with
-    :class:`~krrood_spatial_math.coordinate_system.AxisCoordinate`.
+    the axes of an affine frame, one per axis its kind of frame names.
 
     .. note::
         The type parameter is the vector type, which fixes the kind of frame, the

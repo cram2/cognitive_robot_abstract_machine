@@ -27,8 +27,7 @@ class Vector(
 ):
     """
     A translation of an affine space, given by its amounts along the axes of an affine
-    frame; a subclass marks one field per axis, such as ``u`` and ``v``, with
-    :class:`~krrood_spatial_math.coordinate_system.AxisCoordinate`.
+    frame, one per axis its kind of frame names, such as ``u`` and ``v``.
 
     A vector has no position: a change of frame turns its axes but never shifts it.
 
@@ -118,14 +117,6 @@ class Vector(
             raise UnsupportedOperationError(operation="cross", left=self, right=other)
         self.ensure_same_coordinate_system(other=other, context="the crossed vector")
         return self.frame_kind.cross_product(first=self, second=other)
-
-    @classproperty
-    def frame_kind(cls) -> type[GenericAffineFrame]:
-        """
-        The kind of frame vectors of this type are given in, which measures their
-        lengths and angles.
-        """
-        return cls.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
 
 
 GenericVector = TypeVar("GenericVector", bound=Vector)

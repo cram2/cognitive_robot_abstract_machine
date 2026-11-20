@@ -5,6 +5,7 @@ Errors of spatial types, frames and the spaces they chart.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from typing_extensions import TYPE_CHECKING
 
@@ -120,6 +121,34 @@ class FrameMeasuresNoLengthsError(SpatialTypesError):
         return (
             "change the values into a Cartesian frame first, or give their type a kind "
             "of frame that subclasses CartesianFrame."
+        )
+
+
+@dataclass(kw_only=True)
+class MissingAxisCoordinatesError(SpatialTypesError):
+    """
+    Raised when a point or vector type is defined without an attribute for one of the
+    axes of its kind of frame, so it cannot hold a coordinate along that axis.
+    """
+
+    value_type: type
+    """
+    The point or vector type that was defined.
+    """
+
+    axes: tuple[StrEnum, ...]
+    """
+    The axes of its kind of frame that it holds no coordinate for.
+    """
+
+    def error_message(self) -> str:
+        missing = ", ".join(self.axes)
+        return f"{self.value_type.__name__} has no attribute for the axes {missing}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "declare a field or property named after each axis of the frame kind, as "
+            "its axes classproperty names them."
         )
 
 

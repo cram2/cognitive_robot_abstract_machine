@@ -5,19 +5,21 @@ coordinate systems of one space.
 
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
+from enum import StrEnum
 
 from typing_extensions import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 from krrood.patterns.classproperty import classproperty
-from krrood.patterns.field_metadata import FieldMetadata
 from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_spatial_math.exceptions import (
     FrameHasNoCrossProductError,
     FrameMeasuresNoLengthsError,
+    MissingAxisCoordinatesError,
     ReferenceFrameMismatchError,
 )
 from krrood_spatial_math.space import EuclideanSpace, Space
@@ -54,6 +56,28 @@ class CoordinateSystem(
 # %% frames: coordinate systems with straight axes
 
 
+class FrameAxis(StrEnum):
+    """
+    An axis of a frame with straight axes, named as the coordinates along it are; the
+    first, second and third axes of most frames.
+    """
+
+    X = "x"
+    """
+    The first axis.
+    """
+
+    Y = "y"
+    """
+    The second axis.
+    """
+
+    Z = "z"
+    """
+    The third axis.
+    """
+
+
 class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
     """
     A coordinate system given by an origin and linearly independent, straight axes; the
@@ -62,6 +86,14 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
     The axes may differ in length and need not be perpendicular, as the axes of an
     image's pixels may, so an affine frame measures no lengths or angles.
     """
+
+    @classproperty
+    @abstractmethod
+    def axes(cls) -> tuple[StrEnum, ...]:
+        """
+        The axes of a frame of this kind, in order; a value given in such a frame holds
+        its coordinate along each axis in the attribute named after it.
+        """
 
     @classmethod
     def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
@@ -219,19 +251,11 @@ The kind of value given in a coordinate system.
 # %% values given by one coordinate per axis of a frame
 
 
-@dataclass(kw_only=True)
-class AxisCoordinate(FieldMetadata):
-    """
-    Marks a field of an :class:`AxisCoordinates` value as its coordinate along one axis.
-    The marked fields are the axes in the order they are declared.
-    """
-
-
 @dataclass(kw_only=True, eq=False)
 class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
     """
-    A value given by one coordinate per axis of its coordinate system, such as a point or
-    a vector, whose coordinates are the fields its class marks with :class:`AxisCoordinate`.
+    A value given by one coordinate per axis of its kind of frame, such as a point or a
+    vector, held in the attribute named after that axis.
     """
 
     coordinate_system: GenericCoordinateSystem | None
@@ -245,19 +269,36 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         The amounts along the axes of the coordinate system, one per axis, in the order
         of the axes.
         """
-        return tuple(getattr(self, name) for name in self.coordinate_names)
+        return tuple(getattr(self, axis) for axis in self.frame_kind.axes)
 
     @classproperty
-    def coordinate_names(cls) -> tuple[str, ...]:
+    def frame_kind(cls) -> type[AffineFrame]:
         """
-        The names of the coordinates, one per axis in the order of the axes, under which
-        the constructor takes them: the fields marked with :class:`AxisCoordinate`.
+        The kind of frame values of this type are given in, which names their axes and
+        measures their lengths and angles.
         """
-        return tuple(
-            coordinate_field.name
-            for coordinate_field in fields(cls)
-            if AxisCoordinate in coordinate_field.metadata
+        return cls.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        :raises MissingAxisCoordinatesError: If a concrete value type lacks a field or
+            property for one of the axes of its kind of frame.
+        """
+        super().__init_subclass__(**kwargs)
+        if Interface.is_abstract(class_=cls) or not cls.binds_generic_parameter(
+            parameter=GenericCoordinateSystem
+        ):
+            return
+        missing_axes = tuple(
+            axis
+            for axis in cls.frame_kind.axes
+            if not any(
+                axis in vars(base) or axis in inspect.get_annotations(base)
+                for base in cls.__mro__
+            )
         )
+        if missing_axes:
+            raise MissingAxisCoordinatesError(value_type=cls, axes=missing_axes)
 
     @classmethod
     def from_coordinates(
@@ -272,7 +313,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         :return: The value with these coordinates.
         """
         return cls(
-            **dict(zip(cls.coordinate_names, coordinates, strict=True)),
+            **dict(zip(cls.frame_kind.axes, coordinates, strict=True)),
             **cls.coordinate_system_arguments(coordinate_system=coordinate_system),
         )
 

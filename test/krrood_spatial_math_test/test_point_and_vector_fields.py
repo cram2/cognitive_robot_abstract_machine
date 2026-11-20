@@ -9,9 +9,11 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from krrood_spatial_math.coordinate_system import GenericCoordinate
-from krrood_spatial_math.coordinate_system import AxisCoordinate
-from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
+from krrood_spatial_math.coordinate_system import FrameAxis, GenericCoordinate
+from krrood_spatial_math.exceptions import (
+    MissingAxisCoordinatesError,
+    ReferenceFrameMismatchError,
+)
 from krrood_spatial_math.point import Point
 
 from .dataset.spaces import (
@@ -40,14 +42,14 @@ def other_scalable_plane_frame() -> ScalablePlaneFrame:
     return NamedScalablePlaneFrame(name="other sheet")
 
 
-# %% coordinates are the declared fields
+# %% coordinates are the fields named after the axes
 
 
 def test_the_coordinates_of_a_vector_are_its_declared_fields_in_order(
     scalable_plane_frame,
 ):
     """
-    The coordinates come from the fields the vector class declares, first field first.
+    The coordinates come from the fields the vector class names after the axes.
     """
     vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=scalable_plane_frame)
 
@@ -58,7 +60,7 @@ def test_the_coordinates_of_a_point_are_its_declared_fields_in_order(
     scalable_plane_frame,
 ):
     """
-    The coordinates come from the fields the point class declares, first field first.
+    The coordinates come from the fields the point class names after the axes.
     """
     point = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=scalable_plane_frame)
 
@@ -178,12 +180,12 @@ def test_a_point_is_not_moved_by_a_vector_of_another_frame(
         point + vector
 
 
-# %% coordinates are only the fields marked as coordinates
+# %% coordinates are the attributes named after the frame's axes
 
 
-def test_a_field_not_marked_as_a_coordinate_is_no_coordinate(scalable_plane_frame):
+def test_a_field_not_named_after_an_axis_is_no_coordinate(scalable_plane_frame):
     """
-    A field a point type declares without marking it is kept out of its coordinates.
+    A field a point type declares besides its axes is kept out of its coordinates.
     """
 
     @dataclass(kw_only=True)
@@ -192,7 +194,7 @@ def test_a_field_not_marked_as_a_coordinate_is_no_coordinate(scalable_plane_fram
         A point on a scalable plane that also carries a label.
         """
 
-        x: float = field(metadata=AxisCoordinate().as_dict())
+        x: float
         """
         The first coordinate.
         """
@@ -202,7 +204,7 @@ def test_a_field_not_marked_as_a_coordinate_is_no_coordinate(scalable_plane_fram
         What the point marks.
         """
 
-        y: float = field(metadata=AxisCoordinate().as_dict())
+        y: float
         """
         The second coordinate.
         """
@@ -212,3 +214,64 @@ def test_a_field_not_marked_as_a_coordinate_is_no_coordinate(scalable_plane_fram
     )
 
     assert point.coordinates == (1.0, 2.0)
+
+
+def test_the_coordinates_follow_the_order_of_the_frames_axes(scalable_plane_frame):
+    """
+    The coordinates are in the order of the axes, whatever order the fields have.
+    """
+
+    @dataclass(kw_only=True)
+    class ReorderedPoint(Point[ScalablePlaneVector]):
+        """
+        A point on a scalable plane declaring its second coordinate first.
+        """
+
+        y: float
+        """
+        The second coordinate.
+        """
+
+        x: float
+        """
+        The first coordinate.
+        """
+
+    point = ReorderedPoint(y=2.0, x=1.0, coordinate_system=scalable_plane_frame)
+
+    assert point.coordinates == (1.0, 2.0)
+
+
+def test_a_point_type_without_an_attribute_per_axis_is_refused_where_it_is_defined():
+    """
+    A value type must hold a coordinate for every axis of its kind of frame.
+    """
+    with pytest.raises(MissingAxisCoordinatesError) as raised:
+
+        @dataclass(kw_only=True)
+        class HalfPoint(Point[ScalablePlaneVector]):
+            """
+            A point on a scalable plane that declares only its first coordinate.
+            """
+
+            x: float
+            """
+            The first coordinate.
+            """
+
+    assert raised.value.axes == (FrameAxis.Y,)
+
+
+def test_a_value_built_from_coordinates_holds_them_under_the_axes_names(
+    scalable_plane_frame,
+):
+    """
+    Building from coordinates gives the value one coordinate per axis, in axis order.
+    """
+    vector = ScalablePlaneVector.from_coordinates(
+        coordinates=(3.0, 4.0), coordinate_system=scalable_plane_frame
+    )
+
+    assert vector == ScalablePlaneVector(
+        x=3.0, y=4.0, coordinate_system=scalable_plane_frame
+    )

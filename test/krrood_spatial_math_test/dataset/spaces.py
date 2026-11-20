@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from typing_extensions import Self
 
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.point import GenericPoint, Point
@@ -17,8 +18,8 @@ from krrood_spatial_math.vector import GenericVector, Vector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
-    AxisCoordinate,
     AffineFrame,
+    FrameAxis,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.space import Space
@@ -37,6 +38,10 @@ class ScalablePlaneFrame(AffineFrame[ScalablePlane, str], Interface):
     """
     An affine frame on a :class:`ScalablePlane`, called by a plain name.
     """
+
+    @classproperty
+    def axes(cls) -> tuple[FrameAxis, ...]:
+        return (FrameAxis.X, FrameAxis.Y)
 
 
 # %% a frame of a scalable plane
@@ -70,15 +75,15 @@ class NamedScalablePlaneFrame(ScalablePlaneFrame):
 @dataclass(kw_only=True)
 class ScalablePlaneVector(Vector[ScalablePlaneFrame]):
     """
-    A vector on a scalable plane whose coordinates are its marked fields.
+    A vector on a scalable plane whose coordinates are its fields named after the axes.
     """
 
-    x: float = field(metadata=AxisCoordinate().as_dict())
+    x: float
     """
     The amount along the first axis.
     """
 
-    y: float = field(metadata=AxisCoordinate().as_dict())
+    y: float
     """
     The amount along the second axis.
     """
@@ -87,15 +92,15 @@ class ScalablePlaneVector(Vector[ScalablePlaneFrame]):
 @dataclass(kw_only=True)
 class ScalablePlanePoint(Point[ScalablePlaneVector]):
     """
-    A point on a scalable plane whose coordinates are its marked fields.
+    A point on a scalable plane whose coordinates are its fields named after the axes.
     """
 
-    x: float = field(metadata=AxisCoordinate().as_dict())
+    x: float
     """
     The first coordinate.
     """
 
-    y: float = field(metadata=AxisCoordinate().as_dict())
+    y: float
     """
     The second coordinate.
     """

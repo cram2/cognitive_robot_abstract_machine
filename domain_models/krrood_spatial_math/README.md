@@ -34,8 +34,8 @@ coordinate system. Its base depends on `krrood` alone.
   right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
   with that frame's origin, x-axis and y-axis, that values on the plane are given in.
 - `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space given
-  by its coordinates in an affine frame, the fields a subclass marks with
-  `AxisCoordinate`. A second parameter names the coordinate type when it is not
+  by its coordinates in an affine frame, one per axis that frame's kind names in its
+  `axes`, held in the field or property of that name. A second parameter names the coordinate type when it is not
   `float`. Its `norm` and `dot` are measured by the kind of frame, and an affine one
   that is not Cartesian raises `FrameMeasuresNoLengthsError`. Its `cross` is the kind
   of frame's too: only a `CartesianFrame3Dimensional` has a cross product, and any
@@ -93,17 +93,20 @@ example, adds image planes, whose pixel frames are affine and related by affine 
 
 ## Adding a space
 
-A new space needs a space, a kind of frame on it with a frame of that kind, and a
-vector type given in that kind of frame and a point type moved by it. `Point` and
-`Vector` declare the frame field, do the arithmetic and refuse values of two frames, so
-the point and vector only mark their coordinates:
+A new space needs a space, a kind of frame on it that names its axes, a frame of that
+kind, and a vector type given in that kind of frame and a point type moved by it.
+`Point` and `Vector` declare the frame field, do the arithmetic and refuse values of two
+frames, so the point and vector only declare one field per axis:
 
 ```python
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 from krrood.patterns.interface import Interface
-from krrood_spatial_math.coordinate_system import AffineFrame, AxisCoordinate
+from enum import StrEnum
+
+from krrood.patterns.classproperty import classproperty
+from krrood_spatial_math.coordinate_system import AffineFrame
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.vector import Vector
@@ -113,8 +116,19 @@ class ImagePlane(EuclideanSpace):
     """The plane a camera's images lie on."""
 
 
+class PixelAxis(StrEnum):
+    """An axis of a pixel frame, named as the coordinates along it are."""
+
+    U = "u"
+    V = "v"
+
+
 class PixelFrame(AffineFrame[ImagePlane, str], Interface):
     """Pixel coordinates on an image plane, whose axes may differ in length."""
+
+    @classproperty
+    def axes(cls) -> tuple[PixelAxis, ...]:
+        return (PixelAxis.U, PixelAxis.V)
 
 
 @dataclass(eq=False, kw_only=True)
@@ -128,20 +142,21 @@ class CameraPixels(PixelFrame):
 
 @dataclass(kw_only=True)
 class PixelVector(Vector[PixelFrame]):
-    u: float = field(metadata=AxisCoordinate().as_dict())
-    v: float = field(metadata=AxisCoordinate().as_dict())
+    u: float
+    v: float
 
 
 @dataclass(kw_only=True)
 class PixelPoint(Point[PixelVector]):
-    u: float = field(metadata=AxisCoordinate().as_dict())
-    v: float = field(metadata=AxisCoordinate().as_dict())
+    u: float
+    v: float
 ```
 
 With `frame = CameraPixels(name="camera")`,
 `PixelPoint(u=4, v=2, coordinate_system=frame) - PixelPoint(u=1, v=1, coordinate_system=frame)`
-is `PixelVector(u=3, v=1, coordinate_system=frame)`. Combining values of two frames
-raises `ReferenceFrameMismatchError`, and the point's kind of frame is always its
+is `PixelVector(u=3, v=1, coordinate_system=frame)`. A point or vector type without a
+field for one of the axes raises `MissingAxisCoordinatesError` where it is defined.
+Combining values of two frames raises `ReferenceFrameMismatchError`, and the point's kind of frame is always its
 vector's, since it is read from the vector type. A change
 between two pixel frames implements `AffineCoordinateChange[PixelFrame]` and its
 `apply_to_homogeneous_coordinates`; `apply_transformation` then moves pixel points and

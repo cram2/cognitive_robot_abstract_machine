@@ -354,14 +354,6 @@ class Vector2Dimensional(
     def y(self, value: sm.ScalarData):
         self[1] = value
 
-    @classproperty
-    def coordinate_names(cls) -> tuple[str, ...]:
-        """
-        The constructor's coordinate parameters, unlike
-        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
-        """
-        return ("x", "y")
-
     def _verify_type(self):
         if self.shape != (2, 1):
             raise WrongDimensionsError(
@@ -452,14 +444,6 @@ class Point2Dimensional(
     @y.setter
     def y(self, value: sm.ScalarData):
         self[1] = value
-
-    @classproperty
-    def coordinate_names(cls) -> tuple[str, ...]:
-        """
-        The constructor's coordinate parameters, unlike
-        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
-        """
-        return ("x", "y")
 
     def _verify_type(self):
         if self.shape != (2, 1):

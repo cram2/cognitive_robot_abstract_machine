@@ -1517,14 +1517,6 @@ class Vector3Dimensional(
     def z(self, value: sm.ScalarData):
         self[2] = value
 
-    @classproperty
-    def coordinate_names(cls) -> tuple[str, ...]:
-        """
-        The constructor's coordinate parameters, unlike
-        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
-        """
-        return ("x", "y", "z")
-
     def __add__(self, other: Vector3Dimensional) -> Vector3Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
@@ -1854,14 +1846,6 @@ class Point3Dimensional(
     @z.setter
     def z(self, value: sm.ScalarData):
         self[2] = value
-
-    @classproperty
-    def coordinate_names(cls) -> tuple[str, ...]:
-        """
-        The constructor's coordinate parameters, unlike
-        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
-        """
-        return ("x", "y", "z")
 
     def __add__(self, other: Vector3Dimensional) -> Point3Dimensional:
         """

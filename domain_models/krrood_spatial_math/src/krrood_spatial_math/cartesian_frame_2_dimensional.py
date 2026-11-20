@@ -9,11 +9,12 @@ from uuid import UUID, uuid5
 
 from typing_extensions import Self
 
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.identifier_and_name import NameT
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
 )
-from krrood_spatial_math.coordinate_system import CartesianFrame
+from krrood_spatial_math.coordinate_system import FrameAxis, CartesianFrame
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 
 # %% frames that values on a plane are given in
@@ -34,6 +35,10 @@ class CartesianFrame2Dimensional(CartesianFrame[EmbeddedPlane, NameT]):
     """
     The frame whose origin, x-axis and y-axis this frame has.
     """
+
+    @classproperty
+    def axes(cls) -> tuple[FrameAxis, ...]:
+        return (FrameAxis.X, FrameAxis.Y)
 
     @classmethod
     def from_frame_3_dimensional(cls, *, frame: CartesianFrame3Dimensional) -> Self:
