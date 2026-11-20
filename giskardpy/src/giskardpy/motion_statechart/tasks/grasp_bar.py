@@ -1,31 +1,34 @@
+"""
+A task that grasps a bar anywhere along its length.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, ConvergingTask
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
+    HasKinematicChainParameter,
+)
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class GraspBar(ConvergingTask):
+class GraspBar(
+    ConvergingTask,
+    HasKinematicChainParameter,
+    HasCruiseLinearVelocityParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
     Like a CartesianPose but with more freedom: the tip link is allowed to be at any
-    point along the bar axis within ``bar_center +/- bar_length / 2``.
+    point along the bar axis within ``bar_center +/- bar_length / 2``. Its error is the
+    distance to the bar, in meters.
 
     It aligns ``tip_grasp_axis`` with ``bar_axis`` while allowing rotation around it.
-    """
-
-    root_link: Body
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: Body
-    """
-    Tip link of the kinematic chain.
     """
 
     tip_grasp_axis: Vector3
@@ -48,21 +51,6 @@ class GraspBar(ConvergingTask):
     Length of the bar to be grasped.
     """
 
-    threshold: float = 0.01
-    """
-    Distance threshold to the bar for goal achievement in meters.
-    """
-
-    cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the goal position is approached, in m/s; not strictly enforced.
-    """
-
-    cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
-    """
-
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Priority weight relative to other tasks.
@@ -77,21 +65,21 @@ class GraspBar(ConvergingTask):
         """
         artifacts = MotionNodeArtifacts()
         root_P_bar_center = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.bar_center
+            target_frame=self.kinematic_chain.root, spatial_object=self.bar_center
         )
 
         tip_V_tip_grasp_axis = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_grasp_axis
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_grasp_axis
         )
         tip_V_tip_grasp_axis.scale(1)
 
         root_V_bar_axis = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.bar_axis
+            target_frame=self.kinematic_chain.root, spatial_object=self.bar_axis
         )
         root_V_bar_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_V_tip_normal = root_T_tip @ tip_V_tip_grasp_axis
 

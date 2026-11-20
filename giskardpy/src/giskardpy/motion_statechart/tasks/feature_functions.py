@@ -1,47 +1,61 @@
+"""
+Tasks that control a geometric relation between a feature on the tip of a kinematic
+chain and one on its root, such as a height, a distance or an angle.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import field, dataclass
+from dataclasses import dataclass, field
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
+from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
     DebugExpression,
 )
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseAngularVelocityParameter,
+    HasCruiseVelocityParameter,
+    HasKinematicChainParameter,
+    HasLowerAngleParameter,
+    HasLowerLimitParameter,
+    HasReferenceNormalParameter,
+    HasReferencePointParameter,
+    HasReferenceVectorParameter,
+    HasTipNormalParameter,
+    HasTipPointParameter,
+    HasTipVectorParameter,
+    HasUpperAngleParameter,
+    HasUpperLimitParameter,
+)
+
+# %% goals on geometric features
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FeatureFunctionGoal(ConvergingTask, ABC):
+class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
     """
     Base for feature tasks operating on geometric features.
 
-    Transforms the controlled feature (from `tip_link`) and the reference feature
-    (from `root_link`) into a common frame and registers debug visualizations.
+    :attr:`controlled_feature` is fixed on the tip of :attr:`kinematic_chain` and
+    :attr:`reference_feature` on its root. Both are transformed into a common frame, and
+    debug visualizations are registered for them.
     """
 
-    tip_link: KinematicStructureEntity
-    """
-    The link where the controlled feature is attached. Defines the moving frame of reference.
-    """
-    root_link: KinematicStructureEntity
-    """
-    The static reference link. Defines the fixed frame of reference.
-    """
     controlled_feature: Point3 | Vector3 = field(init=False)
     """
-    The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
+    The geometric feature (point or vector) that is being controlled, expressed in the
+    tip link frame.
     """
+
     reference_feature: Point3 | Vector3 = field(init=False)
     """
-    The geometric feature (point or vector) that serves as reference, expressed in the root link frame.
+    The geometric feature (point or vector) that serves as reference, expressed in the
+    root link frame.
     """
 
     @abstractmethod
@@ -51,24 +65,31 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
         """
         Return the controlled and reference features.
 
-        :return: Tuple (controlled_feature, reference_feature), each a Point3 or Vector3.
+        :return: Tuple (controlled_feature, reference_feature), each a Point3 or
+            Vector3.
         """
         raise NotImplementedError
 
     def build(self) -> MotionNodeArtifacts:
+        """
+        Differs from the inherited ``build`` in also expressing both features relative
+        to the root of :attr:`kinematic_chain` and drawing them as debug expressions.
+        """
         self.controlled_feature, self.reference_feature = (
             self.get_controlled_and_reference_features()
         )
         feature_debug_expressions: list[DebugExpression] = []
         root_reference_feature = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_feature
+            target_frame=self.kinematic_chain.root,
+            spatial_object=self.reference_feature,
         )
         tip_controlled_feature = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.controlled_feature
+            target_frame=self.kinematic_chain.tip,
+            spatial_object=self.controlled_feature,
         )
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         if isinstance(self.controlled_feature, Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
@@ -120,49 +141,32 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
 
     def _vector_to_draw(self, *, root_V_feature: Vector3, feature: Vector3) -> Vector3:
         """
-        :param root_V_feature: `feature` expressed in :attr:`root_link`.
+        :param root_V_feature: `feature` expressed in the root of :attr:`kinematic_chain`.
         :param feature: The vector feature as the task was given it.
         :return: A copy of `root_V_feature` drawn from the visualisation frame of
-            `feature`, or from :attr:`tip_link` if it has none.
+            `feature`, or from the tip of :attr:`kinematic_chain` if it has none.
         """
         vector_to_draw = Vector3.from_iterable(root_V_feature)
         vector_to_draw.visualisation_frame = (
             feature.visualisation_frame
             if feature.visualisation_frame is not None
-            else self.tip_link
+            else self.kinematic_chain.tip
         )
         return vector_to_draw
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AlignPerpendicular(FeatureFunctionGoal):
+class AlignPerpendicular(
+    FeatureFunctionGoal,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
     Align two normal vectors to be perpendicular.
 
-    The goal drives the angle between `tip_normal` and `reference_normal` to π/2.
-    Completion occurs when |current_angle - π/2| < `threshold`.
-    """
-
-    tip_normal: Vector3
-    """
-    The normal vector to be controlled, defined in the tip link frame.
-    """
-    reference_normal: Vector3
-    """
-    The reference normal vector to align against, defined in the root link frame.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the alignment constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the alignment goal is approached, in rad/s; not strictly enforced.
-    """
-    threshold: float = 0.01
-    """
-    Tolerance threshold in radians. The goal is considered achieved when the absolute
-    difference between the current angle and 90 degrees is below this value.
+    The goal drives the dot product of :attr:`tip_normal` and :attr:`reference_normal`
+    to zero, and its error is the absolute dot product.
     """
 
     def get_controlled_and_reference_features(self):
@@ -172,13 +176,14 @@ class AlignPerpendicular(FeatureFunctionGoal):
         """
         Build a constraint that drives the two normals perpendicular.
 
-        :return: The artifacts of this task, whose error is how far the dot product of the two normals is from zero.
+        :return: The artifacts of this task, whose error is how far the dot product of
+            the two normals is from zero.
         """
         artifacts = MotionNodeArtifacts()
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             velocity_scale=VelocityScale.ROTATION,
             equality_bound=0 - expr,
             quadratic_weight=self.weight,
@@ -190,36 +195,19 @@ class AlignPerpendicular(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HeightGoal(FeatureFunctionGoal):
+class HeightGoal(
+    FeatureFunctionGoal,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasLowerLimitParameter,
+    HasUpperLimitParameter,
+    HasCruiseVelocityParameter,
+):
     """
-    Moves the `tip_point` to be the specified distance away from the `reference_point`
-    along the z-axis of the map frame.
+    Moves :attr:`tip_point` to be the specified distance away from
+    :attr:`reference_point` along the z-axis of the map frame.
     """
 
-    tip_point: Point3
-    """
-    Tip point to be controlled.
-    """
-    reference_point: Point3
-    """
-    Reference point to measure the distance against.
-    """
-    lower_limit: float
-    """
-    Lower limit to control the distance away from the `reference_point`.
-    """
-    upper_limit: float
-    """
-    Upper limit to control the distance away from the `reference_point`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the height constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the height goal is approached, in m/s; not strictly enforced.
-    """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
@@ -232,7 +220,8 @@ class HeightGoal(FeatureFunctionGoal):
         """
         Build a constraint that keeps the height difference within the limits.
 
-        :return: The artifacts of this task, whose error is how far the height difference lies outside the limits.
+        :return: The artifacts of this task, whose error is how far the height
+            difference lies outside the limits.
         """
         artifacts = MotionNodeArtifacts()
         expr = (
@@ -254,36 +243,19 @@ class HeightGoal(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DistanceGoal(FeatureFunctionGoal):
+class DistanceGoal(
+    FeatureFunctionGoal,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasLowerLimitParameter,
+    HasUpperLimitParameter,
+    HasCruiseVelocityParameter,
+):
     """
-    Moves the `tip_point` to be the specified distance away from the `reference_point`
-    measured in the x-y-plane of the map frame.
+    Moves :attr:`tip_point` to be the specified distance away from
+    :attr:`reference_point` measured in the x-y-plane of the map frame.
     """
 
-    tip_point: Point3
-    """
-    Tip point to be controlled.
-    """
-    reference_point: Point3
-    """
-    Reference point to measure the distance against.
-    """
-    lower_limit: float
-    """
-    Lower limit to control the distance away from the `reference_point`.
-    """
-    upper_limit: float
-    """
-    Upper limit to control the distance away from the `reference_point`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the distance constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the distance goal is approached, in m/s; not strictly enforced.
-    """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
@@ -296,7 +268,8 @@ class DistanceGoal(FeatureFunctionGoal):
         """
         Build a constraint that keeps the planar distance within the limits.
 
-        :return: The artifacts of this task, whose error is how far the planar distance lies outside the limits.
+        :return: The artifacts of this task, whose error is how far the planar distance
+            lies outside the limits.
         """
         artifacts = MotionNodeArtifacts()
         root_V_diff = self.root_P_controlled_feature - self.root_P_reference_feature
@@ -330,30 +303,15 @@ class DistanceGoal(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ReachPoint(FeatureFunctionGoal):
+class ReachPoint(
+    FeatureFunctionGoal,
+    HasTipPointParameter,
+    HasReferencePointParameter,
+    HasCruiseVelocityParameter,
+):
     """
-    Drives a controlled point on the tip onto a reference point.
-    """
-
-    tip_point: Point3
-    """
-    The point to be controlled, defined in the tip link frame.
-    """
-    reference_point: Point3
-    """
-    The target point to reach, defined in the root link frame.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the reach constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the reaching goal is approached, in m/s; not strictly enforced.
-    """
-    threshold: float = 0.01
-    """
-    Distance at or below which the goal is considered achieved, in meters.
+    Drives a controlled point on the tip onto a reference point, with an error in
+    meters.
     """
 
     def get_controlled_and_reference_features(self) -> tuple[Point3, Point3]:
@@ -363,7 +321,8 @@ class ReachPoint(FeatureFunctionGoal):
         """
         Build a constraint that moves the controlled point onto the reference point.
 
-        :return: The artifacts of this task, whose error is the distance between the two points.
+        :return: The artifacts of this task, whose error is the distance between the two
+            points.
         """
         artifacts = MotionNodeArtifacts()
         artifacts.geometry.add_point_goal_constraints(
@@ -379,36 +338,19 @@ class ReachPoint(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AngleGoal(FeatureFunctionGoal):
+class AngleGoal(
+    FeatureFunctionGoal,
+    HasTipVectorParameter,
+    HasReferenceVectorParameter,
+    HasLowerAngleParameter,
+    HasUpperAngleParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
-    Controls the angle between the `tip_vector` and the `reference_vector` to be between
-    `lower_angle` and `upper_angle`.
+    Controls the angle between :attr:`tip_vector` and :attr:`reference_vector` to be
+    between `lower_angle` and `upper_angle`.
     """
 
-    tip_vector: Vector3
-    """
-    Tip vector to be controlled.
-    """
-    reference_vector: Vector3
-    """
-    Reference vector to measure the angle against.
-    """
-    lower_angle: float
-    """
-    Lower limit to control the angle between the `tip_vector` and the `reference_vector`.
-    """
-    upper_angle: float
-    """
-    Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the angle constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the angle goal is approached, in rad/s; not strictly enforced.
-    """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
@@ -421,7 +363,8 @@ class AngleGoal(FeatureFunctionGoal):
         """
         Build a constraint that keeps the angle between the vectors within the limits.
 
-        :return: The artifacts of this task, whose error is how far the angle lies outside the limits.
+        :return: The artifacts of this task, whose error is how far the angle lies
+            outside the limits.
         """
         artifacts = MotionNodeArtifacts()
         expr = self.root_V_reference_feature.angle_between(
@@ -429,7 +372,7 @@ class AngleGoal(FeatureFunctionGoal):
         )
 
         artifacts.constraints.add_inequality_constraint(
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             velocity_scale=VelocityScale.ROTATION,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
