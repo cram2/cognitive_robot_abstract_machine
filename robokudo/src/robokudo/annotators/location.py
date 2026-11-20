@@ -105,9 +105,8 @@ class LocationAnnotator(ThreadedAnnotator):
         :param world_to_camera_transform_matrix: Transform from world to camera frame
         :param object_hypotheses: List of object hypotheses to check
         """
-        runtime_world = self.world
         obb = region_obb_in_camera_coordinates(
-            runtime_world, region, world_to_camera_transform_matrix
+            self.world, region, world_to_camera_transform_matrix
         )
         for object_hypothesis in object_hypotheses:
             # Extract the indices of an object that lies inside the region
@@ -143,8 +142,7 @@ class LocationAnnotator(ThreadedAnnotator):
         :return: SUCCESS after processing
         """
         start_timer = default_timer()
-        runtime_world = self.world
-        regions = runtime_world.get_kinematic_structure_entity_by_type(Region)
+        regions = self.world.get_kinematic_structure_entity_by_type(Region)
         active_regions = {str(region.name): region for region in regions}
         # TODO Filter active regions by FRUSTUM CULLING
 

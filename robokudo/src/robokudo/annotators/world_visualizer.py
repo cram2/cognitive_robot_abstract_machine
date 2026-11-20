@@ -58,7 +58,6 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     def compute(self) -> py_trees.common.Status:
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        runtime_world = self.world
 
         try:
             world_to_camera_transform = (
@@ -73,7 +72,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
         visualized_geometries = []
 
         if self.descriptor.parameters.visualize_objects:
-            predefined_objects = runtime_world.get_semantic_annotations_by_type(
+            predefined_objects = self.world.get_semantic_annotations_by_type(
                 PredefinedObject
             )
             for predefined_object in predefined_objects:
@@ -91,10 +90,10 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 visualized_geometries.append({"name": str(body.name), "geometry": obb})
 
         if self.descriptor.parameters.visualize_regions:
-            regions = runtime_world.get_kinematic_structure_entity_by_type(Region)
+            regions = self.world.get_kinematic_structure_entity_by_type(Region)
             for region in regions:
                 obb = region_obb_in_camera_coordinates(
-                    runtime_world, region, world_to_camera_transform
+                    self.world, region, world_to_camera_transform
                 )
                 visualized_geometries.append(
                     {"name": str(region.name), "geometry": obb}
