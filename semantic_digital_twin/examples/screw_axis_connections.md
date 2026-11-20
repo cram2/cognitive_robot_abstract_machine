@@ -294,7 +294,7 @@ Code that has to tell revolute and prismatic connections apart asks
 Because the screw axis holds both a rotation and a translation per unit of position, the child can also
 rotate and translate at once: a bottle cap, a jar
 lid or the spindle of a vice turns and advances along its axis in proportion. Such a *helical* motion is
-described by its pitch, the distance the child advances per revolution.
+described by its pitch $p$, the distance the child advances per revolution.
 
 | Connection | Factory | Position |
 |---|---|---|
@@ -483,8 +483,8 @@ gives every motion of the family with finite numbers:
 
 ### Why the screw axis is normalized
 
-Following $k\,\mathcal{S}$ for $\theta / k$ moves the child as following $\mathcal{S}$ for $\theta$ does,
-for any $k \neq 0$. The normalization fixes $k$:
+Following $k\,\mathcal{S}$ for $\theta / k$ moves the child as following $\mathcal{S}$ for the position
+$\theta$ does, for any number $k \neq 0$. The normalization fixes $k$:
 
 - The position is in radians when the child rotates and in meters when it only translates. Limits of
   degrees of freedom, the joints of URDF, MJCF and SDF files, and MuJoCo's hinge and slide joints all
@@ -540,19 +540,21 @@ connection describes all of its motions with one such matrix. For a position $\t
 $$
 T(\theta) =
 \begin{bmatrix}
-R(\hat{s}, \lVert\omega\rVert\theta) & v\theta \\
+R(\hat{s}, |\omega|\,\theta) & v\theta \\
 0 & 1
 \end{bmatrix},
 $$
 
-where $R(\hat{s}, \varphi) = I + \sin\varphi\,[\hat{s}] + (1 - \cos\varphi)[\hat{s}]^2$ rotates by the angle
-$\varphi$ about the direction $\hat{s}$ of the axis, by
+where $|\omega|$ is the length of $\omega$, and
+$R(\hat{s}, \varphi) = I + \sin\varphi\,[\hat{s}]_\times + (1 - \cos\varphi)[\hat{s}]_\times^2$ rotates by the angle
+$\varphi$ about the direction $\hat{s}$ of the axis, with $I$ the identity and $[\hat{s}]_\times$ the matrix that
+takes the cross product with $\hat{s}$, by
 [Rodrigues' rotation formula](https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula). The pose of
 the child relative to the parent is
 `parent_T_connection_expression` $\cdot\, T(\theta) \,\cdot$ `connection_T_child_expression`.
 
 The rotation turns about the axis direction $\hat{s}$, and the translation $v\theta$ points along it.
-For an axis along $z$, the three kinds of connection give:
+For an axis along $z$, with $\hat{z}$ the unit vector along it, the three kinds of connection give:
 
 $$
 \underbrace{\begin{bmatrix}
@@ -613,7 +615,7 @@ that $q = 0$ and $v = h\omega$ is parallel to $\omega$. The connection frame, pl
 
 A connection given a screw axis that misses the origin of its connection frame raises a
 `ScrewAxisOffConnectionOriginError`. A screw axis $(\omega, v)$ in the general form, with
-$\lVert\omega\rVert = 1$, is converted by moving the connection frame to the point $q = \omega \times v$
+$|\omega| = 1$, is converted by moving the connection frame to the point $q = \omega \times v$
 on the axis, placing the child relative to the moved frame, and keeping the screw axis
 $(\omega, (\omega \cdot v)\,\omega)$ there.
 
