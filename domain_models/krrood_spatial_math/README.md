@@ -93,20 +93,30 @@ example, adds image planes, whose pixel frames are affine and related by affine 
 
 ## Adding a space
 
-A new space needs a space, a kind of frame on it that names its axes, a frame of that
-kind, and a vector type given in that kind of frame and a point type moved by it.
-`Point` and `Vector` declare the frame field, do the arithmetic and refuse values of two
-frames, so the point and vector only declare one field per axis:
+This example adds the pixels of camera images. A camera's image plane is a plane, but
+its pixels need not be square, so its pixel frames are affine, not Cartesian: they
+measure no lengths or angles. Cropping and resizing an image changes the pixel frame,
+which is an affine change. A new space needs five things:
+
+1. the space, here `ImagePlane`;
+2. a kind of frame on it that names its axes, here `PixelFrame` with the axes u and v;
+3. a frame of that kind, here `ImagePixels`, the pixels of one image;
+4. a vector type and a point type, which only declare one field per axis;
+5. the coordinate changes between its frames, here `CropAndResize`.
+
+`Point` and `Vector` do the arithmetic, refuse to combine values of two frames, and move
+values through any affine change, so steps 1 to 4 hold no logic:
 
 ```python
 from dataclasses import dataclass, field
+from enum import StrEnum
 from uuid import UUID, uuid4
 
-from krrood.patterns.interface import Interface
-from enum import StrEnum
+from typing_extensions import Self
 
 from krrood.patterns.classproperty import classproperty
-from krrood_spatial_math.coordinate_system import AffineFrame
+from krrood.patterns.interface import Interface
+from krrood_spatial_math.coordinate_system import AffineCoordinateChange, AffineFrame
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.vector import Vector
@@ -117,7 +127,7 @@ class ImagePlane(EuclideanSpace):
 
 
 class PixelAxis(StrEnum):
-    """An axis of a pixel frame, named as the coordinates along it are."""
+    """An axis of a pixel frame: u runs right along a row, v down along a column."""
 
     U = "u"
     V = "v"
@@ -132,8 +142,8 @@ class PixelFrame(AffineFrame[ImagePlane, str], Interface):
 
 
 @dataclass(eq=False, kw_only=True)
-class CameraPixels(PixelFrame):
-    """The pixels of one camera's images."""
+class ImagePixels(PixelFrame):
+    """The pixels of one image, counted from its top-left corner."""
 
     name: str
     space: ImagePlane | None = None
@@ -142,25 +152,114 @@ class CameraPixels(PixelFrame):
 
 @dataclass(kw_only=True)
 class PixelVector(Vector[PixelFrame]):
+    """An offset between two pixels, such as the width of a bounding box."""
+
     u: float
     v: float
 
 
 @dataclass(kw_only=True)
 class PixelPoint(Point[PixelVector]):
+    """A position in an image, such as a detected keypoint."""
+
     u: float
     v: float
 ```
 
-With `frame = CameraPixels(name="camera")`,
-`PixelPoint(u=4, v=2, coordinate_system=frame) - PixelPoint(u=1, v=1, coordinate_system=frame)`
-is `PixelVector(u=3, v=1, coordinate_system=frame)`. A point or vector type without a
-field for one of the axes raises `MissingAxisCoordinatesError` where it is defined.
-Combining values of two frames raises `ReferenceFrameMismatchError`, and the point's kind of frame is always its
-vector's, since it is read from the vector type. A change
-between two pixel frames implements `AffineCoordinateChange[PixelFrame]` and its
-`apply_to_homogeneous_coordinates`; `apply_transformation` then moves pixel points and
-vectors with no code of their own.
+Step 5 is the only code with logic: the change says how it maps homogeneous
+coordinates, and how it inverts and composes. A crop moves the origin to the crop's
+top-left corner, and a resize scales each axis:
+
+```python
+@dataclass(kw_only=True)
+class CropAndResize(AffineCoordinateChange[PixelFrame]):
+    """From an image's pixels to those of a crop of it, scaled per axis."""
+
+    source_coordinate_system: PixelFrame | None
+    target_coordinate_system: PixelFrame | None
+    crop_u: float = 0.0
+    crop_v: float = 0.0
+    scale_u: float = 1.0
+    scale_v: float = 1.0
+
+    def apply_to_homogeneous_coordinates(
+        self, *, homogeneous_coordinates: tuple[float, ...]
+    ) -> tuple[float, ...]:
+        u, v, weight = homogeneous_coordinates
+        return (
+            self.scale_u * (u - self.crop_u * weight),
+            self.scale_v * (v - self.crop_v * weight),
+            weight,
+        )
+
+    def inverse(self) -> Self:
+        return CropAndResize(
+            source_coordinate_system=self.target_coordinate_system,
+            target_coordinate_system=self.source_coordinate_system,
+            crop_u=-self.crop_u * self.scale_u,
+            crop_v=-self.crop_v * self.scale_v,
+            scale_u=1 / self.scale_u,
+            scale_v=1 / self.scale_v,
+        )
+
+    def __matmul__(self, other: Self) -> Self:
+        return CropAndResize(
+            source_coordinate_system=other.source_coordinate_system,
+            target_coordinate_system=self.target_coordinate_system,
+            crop_u=other.crop_u + self.crop_u / other.scale_u,
+            crop_v=other.crop_v + self.crop_v / other.scale_v,
+            scale_u=self.scale_u * other.scale_u,
+            scale_v=self.scale_v * other.scale_v,
+        )
+```
+
+Everything else comes from the interfaces. A thumbnail cropped from (100, 50) and halved
+moves a keypoint by the crop and then scales it. A bounding box's width is only scaled:
+a vector has no position, so the crop never shifts it.
+
+```python
+camera_image = ImagePixels(name="camera image")
+thumbnail = ImagePixels(name="thumbnail")
+thumbnail_from_camera_image = CropAndResize(
+    source_coordinate_system=camera_image,
+    target_coordinate_system=thumbnail,
+    crop_u=100,
+    crop_v=50,
+    scale_u=0.5,
+    scale_v=0.5,
+)
+
+keypoint = PixelPoint(u=300, v=250, coordinate_system=camera_image)
+box_width = PixelVector(u=40, v=0, coordinate_system=camera_image)
+
+assert keypoint.apply_transformation(
+    transformation=thumbnail_from_camera_image
+) == PixelPoint(u=100, v=100, coordinate_system=thumbnail)
+assert box_width.apply_transformation(
+    transformation=thumbnail_from_camera_image
+) == PixelVector(u=20, v=0, coordinate_system=thumbnail)
+
+# the change back returns the keypoint
+assert keypoint.apply_transformation(
+    transformation=thumbnail_from_camera_image
+).apply_transformation(
+    transformation=thumbnail_from_camera_image.inverse()
+) == keypoint
+
+# arithmetic stays within one frame
+assert keypoint + box_width == PixelPoint(u=340, v=250, coordinate_system=camera_image)
+thumbnail_keypoint = PixelPoint(u=1, v=1, coordinate_system=thumbnail)
+```
+
+What the interfaces refuse, each where it is first possible:
+
+- `keypoint - thumbnail_keypoint`, points of two frames, raises `ReferenceFrameMismatchError`.
+- `box_width.norm()` raises `FrameMeasuresNoLengthsError`: pixels may not be square, so a
+  pixel frame measures no lengths. Measuring needs a camera model that maps pixels to
+  the Cartesian frame of the camera.
+- `box_width.cross(other=box_width)` raises `FrameHasNoCrossProductError`.
+- A `PixelPoint` declared with fields `x` and `y` instead of `u` and `v` raises
+  `MissingAxisCoordinatesError` where the class is defined.
 
 Points of two spaces, such as a body and an image of it, relate only through a map
 between the spaces, such as a camera, never through a coordinate change.
