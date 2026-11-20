@@ -102,3 +102,29 @@ def test_cluster_annotation_requires_minimum_points(
     assert len(clusters.point_clouds) == 1
     assert len(clusters.object_hypotheses) == annotation_count
     assert cas.annotations == clusters.object_hypotheses
+
+
+# %% Annotation source
+def test_renamed_extractor_hypotheses_name_its_class(
+    cluster_extractor: ImageClusterExtractor,
+    monkeypatch: pytest.MonkeyPatch,
+    renamed_annotator_name: str,
+) -> None:
+    """
+    Hypotheses from a renamed extractor record its class, not its instance name.
+    """
+    cas = CAS()
+    monkeypatch.setattr(cluster_extractor, "get_cas", lambda: cas)
+    cluster_extractor.name = renamed_annotator_name
+    cluster_extractor.depth = np.full((12, 12), 1000, dtype=np.uint16)
+    cluster_extractor.camera_intrinsics = open3d.camera.PinholeCameraIntrinsic(
+        12, 12, 1.0, 1.0, 0.0, 0.0
+    )
+    cluster_extractor.descriptor.parameters.min_points_threshold = 1
+    contour = np.array([[[2, 2]], [[9, 2]], [[9, 9]], [[2, 9]]], dtype=np.int32)
+    color_image = np.zeros((12, 12, 3), dtype=np.uint8)
+
+    clusters = cluster_extractor._extract_clusters(color_image, [contour])
+
+    (hypothesis,) = clusters.object_hypotheses
+    assert hypothesis.source == ImageClusterExtractor.get_class_name()

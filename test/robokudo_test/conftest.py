@@ -232,6 +232,17 @@ def annotator_output_buffer() -> AnnotatorOutputPerPipelineMap:
     return buffer
 
 
+# %% annotator naming
+
+
+@pytest.fixture
+def renamed_annotator_name() -> str:
+    """
+    A custom annotator name that differs from every annotator class name.
+    """
+    return "RenamedAnnotator"
+
+
 # %% recorded RGB-D frames
 
 

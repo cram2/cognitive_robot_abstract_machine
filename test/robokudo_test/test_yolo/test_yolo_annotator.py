@@ -264,7 +264,24 @@ def test_detection_becomes_hypothesis_classified_as_detected_class(model_loader,
     assert classification.confidence == pytest.approx(
         model_loader.model.detections[0].confidence
     )
-    assert classification.source == annotator.name
+
+
+def test_renamed_annotator_detection_names_its_class(
+    model_loader, scene, renamed_annotator_name: str
+):
+    """
+    The hypothesis and its classification record the annotator class.
+    """
+    annotator = YoloAnnotator(
+        name=renamed_annotator_name, descriptor=scene.descriptor()
+    )
+    scene.place_in_pipeline(annotator)
+
+    annotator.compute()
+
+    hypothesis = _only_hypothesis(annotator)
+    assert hypothesis.source == YoloAnnotator.get_class_name()
+    assert _classification(hypothesis).source == YoloAnnotator.get_class_name()
 
 
 def test_hypothesis_region_is_detection_bounding_box(model_loader, scene):

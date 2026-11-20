@@ -5,6 +5,8 @@ Tests for the static object detector.
 from __future__ import annotations
 
 # %% Imports
+from dataclasses import dataclass
+
 import numpy as np
 import open3d
 import pytest
@@ -80,14 +82,40 @@ def test_bounding_box_cloud_covers_box_on_depth_resolution(
 
 
 # %% Body-relative bounding boxes
-@pytest.mark.parametrize("explicit_camera_transform", [False, True])
-def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
+@dataclass(kw_only=True)
+class ObservedOffsetBody:
+    """
+    A body whose box is offset from its origin, in view of the detector's camera.
+    """
+
+    detector: StaticObjectDetectorAnnotator
+    """
+    The detector whose CAS holds the camera observation of the body.
+    """
+
+    body: Body
+    """
+    The observed body.
+    """
+
+    shape: Box
+    """
+    The box of the body, offset from the body's origin.
+    """
+
+    world_T_camera: HomogeneousTransformationMatrix
+    """
+    The pose of the camera's optical frame in the world.
+    """
+
+
+@pytest.fixture
+def observed_offset_body(
     detector_on_half_resolution_depth: StaticObjectDetectorAnnotator,
     world_with_two_bodies: tuple[World, Body, Body],
-    explicit_camera_transform: bool,
-) -> None:
+) -> ObservedOffsetBody:
     """
-    Camera and body poses place an offset bounding box in the optical frame.
+    A rotated, offset body whose box projects into the detector's camera image.
     """
     detector = detector_on_half_resolution_depth
     world, root, body = world_with_two_bodies
@@ -134,6 +162,23 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
     )
     detector.descriptor.parameters.create_pose_annotation = True
     detector.descriptor.parameters.create_bounding_box_annotation = True
+    return ObservedOffsetBody(
+        detector=detector, body=body, shape=shape, world_T_camera=world_T_camera
+    )
+
+
+@pytest.mark.parametrize("explicit_camera_transform", [False, True])
+def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
+    observed_offset_body: ObservedOffsetBody,
+    explicit_camera_transform: bool,
+) -> None:
+    """
+    Camera and body poses place an offset bounding box in the optical frame.
+    """
+    detector = observed_offset_body.detector
+    body = observed_offset_body.body
+    shape = observed_offset_body.shape
+    world_T_camera = observed_offset_body.world_T_camera
 
     hypothesis = (
         detector.detect_from_body(body, camera_T_world=world_T_camera.inverse())
@@ -163,3 +208,37 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
         shape.scale.to_np(),
     )
     np.testing.assert_allclose(np.asarray(hypothesis.points.points), [[1.0, -1.0, 6.0]])
+
+
+# %% Annotation source
+
+
+def test_renamed_bounding_box_detection_names_detector_class(
+    detector_on_half_resolution_depth: StaticObjectDetectorAnnotator,
+    renamed_annotator_name: str,
+) -> None:
+    """
+    A hypothesis from the configured bounding box records the detector class.
+    """
+    detector = detector_on_half_resolution_depth
+    detector.name = renamed_annotator_name
+    color_rgb = np.zeros((*detector.depth.shape, 3), dtype=np.uint8)
+
+    hypothesis = detector.detect_from_bb_descriptor(color_rgb)
+
+    assert hypothesis.source == StaticObjectDetectorAnnotator.get_class_name()
+
+
+def test_renamed_body_detection_names_detector_class(
+    observed_offset_body: ObservedOffsetBody,
+    renamed_annotator_name: str,
+) -> None:
+    """
+    A hypothesis from a body's geometry records the detector class.
+    """
+    detector = observed_offset_body.detector
+    detector.name = renamed_annotator_name
+
+    hypothesis = detector.detect_from_body(observed_offset_body.body)
+
+    assert hypothesis.source == StaticObjectDetectorAnnotator.get_class_name()

@@ -472,7 +472,7 @@ class ClusterColorAnnotator(BaseAnnotator):
                 if color_ratio > self.descriptor.parameters.ratio_annotation_threshold:
                     color_annotation = SemanticColor()
                     color_annotation.color = str(color_name.name.lower())
-                    color_annotation.source = self.name
+                    color_annotation.source = self.get_class_name()
                     color_annotation.ratio = color_ratio
                     object_hypothesis.annotations.append(color_annotation)
                 else:

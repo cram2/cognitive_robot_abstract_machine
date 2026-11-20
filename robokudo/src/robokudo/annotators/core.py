@@ -301,16 +301,13 @@ class BaseAnnotator(Behaviour):
             self.get_parent_pipeline().name
         ].init_annotator(self.name)
 
-    def get_class_name(self) -> str:
+    @classmethod
+    def get_class_name(cls) -> str:
         """
-        Get the class name of this annotator.
-
-        Unlike self.name which can be customized, this always returns the actual class
-        name.
-
-        :return: The class name of this annotator
+        :return: The name of this annotator's class, which annotations record as their
+            source. Unlike :attr:`name`, it cannot be customized per instance.
         """
-        return type(self).__name__
+        return cls.__name__
 
     def get_data_from_analysis_scope(
         self, analysis_scope: list[str | type]

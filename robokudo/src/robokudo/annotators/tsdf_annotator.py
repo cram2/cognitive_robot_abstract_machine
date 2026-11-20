@@ -1,3 +1,7 @@
+"""
+Integration of posed object hypotheses into per-object TSDF volumes.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -279,7 +283,7 @@ class TSDFAnnotator(ThreadedAnnotator):
                 extrinsic=pose_in_camera,
             )
 
-            volume_annotation = TSDFAnnotation(source=self.name)
+            volume_annotation = TSDFAnnotation(source=self.get_class_name())
             volume_annotation.volume = volume
             volume_annotation.transform = pose_in_camera
             object_hypothesis.annotations.append(volume_annotation)

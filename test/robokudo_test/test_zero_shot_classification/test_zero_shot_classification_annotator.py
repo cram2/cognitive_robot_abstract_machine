@@ -49,7 +49,7 @@ class ChannelMeanClassificationAnnotator(ZeroShotClassificationAnnotator):
         mean_color = image.reshape(-1, 3).mean(axis=0) / 255.0
         classifications = [
             Classification(
-                source=self.name,
+                source=self.get_class_name(),
                 classname=word,
                 confidence=float(mean_color @ (rgb(COLOR_BY_WORD[word]) / 255.0)),
             )
@@ -150,10 +150,13 @@ def test_object_hypothesis_scope_classifies_each_hypothesis_by_its_region():
 
 
 def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
+    """
+    Hypotheses the filter rejects receive no classification.
+    """
     descriptor = _object_hypothesis_descriptor()
     rejected_object = object_hypothesis(x=0, y=0, width=10, height=10)
-    descriptor.parameters.filter_fn = (
-        lambda hypothesis: hypothesis is not rejected_object
+    descriptor.parameters.filter_fn = lambda hypothesis: (
+        hypothesis is not rejected_object
     )
     annotator = _annotator_in_pipeline(descriptor, two_color_scene())
     accepted_object = object_hypothesis(x=30, y=0, width=10, height=10)

@@ -283,13 +283,3 @@ def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
         fy=1 / color_to_depth_ratio.vertical,
         interpolation=cv2.INTER_NEAREST,
     )
-
-
-def generate_source_name(annotator: BaseAnnotator) -> str:
-    """
-    Helper to create the standard name for the 'source' field of Annotations.
-
-    :param annotator: The annotator to generate the source name for
-    :return: The source name as string
-    """
-    return type(annotator).__name__

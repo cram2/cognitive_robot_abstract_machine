@@ -306,13 +306,20 @@ def test_classification_keeps_save_top_k_classifications(color_embedding_clip):
     assert len(classifications) == descriptor.parameters.save_top_k
 
 
-def test_classifications_name_the_annotator_as_source(color_embedding_clip):
-    annotator = CLIPAnnotator(descriptor=_color_descriptor())
+def test_classifications_name_the_annotator_class_as_source(
+    color_embedding_clip, renamed_annotator_name: str
+):
+    """
+    Classifications record the annotator class, not its instance name.
+    """
+    annotator = CLIPAnnotator(
+        name=renamed_annotator_name, descriptor=_color_descriptor()
+    )
 
     classifications = _classify_solid_image(annotator, COLOR_BY_WORD["red"])
 
     assert {classification.source for classification in classifications} == {
-        annotator.name
+        CLIPAnnotator.get_class_name()
     }
 
 

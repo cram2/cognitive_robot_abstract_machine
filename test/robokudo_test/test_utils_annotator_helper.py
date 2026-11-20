@@ -28,7 +28,6 @@ from robokudo.utils.annotator_helper import (
     get_color_image,
     scale_camera_intrinsics,
     resize_mask,
-    generate_source_name,
 )
 from krrood_spatial_math.spatial_types import Point2
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
@@ -555,7 +554,3 @@ class TestUtilsAnnotatorHelper(object):
         resized_mask = resize_mask(annotator_in_pipeline, mask)
 
         assert np.array_equal(mask, resized_mask)
-
-    def test_generate_source_name(self, annotator_in_pipeline: BaseAnnotator) -> None:
-        name = generate_source_name(annotator_in_pipeline)
-        assert name == type(annotator_in_pipeline).__name__

@@ -1,3 +1,7 @@
+"""
+Zero-shot classification of images against a vocabulary with CLIP.
+"""
+
 from __future__ import annotations
 
 import faiss
@@ -173,7 +177,7 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
         return [
             [
                 Classification(
-                    source=self.name,
+                    source=self.get_class_name(),
                     classname=self.descriptor.parameters.vocabulary[index],
                     confidence=similarity,
                 )
