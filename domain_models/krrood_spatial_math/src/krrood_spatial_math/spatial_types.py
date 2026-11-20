@@ -2662,13 +2662,17 @@ class RigidMotionRate(VectorPair, ABC):
 
     @classproperty
     def _series_rotation_angle(cls) -> float:
-        """
-        The rotation angle below which the left Jacobian's coefficients are the first
-        three terms of their series, not their closed forms (`Todesco and Brüls
-        <https://orbi.uliege.be/handle/2268/306081>`__, section 8): where leaving out
-        the fourth term costs as much accuracy as the closed forms' round-off::
+        r"""
+        The rotation angle below which the left Jacobian's coefficients take three terms
+        of their series: omitting the fourth costs what the closed forms' round-off does
+        (`Todesco and Brüls <https://orbi.uliege.be/handle/2268/306081>`__, section 8):
 
-            2 φ⁶ / 8! = 2 ε / φ²  ⇒  φ = (8! ε)^(1/8) ≈ 0.042 rad,  ε: machine epsilon
+        .. math::
+
+            \frac{2 \varphi^6}{8!} = \frac{2 \varepsilon}{\varphi^2}
+            \quad\Rightarrow\quad
+            \varphi = (8!\,\varepsilon)^{1/8} \approx 0.042\ \text{rad},
+            \qquad \varepsilon\text{: machine epsilon}
         """
         return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
 
@@ -2697,15 +2701,15 @@ class RigidMotionRate(VectorPair, ABC):
     def _apply_left_jacobian(
         cls, *, rotation: Vector3, translation: Vector3
     ) -> Vector3:
-        """
-        :param rotation: The rotation vector ``r`` the body turns by.
-        :param translation: The vector ``t`` the origin of the body would move by
+        r"""
+        :param rotation: The rotation vector :math:`r` the body turns by.
+        :param translation: The vector :math:`t` the origin of the body would move by
             without turning.
         :return: Where the origin of the body ends up when it turns while it moves:
-            ``t + a (r × t) + b (r × (r × t))``, with ``a`` from
-            :meth:`_first_order_coefficient` and ``b`` from
-            :meth:`_second_order_coefficient`. This is the left Jacobian of ``r``
-            applied to ``t`` (Eade, `Lie Groups for 2D and 3D Transformations
+            :math:`t + a\,(r \times t) + b\,(r \times (r \times t))`, with :math:`a`
+            from :meth:`_first_order_coefficient` and :math:`b` from
+            :meth:`_second_order_coefficient`. This is the left Jacobian of :math:`r`
+            applied to :math:`t` (Eade, `Lie Groups for 2D and 3D Transformations
             <https://www.ethaneade.com/lie.pdf>`__, section 3.2, equation (83)).
         """
         angle_squared = rotation.dot(rotation)
@@ -2719,13 +2723,18 @@ class RigidMotionRate(VectorPair, ABC):
 
     @classmethod
     def _first_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
-        """
-        The coefficient of ``r × t`` in :meth:`_apply_left_jacobian`, for the rotation
-        angle ``φ``. Above :attr:`_series_rotation_angle` it is the closed form
-        ``(1 − cos φ) / φ²``, below it the first three terms of its series,
-        ``1/2! − φ²/4! + φ⁴/6!`` (Eade, section 3.2, equations (76) and (75)).
+        r"""
+        The coefficient :math:`a` of :math:`r \times t` in the left Jacobian: above
+        :attr:`_series_rotation_angle` the closed form, below it the first three terms
+        of its series (Eade, section 3.2, equations (76) and (75)):
 
-        :param angle_squared: ``φ²``, the square of the angle the body turns by.
+        .. math::
+
+            a = \frac{1 - \cos\varphi}{\varphi^2}
+            \approx \frac{1}{2!} - \frac{\varphi^2}{4!} + \frac{\varphi^4}{6!}
+
+        :param angle_squared: :math:`\varphi^2`, the square of the angle the body
+            turns by.
         """
         angle = sm.sqrt(angle_squared)
         series = (
@@ -2740,13 +2749,18 @@ class RigidMotionRate(VectorPair, ABC):
 
     @classmethod
     def _second_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
-        """
-        The coefficient of ``r × (r × t)`` in :meth:`_apply_left_jacobian`, for the
-        rotation angle ``φ``. Above :attr:`_series_rotation_angle` it is the closed form
-        ``(φ − sin φ) / φ³``, below it the first three terms of its series,
-        ``1/3! − φ²/5! + φ⁴/7!`` (Eade, section 3.2, equations (76) and (75)).
+        r"""
+        The coefficient :math:`b` of :math:`r \times (r \times t)` in the left Jacobian:
+        above :attr:`_series_rotation_angle` the closed form, below it the first three
+        terms of its series (Eade, section 3.2, equations (76) and (75)):
 
-        :param angle_squared: ``φ²``, the square of the angle the body turns by.
+        .. math::
+
+            b = \frac{\varphi - \sin\varphi}{\varphi^3}
+            \approx \frac{1}{3!} - \frac{\varphi^2}{5!} + \frac{\varphi^4}{7!}
+
+        :param angle_squared: :math:`\varphi^2`, the square of the angle the body
+            turns by.
         """
         angle = sm.sqrt(angle_squared)
         series = (

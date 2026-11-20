@@ -8,6 +8,7 @@ import json
 
 import numpy as np
 import pytest
+from scipy.linalg import expm
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
@@ -15,7 +16,7 @@ from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
 from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
 
 from .dataset.frames import KnownFrames
-from .reference_implementations import matrix_exponential, rigid_motion_rate_matrix
+from .reference_implementations import rigid_motion_rate_matrix
 
 # %% the parts of a screw axis
 
@@ -228,7 +229,7 @@ def test_the_displacement_agrees_with_the_matrix_exponential(position: float):
         rotation_per_unit_position=Vector3(0.0, 0.6, 0.8),
         translation_per_unit_position=Vector3(0.3, -0.2, 0.1),
     )
-    expected = matrix_exponential(
+    expected = expm(
         rigid_motion_rate_matrix(
             rotation=screw_axis.rotation_per_unit_position.to_np()[:3],
             translation=screw_axis.translation_per_unit_position.to_np()[:3],
