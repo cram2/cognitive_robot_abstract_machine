@@ -50,6 +50,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
     BinomialLayer,
+    TruncatedBinomialLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
@@ -266,8 +267,8 @@ class BinomialLeavesToBinomialLayerConverter(
 ): ...
 
 
-class TruncatedBinomialLeavesToBinomialLayerConverter(
-    LeavesToInputLayerConverter[TruncatedBinomialDistribution, BinomialLayer]
+class TruncatedBinomialLeavesToTruncatedBinomialLayerConverter(
+    LeavesToInputLayerConverter[TruncatedBinomialDistribution, TruncatedBinomialLayer]
 ): ...
 
 

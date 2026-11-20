@@ -28,6 +28,7 @@ from probabilistic_model.exceptions import SuccessProbabilityOutsideUnitInterval
 from probabilistic_model.learning.row_kernel_mixture import RowKernelMixture
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
     BinomialLayer,
+    TruncatedBinomialLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
@@ -192,7 +193,7 @@ def test_a_truncated_layer_holds_the_truncated_distributions(
         truncation = layer.log_truncated_of_assignment(assignment, False)
         expected = [distribution.log_truncated(event) for distribution in distributions]
 
-    assert type(truncation.layer) is BinomialLayer
+    assert type(truncation.layer) is TruncatedBinomialLayer
     assert np.allclose(
         truncation.log_probabilities, [each.log_probability for each in expected]
     )
@@ -242,7 +243,7 @@ def test_conditioning_on_a_value_keeps_only_that_value(layer, distributions, cou
             [distribution.probabilities[2] for distribution in distributions]
         )
 
-    assert type(conditioning.layer) is BinomialLayer
+    assert type(conditioning.layer) is TruncatedBinomialLayer
     assert isinstance(
         conditioning.layer.node_distribution(1, count), TruncatedBinomialDistribution
     )
@@ -250,6 +251,56 @@ def test_conditioning_on_a_value_keeps_only_that_value(layer, distributions, cou
     assert np.allclose(
         conditioning.layer.log_likelihood_of_nodes(np.array([[2.0]]))[0, :2], 0.0
     )
+
+
+def test_a_layer_of_truncated_distributions_holds_them(distributions, count, values):
+    """
+    A truncated layer made of truncated distributions has them as its nodes and their
+    log-likelihoods.
+    """
+    truncated = [
+        TruncatedBinomialDistribution(
+            variable=count,
+            number_of_trials=distribution.number_of_trials,
+            success_probability=distribution.success_probability,
+            offset=distribution.offset,
+            truncation_interval=closed(-1, 0) | closed(2, 3),
+        )
+        for distribution in distributions[:2]
+    ]
+    layer = TruncatedBinomialLayer.from_distributions(0, truncated)
+    with np.errstate(divide="ignore"):
+        expected = np.log(
+            [
+                [distribution.probabilities[value] for distribution in truncated]
+                for value in values[:, 0]
+            ]
+        )
+
+    assert np.allclose(layer.log_likelihood_of_nodes(values), expected)
+    for node, distribution in zip(layer.node_distributions(count), truncated):
+        assert dict(node.probabilities) == pytest.approx(
+            dict(distribution.probabilities)
+        )
+
+
+def test_selected_and_concatenated_truncated_layers_keep_their_nodes(
+    layer, distributions, count
+):
+    """
+    Selecting nodes of a truncated layer and joining truncated layers keep every node
+    restricted as it was.
+    """
+    truncated = layer.log_truncated_of_assignment(closed(0, 2), False).layer
+    expected = truncated.node_distributions(count)
+    pieces = [
+        truncated.select_nodes(np.array([True, False, False])),
+        truncated.select_nodes(np.array([False, True, True])),
+    ]
+    joined = TruncatedBinomialLayer.concatenate(pieces)
+    assert [dict(node.probabilities) for node in joined.node_distributions(count)] == [
+        dict(node.probabilities) for node in expected
+    ]
 
 
 # %% the success probabilities are parameters

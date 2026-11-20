@@ -1,5 +1,6 @@
 """
-The tensorized input layer whose leaves are binomial distributions, truncated or not.
+The tensorized input layers whose leaves are binomial and truncated binomial
+distributions.
 """
 
 from __future__ import annotations
@@ -55,12 +56,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 @dataclass(eq=False, repr=False, kw_only=True)
 class BinomialLayer(UnivariateInputLayer):
     """
-    A layer of binomial distributions over one integer variable, each restricted to its
-    :attr:`allowed_successes` and renormalized, see
-    :class:`~probabilistic_model.distributions.binomial.BinomialDistribution` and
-    :class:`~probabilistic_model.distributions.binomial.TruncatedBinomialDistribution`.
+    A layer of binomial distributions over one integer variable, see
+    :class:`~probabilistic_model.distributions.binomial.BinomialDistribution`.
 
     The success probabilities are its parameters; everything else is structure.
+    Truncated or conditioned, it becomes a :class:`TruncatedBinomialLayer`.
     """
 
     number_of_trials: NodeIntegers
@@ -76,12 +76,6 @@ class BinomialLayer(UnivariateInputLayer):
     offset: NodeIntegers
     """
     The value of no success of every node.
-    """
-
-    allowed_successes: NodeStateMask
-    """
-    The numbers of :attr:`successes` every node is restricted to; an untruncated node
-    allows every one up to its number of trials.
     """
 
     @property
@@ -109,16 +103,13 @@ class BinomialLayer(UnivariateInputLayer):
     def validate_own(self):
         """
         :raises ShapeMismatchError: If the nodes do not each have a number of trials, a
-            success probability, an offset and a flag per number of successes.
+            success probability and an offset.
         :raises SuccessProbabilityOutsideUnitIntervalError: If a success probability is
             not within [0, 1].
         """
         for other in (self.success_probability, self.offset):
             if self.number_of_trials.shape != other.shape:
                 raise ShapeMismatchError(self.number_of_trials.shape, other.shape)
-        expected_shape = (self.number_of_nodes, len(self.successes))
-        if self.allowed_successes.shape != expected_shape:
-            raise ShapeMismatchError(self.allowed_successes.shape, expected_shape)
         success_probability = self.host_copy(self.success_probability)
         # the negated comparison also catches a success probability that is nan
         outside = ~((success_probability >= 0) & (success_probability <= 1))
@@ -145,6 +136,13 @@ class BinomialLayer(UnivariateInputLayer):
         """
         return self.offset[:, None] + self.successes[None, :]
 
+    def possible_successes(self) -> NodeStateMask:
+        """
+        :return: The numbers of :attr:`successes` every node can have, shape (#nodes,
+            #numbers).
+        """
+        return self.successes[None, :] <= self.number_of_trials[:, None]
+
     def log_coefficients_of_successes(self) -> NodeStateValues:
         """
         :return: The logarithm of the binomial coefficient of every number of
@@ -166,24 +164,14 @@ class BinomialLayer(UnivariateInputLayer):
     def log_probabilities_of_successes(self) -> NodeStateValues:
         """
         :return: The log-probability of every number of :attr:`successes` under every
-            node, ``-inf`` where it is not allowed, shape (#nodes, #numbers).
+            node, ``-inf`` where it is not possible, shape (#nodes, #numbers).
         """
-        namespace = self.namespace
         successes = self.successes[None, :]
-        log_binomial = self.log_coefficients_of_successes() + self.log_success_terms(
+        return self.log_coefficients_of_successes() + self.log_success_terms(
             successes=self.backend_array(values=successes),
             failures=self.backend_array(
                 values=np.maximum(self.number_of_trials[:, None] - successes, 0)
             ),
-        )
-        allowed = namespace.asarray(self.allowed_successes, device=self.device)
-        restricted = namespace.where(allowed, log_binomial, -namespace.inf)
-        mass = namespace.sum(namespace.exp(restricted), axis=1, keepdims=True)
-        possible = mass > 0
-        return namespace.where(
-            possible,
-            restricted - namespace.log(namespace.where(possible, mass, 1.0)),
-            -namespace.inf,
         )
 
     def log_success_terms(
@@ -347,7 +335,7 @@ class BinomialLayer(UnivariateInputLayer):
     def type_of_truncated_layer(
         self, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> type[Layer]:
-        return self.__class__
+        return TruncatedBinomialLayer
 
     def log_truncated_of_assignment(
         self, assignment: AbstractCompositeSet, singleton_allowed: bool
@@ -359,12 +347,8 @@ class BinomialLayer(UnivariateInputLayer):
                 np.where(selected, probabilities, 0.0).sum(axis=1)
             )
         return LayerWithLogProbabilities(
-            dataclasses.replace(
-                self,
-                number_of_trials=self.number_of_trials.copy(),
-                success_probability=self.host_copy(self.success_probability).copy(),
-                offset=self.offset.copy(),
-                allowed_successes=self.allowed_successes & selected,
+            TruncatedBinomialLayer.from_binomial_layer(
+                layer=self, allowed_successes=self.possible_successes() & selected
             ),
             log_probabilities,
         )
@@ -378,17 +362,142 @@ class BinomialLayer(UnivariateInputLayer):
     # %% nodes
 
     def node_distribution(self, index: int, variable: Variable) -> BinomialDistribution:
-        untruncated = BinomialDistribution(
+        return BinomialDistribution(
             variable=variable,
             number_of_trials=int(self.number_of_trials[index]),
             success_probability=float(self.host_copy(self.success_probability)[index]),
             offset=int(self.offset[index]),
         )
-        allowed = self.allowed_successes[index]
-        if np.array_equal(allowed, self.successes <= self.number_of_trials[index]):
-            return untruncated
+
+    @classmethod
+    def from_distributions(
+        cls, variable_index: int, distributions: list[BinomialDistribution]
+    ) -> Self:
+        return cls(
+            variable=variable_index,
+            number_of_trials=np.array(
+                [distribution.number_of_trials for distribution in distributions],
+                dtype=np.int64,
+            ),
+            success_probability=np.array(
+                [distribution.success_probability for distribution in distributions],
+                dtype=float,
+            ),
+            offset=np.array(
+                [distribution.offset for distribution in distributions], dtype=np.int64
+            ),
+        )
+
+    def select_nodes(self, mask: NodeMask) -> Self:
+        return dataclasses.replace(
+            self,
+            number_of_trials=self.number_of_trials[mask],
+            success_probability=self.success_probability[mask],
+            offset=self.offset[mask],
+        )
+
+    @classmethod
+    def concatenate(cls, layers: list[Self]) -> Self:
+        return dataclasses.replace(
+            layers[0],
+            number_of_trials=np.concatenate(
+                [layer.number_of_trials for layer in layers]
+            ),
+            success_probability=np.concatenate(
+                [layer.success_probability for layer in layers]
+            ),
+            offset=np.concatenate([layer.offset for layer in layers]),
+        )
+
+    def has_equal_parameters(self, other: Self) -> bool:
+        return (
+            np.array_equal(self.number_of_trials, other.number_of_trials)
+            and np.array_equal(self.offset, other.offset)
+            and np.array_equal(
+                self.host_copy(self.success_probability),
+                self.host_copy(other.success_probability),
+            )
+        )
+
+
+# %% truncated binomial layer
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class TruncatedBinomialLayer(BinomialLayer):
+    """
+    A layer of binomial distributions over one integer variable, each restricted to its
+    :attr:`allowed_successes` and renormalized, see
+    :class:`~probabilistic_model.distributions.binomial.TruncatedBinomialDistribution`.
+    """
+
+    allowed_successes: NodeStateMask
+    """
+    The numbers of :attr:`successes` every node is restricted to.
+    """
+
+    @classmethod
+    def from_binomial_layer(
+        cls, *, layer: BinomialLayer, allowed_successes: NodeStateMask
+    ) -> Self:
+        """
+        :param layer: The layer whose nodes to truncate.
+        :param allowed_successes: The numbers of successes every node is restricted to.
+        :return: The nodes of the layer restricted to these numbers of successes, with
+            copies of its arrays on the host.
+        """
+        return cls(
+            variable=layer.variable,
+            number_of_trials=layer.number_of_trials.copy(),
+            success_probability=layer.host_copy(layer.success_probability).copy(),
+            offset=layer.offset.copy(),
+            allowed_successes=allowed_successes,
+        )
+
+    def validate_own(self):
+        """
+        Like :meth:`BinomialLayer.validate_own`, and also:
+
+        :raises ShapeMismatchError: If the nodes do not each have a flag per number of
+            successes.
+        """
+        super().validate_own()
+        expected_shape = (self.number_of_nodes, len(self.successes))
+        if self.allowed_successes.shape != expected_shape:
+            raise ShapeMismatchError(self.allowed_successes.shape, expected_shape)
+
+    def possible_successes(self) -> NodeStateMask:
+        """
+        Like :meth:`BinomialLayer.possible_successes`, only the
+        :attr:`allowed_successes`.
+        """
+        return super().possible_successes() & self.allowed_successes
+
+    def log_probabilities_of_successes(self) -> NodeStateValues:
+        """
+        Like :meth:`BinomialLayer.log_probabilities_of_successes`, restricted to the
+        :attr:`allowed_successes` and renormalized.
+        """
+        namespace = self.namespace
+        restricted = namespace.where(
+            namespace.asarray(self.allowed_successes, device=self.device),
+            super().log_probabilities_of_successes(),
+            -namespace.inf,
+        )
+        largest = namespace.max(restricted, axis=1, keepdims=True)
+        possible = largest > -namespace.inf
+        shift = namespace.where(possible, largest, 0.0)
+        mass = namespace.sum(namespace.exp(restricted - shift), axis=1, keepdims=True)
+        log_mass = shift + namespace.log(namespace.where(possible, mass, 1.0))
+        return namespace.where(possible, restricted - log_mass, -namespace.inf)
+
+    def node_distribution(
+        self, index: int, variable: Variable
+    ) -> TruncatedBinomialDistribution:
+        untruncated = super().node_distribution(index, variable)
         truncation_interval = Interval()
-        for value in self.values_of_successes[index][allowed].tolist():
+        values = self.values_of_successes[index][self.possible_successes()[index]]
+        for value in values.tolist():
             truncation_interval |= singleton(value)
         return TruncatedBinomialDistribution(
             variable=variable,
@@ -400,24 +509,12 @@ class BinomialLayer(UnivariateInputLayer):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[BinomialDistribution]
+        cls, variable_index: int, distributions: list[TruncatedBinomialDistribution]
     ) -> Self:
-        number_of_trials = np.array(
-            [distribution.number_of_trials for distribution in distributions],
-            dtype=np.int64,
-        )
-        offset = np.array(
-            [distribution.offset for distribution in distributions], dtype=np.int64
-        )
-        values = offset[:, None] + np.arange(int(number_of_trials.max(initial=0)) + 1)
-        return cls(
-            variable=variable_index,
-            number_of_trials=number_of_trials,
-            success_probability=np.array(
-                [distribution.success_probability for distribution in distributions],
-                dtype=float,
-            ),
-            offset=offset,
+        untruncated = BinomialLayer.from_distributions(variable_index, distributions)
+        values = untruncated.values_of_successes
+        return cls.from_binomial_layer(
+            layer=untruncated,
             allowed_successes=np.array(
                 [
                     [value in distribution.allowed_values for value in row]
@@ -428,34 +525,27 @@ class BinomialLayer(UnivariateInputLayer):
         )
 
     def select_nodes(self, mask: NodeMask) -> Self:
-        number_of_trials = self.number_of_trials[mask]
+        selected = super().select_nodes(mask)
         return dataclasses.replace(
-            self,
-            number_of_trials=number_of_trials,
-            success_probability=self.success_probability[mask],
-            offset=self.offset[mask],
+            selected,
             allowed_successes=self.allowed_successes[mask][
-                :, : int(number_of_trials.max(initial=0)) + 1
+                :, : len(selected.successes)
             ],
         )
 
     @classmethod
     def concatenate(cls, layers: list[Self]) -> Self:
-        number_of_columns = max(len(layer.successes) for layer in layers)
+        concatenated = super().concatenate(layers)
         return dataclasses.replace(
-            layers[0],
-            number_of_trials=np.concatenate(
-                [layer.number_of_trials for layer in layers]
-            ),
-            success_probability=np.concatenate(
-                [layer.success_probability for layer in layers]
-            ),
-            offset=np.concatenate([layer.offset for layer in layers]),
+            concatenated,
             allowed_successes=np.concatenate(
                 [
                     np.pad(
                         layer.allowed_successes,
-                        ((0, 0), (0, number_of_columns - len(layer.successes))),
+                        (
+                            (0, 0),
+                            (0, len(concatenated.successes) - len(layer.successes)),
+                        ),
                     )
                     for layer in layers
                 ]
@@ -463,12 +553,6 @@ class BinomialLayer(UnivariateInputLayer):
         )
 
     def has_equal_parameters(self, other: Self) -> bool:
-        return (
-            np.array_equal(self.number_of_trials, other.number_of_trials)
-            and np.array_equal(self.offset, other.offset)
-            and np.array_equal(self.allowed_successes, other.allowed_successes)
-            and np.array_equal(
-                self.host_copy(self.success_probability),
-                self.host_copy(other.success_probability),
-            )
+        return super().has_equal_parameters(other) and np.array_equal(
+            self.allowed_successes, other.allowed_successes
         )

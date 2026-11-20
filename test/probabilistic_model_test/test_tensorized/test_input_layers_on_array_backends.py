@@ -35,6 +35,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base impor
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
     BinomialLayer,
+    TruncatedBinomialLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
@@ -238,39 +239,69 @@ def integer_case() -> InputLayerQueryCase:
 
 
 @pytest.fixture
-def binomial_case() -> InputLayerQueryCase:
+def binomial_distributions() -> list[BinomialDistribution]:
     """
-    Binomial distributions of different trials and offsets, one certain to succeed and
-    one truncated to some of its values.
+    Binomial distributions of different trials and offsets, one certain to succeed.
     """
     count = Integer("n")
-    layer = BinomialLayer.from_distributions(
-        0,
-        [
-            BinomialDistribution(
-                variable=count, number_of_trials=2, success_probability=0.3, offset=1
-            ),
-            BinomialDistribution(
-                variable=count, number_of_trials=5, success_probability=0.5, offset=-1
-            ),
-            BinomialDistribution(
-                variable=count, number_of_trials=3, success_probability=1.0
-            ),
-            TruncatedBinomialDistribution(
-                variable=count,
-                number_of_trials=4,
-                success_probability=0.6,
-                truncation_interval=closed(1, 2) | closed(4, 4),
-            ),
-        ],
-    )
+    return [
+        BinomialDistribution(
+            variable=count, number_of_trials=2, success_probability=0.3, offset=1
+        ),
+        BinomialDistribution(
+            variable=count, number_of_trials=5, success_probability=0.5, offset=-1
+        ),
+        BinomialDistribution(
+            variable=count, number_of_trials=3, success_probability=1.0
+        ),
+    ]
+
+
+def binomial_layer_case(layer: BinomialLayer, variable: Integer) -> InputLayerQueryCase:
+    """
+    :param layer: A binomial layer with numpy parameters.
+    :param variable: Its variable.
+    :return: The case of the layer, its success probabilities in any backend.
+    """
     return InputLayerQueryCase(
         build=lambda namespace: layer.copy_with_parameters(
             [namespace.asarray(layer.success_probability)]
         ),
-        variable=count,
+        variable=variable,
         values=[-2.0, -1.0, 0.0, 1.0, 1.5, 2.0, 3.0, 4.0, 7.0],
         assignment=closed(0, 1) | closed(3, 6),
+    )
+
+
+@pytest.fixture
+def binomial_case(binomial_distributions) -> InputLayerQueryCase:
+    """
+    The layer of the binomial distributions.
+    """
+    return binomial_layer_case(
+        BinomialLayer.from_distributions(0, binomial_distributions),
+        binomial_distributions[0].variable,
+    )
+
+
+@pytest.fixture
+def truncated_binomial_case(binomial_distributions) -> InputLayerQueryCase:
+    """
+    The binomial distributions truncated to values that leave one of them none.
+    """
+    truncated = [
+        TruncatedBinomialDistribution(
+            variable=distribution.variable,
+            number_of_trials=distribution.number_of_trials,
+            success_probability=distribution.success_probability,
+            offset=distribution.offset,
+            truncation_interval=closed(-1, 0) | closed(2, 2),
+        )
+        for distribution in binomial_distributions
+    ]
+    return binomial_layer_case(
+        TruncatedBinomialLayer.from_distributions(0, truncated),
+        binomial_distributions[0].variable,
     )
 
 
@@ -311,6 +342,7 @@ def symbolic_case() -> InputLayerQueryCase:
         "dirac_delta_case",
         "integer_case",
         "binomial_case",
+        "truncated_binomial_case",
         "symbolic_case",
     ]
 )
@@ -329,6 +361,7 @@ def input_layer_case(request) -> InputLayerQueryCase:
         "dirac_delta_case",
         "integer_case",
         "binomial_case",
+        "truncated_binomial_case",
     ]
 )
 def ordered_input_layer_case(request) -> InputLayerQueryCase:
