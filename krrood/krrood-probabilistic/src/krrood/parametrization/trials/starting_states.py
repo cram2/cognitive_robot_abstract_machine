@@ -13,8 +13,8 @@ from multiprocessing.managers import EventProxy
 from typing_extensions import Generic, TypeVar
 
 from krrood.parametrization.trials.database import ObjectDatabase
-from krrood.parametrization.trials.workers import ParallelJob, WorkerPool
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood_compute_resources.workers import ParallelJob, WorkerPool
 
 TState = TypeVar("TState")
 """

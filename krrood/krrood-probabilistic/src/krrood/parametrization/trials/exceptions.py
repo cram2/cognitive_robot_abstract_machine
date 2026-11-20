@@ -123,33 +123,6 @@ class NoSuccessfulTrials(InputError):
 
 
 @dataclass(kw_only=True)
-class NotEnoughMemoryForWorkers(DataclassException):
-    """
-    Raised when not even one worker fits into the working memory that is free and
-    budgeted.
-    """
-
-    memory_per_worker: int
-    """
-    How much working memory each worker needs, in bytes.
-    """
-
-    available_memory: int
-    """
-    How much working memory the workers may use, in bytes.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"A worker of {self.memory_per_worker / 1e9:.1f} GB needs more than the "
-            f"{self.available_memory / 1e9:.1f} GB the workers may use."
-        )
-
-    def suggest_correction(self) -> str:
-        return "Raise the memory budget, or free working memory first."
-
-
-@dataclass(kw_only=True)
 class OutcomeDidNotVaryInPilot(DataclassException):
     """
     Raised when every pilot trial of a campaign came out the same, such as when success

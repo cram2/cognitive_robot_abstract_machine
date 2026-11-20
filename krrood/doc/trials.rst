@@ -63,7 +63,9 @@ trials of one starting state:
         ),
         pilot_trials=20,
         worker_pool=WorkerPool(
-            number_of_workers=48, memory_per_worker=4 * 10**9, memory_budget=120 * 10**9
+            number_of_workers=48,
+            memory_per_worker=4 * 10**9,
+            memory=BudgetedMemory(memory=HostMemory(), budget_bytes=120 * 10**9),
         ),
     )
     campaign.run()
@@ -71,8 +73,8 @@ trials of one starting state:
     analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
     [strongest, *_] = analysis.effects_on_success()
 
-The :class:`~krrood.parametrization.trials.workers.WorkerPool` runs only as many workers as
-fit into the free working memory and its budget, here 30. Stop a campaign by
+The :class:`~krrood_compute_resources.workers.WorkerPool` runs only as many workers as fit
+into the free memory it is given, here at most 30 within a budget of 120 GB. Stop a campaign by
 interrupting or terminating its own process, never its workers: every worker finishes
 its current trial and stops, and every finished trial stays kept.
 

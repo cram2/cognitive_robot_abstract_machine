@@ -31,6 +31,7 @@ dependencies = [
     "krrood-eql==26.10.0",
     "krrood-ormatic==26.10.0",
     "krrood-symbolic-math==26.10.0",
+    "krrood_compute_resources>=26.10.0",
     "numpy",
     "pandas",
     "sqlalchemy",

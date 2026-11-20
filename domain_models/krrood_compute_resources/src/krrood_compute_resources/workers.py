@@ -1,25 +1,25 @@
 """
 Working through items in several worker processes at once, as many as fit into the
-working memory, stopping cleanly when asked to.
+memory of the host, stopping cleanly when asked to.
 """
 
 from __future__ import annotations
 
-import os
 import signal
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from multiprocessing import get_context
 from multiprocessing.managers import EventProxy
 
 from typing_extensions import Any, Generic, TypeVar
 
-from krrood.parametrization.trials.exceptions import NotEnoughMemoryForWorkers
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood_compute_resources.exceptions import NotEnoughMemoryForWorkers
+from krrood_compute_resources.memory import DeviceMemory, HostMemory
 
 TItem = TypeVar("TItem")
 """
@@ -57,7 +57,7 @@ class ParallelJob(Generic[TItem, TResult], SubClassSafeGeneric, ABC):
 @dataclass(kw_only=True)
 class WorkerPool:
     """
-    Runs a job in as many worker processes as fit into the working memory.
+    Runs a job in as many worker processes as fit into the free memory of the host.
 
     An interrupt or a termination signal to this process lets every worker finish its
     current item and stop, keeping what is done.
@@ -70,34 +70,29 @@ class WorkerPool:
 
     memory_per_worker: int | None = None
     """
-    How much working memory a worker needs at most, in bytes; ``None`` when the workers
-    are not sized by memory.
+    How much memory a worker needs at most, in bytes; ``None`` when the workers are not
+    sized by memory.
     """
 
-    memory_budget: int | None = None
+    memory: DeviceMemory = field(default_factory=HostMemory)
     """
-    How much working memory all workers together may use, in bytes; ``None`` for all
-    that is free.
+    The memory the workers share, such as a :class:`BudgetedMemory` of the host to leave
+    room for other processes.
     """
 
     def workers_that_fit(self) -> int:
         """
         :return: How many workers run: :attr:`number_of_workers`, or fewer where not
-            that many fit into the free and budgeted working memory.
+            that many fit into the free bytes of :attr:`memory`.
         :raises NotEnoughMemoryForWorkers: If not even one worker fits.
         """
         if self.memory_per_worker is None:
             return self.number_of_workers
-        available_memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_AVPHYS_PAGES")
-        if self.memory_budget is not None:
-            available_memory = min(available_memory, self.memory_budget)
-        fitting = min(
-            self.number_of_workers, available_memory // self.memory_per_worker
-        )
+        free_bytes = self.memory.free_bytes()
+        fitting = min(self.number_of_workers, free_bytes // self.memory_per_worker)
         if fitting == 0:
             raise NotEnoughMemoryForWorkers(
-                memory_per_worker=self.memory_per_worker,
-                available_memory=available_memory,
+                memory_per_worker=self.memory_per_worker, free_bytes=free_bytes
             )
         return fitting
 

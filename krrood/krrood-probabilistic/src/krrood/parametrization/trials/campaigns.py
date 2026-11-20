@@ -14,8 +14,8 @@ from typing_extensions import Generic
 from krrood.parametrization.trials.exceptions import OutcomeDidNotVaryInPilot
 from krrood.parametrization.trials.parameter_spaces import ParameterSource
 from krrood.parametrization.trials.records import TParameters, TTrial
-from krrood.parametrization.trials.workers import ParallelJob, WorkerPool
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood_compute_resources.workers import ParallelJob, WorkerPool
 
 # %% trying and storing
 
