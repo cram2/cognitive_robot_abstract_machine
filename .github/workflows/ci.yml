@@ -37,7 +37,7 @@ jobs:
     # a draft pull request runs no CI; marking it ready for review starts the run
     if: ${{ !github.event.pull_request.draft }}
     # A pull request runs only the tests its change can affect; every other event runs them
-    # all. The libraries that share a job are listed in .github/ci_jobs.toml.
+    # all. The libraries that share a job are listed in .github/continuous_integration_jobs.toml.
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
@@ -62,7 +62,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             since=(--since HEAD^1)
           fi
-          matrix=$(python scripts/select_ci_jobs.py "${since[@]}")
+          matrix=$(python scripts/select_continuous_integration_jobs.py "${since[@]}")
           echo "$matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
@@ -74,7 +74,7 @@ jobs:
     uses: ./.github/workflows/ci_reusable.yml
     with:
       name: ${{ matrix.name }}
-      libs: ${{ matrix.libs }}
+      libraries: ${{ matrix.libraries }}
       test_paths: ${{ matrix.test_paths }}
       repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
       check_rules: ${{ matrix.check_rules }}

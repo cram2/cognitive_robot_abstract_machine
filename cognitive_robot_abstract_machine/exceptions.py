@@ -172,7 +172,7 @@ class UnorderableOrmInterfacesError(DataclassException):
 
 
 @dataclass(kw_only=True)
-class UnknownCILibraryError(DataclassException, ValueError):
+class UnknownContinuousIntegrationLibraryError(DataclassException, ValueError):
     """
     Raised when the CI job layout names a library the repository has no tests of.
     """

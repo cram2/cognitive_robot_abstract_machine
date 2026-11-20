@@ -1,6 +1,6 @@
 # How CI divides the tests of the libraries into jobs. Every library not named in a
 # shared job runs in a job of its own, named after it. A pull request runs only the tests
-# its change can affect: see cognitive_robot_abstract_machine/ci_jobs.py.
+# its change can affect: see cognitive_robot_abstract_machine/continuous_integration_jobs.py.
 
 [[shared_jobs]]
 # The krrood distributions, whose tests all live in test/krrood_test, share one job

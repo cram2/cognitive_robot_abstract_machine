@@ -31,7 +31,7 @@ class RepositoryFile(PathEnumeration):
     The workflow that finds the public signatures a pull request breaks.
     """
 
-    CI_JOBS = Path(".github") / "ci_jobs.toml"
+    CONTINUOUS_INTEGRATION_JOBS = Path(".github") / "continuous_integration_jobs.toml"
     """
     The CI jobs that run the tests of several libraries together.
     """

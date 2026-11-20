@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from cognitive_robot_abstract_machine.ci_jobs import (
-    CIJob,
-    CIJobLayout,
-    CIJobMatrix,
+from cognitive_robot_abstract_machine.continuous_integration_jobs import (
+    ContinuousIntegrationJob,
+    ContinuousIntegrationJobLayout,
+    ContinuousIntegrationJobMatrix,
     DocumentationPath,
     LibraryTests,
     MatrixKey,
@@ -20,7 +20,9 @@ from cognitive_robot_abstract_machine.ci_jobs import (
     Workspace,
     WorkspaceMember,
 )
-from cognitive_robot_abstract_machine.exceptions import UnknownCILibraryError
+from cognitive_robot_abstract_machine.exceptions import (
+    UnknownContinuousIntegrationLibraryError,
+)
 from cognitive_robot_abstract_machine.orm_interfaces import REPOSITORY_ROOT
 from cognitive_robot_abstract_machine.repository_files import (
     RepositoryDirectory,
@@ -43,18 +45,20 @@ def dependent_workspace_root() -> Path:
 
 
 @pytest.fixture
-def dependent_layout(dependent_workspace_root: Path) -> CIJobLayout:
+def dependent_layout(dependent_workspace_root: Path) -> ContinuousIntegrationJobLayout:
     """
     The CI job layout of :func:`dependent_workspace_root`.
     """
-    return CIJobLayout.from_toml(
-        text=(dependent_workspace_root / RepositoryFile.CI_JOBS.name).read_text()
+    return ContinuousIntegrationJobLayout.from_toml(
+        text=(
+            dependent_workspace_root / RepositoryFile.CONTINUOUS_INTEGRATION_JOBS.name
+        ).read_text()
     )
 
 
 @pytest.fixture
 def dependent_tests(
-    dependent_workspace_root: Path, dependent_layout: CIJobLayout
+    dependent_workspace_root: Path, dependent_layout: ContinuousIntegrationJobLayout
 ) -> RepositoryTestSuite:
     """
     The tests of :func:`dependent_workspace_root`.
@@ -69,17 +73,19 @@ def dependent_tests(
 
 
 @pytest.fixture
-def repository_layout() -> CIJobLayout:
+def repository_layout() -> ContinuousIntegrationJobLayout:
     """
     The CI job layout of this repository.
     """
-    return CIJobLayout.from_toml(
-        text=(REPOSITORY_ROOT / RepositoryFile.CI_JOBS).read_text()
+    return ContinuousIntegrationJobLayout.from_toml(
+        text=(REPOSITORY_ROOT / RepositoryFile.CONTINUOUS_INTEGRATION_JOBS).read_text()
     )
 
 
 @pytest.fixture
-def repository_tests(repository_layout: CIJobLayout) -> RepositoryTestSuite:
+def repository_tests(
+    repository_layout: ContinuousIntegrationJobLayout,
+) -> RepositoryTestSuite:
     """
     The tests of this repository.
     """
@@ -318,7 +324,9 @@ def test_semantic_digital_twin_change_does_not_affect_krrood_core_tests(
     assert "krrood-core" not in paths_by_library(affected)
 
 
-def test_every_assigned_test_path_exists(repository_layout: CIJobLayout) -> None:
+def test_every_assigned_test_path_exists(
+    repository_layout: ContinuousIntegrationJobLayout,
+) -> None:
     """
     Every test assigned to a library by hand is there.
     """
@@ -335,7 +343,8 @@ def test_every_assigned_test_path_exists(repository_layout: CIJobLayout) -> None
 
 
 def test_shared_job_runs_only_its_affected_libraries(
-    dependent_tests: RepositoryTestSuite, dependent_layout: CIJobLayout
+    dependent_tests: RepositoryTestSuite,
+    dependent_layout: ContinuousIntegrationJobLayout,
 ) -> None:
     """
     A shared job runs the tests of its affected libraries only, and every affected
@@ -350,9 +359,9 @@ def test_shared_job_runs_only_its_affected_libraries(
         known_library_names=dependent_tests.library_names,
     )
     assert jobs == (
-        CIJob(name="top", libraries=(affected_by_name["top"],)),
-        CIJob(name="chain", libraries=(affected_by_name["middle"],)),
-        CIJob(
+        ContinuousIntegrationJob(name="top", libraries=(affected_by_name["top"],)),
+        ContinuousIntegrationJob(name="chain", libraries=(affected_by_name["middle"],)),
+        ContinuousIntegrationJob(
             name="rules",
             libraries=(affected_by_name["repository"],),
             check_rules=True,
@@ -361,7 +370,8 @@ def test_shared_job_runs_only_its_affected_libraries(
 
 
 def test_shared_job_checking_rules_runs_without_affected_libraries(
-    dependent_tests: RepositoryTestSuite, dependent_layout: CIJobLayout
+    dependent_tests: RepositoryTestSuite,
+    dependent_layout: ContinuousIntegrationJobLayout,
 ) -> None:
     """
     The job checking the rules runs even when the change affects none of its libraries.
@@ -369,12 +379,17 @@ def test_shared_job_checking_rules_runs_without_affected_libraries(
     jobs = dependent_layout.jobs_running(
         affected_tests=(), known_library_names=dependent_tests.library_names
     )
-    assert jobs == (CIJob(name="rules", libraries=(), check_rules=True),)
+    assert jobs == (
+        ContinuousIntegrationJob(name="rules", libraries=(), check_rules=True),
+    )
 
 
 @pytest.mark.parametrize(
     "layout_file_name",
-    ["ci_jobs_unknown_library.toml", "ci_jobs_unknown_assigned_library.toml"],
+    [
+        "continuous_integration_jobs_unknown_library.toml",
+        "continuous_integration_jobs_unknown_assigned_library.toml",
+    ],
 )
 def test_layout_naming_a_library_without_tests_is_rejected(
     layout_file_name: str,
@@ -385,10 +400,10 @@ def test_layout_naming_a_library_without_tests_is_rejected(
     A shared job or an assignment naming a library without tests is a mistake in the
     layout.
     """
-    layout = CIJobLayout.from_toml(
+    layout = ContinuousIntegrationJobLayout.from_toml(
         text=(dependent_workspace_root / layout_file_name).read_text()
     )
-    with pytest.raises(UnknownCILibraryError):
+    with pytest.raises(UnknownContinuousIntegrationLibraryError):
         layout.jobs_running(
             affected_tests=dependent_tests.all_tests(),
             known_library_names=dependent_tests.library_names,
@@ -396,7 +411,8 @@ def test_layout_naming_a_library_without_tests_is_rejected(
 
 
 def test_repository_jobs_run_every_library_once(
-    repository_tests: RepositoryTestSuite, repository_layout: CIJobLayout
+    repository_tests: RepositoryTestSuite,
+    repository_layout: ContinuousIntegrationJobLayout,
 ) -> None:
     """
     The repository's job layout runs the tests of every library in exactly one job.
@@ -422,8 +438,10 @@ def test_matrix_lists_the_tests_of_each_library_of_a_job_as_json() -> None:
     library = LibraryTests(
         library_name="base", test_paths=(RepositoryDirectory.TESTS / "base_test",)
     )
-    job = CIJob(name="chain", libraries=(library,))
-    [entry] = json.loads(CIJobMatrix(jobs=(job,)).to_json())[MatrixKey.INCLUDE]
+    job = ContinuousIntegrationJob(name="chain", libraries=(library,))
+    [entry] = json.loads(ContinuousIntegrationJobMatrix(jobs=(job,)).to_json())[
+        MatrixKey.INCLUDE
+    ]
     assert json.loads(entry[MatrixKey.TEST_PATHS]) == {
         library.library_name: [str(path) for path in library.test_paths]
     }

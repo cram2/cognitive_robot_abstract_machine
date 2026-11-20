@@ -22,33 +22,20 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from typing_extensions import Any, Iterable
 
-from cognitive_robot_abstract_machine.exceptions import UnknownCILibraryError
+from cognitive_robot_abstract_machine.exceptions import (
+    UnknownContinuousIntegrationLibraryError,
+)
+from cognitive_robot_abstract_machine.pyproject import Pyproject
 from cognitive_robot_abstract_machine.repository_files import (
     RepositoryDirectory,
-    RepositoryFile,
 )
 
 # %% keys and names of the files read and written
 
 
-class PyprojectKey(StrEnum):
-    """
-    The keys of a ``pyproject.toml`` read to find the workspace's members and their
-    dependencies.
-    """
-
-    PROJECT = "project"
-    NAME = "name"
-    DEPENDENCIES = "dependencies"
-    TOOL = "tool"
-    UV = "uv"
-    WORKSPACE = "workspace"
-    MEMBERS = "members"
-
-
 class JobLayoutKey(StrEnum):
     """
-    The keys of :attr:`RepositoryFile.CI_JOBS`.
+    The keys of :attr:`RepositoryFile.CONTINUOUS_INTEGRATION_JOBS`.
     """
 
     SHARED_JOBS = "shared_jobs"
@@ -66,7 +53,7 @@ class MatrixKey(StrEnum):
 
     INCLUDE = "include"
     NAME = "name"
-    LIBRARIES = "libs"
+    LIBRARIES = "libraries"
     TEST_PATHS = "test_paths"
     CHECK_RULES = "check_rules"
 
@@ -188,15 +175,13 @@ class WorkspaceMember:
         :param directory: The member's directory, relative to the repository root.
         :return: The member its ``pyproject.toml`` declares.
         """
-        project = tomllib.loads(
-            (repository_root / directory / RepositoryFile.PYPROJECT).read_text()
-        )[PyprojectKey.PROJECT]
+        pyproject = Pyproject.from_directory(directory=repository_root / directory)
         return cls(
             directory=directory,
-            distribution_name=canonicalize_name(project[PyprojectKey.NAME]),
+            distribution_name=pyproject.distribution_name,
             dependency_names=frozenset(
                 canonicalize_name(Requirement(specifier).name)
-                for specifier in project.get(PyprojectKey.DEPENDENCIES, [])
+                for specifier in pyproject.dependencies
             ),
         )
 
@@ -278,17 +263,14 @@ class Workspace:
             ``pyproject.toml``.
         :return: The workspace it declares.
         """
-        member_directories = tomllib.loads(
-            (repository_root / RepositoryFile.PYPROJECT).read_text()
-        )[PyprojectKey.TOOL][PyprojectKey.UV][PyprojectKey.WORKSPACE][
-            PyprojectKey.MEMBERS
-        ]
         return cls(
             members=tuple(
                 WorkspaceMember.from_directory(
                     repository_root=repository_root, directory=Path(directory)
                 )
-                for directory in member_directories
+                for directory in Pyproject.from_directory(
+                    directory=repository_root
+                ).workspace_members
             )
         )
 
@@ -647,7 +629,7 @@ class RepositoryTestSuite:
 class SharedJob:
     """
     A CI job that runs the tests of several libraries, as
-    :attr:`RepositoryFile.CI_JOBS` declares it.
+    :attr:`RepositoryFile.CONTINUOUS_INTEGRATION_JOBS` declares it.
     """
 
     name: str
@@ -668,7 +650,7 @@ class SharedJob:
 
 
 @dataclass(kw_only=True, frozen=True)
-class CIJob:
+class ContinuousIntegrationJob:
     """
     A CI job running the tests of one or more libraries.
     """
@@ -709,7 +691,7 @@ class CIJob:
 
 
 @dataclass(kw_only=True, frozen=True)
-class CIJobLayout:
+class ContinuousIntegrationJobLayout:
     """
     How the tests of the libraries are divided into CI jobs: the libraries of a shared
     job run together, every other library in a job of its own.
@@ -731,14 +713,14 @@ class CIJobLayout:
         *,
         affected_tests: Iterable[LibraryTests],
         known_library_names: Iterable[str],
-    ) -> tuple[CIJob, ...]:
+    ) -> tuple[ContinuousIntegrationJob, ...]:
         """
         :param affected_tests: The tests to run.
         :param known_library_names: Every library CI can list, in the order of the jobs
             that run one library alone.
         :return: The jobs running exactly those tests. A shared job that checks the
             rules is kept even when none of its libraries is affected.
-        :raises UnknownCILibraryError: When a shared job or the assigned tests name
+        :raises UnknownContinuousIntegrationLibraryError: When a shared job or the assigned tests name
             an unknown library.
         """
         known_library_names = tuple(known_library_names)
@@ -746,7 +728,7 @@ class CIJobLayout:
             assigned.library_name for assigned in self.assigned_tests
         }.difference(known_library_names)
         if unknown_assigned_library_names:
-            raise UnknownCILibraryError(
+            raise UnknownContinuousIntegrationLibraryError(
                 section=JobLayoutKey.ASSIGNED_TESTS,
                 library_names=tuple(sorted(unknown_assigned_library_names)),
                 known_library_names=known_library_names,
@@ -759,7 +741,7 @@ class CIJobLayout:
                 known_library_names
             )
             if unknown_library_names:
-                raise UnknownCILibraryError(
+                raise UnknownContinuousIntegrationLibraryError(
                     section=shared_job.name,
                     library_names=tuple(sorted(unknown_library_names)),
                     known_library_names=known_library_names,
@@ -772,23 +754,23 @@ class CIJobLayout:
             )
             if libraries or shared_job.check_rules:
                 shared_jobs.append(
-                    CIJob(
+                    ContinuousIntegrationJob(
                         name=shared_job.name,
                         libraries=libraries,
                         check_rules=shared_job.check_rules,
                     )
                 )
         own_jobs = tuple(
-            CIJob(name=name, libraries=(affected_by_name[name],))
+            ContinuousIntegrationJob(name=name, libraries=(affected_by_name[name],))
             for name in known_library_names
             if name in affected_by_name and name not in shared_library_names
         )
         return own_jobs + tuple(shared_jobs)
 
     @classmethod
-    def from_toml(cls, *, text: str) -> CIJobLayout:
+    def from_toml(cls, *, text: str) -> ContinuousIntegrationJobLayout:
         """
-        :param text: The content of :attr:`RepositoryFile.CI_JOBS`.
+        :param text: The content of :attr:`RepositoryFile.CONTINUOUS_INTEGRATION_JOBS`.
         :return: The layout it describes.
         """
         layout = tomllib.loads(text)
@@ -814,12 +796,12 @@ class CIJobLayout:
 
 
 @dataclass(kw_only=True, frozen=True)
-class CIJobMatrix:
+class ContinuousIntegrationJobMatrix:
     """
     The test jobs of one CI run, as the matrix its workflow expands.
     """
 
-    jobs: tuple[CIJob, ...]
+    jobs: tuple[ContinuousIntegrationJob, ...]
     """
     The jobs, in the order the matrix lists them.
     """

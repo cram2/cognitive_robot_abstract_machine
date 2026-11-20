@@ -10,7 +10,7 @@ on:
         description: "Name of the job's test group, which its cache is saved under"
         required: true
         type: string
-      libs:
+      libraries:
         description: "JSON list of the library folder names (relative to repo root) whose tests the job runs"
         required: true
         type: string
@@ -77,7 +77,7 @@ jobs:
           krrood check --since HEAD^1
 
       - name: Install drake
-        if: ${{ contains(fromJSON(inputs.libs), 'semantic_digital_twin') }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'semantic_digital_twin') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
@@ -86,7 +86,7 @@ jobs:
           uv pip install drake
 
       - name: Install usd-core
-        if: ${{ contains(fromJSON(inputs.libs), 'semantic_digital_twin') }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'semantic_digital_twin') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
@@ -96,7 +96,7 @@ jobs:
           uv pip install usd-core
 
       - name: Install robokudo optional requirements
-        if: ${{ contains(fromJSON(inputs.libs), 'robokudo') }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'robokudo') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
@@ -117,7 +117,7 @@ jobs:
             ${{ runner.os }}-cache-${{ inputs.name }}-
 
       - name: Run CPP tests
-        if: ${{ contains(fromJSON(inputs.libs), 'random_events') }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'random_events') }}
         run: |
           cd cognitive_robot_abstract_machine/random_events/src/random_events_lib
           sudo apt-get install -y g++ unzip zip
@@ -134,7 +134,7 @@ jobs:
       - name: Check the generated rules in AGENTS.md
         # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
         # edit or a forgotten regeneration fails here.
-        if: ${{ contains(fromJSON(inputs.libs), 'krrood') }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'krrood') }}
         run: |
           source /opt/ros/cram-env/bin/activate
           cd cognitive_robot_abstract_machine
@@ -143,7 +143,7 @@ jobs:
       - name: Check the generated skills
         # Every SKILL.md of a skill declared in agent_skills.py is generated; a hand edit
         # or a forgotten regeneration fails here.
-        if: ${{ contains(fromJSON(inputs.libs), 'krrood') }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'krrood') }}
         run: |
           source /opt/ros/cram-env/bin/activate
           cd cognitive_robot_abstract_machine
@@ -159,19 +159,19 @@ jobs:
           # One pytest run per library, each in a subshell so a library's environment stays its
           # own; every library runs even after another one failed.
           failed=0
-          for lib in ${{ join(fromJSON(inputs.libs), ' ') }}; do
+          for library in ${{ join(fromJSON(inputs.libraries), ' ') }}; do
             (
-              if [[ "$lib" == "probabilistic_model" ]]; then
+              if [[ "$library" == "probabilistic_model" ]]; then
                 export QT_QPA_PLATFORM=offscreen
               fi
               # The MuJoCo video-recorder tests render offscreen; xvfb provides a display, so MuJoCo
               # would otherwise pick its windowed GLFW backend and fail to create a context on the
               # runner. EGL renders headlessly. Must be set before Python imports mujoco, which locks
               # the GL backend at import, so it cannot be done from inside the test process.
-              if [[ "$lib" == "semantic_digital_twin" ]]; then
+              if [[ "$library" == "semantic_digital_twin" ]]; then
                 export MUJOCO_GL=egl
               fi
-              read -ra test_paths <<< "$(python -c 'import json, sys; print(" ".join(json.loads(sys.argv[1]).get(sys.argv[2], [f"test/{sys.argv[2]}_test"])))' "$TEST_PATHS" "$lib")"
+              read -ra test_paths <<< "$(python -c 'import json, sys; print(" ".join(json.loads(sys.argv[1]).get(sys.argv[2], [f"test/{sys.argv[2]}_test"])))' "$TEST_PATHS" "$library")"
               python -m pytest -n auto "${test_paths[@]/#/cognitive_robot_abstract_machine/}"
             ) || failed=1
           done

@@ -11,9 +11,9 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from cognitive_robot_abstract_machine.ci_jobs import (
-    CIJobLayout,
-    CIJobMatrix,
+from cognitive_robot_abstract_machine.continuous_integration_jobs import (
+    ContinuousIntegrationJobLayout,
+    ContinuousIntegrationJobMatrix,
     RepositoryTestSuite,
     Workspace,
 )
@@ -40,8 +40,8 @@ def main() -> None:
             check=True,
         ).stdout.strip()
     )
-    layout = CIJobLayout.from_toml(
-        text=(repository_root / RepositoryFile.CI_JOBS).read_text()
+    layout = ContinuousIntegrationJobLayout.from_toml(
+        text=(repository_root / RepositoryFile.CONTINUOUS_INTEGRATION_JOBS).read_text()
     )
     test_suite = RepositoryTestSuite(
         repository_root=repository_root,
@@ -64,7 +64,7 @@ def main() -> None:
         affected_tests=affected_tests,
         known_library_names=test_suite.library_names,
     )
-    print(CIJobMatrix(jobs=jobs).to_json())
+    print(ContinuousIntegrationJobMatrix(jobs=jobs).to_json())
 
 
 if __name__ == "__main__":
