@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import partial
+from threading import Lock
 
 from geometry_msgs.msg import (
     PoseStamped as ROSPoseStamped,
@@ -21,14 +23,16 @@ try:
 except ModuleNotFoundError:
     NavigateToPose = None
 from rclpy.action import ActionClient
+from rclpy.action.client import ClientGoalHandle
+from rclpy.task import Future
 from std_msgs.msg import Header
-from typing_extensions import TypeVar, Generic
+from typing_extensions import Callable, TypeVar, Generic
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValue
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
@@ -43,6 +47,82 @@ Action = TypeVar("Action")
 ActionGoal = TypeVar("ActionGoal")
 ActionResult = TypeVar("ActionResult")
 ActionFeedback = TypeVar("ActionFeedback")
+
+
+# %% goals sent to an action server
+
+
+@dataclass(kw_only=True)
+class SentGoal:
+    """
+    One goal an :class:`ActionServerTask` sent to its action server.
+
+    Once cancelled, the server's responses to it are no longer passed on, and the server
+    is asked to cancel it as soon as it accepted it.
+    """
+
+    goal_handle: ClientGoalHandle | None = field(init=False, default=None)
+    """
+    The client's handle of the goal, None until the server accepted it.
+    """
+
+    is_cancelled: bool = field(init=False, default=False)
+    """
+    Whether the task no longer pursues the goal.
+    """
+
+    is_answered: bool = field(init=False, default=False)
+    """
+    Whether the server sent the goal's result.
+    """
+
+    _lock: Lock = field(init=False, default_factory=Lock, repr=False)
+    """
+    Orders cancelling, which runs on the ticking thread, against the server's responses,
+    which arrive on the ROS executor's thread.
+    """
+
+    def cancel(self) -> None:
+        """
+        Stops pursuing the goal, and asks the server to cancel it if the server accepted
+        it and has not answered it yet.
+        """
+        with self._lock:
+            if self.is_cancelled:
+                return
+            self.is_cancelled = True
+            if self.goal_handle is not None and not self.is_answered:
+                self.goal_handle.cancel_goal_async()
+
+    def receive_goal_response(
+        self, *, goal_handle: ClientGoalHandle, record_response: Callable[[], None]
+    ) -> None:
+        """
+        Calls `record_response` unless the goal is cancelled.
+
+        A goal the server accepted after it was cancelled is cancelled on the server.
+        """
+        with self._lock:
+            if goal_handle.accepted:
+                self.goal_handle = goal_handle
+            if not self.is_cancelled:
+                record_response()
+                return
+            if goal_handle.accepted:
+                goal_handle.cancel_goal_async()
+
+    def receive_result(self, *, store_result: Callable[[], None]) -> None:
+        """
+        Marks the goal as answered and calls `store_result` unless the goal is
+        cancelled.
+        """
+        with self._lock:
+            self.is_answered = True
+            if not self.is_cancelled:
+                store_result()
+
+
+# %% tasks calling an action server
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -76,9 +156,14 @@ class ActionServerTask(
     Goal to send to the action server.
     """
 
-    _result: ActionResult = field(init=False, default=None)
+    _result: ActionResult | None = field(init=False, default=None)
     """
-    ROS action server result.
+    The result of the goal last sent, None until it arrived.
+    """
+
+    _sent_goal: SentGoal | None = field(init=False, default=None)
+    """
+    The goal last sent to the action server, None before the first one.
     """
 
     @classproperty
@@ -109,31 +194,108 @@ class ActionServerTask(
 
     def on_start(self) -> None:
         """
-        Creates a goal and sends it to the action server asynchronously.
+        Differs from :meth:`StatechartNode.on_start` in calling
+        :meth:`pursue_goal_only_while_running`.
         """
+        self.pursue_goal_only_while_running()
+
+    def on_pause(self) -> None:
+        """
+        Differs from :meth:`StatechartNode.on_pause` in calling
+        :meth:`pursue_goal_only_while_running`.
+        """
+        self.pursue_goal_only_while_running()
+
+    def on_unpause(self) -> None:
+        """
+        Differs from :meth:`StatechartNode.on_unpause` in calling
+        :meth:`pursue_goal_only_while_running`.
+        """
+        self.pursue_goal_only_while_running()
+
+    def on_end(self) -> None:
+        """
+        Differs from :meth:`StatechartNode.on_end` in calling
+        :meth:`pursue_goal_only_while_running`.
+        """
+        self.pursue_goal_only_while_running()
+
+    def on_reset(self) -> None:
+        """
+        Differs from :meth:`StatechartNode.on_reset` in calling
+        :meth:`pursue_goal_only_while_running`.
+        """
+        self.pursue_goal_only_while_running()
+
+    def pursue_goal_only_while_running(self) -> None:
+        """
+        Sends a new goal if this task runs and pursues none, and cancels the goal it
+        pursues if it does not run.
+
+        .. note:: A task that starts paused therefore sends its goal only once it
+            continues.
+        """
+        pursues_goal = self._sent_goal is not None and not self._sent_goal.is_cancelled
+        is_running = self.life_cycle_state == LifeCycleValue.RUNNING
+        if is_running and not pursues_goal:
+            self.send_goal()
+        elif not is_running and pursues_goal:
+            self._sent_goal.cancel()
+
+    def send_goal(self) -> None:
+        """
+        Sends :attr:`_action_goal` to the action server as a new goal, forgetting the
+        result of the goal sent before.
+        """
+        self._result = None
+        sent_goal = SentGoal()
+        self._sent_goal = sent_goal
         future = self._action_client.send_goal_async(self._action_goal)
-        future.add_done_callback(self.goal_response_callback)
+        future.add_done_callback(
+            partial(self.goal_response_callback, sent_goal=sent_goal)
+        )
 
     @called_positionally
-    def goal_response_callback(self, future):
+    def goal_response_callback(self, future: Future, *, sent_goal: SentGoal) -> None:
         """
-        Handles the server's response to the goal submission.
-
-        On rejection a failure sentinel is stored so that :meth:`on_tick` can return
-        :attr:`~ObservationStateValue.FALSE` immediately.
+        Handles the server's response to `sent_goal`, and waits for the goal's result
+        once the server accepted it.
         """
         goal_handle = future.result()
+        sent_goal.receive_goal_response(
+            goal_handle=goal_handle,
+            record_response=partial(
+                self.record_goal_response, accepted=goal_handle.accepted
+            ),
+        )
         if not goal_handle.accepted:
-            logger.error("Goal rejected by action server")
             return
-
-        logger.info("Sent query to action server ")
-
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self.result_callback)
+        goal_handle.get_result_async().add_done_callback(
+            partial(self.goal_result_callback, sent_goal=sent_goal)
+        )
 
     @called_positionally
-    def result_callback(self, future):
+    def goal_result_callback(self, future: Future, *, sent_goal: SentGoal) -> None:
+        """
+        Handles the result the server sent for `sent_goal`.
+        """
+        sent_goal.receive_result(
+            store_result=partial(self.result_callback, future=future)
+        )
+
+    def record_goal_response(self, *, accepted: bool) -> None:
+        """
+        Records whether the server accepted the goal last sent.
+        """
+        if accepted:
+            logger.info(f"Action server {self.action_topic} accepted the goal.")
+            return
+        logger.error(f"Action server {self.action_topic} rejected the goal.")
+
+    def result_callback(self, *, future: Future) -> None:
+        """
+        Stores the result of the goal last sent.
+        """
         self._result = future.result()
         logger.info(f"Action server {self.action_topic} done.")
 
@@ -206,10 +368,10 @@ class NavigateActionServerTask(
 
         return artifacts
 
-    @called_positionally
-    def result_callback(self, future):
+    def result_callback(self, *, future: Future) -> None:
         """
-        Stores the navigation result returned by the action server.
+        Differs from :meth:`ActionServerTask.result_callback` in logging the navigation
+        status and error code.
         """
         # TODO: Check the ._result.result calls against a running action server because I'm not sure if all of them are correct
         super().result_callback(future=future)

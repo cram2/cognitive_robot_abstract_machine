@@ -36,6 +36,12 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.tracy import Tracy
 
+from .test_action_server_task_goal_cancellation import (
+    GoalCancellationScenario,
+    GoalHoldingServer,
+    UnansweredGoalTreatment,
+)
+
 
 def unique_topic(prefix: str = "robotiq/gripper_cmd") -> str:
     """
@@ -256,3 +262,33 @@ def test_robotiq_task_uses_default_values(rclpy_node: Node) -> None:
         assert list(received_cmd.effort) == [50.0]
     finally:
         server.destroy()
+
+
+# %% restarting
+
+
+def test_a_restarted_robotiq_task_waits_for_the_result_of_its_new_goal(
+    rclpy_node: Node,
+) -> None:
+    """
+    A Robotiq task started again does not observe the answer to the goal it sent before
+    while the server has not yet accepted its new goal.
+    """
+    topic = unique_topic()
+    server = GoalHoldingServer(
+        action=ParallelGripperCommand,
+        answered_goal_count=1,
+        unanswered_goal_treatment=UnansweredGoalTreatment.LEFT_UNACCEPTED,
+    )
+    action_server = server.serve(node=rclpy_node, action_topic=topic)
+    task = RobotiqGripperActionServerTask(action_topic=topic, target_position=0.03)
+    scenario = GoalCancellationScenario(task=task, server=server, rclpy_node=rclpy_node)
+    task.reset_condition = scenario.add_one_tick_trigger(
+        start_condition=task.observes_false
+    ).observes_true
+
+    try:
+        scenario.run_until(condition=lambda: server.received_goal_count >= 2)
+        assert task.observation_state == ObservationStateValue.UNKNOWN
+    finally:
+        action_server.destroy()
