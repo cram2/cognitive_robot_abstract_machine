@@ -7,5 +7,8 @@ The spatial mathematics robot and image packages share.
   value refers to one.
 - `krrood_spatial_math.spatial_types`, with the extra `krrood_spatial_math[casadi]`:
   `Point2`, `Point3`, `Vector3`, `RotationMatrix`, `Quaternion`, `AxisAngle`,
-  `HomogeneousTransformationMatrix`, `Pose` and `Pose2D`, as symbolic expressions that
-  can also hold plain numbers.
+  `HomogeneousTransformationMatrix`, `Pose`, `Pose2D`, and the motions `Displacement`,
+  `Twist` and `ScrewAxis`, as symbolic expressions that can also hold plain numbers.
+
+The documentation, including how a twist or a screw axis becomes a displacement, is at
+https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math.
