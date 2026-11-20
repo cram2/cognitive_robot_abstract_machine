@@ -188,7 +188,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         raise NotImplementedError
 
     @abstractmethod
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         """
         :param mask: The nodes to keep.
         :return: The table of the kept nodes.
@@ -292,12 +292,12 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     def parameters(self) -> list[BackendArray]:
         return [self.log_probabilities]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         (log_probabilities,) = parameters
         return dataclasses.replace(self, log_probabilities=log_probabilities)
 
     def projected_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
         """
         :param parameters: Log-probabilities in the shape of :attr:`log_probabilities`.
@@ -353,7 +353,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         probabilities normalized per node, so that their gradient lowers the other
         states of a node wherever it raises one.
         """
-        (normalized,) = self.projected_parameters([self.log_probabilities])
+        (normalized,) = self.projected_parameters(parameters=[self.log_probabilities])
         # an unknown state reads the appended column of probability zero
         padded = self.namespace.concat(
             [
@@ -409,7 +409,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         with np.errstate(divide="ignore"):
             return self.__class__(np.log(normalized))
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         return self.__class__(self.log_probabilities[mask])
 
     @classmethod
@@ -451,7 +451,7 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
         """
         return [self.log_probabilities.data]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         """
         :meth:`HasParameterArrays.copy_with_parameters` that copies the values of the
         parameters to the host, since the table is a scipy sparse array.
@@ -574,7 +574,7 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
             rows, columns, probabilities / totals[rows], self.log_probabilities.shape
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         return self.__class__(csr_array(self.log_probabilities[np.flatnonzero(mask)]))
 
     @classmethod

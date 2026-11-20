@@ -1,3 +1,8 @@
+"""
+Converters of rustworkx circuits into layered circuits, one group of units of a type and
+scope per layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -225,9 +230,14 @@ class LeavesToInputLayerConverter(UnitsToLayerConverter[InputType, OutputType]):
     def convert(
         cls, data: list[Unit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
+        """
+        :return: The input layer of the distributions of the leaves, one node per leaf.
+        """
         layer = cls.output_type().from_distributions(
-            data[0].probabilistic_circuit.variables.index(data[0].variable),
-            [unit.distribution for unit in data],
+            variable_index=data[0].probabilistic_circuit.variables.index(
+                data[0].variable
+            ),
+            distributions=[unit.distribution for unit in data],
         )
         return ConvertedLayer.of_units(layer, data)
 
@@ -264,12 +274,19 @@ class IntegerLeavesToIntegerLayerConverter(
 
 class BinomialLeavesToBinomialLayerConverter(
     LeavesToInputLayerConverter[BinomialDistribution, BinomialLayer]
-): ...
+):
+    """
+    Converts leaves of binomial distributions into a :class:`BinomialLayer`.
+    """
 
 
 class TruncatedBinomialLeavesToTruncatedBinomialLayerConverter(
     LeavesToInputLayerConverter[TruncatedBinomialDistribution, TruncatedBinomialLayer]
-): ...
+):
+    """
+    Converts leaves of truncated binomial distributions into a
+    :class:`TruncatedBinomialLayer`.
+    """
 
 
 class MultivariateLeavesToLayerConverter(UnitsToLayerConverter[InputType, OutputType]):
@@ -282,9 +299,13 @@ class MultivariateLeavesToLayerConverter(UnitsToLayerConverter[InputType, Output
     def convert(
         cls, data: list[Unit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
+        """
+        :return: The input layer of the distributions of the leaves over the variables of the
+            circuit, one node per leaf.
+        """
         layer = cls.output_type().from_distributions(
-            data[0].probabilistic_circuit.variables,
-            [unit.distribution for unit in data],
+            variables=data[0].probabilistic_circuit.variables,
+            distributions=[unit.distribution for unit in data],
         )
         return ConvertedLayer.of_units(layer, data)
 

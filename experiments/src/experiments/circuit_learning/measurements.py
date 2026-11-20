@@ -117,7 +117,7 @@ class ChunkedLogLikelihoodEvaluation:
             )
             return np.asarray(
                 HasParameterArrays.host_copy(
-                    self.circuit.root.log_likelihood_of_nodes(data)[:, 0]
+                    self.circuit.root.log_likelihood_of_nodes(events=data)[:, 0]
                 )
             )
         padded = np.pad(encoded, ((0, self.chunk_rows - len(chunk)), (0, 0)), "edge")

@@ -1,3 +1,8 @@
+"""
+The input layers of symbolic and integer distributions, whose probabilities a
+probability table holds.
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -95,15 +100,18 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     def parameters(self) -> list[BackendArray]:
         return self.table.parameters
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         return dataclasses.replace(
-            self, table=self.table.copy_with_parameters(parameters)
+            self, table=self.table.copy_with_parameters(parameters=parameters)
         )
 
     def projected_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
-        return self.table.projected_parameters(parameters)
+        """
+        Like :meth:`Layer.projected_parameters`, as the :attr:`table` projects them.
+        """
+        return self.table.projected_parameters(parameters=parameters)
 
     @property
     def float_states(self) -> BackendArray:
@@ -150,7 +158,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.table.log_probabilities_of_states(
             self.state_indices_of(self.column_of(events))
@@ -158,13 +166,14 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         raise UndefinedCumulativeDistributionError(self.__class__)
 
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -174,17 +183,17 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         )
 
     def type_of_truncated_layer(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> type[Layer]:
         return self.__class__
 
     def log_truncated_of_assignment(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> LayerWithLogProbabilities:
         # a single state left is handled like any other set of states
         return self.renormalized_to(self.selected_states(assignment))
 
-    def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
+    def log_conditional_of_value(self, *, value: Any) -> LayerWithLogProbabilities:
         # the value is read like the values of events, see state_indices_of
         selected = np.zeros(self.number_of_states, dtype=bool)
         [index] = self.state_indices_of(np.array([value], dtype=float))
@@ -242,6 +251,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     @classmethod
     def from_distributions(
         cls,
+        *,
         variable_index: int,
         distributions: list[DiscreteDistribution],
         table_type: type[ProbabilityTable] = DenseProbabilityTable,
@@ -317,11 +327,11 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         """
         return dict(distribution.probabilities)
 
-    def select_nodes(self, mask: NodeMask) -> Self:
-        return self.with_table(self.table.select_nodes(mask))
+    def select_nodes(self, *, mask: NodeMask) -> Self:
+        return self.with_table(self.table.select_nodes(mask=mask))
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         # truncating a discrete layer never changes its states, so the tables line up;
         # the result is stored like the table of the first layer
         table_type = type(layers[0].table)
@@ -329,7 +339,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             table_type.concatenate([table_type.of(layer.table) for layer in layers])
         )
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         """
         Like :meth:`LeafLayer.has_equal_parameters`, but tables stored in different
         types count as different, whatever they hold.
@@ -343,7 +353,13 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             and self.table.has_equal_probabilities(other.table)
         )
 
-    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+    def sample_of_nodes(
+        self, *, nodes: NodeIndices, variables: SortedSet
+    ) -> SampleColumn:
+        """
+        Like :meth:`UnivariateInputLayer.sample_of_nodes`, drawing the states from the
+        :attr:`table`; a node without probability gives ``nan``.
+        """
         indices = self.table.sample_state_indices(nodes)
         return np.where(
             indices >= 0, self.states[np.maximum(indices, 0)].astype(float), np.nan
@@ -371,10 +387,15 @@ class SymbolicLayer(DiscreteLayer):
     @classmethod
     def from_distributions(
         cls,
+        *,
         variable_index: int,
         distributions: list[SymbolicDistribution],
         table_type: type[ProbabilityTable] = DenseProbabilityTable,
     ) -> Self:
+        """
+        Like :meth:`DiscreteLayer.from_distributions`, keeping the hashes of the domain
+        elements of the variable.
+        """
         return cls(
             variable_index,
             *cls.parameters_of(distributions, table_type),
@@ -391,7 +412,9 @@ class SymbolicLayer(DiscreteLayer):
             for hash_value, probability in distribution.probabilities.items()
         }
 
-    def node_distribution(self, index: int, variable: Variable) -> SymbolicDistribution:
+    def node_distribution(
+        self, *, index: int, variable: Variable
+    ) -> SymbolicDistribution:
         domain_elements = variable.domain.simple_sets
         return SymbolicDistribution(
             variable=variable,
@@ -417,7 +440,9 @@ class IntegerLayer(DiscreteLayer):
     A layer of distributions over one integer variable.
     """
 
-    def node_distribution(self, index: int, variable: Variable) -> IntegerDistribution:
+    def node_distribution(
+        self, *, index: int, variable: Variable
+    ) -> IntegerDistribution:
         return IntegerDistribution(
             variable=variable, probabilities=self.probabilities_of_node(index)
         )
@@ -429,7 +454,7 @@ class IntegerLayer(DiscreteLayer):
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Unlike :meth:`DiscreteLayer.cumulative_distribution_of_nodes`, integers are
@@ -441,7 +466,7 @@ class IntegerLayer(DiscreteLayer):
         ).T
 
     def moment_of_nodes_own(
-        self, order: int, center: float, variable: Variable
+        self, *, order: int, center: float, variable: Variable
     ) -> NodeValues:
         """
         Like :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.ba

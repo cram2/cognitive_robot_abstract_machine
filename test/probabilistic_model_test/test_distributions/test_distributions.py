@@ -1,3 +1,7 @@
+"""
+Tests of the integer, symbolic and Dirac delta distributions.
+"""
+
 from __future__ import annotations
 
 import json
@@ -168,7 +172,11 @@ def test_integer_truncation_to_a_singleton(integer_variable):
 
 
 def test_integer_fit(integer_distribution):
-    integer_distribution.fit([1, 2, 2, 2])
+    """
+    Fitted to data, an integer distribution has the frequency of every value as its
+    probability.
+    """
+    integer_distribution.fit(data=[1, 2, 2, 2])
     assert integer_distribution.probabilities[1] == 1 / 4
     assert integer_distribution.probabilities[2] == 3 / 4
 
@@ -191,7 +199,7 @@ def test_integer_fit_of_minus_one(integer_distribution):
     """
     Fitted on data holding -1, the distribution keeps the frequency of -1 at -1.
     """
-    integer_distribution.fit(np.array([-2, -1, -1, 0]))
+    integer_distribution.fit(data=np.array([-2, -1, -1, 0]))
     assert dict(integer_distribution.probabilities) == {-2: 1 / 4, -1: 2 / 4, 0: 1 / 4}
 
 
@@ -288,7 +296,7 @@ def test_symbolic_likelihood_survives_a_category_whose_hash_exceeds_the_modulus(
     distribution = SymbolicDistribution(
         variable=variable, probabilities=MissingDict(float, {hash(category): 1.0})
     )
-    log_likelihood = distribution.log_likelihood(np.array([[category]]))
+    log_likelihood = distribution.log_likelihood(events=np.array([[category]]))
     assert log_likelihood[0] == pytest.approx(0.0)
 
 
@@ -385,7 +393,7 @@ def test_dirac_delta_scaling_multiplies_the_location(x):
     """
     location, factor = 2.0, 3.0
     distribution = DiracDeltaDistribution(variable=x, location=location)
-    distribution.apply_scaling({x: factor})
+    distribution.apply_scaling(scaling={x: factor})
     assert distribution.location == location * factor
 
 

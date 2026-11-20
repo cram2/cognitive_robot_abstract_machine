@@ -258,20 +258,20 @@ class ProductLayer(InnerLayer):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
-            child_layer.log_likelihood_of_nodes(events, cache=cache)
+            child_layer.log_likelihood_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
         return self.combine_factors(child_results, RowReduction.SUM)
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
-            child_layer.cumulative_distribution_of_nodes(events, cache=cache)
+            child_layer.cumulative_distribution_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
         return self.combine_factors(child_results, RowReduction.PRODUCT)
@@ -279,13 +279,14 @@ class ProductLayer(InnerLayer):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
         child_results = [
             child_layer.probability_of_simple_event_of_nodes(
-                event, variables, cache=cache
+                event=event, variables=variables, cache=cache
             )
             for child_layer in self.child_layers
         ]

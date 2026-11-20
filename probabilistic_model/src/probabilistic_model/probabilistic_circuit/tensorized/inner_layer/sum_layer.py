@@ -194,7 +194,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
         log_probabilities_per_child_layer = []
         for layer_type, typed_pieces in pieces_by_type.items():
             child_layers.append(
-                layer_type.concatenate([piece.layer for piece in typed_pieces])
+                layer_type.concatenate(layers=[piece.layer for piece in typed_pieces])
             )
             log_probabilities_per_child_layer.extend(
                 piece.log_probabilities for piece in typed_pieces
@@ -230,7 +230,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
     def parameters(self) -> list[BackendArray]:
         return [self.log_weights]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         (log_weights,) = parameters
         return dataclasses.replace(self, log_weights=log_weights)
 
@@ -409,20 +409,20 @@ class SumLayer(HasParameterArrays, InnerLayer):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
-            child_layer.log_likelihood_of_nodes(events, cache=cache)
+            child_layer.log_likelihood_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
         return self.log_weighted_sum(child_results)
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
-            child_layer.cumulative_distribution_of_nodes(events, cache=cache)
+            child_layer.cumulative_distribution_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
         return self._weighted_forward(child_results)
@@ -430,6 +430,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -437,7 +438,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
         child_results = [
             self.namespace.reshape(
                 child_layer.probability_of_simple_event_of_nodes(
-                    event, variables, cache=cache
+                    event=event, variables=variables, cache=cache
                 ),
                 (1, -1),
             )

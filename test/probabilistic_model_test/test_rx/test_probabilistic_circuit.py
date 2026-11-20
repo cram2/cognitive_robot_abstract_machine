@@ -1,3 +1,7 @@
+"""
+Tests of rustworkx probabilistic circuits.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -75,7 +79,10 @@ def test_truncation(mixture_of_products, x):
 
 
 def test_translation_moves_the_probability_along(mixture_of_products, x, y):
-    mixture_of_products.apply_translation({x: 5, y: 10})
+    """
+    Translated, a circuit gives the translated event the probability of the original.
+    """
+    mixture_of_products.apply_translation(translation={x: 5, y: 10})
     event = SimpleEvent.from_data(
         {x: closed(5, 5.25) | closed(5.5, 5.75)}
     ).as_composite_set()
@@ -92,7 +99,11 @@ def test_deep_copy_is_a_valid_independent_circuit(mixture_of_products):
 
 
 def test_plot_structure_with_inference_results(mixture_of_products):
-    mixture_of_products.log_likelihood(np.array([[0.5, 0.5]]))
+    """
+    The structure of a circuit can be plotted with the results of a query and colours
+    per unit.
+    """
+    mixture_of_products.log_likelihood(events=np.array([[0.5, 0.5]]))
     color_map = {
         mixture_of_products.root: "red",
         mixture_of_products.root.subcircuits[0]: "blue",
@@ -247,7 +258,9 @@ def test_probability_of_a_point_that_only_one_component_supports(
     log_probability = mixture_of_nested_squares.log_conditional({x: 1.5}).log_likelihood
     assert log_probability == pytest.approx(np.log(0.5 * 0.5))
     assert log_probability == pytest.approx(
-        mixture_of_nested_squares.marginal([x]).log_likelihood(np.array([[1.5]]))[0]
+        mixture_of_nested_squares.marginal([x]).log_likelihood(
+            events=np.array([[1.5]])
+        )[0]
     )
 
 

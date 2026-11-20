@@ -1,3 +1,7 @@
+"""
+The exceptions raised by probabilistic models and their queries.
+"""
+
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass

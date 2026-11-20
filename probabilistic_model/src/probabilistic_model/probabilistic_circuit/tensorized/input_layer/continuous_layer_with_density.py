@@ -1,3 +1,7 @@
+"""
+The base classes of the input layers of continuous distributions with a density.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -69,7 +73,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         return self.__class__
 
     def type_of_truncated_layer(
-        self, assignment: Interval, singleton_allowed: bool
+        self, *, assignment: Interval, singleton_allowed: bool
     ) -> type[Layer]:
         if len(assignment.simple_sets) > 1:
             return SumLayer
@@ -81,7 +85,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         return self.type_of_layer_truncated_to_interval(interval)
 
     def log_truncated_of_assignment(
-        self, assignment: Interval, singleton_allowed: bool
+        self, *, assignment: Interval, singleton_allowed: bool
     ) -> LayerWithLogProbabilities:
         pieces = [
             self.log_truncated_of_simple_interval(interval, singleton_allowed)
@@ -118,7 +122,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         )
         return LayerWithLogProbabilities(dirac_delta_layer, log_likelihood)
 
-    def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
+    def log_conditional_of_value(self, *, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]
         dirac_delta_layer = DiracDeltaLayer(
             self.variable,
@@ -150,7 +154,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
     def parameters(self) -> list[BackendArray]:
         return [self.interval]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         (interval,) = parameters
         return dataclasses.replace(self, interval=interval)
 
@@ -307,24 +311,30 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
             log_probabilities,
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         return self.__class__(self.variable, self.interval[mask], self.bounds[mask])
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         return cls(
             layers[0].variable,
             np.concatenate([layer.interval for layer in layers]),
             np.concatenate([layer.bounds for layer in layers]),
         )
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         return np.array_equal(self.interval, other.interval) and np.array_equal(
             self.bounds, other.bounds
         )
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Moves the support of every node by the translation of its variable.
+        """
         self.interval = self.interval + translation[self.variable]
 
-    def apply_scaling_own(self, scaling: VariableValues):
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
+        """
+        Multiplies the support of every node by the scaling of its variable.
+        """
         self.interval = self.interval * scaling[self.variable]

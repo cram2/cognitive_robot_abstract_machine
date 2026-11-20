@@ -229,7 +229,9 @@ def integer_case() -> InputLayerQueryCase:
             variable=count, probabilities=MissingDict(float, {2: 0.6, 3: 0.4})
         ),
     ]
-    layer = IntegerLayer.from_distributions(0, distributions)
+    layer = IntegerLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
     return InputLayerQueryCase(
         build=lambda namespace: convert_table_to_namespace(layer, namespace),
         variable=count,
@@ -265,7 +267,7 @@ def binomial_layer_case(layer: BinomialLayer, variable: Integer) -> InputLayerQu
     """
     return InputLayerQueryCase(
         build=lambda namespace: layer.copy_with_parameters(
-            [namespace.asarray(layer.success_probability)]
+            parameters=[namespace.asarray(layer.success_probability)]
         ),
         variable=variable,
         values=[-2.0, -1.0, 0.0, 1.0, 1.5, 2.0, 3.0, 4.0, 7.0],
@@ -279,7 +281,9 @@ def binomial_case(binomial_distributions) -> InputLayerQueryCase:
     The layer of the binomial distributions.
     """
     return binomial_layer_case(
-        BinomialLayer.from_distributions(0, binomial_distributions),
+        BinomialLayer.from_distributions(
+            variable_index=0, distributions=binomial_distributions
+        ),
         binomial_distributions[0].variable,
     )
 
@@ -300,7 +304,9 @@ def truncated_binomial_case(binomial_distributions) -> InputLayerQueryCase:
         for distribution in binomial_distributions
     ]
     return binomial_layer_case(
-        TruncatedBinomialLayer.from_distributions(0, truncated),
+        TruncatedBinomialLayer.from_distributions(
+            variable_index=0, distributions=truncated
+        ),
         binomial_distributions[0].variable,
     )
 
@@ -325,7 +331,9 @@ def symbolic_case() -> InputLayerQueryCase:
             ),
         ),
     ]
-    layer = SymbolicLayer.from_distributions(0, distributions)
+    layer = SymbolicLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
     return InputLayerQueryCase(
         build=lambda namespace: convert_table_to_namespace(layer, namespace),
         variable=letter,
@@ -383,9 +391,9 @@ def test_log_likelihood_of_nodes_on_every_backend(input_layer_case, array_backen
     case = input_layer_case
     assert_result_of_backend_equals(
         case.build(array_backend).log_likelihood_of_nodes(
-            case.events(namespace=array_backend)
+            events=case.events(namespace=array_backend)
         ),
-        case.build(np).log_likelihood_of_nodes(case.events(namespace=np)),
+        case.build(np).log_likelihood_of_nodes(events=case.events(namespace=np)),
         array_backend,
     )
 
@@ -400,9 +408,11 @@ def test_cumulative_distribution_of_nodes_on_every_backend(
     case = ordered_input_layer_case
     assert_result_of_backend_equals(
         case.build(array_backend).cumulative_distribution_of_nodes(
-            case.events(namespace=array_backend)
+            events=case.events(namespace=array_backend)
         ),
-        case.build(np).cumulative_distribution_of_nodes(case.events(namespace=np)),
+        case.build(np).cumulative_distribution_of_nodes(
+            events=case.events(namespace=np)
+        ),
         array_backend,
     )
 
@@ -417,10 +427,10 @@ def test_probability_of_simple_event_of_nodes_on_every_backend(
     case = input_layer_case
     assert_result_of_backend_equals(
         case.build(array_backend).probability_of_simple_event_of_nodes(
-            case.simple_event, case.variables
+            event=case.simple_event, variables=case.variables
         ),
         case.build(np).probability_of_simple_event_of_nodes(
-            case.simple_event, case.variables
+            event=case.simple_event, variables=case.variables
         ),
         array_backend,
     )
@@ -450,12 +460,12 @@ def test_log_likelihood_of_nodes_compiles_with_jax(input_layer_case):
     case = input_layer_case
     with jax.enable_x64(True):
         layer = case.build(jnp)
-        result = jax.jit(lambda events: layer.log_likelihood_of_nodes(events))(
+        result = jax.jit(lambda events: layer.log_likelihood_of_nodes(events=events))(
             case.events(namespace=jnp)
         )
     np.testing.assert_allclose(
         np.asarray(result),
-        case.build(np).log_likelihood_of_nodes(case.events(namespace=np)),
+        case.build(np).log_likelihood_of_nodes(events=case.events(namespace=np)),
         rtol=1e-12,
     )
 
@@ -468,12 +478,14 @@ def test_cumulative_distribution_of_nodes_compiles_with_jax(ordered_input_layer_
     case = ordered_input_layer_case
     with jax.enable_x64(True):
         layer = case.build(jnp)
-        result = jax.jit(lambda events: layer.cumulative_distribution_of_nodes(events))(
-            case.events(namespace=jnp)
-        )
+        result = jax.jit(
+            lambda events: layer.cumulative_distribution_of_nodes(events=events)
+        )(case.events(namespace=jnp))
     np.testing.assert_allclose(
         np.asarray(result),
-        case.build(np).cumulative_distribution_of_nodes(case.events(namespace=np)),
+        case.build(np).cumulative_distribution_of_nodes(
+            events=case.events(namespace=np)
+        ),
         rtol=1e-12,
     )
 
@@ -490,10 +502,12 @@ def test_a_layer_that_answered_a_query_can_be_deep_copied(
     """
     case = input_layer_case
     layer = case.build(array_backend)
-    expected = layer.log_likelihood_of_nodes(case.events(namespace=array_backend))
+    expected = layer.log_likelihood_of_nodes(
+        events=case.events(namespace=array_backend)
+    )
     assert_result_of_backend_equals(
         copy.deepcopy(layer).log_likelihood_of_nodes(
-            case.events(namespace=array_backend)
+            events=case.events(namespace=array_backend)
         ),
         np.asarray(expected),
         array_backend,

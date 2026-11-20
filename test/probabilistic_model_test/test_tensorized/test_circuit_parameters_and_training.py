@@ -86,7 +86,7 @@ def test_a_copy_with_other_parameters_keeps_shared_layers_shared(
     layer both sum layers point to stays one layer.
     """
     circuit = mixture_of_products_case.circuit(np)
-    copy = circuit.copy_with_parameters(circuit.parameters)
+    copy = circuit.copy_with_parameters(parameters=circuit.parameters)
     mixtures, products = copy.root.child_layers
     assert mixtures.child_layers[0] is products
     assert products is not circuit.root.child_layers[1]
@@ -104,16 +104,16 @@ def test_a_copy_with_scaled_weights_answers_with_the_new_weights(
     circuit = case.circuit(np)
     np.testing.assert_allclose(
         circuit.copy_with_parameters(
-            parameters_shifted(circuit, SumLayer, 2.0)
-        ).log_likelihood(case.events(np)),
-        circuit.log_likelihood(case.events(np)),
+            parameters=parameters_shifted(circuit, SumLayer, 2.0)
+        ).log_likelihood(events=case.events(np)),
+        circuit.log_likelihood(events=case.events(np)),
         rtol=1e-12,
     )
     assert not np.allclose(
         circuit.copy_with_parameters(
-            parameters_shifted(circuit, GaussianLayer, 1.0)
-        ).log_likelihood(case.events(np)),
-        circuit.log_likelihood(case.events(np)),
+            parameters=parameters_shifted(circuit, GaussianLayer, 1.0)
+        ).log_likelihood(events=case.events(np)),
+        circuit.log_likelihood(events=case.events(np)),
     )
 
 
@@ -131,15 +131,15 @@ def test_converting_to_jax_and_back_keeps_the_log_likelihood(mixture_of_products
         on_jax = circuit.to_namespace(jnp)
         assert all(isinstance(parameter, jax.Array) for parameter in on_jax.parameters)
         np.testing.assert_allclose(
-            np.asarray(on_jax.log_likelihood(case.events(jnp))),
-            circuit.log_likelihood(case.events(np)),
+            np.asarray(on_jax.log_likelihood(events=case.events(jnp))),
+            circuit.log_likelihood(events=case.events(np)),
             rtol=1e-12,
         )
         back = on_jax.to_namespace(np)
     assert all(isinstance(parameter, np.ndarray) for parameter in back.parameters)
     np.testing.assert_allclose(
-        back.log_likelihood(case.events(np)),
-        circuit.log_likelihood(case.events(np)),
+        back.log_likelihood(events=case.events(np)),
+        circuit.log_likelihood(events=case.events(np)),
         rtol=1e-12,
     )
 
@@ -154,10 +154,10 @@ def test_a_circuit_in_single_precision_computes_in_single_precision(
     case = mixture_of_products_case
     circuit = case.circuit(np)
     single = circuit.to_namespace(np, floating_point_type=np.float32)
-    result = single.log_likelihood(case.events(np))
+    result = single.log_likelihood(events=case.events(np))
     assert result.dtype == np.float32
     np.testing.assert_allclose(
-        result, circuit.log_likelihood(case.events(np)), rtol=1e-5
+        result, circuit.log_likelihood(events=case.events(np)), rtol=1e-5
     )
 
 
@@ -193,7 +193,7 @@ def test_projected_gaussian_scales_are_at_least_the_minimum_scale():
     """
     layer = GaussianLayer(0, np.array([0.0, 1.0]), np.array([1.0, 2.0]))
     location, scale = layer.projected_parameters(
-        [np.array([0.5, -0.5]), np.array([-1.0, 0.5])]
+        parameters=[np.array([0.5, -0.5]), np.array([-1.0, 0.5])]
     )
     np.testing.assert_array_equal(location, [0.5, -0.5])
     np.testing.assert_array_equal(scale, [GaussianLayer.minimum_scale, 0.5])
@@ -205,7 +205,7 @@ def test_projected_log_probabilities_are_normalized_per_node():
     """
     table = DenseProbabilityTable(np.log(np.array([[0.2, 0.8], [0.5, 0.5]])))
     (log_probabilities,) = table.projected_parameters(
-        [np.log(np.array([[1.0, 3.0], [2.0, 2.0]]))]
+        parameters=[np.log(np.array([[1.0, 3.0], [2.0, 2.0]]))]
     )
     np.testing.assert_allclose(
         logsumexp(log_probabilities, axis=1), [0.0, 0.0], atol=1e-12
@@ -221,7 +221,7 @@ def test_projection_keeps_a_node_without_probability_mass_impossible():
     table = DenseProbabilityTable(np.log(np.array([[0.2, 0.8], [0.5, 0.5]])))
     with np.errstate(divide="ignore"):
         log_probabilities = np.log(np.array([[1.0, 3.0], [0.0, 0.0]]))
-    (projected,) = table.projected_parameters([log_probabilities])
+    (projected,) = table.projected_parameters(parameters=[log_probabilities])
     np.testing.assert_array_equal(projected[1], [-np.inf, -np.inf])
     np.testing.assert_allclose(np.exp(projected[0]), [0.25, 0.75])
 
@@ -251,13 +251,15 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
     start = case.circuit(np)
     moved = parameters_shifted(start, GaussianLayer, 1.5)
     with jax.enable_x64(True):
-        circuit = start.copy_with_parameters(moved).to_namespace(jnp)
-        before = float(jnp.mean(circuit.log_likelihood(jnp.asarray(data))))
+        circuit = start.copy_with_parameters(parameters=moved).to_namespace(jnp)
+        before = float(jnp.mean(circuit.log_likelihood(events=jnp.asarray(data))))
         trained_root = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize(200, jnp.asarray(data))
         after = float(
-            jnp.mean(trained_root.log_likelihood_of_nodes(jnp.asarray(data))[:, 0])
+            jnp.mean(
+                trained_root.log_likelihood_of_nodes(events=jnp.asarray(data))[:, 0]
+            )
         )
     assert after > before + minimum_improvement
 
@@ -281,14 +283,14 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
     start = case.circuit(np)
     namespace = array_namespace(torch.zeros(0))
     circuit = start.copy_with_parameters(
-        parameters_shifted(start, GaussianLayer, 1.5)
+        parameters=parameters_shifted(start, GaussianLayer, 1.5)
     ).to_namespace(namespace)
     events = namespace.asarray(data)
-    before = float(circuit.log_likelihood(events).mean())
+    before = float(circuit.log_likelihood(events=events).mean())
     trained_root = torch_gradient_descent.TorchGradientDescent(
         circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize(200, events)
-    after = float(trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
+    after = float(trained_root.log_likelihood_of_nodes(events=events)[:, 0].mean())
     assert after > before + minimum_improvement
     assert all(
         float(layer.scale.min()) >= GaussianLayer.minimum_scale
@@ -337,7 +339,7 @@ def test_training_with_weight_decay_keeps_zero_probability_weights(
         for parameter in layer.parameters
     ]
     with jax.enable_x64(True):
-        circuit = start.copy_with_parameters(parameters).to_namespace(jnp)
+        circuit = start.copy_with_parameters(parameters=parameters).to_namespace(jnp)
         trained = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adamw(1e-2)
         ).minimize(20, jnp.asarray(data))

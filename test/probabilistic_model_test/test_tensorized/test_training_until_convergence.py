@@ -345,10 +345,10 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
     start = case.circuit(np)
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(
-            parameters_shifted(start, GaussianLayer, 1.5)
+            parameters=parameters_shifted(start, GaussianLayer, 1.5)
         ).to_namespace(jnp)
         events = jnp.asarray(data)
-        before = float(jnp.mean(circuit.log_likelihood(events)))
+        before = float(jnp.mean(circuit.log_likelihood(events=events)))
         run = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize_until_converged(
@@ -356,7 +356,9 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
             convergence=training_convergence,
             mini_batches=MiniBatches(batch_size=100),
         )
-        after = float(jnp.mean(run.trained_root.log_likelihood_of_nodes(events)[:, 0]))
+        after = float(
+            jnp.mean(run.trained_root.log_likelihood_of_nodes(events=events)[:, 0])
+        )
     assert after > before + minimum_improvement
 
 
@@ -378,10 +380,10 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     start = case.circuit(np)
     namespace = array_namespace(torch.zeros(0))
     circuit = start.copy_with_parameters(
-        parameters_shifted(start, GaussianLayer, 1.5)
+        parameters=parameters_shifted(start, GaussianLayer, 1.5)
     ).to_namespace(namespace)
     events = namespace.asarray(data)
-    before = float(circuit.log_likelihood(events).mean())
+    before = float(circuit.log_likelihood(events=events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
         circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize_until_converged(
@@ -389,5 +391,5 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
         convergence=training_convergence,
         mini_batches=MiniBatches(batch_size=100),
     )
-    after = float(run.trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
+    after = float(run.trained_root.log_likelihood_of_nodes(events=events)[:, 0].mean())
     assert after > before + minimum_improvement

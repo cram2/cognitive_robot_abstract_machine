@@ -90,17 +90,21 @@ class BinomialLayer(UnivariateInputLayer):
     def parameters(self) -> list[BackendArray]:
         return [self.success_probability]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         (success_probability,) = parameters
         return dataclasses.replace(self, success_probability=success_probability)
 
     def projected_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
+        """
+        Like :meth:`Layer.projected_parameters`, bringing every success probability back
+        into [0, 1].
+        """
         (success_probability,) = parameters
         return [self.namespace.clip(success_probability, 0.0, 1.0)]
 
-    def validate_own(self):
+    def validate_own(self) -> None:
         """
         :raises ShapeMismatchError: If the nodes do not each have a number of trials, a
             success probability and an offset.
@@ -208,7 +212,7 @@ class BinomialLayer(UnivariateInputLayer):
             values, dtype=self.floating_point_type, device=self.device
         )
 
-    def selected_successes(self, assignment: AbstractCompositeSet) -> NodeStateMask:
+    def selected_successes(self, *, assignment: AbstractCompositeSet) -> NodeStateMask:
         """
         :param assignment: The assignment of the variable of this layer.
         :return: The numbers of :attr:`successes` at which every node takes a value of
@@ -220,7 +224,7 @@ class BinomialLayer(UnivariateInputLayer):
         ]
         return np.isin(values, contained)
 
-    def successes_of_column(self, values: SampleColumn) -> SampleNodeValues:
+    def successes_of_column(self, *, values: SampleColumn) -> SampleNodeValues:
         """
         :param values: Values of the variable of this layer, shape (#events,).
         :return: The number of successes every node needs for every value, shape
@@ -258,10 +262,10 @@ class BinomialLayer(UnivariateInputLayer):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         namespace = self.namespace
-        successes = self.successes_of_column(self.column_of(events))
+        successes = self.successes_of_column(values=self.column_of(events))
         possible = (
             (successes >= 0)
             & (successes <= len(self.successes) - 1)
@@ -275,10 +279,12 @@ class BinomialLayer(UnivariateInputLayer):
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         namespace = self.namespace
-        successes = namespace.floor(self.successes_of_column(self.column_of(events)))
+        successes = namespace.floor(
+            self.successes_of_column(values=self.column_of(events))
+        )
         cumulative = namespace.cumulative_sum(
             namespace.exp(self.log_probabilities_of_successes()), axis=1
         )
@@ -291,12 +297,13 @@ class BinomialLayer(UnivariateInputLayer):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
         namespace = self.namespace
-        selected = self.selected_successes(event[variables[self.variable]])
+        selected = self.selected_successes(assignment=event[variables[self.variable]])
         return namespace.sum(
             namespace.where(
                 namespace.asarray(selected, device=self.device),
@@ -307,7 +314,7 @@ class BinomialLayer(UnivariateInputLayer):
         )
 
     def moment_of_nodes_own(
-        self, order: int, center: float, variable: Variable
+        self, *, order: int, center: float, variable: Variable
     ) -> NodeValues:
         """
         Like :meth:`UnivariateInputLayer.moment_of_nodes_own`, as the expectation of the
@@ -320,7 +327,13 @@ class BinomialLayer(UnivariateInputLayer):
             axis=1,
         )
 
-    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+    def sample_of_nodes(
+        self, *, nodes: NodeIndices, variables: SortedSet
+    ) -> SampleColumn:
+        """
+        Like :meth:`UnivariateInputLayer.sample_of_nodes`, drawing the number of
+        successes of every entry from the probabilities of its node, all nodes at once.
+        """
         cumulative = np.cumsum(
             np.exp(self.host_copy(self.log_probabilities_of_successes()))[nodes], axis=1
         )
@@ -333,14 +346,14 @@ class BinomialLayer(UnivariateInputLayer):
     # %% structural queries
 
     def type_of_truncated_layer(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> type[Layer]:
         return TruncatedBinomialLayer
 
     def log_truncated_of_assignment(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> LayerWithLogProbabilities:
-        selected = self.selected_successes(assignment)
+        selected = self.selected_successes(assignment=assignment)
         probabilities = np.exp(self.host_copy(self.log_probabilities_of_successes()))
         with np.errstate(divide="ignore"):
             log_probabilities = np.log(
@@ -353,15 +366,22 @@ class BinomialLayer(UnivariateInputLayer):
             log_probabilities,
         )
 
-    def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
-        return self.log_truncated_of_assignment(singleton(value), False)
+    def log_conditional_of_value(self, *, value: Any) -> LayerWithLogProbabilities:
+        return self.log_truncated_of_assignment(
+            assignment=singleton(value), singleton_allowed=False
+        )
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Moves the :attr:`offset` of every node by the translation of its variable.
+        """
         self.offset = self.offset + int(translation[self.variable])
 
     # %% nodes
 
-    def node_distribution(self, index: int, variable: Variable) -> BinomialDistribution:
+    def node_distribution(
+        self, *, index: int, variable: Variable
+    ) -> BinomialDistribution:
         return BinomialDistribution(
             variable=variable,
             number_of_trials=int(self.number_of_trials[index]),
@@ -371,7 +391,7 @@ class BinomialLayer(UnivariateInputLayer):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[BinomialDistribution]
+        cls, *, variable_index: int, distributions: list[BinomialDistribution]
     ) -> Self:
         return cls(
             variable=variable_index,
@@ -388,7 +408,7 @@ class BinomialLayer(UnivariateInputLayer):
             ),
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         return dataclasses.replace(
             self,
             number_of_trials=self.number_of_trials[mask],
@@ -397,7 +417,7 @@ class BinomialLayer(UnivariateInputLayer):
         )
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         return dataclasses.replace(
             layers[0],
             number_of_trials=np.concatenate(
@@ -409,7 +429,7 @@ class BinomialLayer(UnivariateInputLayer):
             offset=np.concatenate([layer.offset for layer in layers]),
         )
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         return (
             np.array_equal(self.number_of_trials, other.number_of_trials)
             and np.array_equal(self.offset, other.offset)
@@ -454,7 +474,7 @@ class TruncatedBinomialLayer(BinomialLayer):
             allowed_successes=allowed_successes,
         )
 
-    def validate_own(self):
+    def validate_own(self) -> None:
         """
         Like :meth:`BinomialLayer.validate_own`, and also:
 
@@ -492,9 +512,13 @@ class TruncatedBinomialLayer(BinomialLayer):
         return namespace.where(possible, restricted - log_mass, -namespace.inf)
 
     def node_distribution(
-        self, index: int, variable: Variable
+        self, *, index: int, variable: Variable
     ) -> TruncatedBinomialDistribution:
-        untruncated = super().node_distribution(index, variable)
+        """
+        Like :meth:`BinomialLayer.node_distribution`, restricted to the values the node
+        allows.
+        """
+        untruncated = super().node_distribution(index=index, variable=variable)
         truncation_interval = Interval()
         values = self.values_of_successes[index][self.possible_successes()[index]]
         for value in values.tolist():
@@ -509,9 +533,15 @@ class TruncatedBinomialLayer(BinomialLayer):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[TruncatedBinomialDistribution]
+        cls, *, variable_index: int, distributions: list[TruncatedBinomialDistribution]
     ) -> Self:
-        untruncated = BinomialLayer.from_distributions(variable_index, distributions)
+        """
+        Like :meth:`BinomialLayer.from_distributions`, restricting every node to the
+        allowed values of its distribution.
+        """
+        untruncated = BinomialLayer.from_distributions(
+            variable_index=variable_index, distributions=distributions
+        )
         values = untruncated.values_of_successes
         return cls.from_binomial_layer(
             layer=untruncated,
@@ -524,8 +554,12 @@ class TruncatedBinomialLayer(BinomialLayer):
             ).reshape(values.shape),
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
-        selected = super().select_nodes(mask)
+    def select_nodes(self, *, mask: NodeMask) -> Self:
+        """
+        Like :meth:`BinomialLayer.select_nodes`, keeping the allowed successes of the
+        selected nodes.
+        """
+        selected = super().select_nodes(mask=mask)
         return dataclasses.replace(
             selected,
             allowed_successes=self.allowed_successes[mask][
@@ -534,8 +568,12 @@ class TruncatedBinomialLayer(BinomialLayer):
         )
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
-        concatenated = super().concatenate(layers)
+    def concatenate(cls, *, layers: list[Self]) -> Self:
+        """
+        Like :meth:`BinomialLayer.concatenate`, joining the allowed successes of the
+        layers too.
+        """
+        concatenated = super().concatenate(layers=layers)
         return dataclasses.replace(
             concatenated,
             allowed_successes=np.concatenate(
@@ -552,7 +590,11 @@ class TruncatedBinomialLayer(BinomialLayer):
             ),
         )
 
-    def has_equal_parameters(self, other: Self) -> bool:
-        return super().has_equal_parameters(other) and np.array_equal(
+    def has_equal_parameters(self, *, other: Self) -> bool:
+        """
+        Like :meth:`BinomialLayer.has_equal_parameters`, comparing the allowed successes
+        too.
+        """
+        return super().has_equal_parameters(other=other) and np.array_equal(
             self.allowed_successes, other.allowed_successes
         )

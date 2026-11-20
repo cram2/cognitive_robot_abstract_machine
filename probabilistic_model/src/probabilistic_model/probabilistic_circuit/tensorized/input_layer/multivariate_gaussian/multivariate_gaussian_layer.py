@@ -1,3 +1,7 @@
+"""
+The input layer of multivariate Gaussian distributions.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -62,13 +66,14 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
     """
 
     def node_distribution(
-        self, index: int, variables: SortedSet
+        self, *, index: int, variables: SortedSet
     ) -> MultivariateGaussianDistribution:
         return self.untruncated_distribution(index, variables)
 
     @classmethod
     def from_distributions(
         cls,
+        *,
         variables: SortedSet,
         distributions: list[MultivariateGaussianDistribution],
     ) -> Self:
@@ -83,7 +88,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         )
         return cls(scope=scope, mean=gaussians.mean, covariance=gaussians.covariance)
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         return self.__class__(
             scope=self.scope.copy(),
             mean=self.mean[mask],
@@ -91,7 +96,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         )
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         return cls(
             scope=layers[0].scope.copy(),
             mean=np.concatenate([layer.mean for layer in layers]),
@@ -104,13 +109,13 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.untruncated_gaussians.log_density(self.values_of_scope(events))
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         values = self.values_of_scope(events)
         return np.stack(
@@ -128,6 +133,7 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -180,7 +186,9 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
                 np.sqrt(self.covariance.variances[:, position]),
             )
             result[:, index] = marginal.moment_of_nodes_own(
-                int(query.order[index]), float(query.center[index]), variables[index]
+                order=int(query.order[index]),
+                center=float(query.center[index]),
+                variable=variables[index],
             )
         return result
 

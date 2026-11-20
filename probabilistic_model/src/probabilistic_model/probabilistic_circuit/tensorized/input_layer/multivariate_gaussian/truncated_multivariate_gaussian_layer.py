@@ -1,3 +1,7 @@
+"""
+The input layer of multivariate Gaussian distributions restricted to boxes.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -106,7 +110,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             )
 
     def node_distribution(
-        self, index: int, variables: SortedSet
+        self, *, index: int, variables: SortedSet
     ) -> TruncatedMultivariateGaussianDistribution:
         return TruncatedMultivariateGaussianDistribution(
             untruncated=self.untruncated_distribution(index, variables),
@@ -120,6 +124,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
     @classmethod
     def from_distributions(
         cls,
+        *,
         variables: SortedSet,
         distributions: list[TruncatedMultivariateGaussianDistribution],
     ) -> Self:
@@ -168,11 +173,11 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             log_normalizing_constant=self.log_normalizing_constant[indices],
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         return self.with_nodes(mask)
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         return dataclasses.replace(
             layers[0],
             scope=layers[0].scope.copy(),
@@ -188,9 +193,13 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             ),
         )
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
+        """
+        Like :meth:`AbstractMultivariateGaussianLayer.has_equal_parameters`, comparing
+        the boxes of the nodes too.
+        """
         return (
-            super().has_equal_parameters(other)
+            super().has_equal_parameters(other=other)
             and np.array_equal(
                 self.hyperrectangles.interval, other.hyperrectangles.interval
             )
@@ -206,7 +215,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         values = self.values_of_scope(events)
         return np.where(
@@ -218,7 +227,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         # the probability of the part of the hyperrectangle below the point
         values = self.values_of_scope(events)
@@ -240,6 +249,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -411,11 +421,19 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
         super().reorder_scope(order)
         self.hyperrectangles = self.hyperrectangles.over(order)
 
-    def apply_translation_own(self, translation: VariableValues):
-        super().apply_translation_own(translation)
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Like :meth:`AbstractMultivariateGaussianLayer.apply_translation_own`, moving the
+        boxes too.
+        """
+        super().apply_translation_own(translation=translation)
         self.hyperrectangles = self.hyperrectangles.translated(translation[self.scope])
 
-    def apply_scaling_own(self, scaling: VariableValues):
-        super().apply_scaling_own(scaling)
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
+        """
+        Like :meth:`AbstractMultivariateGaussianLayer.apply_scaling_own`, scaling the
+        boxes too.
+        """
+        super().apply_scaling_own(scaling=scaling)
         self.hyperrectangles = self.hyperrectangles.scaled(scaling[self.scope])
         # the hyperrectangle scales with the Gaussian, so its probability stays the same

@@ -118,8 +118,11 @@ def test_a_node_without_mass_stays_without_mass(table):
 
 
 def test_select_nodes_and_concatenate(table, table_type, probabilities):
+    """
+    Selecting nodes of a table and joining tables keep the probabilities of the nodes.
+    """
     mask = np.array([True, False, True])
-    selected = table.select_nodes(mask)
+    selected = table.select_nodes(mask=mask)
     np.testing.assert_allclose(selected.dense_probabilities(), probabilities[mask])
     joined = table_type.concatenate([selected, table])
     np.testing.assert_allclose(
@@ -234,7 +237,7 @@ def test_sparse_table_keeps_a_state_with_probability_one(derive, probabilities):
     """
     only_certain_node = np.array([False, True, False])
     selected = table_of(SparseProbabilityTable, probabilities).select_nodes(
-        only_certain_node
+        mask=only_certain_node
     )
     derived = derive(selected)
     assert derived.number_of_stored_entries == 1

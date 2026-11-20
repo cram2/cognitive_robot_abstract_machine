@@ -69,7 +69,9 @@ def layer(distributions) -> BinomialLayer:
     """
     The layer of the distributions.
     """
-    return BinomialLayer.from_distributions(0, distributions)
+    return BinomialLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
 
 
 @pytest.fixture
@@ -111,7 +113,7 @@ def test_log_likelihoods_are_those_of_the_distributions(layer, distributions, va
                 for value in values[:, 0]
             ]
         )
-    assert np.allclose(layer.log_likelihood_of_nodes(values), expected)
+    assert np.allclose(layer.log_likelihood_of_nodes(events=values), expected)
 
 
 def test_cumulative_distribution_is_that_of_the_distributions(
@@ -127,7 +129,7 @@ def test_cumulative_distribution_is_that_of_the_distributions(
         ],
         axis=1,
     )
-    assert np.allclose(layer.cumulative_distribution_of_nodes(values), expected)
+    assert np.allclose(layer.cumulative_distribution_of_nodes(events=values), expected)
 
 
 def test_probability_of_an_event_is_that_of_the_distributions(
@@ -138,7 +140,9 @@ def test_probability_of_an_event_is_that_of_the_distributions(
     """
     event = SimpleEvent.from_data({count: closed(0, 1) | closed(3, 6)})
     assert np.allclose(
-        layer.probability_of_simple_event_of_nodes(event, SortedSet([count])),
+        layer.probability_of_simple_event_of_nodes(
+            event=event, variables=SortedSet([count])
+        ),
         [
             distribution.probability_of_simple_event(event)
             for distribution in distributions
@@ -168,7 +172,7 @@ def test_samples_of_a_node_lie_in_its_support(layer, distributions, count):
     """
     np.random.seed(0)
     nodes = np.repeat(np.arange(len(distributions)), 50)
-    samples = layer.sample_of_nodes(nodes, SortedSet([count]))
+    samples = layer.sample_of_nodes(nodes=nodes, variables=SortedSet([count]))
     for node, sample in zip(nodes, samples):
         assert distributions[node].probabilities[int(sample)] > 0
 
@@ -190,7 +194,9 @@ def test_a_truncated_layer_holds_the_truncated_distributions(
     """
     event = SimpleEvent.from_data({count: assignment}).as_composite_set()
     with np.errstate(divide="ignore"):
-        truncation = layer.log_truncated_of_assignment(assignment, False)
+        truncation = layer.log_truncated_of_assignment(
+            assignment=assignment, singleton_allowed=False
+        )
         expected = [distribution.log_truncated(event) for distribution in distributions]
 
     assert type(truncation.layer) is TruncatedBinomialLayer
@@ -211,7 +217,9 @@ def test_a_truncated_layer_keeps_the_success_probabilities_as_parameters(
     """
     Truncated, the nodes keep their success probabilities as the parameters.
     """
-    truncated = layer.log_truncated_of_assignment(closed(1, 3), False).layer
+    truncated = layer.log_truncated_of_assignment(
+        assignment=closed(1, 3), singleton_allowed=False
+    ).layer
     [success_probability] = truncated.parameters
     assert success_probability.tolist() == [
         distribution.success_probability for distribution in distributions
@@ -223,8 +231,12 @@ def test_truncating_twice_restricts_to_both_assignments(layer, distributions, co
     Truncated to one assignment and then another, the nodes are restricted to the values
     of both.
     """
-    once = layer.log_truncated_of_assignment(closed(0, 3), False).layer
-    twice = once.log_truncated_of_assignment(closed(2, 6), False).layer
+    once = layer.log_truncated_of_assignment(
+        assignment=closed(0, 3), singleton_allowed=False
+    ).layer
+    twice = once.log_truncated_of_assignment(
+        assignment=closed(2, 6), singleton_allowed=False
+    ).layer
     event = SimpleEvent.from_data({count: closed(2, 3)}).as_composite_set()
     for node, distribution in zip(twice.node_distributions(count), distributions):
         assert dict(node.probabilities) == pytest.approx(
@@ -238,18 +250,19 @@ def test_conditioning_on_a_value_keeps_only_that_value(layer, distributions, cou
     probabilities are the log-likelihoods of the value.
     """
     with np.errstate(divide="ignore"):
-        conditioning = layer.log_conditional_of_value(2)
+        conditioning = layer.log_conditional_of_value(value=2)
         expected = np.log(
             [distribution.probabilities[2] for distribution in distributions]
         )
 
     assert type(conditioning.layer) is TruncatedBinomialLayer
     assert isinstance(
-        conditioning.layer.node_distribution(1, count), TruncatedBinomialDistribution
+        conditioning.layer.node_distribution(index=1, variable=count),
+        TruncatedBinomialDistribution,
     )
     assert np.allclose(conditioning.log_probabilities, expected)
     assert np.allclose(
-        conditioning.layer.log_likelihood_of_nodes(np.array([[2.0]]))[0, :2], 0.0
+        conditioning.layer.log_likelihood_of_nodes(events=np.array([[2.0]]))[0, :2], 0.0
     )
 
 
@@ -268,7 +281,9 @@ def test_a_layer_of_truncated_distributions_holds_them(distributions, count, val
         )
         for distribution in distributions[:2]
     ]
-    layer = TruncatedBinomialLayer.from_distributions(0, truncated)
+    layer = TruncatedBinomialLayer.from_distributions(
+        variable_index=0, distributions=truncated
+    )
     with np.errstate(divide="ignore"):
         expected = np.log(
             [
@@ -277,7 +292,7 @@ def test_a_layer_of_truncated_distributions_holds_them(distributions, count, val
             ]
         )
 
-    assert np.allclose(layer.log_likelihood_of_nodes(values), expected)
+    assert np.allclose(layer.log_likelihood_of_nodes(events=values), expected)
     for node, distribution in zip(layer.node_distributions(count), truncated):
         assert dict(node.probabilities) == pytest.approx(
             dict(distribution.probabilities)
@@ -291,13 +306,15 @@ def test_selected_and_concatenated_truncated_layers_keep_their_nodes(
     Selecting nodes of a truncated layer and joining truncated layers keep every node
     restricted as it was.
     """
-    truncated = layer.log_truncated_of_assignment(closed(0, 2), False).layer
+    truncated = layer.log_truncated_of_assignment(
+        assignment=closed(0, 2), singleton_allowed=False
+    ).layer
     expected = truncated.node_distributions(count)
     pieces = [
-        truncated.select_nodes(np.array([True, False, False])),
-        truncated.select_nodes(np.array([False, True, True])),
+        truncated.select_nodes(mask=np.array([True, False, False])),
+        truncated.select_nodes(mask=np.array([False, True, True])),
     ]
-    joined = TruncatedBinomialLayer.concatenate(pieces)
+    joined = TruncatedBinomialLayer.concatenate(layers=pieces)
     assert [dict(node.probabilities) for node in joined.node_distributions(count)] == [
         dict(node.probabilities) for node in expected
     ]
@@ -324,17 +341,23 @@ def test_the_gradient_of_the_log_likelihood_is_that_of_the_binomial(count):
     """
     trials, successes, probability = 6, 2, 0.4
     layer = BinomialLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             BinomialDistribution(
                 variable=count, number_of_trials=trials, success_probability=probability
             )
         ],
-    ).copy_with_parameters([jnp.asarray([probability])])
+    ).copy_with_parameters(parameters=[jnp.asarray([probability])])
 
     def log_likelihood(success_probability: jax.Array) -> jax.Array:
-        changed = layer.copy_with_parameters([success_probability])
-        return changed.log_likelihood_of_nodes(jnp.asarray([[float(successes)]]))[0, 0]
+        """
+        :param success_probability: The success probability of the only node.
+        :return: The log-likelihood of the successes under the node.
+        """
+        changed = layer.copy_with_parameters(parameters=[success_probability])
+        return changed.log_likelihood_of_nodes(
+            events=jnp.asarray([[float(successes)]])
+        )[0, 0]
 
     gradient = jax.grad(log_likelihood)(jnp.asarray([probability]))
     assert float(gradient[0]) == pytest.approx(
@@ -346,7 +369,7 @@ def test_projected_success_probabilities_are_probabilities(layer):
     """
     Projected, a step past zero or one is brought back to it.
     """
-    [projected] = layer.projected_parameters([np.array([-0.2, 0.5, 1.3])])
+    [projected] = layer.projected_parameters(parameters=[np.array([-0.2, 0.5, 1.3])])
     assert projected.tolist() == [0.0, 0.5, 1.0]
 
 
@@ -354,7 +377,7 @@ def test_a_success_probability_outside_of_zero_and_one_is_refused(layer):
     """
     A success probability that is no probability makes the layer invalid.
     """
-    invalid = layer.copy_with_parameters([np.array([0.3, 1.5, 0.2])])
+    invalid = layer.copy_with_parameters(parameters=[np.array([0.3, 1.5, 0.2])])
     with pytest.raises(SuccessProbabilityOutsideUnitIntervalError):
         invalid.validate_own()
 
@@ -368,7 +391,7 @@ def test_a_translation_moves_the_offsets(layer, distributions):
     offset.
     """
     translated = copy.deepcopy(layer)
-    translated.apply_translation_own(np.array([3]))
+    translated.apply_translation_own(translation=np.array([3]))
     assert translated.offset.tolist() == [
         distribution.offset + 3 for distribution in distributions
     ]
@@ -386,7 +409,9 @@ def test_a_circuit_of_binomial_leaves_converts_to_binomial_layers():
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(circuit)
 
     assert any(isinstance(each, BinomialLayer) for each in layered.root.all_layers())
-    assert np.allclose(layered.log_likelihood(events), circuit.log_likelihood(events))
+    assert np.allclose(
+        layered.log_likelihood(events=events), circuit.log_likelihood(events=events)
+    )
 
 
 def test_a_truncated_circuit_of_binomial_leaves_converts_to_binomial_layers():
@@ -404,4 +429,6 @@ def test_a_truncated_circuit_of_binomial_leaves_converts_to_binomial_layers():
 
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(truncated)
 
-    assert np.allclose(layered.log_likelihood(events), truncated.log_likelihood(events))
+    assert np.allclose(
+        layered.log_likelihood(events=events), truncated.log_likelihood(events=events)
+    )

@@ -1,3 +1,7 @@
+"""
+The base classes of the input layers of layered circuits over one variable.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -98,7 +102,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
 
     @abstractmethod
     def node_distribution(
-        self, index: int, variable: Variable
+        self, *, index: int, variable: Variable
     ) -> UnivariateDistribution:
         """
         Materialize one node of this layer as a univariate distribution.
@@ -112,7 +116,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     @classmethod
     @abstractmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[UnivariateDistribution]
+        cls, *, variable_index: int, distributions: list[UnivariateDistribution]
     ) -> Self:
         """
         Create a layer from a list of distributions of the type of this layer.
@@ -124,7 +128,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         """
         Create a layer that only holds the nodes selected by a mask.
 
@@ -139,7 +143,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         :return: Every node of this layer as a univariate distribution.
         """
         return [
-            self.node_distribution(index, variable)
+            self.node_distribution(index=index, variable=variable)
             for index in range(self.number_of_nodes)
         ]
 
@@ -181,9 +185,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
                 device=self.device,
             )
         own_moments = self.moment_of_nodes_own(
-            int(query.order[self.variable]),
-            float(query.center[self.variable]),
-            variables[self.variable],
+            order=int(query.order[self.variable]),
+            center=float(query.center[self.variable]),
+            variable=variables[self.variable],
         )
         is_own_variable = self.namespace.asarray(
             np.arange(query.number_of_variables) == self.variable, device=self.device
@@ -191,7 +195,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         return self.namespace.where(is_own_variable, own_moments[:, None], 0.0)
 
     def moment_of_nodes_own(
-        self, order: int, center: float, variable: Variable
+        self, *, order: int, center: float, variable: Variable
     ) -> NodeValues:
         """
         Calculate the moment of the variable of this layer for every node.
@@ -233,10 +237,12 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         if not rows:
             return
         samples[np.concatenate(rows), self.variable] = self.sample_of_nodes(
-            np.concatenate(nodes), variables
+            nodes=np.concatenate(nodes), variables=variables
         )
 
-    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+    def sample_of_nodes(
+        self, *, nodes: NodeIndices, variables: SortedSet
+    ) -> SampleColumn:
         """
         Draw one sample from the node of every entry of ``nodes``.
 
@@ -267,14 +273,16 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         :param variables: The variables of the circuit.
         :return: The samples with shape (amount,).
         """
-        distribution = self.node_distribution(node, variables[self.variable])
+        distribution = self.node_distribution(
+            index=node, variable=variables[self.variable]
+        )
         return distribution.sample(amount)[:, 0]
 
     # %% structural
 
     @abstractmethod
     def log_truncated_of_assignment(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> LayerWithLogProbabilities:
         """
         Truncate every node of this layer to the assignment of its variable at once.
@@ -288,7 +296,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
 
     @abstractmethod
     def type_of_truncated_layer(
-        self, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
     ) -> type[Layer]:
         """
         :param assignment: The assignment of the variable of this layer.
@@ -307,7 +315,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     ) -> LayerWithLogProbabilities:
         return query.log_probabilities.record(
             self.log_truncated_of_assignment(
-                event[query.variables[self.variable]], query.singleton_allowed
+                assignment=event[query.variables[self.variable]],
+                singleton_allowed=query.singleton_allowed,
             )
         )
 
@@ -320,7 +329,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         """
         variable = query.variables[self.variable]
         types = {
-            self.type_of_truncated_layer(event[variable], query.singleton_allowed)
+            self.type_of_truncated_layer(
+                assignment=event[variable], singleton_allowed=query.singleton_allowed
+            )
             for event in events
         }
         return len(types) == 1 and issubclass(types.pop(), UnivariateInputLayer)
@@ -334,19 +345,21 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     ) -> LayerWithLogProbabilities:
         variable = query.variables[self.variable]
         truncated = [
-            self.log_truncated_of_assignment(event[variable], query.singleton_allowed)
+            self.log_truncated_of_assignment(
+                assignment=event[variable], singleton_allowed=query.singleton_allowed
+            )
             for event in events
         ]
         layers = [piece.layer for piece in truncated]
         return query.log_probabilities.record(
             LayerWithLogProbabilities(
-                type(layers[0]).concatenate(layers),
+                type(layers[0]).concatenate(layers=layers),
                 np.concatenate([piece.log_probabilities for piece in truncated]),
             )
         )
 
     @abstractmethod
-    def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
+    def log_conditional_of_value(self, *, value: Any) -> LayerWithLogProbabilities:
         """
         Condition every node of this layer on a value of its variable at once.
 
@@ -369,7 +382,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
                 copy.deepcopy(self), np.zeros(self.number_of_nodes)
             )
         else:
-            result = self.log_conditional_of_value(point[variable])
+            result = self.log_conditional_of_value(value=point[variable])
         return query.log_probabilities.record(result)
 
     def rebuild(
@@ -380,7 +393,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         alive = needed[id(self)]
         if not alive.any():
             return None
-        return self.select_nodes(alive)
+        return self.select_nodes(mask=alive)
 
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
@@ -398,7 +411,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.log_likelihood_of_nodes_from_column(self.column_of(events))
 
@@ -418,6 +431,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -439,7 +453,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.cumulative_distribution_of_nodes_from_column(self.column_of(events))
 

@@ -1,3 +1,7 @@
+"""
+The base class of the input layers of multivariate Gaussian distributions.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -188,7 +192,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
     # %% per node view
 
     @abstractmethod
-    def node_distribution(self, index: int, variables: SortedSet) -> Any:
+    def node_distribution(self, *, index: int, variables: SortedSet) -> Any:
         """
         :param index: The index of a node.
         :param variables: The variables of the circuit.
@@ -202,19 +206,19 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         :return: The distribution of every node.
         """
         return [
-            self.node_distribution(index, variables)
+            self.node_distribution(index=index, variables=variables)
             for index in range(self.number_of_nodes)
         ]
 
     @abstractmethod
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         """
         :param mask: A boolean mask over the nodes of this layer.
         :return: A layer that only holds the selected nodes.
         """
         raise NotImplementedError
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         return np.array_equal(self.mean, other.mean) and np.array_equal(
             self.covariance.lower_triangles, other.covariance.lower_triangles
         )
@@ -305,7 +309,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         return SumLayer.mixture_of_pieces(pieces)
 
     def type_of_truncated_layer(
-        self, event: SimpleEvent, variables: SortedSet
+        self, *, event: SimpleEvent, variables: SortedSet
     ) -> type[Layer]:
         """
         :param event: A simple event.
@@ -337,10 +341,13 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
     def can_truncate_in_one_batch(
         self, events: list[SimpleEvent], query: StructuralQuery
     ) -> bool:
-        # the truncations are joined with concatenate, which needs them all to be
-        # layers of one Gaussian type
+        """
+        Like :meth:`Layer.can_truncate_in_one_batch`, only if the truncations are all
+        layers of one Gaussian type.
+        """
         types = {
-            self.type_of_truncated_layer(event, query.variables) for event in events
+            self.type_of_truncated_layer(event=event, variables=query.variables)
+            for event in events
         }
         return len(types) == 1 and issubclass(
             types.pop(), AbstractMultivariateGaussianLayer
@@ -362,7 +369,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         layers = [piece.layer for piece in truncated]
         return query.log_probabilities.record(
             LayerWithLogProbabilities(
-                type(layers[0]).concatenate(layers),
+                type(layers[0]).concatenate(layers=layers),
                 np.concatenate([piece.log_probabilities for piece in truncated]),
             )
         )
@@ -434,7 +441,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         alive = needed[id(self)]
         if not alive.any():
             return None
-        return self.select_nodes(alive)
+        return self.select_nodes(mask=alive)
 
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
@@ -470,10 +477,17 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         self.mean = self.mean[:, order]
         self.covariance = self.covariance.marginal(order)
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Moves the mean of every node by the translation of its variables.
+        """
         self.mean = self.mean + translation[self.scope]
 
-    def apply_scaling_own(self, scaling: VariableValues):
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
+        """
+        Multiplies the mean of every node by the scaling of its variables and scales its
+        covariance with them.
+        """
         factors = scaling[self.scope]
         self.mean = self.mean * factors
         self.covariance = self.covariance.scaled(factors)

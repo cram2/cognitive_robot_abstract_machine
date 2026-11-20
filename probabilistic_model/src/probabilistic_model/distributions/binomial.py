@@ -57,7 +57,7 @@ class BinomialDistribution(IntegerDistribution):
     :meth:`probabilities_from_parameters`.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         :raises SuccessProbabilityOutsideUnitIntervalError: If the success probability
             is not within [0, 1].
@@ -120,7 +120,7 @@ class BinomialDistribution(IntegerDistribution):
         return closed(self.offset, self.offset + self.number_of_trials)
 
     def log_conditional_of_composite_set(
-        self, event: AbstractCompositeSet
+        self, *, event: AbstractCompositeSet
     ) -> LogTruncation[TruncatedBinomialDistribution]:
         """
         Like :meth:`DiscreteDistribution.log_conditional_of_composite_set`, but the
@@ -145,7 +145,7 @@ class BinomialDistribution(IntegerDistribution):
             math.log(probability),
         )
 
-    def apply_translation(self, translation: dict[Variable, int]):
+    def apply_translation(self, *, translation: dict[Variable, int]) -> None:
         """
         Like :meth:`IntegerDistribution.apply_translation`, by moving the
         :attr:`offset`.
@@ -153,7 +153,7 @@ class BinomialDistribution(IntegerDistribution):
         self.offset += int(translation[self.variable])
         self.probabilities = self.probabilities_from_parameters()
 
-    def apply_scaling(self, scaling: dict[Variable, int]):
+    def apply_scaling(self, *, scaling: dict[Variable, int]) -> None:
         """
         Unlike :meth:`IntegerDistribution.apply_scaling`, a binomial distribution cannot
         be scaled in place, since the scaled one is no binomial distribution.
@@ -162,7 +162,7 @@ class BinomialDistribution(IntegerDistribution):
         """
         raise UndefinedOperationError(self)
 
-    def fit(self, data: npt.NDArray) -> Self:
+    def fit(self, *, data: npt.NDArray) -> Self:
         """
         Unlike :meth:`IntegerDistribution.fit`, the frequencies of the data are no
         binomial distribution.
@@ -195,7 +195,7 @@ class TruncatedBinomialDistribution(BinomialDistribution):
         """
         return super().allowed_values & self.truncation_interval
 
-    def apply_translation(self, translation: dict[Variable, int]):
+    def apply_translation(self, *, translation: dict[Variable, int]) -> None:
         """
         Like :meth:`BinomialDistribution.apply_translation`, moving the
         :attr:`truncation_interval` with the :attr:`offset`.
@@ -205,4 +205,4 @@ class TruncatedBinomialDistribution(BinomialDistribution):
         for value in self.probabilities:
             truncation_interval |= singleton(value + shift)
         self.truncation_interval = truncation_interval
-        super().apply_translation(translation)
+        super().apply_translation(translation=translation)

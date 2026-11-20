@@ -33,6 +33,6 @@ def test_chunked_log_likelihoods_of_a_jax_circuit_are_those_of_its_host_circuit(
     )
     np.testing.assert_allclose(
         evaluation.compute_log_likelihoods(rows=rows),
-        host.log_likelihood(rows),
+        host.log_likelihood(events=rows),
         rtol=1e-5,
     )

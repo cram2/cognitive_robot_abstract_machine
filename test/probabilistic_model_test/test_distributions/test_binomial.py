@@ -166,7 +166,7 @@ def test_a_translated_truncated_distribution_moves_its_values(count):
         truncation_interval=closed(1, 2),
     )
     original = dict(distribution.probabilities)
-    distribution.apply_translation({count: 3})
+    distribution.apply_translation(translation={count: 3})
     assert dict(distribution.probabilities) == pytest.approx(
         {value + 3: p for value, p in original.items()}
     )
@@ -209,7 +209,7 @@ def test_a_translation_moves_the_offset_and_the_probabilities(count):
         variable=count, number_of_trials=3, success_probability=0.2, offset=4
     )
     original = dict(distribution.probabilities)
-    distribution.apply_translation({count: 2})
+    distribution.apply_translation(translation={count: 2})
     assert distribution.offset == 6
     assert dict(distribution.probabilities) == {
         value + 2: probability for value, probability in original.items()
@@ -224,6 +224,6 @@ def test_a_scaled_or_fitted_binomial_is_refused(count):
         variable=count, number_of_trials=3, success_probability=0.2
     )
     with pytest.raises(UndefinedOperationError):
-        distribution.apply_scaling({count: 2})
+        distribution.apply_scaling(scaling={count: 2})
     with pytest.raises(UndefinedOperationError):
-        distribution.fit(np.array([[1], [2]]))
+        distribution.fit(data=np.array([[1], [2]]))
