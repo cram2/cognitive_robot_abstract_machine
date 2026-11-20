@@ -577,7 +577,7 @@ class Statechart(SubclassJSONSerializer):
             self._end_nodes.append(node)
         if isinstance(node, CompositeNodeChoosingItsChild):
             self._choosing_nodes.append(node)
-        self.structure_change_recorder.record_joined_node(node=node)
+        node._record_structure(recorder=self.structure_change_recorder)
 
     def apply_change_block_from_json(
         self, *, data: dict[str, Any], **kwargs: Any

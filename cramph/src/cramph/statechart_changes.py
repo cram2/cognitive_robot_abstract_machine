@@ -555,14 +555,15 @@ class StatechartChangeBlock(SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
-        Resolves the nodes the changes name through the
-        :class:`~cramph.node.DeserializedNodeTracker` in `kwargs`, which also tracks
-        the nodes the block adds, so that later changes of the block find them.
+        Resolves the nodes the changes name through one
+        :class:`~cramph.node.DeserializedNodeTracker`, the one in `kwargs` or a new one,
+        which also tracks the nodes the block adds, so that later changes of the block
+        find them.
         """
-        DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
+        tracker = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
             changes=[
-                from_json(change, **kwargs)
+                from_json(change, **{**kwargs, **tracker.create_kwargs()})
                 for change in data[StatechartChangeJSONKey.CHANGES]
             ]
         )
@@ -623,19 +624,6 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
         self.recorded_change_count += 1
         self.recorded_changes.append(change)
         self._close_change_block_outside_modify()
-
-    def record_joined_node(self, *, node: StatechartNode) -> None:
-        """
-        Records that the children, the chosen children and every condition of `node`,
-        which just joined, are to be written into a block once the nodes they name
-        joined too.
-        """
-        if isinstance(node, CompositeNode):
-            self._record_changed_children(node=node)
-        if isinstance(node, CompositeNodeChoosingItsChild):
-            self._record_changed_chosen_children(node=node)
-        for transition_kind in TransitionKind:
-            self._record_changed_condition(node=node, transition_kind=transition_kind)
 
     def _record_changed_children(self, *, node: CompositeNode) -> None:
         self._record_pending_change(pending=PendingChildrenChange(node=node))

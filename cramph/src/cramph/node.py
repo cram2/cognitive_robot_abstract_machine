@@ -1552,6 +1552,16 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             return StructureChangeRecorderOutsideStatechart()
         return self._statechart.structure_change_recorder
 
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Records with `recorder` every part of the structure of this node that a copy of
+        its statechart has to repeat: the condition of every transition.
+        """
+        for transition_kind in TransitionKind:
+            recorder._record_changed_condition(
+                node=self, transition_kind=transition_kind
+            )
+
     @property
     def context(self) -> StatechartContext:
         """
@@ -2411,6 +2421,13 @@ class CompositeNode(StatechartNode):
         """
         self.nodes = list(children)
         self._structure_change_recorder._record_changed_children(node=self)
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Also records the children, see :meth:`StatechartNode._record_structure`.
+        """
+        super()._record_structure(recorder=recorder)
+        recorder._record_changed_children(node=self)
 
     def insert_child(self, *, position: int, node: StatechartNode) -> None:
         """
