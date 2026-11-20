@@ -1,3 +1,7 @@
+"""
+Tests the control structure nodes and replacing the nodes they hold.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -18,6 +22,7 @@ from cramph.exceptions import (
     NotHeldByControlStructureNodeError,
     NoControlStructureNodeAboveError,
     StatechartAlreadyCompiledError,
+    StatechartBrokenByFailedModificationError,
 )
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart, StatechartNode
@@ -523,6 +528,44 @@ def test_a_failed_replacement_by_another_node_leaves_the_step_where_it_was(
     assert sequence.nodes == [first, second]
     assert second.parent_node is sequence
     assert _start_order(statechart, [second, first]) == [first, second]
+
+
+def test_a_node_rejected_before_a_modification_changed_anything_leaves_the_statechart_usable(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The handed child is rejected before the sequence holding it joins.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    first = _succeeding("1")
+    statechart.add_node(node=(sequence := Sequence(nodes=[first])))
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+        with statechart.modify():
+            statechart.add_node(node=Sequence(nodes=[first]))
+    _run(statechart_executor, statechart, sequence)
+
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
+
+
+def test_a_node_rejected_after_its_modification_changed_the_statechart_breaks_it(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The node added before the rejected one stays, so the statechart is half changed.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    first = _succeeding("1")
+    statechart.add_node(node=Sequence(nodes=[first]))
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError) as raised:
+        with statechart.modify():
+            statechart.add_node(node=_succeeding("2"))
+            statechart.add_node(node=Sequence(nodes=[first]))
+
+    with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
+        statechart.check_not_broken()
+    assert broken.value.modification_error is raised.value
 
 
 def test_only_a_node_a_language_node_or_the_top_level_holds_can_be_replaced(
