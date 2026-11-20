@@ -15,6 +15,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     NotExactlyOneRootError,
     UnitNotConvertedError,
 )
+from probabilistic_model.distributions.binomial import BinomialDistribution
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
     IntegerDistribution,
@@ -43,6 +44,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_la
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
+    BinomialLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
@@ -134,7 +138,6 @@ class UnitsToLayerConverter(RustworkxToTensorizedConverter[InputType, OutputType
 
 
 class SumUnitsToSumLayerConverter(UnitsToLayerConverter[SumUnit, SumLayer]):
-
     @classmethod
     def convert(
         cls, data: list[SumUnit], converted_layers: list[ConvertedLayer]
@@ -176,7 +179,6 @@ class SumUnitsToSumLayerConverter(UnitsToLayerConverter[SumUnit, SumLayer]):
 class ProductUnitsToProductLayerConverter(
     UnitsToLayerConverter[ProductUnit, ProductLayer]
 ):
-
     @classmethod
     def convert(
         cls, data: list[ProductUnit], converted_layers: list[ConvertedLayer]
@@ -253,6 +255,11 @@ class SymbolicLeavesToSymbolicLayerConverter(
 
 class IntegerLeavesToIntegerLayerConverter(
     LeavesToInputLayerConverter[IntegerDistribution, IntegerLayer]
+): ...
+
+
+class BinomialLeavesToBinomialLayerConverter(
+    LeavesToInputLayerConverter[BinomialDistribution, BinomialLayer]
 ): ...
 
 

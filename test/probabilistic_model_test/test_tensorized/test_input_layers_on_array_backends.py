@@ -29,6 +29,9 @@ from probabilistic_model.distributions.distributions import (
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
     UnivariateInputLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
+    BinomialLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
 )
@@ -231,6 +234,24 @@ def integer_case() -> InputLayerQueryCase:
 
 
 @pytest.fixture
+def binomial_case() -> InputLayerQueryCase:
+    """
+    Binomial distributions of different trials and offsets, one certain to succeed.
+    """
+    return InputLayerQueryCase(
+        build=lambda namespace: BinomialLayer(
+            variable=0,
+            number_of_trials=np.array([2, 5, 3]),
+            success_probability=namespace.asarray([0.3, 0.5, 1.0]),
+            offset=np.array([1, -1, 0]),
+        ),
+        variable=Integer("n"),
+        values=[-2.0, -1.0, 0.0, 1.0, 1.5, 2.0, 3.0, 4.0, 7.0],
+        assignment=closed(0, 1) | closed(3, 6),
+    )
+
+
+@pytest.fixture
 def symbolic_case() -> InputLayerQueryCase:
     """
     Two categorical distributions over :class:`Letter`.
@@ -266,6 +287,7 @@ def symbolic_case() -> InputLayerQueryCase:
         "uniform_case",
         "dirac_delta_case",
         "integer_case",
+        "binomial_case",
         "symbolic_case",
     ]
 )
@@ -283,6 +305,7 @@ def input_layer_case(request) -> InputLayerQueryCase:
         "uniform_case",
         "dirac_delta_case",
         "integer_case",
+        "binomial_case",
     ]
 )
 def ordered_input_layer_case(request) -> InputLayerQueryCase:
