@@ -333,9 +333,7 @@ class ExternalTable(TableLike):
         dao_reference = self.qualified_reference
         result = []
         for relationship in mapper.relationships:
-            if relationship.parent is not mapper or relationship.info.get(
-                RelationshipInformationKey.PART, False
-            ):
+            if relationship.parent is not mapper:
                 continue
             target = relationship.mapper.class_
             target_reference = module_and_class_name(target)
@@ -421,14 +419,6 @@ class WrappedTable(TableLike):
     The relationships of this table as the part class of an open class declares them.
     """
 
-    secondary_base_part_relationships: list[ColumnConstructor] = field(
-        default_factory=list, init=False
-    )
-    """
-    The relationships to the parts holding this table's rows in the tables of its
-    secondary bases.
-    """
-
     mapper_args: dict[str, str] = field(default_factory=dict, init=False)
     """
     Keyword Arguments for the sqlalchemy mapper.
@@ -453,9 +443,15 @@ class WrappedTable(TableLike):
     @property
     def primary_key(self) -> ColumnConstructor:
         """
-        :return: The primary key, which refers to the row of the parent table.
+        :return: The primary key, which refers to the row of the parent table, or to the
+            object's row in the table of every stored object for a root table. The
+            reference is checked at commit, since a flush may insert a part first.
         """
-        column_type = f"ForeignKey({self.parent_table.qualified_full_primary_key_name})"
+        referenced_table = self.parent_table or self.ormatic.stored_object_table
+        column_type = (
+            f"ForeignKey({referenced_table.qualified_full_primary_key_name}, "
+            f"deferrable=True, initially='DEFERRED')"
+        )
         return ColumnConstructor(
             name=self.primary_key_name,
             type=f"Mapped[{module_and_class_name(int)}]",
@@ -464,8 +460,26 @@ class WrappedTable(TableLike):
 
     def create_mapper_args(self) -> None:
         """
-        Declare the table's polymorphic identity and how it joins its parent table.
+        Declare the table's polymorphic identity and how it joins its parent table; a
+        root table also gets the type column of its hierarchy.
         """
+        # every root is unconditionally polymorphic-ready: a downstream package can subclass it
+        if self.parent_table is None:
+            self.custom_columns.append(
+                ColumnConstructor(
+                    name=self.polymorphic_on_name,
+                    type="Mapped[str]",
+                    constructor="mapped_column(String(255), nullable=False, use_existing_column=True)",
+                )
+            )
+            self.mapper_args.update(
+                {
+                    "'polymorphic_on'": f"'{self.polymorphic_on_name}'",
+                    "'polymorphic_identity'": f"'{self.tablename}'",
+                }
+            )
+            return
+
         self.mapper_args.update(
             {
                 "'polymorphic_identity'": f"'{self.tablename}'",
@@ -490,15 +504,7 @@ class WrappedTable(TableLike):
         return result
 
     @cached_property
-    def parent_table(self) -> TableLike:
-        """
-        :return: The table this table inherits: its primary base class's, or the table
-            of every stored object for a class without a mapped base class.
-        """
-        return self._mapped_parent_table or self.ormatic.stored_object_table
-
-    @cached_property
-    def _mapped_parent_table(self) -> TableLike | None:
+    def parent_table(self) -> TableLike | None:
         """
         Resolve the parent DAO table for this table.
 
@@ -726,8 +732,8 @@ class WrappedTable(TableLike):
     @cached_property
     def primary_chain_tables(self) -> list[TableLike]:
         """
-        :return: The tables this table inherits, from its parent table up to the table
-            of every stored object.
+        :return: The tables this table inherits, from its parent table up to the root
+            table of its hierarchy.
         """
         result = []
         table = self.parent_table
@@ -744,9 +750,7 @@ class WrappedTable(TableLike):
             has are left to the parent table.
         """
         parent_class = (
-            None
-            if self.parent_table is self.ormatic.stored_object_table
-            else self.parent_table.domain_class
+            None if self.parent_table is None else self.parent_table.domain_class
         )
         return [
             table
@@ -853,31 +857,7 @@ class WrappedTable(TableLike):
 
             self.parse_field(wrapped_field=f)
 
-        self.create_secondary_base_part_relationships()
         self.create_mapper_args()
-
-    def create_secondary_base_part_relationships(self) -> None:
-        """
-        Relate this table's DAO to the parts holding its rows in the tables of its
-        secondary bases, which share its id.
-        """
-        for table in self.secondary_base_tables:
-            part_reference = self.ormatic.part_class_reference(table=table)
-            own_key = f"{self.tablename}.{self.primary_key_name}"
-            part_key = f"{part_reference}.{table.primary_key_name}"
-            self.secondary_base_part_relationships.append(
-                ColumnConstructor(
-                    name=f"_{table.tablename}_part",
-                    type=f"Mapped[{part_reference}]",
-                    constructor=(
-                        f"relationship({part_reference}, uselist=False, "
-                        f"primaryjoin=lambda: {own_key} == {part_key}, "
-                        f"foreign_keys=lambda: [{part_key}], "
-                        f"cascade='all, delete-orphan', lazy='selectin', "
-                        f"info={{{_information_key(RelationshipInformationKey.PART)}: True}})"
-                    ),
-                )
-            )
 
     def parse_field(self, *, wrapped_field: WrappedField):
         """
@@ -1182,8 +1162,11 @@ class WrappedTable(TableLike):
     @property
     def base_class_name(self) -> str:
         """
-        :return: The reference to the DAO class of the parent table.
+        :return: The reference to the DAO class of the parent table, or the declarative
+            base for a root table.
         """
+        if self.parent_table is None:
+            return "Base"
         return self.parent_table.qualified_reference
 
     def __hash__(self):

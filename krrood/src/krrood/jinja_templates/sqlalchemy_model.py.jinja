@@ -79,10 +79,6 @@ class {{ table.tablename }}({{ table.base_class_name }}, DataAccessObject[{{tabl
     {{ column }}
     {% endfor %}
 
-    {% for column in table.secondary_base_part_relationships %}
-    {{ column }}
-    {% endfor %}
-
     {% if table.mapper_args %}
     __mapper_args__ = {
     {% for key, value in table.mapper_args.items() %}

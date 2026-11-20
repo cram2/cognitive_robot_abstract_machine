@@ -445,19 +445,6 @@ class ORMatic:
                 result[wrapped_class.clazz] = table
         return result
 
-    def part_class_reference(self, *, table: TableLike) -> str:
-        """
-        :param table: The table of an open class.
-        :return: The reference to the part class of the table in the generated
-            interface, which generates it for a dependency's table without one.
-        """
-        if isinstance(table, WrappedTable):
-            return table.part_class_name
-        part_class = self.part_class_of_external_table(external_table=table)
-        if part_class is None:
-            return table.part_class_name
-        return module_and_class_name(part_class)
-
     @staticmethod
     def part_class_of_external_table(
         *, external_table: ExternalTable

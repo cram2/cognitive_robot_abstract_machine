@@ -5,7 +5,7 @@ table of every one of them, and comes back through a field typed with any of the
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select
 
 from krrood.entity_query_language.factories import an, entity, variable
 from krrood.ormatic.data_access_objects.dao import StoredObjectDAO
@@ -26,15 +26,16 @@ from ..dataset.multiple_inheritance import (
 # %% generated schema
 
 
-def test_every_table_inherits_the_table_of_every_stored_object():
+def test_root_tables_take_their_ids_from_the_table_of_every_stored_object():
     """
-    A class without mapped base classes still inherits the root table, which holds the
-    ids of all stored objects.
+    The table of a class without mapped base classes refers with its key to the table
+    holding the ids of all stored objects.
     """
     from ..dataset.ormatic_interface import HingeDAO, InventoryItemDAO
 
-    assert issubclass(InventoryItemDAO, StoredObjectDAO)
-    assert issubclass(HingeDAO, StoredObjectDAO)
+    for dao_class in [InventoryItemDAO, HingeDAO]:
+        [foreign_key] = dao_class.__table__.c.database_id.foreign_keys
+        assert foreign_key.column.table is StoredObjectDAO.__table__
 
 
 def test_fields_of_a_base_class_live_in_its_own_table():
@@ -49,12 +50,17 @@ def test_fields_of_a_base_class_live_in_its_own_table():
 
 def test_an_interface_is_a_table_without_fields():
     """
-    An interface a field is typed with gets a table holding only its key.
+    An interface a field is typed with gets a table holding only its key and the type
+    column of its hierarchy.
     """
     from ..dataset.ormatic_interface import ReferenceFrameDAO, TaggedFrameDAO
 
-    assert list(ReferenceFrameDAO.__table__.columns.keys()) == ["database_id"]
-    assert list(TaggedFrameDAO.__table__.columns.keys()) == ["database_id"]
+    for dao_class in [ReferenceFrameDAO, TaggedFrameDAO]:
+        table = dao_class.__table__
+        assert set(table.columns) == {
+            table.c.database_id,
+            inspect(dao_class).polymorphic_on,
+        }
 
 
 # %% one row per base class
