@@ -4,7 +4,6 @@ The values the parameters of a trial may take, and the models that draw them.
 
 from __future__ import annotations
 
-import dataclasses
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -17,19 +16,16 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from typing_extensions import TYPE_CHECKING, Generic, get_type_hints
+from typing_extensions import TYPE_CHECKING, Generic
 
 from krrood.bounds import Bounds
-from krrood.entity_query_language.factories import ConditionType, a
+from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import ModelRegistry
 from krrood.parametrization.parameterizer import ModelQueryParameters
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
-from krrood.parametrization.trials.exceptions import (
-    FieldOfUnsupportedType,
-    ParameterWithoutCentre,
-)
+from krrood.parametrization.trials.exceptions import ParameterWithoutCentre
 from krrood.parametrization.trials.records import TParameters, TrialParameters
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -63,34 +59,7 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
         :raises FieldOfUnsupportedType: If a field is neither a number nor a
             dataclass.
         """
-        return self.underspecified_pattern(
-            parameter_type=self.get_type_of_generic_parameter(parameter=TParameters)
-        )
-
-    def underspecified_pattern(self, *, parameter_type: type) -> Match:
-        """
-        :param parameter_type: A dataclass of numbers, directly or nested.
-        :return: The pattern of the dataclass with every number left to be drawn.
-        :raises FieldOfUnsupportedType: If a field is neither a number nor a
-            dataclass.
-        """
-        hints = get_type_hints(parameter_type)
-        assigned = {}
-        for parameter_field in dataclasses.fields(parameter_type):
-            hint = hints[parameter_field.name]
-            if dataclasses.is_dataclass(hint):
-                assigned[parameter_field.name] = self.underspecified_pattern(
-                    parameter_type=hint
-                )
-                continue
-            if hint not in (float, int):
-                raise FieldOfUnsupportedType(
-                    owner=parameter_type,
-                    field_name=parameter_field.name,
-                    field_type=hint,
-                )
-            assigned[parameter_field.name] = ...
-        return a(parameter_type)(**assigned)
+        return self.get_type_of_generic_parameter(parameter=TParameters).pattern()
 
     def statement(self) -> Match[TParameters]:
         """

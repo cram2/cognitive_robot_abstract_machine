@@ -81,6 +81,23 @@ are tried before any worker starts. When they all come out the same, the campaig
 with :class:`~krrood.parametrization.trials.exceptions.OutcomeDidNotVaryInPilot`: an
 outcome that cannot succeed by construction would make every analysis empty.
 
+Every :class:`~krrood.parametrization.trials.analysis.EffectOnSuccess` says with its
+:attr:`~krrood.parametrization.trials.analysis.EffectOnSuccess.p_value` how likely so
+different success rates arise by chance. Where the question is causal, a
+:class:`~krrood.parametrization.trials.analysis.CausalTrialAnalysis` fits a joint
+probability tree to the trials and searches every parameter and measurement as a cause
+of success through the probabilistic backend. Each
+:class:`~krrood.parametrization.trials.analysis.CauseOfSuccess` gives the region of its
+values that makes success most likely and how likely success is when it is set there.
+A measurement, such as the pose actually reached, is searched adjusted for the
+parameters, so a mediator is told apart from the parameters it depends on:
+
+.. code-block:: python
+
+    [strongest, *_] = CausalTrialAnalysis(trials=trials).causes_of_success()
+    strongest.attribute_path  # "measurements.reached_angle"
+    strongest.region  # Bounds(lower=0.60, upper=0.79)
+
 A simulation run twice from the same state need not end the same. A campaign tries each
 parameters :attr:`~krrood.parametrization.trials.campaigns.TrialCampaign.repetitions`
 times, and

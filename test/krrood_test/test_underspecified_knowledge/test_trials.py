@@ -20,7 +20,7 @@ from krrood.ormatic.utils import create_engine
 
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from krrood.parametrization.trials.analysis import TrialAnalysis
+from krrood.parametrization.trials.analysis import CausalTrialAnalysis, TrialAnalysis
 from krrood.parametrization.trials.campaigns import TrialCampaign
 from krrood.bounds import Bounds
 from krrood.parametrization.trials.exceptions import (
@@ -639,3 +639,106 @@ def test_an_analysis_without_trials_is_refused():
     """
     with pytest.raises(NoTrials):
         TrialAnalysis(trials=[])
+
+
+# %% how sure an effect is and what causes success
+
+
+@pytest.fixture(scope="module")
+def many_drawn() -> list[ThrowParameters]:
+    """
+    Enough throws drawn uniformly to tell effects apart from chance.
+    """
+    np.random.seed(6)
+    return ThrowSpace().drawn_parameters(
+        number_of_draws=400, model_registry=UniformPriorRegistry()
+    )
+
+
+def effect_on_success(*, analysis: TrialAnalysis, attribute_path: str):
+    """
+    :param analysis: The analysis to read.
+    :param attribute_path: The parameter or measurement.
+    :return: Its effect on success.
+    """
+    [effect] = [
+        effect
+        for effect in analysis.effects_on_success()
+        if effect.attribute_path == attribute_path
+    ]
+    return effect
+
+
+def test_the_effect_of_the_value_that_decides_success_is_sure(many_drawn):
+    """
+    That the steepness of a throw decides whether it lands is told apart from chance.
+    """
+    performer = SteepThrowsLand()
+    analysis = TrialAnalysis(
+        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
+    )
+    effect = effect_on_success(analysis=analysis, attribute_path="parameters.angle")
+    assert effect.p_value < 0.01
+
+
+def test_the_effect_of_a_value_without_influence_is_not_sure(many_drawn):
+    """
+    That the speed seems to change whether a throw lands is put down to chance.
+    """
+    performer = SteepThrowsLand()
+    analysis = TrialAnalysis(
+        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
+    )
+    effect = effect_on_success(analysis=analysis, attribute_path="parameters.speed")
+    assert effect.p_value > 0.05
+
+
+def test_an_effect_on_trials_that_all_failed_has_no_p_value(many_drawn):
+    """
+    When no throw lands, no effect on landing can be told.
+    """
+    performer = SteepThrowsLand(steepness=Bounds(lower=2.0, upper=3.0))
+    analysis = TrialAnalysis(
+        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
+    )
+    effect = effect_on_success(analysis=analysis, attribute_path="parameters.angle")
+    assert effect.p_value is None
+
+
+@pytest.fixture(scope="module")
+def causes_in_the_wind(many_drawn) -> list:
+    """
+    The causes of landing of throws turned by the wind, so that only the angle the ball
+    actually leaves the hand at decides whether it lands.
+    """
+    np.random.seed(7)
+    performer = SteepThrowsLand(wind=0.2)
+    return CausalTrialAnalysis(
+        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
+    ).causes_of_success()
+
+
+def test_the_measurement_that_decides_success_is_its_strongest_cause(
+    causes_in_the_wind,
+):
+    """
+    The reached angle is the strongest cause of landing, and its region, where nearly
+    every throw lands, lies within the steep enough angles to 0.05 rad.
+    """
+    steepness = SteepThrowsLand().steepness
+    [strongest, *_] = causes_in_the_wind
+
+    assert strongest.attribute_path == "measurements.reached_angle"
+    assert steepness.lower - 0.05 <= strongest.region.lower
+    assert strongest.region.upper <= steepness.upper + 0.05
+    assert strongest.success_probability > 0.9
+
+
+def test_the_aimed_angle_causes_success_more_than_the_speed(causes_in_the_wind):
+    """
+    Aiming the throw at a steep angle makes landing more likely than any speed does.
+    """
+    probabilities = {
+        found.attribute_path: found.success_probability for found in causes_in_the_wind
+    }
+    assert probabilities["parameters.angle"] > probabilities["parameters.speed"]

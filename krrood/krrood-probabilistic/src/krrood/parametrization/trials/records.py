@@ -8,8 +8,10 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 
-from typing_extensions import Any, Generic, TypeVar
+from typing_extensions import Any, Generic, Self, TypeVar, get_type_hints
 
+from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.trials.exceptions import FieldOfUnsupportedType
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -54,6 +56,43 @@ class RecordOfNumbers:
                 )
             numbers[path] = float(value)
         return numbers
+
+    @classmethod
+    def pattern(cls, *, marker: Any = ...) -> Match[Self]:
+        """
+        :param marker: What every number is matched with, such as ``...`` to leave it
+            to be drawn or ``cause`` to search it as a cause.
+        :return: The pattern of the record, with every number matched with the marker.
+        :raises FieldOfUnsupportedType: If a field is neither a number nor a
+            dataclass.
+        """
+        return cls.pattern_of_numbers(record_type=cls, marker=marker)
+
+    @classmethod
+    def pattern_of_numbers(cls, *, record_type: type, marker: Any) -> Match:
+        """
+        :param record_type: The record or a dataclass nested in it.
+        :param marker: What every number is matched with.
+        :return: The pattern of the dataclass, with every number matched with the
+            marker.
+        :raises FieldOfUnsupportedType: If a field is neither a number nor a
+            dataclass.
+        """
+        hints = get_type_hints(record_type)
+        assigned = {}
+        for record_field in dataclasses.fields(record_type):
+            hint = hints[record_field.name]
+            if dataclasses.is_dataclass(hint):
+                assigned[record_field.name] = cls.pattern_of_numbers(
+                    record_type=hint, marker=marker
+                )
+                continue
+            if hint not in (float, int):
+                raise FieldOfUnsupportedType(
+                    owner=record_type, field_name=record_field.name, field_type=hint
+                )
+            assigned[record_field.name] = marker
+        return a(record_type)(**assigned)
 
 
 @dataclass(kw_only=True)
