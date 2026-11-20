@@ -115,6 +115,14 @@ class GraphOfBoundingBoxes(
     def _default_search_space(self) -> BoundingBoxCollection[BoxT]:
         raise NotImplementedError
 
+    @abstractmethod
+    def _express_in_search_space(self, *, point: PointT) -> PointT:
+        """
+        :param point: A point in any reference frame of this graph's world.
+        :return: The point this graph's boxes are compared with, in the search space's
+            reference frame.
+        """
+
     @classmethod
     def box_type(cls) -> type[BoxT]:
         """
@@ -272,9 +280,10 @@ class GraphOfBoundingBoxes(
         :raises PointOccupiedError: If the point lies within that region but in none of
             its free-space nodes.
         """
-        if not self.search_space.contains(point):
+        point_in_search_space = self._express_in_search_space(point=point)
+        if not self.search_space.contains(point_in_search_space):
             raise PointOutsideSearchSpaceError(point, self.search_space.bounding_box())
-        node = self._node_of_point(point)
+        node = self._node_of_point(point_in_search_space)
         if node is None:
             raise PointOccupiedError(point)
         return node
@@ -285,8 +294,10 @@ class GraphOfBoundingBoxes(
         :return: Whether the point lies in one of this graph's free-space nodes; a
             point beyond the region this graph was built over is not.
         """
+        point_in_search_space = self._express_in_search_space(point=point)
         return (
-            self.search_space.contains(point) and self._node_of_point(point) is not None
+            self.search_space.contains(point_in_search_space)
+            and self._node_of_point(point_in_search_space) is not None
         )
 
     def nearest_free_point(self, *, point: PointT) -> PointT:
@@ -299,7 +310,7 @@ class GraphOfBoundingBoxes(
         if self.graph.num_nodes() == 0:
             raise NoFreeSpaceError(point=point)
         reference_frame = self.search_space.reference_frame
-        coordinates = self.world.transform(point, reference_frame).to_np()[
+        coordinates = self._express_in_search_space(point=point).to_np()[
             : self.dimensionality
         ]
         nearest = min(
@@ -337,9 +348,8 @@ class GraphOfBoundingBoxes(
         :raises PointOccupiedError: If either point lies within that region but in none
             of its free-space nodes.
         """
-        reference_frame = self.search_space.reference_frame
-        start = self.world.transform(start, reference_frame)
-        goal = self.world.transform(goal, reference_frame)
+        start = self._express_in_search_space(point=start)
+        goal = self._express_in_search_space(point=goal)
 
         start_node = self.node_of_point(start)
         goal_node = self.node_of_point(goal)
@@ -555,6 +565,11 @@ class VolumetricGraphOfBoundingBoxes(
     free space in all three dimensions.
     """
 
+    def _express_in_search_space(
+        self, *, point: Point3Dimensional
+    ) -> Point3Dimensional:
+        return self.world.transform(point, self.search_space.reference_frame)
+
     def _default_search_space(
         self,
     ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional]:
@@ -730,13 +745,22 @@ class PlanarGraphOfBoundingBoxes(
 ):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes, partitioning
-    free space on a single navigable plane.
+    free space on a single navigable plane, for base navigation: a query asks whether an
+    x,y footprint is free, and an obstacle blocks a footprint at every height.
 
-    Built for base navigation: the z-axis never enters the decomposition, so a query
-    only has to answer whether an x,y footprint is free -- and an obstacle blocks a
-    footprint at every height, since the robot has to fit through the entire column of
-    space above it, not just its floor-level silhouette.
+    A point given on another plane is taken as its projection onto the search space's.
     """
+
+    def _express_in_search_space(
+        self, *, point: Point2Dimensional
+    ) -> Point2Dimensional:
+        if point.reference_frame == self.search_space.reference_frame:
+            return point
+        return Point2Dimensional.from_point_3_dimensional(
+            self.world.transform(
+                point.to_point_3_dimensional(), self.search_space.reference_frame
+            )
+        )
 
     def _default_search_space(
         self,

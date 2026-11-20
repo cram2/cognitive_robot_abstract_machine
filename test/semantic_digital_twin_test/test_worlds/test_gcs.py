@@ -835,9 +835,23 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
         waypoint.reference_frame == graph.search_space.reference_frame
         for waypoint in path
     )
-    world_P_first = world.transform(path[0], world.root)
+    world_P_first = _footprint_in_frame(world=world, point=path[0], frame=world.root)
     assert float(world_P_first.x) == pytest.approx(float(world_P_start.x))
     assert float(world_P_first.y) == pytest.approx(float(world_P_start.y))
+
+
+def _footprint_in_frame(
+    *, world: World, point: Point2Dimensional, frame: Body
+) -> Point2Dimensional:
+    """
+    :param world: The world both frames belong to.
+    :param point: A point on the plane of its reference frame.
+    :param frame: A frame whose plane may lie at another height.
+    :return: The projection of ``point`` onto the plane of ``frame``.
+    """
+    return Point2Dimensional.from_point_3_dimensional(
+        world.transform(point.to_point_3_dimensional(), frame)
+    )
 
 
 def _navigation_map_around_the_table(
@@ -912,8 +926,8 @@ def test_path_from_to_accepts_points_in_another_reference_frame(table_world: Wor
     world_P_goal = Point2Dimensional(-2.5, 1.5, reference_frame=table_world.root)
 
     path = navigation_map.path_from_to(
-        table_world.transform(world_P_start, table_top),
-        table_world.transform(world_P_goal, table_top),
+        _footprint_in_frame(world=table_world, point=world_P_start, frame=table_top),
+        _footprint_in_frame(world=table_world, point=world_P_goal, frame=table_top),
     )
 
     assert all(
@@ -1029,7 +1043,9 @@ def test_whether_a_point_is_free_does_not_depend_on_its_frame(table_world: World
     table_top = table_world.get_body_by_name("top")
     free = Point2Dimensional(-4.5, -0.5, reference_frame=table_world.root)
 
-    assert navigation_map.is_free(point=table_world.transform(free, table_top))
+    assert navigation_map.is_free(
+        point=_footprint_in_frame(world=table_world, point=free, frame=table_top)
+    )
 
 
 # %% the free point nearest a point
