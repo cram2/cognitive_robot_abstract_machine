@@ -15,7 +15,6 @@ from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
-from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.trials.campaigns import TrialPerformer, TrialSetup
 from krrood.parametrization.trials.database import DatabaseTrialStore
 from krrood.parametrization.trials.parameter_spaces import ParameterSpace
@@ -216,8 +215,7 @@ class ThrowsInADatabase(DatabaseTrialStore[Throw]):
 @dataclass(kw_only=True)
 class ThrowingSetup(TrialSetup[ThrowParameters, Throw]):
     """
-    Steep throws landing, drawn uniformly from the throws a person can make and kept in
-    a database.
+    Steep throws landing, kept in a database.
     """
 
     database_url: str
@@ -230,24 +228,14 @@ class ThrowingSetup(TrialSetup[ThrowParameters, Throw]):
     The database id of the court the throws are made on.
     """
 
-    parameter_space: ThrowSpace = field(default_factory=ThrowSpace)
+    performer: SteepThrowsLand = field(default_factory=SteepThrowsLand)
     """
-    What the throws are drawn from.
-    """
-
-    model_registry: UniformPriorRegistry = field(default_factory=UniformPriorRegistry)
-    """
-    Draws the throws uniformly.
-    """
-
-    wind: float = 0.0
-    """
-    The standard deviation of the angle the wind turns each throw by, in radians.
+    Throws the ball.
     """
 
     @contextmanager
     def performing(self) -> Iterator[SteepThrowsLand]:
-        yield SteepThrowsLand(wind=self.wind)
+        yield self.performer
 
     def create_store(self) -> ThrowsInADatabase:
         return ThrowsInADatabase(

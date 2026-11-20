@@ -49,8 +49,13 @@ trials of one starting state:
     setup = ThrowingSetup(database_url="sqlite:///throws.sqlite", starting_state_id=1)
     campaign = TrialCampaign(
         setup=setup,
+        parameter_source=DrawnParameters(
+            parameter_space=ThrowSpace(),
+            model_registry=UniformPriorRegistry(),
+            number_of_draws=160,
+        ),
+        pilot_trials=20,
         number_of_workers=8,
-        trials_per_worker=20,
         memory_per_worker=4 * 10**9,
     )
     campaign.run()
@@ -59,7 +64,12 @@ trials of one starting state:
     [strongest, *_] = analysis.effects_on_success()
     registry = NearCentresRegistry(centres=analysis.successful_parameters(), spread=0.1)
 
+The first :attr:`~krrood.parametrization.trials.campaigns.TrialCampaign.pilot_trials`
+are tried before any worker starts. When they all come out the same, the campaign stops
+with :class:`~krrood.parametrization.trials.exceptions.OutcomeDidNotVaryInPilot`: an
+outcome that cannot succeed by construction would make every analysis empty.
+
 .. note::
-    Check on a few trials that the measured outcome can come out both ways before
-    starting a large campaign: an outcome that cannot succeed by construction makes every
-    analysis empty.
+    A pilot cannot tell an outcome that never passes from one that passes rarely. When
+    it stops, check the judgement of success on a state where it must pass before trying
+    more pilot trials.

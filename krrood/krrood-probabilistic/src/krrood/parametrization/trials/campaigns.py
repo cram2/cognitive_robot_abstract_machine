@@ -11,12 +11,13 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from multiprocessing import get_context
 
-import numpy as np
 from typing_extensions import Generic
 
-from krrood.parametrization.model_registries import ModelRegistry
-from krrood.parametrization.trials.exceptions import NotEnoughMemoryForWorkers
-from krrood.parametrization.trials.parameter_spaces import ParameterSpace
+from krrood.parametrization.trials.exceptions import (
+    NotEnoughMemoryForWorkers,
+    OutcomeDidNotVaryInPilot,
+)
+from krrood.parametrization.trials.parameter_spaces import ParameterSource
 from krrood.parametrization.trials.records import TParameters, TTrial
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -63,16 +64,6 @@ class TrialSetup(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
     process, so it holds only what can be pickled and builds the rest there.
     """
 
-    parameter_space: ParameterSpace[TParameters]
-    """
-    What the parameters are drawn from.
-    """
-
-    model_registry: ModelRegistry
-    """
-    Answers the statement of :attr:`parameter_space`.
-    """
-
     @abstractmethod
     def performing(self) -> AbstractContextManager[TrialPerformer[TParameters, TTrial]]:
         """
@@ -93,9 +84,8 @@ class TrialSetup(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
 @dataclass(kw_only=True)
 class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
     """
-    Tries parameters drawn by a setup's model in several worker processes at once, each
-    drawing its own with a seed of its own and keeping every trial as soon as it is
-    tried.
+    Tries the parameters of a source, each as often as asked, in several worker
+    processes at once, keeping every trial as soon as it is tried.
     """
 
     setup: TrialSetup[TParameters, TTrial]
@@ -103,19 +93,20 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
     What every worker tries its trials with.
     """
 
+    parameter_source: ParameterSource[TParameters]
+    """
+    Gives the parameters to try.
+    """
+
+    pilot_trials: int = 0
+    """
+    How many of the first trials are tried in this process before any worker starts, to
+    make sure their outcome varies; none when ``0``.
+    """
+
     number_of_workers: int = 1
     """
     How many processes try trials at once; a single worker tries them in this process.
-    """
-
-    trials_per_worker: int = 10
-    """
-    How many parameters each worker draws.
-    """
-
-    first_draw_seed: int = 0
-    """
-    The seed the first worker draws with; each further worker's seed is one more.
     """
 
     memory_per_worker: int | None = None
@@ -129,36 +120,56 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
         :return: How many trials were kept.
         :raises NotEnoughMemoryForWorkers: If the workers would need more working
             memory than is free.
+        :raises OutcomeDidNotVaryInPilot: If every pilot trial came out the same.
         """
         self.raise_unless_the_workers_fit_into_memory()
         self.setup.create_store().prepare()
-        seeds = [
-            self.first_draw_seed + worker for worker in range(self.number_of_workers)
-        ]
+        parameters = self.parameter_source.parameters_to_try()
+        pilot = parameters[: self.pilot_trials]
+        if pilot:
+            self.raise_unless_the_outcome_varies(
+                successes=self.try_trials(parameters=pilot)
+            )
+        remaining = parameters[len(pilot) :]
         if self.number_of_workers == 1:
-            return self.run_worker(draw_seed=seeds[0])
+            return len(pilot) + len(self.try_trials(parameters=remaining))
+        shares = [
+            remaining[worker :: self.number_of_workers]
+            for worker in range(self.number_of_workers)
+        ]
         with ProcessPoolExecutor(
             max_workers=self.number_of_workers, mp_context=get_context("spawn")
         ) as pool:
-            workers = [pool.submit(self.run_worker, draw_seed=seed) for seed in seeds]
-            return sum(worker.result() for worker in workers)
+            workers = [
+                pool.submit(self.try_trials, parameters=share) for share in shares
+            ]
+            return len(pilot) + sum(len(worker.result()) for worker in workers)
 
-    def run_worker(self, *, draw_seed: int) -> int:
+    def try_trials(self, *, parameters: list[TParameters]) -> list[bool]:
         """
-        :param draw_seed: Seeds the worker's draws.
-        :return: How many trials the worker kept.
+        :param parameters: The parameters to try, in order.
+        :return: Whether each trial succeeded, in the order they were tried.
         """
-        # the probabilistic models draw from numpy's global random state
-        np.random.seed(draw_seed)
-        drawn = self.setup.parameter_space.drawn_parameters(
-            number_of_draws=self.trials_per_worker,
-            model_registry=self.setup.model_registry,
-        )
         store = self.setup.create_store()
+        successes = []
         with self.setup.performing() as performer:
-            for parameters in drawn:
-                store.add(trial=performer.perform(parameters=parameters))
-        return len(drawn)
+            for trial_parameters in parameters:
+                trial = performer.perform(parameters=trial_parameters)
+                store.add(trial=trial)
+                successes.append(trial.succeeded)
+        return successes
+
+    @staticmethod
+    def raise_unless_the_outcome_varies(*, successes: list[bool]) -> None:
+        """
+        :param successes: Whether each pilot trial succeeded.
+        :raises OutcomeDidNotVaryInPilot: If every pilot trial came out the same.
+        """
+        if len(set(successes)) > 1:
+            return
+        raise OutcomeDidNotVaryInPilot(
+            number_of_trials=len(successes), succeeded=successes[0]
+        )
 
     def raise_unless_the_workers_fit_into_memory(self) -> None:
         """

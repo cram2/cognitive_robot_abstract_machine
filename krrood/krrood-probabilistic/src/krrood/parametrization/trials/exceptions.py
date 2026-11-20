@@ -111,6 +111,35 @@ class NotEnoughMemoryForWorkers(DataclassException):
         )
 
 
+@dataclass(kw_only=True)
+class OutcomeDidNotVaryInPilot(DataclassException):
+    """
+    Raised when every pilot trial of a campaign came out the same, such as when success
+    is judged in a way no trial can pass, so the campaign would learn nothing.
+    """
+
+    number_of_trials: int
+    """
+    How many pilot trials were tried.
+    """
+
+    succeeded: bool
+    """
+    Whether every pilot trial succeeded or every one failed.
+    """
+
+    def error_message(self) -> str:
+        outcome = "succeeded" if self.succeeded else "failed"
+        return f"All {self.number_of_trials} pilot trials {outcome}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the judgement of success can come out both ways, for example on "
+            "a state where it must pass; if successes are only rare, try more pilot "
+            "trials."
+        )
+
+
 # %% what made trials succeed
 
 

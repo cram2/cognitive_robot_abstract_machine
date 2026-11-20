@@ -17,13 +17,18 @@ from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from krrood.parametrization.trials.analysis import TrialAnalysis
 from krrood.parametrization.trials.campaigns import TrialCampaign
+from krrood.bounds import Bounds
 from krrood.parametrization.trials.exceptions import (
     FieldOfUnsupportedType,
     NotEnoughMemoryForWorkers,
     NoTrials,
+    OutcomeDidNotVaryInPilot,
     ParameterWithoutCentre,
 )
-from krrood.parametrization.trials.parameter_spaces import NearCentresRegistry
+from krrood.parametrization.trials.parameter_spaces import (
+    DrawnParameters,
+    NearCentresRegistry,
+)
 from ..dataset.throwing_trials import (
     Court,
     FastThrowSpace,
@@ -269,35 +274,50 @@ def test_trials_are_read_back_by_the_state_they_started_from(
 # %% many trials at once
 
 
-def test_a_single_worker_keeps_every_trial_it_draws(database_url, court_id):
+def uniformly_drawn_throws(*, number_of_draws: int) -> DrawnParameters[ThrowParameters]:
     """
-    A campaign of one worker keeps as many trials as the worker draws.
+    :param number_of_draws: How many throws to draw.
+    :return: Throws drawn uniformly from the throws a person can make.
+    """
+    return DrawnParameters(
+        parameter_space=ThrowSpace(),
+        model_registry=UniformPriorRegistry(),
+        number_of_draws=number_of_draws,
+    )
+
+
+def test_a_single_worker_keeps_every_trial_it_tries(database_url, court_id):
+    """
+    A campaign of one worker keeps a trial of every parameters its source gives.
     """
     setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
-    campaign = TrialCampaign(setup=setup, trials_per_worker=5)
+    source = uniformly_drawn_throws(number_of_draws=5)
+    campaign = TrialCampaign(setup=setup, parameter_source=source)
 
     kept = campaign.run()
 
-    assert kept == campaign.trials_per_worker
-    assert len(setup.create_store().stored_trials()) == campaign.trials_per_worker
+    assert kept == source.number_of_draws
+    assert [throw.parameters for throw in setup.create_store().stored_trials()] == (
+        source.parameters_to_try()
+    )
 
 
-def test_several_workers_keep_every_trial_with_draws_of_their_own(
-    database_url, court_id
-):
+def test_several_workers_keep_every_trial_of_their_share(database_url, court_id):
     """
-    Two workers in processes of their own keep all their trials in the shared database,
-    each with draws of its own seed.
+    Two workers in processes of their own keep all trials in the shared database, each
+    trying a share of the drawn parameters of its own.
     """
     setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
-    campaign = TrialCampaign(setup=setup, number_of_workers=2, trials_per_worker=4)
+    source = uniformly_drawn_throws(number_of_draws=8)
+    campaign = TrialCampaign(setup=setup, parameter_source=source, number_of_workers=2)
 
     kept = campaign.run()
-    throws = setup.create_store().stored_trials()
+    angles = [throw.parameters.angle for throw in setup.create_store().stored_trials()]
 
-    assert kept == campaign.number_of_workers * campaign.trials_per_worker
-    assert len(throws) == kept
-    assert len({throw.parameters.angle for throw in throws}) == kept
+    assert kept == source.number_of_draws
+    assert sorted(angles) == sorted(
+        parameters.angle for parameters in source.parameters_to_try()
+    )
 
 
 def test_workers_that_need_more_memory_than_is_free_are_refused(
@@ -309,12 +329,56 @@ def test_workers_that_need_more_memory_than_is_free_are_refused(
     """
     campaign = TrialCampaign(
         setup=ThrowingSetup(database_url=database_url),
+        parameter_source=uniformly_drawn_throws(number_of_draws=2),
         number_of_workers=2,
         memory_per_worker=10**18,
     )
     with pytest.raises(NotEnoughMemoryForWorkers):
         campaign.run()
     assert not database_path.exists()
+
+
+# %% checking the outcome before scaling up
+
+
+def test_a_campaign_whose_pilot_trials_all_fail_stops_after_them(
+    database_url, court_id
+):
+    """
+    When no angle a person can throw at lands the ball, the campaign stops after the
+    pilot trials and keeps only them.
+    """
+    setup = ThrowingSetup(
+        database_url=database_url,
+        starting_state_id=court_id,
+        performer=SteepThrowsLand(steepness=Bounds(lower=2.0, upper=3.0)),
+    )
+    campaign = TrialCampaign(
+        setup=setup,
+        parameter_source=uniformly_drawn_throws(number_of_draws=20),
+        pilot_trials=5,
+        number_of_workers=2,
+    )
+
+    with pytest.raises(OutcomeDidNotVaryInPilot):
+        campaign.run()
+
+    assert len(setup.create_store().stored_trials()) == campaign.pilot_trials
+
+
+def test_a_campaign_whose_pilot_trials_vary_tries_every_trial(database_url, court_id):
+    """
+    When some pilot throws land and some do not, the campaign goes on to try every drawn
+    throw.
+    """
+    setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
+    source = uniformly_drawn_throws(number_of_draws=30)
+    campaign = TrialCampaign(setup=setup, parameter_source=source, pilot_trials=20)
+
+    kept = campaign.run()
+
+    assert kept == source.number_of_draws
+    assert len(setup.create_store().stored_trials()) == source.number_of_draws
 
 
 # %% what made trials succeed

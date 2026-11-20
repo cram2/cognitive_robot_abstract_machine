@@ -9,6 +9,7 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+import numpy as np
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -194,3 +195,53 @@ class NearCentresRegistry(ModelRegistry):
                 )
             mixture.add_subcircuit(component, -math.log(len(self.centres)))
         return circuit
+
+
+# %% the parameters a campaign tries
+
+
+@dataclass(kw_only=True)
+class ParameterSource(Generic[TParameters], SubClassSafeGeneric, ABC):
+    """
+    Gives the parameters a campaign tries.
+    """
+
+    @abstractmethod
+    def parameters_to_try(self) -> list[TParameters]:
+        """
+        :return: The parameters to try, each once, in the order they are tried.
+        """
+
+
+@dataclass(kw_only=True)
+class DrawnParameters(ParameterSource[TParameters]):
+    """
+    Parameters a model draws from a space.
+    """
+
+    parameter_space: ParameterSpace[TParameters]
+    """
+    What the parameters are drawn from.
+    """
+
+    model_registry: ModelRegistry
+    """
+    Answers the statement of :attr:`parameter_space`.
+    """
+
+    number_of_draws: int = 10
+    """
+    How many parameters to draw; fewer are tried where the space does not accept some.
+    """
+
+    draw_seed: int = 0
+    """
+    Seeds the draws, so the same source draws the same parameters.
+    """
+
+    def parameters_to_try(self) -> list[TParameters]:
+        # the probabilistic models draw from numpy's global random state
+        np.random.seed(self.draw_seed)
+        return self.parameter_space.drawn_parameters(
+            number_of_draws=self.number_of_draws, model_registry=self.model_registry
+        )
