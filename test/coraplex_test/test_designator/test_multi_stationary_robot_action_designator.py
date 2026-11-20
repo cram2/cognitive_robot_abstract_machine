@@ -394,7 +394,7 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
     world, view, extensions = stationary_block_context
     right_arm = right_or_only_arm(view)
     anchor = Pose3Dimensional(anchor_position, reference_frame=world.root)
-    anchor_T = anchor.homogeneous_matrix
+    anchor_T = anchor.to_coordinate_change()
     offset_T = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),

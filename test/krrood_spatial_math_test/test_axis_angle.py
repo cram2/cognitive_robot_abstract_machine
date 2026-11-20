@@ -80,7 +80,7 @@ def test_axis_angle_converts_into_the_rotation_it_describes(axis, angle):
     axis_angle = AxisAngle(axis=Vector3Dimensional(*axis), angle=angle)
 
     assert np.allclose(
-        axis_angle.rotation_matrix.to_np(),
+        axis_angle.to_coordinate_change().to_np(),
         rotation_matrix_from_axis_angle(np.array(axis), angle),
     )
     assert np.allclose(
@@ -90,7 +90,7 @@ def test_axis_angle_converts_into_the_rotation_it_describes(axis, angle):
 
 
 def test_axis_angle_without_arguments_is_the_identity_rotation():
-    assert np.allclose(AxisAngle().rotation_matrix.to_np(), np.eye(4))
+    assert np.allclose(AxisAngle().to_coordinate_change().to_np(), np.eye(4))
 
 
 @pytest.mark.parametrize("axis, angle", rotations)

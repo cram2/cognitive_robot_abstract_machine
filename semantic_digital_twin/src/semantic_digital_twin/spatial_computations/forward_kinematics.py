@@ -162,9 +162,9 @@ class ForwardKinematicsManager(ModelChangeCallback):
             connection: Connection
             for connection in root_chain:
                 tip_T_root = connection.origin_expression.inverse()
-                fk = fk.dot(tip_T_root)
+                fk = fk.dot(other=tip_T_root)
             for connection in tip_chain:
-                fk = fk.dot(connection.origin_expression)
+                fk = fk.dot(other=connection.origin_expression)
         fk.reference_frame = root
         fk.child_frame = tip
         return fk

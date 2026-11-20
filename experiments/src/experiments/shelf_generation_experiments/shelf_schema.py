@@ -739,7 +739,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         corpus_pose = (
             corpus_pose_in_content_frame
             if parent_T_self is None
-            else parent_T_self.dot(corpus_pose_in_content_frame)
+            else parent_T_self.dot(other=corpus_pose_in_content_frame)
         )
         corpus_annotation = Cabinet.get_annotation_specification(
             name or self.name or "shelf_corpus",
@@ -770,7 +770,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
             layer_pose = (
                 layer_pose_in_content_frame
                 if parent_T_self is None
-                else parent_T_self.dot(layer_pose_in_content_frame)
+                else parent_T_self.dot(other=layer_pose_in_content_frame)
             )
             layer.spawn(
                 world,

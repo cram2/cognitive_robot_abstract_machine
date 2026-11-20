@@ -331,7 +331,9 @@ class PlacementRegionFidelityMeasurer:
             for y_sign in (-1.0, 1.0)
             for z_sign in (-1.0, 1.0)
         ]
-        world_corners = [region.world_T_sampler.dot(corner) for corner in local_corners]
+        world_corners = [
+            region.world_T_sampler.dot(other=corner) for corner in local_corners
+        ]
         x_values = [float(corner.x) for corner in world_corners]
         y_values = [float(corner.y) for corner in world_corners]
         z_values = [float(corner.z) for corner in world_corners]

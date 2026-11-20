@@ -1196,7 +1196,10 @@ class MobileBase(
         its x-axis, so the same heading serves bases modelled with different axes. Its
         position is kept as it is.
         """
-        reference_T_heading = heading.homogeneous_matrix
+        heading_3_dimensional = (
+            heading.pose if isinstance(heading, Pose2Dimensional) else heading
+        )
+        reference_T_heading = heading_3_dimensional.to_coordinate_change()
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             reference_T_heading.position,
             reference_T_heading.rotation_matrix @ self.base_R_front.inverse(),
@@ -1512,7 +1515,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         if pose.reference_frame is not parent_kinematic_structure_entity:
             pose = self._world.transform(pose, parent_kinematic_structure_entity)
 
-        connection.origin = pose.homogeneous_matrix
+        connection.origin = pose.to_coordinate_change()
 
     @property
     def _one_dof_connections(self) -> list[ActiveConnection1DOF]:

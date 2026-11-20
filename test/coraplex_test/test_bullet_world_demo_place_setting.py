@@ -60,7 +60,7 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
 
     for placed_object in demonstration.place_setting:
         body = placed_object.annotation_in(world).root
-        target = placed_object.target_location(world).homogeneous_matrix
+        target = placed_object.target_location(world).to_coordinate_change()
         with world.modify_world():
             world.remove_connection(body.parent_connection)
             world.add_connection(

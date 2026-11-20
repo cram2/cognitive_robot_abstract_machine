@@ -129,7 +129,7 @@ class TestPose2DimensionalToPose:
         )
 
         p2 = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0)
-        m = p2.homogeneous_matrix
+        m = p2.pose.to_coordinate_change()
         assert isinstance(m, HomogeneousTransformationMatrix3Dimensional)
         assert m[0, 3].to_np() == pytest.approx(1.0)
         assert m[1, 3].to_np() == pytest.approx(2.0)

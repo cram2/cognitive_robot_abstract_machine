@@ -374,7 +374,7 @@ class HomogeneousTransformationMatrix3DimensionalMapping(
     def to_domain_object(self) -> HomogeneousTransformationMatrix3Dimensional:
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=self.position,
-            rotation_matrix=self.axis_angle.rotation_matrix,
+            rotation_matrix=self.axis_angle.to_coordinate_change(),
             reference_frame=self.reference_frame,
             child_frame=self.child_frame,
         )
@@ -394,7 +394,7 @@ class RotationMatrixMapping(
     """
 
     def to_domain_object(self) -> RotationMatrix:
-        rotation_matrix = self.axis_angle.rotation_matrix
+        rotation_matrix = self.axis_angle.to_coordinate_change()
         rotation_matrix.reference_frame = self.reference_frame
         rotation_matrix.child_frame = self.child_frame
         return rotation_matrix

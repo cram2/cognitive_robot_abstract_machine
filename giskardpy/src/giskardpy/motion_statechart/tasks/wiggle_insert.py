@@ -217,7 +217,7 @@ class WiggleInsert(
         root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
-        root_R_goal = root_R_current.dot(tip_R_hole_normal)
+        root_R_goal = root_R_current.dot(other=tip_R_hole_normal)
 
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,

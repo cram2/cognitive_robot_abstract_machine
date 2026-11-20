@@ -868,7 +868,7 @@ def test_axes_centered_on_the_bounding_box_start_at_its_center_in_the_mesh_orien
 
     axes = visualization.axes_pose(shape, pose).to_np()
 
-    camera_T_mesh = pose.homogeneous_matrix.to_np()
+    camera_T_mesh = pose.to_coordinate_change().to_np()
     box_center = shape.mesh.bounding_box_oriented.primitive.transform[:3, 3]
     numpy.testing.assert_allclose(
         axes[:, 3], camera_T_mesh @ numpy.append(box_center, 1)
@@ -902,7 +902,7 @@ def test_axes_are_drawn_in_color_image_pixels_from_the_depth_image_calibration(
     )
     depth = 0.5
 
-    visualization.draw_axes(object_pose_at_depth(depth).homogeneous_matrix)
+    visualization.draw_axes(object_pose_at_depth(depth).to_coordinate_change())
 
     intrinsic_matrix = color_camera_model.intrinsic_matrix
     center_x, center_y = intrinsic_matrix[0, 2], intrinsic_matrix[1, 2]
@@ -925,7 +925,7 @@ def test_axes_reaching_behind_the_camera_are_not_drawn(
         0.0, 0.0, 0.05, 1.0, 0.0, 0.0, 0.0
     )
 
-    visualization.draw_axes(pose_facing_the_camera.homogeneous_matrix)
+    visualization.draw_axes(pose_facing_the_camera.to_coordinate_change())
 
     assert not visualization.color_image.any()
 

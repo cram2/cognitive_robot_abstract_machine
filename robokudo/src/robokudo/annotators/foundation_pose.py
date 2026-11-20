@@ -352,7 +352,7 @@ class PoseVisualization:
         if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
             smallest_box = shape.mesh.bounding_box_oriented.primitive
             box_pose = (
-                pose.homogeneous_matrix
+                pose.to_coordinate_change()
                 @ HomogeneousTransformationMatrix3Dimensional(
                     data=smallest_box.transform
                 )
@@ -360,7 +360,7 @@ class PoseVisualization:
             return create_oriented_bounding_box(smallest_box.extents, box_pose.to_np())
         mesh_box = shape.local_frame_bounding_box
         box_pose = (
-            pose.homogeneous_matrix
+            pose.to_coordinate_change()
             @ HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=mesh_box.center
             )
@@ -379,11 +379,11 @@ class PoseVisualization:
             data=shape.mesh.bounding_box_oriented.primitive.transform
         )
         if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
-            return pose.homogeneous_matrix @ smallest_box_pose
+            return pose.to_coordinate_change() @ smallest_box_pose
         if not self.center_axes_on_bounding_box:
-            return pose.homogeneous_matrix
+            return pose.to_coordinate_change()
         return (
-            pose.homogeneous_matrix
+            pose.to_coordinate_change()
             @ HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=smallest_box_pose.position
             )
@@ -1009,7 +1009,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
             projects into the mask region, enlarged by the maximum track center offset.
         """
         mesh_center = request.class_mesh.shape.local_frame_bounding_box.center
-        center = (tracked_pose.homogeneous_matrix @ mesh_center).to_np()[:3]
+        center = (tracked_pose.to_coordinate_change() @ mesh_center).to_np()[:3]
         if center[2] <= 0:
             return False
         camera_model = request.object_observation.frame.camera_model

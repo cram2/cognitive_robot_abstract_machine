@@ -100,7 +100,7 @@ def build_world() -> World:
         robots=[
             RobotSpecification(
                 semantic_annotation_type=UnitreeG1,
-                localization_pose=ROBOT_START_POSE.homogeneous_matrix,
+                localization_pose=ROBOT_START_POSE.to_coordinate_change(),
             )
         ],
         objects=[
@@ -108,7 +108,7 @@ def build_world() -> World:
                 "parcel",
                 PARCEL_SCALE,
                 color=Color.from_rgba(red=0.85, green=0.45, blue=0.1),
-                parent_T_self=PICK_POSE.homogeneous_matrix,
+                parent_T_self=PICK_POSE.to_coordinate_change(),
             )
         ],
     ).create_world()

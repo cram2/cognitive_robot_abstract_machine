@@ -195,7 +195,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         ContactParameters.create_for_grasped_object().apply_to([milk.root])
         milk.root.parent_connection.origin = self._milk_pose_on(
             world.get_body_by_name(SceneBody.COUNTER), milk
-        ).homogeneous_matrix
+        ).to_coordinate_change()
 
     def build_context_extensions(self, world: World) -> list[ContextExtension]:
         return [
@@ -277,7 +277,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         """
         return Pose2Dimensional.from_pose(
             (
-                milk_pose.homogeneous_matrix
+                milk_pose.to_coordinate_change()
                 @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-self.standing_distance
                 )
@@ -302,7 +302,7 @@ class MilkTransportDemonstration(RobotDemonstration):
             )
             @ milk.root._world.transform(
                 closest.grasp_pose, milk.root
-            ).homogeneous_matrix
+            ).to_coordinate_change()
         )
         return replace(closest, grasp_pose=milk_T_raised_grasp.pose)
 

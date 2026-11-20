@@ -32,9 +32,11 @@ class ExpressingFrame(NamedFrame):
     def compare_embedded_plane_in_own_space(
         self, *, frame: CartesianFrame3Dimensional
     ) -> EmbeddedPlaneRelation:
-        return self.express_in_own_frame(
-            value=Pose3Dimensional(reference_frame=frame)
-        ).homogeneous_matrix.embedded_plane_relation
+        return (
+            self.express_in_own_frame(value=Pose3Dimensional(reference_frame=frame))
+            .to_coordinate_change()
+            .embedded_plane_relation
+        )
 
 
 # %% frames other frames are fixed on

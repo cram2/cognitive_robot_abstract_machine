@@ -467,7 +467,7 @@ class HasGraspApproach(
             x=-distance
         )
         return end_effector.tool_frame_goal_for_grasp(
-            (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
+            (reference_T_grasp.to_coordinate_change() @ grasp_T_pre_grasp).pose
         )
 
     def _approach_distance(self, *, grasp_candidate: GraspCandidate | None) -> float:
@@ -545,7 +545,7 @@ class HasGraspApproach(
         target = reference_T_grasp.reference_frame
         world = target._world
         world_T_grasp = world.transform(
-            reference_T_grasp.homogeneous_matrix, world.root
+            reference_T_grasp.to_coordinate_change(), world.root
         )
         world_T_lift = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=self.retreat_distance, reference_frame=world.root

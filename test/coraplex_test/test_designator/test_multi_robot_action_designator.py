@@ -238,7 +238,7 @@ def stand_facing(
     """
     return robot.mobile_base.pose_facing(
         heading=heading_towards(world_P_stand, world_P_target, world)
-    ).homogeneous_matrix
+    ).to_coordinate_change()
 
 
 @pytest.fixture(

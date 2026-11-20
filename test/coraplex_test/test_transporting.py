@@ -477,7 +477,7 @@ def test_grasps_ranked_from_the_robot_are_ranked_from_where_it_stands_when_ranke
 
     robot.root.parent_connection.origin = _standing_in_front_of(
         grasp, world
-    ).homogeneous_matrix
+    ).to_coordinate_change()
 
     closest, *_ = ranking()
     assert _grasp_signature(closest) == _grasp_signature(grasp)

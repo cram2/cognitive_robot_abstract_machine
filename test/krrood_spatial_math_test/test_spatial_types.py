@@ -162,7 +162,7 @@ class TestRotationMatrix:
         axis_angle = rotation.axis_angle
 
         assert axis_angle.angle.to_np()[0] == pytest.approx(np.pi)
-        assert np.allclose(axis_angle.rotation_matrix.to_np(), rotation.to_np())
+        assert np.allclose(axis_angle.to_coordinate_change().to_np(), rotation.to_np())
 
     def test_axis_angle_of_the_identity_turns_by_zero_around_z(self):
         """
@@ -1751,7 +1751,7 @@ class TestTransformationMatrix:
             1, 2, 3, 0.1, 0.2, 0.3
         )
         m2 = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=x)
-        actual = m1.dot(m2).substitute(old_variables=[x], new_variables=[0.5])
+        actual = m1.dot(other=m2).substitute(old_variables=[x], new_variables=[0.5])
         expected = (
             m1.to_np()
             @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.5).to_np()

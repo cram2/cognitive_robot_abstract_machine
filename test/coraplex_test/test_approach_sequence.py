@@ -114,7 +114,7 @@ def _fingers_at(goal, end_effector) -> np.ndarray:
     :return: Where the point its fingers meet at lands once the goal is reached, which
         is what the sequence aims and so what the clearances are measured at.
     """
-    reached = goal.homogeneous_matrix.to_np()
+    reached = goal.to_coordinate_change().to_np()
     tool_P_grasp = end_effector.tool_P_grasp_when_closed.to_np()[:3].ravel()
     return reached[:3, :3] @ tool_P_grasp + reached[:3, 3]
 
@@ -272,10 +272,10 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
     )
 
     world_P_grasp = world.transform(
-        grasp.grasp_pose.homogeneous_matrix, world.root
+        grasp.grasp_pose.to_coordinate_change(), world.root
     ).to_np()
     world_P_retreat = world.transform(
-        poses.retreat.homogeneous_matrix, world.root
+        poses.retreat.to_coordinate_change(), world.root
     ).to_np()
     np.testing.assert_allclose(
         world_P_retreat[:3, 3] - world_P_grasp[:3, 3],

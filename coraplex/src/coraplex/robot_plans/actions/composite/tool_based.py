@@ -235,7 +235,7 @@ class MixingAction(ToolMotionAction, ParallelAction):
         return build_container_path(self.container, pattern=MixingPattern.SPIRAL)
 
     def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
-        return self.container.global_pose.homogeneous_matrix
+        return self.container.global_pose.to_coordinate_change()
 
     @property
     def _alignment_target(self) -> Body | Pose3Dimensional | None:
@@ -288,7 +288,7 @@ class CuttingAction(ToolMotionAction, ParallelAction):
         )
 
     def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
-        return self.object_to_cut.global_pose.homogeneous_matrix
+        return self.object_to_cut.global_pose.to_coordinate_change()
 
     @property
     def _alignment_target(self) -> Body | Pose3Dimensional | None:
@@ -384,10 +384,10 @@ class WipingAction(ToolMotionAction, TryAllAction):
 
     def _path_frame(self) -> HomogeneousTransformationMatrix3Dimensional:
         if self.surface is not None:
-            return self.surface.global_pose.homogeneous_matrix
+            return self.surface.global_pose.to_coordinate_change()
         if self.target_pose.reference_frame is None:
             self.target_pose.reference_frame = self.world.root
-        return self.target_pose.homogeneous_matrix
+        return self.target_pose.to_coordinate_change()
 
     @property
     def _alignment_target(self) -> Body | Pose3Dimensional | None:

@@ -797,7 +797,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         """
         return self[2, 3]
 
-    def dot(self, other: GenericSpatialType) -> GenericSpatialType:
+    def dot(self, *, other: GenericSpatialType) -> GenericSpatialType:
         """
         This transformation applied to ``other``, a value given in its child frame or a
         change into it.
@@ -813,7 +813,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         return other.apply_transformation(transformation=self)
 
     def __matmul__(self, other: GenericSpatialType) -> GenericSpatialType:
-        return self.dot(other)
+        return self.dot(other=other)
 
     @classmethod
     def from_transformation(
@@ -984,7 +984,7 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
         Overrides :meth:`HomogeneousTransformationMatrix3Dimensional._from_constant_json`:
         a rotation is stored as its quaternion alone.
         """
-        result = Quaternion.from_iterable(data["quaternion"]).rotation_matrix
+        result = Quaternion.from_iterable(data["quaternion"]).to_coordinate_change()
         result.reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -1332,7 +1332,7 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
         :param other: The second rotation matrix.
         :return: The angular error between the two rotation matrices as an expression.
         """
-        r_distance = self.dot(other.inverse())
+        r_distance = self.dot(other=other.inverse())
         return r_distance.angle
 
 
@@ -2276,7 +2276,7 @@ class Quaternion(
         )
 
     def to_coordinate_change(self) -> RotationMatrix:
-        return self.rotation_matrix
+        return RotationMatrix.from_quaternion(self)
 
     @classmethod
     def from_coordinate_change(cls, *, change: RotationMatrix) -> Quaternion:
@@ -2333,18 +2333,11 @@ class Quaternion(
         return sm.Vector.from_casadi_sx(casadi_sx=copy(self.casadi_sx))
 
     @property
-    def rotation_matrix(self) -> RotationMatrix:
-        """
-        :return: The rotation this quaternion describes.
-        """
-        return RotationMatrix.from_quaternion(self)
-
-    @property
     def rpy(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
         """
         :return: roll, pitch, yaw
         """
-        return self.rotation_matrix.rpy
+        return self.to_coordinate_change().rpy
 
     def dot(self, other: Quaternion) -> sm.Scalar:
         if isinstance(other, Quaternion):
@@ -2563,15 +2556,8 @@ class AxisAngle(
         """
         return Quaternion.from_axis_angle(self)
 
-    @property
-    def rotation_matrix(self) -> RotationMatrix:
-        """
-        :return: The rotation this axis angle describes.
-        """
-        return RotationMatrix.from_axis_angle(self)
-
     def to_coordinate_change(self) -> RotationMatrix:
-        return self.rotation_matrix
+        return RotationMatrix.from_axis_angle(self)
 
     @classmethod
     def from_coordinate_change(cls, *, change: RotationMatrix) -> AxisAngle:
@@ -3062,7 +3048,7 @@ class Pose3Dimensional(
             orientation = Quaternion()
         transformation_matrix = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
-                point=position, rotation_matrix=orientation.rotation_matrix
+                point=position, rotation_matrix=orientation.to_coordinate_change()
             )
         )
         self._casadi_sx = transformation_matrix._casadi_sx
@@ -3258,17 +3244,10 @@ class Pose3Dimensional(
         """
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
-    @property
-    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        :return: The transformation that moves the reference frame to this pose.
-        """
+    def to_coordinate_change(self) -> HomogeneousTransformationMatrix3Dimensional:
         return HomogeneousTransformationMatrix3Dimensional(
             data=self, reference_frame=self.reference_frame
         )
-
-    def to_coordinate_change(self) -> HomogeneousTransformationMatrix3Dimensional:
-        return self.homogeneous_matrix
 
     @classmethod
     def from_coordinate_change(

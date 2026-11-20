@@ -98,7 +98,7 @@ location = ReachabilityLocation(
 
 run(NavigateAction(planar_goal_pose=location.ground()))
 
-pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
+pr2_view.root.parent_connection.origin = origin_pose.to_coordinate_change()
 ```
 
 {meth}`~coraplex.locations.base.Location.ground` returns the first candidate. It is a pose near the countertop where
@@ -151,7 +151,7 @@ location = VisibilityLocation(
 
 run(NavigateAction(planar_goal_pose=location.ground()))
 
-pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
+pr2_view.root.parent_connection.origin = origin_pose.to_coordinate_change()
 ```
 
 ## Iterating the Candidates
@@ -196,7 +196,7 @@ navigate = a(NavigateAction)(
 
 run(StatementNode(statement=navigate))
 
-pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
+pr2_view.root.parent_connection.origin = origin_pose.to_coordinate_change()
 ```
 
 ## Tuning the Costmaps

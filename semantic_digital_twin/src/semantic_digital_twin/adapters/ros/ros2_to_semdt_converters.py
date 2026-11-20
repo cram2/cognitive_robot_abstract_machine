@@ -200,7 +200,9 @@ class CubeMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Box]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Box:
         result = Box(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             scale=Scale(data.scale.x, data.scale.y, data.scale.z),
         )
@@ -219,7 +221,9 @@ class CylinderMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Cylinder]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Cylinder:
         result = Cylinder(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             width=data.scale.x,
             height=data.scale.z,
@@ -239,7 +243,9 @@ class SphereMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Sphere]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Sphere:
         result = Sphere(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             radius=data.scale.x / 2,
         )
@@ -268,7 +274,9 @@ class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Mesh]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Mesh:
         result = Mesh(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             scale=Scale(data.scale.x, data.scale.y, data.scale.z),
             filename=cls.local_filename_of(data.mesh_resource),

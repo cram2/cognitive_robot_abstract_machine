@@ -77,8 +77,8 @@ def test_a_transformation_turns_an_axis_angle(table_frame, camera_frame):
     assert isinstance(turned, AxisAngle)
     assert turned.reference_frame is table_frame
     np.testing.assert_allclose(
-        turned.rotation_matrix.to_np(),
-        (table_T_camera.rotation_matrix @ turn_about_x.rotation_matrix).to_np(),
+        turned.to_coordinate_change().to_np(),
+        (table_T_camera.rotation_matrix @ turn_about_x.to_coordinate_change()).to_np(),
         atol=1e-12,
     )
 

@@ -132,7 +132,7 @@ class DataPlayer(EpisodePlayer, ABC):
             return
         for obj in self.world.bodies_with_collision:
             if obj in objects_poses:
-                obj.parent_connection.origin = objects_poses[obj].homogeneous_matrix
+                obj.parent_connection.origin = objects_poses[obj].to_coordinate_change()
 
     @abstractmethod
     def get_objects_poses(self, frame_data: FrameData) -> dict[Body, Pose3Dimensional]:

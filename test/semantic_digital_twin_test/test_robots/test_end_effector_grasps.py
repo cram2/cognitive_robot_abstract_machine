@@ -427,7 +427,7 @@ def test_the_tool_frame_goal_for_a_grasp_puts_the_grasp_point_on_it(
 
     goal = pr2_gripper.tool_frame_goal_for_grasp(grasp)
 
-    reached = goal.homogeneous_matrix.to_np()
+    reached = goal.to_coordinate_change().to_np()
     grasp_point_once_reached = (
         reached[:3, :3] @ pr2_gripper.fingertips.tool_P_grasp.to_np()[:3].ravel()
         + reached[:3, 3]

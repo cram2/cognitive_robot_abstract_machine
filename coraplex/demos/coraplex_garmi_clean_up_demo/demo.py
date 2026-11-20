@@ -628,7 +628,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                 z=HandDistance.RETRACT_ABOVE_PLACE.value,
                 reference_frame=milk_in_drawer.reference_frame,
             )
-            @ tool_at_place.homogeneous_matrix
+            @ tool_at_place.to_coordinate_change()
         ).pose
         return [
             *laying_down,

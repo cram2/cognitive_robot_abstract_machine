@@ -471,7 +471,7 @@ class Connection6DoF(Connection):
             y=self.qy.variables.position,
             z=self.qz.variables.position,
             w=self.qw.variables.position,
-        ).rotation_matrix
+        ).to_coordinate_change()
         self._kinematics = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=parent_P_child,
@@ -584,7 +584,8 @@ class Connection6DoF(Connection):
             :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
             otherwise); does not need to already be expressed in the parent frame. Other
             spatial types (e.g. ``Pose3Dimensional``) must be converted with their own
-            ``homogeneous_matrix`` before being assigned here.
+            :meth:`~krrood_spatial_math.pose.Pose.to_coordinate_change` before being
+            assigned here.
         """
         local_kinematics = self._calculate_local_kinematics(
             self._world.transform(transformation, self.parent)

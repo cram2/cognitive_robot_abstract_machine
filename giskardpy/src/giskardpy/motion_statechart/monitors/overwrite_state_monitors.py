@@ -79,7 +79,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
         `goal_pose` at once, so `threshold` is ignored.
         """
         return cls(
-            base_pose=goal_pose.homogeneous_matrix,
+            base_pose=goal_pose.to_coordinate_change(),
             odom_connection=robot.root.parent_connection,
         )
 

@@ -105,7 +105,7 @@ def test_a_place_puts_the_held_object_on_the_target_however_it_is_held(
     placed_milk = descent.goal_pose.evaluate() @ tool_T_milk.to_np()
 
     np.testing.assert_allclose(
-        placed_milk, target.homogeneous_matrix.to_np(), atol=1e-9
+        placed_milk, target.to_coordinate_change().to_np(), atol=1e-9
     )
 
 

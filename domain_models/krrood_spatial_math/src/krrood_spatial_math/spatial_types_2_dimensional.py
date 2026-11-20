@@ -719,13 +719,6 @@ class Pose2Dimensional(
         """
         return self.pose.rotation_matrix
 
-    @property
-    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        :return: The transformation that moves the reference frame to this pose.
-        """
-        return self.pose.homogeneous_matrix
-
     # %% Factory methods
 
     @classmethod

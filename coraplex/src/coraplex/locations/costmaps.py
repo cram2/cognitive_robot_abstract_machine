@@ -546,7 +546,7 @@ class VisibilityCostmap(Costmap):
 
         ray_tracer = RayTracer(self.world)
 
-        origin_copy = deepcopy(self.origin).homogeneous_matrix
+        origin_copy = deepcopy(self.origin).to_coordinate_change()
 
         for _ in range(4):
             origin_copy = (

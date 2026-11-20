@@ -767,7 +767,7 @@ def stretch_reaching_milk_from(
         )
     )
     drive = robot.root.parent_connection
-    drive.origin = world.transform(root_T_base, drive.parent).homogeneous_matrix
+    drive.origin = world.transform(root_T_base, drive.parent).to_coordinate_change()
     recording = OrientationWhileRunning(body=robot.root)
     executor = KinematicallySimulatedPlanExecutor(
         context=StatechartContext.with_extensions(world=world, extensions=extensions),
