@@ -25,6 +25,7 @@ We start by generating some random points and rotating them. Then we create a po
 import numpy as np
 from scipy.spatial import ConvexHull
 from random_events.polytope import Polytope
+from random_events.plotting import EventPlotter
 import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
@@ -36,7 +37,7 @@ np.random.seed(69)
 points = np.random.uniform(-1, 1, (100, 2))
 points = points @ rotation_matrix(0.3)
 
-polytope = Polytope.from_2d_points(points)
+polytope = Polytope.from_points(points)
 ```
 
 Let's have a look at the generated data and polytope.
@@ -54,7 +55,7 @@ Next, let's create the inner box approximation of the polytope.
 
 ```{code-cell} ipython3
 inner_event = polytope.inner_box_approximation()
-fig.add_traces(inner_event.plot("#2ca02c"))
+fig.add_traces(EventPlotter(inner_event).plot("#2ca02c"))
 fig.show()
 ```
 
@@ -63,6 +64,6 @@ Let's create the outer box approximation of the polytope.
 ```{code-cell} ipython3
 outer_event = polytope.outer_box_approximation()
 outer_event = outer_event - inner_event
-fig.add_traces(outer_event.plot("#d62728"))
+fig.add_traces(EventPlotter(outer_event).plot("#d62728"))
 fig.show()
 ```

@@ -16,6 +16,8 @@ kernelspec:
 This example demonstrates how to use `CartesianPose` goals to move a robot to a specific pose. We will use the PR2 robot for this demonstration.
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
+
 import os
 from cramph.context import StatechartContext
 from cramph.executor import SimulationPacer, StatechartExecutor
