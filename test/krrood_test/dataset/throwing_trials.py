@@ -19,6 +19,10 @@ from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.parametrization.trials.campaigns import TrialPerformer, TrialSetup
 from krrood.parametrization.trials.database import DatabaseTrialStore
 from krrood.parametrization.trials.parameter_spaces import ParameterSpace
+from krrood.parametrization.trials.starting_states import (
+    StartingStateRecipe,
+    StateReacher,
+)
 from krrood.parametrization.trials.records import (
     Trial,
     TrialMeasurements,
@@ -101,6 +105,70 @@ class Court:
     """
     How far the basket stands from the thrower, in metres.
     """
+
+
+@dataclass(kw_only=True)
+class CourtBuilder(StateReacher[Court]):
+    """
+    Sets the basket up at a distance that varies around the one aimed for.
+    """
+
+    aimed_distance: float
+    """
+    The distance the basket is meant to stand at, in metres.
+    """
+
+    placement_spread: float
+    """
+    The standard deviation of the distance the basket ends up at, in metres.
+    """
+
+    def reach(self) -> Court:
+        return Court(
+            basket_distance=float(
+                np.random.normal(loc=self.aimed_distance, scale=self.placement_spread)
+            )
+        )
+
+
+@dataclass(kw_only=True)
+class CourtRecipe(StartingStateRecipe[Court]):
+    """
+    A court whose basket stands within given distances from the thrower.
+    """
+
+    wanted_distance: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=1.9, upper=2.1)
+    )
+    """
+    The distances of a court wanted for the throws, in metres.
+    """
+
+    placement_spread: float = 0.2
+    """
+    The standard deviation of the distance the basket ends up at, in metres.
+    """
+
+    @property
+    def data_access_object_class(self) -> type[DataAccessObject]:
+        from .ormatic_interface import CourtDAO
+
+        return CourtDAO
+
+    @contextmanager
+    def reaching(self) -> Iterator[CourtBuilder]:
+        yield CourtBuilder(
+            aimed_distance=(self.wanted_distance.lower + self.wanted_distance.upper)
+            / 2,
+            placement_spread=self.placement_spread,
+        )
+
+    def is_wanted(self, *, state: Court) -> bool:
+        return (
+            self.wanted_distance.lower
+            <= state.basket_distance
+            < self.wanted_distance.upper
+        )
 
 
 # %% the values a throw may take

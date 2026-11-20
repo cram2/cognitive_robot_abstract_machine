@@ -4,7 +4,13 @@ Finding What Makes a Behaviour Succeed
 When a behaviour fails in a way no single fix explains, the module
 :mod:`krrood.parametrization.trials` turns the failure into an experiment:
 
-1. Reach the state the failure shows in once and keep it, so every trial starts from it.
+1. Reach the state the failure shows in and keep it, so every trial starts from it: a
+   :class:`~krrood.parametrization.trials.starting_states.StartingStateRecipe` states the
+   steps that lead to it and how to tell the state reached is the one wanted, such as an
+   object held by the fingers and touching its target. Reaching it can fail and physics
+   varies, so its
+   :meth:`~krrood.parametrization.trials.starting_states.StartingStateRecipe.reach_and_store`
+   attempts it in several workers at once and keeps every state that is the one wanted.
 2. Declare what the behaviour may vary by as a dataclass of numbers, a
    :class:`~krrood.parametrization.trials.records.TrialParameters`, and bound it with a
    :class:`~krrood.parametrization.trials.parameter_spaces.ParameterSpace`. Declare

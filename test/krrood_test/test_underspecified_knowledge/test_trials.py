@@ -38,6 +38,7 @@ from krrood.parametrization.trials.parameter_spaces import (
 )
 from ..dataset.throwing_trials import (
     Court,
+    CourtRecipe,
     FastThrowSpace,
     NamedThrowParameters,
     ReleasePoint,
@@ -276,6 +277,43 @@ def test_trials_are_read_back_by_the_state_they_started_from(
 
     assert store.stored_trials() == [throw]
     assert other_store.stored_trials() == [other_throw]
+
+
+# %% reaching starting states
+
+
+@pytest.mark.parametrize("number_of_workers", [1, 2])
+def test_only_the_states_wanted_are_kept(database_url, number_of_workers):
+    """
+    Of the courts set up, in this process or in workers of their own, exactly those
+    whose basket stands within the wanted distances are kept.
+    """
+    recipe = CourtRecipe(database_url=database_url)
+    np.random.seed(5)
+
+    stored_ids = recipe.reach_and_store(
+        attempts=20, worker_pool=WorkerPool(number_of_workers=number_of_workers)
+    )
+    courts = [recipe.stored_object(database_id=court_id) for court_id in stored_ids]
+
+    assert 0 < len(courts) < 20
+    assert len(set(stored_ids)) == len(stored_ids)
+    assert all(recipe.is_wanted(state=court) for court in courts)
+
+
+def test_trials_start_from_a_state_the_recipe_kept(database_url):
+    """
+    The trials of a campaign that starts from a kept court are read back as episodes of
+    that court.
+    """
+    recipe = CourtRecipe(database_url=database_url, placement_spread=0.0)
+    [court_id] = recipe.reach_and_store(attempts=1, worker_pool=WorkerPool())
+    setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
+    source = uniformly_drawn_throws(number_of_draws=3)
+
+    TrialCampaign(setup=setup, parameter_source=source).run()
+
+    assert len(setup.create_store().stored_trials()) == source.number_of_draws
 
 
 # %% many trials at once
