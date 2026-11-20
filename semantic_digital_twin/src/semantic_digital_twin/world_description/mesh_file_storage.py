@@ -12,7 +12,10 @@ import psutil
 from krrood.singleton import SingletonMeta
 from typing_extensions import ClassVar
 
-from semantic_digital_twin.adapters.package_resolver import PathResolver
+from semantic_digital_twin.adapters.package_resolver import (
+    PackageUriResolver,
+    PathResolver,
+)
 
 # %% where a mesh file is read from
 
@@ -27,12 +30,11 @@ class MeshFileSources(metaclass=SingletonMeta):
     local path, so a reference to a file held elsewhere becomes a path every consumer of
     a mesh -- the mesh loader, the collision detectors, the visualizer -- can open.
 
-    ..note:: With no source registered a reference is answered with itself, which is
-        what makes a process that reads only local files behave as though this did not
-        exist.
+    ..note:: A reference no source claims is answered with itself, which is what makes
+        a process that reads only local files behave as though this did not exist.
     """
 
-    sources: list[PathResolver] = field(default_factory=list)
+    sources: list[PathResolver] = field(default_factory=lambda: [PackageUriResolver()])
     """
     The sources consulted, in order of precedence.
     """

@@ -300,7 +300,7 @@ def test_create_world_is_repeatable():
 
 def test_world_specification_from_urdf_environment():
     world = WorldSpecification.from_urdf(
-        os.path.join(RESOURCES, "urdf", "table.urdf")
+        "package://iai_objects/urdf/table.urdf"
     ).create_world()
     assert not world.is_empty()
     assert world.root is not None
@@ -308,7 +308,7 @@ def test_world_specification_from_urdf_environment():
 
 def test_materialized_environments_share_no_entity_ids():
     specification = WorldSpecification.from_urdf(
-        os.path.join(RESOURCES, "urdf", "table.urdf")
+        "package://iai_objects/urdf/table.urdf"
     )
     first = specification.create_world()
     second = specification.create_world()
@@ -407,7 +407,9 @@ def test_world_specification_from_gazebo_environment():
         lambda: BodySpecification.box("shape", Scale(1, 1, 1)),
         lambda: BodySpecification.sphere("shape", 0.5),
         lambda: BodySpecification.cylinder("shape", 0.4, 1.0),
-        lambda: BodySpecification.mesh("shape", str(RESOURCES / "stl" / "milk.stl")),
+        lambda: BodySpecification.mesh(
+            "shape", "package://iai_objects/objects/milk.stl"
+        ),
     ],
 )
 def test_shape_constructors_spawn(empty_world, make_spec):
@@ -431,7 +433,7 @@ def test_from_event_constructor_spawns(empty_world):
         lambda pose: BodySpecification.sphere("shape", 0.5, parent_T_self=pose),
         lambda pose: BodySpecification.cylinder("shape", 0.4, 1.0, parent_T_self=pose),
         lambda pose: BodySpecification.mesh(
-            "shape", str(RESOURCES / "stl" / "milk.stl"), parent_T_self=pose
+            "shape", "package://iai_objects/objects/milk.stl", parent_T_self=pose
         ),
         lambda pose: BodySpecification.from_event(
             "shape",
@@ -712,7 +714,7 @@ def test_a_robot_is_spawned_from_the_description_it_reads_itself(empty_world):
 def test_world_specification_from_urdf_with_robot():
     try:
         world = WorldSpecification.from_urdf(
-            os.path.join(RESOURCES, "urdf", "table.urdf"),
+            "package://iai_objects/urdf/table.urdf",
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
         ).create_world()
     except ParsingError as error:

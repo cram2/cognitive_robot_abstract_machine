@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, RegionSpec
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Scale
 
@@ -10,12 +11,8 @@ class WorldDescriptor(BaseWorldDescriptor):
         super().__init__()
         root = self.world.root
 
-        milk_path = (
-            Path(__file__).resolve().parents[5]
-            / "semantic_digital_twin"
-            / "resources"
-            / "stl"
-            / "milk.stl"
+        milk_path = Path(
+            PackageUriResolver().resolve("package://iai_objects/objects/milk.stl")
         )
 
         object_specs = [

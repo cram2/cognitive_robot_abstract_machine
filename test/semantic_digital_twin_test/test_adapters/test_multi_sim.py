@@ -66,15 +66,6 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSynchronizer,
 )
 
-urdf_dir = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "..",
-    "..",
-    "semantic_digital_twin",
-    "resources",
-    "urdf",
-)
 mjcf_dir = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..",
@@ -100,7 +91,7 @@ pytestmark = pytest.mark.skipif(
     reason="Only run test in CI or multisim could not be imported.",
 )
 
-TEST_URDF_1 = os.path.normpath(os.path.join(urdf_dir, "simple_two_arm_robot.urdf"))
+TEST_URDF_1 = "package://iai_objects/urdf/simple_two_arm_robot.urdf"
 TEST_URDF_2 = HSRB.get_ros_file_path()
 TEST_URDF_TRACY = Tracy.get_ros_file_path()
 TEST_MJCF_1 = os.path.normpath(os.path.join(mjcf_dir, "mjx_single_cube_no_mesh.xml"))
@@ -848,16 +839,7 @@ def test_mujoco_with_tracy_dae_files():
 
 
 def test_mujocosim_world_with_added_objects(test_urdf_1_world):
-    milk_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "stl",
-        "milk.stl",
-    )
+    milk_path = "package://iai_objects/objects/milk.stl"
     stl_parser = STLParser(milk_path)
     mesh_world = stl_parser.create_world()
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(

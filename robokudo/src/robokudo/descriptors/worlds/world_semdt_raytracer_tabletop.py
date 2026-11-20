@@ -7,8 +7,6 @@ from semantic_digital_twin.datastructures.camera_model import (
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.robots.robot_parts import Camera
-from importlib.util import find_spec
-from pathlib import Path
 
 from robokudo.world_descriptor import (
     BaseWorldDescriptor,
@@ -38,14 +36,8 @@ class WorldDescriptor(BaseWorldDescriptor):
 
         table_top_z = 0.78
         table_thickness = 0.06
-        pycram_spec = find_spec("coraplex")
-        if pycram_spec is None or pycram_spec.origin is None:
-            raise ImportError("Could not locate the coraplex package for mesh loading.")
-        object_mesh_dir = (
-            Path(pycram_spec.origin).resolve().parents[2] / "resources" / "objects"
-        )
-        cup_mesh_path = object_mesh_dir / "jeroen_cup.stl"
-        milk_mesh_path = object_mesh_dir / "milk.stl"
+        cup_mesh_uri = "package://iai_objects/objects/jeroen_cup.stl"
+        milk_mesh_uri = "package://iai_objects/objects/milk.stl"
 
         object_specs = [
             ObjectSpec(
@@ -105,12 +97,12 @@ class WorldDescriptor(BaseWorldDescriptor):
         with self.world.modify_world():
             cup_visual_mesh = Mesh(
                 origin=HomogeneousTransformationMatrix(),
-                filename=str(cup_mesh_path),
+                filename=cup_mesh_uri,
                 color=cup_color,
             )
             cup_collision_mesh = Mesh(
                 origin=HomogeneousTransformationMatrix(),
-                filename=str(cup_mesh_path),
+                filename=cup_mesh_uri,
                 color=cup_color,
             )
             cup_body = Body(
@@ -126,12 +118,12 @@ class WorldDescriptor(BaseWorldDescriptor):
 
             milk_visual_mesh = Mesh(
                 origin=HomogeneousTransformationMatrix(),
-                filename=str(milk_mesh_path),
+                filename=milk_mesh_uri,
                 color=milk_color,
             )
             milk_collision_mesh = Mesh(
                 origin=HomogeneousTransformationMatrix(),
-                filename=str(milk_mesh_path),
+                filename=milk_mesh_uri,
                 color=milk_color,
             )
             milk_body = Body(

@@ -642,45 +642,13 @@ def _tiago_world_setup():
 @pytest.fixture(scope="session")
 def _apartment_world_setup():
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "milk.stl",
-        )
-    ).create_world()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     cereal_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "breakfast_cereal.stl",
-        )
+        "package://iai_objects/objects/breakfast_cereal.stl"
     ).create_world()
-    spoon_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "spoon.stl",
-        )
-    ).create_world()
+    spoon_world = STLParser("package://iai_objects/objects/spoon.stl").create_world()
 
     apartment_world.merge_world_at_pose(
         milk_world,
@@ -900,16 +868,7 @@ def _simple_apartment_setup():
         world.add_connection(wall_3_connection)
         world.add_connection(wall_4_connection)
 
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "milk.stl",
-        )
-    ).create_world()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
@@ -919,14 +878,7 @@ def _simple_apartment_setup():
 
 @pytest.fixture(scope="session")
 def kitchen_world():
-    path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-        "kitchen-small.urdf",
-    )
+    path = "package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     parser = URDFParser.from_file(file_path=path)
     world = parser.create_world()
     world.validate()

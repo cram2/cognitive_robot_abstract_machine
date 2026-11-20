@@ -6,6 +6,7 @@ import numpy
 import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.multi_sim import MujocoLight, MujocoTendon
 from semantic_digital_twin.world_description.contact import (
     ContactFriction,
@@ -444,6 +445,23 @@ def test_a_scene_named_by_a_package_uri_is_read_from_that_package(
     from_file = MJCFParser(os.path.join(DATASET_DIR, scene_file_name)).create_world()
     assert [body.name for body in from_package.kinematic_structure_entities] == [
         body.name for body in from_file.kinematic_structure_entities
+    ]
+
+
+def test_a_mesh_file_named_by_a_package_uri_is_read_from_that_package():
+    """
+    A mesh asset of an MJCF scene named by a ``package://`` URI reads the file the URI
+    resolves to.
+    """
+    world = MJCFParser(os.path.join(MJCF_DIR, "jeroen_cups.xml")).create_world()
+
+    [cup] = [
+        body
+        for body in world.kinematic_structure_entities
+        if body.name.name == "jeroen_cup"
+    ]
+    assert [mesh.filename for mesh in cup.collision] == [
+        PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl")
     ]
 
 

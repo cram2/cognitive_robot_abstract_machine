@@ -7,7 +7,11 @@ import pytest
 from scipy.spatial.transform import Rotation
 from urdf_parser_py import urdf as urdfpy
 
-from semantic_digital_twin.adapters.package_resolver import SearchPathFileResolver
+from semantic_digital_twin.adapters.package_resolver import (
+    CompositePathResolver,
+    PackageUriResolver,
+    SearchPathFileResolver,
+)
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -110,8 +114,8 @@ MATERIAL_COLORED_LINKS_URDF = os.path.join(
 """
 Description whose bare mesh links take their color from a material the description
 names, from a material of their own, and from no material, beside a mesh whose file
-paints itself and a box with a material of its own; its mesh files are named relative to
-the package's resources.
+paints itself and a box with a material of its own; its mesh files are named by
+``package://`` URIs or relative to the package's resources.
 """
 
 
@@ -130,7 +134,12 @@ def material_colored_world():
     )
     return URDFParser.from_file(
         MATERIAL_COLORED_LINKS_URDF,
-        path_resolver=SearchPathFileResolver(root_directories=[resources]),
+        path_resolver=CompositePathResolver(
+            resolvers=[
+                SearchPathFileResolver(root_directories=[resources]),
+                PackageUriResolver(),
+            ]
+        ),
     ).create_world()
 
 
@@ -165,19 +174,10 @@ def urdf_paths():
     """
     Fixture providing paths to various URDF files.
     """
-    urdf_directory = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
     return URDFPaths(
-        table=os.path.join(urdf_directory, "table.urdf"),
-        kitchen=os.path.join(urdf_directory, "kitchen-small.urdf"),
-        apartment=os.path.join(urdf_directory, "apartment.urdf"),
+        table="package://iai_objects/urdf/table.urdf",
+        kitchen="package://iai_kitchen/urdf_obj/kitchen-small.urdf",
+        apartment="package://iai_apartment/urdf/apartment.urdf",
         pr2=PR2.get_ros_file_path(),
     )
 

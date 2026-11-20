@@ -1,5 +1,4 @@
 import json
-import os
 from copy import deepcopy
 
 import numpy as np
@@ -395,22 +394,7 @@ def test_screw_connection_json_serialization_with_world():
 
 
 def test_json_serialization_with_mesh():
-    body: Body = (
-        STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "..",
-                "semantic_digital_twin",
-                "resources",
-                "stl",
-                "milk.stl",
-            )
-        )
-        .create_world()
-        .root
-    )
+    body: Body = STLParser("package://iai_objects/objects/milk.stl").create_world().root
 
     json_data = to_json(body)
     body2 = from_json(json_data)

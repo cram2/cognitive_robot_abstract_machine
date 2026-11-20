@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import pytest
 import trimesh
@@ -20,16 +18,7 @@ from semantic_digital_twin.world_description.geometry import Box, Mesh
 
 @pytest.fixture(scope="function")
 def jeroen_cup_world_fixture():
-    stl_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "stl",
-    )
-    world = STLParser(os.path.join(stl_dir, "jeroen_cup.stl")).create_world()
+    world = STLParser("package://iai_objects/objects/jeroen_cup.stl").create_world()
     world.root.name = PrefixedName("root")
     return world
 

@@ -116,6 +116,9 @@ class MJCFParser(WorldModelParser):
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
+        for mesh in self.spec.meshes:
+            if package_uri_resolver.supports(mesh.file):
+                mesh.file = package_uri_resolver.resolve(mesh.file)
 
     @cached_property
     def resolved_document(self) -> ET.Element:

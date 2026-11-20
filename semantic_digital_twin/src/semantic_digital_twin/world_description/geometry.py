@@ -779,8 +779,8 @@ class Mesh(Shape):
     @classmethod
     def _serialized_fields(cls) -> list[Field]:
         """
-        A mesh carries its geometry rather than the file it was read from, which the
-        process reading the json may not have.
+        A mesh carries its package URI or its geometry rather than the file it was read
+        from, which the process reading the json may not have.
         """
         return [
             field_
@@ -789,6 +789,13 @@ class Mesh(Shape):
         ]
 
     def to_json(self, **kwargs) -> dict[str, Any]:
+        """
+        A mesh whose file lies in a ROS package is written as its :attr:`package_uri`
+        and without its geometry, which the reader resolves in its own install.
+        """
+        package_uri = self.package_uri
+        if package_uri is not None:
+            return {**super().to_json(**kwargs), "package_uri": package_uri}
         # Serialize the unscaled geometry and the scale separately. This is the same
         # mesh :attr:`mesh` exposes, so a deserialized mesh reproduces the original
         # rather than a differently tessellated version of the same file.
@@ -809,7 +816,11 @@ class Mesh(Shape):
         return {**super().to_json(**kwargs), "mesh": to_json(geometry, **kwargs)}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Mesh:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Mesh:
+        if "package_uri" in data:
+            mesh = super()._from_json(data=data, **kwargs)
+            mesh.filename = data["package_uri"]
+            return mesh
         geometry = from_json(data["mesh"], **kwargs)
         # Recreate the trimesh without processing to preserve exact topology
         mesh = trimesh.Trimesh(
@@ -871,6 +882,20 @@ class Mesh(Shape):
         and texture files the mesh refers to by name sit beside the answer.
         """
         return MeshFileSources().resolve(self.filename)
+
+    @property
+    def package_uri(self) -> str | None:
+        """
+        The ``package://`` URI of the mesh's file, which every machine resolves in its
+        own install, or ``None`` when the file lies in no package's share directory.
+        """
+        if self.filename.startswith("package://"):
+            return self.filename
+        parts = self.local_file.parts
+        if "share" not in parts[:-2]:
+            return None
+        share_index = len(parts) - 1 - parts[::-1].index("share")
+        return "package://" + "/".join(parts[share_index + 1 :])
 
     @property
     def stored_mesh(self) -> trimesh.Trimesh:
