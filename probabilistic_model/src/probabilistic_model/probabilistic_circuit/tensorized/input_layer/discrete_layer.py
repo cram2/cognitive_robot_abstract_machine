@@ -1,3 +1,8 @@
+"""
+Input layers whose nodes are each a distribution over the states of a symbolic or an
+integer variable.
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -236,7 +241,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         with np.errstate(divide="ignore"):
             node_log_probabilities = np.log(self.table.probability_of_states(selected))
         return LayerWithLogProbabilities(
-            self.with_table(self.table.restricted_to(selected).normalized()),
+            self.copy_with_table(table=self.table.restricted_to(selected).normalized()),
             node_log_probabilities,
         )
 
@@ -257,7 +262,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             },
         )
 
-    def with_table(self, table: ProbabilityTable) -> Self:
+    def copy_with_table(self, *, table: ProbabilityTable) -> Self:
         """
         :param table: The probability table of the new layer, over the nodes and the
             states of this one.
@@ -272,7 +277,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         :param table_type: The type of table to store the probabilities in.
         :return: This layer with its probabilities stored in a table of that type.
         """
-        return self.with_table(table_type.of(self.table))
+        return self.copy_with_table(table=table_type.from_table(table=self.table))
 
     @classmethod
     def from_distributions(
@@ -381,7 +386,10 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             node_variables=np.concatenate([layer.node_variables for layer in layers]),
             states=states,
             table=table_type.concatenate(
-                [table_type.of(layer.table_over(states=states)) for layer in layers]
+                [
+                    table_type.from_table(table=layer.table_over(states=states))
+                    for layer in layers
+                ]
             ),
         )
 

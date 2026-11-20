@@ -1,3 +1,8 @@
+"""
+Input layers whose nodes are each a multivariate Gaussian over several continuous
+variables.
+"""
+
 from __future__ import annotations
 
 import copy

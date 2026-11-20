@@ -1,3 +1,7 @@
+"""
+Input layers whose nodes each put all probability on one value of a continuous variable.
+"""
+
 from __future__ import annotations
 
 import dataclasses

@@ -91,7 +91,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         raise NotImplementedError
 
     @classmethod
-    def of(cls, table: ProbabilityTable) -> Self:
+    def from_table(cls, *, table: ProbabilityTable) -> Self:
         """
         :param table: A table of any type.
         :return: A table of this type with the same probabilities.

@@ -1,3 +1,10 @@
+"""
+Tests of stacking copies of a layer graph that share its structure into one layer graph
+whose root holds one node per copy.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np

@@ -199,7 +199,10 @@ def test_json_round_trip(table, table_type, probabilities):
     "target", [DenseProbabilityTable, SparseProbabilityTable], ids=lambda t: t.__name__
 )
 def test_conversion_between_the_types(table, target, probabilities):
-    converted = target.of(table)
+    """
+    A table converted to another type of table keeps its probabilities.
+    """
+    converted = target.from_table(table=table)
     assert isinstance(converted, target)
     np.testing.assert_allclose(converted.dense_probabilities(), probabilities)
 

@@ -63,9 +63,8 @@ class ProductLayer(InnerLayer):
     A layer of product units.
 
     Every node multiplies nodes of its child layers, possibly several of one child
-    layer, so the scope of a node is the union of the scopes of its factors and its
-    likelihood is the sum of their log-likelihoods. A node of a child layer may be a
-    factor of several nodes.
+    layer, so its scope is the union of the scopes of its factors. A node of a child
+    layer may be a factor of several nodes.
     """
 
     @classmethod

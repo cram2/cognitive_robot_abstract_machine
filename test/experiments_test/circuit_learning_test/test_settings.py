@@ -45,6 +45,10 @@ def dataset() -> BenchmarkDataset:
     generator = np.random.default_rng(0)
 
     def frame(number_of_rows: int) -> pd.DataFrame:
+        """
+        :param number_of_rows: The number of rows.
+        :return: Rows drawn from the two clusters.
+        """
         cluster = generator.integers(0, 2, number_of_rows)
         return pd.DataFrame(
             {

@@ -227,12 +227,10 @@ class SumLayer(HasParameterArrays, InnerLayer):
         cls, pieces: list[LayerWithLogProbabilities]
     ) -> LayerWithLogProbabilities:
         """
-        Join the pieces a query splits the nodes of a layer into, the nodes of
-        ``pieces[k]`` as one contiguous block after those of the pieces before it.
+        Join the pieces a query splits the nodes of a layer into, in their order.
 
-        A single piece is returned as it is. Leaf pieces of one type become one layer of
-        that type. Any other pieces become a sum layer whose every node has the one node
-        of its piece as its only child, with weight one.
+        A single piece stays as it is, leaf pieces of one type become one layer, and
+        other pieces a sum layer with one child of weight one per node.
 
         :param pieces: The pieces, in the order of their nodes, and the log-
             probabilities of their nodes.

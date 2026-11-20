@@ -1,3 +1,8 @@
+"""
+Input layers over continuous variables whose distributions have a density, possibly on a
+constrained support.
+"""
+
 from __future__ import annotations
 
 import copy

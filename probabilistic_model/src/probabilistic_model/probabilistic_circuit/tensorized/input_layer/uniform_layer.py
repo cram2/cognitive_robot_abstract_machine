@@ -1,3 +1,8 @@
+"""
+Input layers whose nodes are each a uniform distribution over an interval of a
+continuous variable.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

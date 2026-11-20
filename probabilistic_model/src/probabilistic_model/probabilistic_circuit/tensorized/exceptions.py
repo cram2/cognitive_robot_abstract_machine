@@ -1,3 +1,7 @@
+"""
+Exceptions raised by layered circuits and their layers.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

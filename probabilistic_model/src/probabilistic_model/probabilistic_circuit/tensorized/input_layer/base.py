@@ -1,3 +1,7 @@
+"""
+Input layers of a layered circuit whose nodes are each a distribution over one variable.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -63,12 +67,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     """
     Abstract base class for the input layers of a layered circuit whose nodes are
-    univariate distributions.
+    univariate distributions of one type, every node over its own variable.
 
-    An input layer holds univariate distributions of one single type, every node over
-    its own variable and the nodes sorted by variable, so that the likelihood of all of
-    its nodes is evaluated without any branching. Its numeric queries compute with the
-    array backend of its parameters.
+    The nodes are sorted by variable, and the numeric queries compute with the array
+    backend of the parameters.
     """
 
     node_variables: VariableIndices
@@ -99,7 +101,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             raise LayerOverSeveralVariablesError(variables=self.variables)
         return int(self.node_variables[0])
 
-    def validate_own(self):
+    def validate_own(self) -> None:
         """
         :raises UnsortedNodeVariablesError: If the nodes are not sorted by variable.
         """
@@ -273,9 +275,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         Calculate the moment of the variable of this layer for every node of a layer
         over one variable.
 
-        The fallback evaluates the nodes one by one through their distributions, on the
-        host only. Layers whose moment has a closed form evaluate it for all nodes at
-        once on the backend of their parameters.
+        The fallback evaluates the nodes one by one on the host; layers whose moment has
+        a closed form override it.
 
         :param order: The order of the moment.
         :param center: The center of the moment.
@@ -330,9 +331,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         Draw one sample from the node of every entry of ``nodes``, for a layer over one
         variable.
 
-        The fallback draws from the nodes one by one through :meth:`sample_of_node`.
-        Layers whose distributions numpy or scipy can sample for all nodes at once
-        override this.
+        The fallback draws node by node through :meth:`sample_of_node`; layers that
+        sample all their nodes at once override it.
 
         :param nodes: The node to draw each sample from.
         :param variables: The variables of the circuit.

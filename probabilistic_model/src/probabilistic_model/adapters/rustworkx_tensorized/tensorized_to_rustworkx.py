@@ -1,3 +1,8 @@
+"""
+Conversion of a layered circuit into a rustworkx circuit, one unit per node of every
+layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

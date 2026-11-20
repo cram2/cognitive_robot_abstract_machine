@@ -264,9 +264,8 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         predicted_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a randomly initialized RAT-SPN with numpy
-        parameters, folded by :class:`LayerFolding`. With a predicted variable, the root
-        region has one sum unit per category of it and the root mixes them, each
+        Convert the region graph to a folded, randomly initialized RAT-SPN on the host.
+        With a predicted variable, the root mixes one sum unit per category of it, each
         multiplied by the indicator of its category, so that the circuit classifies;
         without one, the root region has a single sum unit.
 

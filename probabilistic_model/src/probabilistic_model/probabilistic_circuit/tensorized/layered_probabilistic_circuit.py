@@ -288,7 +288,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         for layer in self.layers:
             if isinstance(layer, DiscreteLayer):
-                layer.table = table_type.of(layer.table)
+                layer.table = table_type.from_table(table=layer.table)
         return self
 
     # %% parameters

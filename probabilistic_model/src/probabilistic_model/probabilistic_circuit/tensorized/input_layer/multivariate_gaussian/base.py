@@ -1,3 +1,8 @@
+"""
+The base of input layers whose nodes are each a Gaussian over several continuous
+variables.
+"""
+
 from __future__ import annotations
 
 import copy

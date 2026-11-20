@@ -594,16 +594,14 @@ class EdgeBlockStack:
         return np.tile(self.block_columns, (1, self.block_shape[1])).reshape(-1)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BlockEdgeMatrix(EdgeMatrix):
     """
     An edge matrix whose rows with the same child columns form full blocks, the blocks
     of one shape stacked.
 
-    Reducing values by node reduces every stack as an array of shape (#blocks, #rows of
-    a block, #columns of a block) at once, one operation per shape of block, which suits
-    layers whose nodes each mix all nodes of a region, such as the merged sums of a
-    region graph.
+    Reducing by node takes one batched operation per shape of block, which suits layers
+    whose nodes each mix all nodes of a region, such as the folded sums of a RAT-SPN.
     """
 
     stacks: list[EdgeBlockStack]
@@ -699,7 +697,7 @@ class BlockEdgeMatrix(EdgeMatrix):
             )
             stacks.append(stack)
             first_position += stack.number_of_edges
-        return cls(stacks, shape)
+        return cls(stacks=stacks, matrix_shape=shape)
 
     def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
         # the value of an edge is found by its key row * #columns + column
