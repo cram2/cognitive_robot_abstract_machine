@@ -373,3 +373,26 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
         reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
         hinge_T_door.to_np(),
     )
+
+
+# %% spatial values given as expressions over the world state
+
+
+def test_a_pose_given_by_the_world_state_is_stored_as_it_stands(
+    pr2_world_state_reset: World,
+):
+    """
+    A pose given as an expression of where a body stands is stored as the pose the body
+    has when it is stored.
+    """
+    world = pr2_world_state_reset
+    tool_frame = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    world_T_tool_frame = world.compose_forward_kinematics_expression(
+        world.root, tool_frame
+    )
+
+    stored = to_dao(world_T_tool_frame).from_dao()
+
+    np.testing.assert_allclose(
+        stored.to_np(), tool_frame.global_pose.to_np(), atol=1e-12
+    )

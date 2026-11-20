@@ -744,6 +744,8 @@ class SymbolicMathType(ABC):
 
         :return: The evaluated value of this expression.
         """
+        if self.is_constant():
+            return self.to_np()
         f = self.compile(
             parameters=VariableParameters.from_lists(self.free_variables()),
             sparse=False,

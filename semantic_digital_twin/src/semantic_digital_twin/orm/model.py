@@ -109,7 +109,7 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Vector3):
-        x, y, z, _ = obj.to_np().tolist()
+        x, y, z, _ = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -129,7 +129,7 @@ class Point3Mapping(AlternativeMapping[Point3]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Point3):
-        x, y, z, _ = float(obj.x), float(obj.y), float(obj.z), obj.reference_frame
+        x, y, z, _ = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -150,7 +150,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Quaternion):
-        x, y, z, w = float(obj.x), float(obj.y), float(obj.z), float(obj.w)
+        x, y, z, w = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, w=w, reference_frame=obj.reference_frame)
         return result
 
@@ -173,7 +173,9 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
     @classmethod
     def from_domain_object(cls, *, obj: AxisAngle):
         return cls(
-            axis=obj.axis, angle=float(obj.angle), reference_frame=obj.reference_frame
+            axis=obj.axis,
+            angle=float(obj.angle.evaluate()[0]),
+            reference_frame=obj.reference_frame,
         )
 
     def to_domain_object(self) -> AxisAngle:
@@ -325,9 +327,8 @@ class Point2Mapping(AlternativeMapping[Point2]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Point2):
-        result = cls(
-            x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame
-        )
+        x, y = obj.evaluate().tolist()[:2]
+        result = cls(x=x, y=y, reference_frame=obj.reference_frame)
         return result
 
     def to_domain_object(self) -> Point2:
@@ -342,7 +343,7 @@ class Pose2DMapping(AlternativeMapping[Pose2D]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Pose2D):
-        result = cls(position=obj.position, yaw=float(obj.yaw))
+        result = cls(position=obj.position, yaw=float(obj.yaw.evaluate()[0]))
         result.reference_frame = obj.reference_frame
         return result
 
