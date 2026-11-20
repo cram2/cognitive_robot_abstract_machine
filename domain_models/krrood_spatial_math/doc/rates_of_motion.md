@@ -28,7 +28,6 @@ import numpy as np
 import plotly.graph_objects as go
 from IPython.display import HTML
 from plotly.subplots import make_subplots
-from scipy.linalg import expm
 from scipy.spatial.transform import Rotation
 
 from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
@@ -105,7 +104,23 @@ and a translational part, given along the axes of the same reference frame.
 | `ScrewAxis` | the angle $\omega$ the body turns by about each axis per unit of position | how far $v$ the point of the body at the frame's origin moves per unit of position | a position, such as a joint's |
 
 For both kinds of rate, $\omega$ names the rotational part and $v$ the translational
-part.
+part. They differ in what the change of the pose is measured against:
+
+- A **screw axis** is how the pose changes per unit of the joint's position $\theta$:
+  an angle in radians for a joint that turns, a distance in meters for one that only
+  slides.
+- A **twist** is how the pose changes per second. It is the screw axis times the joint's
+  speed, $\dot\theta$.
+
+A twist is therefore not the derivative of a screw axis. A joint's screw axis stays the
+same however fast the joint moves; the twist scales it by that speed.
+
+The translational part $v$ describes the point of the body that is at the reference
+frame's origin, which need not be the body's own origin. If the axis the body turns about
+does not run through the frame's origin, that point circles the axis, so $v$ is not zero
+even when the body slides nowhere along the axis. A door turning at 1 rad/s about a
+hinge 0.5 m beside the frame's origin has $\omega = (0, 0, 1)$ rad/s and $v$ of
+0.5 m/s, sideways.
 
 A screw axis describes how a joint moves the body, independent of how fast it does so.
 The body turns about a line and slides along it in proportion, so every point of the body
@@ -247,14 +262,10 @@ print("rotation vector:", quarter_turn.rotation_vector[:3].to_list())
 print("translation:    ", quarter_turn.translation[:3].to_list())
 ```
 
-The screw axis and the twist are both derivatives of the lid's pose, taken with respect
-to different things. The screw axis is the derivative with respect to the lid's
-position: how far the lid moves per radian it is turned. The twist is the derivative
-with respect to time: how far the lid moves per second. The twist is not the derivative
-of the screw axis. By the chain rule, it is the screw axis times how fast the position
-changes, $\dot\theta$, and that is what `ScrewAxis.to_twist` computes. Turned at
-$\dot\theta = 0.5$ rad/s, the lid turns at $\omega = (0, 0, 0.5)$ rad/s and rises at
-$v = (0, 0, 0.001)$ m/s:
+The screw axis says how the lid's pose changes per radian it is turned. The twist says
+how it changes per second: it is the screw axis times the lid's speed $\dot\theta$, and
+that is what `ScrewAxis.to_twist` computes. Turned at $\dot\theta = 0.5$ rad/s, the lid
+turns at $\omega = (0, 0, 0.5)$ rad/s and rises at $v = (0, 0, 0.001)$ m/s:
 
 ```{code-cell} ipython3
 twist = lid.to_twist(position_velocity=0.5)
@@ -415,34 +426,10 @@ show(turning_figure)
 
 ### Why not scipy's matrix exponential
 
-The same displacement is also the exponential of a 4×4 matrix: the rate times $\Delta$,
-with the cross-product matrix of $\omega$ in the top left, $v$ to its right, and a row of
-zeros below. SciPy computes this as `scipy.linalg.expm`, and for the body above it gives
-the same displacement:
-
-```{code-cell} ipython3
-rate = np.zeros((4, 4))
-rate[:3, :3] = [[0, -1, 0], [1, 0, 0], [0, 0, 0]]
-rate[:3, 3] = [1, 0, 0]
-pose = expm(rate * angle)
-displacement = driving.to_displacement(duration=angle)
-assert np.allclose(pose[:3, 3], displacement.translation[:3])
-assert np.allclose(
-    pose[:3, :3],
-    Rotation.from_rotvec(displacement.rotation_vector[:3]).as_matrix(),
-)
-```
-
-The package still computes the formula itself, because its displacements are usually not
-numbers. In semantic_digital_twin, the position of a connection is a symbolic variable.
-The world builds the pose of each body as an expression in these variables, compiles it
-once and evaluates it in every control cycle, and the controller differentiates it with
-respect to the positions. `expm` takes an array of numbers and returns one: it cannot
-take a variable, and it gives no derivative. The formula above uses only operations the
-symbolic math has, such as $\cos$, $\sin$ and the cross product, so it gives an
-expression in the position directly, and a derivative of it, as
-{ref}`why-not-the-value-at-zero` below shows. The package's tests check the formula
-against `expm`.
+`scipy.linalg.expm` gives the same displacement, and the package's tests check the
+formula against it. But `expm` works only on numbers, while the package's positions are
+usually symbolic variables, whose expressions the controller differentiates. The formula
+above uses only operations the symbolic math has, so it works on those variables too.
 
 ## Closed form and series
 
