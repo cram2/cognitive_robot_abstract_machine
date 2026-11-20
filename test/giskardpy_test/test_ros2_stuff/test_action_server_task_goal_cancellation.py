@@ -34,6 +34,8 @@ from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.world import World
 
+from .test_client_presence import wait_until
+
 # %% goal-holding stand-in
 
 
@@ -419,14 +421,58 @@ def test_a_restarted_task_waits_for_the_result_of_its_new_goal(
     assert task.observation_state == ObservationStateValue.UNKNOWN
 
 
+def test_a_task_paused_after_its_goal_was_answered_keeps_the_answer(
+    answering_server: GoalHoldingServer, rclpy_node: Node
+) -> None:
+    """
+    A task paused and continued after the server answered its goal neither sends the
+    goal again nor forgets the answer.
+    """
+    task = ResultObservingTask(action_topic=GoalTopic.ANSWERING)
+    scenario = GoalCancellationScenario(
+        task=task, server=answering_server, rclpy_node=rclpy_node
+    )
+    pause = scenario.add_one_tick_trigger(start_condition=task.observes_true)
+    task.pause_condition = pause.observes_true
+    after_the_pause = CountTicks(ticks=10)
+    scenario.statechart.add_node(node=after_the_pause)
+    after_the_pause.start_condition = pause.observes_false
+
+    scenario.run_until(
+        condition=lambda: (
+            after_the_pause.observation_state == ObservationStateValue.TRUE
+        )
+    )
+
+    assert answering_server.received_goal_count == 1
+    assert task.observation_state == ObservationStateValue.TRUE
+
+
+def test_ending_the_statechart_cancels_the_goal_of_a_running_task(
+    holding_server: GoalHoldingServer, rclpy_node: Node
+) -> None:
+    """
+    A task still running when the statechart ends asks the server to cancel its goal.
+    """
+    task = ResultObservingTask(action_topic=GoalTopic.HOLDING)
+    scenario = GoalCancellationScenario(
+        task=task, server=holding_server, rclpy_node=rclpy_node
+    )
+
+    scenario.run_until(condition=lambda: holding_server.received_goal_count >= 1)
+    wait_until(lambda: holding_server.cancel_request_count >= 1)
+
+    assert holding_server.cancel_request_count == 1
+
+
 # %% the goal's lifetime between sending and the server's answer
 
 
 @dataclass(kw_only=True)
-class GoalHandleCountingCancels:
+class GoalHandleCountingRequests:
     """
-    Stands in for a client's handle of a goal, counting the cancel requests sent
-    through it.
+    Stands in for a client's handle of a goal, counting the cancel and result requests
+    sent through it.
     """
 
     accepted: bool = True
@@ -439,11 +485,25 @@ class GoalHandleCountingCancels:
     How many cancel requests were sent through the handle.
     """
 
+    result_request_count: int = field(init=False, default=0)
+    """
+    How many result requests were sent through the handle.
+    """
+
     def cancel_goal_async(self) -> None:
         """
         Counts one cancel request.
         """
         self.cancel_request_count += 1
+
+    def get_result_async(self) -> Future:
+        """
+        Counts one result request.
+
+        :return: A result that never arrives.
+        """
+        self.result_request_count += 1
+        return Future()
 
 
 @dataclass(kw_only=True)
@@ -472,7 +532,7 @@ def test_a_goal_cancelled_before_the_server_accepts_it_is_cancelled_once_accepte
     """
     goal = SentGoal()
     goal.cancel()
-    goal_handle = GoalHandleCountingCancels()
+    goal_handle = GoalHandleCountingRequests()
 
     goal.receive_goal_response(goal_handle=goal_handle, record_response=lambda: None)
 
@@ -488,7 +548,7 @@ def test_the_responses_to_a_cancelled_goal_are_not_passed_on() -> None:
     goal.cancel()
 
     goal.receive_goal_response(
-        goal_handle=GoalHandleCountingCancels(), record_response=counter.count
+        goal_handle=GoalHandleCountingRequests(), record_response=counter.count
     )
     goal.receive_result(store_result=counter.count)
 
@@ -501,7 +561,7 @@ def test_cancelling_a_goal_twice_sends_one_cancel_request() -> None:
     request.
     """
     goal = SentGoal()
-    goal_handle = GoalHandleCountingCancels()
+    goal_handle = GoalHandleCountingRequests()
     goal.receive_goal_response(goal_handle=goal_handle, record_response=lambda: None)
 
     goal.cancel()
@@ -515,7 +575,7 @@ def test_a_goal_whose_result_arrived_is_not_cancelled_on_the_server() -> None:
     A goal the server already answered is not cancelled there.
     """
     goal = SentGoal()
-    goal_handle = GoalHandleCountingCancels()
+    goal_handle = GoalHandleCountingRequests()
     goal.receive_goal_response(goal_handle=goal_handle, record_response=lambda: None)
     goal.receive_result(store_result=lambda: None)
 
@@ -530,8 +590,24 @@ def test_a_rejected_goal_is_not_cancelled_on_the_server() -> None:
     """
     goal = SentGoal()
     goal.cancel()
-    goal_handle = GoalHandleCountingCancels(accepted=False)
+    goal_handle = GoalHandleCountingRequests(accepted=False)
 
     goal.receive_goal_response(goal_handle=goal_handle, record_response=lambda: None)
 
     assert goal_handle.cancel_request_count == 0
+
+
+def test_the_result_of_a_goal_cancelled_before_acceptance_is_not_requested() -> None:
+    """
+    A goal the task cancelled before the server accepted it gets no result request.
+    """
+    task = ResultObservingTask(action_topic=GoalTopic.HOLDING)
+    goal = SentGoal()
+    goal.cancel()
+    goal_handle = GoalHandleCountingRequests()
+    goal_response = Future()
+    goal_response.set_result(goal_handle)
+
+    task.goal_response_callback(goal_response, sent_goal=goal)
+
+    assert goal_handle.result_request_count == 0

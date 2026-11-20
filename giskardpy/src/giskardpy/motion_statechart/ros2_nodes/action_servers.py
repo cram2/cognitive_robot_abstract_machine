@@ -58,7 +58,8 @@ class SentGoal:
     One goal an :class:`ActionServerTask` sent to its action server.
 
     Once cancelled, the server's responses to it are no longer passed on, and the server
-    is asked to cancel it as soon as it accepted it.
+    is asked to cancel it as soon as it accepted it. A goal the server answered can no
+    longer be cancelled.
     """
 
     goal_handle: ClientGoalHandle | None = field(init=False, default=None)
@@ -68,7 +69,7 @@ class SentGoal:
 
     is_cancelled: bool = field(init=False, default=False)
     """
-    Whether the task no longer pursues the goal.
+    Whether the task stopped pursuing the goal before the server answered it.
     """
 
     is_answered: bool = field(init=False, default=False)
@@ -84,14 +85,14 @@ class SentGoal:
 
     def cancel(self) -> None:
         """
-        Stops pursuing the goal, and asks the server to cancel it if the server accepted
-        it and has not answered it yet.
+        Stops pursuing the goal unless the server already answered it, and asks the
+        server to cancel it if the server accepted it.
         """
         with self._lock:
-            if self.is_cancelled:
+            if self.is_cancelled or self.is_answered:
                 return
             self.is_cancelled = True
-            if self.goal_handle is not None and not self.is_answered:
+            if self.goal_handle is not None:
                 self.goal_handle.cancel_goal_async()
 
     def receive_goal_response(
@@ -195,51 +196,68 @@ class ActionServerTask(
     def on_start(self) -> None:
         """
         Differs from :meth:`StatechartNode.on_start` in calling
-        :meth:`pursue_goal_only_while_running`.
+        :meth:`align_goal_with_life_cycle`.
         """
-        self.pursue_goal_only_while_running()
+        self.align_goal_with_life_cycle()
 
     def on_pause(self) -> None:
         """
         Differs from :meth:`StatechartNode.on_pause` in calling
-        :meth:`pursue_goal_only_while_running`.
+        :meth:`align_goal_with_life_cycle`.
         """
-        self.pursue_goal_only_while_running()
+        self.align_goal_with_life_cycle()
 
     def on_unpause(self) -> None:
         """
         Differs from :meth:`StatechartNode.on_unpause` in calling
-        :meth:`pursue_goal_only_while_running`.
+        :meth:`align_goal_with_life_cycle`.
         """
-        self.pursue_goal_only_while_running()
+        self.align_goal_with_life_cycle()
 
     def on_end(self) -> None:
         """
         Differs from :meth:`StatechartNode.on_end` in calling
-        :meth:`pursue_goal_only_while_running`.
+        :meth:`align_goal_with_life_cycle`.
         """
-        self.pursue_goal_only_while_running()
+        self.align_goal_with_life_cycle()
 
     def on_reset(self) -> None:
         """
         Differs from :meth:`StatechartNode.on_reset` in calling
-        :meth:`pursue_goal_only_while_running`.
+        :meth:`align_goal_with_life_cycle`.
         """
-        self.pursue_goal_only_while_running()
+        self.align_goal_with_life_cycle()
 
-    def pursue_goal_only_while_running(self) -> None:
+    def cleanup(self) -> None:
         """
-        Sends a new goal if this task runs and pursues none, and cancels the goal it
-        pursues if it does not run.
+        Differs from :meth:`StatechartNode.cleanup` in cancelling the goal last sent.
+        """
+        super().cleanup()
+        self.cancel_goal()
+
+    def align_goal_with_life_cycle(self) -> None:
+        """
+        Sends a new goal if this task runs and pursues none, cancels the goal last sent
+        if it does not run, and forgets that goal once it is reset.
 
         .. note:: A task that starts paused therefore sends its goal only once it
-            continues.
+            continues, and a task paused after its goal was answered keeps the answer.
         """
-        pursues_goal = self._sent_goal is not None and not self._sent_goal.is_cancelled
-        is_running = self.life_cycle_state == LifeCycleValue.RUNNING
-        if is_running and not pursues_goal:
-            self.send_goal()
-        elif not is_running and pursues_goal:
+        match self.life_cycle_state:
+            case LifeCycleValue.RUNNING:
+                if self._sent_goal is None or self._sent_goal.is_cancelled:
+                    self.send_goal()
+            case LifeCycleValue.NOT_STARTED:
+                self.cancel_goal()
+                self._sent_goal = None
+            case _:
+                self.cancel_goal()
+
+    def cancel_goal(self) -> None:
+        """
+        Stops pursuing the goal last sent, see :meth:`SentGoal.cancel`.
+        """
+        if self._sent_goal is not None:
             self._sent_goal.cancel()
 
     def send_goal(self) -> None:
@@ -259,7 +277,7 @@ class ActionServerTask(
     def goal_response_callback(self, future: Future, *, sent_goal: SentGoal) -> None:
         """
         Handles the server's response to `sent_goal`, and waits for the goal's result
-        once the server accepted it.
+        once the server accepted it, unless the goal is cancelled.
         """
         goal_handle = future.result()
         sent_goal.receive_goal_response(
@@ -268,7 +286,7 @@ class ActionServerTask(
                 self.record_goal_response, accepted=goal_handle.accepted
             ),
         )
-        if not goal_handle.accepted:
+        if not goal_handle.accepted or sent_goal.is_cancelled:
             return
         goal_handle.get_result_async().add_done_callback(
             partial(self.goal_result_callback, sent_goal=sent_goal)
