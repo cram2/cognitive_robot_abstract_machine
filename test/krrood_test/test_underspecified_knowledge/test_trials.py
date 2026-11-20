@@ -25,6 +25,8 @@ from krrood.parametrization.trials.campaigns import TrialCampaign
 from krrood.bounds import Bounds
 from krrood.parametrization.trials.exceptions import (
     FieldOfUnsupportedType,
+    InformedFieldMissing,
+    NoSuccessfulTrials,
     NotEnoughMemoryForWorkers,
     NoTrials,
     OutcomeDidNotVaryInPilot,
@@ -36,6 +38,7 @@ from krrood.parametrization.trials.parameter_spaces import (
     GivenParameters,
     NearCentresRegistry,
 )
+from krrood.parametrization.trials.records import InformedField
 from ..dataset.throwing_trials import (
     Court,
     CourtRecipe,
@@ -45,6 +48,7 @@ from ..dataset.throwing_trials import (
     SpeedOnlyParameters,
     SteepThrowsLand,
     Throw,
+    ThrowBall,
     ThrowingSetup,
     ThrowMeasurements,
     ThrowParameters,
@@ -624,15 +628,6 @@ def test_the_ranges_of_a_parameter_cover_every_trial(analysis):
         )
 
 
-def test_the_successful_parameters_are_those_of_the_trials_that_succeeded(analysis):
-    """
-    Exactly the parameters of the successful trials are returned, in order.
-    """
-    assert analysis.successful_parameters() == [
-        trial.parameters for trial in analysis.trials if trial.succeeded
-    ]
-
-
 def test_an_analysis_without_trials_is_refused():
     """
     There is nothing to analyse without any trial.
@@ -742,3 +737,90 @@ def test_the_aimed_angle_causes_success_more_than_the_speed(causes_in_the_wind):
         found.attribute_path: found.success_probability for found in causes_in_the_wind
     }
     assert probabilities["parameters.angle"] > probabilities["parameters.speed"]
+
+
+# %% closing the loop
+
+
+def test_the_next_campaign_drawn_near_the_successes_succeeds_more_often(drawn):
+    """
+    Throws drawn near the throws that landed land more often than throws drawn
+    uniformly.
+    """
+    performer = SteepThrowsLand()
+    trials = [performer.perform(parameters=parameters) for parameters in drawn]
+    registry = NearCentresRegistry.from_successful_trials(trials=trials, spread=0.05)
+    np.random.seed(8)
+    next_trials = [
+        performer.perform(parameters=parameters)
+        for parameters in ThrowSpace().drawn_parameters(
+            number_of_draws=len(drawn), model_registry=registry
+        )
+    ]
+
+    assert registry.centres == [trial.parameters for trial in trials if trial.succeeded]
+    assert (
+        TrialAnalysis(trials=next_trials).success_rate
+        > TrialAnalysis(trials=trials).success_rate
+    )
+
+
+def test_drawing_near_the_successes_of_trials_that_all_failed_is_refused(drawn):
+    """
+    There is nothing to draw near when no throw landed.
+    """
+    performer = SteepThrowsLand(steepness=Bounds(lower=2.0, upper=3.0))
+    trials = [performer.perform(parameters=parameters) for parameters in drawn]
+    with pytest.raises(NoSuccessfulTrials):
+        NearCentresRegistry.from_successful_trials(trials=trials)
+
+
+def test_the_best_values_are_adopted_for_the_fields_they_inform(
+    database_url, court_id, central_and_edge_throws
+):
+    """
+    The values of the throw that landed most often are adopted for the fields of the
+    action its parameters inform.
+    """
+    setup = ThrowingSetup(
+        database_url=database_url,
+        starting_state_id=court_id,
+        performer=SteepThrowsLand(wind=0.1),
+    )
+    np.random.seed(4)
+    TrialCampaign(
+        setup=setup, parameter_source=central_and_edge_throws, repetitions=40
+    ).run()
+    analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
+    [best, *_] = analysis.success_rates_of_parameters()
+
+    adopted = {
+        value.informed_field.field_name: value.value
+        for value in analysis.adopted_values()
+    }
+
+    assert adopted == {
+        informed_field.field_name: best.parameters.values_by_attribute_path()[
+            informed_field.attribute_path
+        ]
+        for informed_field in ThrowParameters.informed_fields
+    }
+    assert adopted["aim_angle"] == central_and_edge_throws.parameters[0].angle
+
+
+def test_an_informed_field_knows_the_default_it_would_replace():
+    """
+    The default an informed field has now is the one its action declares.
+    """
+    informed_field = InformedField(
+        attribute_path="angle", owner=ThrowBall, field_name="aim_angle"
+    )
+    assert informed_field.current_default == ThrowBall().aim_angle
+
+
+def test_informing_a_field_the_action_does_not_declare_is_refused():
+    """
+    A misspelt field is refused when it is declared, not when a value is adopted.
+    """
+    with pytest.raises(InformedFieldMissing):
+        InformedField(attribute_path="angle", owner=ThrowBall, field_name="aim_angel")

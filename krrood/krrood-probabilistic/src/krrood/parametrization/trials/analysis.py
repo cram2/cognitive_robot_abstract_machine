@@ -29,7 +29,11 @@ from krrood.parametrization.model_registries import CausalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.parametrization.trials.exceptions import NoTrials
-from krrood.parametrization.trials.records import Trial, TrialParameters
+from krrood.parametrization.trials.records import (
+    InformedField,
+    Trial,
+    TrialParameters,
+)
 
 # %% success along one value
 
@@ -120,6 +124,24 @@ class SuccessRateOfParameters:
     success_rate: float
     """
     The fraction of those trials that succeeded.
+    """
+
+
+@dataclass(kw_only=True)
+class AdoptedValue:
+    """
+    The value of a parameter that worked best, to become the default of the field of an
+    action it informs.
+    """
+
+    informed_field: InformedField
+    """
+    The field whose default the parameter informs.
+    """
+
+    value: float
+    """
+    The value of the parameter in the parameters with the highest success rate.
     """
 
 
@@ -222,12 +244,20 @@ class TrialAnalysis:
         ]
         return sorted(rates, key=lambda rate: rate.success_rate, reverse=True)
 
-    def successful_parameters(self) -> list[TrialParameters]:
+    def adopted_values(self) -> list[AdoptedValue]:
         """
-        :return: The parameters of every trial that succeeded, such as the centres to
-            draw the next trials near.
+        :return: For every field the parameters inform, the value of the parameter in
+            the parameters with the highest success rate.
         """
-        return [trial.parameters for trial in self.trials if trial.succeeded]
+        [best, *_] = self.success_rates_of_parameters()
+        values = best.parameters.values_by_attribute_path()
+        return [
+            AdoptedValue(
+                informed_field=informed_field,
+                value=values[informed_field.attribute_path],
+            )
+            for informed_field in type(best.parameters).informed_fields
+        ]
 
 
 # %% what causes trials to succeed

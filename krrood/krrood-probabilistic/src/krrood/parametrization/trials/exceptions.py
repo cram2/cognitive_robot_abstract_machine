@@ -48,6 +48,30 @@ class FieldOfUnsupportedType(InputError):
         )
 
 
+@dataclass(kw_only=True)
+class InformedFieldMissing(InputError):
+    """
+    Raised when parameters are declared to inform a field that their action does not
+    declare.
+    """
+
+    owner: type
+    """
+    The dataclass of the action.
+    """
+
+    field_name: str
+    """
+    The name of the field that it does not declare.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.owner.__name__} declares no field '{self.field_name}'."
+
+    def suggest_correction(self) -> str:
+        return "Name a field the action declares, as it is spelled there."
+
+
 # %% drawing parameters
 
 
@@ -70,6 +94,28 @@ class ParameterWithoutCentre(InputError):
         return (
             "Draw from a statement whose parameters are exactly those of the centres' "
             "type, or give centres of the type the statement queries."
+        )
+
+
+@dataclass(kw_only=True)
+class NoSuccessfulTrials(InputError):
+    """
+    Raised when the next trials are to be drawn near successful trials, but none
+    succeeded.
+    """
+
+    number_of_trials: int
+    """
+    How many trials there were.
+    """
+
+    def error_message(self) -> str:
+        return f"None of the {self.number_of_trials} trials succeeded."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Draw the next trials from a uniform prior, or retry the trials whose "
+            "measurements came closest to succeeding."
         )
 
 

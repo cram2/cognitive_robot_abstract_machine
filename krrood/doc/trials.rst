@@ -22,9 +22,10 @@ When a behaviour fails in a way no single fix explains, the module
    trial in a :class:`~krrood.parametrization.trials.campaigns.TrialStore` as soon as it
    is tried.
 4. Read with a :class:`~krrood.parametrization.trials.analysis.TrialAnalysis` which
-   parameters and measurements change the success rate, then draw the next campaign near
-   the successful trials with a
-   :class:`~krrood.parametrization.trials.parameter_spaces.NearCentresRegistry`.
+   parameters and measurements change the success rate, and with a
+   :class:`~krrood.parametrization.trials.analysis.CausalTrialAnalysis` what causes it.
+5. Close the loop: draw the next campaign near the successful trials, and adopt the
+   values that worked best as the defaults of the action they belong to.
 
 The parameters may nest dataclasses; every number becomes a parameter, keyed by its path
 of attributes such as ``release.height``. A space states only its conditions, reaching
@@ -69,7 +70,6 @@ trials of one starting state:
 
     analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
     [strongest, *_] = analysis.effects_on_success()
-    registry = NearCentresRegistry(centres=analysis.successful_parameters(), spread=0.1)
 
 The :class:`~krrood.parametrization.trials.workers.WorkerPool` runs only as many workers as
 fit into the free working memory and its budget, here 30. Stop a campaign by
@@ -80,6 +80,11 @@ The first :attr:`~krrood.parametrization.trials.campaigns.TrialCampaign.pilot_tr
 are tried before any worker starts. When they all come out the same, the campaign stops
 with :class:`~krrood.parametrization.trials.exceptions.OutcomeDidNotVaryInPilot`: an
 outcome that cannot succeed by construction would make every analysis empty.
+
+.. note::
+    A pilot cannot tell an outcome that never passes from one that passes rarely. When
+    it stops, check the judgement of success on a state where it must pass before trying
+    more pilot trials.
 
 Every :class:`~krrood.parametrization.trials.analysis.EffectOnSuccess` says with its
 :attr:`~krrood.parametrization.trials.analysis.EffectOnSuccess.p_value` how likely so
@@ -106,7 +111,24 @@ gives the success rate of each. To retry the most promising parameters of an ear
 campaign, give them as
 :class:`~krrood.parametrization.trials.parameter_spaces.GivenParameters`.
 
-.. note::
-    A pilot cannot tell an outcome that never passes from one that passes rarely. When
-    it stops, check the judgement of success on a state where it must pass before trying
-    more pilot trials.
+:meth:`~krrood.parametrization.trials.parameter_spaces.NearCentresRegistry.from_successful_trials`
+draws the next campaign near the trials that succeeded. Parameters declare in
+:attr:`~krrood.parametrization.trials.records.TrialParameters.informed_fields` which
+field of which action each of them informs, and
+:meth:`~krrood.parametrization.trials.analysis.TrialAnalysis.adopted_values` gives the
+value of each in the parameters with the highest success rate, next to the default it
+would replace:
+
+.. code-block:: python
+
+    @dataclass(kw_only=True)
+    class ThrowParameters(TrialParameters):
+        angle: float
+
+        @classproperty
+        def informed_fields(cls):
+            return [InformedField(attribute_path="angle", owner=ThrowBall, field_name="aim_angle")]
+
+    registry = NearCentresRegistry.from_successful_trials(trials=trials, spread=0.05)
+    for adopted in TrialAnalysis(trials=trials).adopted_values():
+        print(adopted.informed_field.current_default, "->", adopted.value)

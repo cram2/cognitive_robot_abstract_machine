@@ -12,7 +12,11 @@ from typing_extensions import Any, Generic, Self, TypeVar, get_type_hints
 
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
-from krrood.parametrization.trials.exceptions import FieldOfUnsupportedType
+from krrood.parametrization.trials.exceptions import (
+    FieldOfUnsupportedType,
+    InformedFieldMissing,
+)
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 # %% records of numbers
@@ -96,10 +100,63 @@ class RecordOfNumbers:
 
 
 @dataclass(kw_only=True)
+class InformedField:
+    """
+    A field of an action whose default a parameter of trials informs, so that the value
+    that worked best becomes that default.
+    """
+
+    attribute_path: str
+    """
+    The parameter, as :meth:`RecordOfNumbers.values_by_attribute_path` names it.
+    """
+
+    owner: type
+    """
+    The dataclass of the action that declares the field.
+    """
+
+    field_name: str
+    """
+    The name of the field.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        :raises InformedFieldMissing: If :attr:`owner` declares no field of that name.
+        """
+        if self.field_name not in {
+            declared.name for declared in dataclasses.fields(self.owner)
+        }:
+            raise InformedFieldMissing(owner=self.owner, field_name=self.field_name)
+
+    @property
+    def current_default(self) -> Any:
+        """
+        The default the field has now, or :data:`dataclasses.MISSING` when it has none.
+        """
+        [informed] = [
+            declared
+            for declared in dataclasses.fields(self.owner)
+            if declared.name == self.field_name
+        ]
+        if informed.default_factory is not dataclasses.MISSING:
+            return informed.default_factory()
+        return informed.default
+
+
+@dataclass(kw_only=True)
 class TrialParameters(RecordOfNumbers):
     """
     Everything one trial of a behaviour varies by.
     """
+
+    @classproperty
+    def informed_fields(cls) -> list[InformedField]:
+        """
+        The fields of actions whose defaults the parameters inform; none by default.
+        """
+        return []
 
 
 @dataclass(kw_only=True)

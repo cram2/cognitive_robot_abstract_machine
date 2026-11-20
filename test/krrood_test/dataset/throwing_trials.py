@@ -16,6 +16,7 @@ from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.trials.campaigns import TrialPerformer, TrialSetup
 from krrood.parametrization.trials.database import DatabaseTrialStore
 from krrood.parametrization.trials.parameter_spaces import ParameterSpace
@@ -24,6 +25,7 @@ from krrood.parametrization.trials.starting_states import (
     StateReacher,
 )
 from krrood.parametrization.trials.records import (
+    InformedField,
     Trial,
     TrialMeasurements,
     TrialParameters,
@@ -41,6 +43,23 @@ class ReleasePoint:
     height: float
     """
     How high above the floor, in metres.
+    """
+
+
+@dataclass(kw_only=True)
+class ThrowBall:
+    """
+    The action of throwing a ball, whose defaults the throwing trials inform.
+    """
+
+    aim_angle: float = 0.3
+    """
+    The angle above the horizon to aim at, in radians.
+    """
+
+    release_height: float = 1.0
+    """
+    How high above the floor to let go of the ball, in metres.
     """
 
 
@@ -64,6 +83,23 @@ class ThrowParameters(TrialParameters):
     """
     Where the hand lets go.
     """
+
+    @classproperty
+    def informed_fields(cls) -> list[InformedField]:
+        """
+        Unlike :attr:`TrialParameters.informed_fields`, the aimed angle and the release
+        height inform the defaults of :class:`ThrowBall`.
+        """
+        return [
+            InformedField(
+                attribute_path="angle", owner=ThrowBall, field_name="aim_angle"
+            ),
+            InformedField(
+                attribute_path="release.height",
+                owner=ThrowBall,
+                field_name="release_height",
+            ),
+        ]
 
 
 @dataclass(kw_only=True)

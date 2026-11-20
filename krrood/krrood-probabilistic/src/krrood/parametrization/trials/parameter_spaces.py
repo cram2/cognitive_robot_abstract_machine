@@ -16,7 +16,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SumUnit,
     leaf,
 )
-from typing_extensions import TYPE_CHECKING, Generic
+from typing_extensions import TYPE_CHECKING, Generic, Self
 
 from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType
@@ -25,8 +25,11 @@ from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import ModelRegistry
 from krrood.parametrization.parameterizer import ModelQueryParameters
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
-from krrood.parametrization.trials.exceptions import ParameterWithoutCentre
-from krrood.parametrization.trials.records import TParameters, TrialParameters
+from krrood.parametrization.trials.exceptions import (
+    NoSuccessfulTrials,
+    ParameterWithoutCentre,
+)
+from krrood.parametrization.trials.records import TParameters, Trial, TrialParameters
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 if TYPE_CHECKING:
@@ -125,6 +128,22 @@ class NearCentresRegistry(ModelRegistry):
     The standard deviation of each Gaussian along a parameter, as a fraction of the
     range the statement allows the parameter.
     """
+
+    @classmethod
+    def from_successful_trials(
+        cls, *, trials: list[Trial], spread: float = 0.1
+    ) -> Self:
+        """
+        :param trials: The trials of a campaign.
+        :param spread: The spread of the registry, as in :attr:`spread`.
+        :return: A registry that draws near the parameters of every trial that
+            succeeded, so that the next campaign tries more like them.
+        :raises NoSuccessfulTrials: If no trial succeeded.
+        """
+        centres = [trial.parameters for trial in trials if trial.succeeded]
+        if not centres:
+            raise NoSuccessfulTrials(number_of_trials=len(trials))
+        return cls(centres=centres, spread=spread)
 
     def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticCircuit:
         """
