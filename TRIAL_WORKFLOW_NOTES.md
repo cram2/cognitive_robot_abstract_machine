@@ -43,64 +43,53 @@ most of the time and caused most of the mistakes.
 
 ## What the pull request already has
 
-`krrood/krrood-probabilistic/src/krrood/parametrization/trials.py`, with tests in
-`test/krrood_test/test_underspecified_knowledge/test_trials.py` against mimic classes in
-`test/krrood_test/dataset/throwing_trials.py`, and the page `krrood/doc/trials.rst`:
+The package `krrood/krrood-probabilistic/src/krrood/parametrization/trials/`, with tests
+in `test/krrood_test/test_underspecified_knowledge/test_trials.py` against mimic classes
+in `test/krrood_test/dataset/throwing_trials.py` (throws mapped through the ORM
+interface of the krrood tests, see `test/krrood_test/conftest.py`), and the page
+`krrood/doc/trials.rst`:
 
-- `TrialParameters`: a dataclass of numbers, nested ones included;
-  `values_by_attribute_path()` keys every number by its path.
-- `ParameterSpace[TParameters]`: derives the statement's pattern from the parameter
-  dataclass; a subclass writes only `conditions` (`conditions_within` for bounds) and may
-  filter draws with `accepts`.
-- `NearCentresRegistry`: an equal Gaussian mixture around given parameters, with a
-  standard deviation of `spread` times each parameter's allowed range.
-- `TrialPerformer`, `TrialStore`, `TrialSetup`: try one trial, keep it, and describe
-  what a worker builds (pickled to each worker process; `performing()` builds what cannot
-  be pickled, such as a simulation).
-- `TrialCampaign`: spawned worker processes, a draw seed each, every trial kept as soon as
-  it is tried, refusal to start when the workers would need more memory than is free.
-- `TrialAnalysis`: success rate, the effect of each parameter as success rates over
-  ranges of equally many trials (strongest first), and the successful parameters.
+- `records`: `TrialParameters` and `TrialMeasurements` (numbers, nested ones keyed by
+  path), `Trial[TParameters, TMeasurements]` with `succeeded` and `starting_state_id`,
+  `InformedField` (which action field a parameter informs; `TrialParameters.informed_fields`).
+- `parameter_spaces`: `ParameterSpace` (statement derived from the parameters),
+  `NearCentresRegistry` (`from_successful_trials`), and the sources a campaign tries:
+  `DrawnParameters` (one seed, drawn in the main process) and `GivenParameters`.
+- `campaigns`: `TrialPerformer`, `TrialStore` (`prepare` runs once before workers),
+  `TrialSetup`, `TrialCampaign` (`repetitions`, `pilot_trials` that raise
+  `OutcomeDidNotVaryInPilot` when all come out the same).
+- `workers`: `WorkerPool` (workers sized by free memory and `memory_budget`; SIGINT or
+  SIGTERM to the campaign's process lets every worker finish its trial and stop) and
+  `ParallelJob`.
+- `database`: `ObjectDatabase` (tables, sessions, storing, reading back by id) and
+  `DatabaseTrialStore` (trials as episodes of their starting state, read back by it).
+- `starting_states`: `StartingStateRecipe` and `StateReacher`; `reach_and_store` attempts
+  in parallel and keeps every state `is_wanted` accepts.
+- `analysis`: `TrialAnalysis` (success rate, effects of parameters and measurements with
+  a chi-square `p_value`, success rate per distinct parameters, `adopted_values`) and
+  `CausalTrialAnalysis` (a JPT over the trials; `causes_of_success` ranks every number
+  through `ProbabilisticBackend.rank_causes`, measurements adjusted for the parameters).
 
 ## Requirements still to realize
 
-These come from what went wrong or was done by hand in the two studies.
+Requirements 1 to 8 are realized as listed above. Open points from realizing them:
 
-1. **Starting worlds as a recipe.** A class for "reach this state, check it is the one
-   wanted, store it": the steps to get there, a predicate on the reached state (for
-   example "broccoli touched by the fingers and touching the plate"), and storing through
-   ormatic. Reaching it can fail and physics varies, so it should try in parallel and keep
-   every state that passes the check.
-2. **Trials stored as episodes through ormatic.** A generic store for any trial dataclass
-   (to_dao, add, commit), with reading back by starting world. Generic dataclasses through
-   ormatic are untested: prove a bound subclass such as `Trial[ThrowParameters,
-   ThrowResult]` round trips in a krrood test first.
-3. **Check the outcome before scaling up.** The release study first measured RoboCasa's
-   judgement, which can never pass there: it needs the gripper 25 cm from the object and
-   the hand moved at most 15 cm. A campaign should run a few pilot trials and refuse to
-   scale up when an outcome cannot vary by construction, or at least report it.
-4. **Record what actually happened, not only what was asked for.** The causal question
-   needed the base pose reached, finger separation and contacts as variables (mediators);
-   they were not stored for the grasps. Results should hold measured mediators next to
-   the outcome.
-5. **Repetition.** MuJoCo runs from an identical start differ. Promising parameters
-   should be retried several times so a success rate, not a single outcome, is learned.
-6. **Analysis through the probabilistic models.** Beyond the success rates per range:
-   fit a probabilistic circuit of parameters and outcome, ask it for the region of the
-   highest success probability, and use `krrood.parametrization.causal_search` and
-   `causal_relation` where the question is causal. Report effects together with how
-   sure they are (the studies used Mann Whitney tests and a logistic fit by hand).
-7. **Closing the loop.** A campaign's successes become the next campaign's centres
-   (`NearCentresRegistry`), and the winning values become the defaults of the action
-   they belong to; say which action field a parameter informs.
-8. **Memory and processes.** 48 whole kitchen workers took about 220 GB and nearly
-   exhausted neem-4; stopping workers by hand killed more than intended. The campaign
-   should size its workers from a memory budget and stop cleanly, keeping finished
-   trials.
-9. **Follow up, not in this pull request:** move `pick_up_trials` and `release_trials` on
-   `robocasa-experiments` onto these classes (their stored data must keep reading
-   back), then use them for the next study: the fingers that sometimes stay shut when
-   opening in the sink before the lift.
+- The pilot refuses a campaign whose pilot trials all failed, which also stops a
+  behaviour that succeeds only rarely (2 of 937 in the first grasp run). Such a campaign
+  runs with `pilot_trials=0`, or more pilot trials.
+- The p value comes from a chi-square test of the ranges against the outcome, not from a
+  Mann Whitney test: a Mann Whitney test misses an effect where failures lie on both
+  sides of the successes, such as the steep angles of a throw. A logistic fit is not
+  part of it.
+- `WorkerPool` reads free memory as `SC_AVPHYS_PAGES`, which leaves out the page cache,
+  so it sizes conservatively; it does not cap the memory a worker actually takes.
+- `CausalTrialAnalysis` fits a plain JPT; `StratifiedLearning` overfits continuous causes
+  (one partition per row). Its `region` is the best region the tree found, a sub range of
+  where success is likely.
+- **Follow up, not in this pull request:** move `pick_up_trials` and `release_trials` on
+  `robocasa-experiments` onto these classes (their stored data must keep reading
+  back), then use them for the next study: the fingers that sometimes stay shut when
+  opening in the sink before the lift.
 
 ## Working environment
 
@@ -114,5 +103,10 @@ These come from what went wrong or was done by hand in the two studies.
   `CRAM_ORM_BUILD=never bash /entrypoint.sh python3 -m pytest ...`, and `krrood format`
   and `krrood check` through
   `python3 -c "import sys; from krrood.development_tools.command_line import CommandLine; sys.argv=['krrood']+sys.argv[1:]; CommandLine.main()"`.
-  That clone borrows objects from a host path, so commit on the host, not in the
-  container, after `chown -R 1004:1004 /opt/cram/.git` from inside it.
+  That clone borrows objects from a host path, so git does not work inside the
+  container (`krrood check --since` fails there; use `--all-lines`), and its `origin`
+  is cram2, not the fork. Edit and commit in a local checkout of the fork, copy the
+  krrood sources and tests to the clone with rsync to test, format and check there, and
+  copy the formatted files back before committing.
+- Cap a test run's memory with `ulimit -v`; 16 GB of address space is too little for
+  the krrood tests to start (`MemoryError`), 96 GB is enough.
