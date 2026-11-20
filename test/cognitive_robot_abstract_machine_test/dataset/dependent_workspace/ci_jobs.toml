@@ -6,3 +6,6 @@ libraries = ["base", "middle"]
 name = "rules"
 libraries = ["repository"]
 check_rules = true
+
+[assigned_tests]
+family = ["test/family_test/test_family_both.py"]

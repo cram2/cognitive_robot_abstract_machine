@@ -1,6 +1,26 @@
-# The CI jobs that run the tests of several libraries in one job. Every library not named
-# here runs in a job of its own, named after it. A pull request runs only the jobs of the
-# libraries its change can affect: see cognitive_robot_abstract_machine/ci_jobs.py.
+# How CI divides the tests of the libraries into jobs. Every library not named in a
+# shared job runs in a job of its own, named after it. A pull request runs only the tests
+# its change can affect: see cognitive_robot_abstract_machine/ci_jobs.py.
+
+[[shared_jobs]]
+# The krrood distributions, whose tests all live in test/krrood_test, share one job
+# instead of each setting up the container for a few minutes of tests.
+name = "krrood"
+libraries = [
+    "krrood",
+    "krrood-core",
+    "krrood-serialization",
+    "krrood-code-generation",
+    "krrood-symbolic-math",
+    "krrood-rustworkx-utils",
+    "krrood-eql",
+    "krrood-planning",
+    "krrood-ormatic",
+    "krrood-probabilistic",
+    "krrood-rdr",
+    "krrood-ontomatic",
+    "krrood-development-tools",
+]
 
 [[shared_jobs]]
 # Libraries whose tests take a minute or less share one job, which would otherwise spend
@@ -18,3 +38,11 @@ libraries = [
 # The job that checks the code a pull request changes against the rules that have a
 # checker, so it runs for every pull request.
 check_rules = true
+
+[assigned_tests]
+# Tests that read the files of every krrood distribution or import them in a subprocess,
+# so they run with the krrood library, which depends on every distribution.
+krrood = [
+    "test/krrood_test/test_declared_dependencies.py",
+    "test/krrood_test/test_namespace_package.py",
+]

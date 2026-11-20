@@ -18,6 +18,11 @@ on:
         description: "Lowercase repository name with tag"
         required: true
         type: string
+      test_paths:
+        description: "JSON object of the test files and directories to run for each library, relative to the repository root; a library it leaves out runs test/<library>_test"
+        required: false
+        default: "{}"
+        type: string
       check_rules:
         description: "Whether the job checks the code a pull request changes against the rules that have a checker, before anything else"
         required: false
@@ -145,6 +150,8 @@ jobs:
           krrood skills --check
 
       - name: Run tests
+        env:
+          TEST_PATHS: ${{ inputs.test_paths }}
         run: |
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
@@ -164,7 +171,8 @@ jobs:
               if [[ "$lib" == "semantic_digital_twin" ]]; then
                 export MUJOCO_GL=egl
               fi
-              python -m pytest -n auto cognitive_robot_abstract_machine/test/${lib}_test
+              read -ra test_paths <<< "$(python -c 'import json, sys; print(" ".join(json.loads(sys.argv[1]).get(sys.argv[2], [f"test/{sys.argv[2]}_test"])))' "$TEST_PATHS" "$lib")"
+              python -m pytest -n auto "${test_paths[@]/#/cognitive_robot_abstract_machine/}"
             ) || failed=1
           done
           exit $failed

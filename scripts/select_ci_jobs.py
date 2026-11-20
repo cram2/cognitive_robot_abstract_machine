@@ -11,7 +11,12 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from cognitive_robot_abstract_machine.ci_jobs import CIJobLayout, CIJobMatrix, Workspace
+from cognitive_robot_abstract_machine.ci_jobs import (
+    CIJobLayout,
+    CIJobMatrix,
+    RepositoryTestSuite,
+    Workspace,
+)
 from cognitive_robot_abstract_machine.repository_files import RepositoryFile
 
 
@@ -35,8 +40,15 @@ def main() -> None:
             check=True,
         ).stdout.strip()
     )
-    workspace = Workspace.from_repository_root(repository_root=repository_root)
-    affected_tests = workspace.all_tests
+    layout = CIJobLayout.from_toml(
+        text=(repository_root / RepositoryFile.CI_JOBS).read_text()
+    )
+    test_suite = RepositoryTestSuite(
+        repository_root=repository_root,
+        workspace=Workspace.from_repository_root(repository_root=repository_root),
+        assigned_tests=layout.assigned_tests,
+    )
+    affected_tests = test_suite.all_tests()
     if arguments.since is not None:
         changed_files = subprocess.run(
             ["git", "diff", "--name-only", arguments.since, "HEAD"],
@@ -45,13 +57,13 @@ def main() -> None:
             check=True,
             cwd=repository_root,
         ).stdout.splitlines()
-        affected_tests = workspace.affected_tests(
+        affected_tests = test_suite.affected_tests(
             changed_paths=[Path(changed_file) for changed_file in changed_files]
         )
-    layout = CIJobLayout.from_toml(
-        text=(repository_root / RepositoryFile.CI_JOBS).read_text()
+    jobs = layout.jobs_running(
+        affected_tests=affected_tests,
+        known_library_names=test_suite.library_names,
     )
-    jobs = layout.jobs_running(affected_tests=affected_tests, workspace=workspace)
     print(CIJobMatrix(jobs=jobs).to_json())
 
 

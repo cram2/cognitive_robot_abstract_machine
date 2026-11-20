@@ -172,14 +172,14 @@ class UnorderableOrmInterfacesError(DataclassException):
 
 
 @dataclass(kw_only=True)
-class UnknownSharedJobLibraryError(DataclassException, ValueError):
+class UnknownCILibraryError(DataclassException, ValueError):
     """
-    Raised when a shared CI job names a library the repository has no tests of.
+    Raised when the CI job layout names a library the repository has no tests of.
     """
 
-    job_name: str
+    section: str
     """
-    Name of the shared job.
+    The shared job or the table of the layout that names the library.
     """
 
     library_names: tuple[str, ...]
@@ -194,12 +194,9 @@ class UnknownSharedJobLibraryError(DataclassException, ValueError):
 
     def error_message(self) -> str:
         return (
-            f"The CI job {self.job_name} runs the tests of "
-            f"{', '.join(self.library_names)}, which the repository has none of."
+            f"{self.section} of the CI job layout names "
+            f"{', '.join(self.library_names)}, which the repository has no tests of."
         )
 
     def suggest_correction(self) -> str:
-        return (
-            f"Name only libraries with a test directory: "
-            f"{', '.join(self.known_library_names)}."
-        )
+        return f"Name only libraries with tests: {', '.join(self.known_library_names)}."

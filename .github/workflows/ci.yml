@@ -36,9 +36,8 @@ jobs:
   select_test_jobs:
     # a draft pull request runs no CI; marking it ready for review starts the run
     if: ${{ !github.event.pull_request.draft }}
-    # A pull request runs only the jobs testing the workspace members it changes and those
-    # depending on them; every other event runs them all. The libraries that share a job
-    # are listed in .github/ci_jobs.toml.
+    # A pull request runs only the tests its change can affect; every other event runs them
+    # all. The libraries that share a job are listed in .github/ci_jobs.toml.
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
@@ -55,9 +54,9 @@ jobs:
       - id: select
         name: Select the test jobs
         env:
-          # krrood's core modules load without its other dependencies, so the job needs no
-          # install of the workspace.
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/krrood/src
+          # krrood-core loads without the rest of krrood, so the job needs no install of the
+          # workspace.
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/krrood/krrood-core/src
         run: |
           since=()
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -76,6 +75,7 @@ jobs:
     with:
       name: ${{ matrix.name }}
       libs: ${{ matrix.libs }}
+      test_paths: ${{ matrix.test_paths }}
       repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
       check_rules: ${{ matrix.check_rules }}
 
