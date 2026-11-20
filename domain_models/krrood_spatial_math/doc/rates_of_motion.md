@@ -402,9 +402,9 @@ once and evaluates it in every control cycle, and the controller differentiates 
 respect to the positions. `expm` takes an array of numbers and returns one: it cannot
 take a variable, and it gives no derivative. The formula above uses only operations the
 symbolic math has, such as $\cos$, $\sin$ and the cross product, so it gives an
-expression in the position directly, and a derivative of it, as the section "Why not
-just the value at zero" below shows. The package's tests check the formula against
-`expm`.
+expression in the position directly, and a derivative of it, as
+{ref}`why-not-the-value-at-zero` below shows. The package's tests check the formula
+against `expm`.
 
 ## Closed form and series
 
@@ -796,6 +796,7 @@ three. With them, $A$ is accurate to $2.6 \cdot 10^{-13}$, less than a picometre
 displacement of a metre. Four or five terms would gain one more digit in $A$, and two to
 three more in its slope.
 
+(why-not-the-value-at-zero)=
 ### Why not just the value at zero
 
 Todesco and Brüls also describe a simpler way around $0/0$ {cite}`todesco2023highly`
