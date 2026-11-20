@@ -15,7 +15,10 @@ from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     NotExactlyOneRootError,
     UnitNotConvertedError,
 )
-from probabilistic_model.distributions.binomial import BinomialDistribution
+from probabilistic_model.distributions.binomial import (
+    BinomialDistribution,
+    TruncatedBinomialDistribution,
+)
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
     IntegerDistribution,
@@ -260,6 +263,11 @@ class IntegerLeavesToIntegerLayerConverter(
 
 class BinomialLeavesToBinomialLayerConverter(
     LeavesToInputLayerConverter[BinomialDistribution, BinomialLayer]
+): ...
+
+
+class TruncatedBinomialLeavesToBinomialLayerConverter(
+    LeavesToInputLayerConverter[TruncatedBinomialDistribution, BinomialLayer]
 ): ...
 
 

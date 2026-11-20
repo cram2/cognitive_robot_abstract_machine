@@ -22,6 +22,10 @@ from random_events.variable import Continuous, Integer, Symbolic, Variable
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Callable
 
+from probabilistic_model.distributions.binomial import (
+    BinomialDistribution,
+    TruncatedBinomialDistribution,
+)
 from probabilistic_model.distributions.distributions import (
     IntegerDistribution,
     SymbolicDistribution,
@@ -236,16 +240,35 @@ def integer_case() -> InputLayerQueryCase:
 @pytest.fixture
 def binomial_case() -> InputLayerQueryCase:
     """
-    Binomial distributions of different trials and offsets, one certain to succeed.
+    Binomial distributions of different trials and offsets, one certain to succeed and
+    one truncated to some of its values.
     """
+    count = Integer("n")
+    layer = BinomialLayer.from_distributions(
+        0,
+        [
+            BinomialDistribution(
+                variable=count, number_of_trials=2, success_probability=0.3, offset=1
+            ),
+            BinomialDistribution(
+                variable=count, number_of_trials=5, success_probability=0.5, offset=-1
+            ),
+            BinomialDistribution(
+                variable=count, number_of_trials=3, success_probability=1.0
+            ),
+            TruncatedBinomialDistribution(
+                variable=count,
+                number_of_trials=4,
+                success_probability=0.6,
+                truncation_interval=closed(1, 2) | closed(4, 4),
+            ),
+        ],
+    )
     return InputLayerQueryCase(
-        build=lambda namespace: BinomialLayer(
-            variable=0,
-            number_of_trials=np.array([2, 5, 3]),
-            success_probability=namespace.asarray([0.3, 0.5, 1.0]),
-            offset=np.array([1, -1, 0]),
+        build=lambda namespace: layer.copy_with_parameters(
+            [namespace.asarray(layer.success_probability)]
         ),
-        variable=Integer("n"),
+        variable=count,
         values=[-2.0, -1.0, 0.0, 1.0, 1.5, 2.0, 3.0, 4.0, 7.0],
         assignment=closed(0, 1) | closed(3, 6),
     )

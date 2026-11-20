@@ -20,14 +20,14 @@ from sortedcontainers import SortedSet
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
-from probabilistic_model.distributions.binomial import BinomialDistribution
+from probabilistic_model.distributions.binomial import (
+    BinomialDistribution,
+    TruncatedBinomialDistribution,
+)
 from probabilistic_model.exceptions import SuccessProbabilityOutsideUnitIntervalError
 from probabilistic_model.learning.row_kernel_mixture import RowKernelMixture
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
     BinomialLayer,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
-    IntegerLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
@@ -172,38 +172,68 @@ def test_samples_of_a_node_lie_in_its_support(layer, distributions, count):
         assert distributions[node].probabilities[int(sample)] > 0
 
 
-# %% truncating and conditioning give integer layers
+# %% truncating and conditioning restrict the binomials
 
 
-def test_a_truncated_layer_is_an_integer_layer_of_the_truncated_distributions(
-    layer, distributions, count
+@pytest.mark.parametrize(
+    "assignment",
+    [closed(1, 3), closed(-1, 0) | closed(3, 4)],
+    ids=["interval", "union of intervals"],
+)
+def test_a_truncated_layer_holds_the_truncated_distributions(
+    layer, distributions, count, assignment
 ):
     """
-    Truncated to an interval, the layer becomes an integer layer whose nodes are the
-    distributions truncated to it, and the log-probabilities are those of the interval.
+    Truncated to an assignment, every node becomes its distribution truncated to it, and
+    the log-probabilities are those of the assignment under the nodes.
     """
-    interval = closed(1, 3)
-    truncation = layer.log_truncated_of_assignment(interval, False)
-    expected = [
-        distribution.log_truncated(
-            SimpleEvent.from_data({count: interval}).as_composite_set()
-        )
-        for distribution in distributions
-    ]
+    event = SimpleEvent.from_data({count: assignment}).as_composite_set()
+    with np.errstate(divide="ignore"):
+        truncation = layer.log_truncated_of_assignment(assignment, False)
+        expected = [distribution.log_truncated(event) for distribution in distributions]
 
-    assert isinstance(truncation.layer, IntegerLayer)
+    assert type(truncation.layer) is BinomialLayer
     assert np.allclose(
         truncation.log_probabilities, [each.log_probability for each in expected]
     )
-    for node, each in enumerate(expected):
-        assert dict(truncation.layer.probabilities_of_node(node)) == pytest.approx(
+    for node, each in zip(truncation.layer.node_distributions(count), expected):
+        if each.distribution is None:
+            continue
+        assert dict(node.probabilities) == pytest.approx(
             dict(each.distribution.probabilities)
         )
 
 
-def test_conditioning_on_a_value_keeps_only_that_value(layer, distributions):
+def test_a_truncated_layer_keeps_the_success_probabilities_as_parameters(
+    layer, distributions
+):
     """
-    Conditioned on a value, the layer is an integer layer certain of it, and the log-
+    Truncated, the nodes keep their success probabilities as the parameters.
+    """
+    truncated = layer.log_truncated_of_assignment(closed(1, 3), False).layer
+    [success_probability] = truncated.parameters
+    assert success_probability.tolist() == [
+        distribution.success_probability for distribution in distributions
+    ]
+
+
+def test_truncating_twice_restricts_to_both_assignments(layer, distributions, count):
+    """
+    Truncated to one assignment and then another, the nodes are restricted to the values
+    of both.
+    """
+    once = layer.log_truncated_of_assignment(closed(0, 3), False).layer
+    twice = once.log_truncated_of_assignment(closed(2, 6), False).layer
+    event = SimpleEvent.from_data({count: closed(2, 3)}).as_composite_set()
+    for node, distribution in zip(twice.node_distributions(count), distributions):
+        assert dict(node.probabilities) == pytest.approx(
+            dict(distribution.log_truncated(event).distribution.probabilities)
+        )
+
+
+def test_conditioning_on_a_value_keeps_only_that_value(layer, distributions, count):
+    """
+    Conditioned on a value, every node that can take it is certain of it, and the log-
     probabilities are the log-likelihoods of the value.
     """
     with np.errstate(divide="ignore"):
@@ -212,9 +242,14 @@ def test_conditioning_on_a_value_keeps_only_that_value(layer, distributions):
             [distribution.probabilities[2] for distribution in distributions]
         )
 
-    assert isinstance(conditioning.layer, IntegerLayer)
+    assert type(conditioning.layer) is BinomialLayer
+    assert isinstance(
+        conditioning.layer.node_distribution(1, count), TruncatedBinomialDistribution
+    )
     assert np.allclose(conditioning.log_probabilities, expected)
-    assert dict(conditioning.layer.probabilities_of_node(1)) == {2: 1.0}
+    assert np.allclose(
+        conditioning.layer.log_likelihood_of_nodes(np.array([[2.0]]))[0, :2], 0.0
+    )
 
 
 # %% the success probabilities are parameters
@@ -237,12 +272,14 @@ def test_the_gradient_of_the_log_likelihood_is_that_of_the_binomial(count):
     binomial, so that gradient descent can learn it.
     """
     trials, successes, probability = 6, 2, 0.4
-    layer = BinomialLayer(
-        variable=0,
-        number_of_trials=np.array([trials]),
-        success_probability=jnp.asarray([probability]),
-        offset=np.array([0]),
-    )
+    layer = BinomialLayer.from_distributions(
+        0,
+        [
+            BinomialDistribution(
+                variable=count, number_of_trials=trials, success_probability=probability
+            )
+        ],
+    ).copy_with_parameters([jnp.asarray([probability])])
 
     def log_likelihood(success_probability: jax.Array) -> jax.Array:
         changed = layer.copy_with_parameters([success_probability])
@@ -299,3 +336,21 @@ def test_a_circuit_of_binomial_leaves_converts_to_binomial_layers():
 
     assert any(isinstance(each, BinomialLayer) for each in layered.root.all_layers())
     assert np.allclose(layered.log_likelihood(events), circuit.log_likelihood(events))
+
+
+def test_a_truncated_circuit_of_binomial_leaves_converts_to_binomial_layers():
+    """
+    Truncated to a union of intervals of its integer column, a row kernel mixture still
+    converts to a layered circuit with its likelihoods.
+    """
+    rows = pd.DataFrame({"count": [1, 3, 5, 8], "angle": [0.1, 0.5, 2.0, 3.0]})
+    circuit = RowKernelMixture(bandwidth=0.5).fit(rows)
+    count = next(each for each in circuit.variables if each.name == "count")
+    truncated = circuit.truncated(
+        SimpleEvent.from_data({count: closed(0, 2) | closed(5, 6)}).as_composite_set()
+    ).distribution
+    events = np.array([[0.2, 1], [1.0, 4], [2.0, 5], [0.0, 20]], dtype=float)
+
+    layered = RustworkxCircuitToLayeredCircuitConverter.convert(truncated)
+
+    assert np.allclose(layered.log_likelihood(events), truncated.log_likelihood(events))

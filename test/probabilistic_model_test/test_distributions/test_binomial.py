@@ -14,8 +14,10 @@ from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Integer
 
-from probabilistic_model.distributions.binomial import BinomialDistribution
-from probabilistic_model.distributions.distributions import IntegerDistribution
+from probabilistic_model.distributions.binomial import (
+    BinomialDistribution,
+    TruncatedBinomialDistribution,
+)
 from probabilistic_model.exceptions import (
     SuccessProbabilityOutsideUnitIntervalError,
     UndefinedOperationError,
@@ -95,17 +97,79 @@ def test_a_truncated_distribution_keeps_the_probabilities_within_the_event(count
     )
 
 
-def test_a_truncated_distribution_is_an_integer_distribution(count):
+def test_a_truncated_distribution_is_a_truncated_binomial(count):
     """
-    Restricted to some of its values, the distribution is no binomial any more.
+    Restricted to some of its values, the distribution keeps its parameters and the
+    values it may take.
     """
     distribution = BinomialDistribution(
-        variable=count, number_of_trials=4, success_probability=0.5
+        variable=count, number_of_trials=4, success_probability=0.5, offset=1
     )
     truncated = distribution.truncated(
-        SimpleEvent.from_data({count: closed(0, 1)}).as_composite_set()
+        SimpleEvent.from_data({count: closed(0, 2)}).as_composite_set()
     ).distribution
-    assert type(truncated) is IntegerDistribution
+    assert isinstance(truncated, TruncatedBinomialDistribution)
+    assert (
+        truncated.number_of_trials,
+        truncated.success_probability,
+        truncated.offset,
+    ) == (
+        distribution.number_of_trials,
+        distribution.success_probability,
+        distribution.offset,
+    )
+    assert truncated.allowed_values == closed(1, 2)
+
+
+def test_a_distribution_truncated_to_a_union_keeps_the_probabilities_of_both(count):
+    """
+    Truncated to two intervals, the distribution keeps the probabilities of the values
+    in either, normalized.
+    """
+    distribution = BinomialDistribution(
+        variable=count, number_of_trials=4, success_probability=0.3
+    )
+    truncation = distribution.truncated(
+        SimpleEvent.from_data({count: closed(0, 0) | closed(3, 4)}).as_composite_set()
+    )
+    kept = {value: distribution.probabilities[value] for value in (0, 3, 4)}
+    assert truncation.probability == pytest.approx(sum(kept.values()))
+    assert dict(truncation.distribution.probabilities) == pytest.approx(
+        {value: p / sum(kept.values()) for value, p in kept.items()}
+    )
+
+
+def test_truncating_twice_restricts_to_both_events(count):
+    """
+    A truncated distribution truncated again may take only the values of both events.
+    """
+    distribution = BinomialDistribution(
+        variable=count, number_of_trials=5, success_probability=0.4
+    )
+    once = distribution.truncated(
+        SimpleEvent.from_data({count: closed(0, 3)}).as_composite_set()
+    ).distribution
+    twice = once.truncated(
+        SimpleEvent.from_data({count: closed(2, 5)}).as_composite_set()
+    ).distribution
+    assert twice.allowed_values == closed(2, 3)
+
+
+def test_a_translated_truncated_distribution_moves_its_values(count):
+    """
+    Translated, a truncated distribution moves the values it may take with its offset.
+    """
+    distribution = TruncatedBinomialDistribution(
+        variable=count,
+        number_of_trials=4,
+        success_probability=0.5,
+        truncation_interval=closed(1, 2),
+    )
+    original = dict(distribution.probabilities)
+    distribution.apply_translation({count: 3})
+    assert dict(distribution.probabilities) == pytest.approx(
+        {value + 3: p for value, p in original.items()}
+    )
 
 
 # %% the parameters

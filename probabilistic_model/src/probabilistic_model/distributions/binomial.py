@@ -8,6 +8,7 @@ import math
 from dataclasses import dataclass, field
 
 import numpy.typing as npt
+from random_events.interval import Interval, closed, singleton
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Integer, Variable
 from typing_extensions import Self
@@ -69,19 +70,22 @@ class BinomialDistribution(IntegerDistribution):
 
     def probabilities_from_parameters(self) -> MissingDict:
         """
-        :return: The probability of every value from :attr:`offset` to :attr:`offset`
-            plus :attr:`number_of_trials` that the distribution can take.
+        :return: The probability of every one of the :attr:`allowed_values` that the
+            distribution can take.
         """
+        allowed_values = self.allowed_values
         probabilities = {
             self.offset + successes: math.comb(self.number_of_trials, successes)
             * self.success_probability**successes
             * (1 - self.success_probability) ** (self.number_of_trials - successes)
             for successes in range(self.number_of_trials + 1)
+            if self.offset + successes in allowed_values
         }
+        total = sum(probabilities.values())
         return MissingDict(
             float,
             {
-                value: probability
+                value: probability / total
                 for value, probability in probabilities.items()
                 if probability > 0
             },
@@ -107,39 +111,52 @@ class BinomialDistribution(IntegerDistribution):
             offset=location - number_of_trials // 2,
         )
 
-    def to_integer_distribution(self) -> IntegerDistribution:
+    @property
+    def allowed_values(self) -> Interval:
         """
-        :return: An integer distribution with the probabilities of this one.
+        :return: The values the distribution may take, those from :attr:`offset` to
+            :attr:`offset` plus :attr:`number_of_trials`.
         """
-        return IntegerDistribution(
-            variable=self.variable,
-            probabilities=MissingDict(float, self.probabilities),
-        )
+        return closed(self.offset, self.offset + self.number_of_trials)
 
     def log_conditional_of_composite_set(
         self, event: AbstractCompositeSet
-    ) -> LogTruncation[IntegerDistribution]:
+    ) -> LogTruncation[TruncatedBinomialDistribution]:
         """
-        Like :meth:`~probabilistic_model.distributions.distributions.DiscreteDistributio
-        n.log_conditional_of_composite_set`, but the result is an integer distribution,
-        since a binomial distribution restricted to some of its values is no binomial
-        distribution.
+        Like :meth:`DiscreteDistribution.log_conditional_of_composite_set`, but the
+        result is the binomial distribution truncated to its allowed values in the
+        event.
         """
-        return self.to_integer_distribution().log_conditional_of_composite_set(event)
+        probability = sum(
+            probability
+            for value, probability in self.probabilities.items()
+            if value in event
+        )
+        if probability == 0:
+            return LogTruncation.impossible()
+        return LogTruncation(
+            TruncatedBinomialDistribution(
+                variable=self.variable,
+                number_of_trials=self.number_of_trials,
+                success_probability=self.success_probability,
+                offset=self.offset,
+                truncation_interval=self.allowed_values & event,
+            ),
+            math.log(probability),
+        )
 
     def apply_translation(self, translation: dict[Variable, int]):
         """
-        Like :meth:`~probabilistic_model.distributions.distributions.IntegerDistribution
-        .apply_translation`, by moving the :attr:`offset`.
+        Like :meth:`IntegerDistribution.apply_translation`, by moving the
+        :attr:`offset`.
         """
         self.offset += int(translation[self.variable])
         self.probabilities = self.probabilities_from_parameters()
 
     def apply_scaling(self, scaling: dict[Variable, int]):
         """
-        Unlike :meth:`~probabilistic_model.distributions.distributions.IntegerDistributi
-        on.apply_scaling`, a binomial distribution cannot be scaled in place, since the
-        scaled one is no binomial distribution.
+        Unlike :meth:`IntegerDistribution.apply_scaling`, a binomial distribution cannot
+        be scaled in place, since the scaled one is no binomial distribution.
 
         :raises UndefinedOperationError: Always.
         """
@@ -147,9 +164,45 @@ class BinomialDistribution(IntegerDistribution):
 
     def fit(self, data: npt.NDArray) -> Self:
         """
-        Unlike :meth:`~probabilistic_model.distributions.distributions.DiscreteDistribut
-        ion.fit`, the frequencies of the data are no binomial distribution.
+        Unlike :meth:`IntegerDistribution.fit`, the frequencies of the data are no
+        binomial distribution.
 
         :raises UndefinedOperationError: Always.
         """
         raise UndefinedOperationError(self)
+
+
+# %% truncated binomial distribution
+
+
+@dataclass(kw_only=True)
+class TruncatedBinomialDistribution(BinomialDistribution):
+    """
+    A binomial distribution restricted to some of its values and renormalized, as
+    truncating a :class:`BinomialDistribution` to an event gives it.
+    """
+
+    truncation_interval: Interval
+    """
+    The values the distribution is restricted to.
+    """
+
+    @property
+    def allowed_values(self) -> Interval:
+        """
+        Like :attr:`BinomialDistribution.allowed_values`, only those in the
+        :attr:`truncation_interval`.
+        """
+        return super().allowed_values & self.truncation_interval
+
+    def apply_translation(self, translation: dict[Variable, int]):
+        """
+        Like :meth:`BinomialDistribution.apply_translation`, moving the
+        :attr:`truncation_interval` with the :attr:`offset`.
+        """
+        shift = int(translation[self.variable])
+        truncation_interval = Interval()
+        for value in self.probabilities:
+            truncation_interval |= singleton(value + shift)
+        self.truncation_interval = truncation_interval
+        super().apply_translation(translation)
