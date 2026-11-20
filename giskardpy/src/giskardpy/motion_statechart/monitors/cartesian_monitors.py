@@ -136,7 +136,9 @@ class OrientationReached(
         :return: Artifacts observing whether the tip is turned less than
             :attr:`threshold` away from :attr:`goal_orientation`.
         """
-        root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
+        root_R_goal = (
+            self.root_T_goal_reference_frame @ self.goal_orientation
+        ).rotation_matrix
         root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
