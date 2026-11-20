@@ -95,6 +95,14 @@ class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interfac
         """
         return frame
 
+    @property
+    def frame_3_dimensional(self) -> CartesianFrame3Dimensional:
+        """
+        The reference frame of the values given in this frame, which is this frame
+        itself.
+        """
+        return self
+
     def express_in_own_frame(
         self, *, value: GenericCoordinateRepresentation
     ) -> GenericCoordinateRepresentation:

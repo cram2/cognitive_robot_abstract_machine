@@ -19,6 +19,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.point import Point
+from krrood_spatial_math.pose import Pose
 from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import (
@@ -35,9 +36,9 @@ from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
     Quaternion,
     RotationMatrix,
-    GenericSpecialEuclideanGroupAction,
+    GenericSpatialType,
     SpatialFrameKey,
-    SpecialEuclideanGroupAction,
+    SymbolicAxisCoordinates,
     SymbolicSpatialChange,
     SymbolicSpatialValue,
     Vector3Dimensional,
@@ -49,7 +50,6 @@ from krrood_spatial_math.spatial_types import (
 @dataclass(eq=False, init=False, repr=False)
 class HomogeneousTransformationMatrix2Dimensional(
     SymbolicSpatialChange[CartesianFrame2Dimensional],
-    SpecialEuclideanGroupAction,
 ):
     """
     A 3x3 homogeneous matrix of SE(2): the rigid change from the :class:`~krrood_spatial
@@ -231,6 +231,16 @@ class HomogeneousTransformationMatrix2Dimensional(
         return sm.atan2(self[1, 0], self[0, 0])
 
     @property
+    def rotation_matrix(self) -> HomogeneousTransformationMatrix2Dimensional:
+        return HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
+            yaw=self.yaw, reference_frame=self.reference_frame
+        )
+
+    @property
+    def translation(self) -> Vector2Dimensional:
+        return Vector2Dimensional(self.x, self.y, reference_frame=self.reference_frame)
+
+    @property
     def pose(self) -> Pose2Dimensional:
         """
         :return: The pose this change moves its reference frame's plane frame to.
@@ -241,9 +251,7 @@ class HomogeneousTransformationMatrix2Dimensional(
 
     # %% acting on values and changes
 
-    def __matmul__(
-        self, other: GenericSpecialEuclideanGroupAction
-    ) -> GenericSpecialEuclideanGroupAction:
+    def __matmul__(self, other: GenericSpatialType) -> GenericSpatialType:
         """
         :param other: A change into this change's child frame, or a point or pose given
             in it.
@@ -255,15 +263,6 @@ class HomogeneousTransformationMatrix2Dimensional(
         """
         self.ensure_acts_on(operand=other, operation="@")
         return other.apply_transformation(transformation=self)
-
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> HomogeneousTransformationMatrix2Dimensional:
-        return HomogeneousTransformationMatrix2Dimensional(
-            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
-            reference_frame=transformation.reference_frame,
-            child_frame=self.child_frame,
-        )
 
     def inverse(self) -> HomogeneousTransformationMatrix2Dimensional:
         inverse = HomogeneousTransformationMatrix2Dimensional(
@@ -314,7 +313,7 @@ class HomogeneousTransformationMatrix2Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
-    SpecialEuclideanGroupAction,
+    SymbolicAxisCoordinates,
     Vector,
 ):
     """
@@ -374,14 +373,6 @@ class Vector2Dimensional(
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
 
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> Vector2Dimensional:
-        turned = ca.mtimes(transformation.casadi_sx, ca.vertcat(self.casadi_sx, 0))
-        return Vector2Dimensional(
-            turned[0], turned[1], reference_frame=transformation.reference_frame
-        )
-
     def __add__(self, other: Vector2Dimensional) -> Vector2Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``other`` is given in another frame.
@@ -414,8 +405,8 @@ class Vector2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point2Dimensional(
-    SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
-    SpecialEuclideanGroupAction,
+    SymbolicSpatialValue,
+    SymbolicAxisCoordinates,
     Point[Vector2Dimensional],
 ):
     """
@@ -524,14 +515,6 @@ class Point2Dimensional(
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
 
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> Point2Dimensional:
-        moved = ca.mtimes(transformation.casadi_sx, ca.vertcat(self.casadi_sx, 1))
-        return Point2Dimensional(
-            moved[0], moved[1], reference_frame=transformation.reference_frame
-        )
-
     def __add__(self, vector: Vector2Dimensional) -> Point2Dimensional:
         """
         :raises ReferenceFrameMismatchError: If ``vector`` is given in another frame.
@@ -633,7 +616,7 @@ class EmbeddedPlaneProjection(
 @dataclass(eq=False, init=False, repr=False)
 class Pose2Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
-    SpecialEuclideanGroupAction,
+    Pose,
 ):
     """
     Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
@@ -782,13 +765,16 @@ class Pose2Dimensional(
             reference_frame=frame,
         )
 
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> Pose2Dimensional:
-        flat_pose = HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
-            x=self.x, y=self.y, yaw=self.yaw
+    def to_coordinate_change(self) -> HomogeneousTransformationMatrix2Dimensional:
+        return HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
+            x=self.x, y=self.y, yaw=self.yaw, reference_frame=self.reference_frame
         )
-        return flat_pose.apply_transformation(transformation=transformation).pose
+
+    @classmethod
+    def from_coordinate_change(
+        cls, *, change: HomogeneousTransformationMatrix2Dimensional
+    ) -> Pose2Dimensional:
+        return change.pose
 
     @classmethod
     def from_xy_yaw(

@@ -4,10 +4,13 @@ Vectors of an affine space: the translations that move its points.
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from dataclasses import dataclass
 
 from typing_extensions import Generic, Self, TypeVar
 
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.interface import Interface
 from krrood.symbolic_math.exceptions import UnsupportedOperationError
 from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
@@ -35,6 +38,10 @@ class Vector(
         The type parameters are, in order, the kind of frame and the coordinate type,
         which is :class:`float` unless given.
     """
+
+    @classproperty
+    def homogeneous_weight(cls) -> int:
+        return 0
 
     def __add__(self, other: Self) -> Self:
         """
@@ -107,4 +114,31 @@ class Vector(
 GenericVector = TypeVar("GenericVector", bound=Vector)
 """
 The kind of vector the points of an affine space are moved by.
+"""
+
+
+# %% vectors of an oriented three-dimensional Euclidean space
+
+
+class CrossProductVector(Interface):
+    """
+    A vector of an oriented three-dimensional Euclidean space, where two vectors have a
+    cross product.
+    """
+
+    @abstractmethod
+    def cross(self, *, other: Self) -> Self:
+        """
+        :param other: A vector given in the same frame.
+        :return: The vector perpendicular to both, as long as the area of the
+            parallelogram they span, such that this vector, ``other`` and the result
+            are right-handed.
+        """
+
+
+GenericCrossProductVector = TypeVar(
+    "GenericCrossProductVector", bound=CrossProductVector
+)
+"""
+The kind of vector whose cross products a value is built with.
 """

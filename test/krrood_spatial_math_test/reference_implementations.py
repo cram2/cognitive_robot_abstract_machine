@@ -1,3 +1,10 @@
+"""
+Numpy implementations of rotations and rigid motions that the symbolic spatial types are
+checked against.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 
 
@@ -249,3 +256,24 @@ def quaternion_slerp(q1, q2, t):
     if 0.001 > abs(sin_half_theta):
         return 0.5 * q1 + 0.5 * q2
     return ratio_a * q1 + ratio_b * q2
+
+
+def adjoint_matrix_from_homogeneous_matrix(matrix: np.ndarray) -> np.ndarray:
+    """
+    :param matrix: A rigid 4x4 homogeneous transformation.
+    :return: The 6x6 matrix that moves a twist, angular part first, by the
+        transformation: ``[[R, 0], [p x R, R]]``.
+    """
+    rotation, shift = matrix[:3, :3], matrix[:3, 3]
+    shift_cross = np.array(
+        [
+            [0.0, -shift[2], shift[1]],
+            [shift[2], 0.0, -shift[0]],
+            [-shift[1], shift[0], 0.0],
+        ]
+    )
+    adjoint = np.zeros((6, 6))
+    adjoint[:3, :3] = rotation
+    adjoint[3:, :3] = shift_cross @ rotation
+    adjoint[3:, 3:] = rotation
+    return adjoint

@@ -201,7 +201,7 @@ class Handle(IsGraspable):
                 Pose3Dimensional(
                     position=Point3Dimensional.from_iterable(mesh.bounds.mean(axis=0)),
                     orientation=RotationMatrix.from_vectors(
-                        x=approach, y=bar_direction.cross(approach)
+                        x=approach, y=bar_direction.cross(other=approach)
                     ).quaternion,
                     reference_frame=self.root,
                 ),

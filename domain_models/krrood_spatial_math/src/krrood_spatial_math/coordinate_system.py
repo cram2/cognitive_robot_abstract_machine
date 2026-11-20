@@ -10,6 +10,7 @@ from dataclasses import dataclass, fields
 
 from typing_extensions import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import FieldMetadata
 from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
@@ -172,6 +173,15 @@ class CoordinateRepresentation(
                 context=context,
             )
 
+    @abstractmethod
+    def apply_transformation(self, *, transformation: CoordinateChange) -> Self:
+        """
+        :param transformation: A change whose source coordinate system is the one this
+            value is given in.
+        :return: The same value, given in the target coordinate system of
+            ``transformation``.
+        """
+
 
 GenericCoordinateRepresentation = TypeVar(
     "GenericCoordinateRepresentation", bound=CoordinateRepresentation
@@ -229,6 +239,24 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
             coordinate_system=coordinate_system,
         )
 
+    @classproperty
+    @abstractmethod
+    def homogeneous_weight(cls) -> int:
+        """
+        The coordinate appended to make this value's homogeneous coordinates, which an
+        affine change multiplies its shift by: 0 for a value without a position, 1 for a
+        value with one.
+        """
+
+    def apply_transformation(self, *, transformation: AffineCoordinateChange) -> Self:
+        moved = transformation.apply_to_homogeneous_coordinates(
+            homogeneous_coordinates=(*self.coordinates, self.homogeneous_weight)
+        )
+        return self.from_coordinates(
+            coordinates=moved[:-1],
+            coordinate_system=transformation.target_coordinate_system,
+        )
+
     @classmethod
     def _coordinate_field_names(cls) -> tuple[str, ...]:
         """
@@ -284,6 +312,12 @@ class CoordinateChange(
         """
 
 
+GenericCoordinateChange = TypeVar("GenericCoordinateChange", bound=CoordinateChange)
+"""
+The kind of change that re-expresses a value in another coordinate system of its kind.
+"""
+
+
 GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
 """
 The kind of affine frame coordinates are given in.
@@ -299,6 +333,19 @@ class AffineCoordinateChange(
 
     It keeps straight lines, parallel lines and ratios of lengths along one line.
     """
+
+    @abstractmethod
+    def apply_to_homogeneous_coordinates(
+        self, *, homogeneous_coordinates: tuple[GenericCoordinate, ...]
+    ) -> tuple[GenericCoordinate, ...]:
+        """
+        :param homogeneous_coordinates: The coordinates of a value in the source
+            coordinate system, followed by its
+            :attr:`~AxisCoordinates.homogeneous_weight`.
+        :return: The same coordinates in the target coordinate system, followed by the
+            unchanged weight: the axes are mapped, and the shift between the origins is
+            added as many times as the weight says.
+        """
 
 
 GenericCartesianFrame = TypeVar("GenericCartesianFrame", bound=CartesianFrame)
@@ -316,3 +363,17 @@ class RigidCoordinateChange(
 
     It also keeps distances and angles.
     """
+
+    @property
+    @abstractmethod
+    def rotation_matrix(self) -> RigidCoordinateChange:
+        """
+        This change without the shift between the origins: it turns the axes only.
+        """
+
+    @property
+    @abstractmethod
+    def translation(self) -> Vector:
+        """
+        Where the source origin lies, along the axes of the target coordinate system.
+        """

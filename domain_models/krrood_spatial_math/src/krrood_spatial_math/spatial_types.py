@@ -18,7 +18,6 @@ from typing_extensions import Any, overload, Self, Callable, Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.patterns.interface import Interface
 from krrood.patterns.mixin import Mixin
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import DerivedGenericParameter
@@ -35,13 +34,16 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 from krrood_spatial_math.coordinate_system import (
     GenericCartesianFrame,
     GenericCoordinate,
+    GenericCoordinateChange,
     GenericCoordinateSystem,
     CoordinateRepresentation,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.line import Line, LineSegment
+from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point
-from krrood_spatial_math.vector import Vector
+from krrood_spatial_math.pose import Orientation, Pose
+from krrood_spatial_math.vector import CrossProductVector, Vector
 from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
     ReferenceFrameMismatchError,
@@ -367,17 +369,44 @@ class SymbolicSpatialChange(
         result.child_frame = self.child_frame
         return result
 
+    def apply_to_homogeneous_coordinates(
+        self, *, homogeneous_coordinates: tuple[sm.ScalarData, ...]
+    ) -> tuple[sm.Scalar, ...]:
+        moved = ca.mtimes(self.casadi_sx, sm.to_sx(list(homogeneous_coordinates)))
+        return tuple(
+            sm.Scalar.from_casadi_sx(casadi_sx=moved[row])
+            for row in range(moved.shape[0])
+        )
+
+    def apply_transformation(self, *, transformation: SymbolicSpatialChange) -> Self:
+        """
+        :param transformation: A change of this kind whose child frame is this change's
+            reference frame.
+        :return: The change that applies this change and then ``transformation``, of
+            the more specific type of the two, such as a rotation for two rotations.
+        """
+        composed_type = (
+            type(self)
+            if isinstance(transformation, type(self))
+            else type(transformation)
+        )
+        return composed_type(
+            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
+            reference_frame=transformation.reference_frame,
+            child_frame=self.child_frame,
+        )
+
     def ensure_acts_on(self, *, operand: Any, operation: str) -> None:
         """
         :param operand: A value or change this change is applied to.
         :param operation: The operator applying it, for the error message.
-        :raises UnsupportedOperationError: If ``operand`` is not moved by a rigid change,
-            or is given in another kind of frame than this change's.
+        :raises UnsupportedOperationError: If ``operand`` is neither a value nor a
+            change, or is given in another kind of frame than this change's.
         :raises ReferenceFrameMismatchError: If ``operand`` is given in a frame other
             than this change's child frame.
         """
         if not (
-            isinstance(operand, SpecialEuclideanGroupAction)
+            isinstance(operand, (CoordinateRepresentation, SymbolicSpatialChange))
             and operand.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
             is self.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
         ):
@@ -404,19 +433,11 @@ class SymbolicSpatialChange(
             )
 
 
-GenericSymbolicSpatialChange = TypeVar(
-    "GenericSymbolicSpatialChange", bound=SymbolicSpatialChange
-)
-"""
-The kind of change that re-expresses a value in another frame.
-"""
-
-
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue(
     SymbolicSpatialType,
     CoordinateRepresentation,
-    Generic[GenericSymbolicSpatialChange],
+    Generic[GenericCoordinateChange],
     ABC,
 ):
     """
@@ -437,16 +458,16 @@ class SymbolicSpatialValue(
         """
         return (
             DerivedGenericParameter(
-                parameter=GenericCoordinateSystem, source=GenericSymbolicSpatialChange
+                parameter=GenericCoordinateSystem, source=GenericCoordinateChange
             ),
             DerivedGenericParameter(
-                parameter=GenericCoordinate, source=GenericSymbolicSpatialChange
+                parameter=GenericCoordinate, source=GenericCoordinateChange
             ),
         )
 
     @classmethod
     def get_change_type(cls) -> type[SymbolicSpatialChange]:
-        return cls.get_type_of_generic_parameter(parameter=GenericSymbolicSpatialChange)
+        return cls.get_type_of_generic_parameter(parameter=GenericCoordinateChange)
 
     @property
     def coordinate_system(self) -> GenericCoordinateSystem | None:
@@ -462,74 +483,36 @@ class SymbolicSpatialValue(
         return frame_kind.from_frame_3_dimensional(frame=self.reference_frame)
 
 
-# %% how a change acts on a value
+# %% values given by one coordinate per axis
 
 
-class SpecialEuclideanGroupAction(Interface):
+class SymbolicAxisCoordinates(Mixin):
     """
-    A value or change the rigid motion group of its kind of frame acts on, SE(3) for a
-    3D frame and SE(2) for a frame on a plane: a homogeneous transformation between two
-    frames of that kind moves it, giving one of the same type.
-    """
-
-    @abstractmethod
-    def apply_transformation(self, *, transformation: SymbolicSpatialChange) -> Self:
-        """
-        :param transformation: A transformation of this value's kind of frame whose
-            child frame is this value's reference frame.
-        :return: This value, given in the reference frame of ``transformation``.
-        """
-
-
-GenericSpecialEuclideanGroupAction = TypeVar(
-    "GenericSpecialEuclideanGroupAction", bound=SpecialEuclideanGroupAction
-)
-"""
-The kind of value or change a transformation is applied to.
-"""
-
-
-class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
-    """
-    A value stored as homogeneous coordinates, which a transformation acts on by
-    multiplying them from the left.
+    A symbolic value given by one coordinate per axis of its frame, built from its
+    coordinates and the reference frame its frame lies on.
     """
 
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
+    @classmethod
+    def from_coordinates(
+        cls,
+        *,
+        coordinates: tuple[sm.ScalarData, ...],
+        coordinate_system: GenericCoordinateSystem | None,
     ) -> Self:
-        result = type(self).from_casadi_sx(
-            casadi_sx=ca.mtimes(transformation.casadi_sx, self.casadi_sx)
+        """
+        Overrides :meth:`~krrood_spatial_math.coordinate_system.AxisCoordinates.from_coor
+        dinates`, which builds a value from its fields: a symbolic value is built from
+        its coordinates and reference frame.
+        """
+        reference_frame = (
+            None if coordinate_system is None else coordinate_system.frame_3_dimensional
         )
-        result.reference_frame = transformation.reference_frame
-        return result
-
-
-class Orientation(SpecialEuclideanGroupAction, Mixin):
-    """
-    An orientation, which SE(3) acts on through the rotation part of a transformation:
-    a transformation turns it and never shifts it, since an orientation has no position.
-    """
-
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
-    ) -> Self:
-        return self.apply_rotation(rotation=transformation.rotation_matrix)
-
-    @abstractmethod
-    def apply_rotation(self, *, rotation: RotationMatrix) -> Self:
-        """
-        :param rotation: The rotation from this orientation's reference frame to the
-            rotation's reference frame.
-        :return: This orientation turned by ``rotation``, in the reference frame of
-            ``rotation``.
-        """
+        return cls(*coordinates, reference_frame=reference_frame)
 
 
 @dataclass(eq=False, init=False, repr=False)
 class HomogeneousTransformationMatrix3Dimensional(
     SymbolicSpatialChange[CartesianFrame3Dimensional],
-    SpecialEuclideanGroupAction,
 ):
     """
     Represents a 4x4 transformation matrix used in kinematics and transformations.
@@ -811,9 +794,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         """
         return self[2, 3]
 
-    def dot(
-        self, other: GenericSpecialEuclideanGroupAction
-    ) -> GenericSpecialEuclideanGroupAction:
+    def dot(self, other: GenericSpatialType) -> GenericSpatialType:
         """
         This transformation applied to ``other``, a value given in its child frame or a
         change into it.
@@ -828,18 +809,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         self.ensure_acts_on(operand=other, operation="dot")
         return other.apply_transformation(transformation=self)
 
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
-    ) -> HomogeneousTransformationMatrix3Dimensional:
-        return HomogeneousTransformationMatrix3Dimensional(
-            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
-            reference_frame=transformation.reference_frame,
-            child_frame=self.child_frame,
-        )
-
-    def __matmul__(
-        self, other: GenericSpecialEuclideanGroupAction
-    ) -> GenericSpecialEuclideanGroupAction:
+    def __matmul__(self, other: GenericSpatialType) -> GenericSpatialType:
         return self.dot(other)
 
     @classmethod
@@ -882,6 +852,12 @@ class HomogeneousTransformationMatrix3Dimensional(
         result = Point3Dimensional.from_casadi_sx(casadi_sx=self.casadi_sx[:4, 3])
         result.reference_frame = self.reference_frame
         return result
+
+    @property
+    def translation(self) -> Vector3Dimensional:
+        return Vector3Dimensional(
+            x=self.x, y=self.y, z=self.z, reference_frame=self.reference_frame
+        )
 
     @property
     def quaternion(self) -> Quaternion:
@@ -1142,21 +1118,6 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
             reference_frame=self.reference_frame,
         )
 
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
-    ) -> HomogeneousTransformationMatrix3Dimensional:
-        """
-        Extends :meth:`HomogeneousTransformationMatrix3Dimensional.apply_transformation`:
-        a rotation composed with a rotation is a :class:`RotationMatrix`.
-        """
-        if not isinstance(transformation, RotationMatrix):
-            return super().apply_transformation(transformation=transformation)
-        return RotationMatrix(
-            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
-            reference_frame=transformation.reference_frame,
-            child_frame=self.child_frame,
-        )
-
     @property
     def rotation_matrix(self) -> RotationMatrix:
         """
@@ -1208,11 +1169,11 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
         if x is None and y is None and z is None:
             raise InsufficientVectorsError(x=x, y=y, z=z)
         if x is not None and y is not None and z is None:
-            z = x.cross(y)
+            z = x.cross(other=y)
         elif x is not None and y is None and z is not None:
-            y = z.cross(x)
+            y = z.cross(other=x)
         elif x is None and y is not None and z is not None:
-            x = y.cross(z)
+            x = y.cross(other=z)
         x.scale(1)
         y.scale(1)
         z.scale(1)
@@ -1245,8 +1206,8 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
         # Crossing a direction with a world axis degenerates when the two are parallel, so
         # pick whichever of the X/Y axes yields the better-conditioned (longer) cross
         # product.
-        frame_V_cross_x = x_vector.cross(Vector3Dimensional.X())
-        frame_V_cross_y = x_vector.cross(Vector3Dimensional.Y())
+        frame_V_cross_x = x_vector.cross(other=Vector3Dimensional.X())
+        frame_V_cross_y = x_vector.cross(other=Vector3Dimensional.Y())
         y = Vector3Dimensional.from_iterable(
             [
                 sm.if_greater(
@@ -1375,8 +1336,9 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
-    HomogeneousCoordinates,
+    SymbolicAxisCoordinates,
     Vector,
+    CrossProductVector,
 ):
     """
     Representation of a 3D vector with reference frame support for homogenous
@@ -1665,7 +1627,7 @@ class Vector3Dimensional(
     def __matmul__(self, other: Vector3Dimensional) -> sm.Scalar:
         return self.dot(other)
 
-    def cross(self, other: Vector3Dimensional) -> Vector3Dimensional:
+    def cross(self, *, other: Vector3Dimensional) -> Vector3Dimensional:
         result = ca.cross(self.casadi_sx[:3], other.casadi_sx[:3])
         result = self.__class__.from_iterable(result)
         result.reference_frame = self.reference_frame
@@ -1764,8 +1726,8 @@ class Vector3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point3Dimensional(
-    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
-    HomogeneousCoordinates,
+    SymbolicSpatialValue,
+    SymbolicAxisCoordinates,
     Point[Vector3Dimensional],
 ):
     """
@@ -1967,7 +1929,7 @@ class Point3Dimensional(
         :return: Tuple of (projected point on the plane, signed distance from point to
             plane)
         """
-        normal = frame_V_plane_vector1.cross(frame_V_plane_vector2)
+        normal = frame_V_plane_vector1.cross(other=frame_V_plane_vector2)
         normal.scale(1)
         frame_V_current = self.vector3
         d = normal @ frame_V_current
@@ -1984,7 +1946,7 @@ class Point3Dimensional(
         :return: tuple of (closest point on the line, shortest distance between self and the line)
         """
         lp_vector = self - line_point
-        cross_product = lp_vector.cross(line_direction)
+        cross_product = lp_vector.cross(other=line_direction)
         distance = cross_product.norm() / line_direction.norm()
 
         line_direction_unit = line_direction / line_direction.norm()
@@ -2310,10 +2272,12 @@ class Quaternion(
             reference_frame=self.reference_frame,
         )
 
-    def apply_rotation(self, *, rotation: RotationMatrix) -> Quaternion:
-        result = rotation.quaternion.multiply(self)
-        result.reference_frame = rotation.reference_frame
-        return result
+    def to_coordinate_change(self) -> RotationMatrix:
+        return self.rotation_matrix
+
+    @classmethod
+    def from_coordinate_change(cls, *, change: RotationMatrix) -> Quaternion:
+        return cls.from_rotation_matrix(change)
 
     def multiply(self, q: Quaternion) -> Quaternion:
         return Quaternion(
@@ -2603,17 +2567,18 @@ class AxisAngle(
         """
         return RotationMatrix.from_axis_angle(self)
 
-    def apply_rotation(self, *, rotation: RotationMatrix) -> AxisAngle:
-        result = AxisAngle.from_quaternion(
-            rotation.quaternion.multiply(self.quaternion)
-        )
-        result.reference_frame = rotation.reference_frame
-        return result
+    def to_coordinate_change(self) -> RotationMatrix:
+        return self.rotation_matrix
+
+    @classmethod
+    def from_coordinate_change(cls, *, change: RotationMatrix) -> AxisAngle:
+        return cls.from_rotation_matrix(change)
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class VectorPair(
     SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
+    MotionVectorPair[Vector3Dimensional],
     ABC,
 ):
     """
@@ -2693,29 +2658,40 @@ class VectorPair(
         )
 
     def _constant_to_json(self) -> dict[str, Any]:
+        """
+        Overrides :meth:`SymbolicSpatialType._constant_to_json`: each part under its own
+        name instead of the matrix entries.
+        """
         return {
-            self._rotational_part_name: self._rotational_part.to_np()[:3].tolist(),
-            self._translational_part_name: self._translational_part.to_np()[
-                :3
-            ].tolist(),
+            self._rotational_part_name: self.rotational_part.to_np()[:3].tolist(),
+            self._translational_part_name: self.translational_part.to_np()[:3].tolist(),
         }
 
     @property
-    def _rotational_part(self) -> Vector3Dimensional:
-        """
-        :return: How the body turns, in the upper three entries.
-        """
+    def rotational_part(self) -> Vector3Dimensional:
         return Vector3Dimensional(
             x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
         )
 
     @property
-    def _translational_part(self) -> Vector3Dimensional:
-        """
-        :return: How a point of the body moves, in the lower three entries.
-        """
+    def translational_part(self) -> Vector3Dimensional:
         return Vector3Dimensional(
             x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
+
+    @classmethod
+    def from_parts(
+        cls,
+        *,
+        rotational_part: Vector3Dimensional,
+        translational_part: Vector3Dimensional,
+    ) -> Self:
+        return cls(
+            **{
+                cls._rotational_part_name: rotational_part,
+                cls._translational_part_name: translational_part,
+            },
+            reference_frame=rotational_part.reference_frame,
         )
 
 
@@ -2762,7 +2738,7 @@ class Displacement(VectorPair):
         :return: The axis the body turned around, scaled by the angle it turned by in
             radians.
         """
-        return self._rotational_part
+        return self.rotational_part
 
     @property
     def translation(self) -> Vector3Dimensional:
@@ -2770,7 +2746,7 @@ class Displacement(VectorPair):
         :return: Where the body's origin ended up, relative to where it started, in
             meters.
         """
-        return self._translational_part
+        return self.translational_part
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
@@ -2817,7 +2793,7 @@ class Twist(VectorPair):
         :return: The axis the body turns around, scaled by how fast it turns, in radians
             per unit of the parameter.
         """
-        return self._rotational_part
+        return self.rotational_part
 
     @property
     def linear_velocity(self) -> Vector3Dimensional:
@@ -2825,7 +2801,7 @@ class Twist(VectorPair):
         :return: How fast the point of the body at the origin of the reference frame
             moves, in meters per unit of the parameter.
         """
-        return self._translational_part
+        return self.translational_part
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
@@ -2871,7 +2847,7 @@ class ScrewAxis(VectorPair):
         :return: The axis the body turns around, scaled by the angle it turns by per
             unit of position, in radians.
         """
-        return self._rotational_part
+        return self.rotational_part
 
     @property
     def translation_per_unit_position(self) -> Vector3Dimensional:
@@ -2879,7 +2855,7 @@ class ScrewAxis(VectorPair):
         :return: How far the point of the body at the origin of the reference frame
             moves per unit of position, in meters.
         """
-        return self._translational_part
+        return self.translational_part
 
     @property
     def unit_direction(self) -> Vector3Dimensional:
@@ -2915,7 +2891,7 @@ class ScrewAxis(VectorPair):
 @dataclass(eq=False, init=False, repr=False)
 class Pose3Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
-    HomogeneousCoordinates,
+    Pose,
 ):
     """
     A position and an orientation, both given in one reference frame.
@@ -3149,6 +3125,15 @@ class Pose3Dimensional(
         return HomogeneousTransformationMatrix3Dimensional(
             data=self, reference_frame=self.reference_frame
         )
+
+    def to_coordinate_change(self) -> HomogeneousTransformationMatrix3Dimensional:
+        return self.homogeneous_matrix
+
+    @classmethod
+    def from_coordinate_change(
+        cls, *, change: HomogeneousTransformationMatrix3Dimensional
+    ) -> Pose3Dimensional:
+        return change.pose
 
     def __hash__(self):
         if self.is_constant():

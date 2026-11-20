@@ -12,6 +12,7 @@ from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import DerivedGenericParameter
 from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
+    GenericCoordinateChange,
     GenericCoordinate,
     GenericCoordinateSystem,
 )
@@ -29,21 +30,30 @@ class Point(AxisCoordinates, Generic[GenericVector]):
     :class:`~krrood_spatial_math.coordinate_system.AxisCoordinate`.
 
     .. note::
-        The type parameter is the vector type, which fixes the kind of frame and the
-        coordinate type, so a point and its vector always share them.
+        The type parameter is the vector type, which fixes the kind of frame, the
+        coordinate type and, where the vector type binds one, the change that
+        re-expresses it, so a point and its vector always share them.
     """
 
     @classproperty
     def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
         """
-        The kind of frame and the coordinate type, read from the vector type.
+        The kind of frame, the coordinate type and the change type, read from the vector
+        type.
         """
         return (
             DerivedGenericParameter(
                 parameter=GenericCoordinateSystem, source=GenericVector
             ),
             DerivedGenericParameter(parameter=GenericCoordinate, source=GenericVector),
+            DerivedGenericParameter(
+                parameter=GenericCoordinateChange, source=GenericVector
+            ),
         )
+
+    @classproperty
+    def homogeneous_weight(cls) -> int:
+        return 1
 
     def __sub__(self, other: Self) -> GenericVector:
         """

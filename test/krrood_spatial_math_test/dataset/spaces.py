@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
+from typing_extensions import Self
+
 from krrood.patterns.interface import Interface
 from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.point import GenericPoint, Point
@@ -163,3 +165,74 @@ class CartesianFrame3DimensionalChange(
     """
     A rigid change between two Cartesian frames, such as from a gripper to the table.
     """
+
+
+# %% a change that scales each axis and then shifts the origin
+
+
+@dataclass(kw_only=True)
+class AxisScalingChange(ScalingChange):
+    """
+    An affine change between two frames of one scalable plane: each axis is scaled by
+    its own factor, and then the origin is shifted.
+    """
+
+    source_coordinate_system: ScalablePlaneFrame | None = None
+    """
+    The frame the coordinates are given in.
+    """
+
+    target_coordinate_system: ScalablePlaneFrame | None = None
+    """
+    The frame the coordinates are changed into.
+    """
+
+    x_scale: float = 1.0
+    """
+    The factor the first coordinate is multiplied by.
+    """
+
+    y_scale: float = 1.0
+    """
+    The factor the second coordinate is multiplied by.
+    """
+
+    x_shift: float = 0.0
+    """
+    The first coordinate of the source origin in the target frame.
+    """
+
+    y_shift: float = 0.0
+    """
+    The second coordinate of the source origin in the target frame.
+    """
+
+    def apply_to_homogeneous_coordinates(
+        self, *, homogeneous_coordinates: tuple[float, ...]
+    ) -> tuple[float, ...]:
+        x, y, weight = homogeneous_coordinates
+        return (
+            self.x_scale * x + self.x_shift * weight,
+            self.y_scale * y + self.y_shift * weight,
+            weight,
+        )
+
+    def inverse(self) -> Self:
+        return AxisScalingChange(
+            source_coordinate_system=self.target_coordinate_system,
+            target_coordinate_system=self.source_coordinate_system,
+            x_scale=1.0 / self.x_scale,
+            y_scale=1.0 / self.y_scale,
+            x_shift=-self.x_shift / self.x_scale,
+            y_shift=-self.y_shift / self.y_scale,
+        )
+
+    def __matmul__(self, other: Self) -> Self:
+        return AxisScalingChange(
+            source_coordinate_system=other.source_coordinate_system,
+            target_coordinate_system=self.target_coordinate_system,
+            x_scale=self.x_scale * other.x_scale,
+            y_scale=self.y_scale * other.y_scale,
+            x_shift=self.x_scale * other.x_shift + self.x_shift,
+            y_shift=self.y_scale * other.y_shift + self.y_shift,
+        )

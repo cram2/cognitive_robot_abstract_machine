@@ -1155,7 +1155,7 @@ class MujocoCamera(MultiSimCamera):
             up_hint = Vector3Dimensional.Y()
 
         z_axis = -forward
-        x_axis = up_hint.cross(z_axis)
+        x_axis = up_hint.cross(other=z_axis)
         x_axis.scale(1)
         return RotationMatrix.from_vectors(x=x_axis, z=z_axis)
 

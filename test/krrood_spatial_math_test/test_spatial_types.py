@@ -1165,12 +1165,16 @@ class TestPoint3Dimensional:
 
 
 class TestVector3:
+    """
+    Building, combining and measuring 3D vectors.
+    """
+
     @pytest.mark.parametrize("u", unit_vectors3)
     @pytest.mark.parametrize("v", unit_vectors3)
     def test_cross(self, u, v):
         assert np.allclose(
             Vector3Dimensional.from_iterable(u).cross(
-                Vector3Dimensional.from_iterable(v)
+                other=Vector3Dimensional.from_iterable(v)
             )[:3],
             np.cross(u, v),
         )
@@ -1255,14 +1259,14 @@ class TestVector3:
         v1 = Vector3Dimensional(x=1, y=0, z=0)
         v2 = Vector3Dimensional(x=0, y=1, z=0)
 
-        result = v1.cross(v2)
+        result = v1.cross(other=v2)
         assert isinstance(result, Vector3Dimensional)
         assert result[3] == 0
         # Cross product of x and y unit vectors should be z unit vector
         assert np.allclose(result[:3], np.array([0, 0, 1]))
 
         # Cross product is anti-commutative
-        result2 = v2.cross(v1)
+        result2 = v2.cross(other=v1)
         assert np.allclose(result2[:3], np.array([0, 0, -1]))
 
     def test_properties(self):
@@ -1486,9 +1490,9 @@ class TestVector3:
         assert np.allclose(compiled_dot, expected)
 
         # Test cross product compilation
-        cross_expr = v1.cross(v2)
+        cross_expr = v1.cross(other=v2)
         compiled_cross = Vector3Dimensional(x=2, y=3, z=4).cross(
-            Vector3Dimensional(x=1, y=2, z=3)
+            other=Vector3Dimensional(x=1, y=2, z=3)
         )
         expected_cross = np.cross([2, 3, 4], [1, 2, 3])
         assert np.allclose(compiled_cross[:3], expected_cross)

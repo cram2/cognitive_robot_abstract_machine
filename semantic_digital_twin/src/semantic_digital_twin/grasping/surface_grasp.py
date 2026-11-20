@@ -79,7 +79,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         )
         root_V_across.scale(1)
         root_V_closing = root_V_across * math.cos(self.roll) + root_V_approach.cross(
-            root_V_across
+            other=root_V_across
         ) * math.sin(self.roll)
         root_T_grasp = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
