@@ -10,6 +10,14 @@ execute:
   execute_notebooks: force
   # a cell that raises fails the build instead of only logging a warning
   raise_on_error: true
+  # not executed for now: the ORM interface is not generated here, the others exceed the cell timeout
+  exclude_patterns:
+    - "examples/persistence_of_annotated_worlds.md"
+    - "examples/building_worlds_with_specifications.md"
+    - "self_assessment/exercises/10_building_worlds_with_specifications.md"
+    - "doc/world_reasoner.md"
+    - "examples/graph_of_convex_sets.md"
+    - "examples/visualizing_worlds.md"
 
 # Define the name of the latex output file for PDF builds
 latex:
