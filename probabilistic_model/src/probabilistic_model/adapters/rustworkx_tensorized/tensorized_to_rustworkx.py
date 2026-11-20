@@ -155,6 +155,9 @@ class MultivariateGaussianLayerToLeavesConverter(
     def convert(
         cls, data: AbstractMultivariateGaussianLayer, builder: RustworkxCircuitBuilder
     ) -> list[Unit]:
+        """
+        Convert a layer into one leaf per node, see :meth:`Converter.convert`.
+        """
         return [
             leaf(distribution, builder.circuit)
             for distribution in data.node_distributions(variables=builder.variables)

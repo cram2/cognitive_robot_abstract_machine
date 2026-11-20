@@ -354,6 +354,10 @@ class SumLayer(HasParameterArrays, InnerLayer):
         )
 
     def store_edges_as(self, edge_matrix_type: type[EdgeMatrix]):
+        """
+        Store the log-weights in the new matrix too, see
+        :meth:`InnerLayer.store_edges_as`.
+        """
         log_weights = SparseEntries(
             self.edge_log_weights, self.edges.rows, self.edges.columns
         )
