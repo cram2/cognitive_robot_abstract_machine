@@ -1,3 +1,8 @@
+"""
+Events over several variables: a :class:`SimpleEvent` maps each variable to a set of its
+values, and an :class:`Event` is a union of simple events.
+"""
+
 from __future__ import annotations
 
 import copy
