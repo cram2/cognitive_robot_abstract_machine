@@ -246,9 +246,16 @@ class LayerFolding:
         :param layers: Univariate input layers of one type.
         :return: Where their nodes went in one layer, sorted by variable.
         """
-        joined = type(layers[0]).concatenate(layers)
+        layer_type = type(layers[0])
+        joined = layer_type.concatenate(layers)
+        variables = np.unique(joined.node_variables)
+        folded = layer_type.concatenate(
+            [
+                joined.select_nodes(joined.node_variables == variable)
+                for variable in variables
+            ]
+        )
         order = np.argsort(joined.node_variables, kind="stable")
-        folded = joined.select_nodes(order)
         position_in_folded = np.argsort(order)
         offsets = np.cumsum([0] + [layer.number_of_nodes for layer in layers])
         return {

@@ -24,6 +24,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matri
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    DenseProbabilityTable,
+    ProbabilityTable,
+    SparseProbabilityTable,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
@@ -79,17 +84,30 @@ def mixture_over_four_variables() -> MixtureOverFourVariables:
     )
 
 
+@pytest.fixture(params=[DenseProbabilityTable, SparseProbabilityTable])
+def table_type(request) -> type[ProbabilityTable]:
+    """
+    :return: The type of table the discrete layers of :func:`circuit` store.
+    """
+    return request.param
+
+
 @pytest.fixture(params=["random_network", "separate_leaves", "mixed_leaves"])
-def circuit(request, mixture_over_four_variables) -> LayeredProbabilisticCircuit:
+def circuit(
+    request, mixture_over_four_variables, table_type
+) -> LayeredProbabilisticCircuit:
     """
     :return: A RAT-SPN, which a region graph builds folded, or the mixture with one
-        variable per leaf layer or with leaf layers that mix variables.
+        variable per leaf layer or with leaf layers that mix variables, its discrete
+        layers storing a table of :func:`table_type`.
     """
     if request.param == "random_network":
-        return request.getfixturevalue("random_network")
-    if request.param == "separate_leaves":
-        return mixture_over_four_variables.separate
-    return mixture_over_four_variables.mixed
+        built = request.getfixturevalue("random_network")
+    elif request.param == "separate_leaves":
+        built = mixture_over_four_variables.separate
+    else:
+        built = mixture_over_four_variables.mixed
+    return built.store_discrete_probabilities_as(table_type)
 
 
 @pytest.fixture
@@ -152,6 +170,7 @@ def test_folded_log_likelihood(circuit, samples):
     )
 
 
+@pytest.mark.parametrize("table_type", [DenseProbabilityTable], indirect=True)
 def test_folded_log_likelihood_in_jax(circuit, samples):
     """
     The folded circuit with jax parameters gives every sample the log-likelihood of the
