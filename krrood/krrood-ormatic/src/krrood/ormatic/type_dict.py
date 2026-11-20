@@ -1,5 +1,12 @@
+"""
+A dictionary keyed by types that finds the entry of a type's closest ancestor.
+"""
+
+from __future__ import annotations
+
+
 from dataclasses import dataclass, field
-from typing_extensions import Any, Iterator
+from typing_extensions import Any, Iterator, get_origin
 
 
 from krrood.inheritance_path_length import inheritance_path_length
@@ -20,15 +27,21 @@ class TypeDict:
     def _get_inheritance_path_length_of_keys(self, *, clazz: type) -> dict[type, int]:
         """
         Get the inheritance path length of all keys in the dictionary relative to the
-        given class.
+        given class. A parametrized generic, such as :data:`numpy.typing.NDArray`, is
+        measured from the class it parametrizes.
 
         :param clazz: The class to get distances from.
         :return: The class distances.
         """
+        child_class = get_origin(clazz) or clazz
         return {
-            k: v
-            for k in self._dict.keys()
-            if (v := inheritance_path_length(child_class=clazz, parent_class=k))
+            key: path_length
+            for key in self._dict.keys()
+            if (
+                path_length := inheritance_path_length(
+                    child_class=child_class, parent_class=key
+                )
+            )
             is not None
         }
 
