@@ -81,7 +81,7 @@ def _cases() -> list[NodeRoundTripCase]:
         NodeRoundTripCase(
             ForceImpactMonitor,
             lambda world: [
-                ForceImpactMonitor(topic_name=RosName.WRENCH_TOPIC, threshold=10)
+                ForceImpactMonitor(topic_name=RosName.WRENCH_TOPIC, force_threshold=10)
             ],
         ),
         NodeRoundTripCase(

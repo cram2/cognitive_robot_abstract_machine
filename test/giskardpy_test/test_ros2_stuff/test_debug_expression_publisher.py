@@ -51,6 +51,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher imp
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% statecharts whose nodes register debug expressions
 
@@ -180,9 +181,8 @@ def align_planes_task(world: World) -> AlignPlanes:
     root = world.root
     tip = world.get_body_by_name("bot")
     return AlignPlanes(
-        root_link=root,
-        tip_link=tip,
-        goal_normal=Vector3.Z(reference_frame=root),
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        reference_normal=Vector3.Z(reference_frame=root),
         tip_normal=Vector3.Z(reference_frame=tip),
         name="align",
     )
@@ -193,8 +193,9 @@ def cartesian_orientation_task(world: World) -> CartesianOrientation:
     A task turning the bot about the z axis of the root.
     """
     return CartesianOrientation(
-        root_link=world.root,
-        tip_link=world.get_body_by_name("bot"),
+        kinematic_chain=KinematicChain(
+            root=world.root, tip=world.get_body_by_name("bot")
+        ),
         goal_orientation=RotationMatrix.from_rpy(yaw=1, reference_frame=world.root),
         name="orientation",
     )
@@ -205,8 +206,9 @@ def align_perpendicular_task(world: World) -> AlignPerpendicular:
     A task turning the x axis of the bot perpendicular to the x axis of the root.
     """
     return AlignPerpendicular(
-        root_link=world.root,
-        tip_link=world.get_body_by_name("bot"),
+        kinematic_chain=KinematicChain(
+            root=world.root, tip=world.get_body_by_name("bot")
+        ),
         tip_normal=Vector3.X(reference_frame=world.get_body_by_name("bot")),
         reference_normal=Vector3.X(reference_frame=world.root),
         name="perpendicular",
@@ -808,7 +810,7 @@ def test_executor_with_motion_control_publishes_the_running_tasks(
     assert [
         visualization.label
         for visualization in publishing._visualizations_per_node[task]
-    ] == ["align/current_normal", "align/goal_normal"]
+    ] == ["align/current_normal", "align/reference_normal"]
     assert published_namespaces(publishing) == collected_namespaces(publishing, task)
 
 
@@ -843,7 +845,7 @@ def test_orientations_and_vectors_of_a_task_are_drawn_at_its_tip(
     publishing._marker_publisher.wait_until_published()
 
     root_P_tip = cylinder_bot_world.compute_forward_kinematics_np(
-        cylinder_bot_world.root, task.tip_link
+        cylinder_bot_world.root, task.kinematic_chain.tip
     )[:3, 3]
     origins = marker_origins_in_root(fake.published[-1].markers, cylinder_bot_world)
     assert len(origins) > 0

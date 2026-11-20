@@ -1,3 +1,8 @@
+"""
+The probabilities of the states of the nodes of a discrete layer, stored densely or
+sparsely.
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -343,10 +348,16 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return int(self.log_probabilities.size)
 
     def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
+        """
+        :meth:`ProbabilityTable.log_probabilities_of_states` read from the log-
+        probabilities normalized per node, so that their gradient lowers the other
+        states of a node wherever it raises one.
+        """
+        (normalized,) = self.projected_parameters([self.log_probabilities])
         # an unknown state reads the appended column of probability zero
         padded = self.namespace.concat(
             [
-                self.log_probabilities,
+                normalized,
                 self.namespace.full(
                     (self.number_of_nodes, 1),
                     -np.inf,

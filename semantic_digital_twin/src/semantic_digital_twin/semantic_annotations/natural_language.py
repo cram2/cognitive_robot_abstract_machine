@@ -1,9 +1,13 @@
+"""
+Annotations that describe a body in natural language.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 
 @dataclass(eq=False)
@@ -19,9 +23,7 @@ class NaturalLanguageDescription(HasRootBody):
 
 
 @dataclass(eq=False)
-class NaturalLanguageWithTypeDescription(
-    NaturalLanguageDescription, HasGraspCandidates
-):
+class NaturalLanguageWithTypeDescription(NaturalLanguageDescription, IsGraspable):
     """
     A natural language description of a Sage10k object including the type information of the object.
 

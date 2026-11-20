@@ -34,10 +34,11 @@ from semantic_digital_twin.robots.pr2 import (
     PR2RightGripperRightFinger,
     PR2KinectV1,
 )
-from semantic_digital_twin.robots.robot_parts import KinematicChain
+from semantic_digital_twin.robots.robot_parts import RobotKinematicChain
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.world_description.derivatives import Derivatives
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -438,12 +439,26 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
 
 
 def test_kinematic_chains(pr2_world_state_reset):
-    semantic_kinematic_chain_annotation: list[KinematicChain] = (
-        pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)
+    """
+    Every kinematic chain of the PR2 has a root and a tip.
+    """
+    semantic_kinematic_chain_annotation: list[RobotKinematicChain] = (
+        pr2_world_state_reset.get_semantic_annotations_by_type(RobotKinematicChain)
     )
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root
         assert chain.tip
+
+
+def test_a_robot_kinematic_chain_is_a_kinematic_chain(pr2_world_state_reset):
+    """
+    An arm stands wherever a chain from a root to a tip is taken, and stays usable as a
+    key while doing so.
+    """
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    assert isinstance(pr2.left_arm, KinematicChain)
+    assert {pr2.left_arm, pr2.right_arm} == {pr2.right_arm, pr2.left_arm}
 
 
 def test_tracy_semantic_annotation(tracy_world):
