@@ -33,11 +33,11 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 )
 from probabilistic_model.utils import MissingDict
 
-# %% kernel density estimation
+# %% one kernel per row
 
 
 @dataclass(kw_only=True)
-class KernelDensity(LearningMethod):
+class RowKernelMixture(LearningMethod):
     """
     Fits an equal mixture of one product of kernels per row, each centred on the row's
     value of its variable: a Gaussian for a continuous variable and a symmetric binomial

@@ -19,8 +19,8 @@ from probabilistic_model.causal_structure.learning import (
 )
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.kernel_density import KernelDensity
 from probabilistic_model.learning.learning_method import LearningMethod
+from probabilistic_model.learning.row_kernel_mixture import RowKernelMixture
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
     MarginalDeterminismTreeNode,
@@ -212,7 +212,7 @@ class TrialModel:
             raise NoSuccessfulTrials(number_of_trials=len(self.trials))
         every_parameters = [trial.parameters for trial in self.trials]
         extractor = FeatureExtractor.from_instances(instances=every_parameters)
-        model = (learning_method or KernelDensity()).fit(
+        model = (learning_method or RowKernelMixture()).fit(
             extractor.create_dataframe(instances=successful),
             infer_variables_from_dataframe(
                 extractor.create_dataframe(instances=every_parameters)
