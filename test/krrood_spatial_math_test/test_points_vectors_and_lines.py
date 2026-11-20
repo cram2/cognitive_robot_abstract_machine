@@ -57,6 +57,16 @@ def test_a_point_is_not_a_vector():
     assert not issubclass(Point, Vector)
 
 
+def test_a_point_has_a_position_and_a_vector_has_none():
+    """
+    Only a point is shifted by an affine change; a vector is only turned or scaled.
+    """
+    assert (ScalablePlanePoint.has_position, ScalablePlaneVector.has_position) == (
+        True,
+        False,
+    )
+
+
 def test_a_point_is_moved_by_a_vector():
     """
     Adding a vector shifts each coordinate of the point by the vector's.

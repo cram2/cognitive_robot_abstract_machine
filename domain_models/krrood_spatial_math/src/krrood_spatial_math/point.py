@@ -51,8 +51,8 @@ class Point(AxisCoordinates, Generic[GenericVector]):
         )
 
     @classproperty
-    def homogeneous_weight(cls) -> int:
-        return 1
+    def has_position(cls) -> bool:
+        return True
 
     def __sub__(self, other: Self) -> GenericVector:
         """

@@ -319,16 +319,15 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
 
     @classproperty
     @abstractmethod
-    def homogeneous_weight(cls) -> int:
+    def has_position(cls) -> bool:
         """
-        The coordinate appended to make this value's homogeneous coordinates, which an
-        affine change multiplies its shift by: 0 for a value without a position, 1 for a
-        value with one.
+        Whether a value of this type is a position, which an affine change shifts along
+        with the origin, rather than an offset, which it only turns or scales.
         """
 
     def apply_transformation(self, *, transformation: AffineCoordinateChange) -> Self:
         moved = transformation.apply_to_homogeneous_coordinates(
-            homogeneous_coordinates=(*self.coordinates, self.homogeneous_weight)
+            homogeneous_coordinates=(*self.coordinates, int(self.has_position))
         )
         return self.from_coordinates(
             coordinates=moved[:-1],
@@ -407,8 +406,8 @@ class AffineCoordinateChange(
     ) -> tuple[GenericCoordinate, ...]:
         """
         :param homogeneous_coordinates: The coordinates of a value in the source
-            coordinate system, followed by its
-            :attr:`~AxisCoordinates.homogeneous_weight`.
+            coordinate system, followed by its weight: 1 if it
+            :attr:`~AxisCoordinates.has_position`, 0 if not.
         :return: The same coordinates in the target coordinate system, followed by the
             unchanged weight: the axes are mapped, and the shift between the origins is
             added as many times as the weight says.

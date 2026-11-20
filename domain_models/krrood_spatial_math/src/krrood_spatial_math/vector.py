@@ -37,8 +37,8 @@ class Vector(
     """
 
     @classproperty
-    def homogeneous_weight(cls) -> int:
-        return 0
+    def has_position(cls) -> bool:
+        return False
 
     def __add__(self, other: Self) -> Self:
         """
