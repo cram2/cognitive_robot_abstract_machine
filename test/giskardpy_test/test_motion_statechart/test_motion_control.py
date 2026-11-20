@@ -1,3 +1,8 @@
+"""
+Tests of the motion control extension: how it ticks, configures and solves the motion
+nodes of a statechart.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -26,6 +31,7 @@ from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% context
 
@@ -99,11 +105,14 @@ class ExtensionCountingTicks(TickingExecutorExtension):
 def test_motion_nodes_and_nodes_of_other_modules_run_in_one_statechart(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A motion node and a node of another module run in one statechart, ticked as often as
+    the executor ticks, with a controller built for the motion node.
+    """
     root = cylinder_bot_world.root
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     goal = CartesianPosition(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(x=0.1, reference_frame=root),
     )
     other_node = ConstTrueNode()
@@ -238,14 +247,17 @@ def test_a_joint_is_at_rest_once_its_node_ended(prismatic_bot2: World) -> None:
 def test_a_goal_that_depends_on_no_degree_of_freedom_is_an_empty_problem(
     prismatic_bot: World,
 ) -> None:
+    """
+    A goal whose chain moves no degree of freedom leaves the controller nothing to
+    solve, which compiling the statechart reports.
+    """
     (slider,) = prismatic_bot.controlled_connections
     executor = StatechartExecutor(
         context=StatechartContext(world=prismatic_bot), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
     reach = CartesianPosition(
-        root_link=slider.child,
-        tip_link=slider.child,
+        kinematic_chain=KinematicChain(root=slider.child, tip=slider.child),
         goal_point=Point3(1, 0, 0, reference_frame=slider.child),
     )
     statechart.add_node(node=reach)

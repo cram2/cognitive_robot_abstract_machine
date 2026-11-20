@@ -236,6 +236,10 @@ def test_merge_records_moving_the_world_properties(simulated_world: World):
 
 
 def test_world_property_addition_survives_json(simulated_world: World):
+    """
+    The addition of a simulator property to a world, sent through JSON, adds the
+    property to the receiving world.
+    """
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
@@ -245,7 +249,7 @@ def test_world_property_addition_survives_json(simulated_world: World):
 
     received = from_json(json.loads(json.dumps(to_json(sent))))
     with world.modify_world():
-        received.apply(world)
+        received.apply(world=world)
 
     assert world.simulator_additional_properties == [MujocoTendon(name="coupling")]
 

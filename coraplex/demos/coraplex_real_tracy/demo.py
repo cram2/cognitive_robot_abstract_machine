@@ -183,7 +183,7 @@ plan = Sequence(
         # Stack Box 2
         ParkArmsAction(arms=tracy.all_arms),
         PickUpAction(
-            grasp=GraspCandidate(
+            grasp_candidate=GraspCandidate(
                 box2_annotation,
                 Pose.from_xyz_rpy(
                     pitch=np.pi / 2, reference_frame=box2_annotation.root
@@ -193,15 +193,15 @@ plan = Sequence(
         ),
         PlaceAction(
             arm=tracy.left_arm,
-            object_designator=box2_annotation,
-            target_location=Pose.from_xyz_rpy(
+            graspable=box2_annotation,
+            goal_pose=Pose.from_xyz_rpy(
                 0.8, 0.0, table_top_z + 1.5 * box_edge, reference_frame=world.root
             ),
         ),
         # Stack Box 3
         ParkArmsAction(arms=tracy.all_arms),
         PickUpAction(
-            grasp=GraspCandidate(
+            grasp_candidate=GraspCandidate(
                 box3_annotation,
                 Pose.from_xyz_rpy(
                     pitch=np.pi / 2, reference_frame=box3_annotation.root
@@ -211,8 +211,8 @@ plan = Sequence(
         ),
         PlaceAction(
             arm=tracy.right_arm,
-            object_designator=box3_annotation,
-            target_location=Pose.from_xyz_rpy(
+            graspable=box3_annotation,
+            goal_pose=Pose.from_xyz_rpy(
                 0.8, 0.0, table_top_z + 2.5 * box_edge, reference_frame=world.root
             ),
         ),

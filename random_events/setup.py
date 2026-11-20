@@ -1,4 +1,11 @@
+"""
+Builds random_events with its C++ extension, compiled by pybind11.
+"""
+
+from __future__ import annotations
+
 import ast
+import sys
 
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 from setuptools import setup
@@ -16,6 +23,8 @@ ext_modules = [
             "src/random_events_lib/random_events_lib/include"
         ],  # Include directory for C++ headers
         cxx_std=17,
+        # MSVC accepts the operator words `and`, `or` and `not` only in conformance mode.
+        extra_compile_args=["/permissive-"] if sys.platform == "win32" else [],
     ),
 ]
 

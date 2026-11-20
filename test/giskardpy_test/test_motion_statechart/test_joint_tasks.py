@@ -305,7 +305,9 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
             ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=max_velocity),
+            JointVelocityLimit(
+                connections=[head_pan_joint], max_joint_velocity=max_velocity
+            ),
         ]
     )
 
@@ -390,8 +392,11 @@ def test_daisy_arm_reaches_its_park_state(
 def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_the_joint(
     pr2_world_state_reset,
 ):
+    """
+    A joint velocity limit scales its constraint by the velocity limit of the joint.
+    """
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
-    limit = JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.05)
+    limit = JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.05)
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
@@ -409,6 +414,10 @@ def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_th
 def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     pr2_world_state_reset,
 ):
+    """
+    A joint velocity limit of zero keeps the joint where it is, although a joint goal
+    pulls it away.
+    """
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     start_position = head_pan_joint.position
     executor = StatechartExecutor(
@@ -421,7 +430,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5})
             ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.0),
+            JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.0),
         ]
     )
     executor.compile(statechart=statechart)

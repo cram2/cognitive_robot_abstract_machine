@@ -257,7 +257,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         """
         with world.modify_world():
             for modification in json_data.get(SnapshotField.MODIFICATIONS, []):
-                from_json(modification, **kwargs).apply(world)
+                from_json(modification, **kwargs).apply(world=world)
 
         state = json_data.get(SnapshotField.STATE, {})
         ids = from_json(state[SnapshotField.IDS])

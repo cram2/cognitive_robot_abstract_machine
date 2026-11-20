@@ -409,7 +409,7 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
 
 
 @dataclass(eq=False)
-class HasGraspCandidates(HasRootBody, Mixin):
+class IsGraspable(HasRootBody, Mixin):
     """
     A mixin class for semantic annotations that state where they may be grasped, by
     their :attr:`grasp_strategy`, and offer grasp candidates.
@@ -489,9 +489,9 @@ class HasGraspCandidates(HasRootBody, Mixin):
             model_registry,
         )
         return [
-            grasp.grasp_candidate(self)
+            grasp.grasp_candidate(graspable=self)
             for grasp in grasps
-            if grasp.reaches_surface_of(self)
+            if grasp.reaches_surface_of(graspable=self)
         ]
 
     def grasp_surface(self) -> trimesh.Trimesh:
@@ -532,7 +532,7 @@ class HasGraspCandidates(HasRootBody, Mixin):
             end=Point3.from_iterable(end, reference_frame=self.root),
         )
 
-    def grasped_part(self) -> HasGraspCandidates:
+    def grasped_part(self) -> IsGraspable:
         """
         :return: The annotation whose surface the object is grasped at; the object
             itself unless one of its parts is grasped instead.
@@ -541,7 +541,7 @@ class HasGraspCandidates(HasRootBody, Mixin):
 
 
 @dataclass(eq=False)
-class HasDrawnGraspsByDefault(HasGraspCandidates, Mixin):
+class HasDrawnGraspsByDefault(IsGraspable, Mixin):
     """
     A mixin class for semantic annotations whose shape is known well enough that, while
     no model is given, their grasps are drawn uniformly from where their
@@ -851,7 +851,7 @@ class HasDoors(PartWholeRelationship, Mixin):
 
 
 @dataclass(eq=False)
-class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
+class HasHandle(IsGraspable, PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have a handle, and are grasped at it
     when they have one.
@@ -865,7 +865,7 @@ class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
     The handle of the semantic annotation.
     """
 
-    def grasped_part(self) -> HasGraspCandidates:
+    def grasped_part(self) -> IsGraspable:
         """
         :return: The handle; without a handle, the part the annotation is grasped at
             otherwise.
@@ -890,7 +890,7 @@ class HasRim(HasDrawnGraspsByDefault, PartWholeRelationship, Mixin):
     The rim of the container.
     """
 
-    def grasped_part(self) -> HasGraspCandidates:
+    def grasped_part(self) -> IsGraspable:
         """
         :return: The rim; without a rim, the part the annotation is grasped at
             otherwise.
@@ -1414,7 +1414,11 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
                 if self.calculate_supporting_surface() is None:
                     raise NoSupportingSurfaceError(self)
 
-        origin = HomogeneousTransformationMatrix(reference_frame=self.root)
+        # The surface's own frame lies on its top, so the free space and the paths
+        # through it are expressed relative to what stands on it.
+        origin = HomogeneousTransformationMatrix(
+            reference_frame=self.supporting_surface
+        )
         surface_box = self.supporting_surface.area.as_bounding_box_collection_at_origin(
             origin
         ).bounding_box()
@@ -1432,7 +1436,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
                     origin,
                 )
             ],
-            self.root,
+            self.supporting_surface,
         )
 
         semantic_obstacle_annotation = SemanticEnvironmentAnnotation(

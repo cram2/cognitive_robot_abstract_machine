@@ -21,6 +21,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% helpers
 
@@ -73,8 +74,7 @@ def _compile_a_recorded_drive(world: World) -> StatechartExecutor:
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPosition(
-            root_link=world.root,
-            tip_link=_robot(world),
+            kinematic_chain=KinematicChain(root=world.root, tip=_robot(world)),
             goal_point=Point3(x=5, reference_frame=world.root),
             name=str(_robot(world).name),
         )

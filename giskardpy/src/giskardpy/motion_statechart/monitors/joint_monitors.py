@@ -1,3 +1,9 @@
+"""
+Monitors of the positions of joints.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
@@ -7,11 +13,14 @@ from semantic_digital_twin.world_description.connections import (
 )
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.mixins import HasThresholdParameter
 from cramph.node import NodeArtifacts
+
+# %% joint monitors
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class JointPositionReached(EndedByOwner, MotionStatechartNode):
+class JointPositionReached(EndedByOwner, MotionStatechartNode, HasThresholdParameter):
     """
     Monitors if a joint position is reached within a certain threshold.
     """
@@ -24,11 +33,6 @@ class JointPositionReached(EndedByOwner, MotionStatechartNode):
     position: float
     """
     Target position to monitor.
-    """
-
-    threshold: float = 0.01
-    """
-    Threshold for position error.
     """
 
     def build_artifacts(self) -> NodeArtifacts:
