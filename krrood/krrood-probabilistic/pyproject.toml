@@ -1,13 +1,26 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "krrood-probabilistic"
 dynamic = ["version"]
 description = "Probabilistic queries and feature extraction over entity queries."
+readme = "README.md"
 requires-python = ">=3.10"
 license = "LGPL-3.0-only"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+]
 authors = [
     {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"},
     {name = "Naren Vasantakumaar", email = "naren@uni-bremen.de"},
