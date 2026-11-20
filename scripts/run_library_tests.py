@@ -9,9 +9,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from cognitive_robot_abstract_machine.continuous_integration_jobs import (
+from krrood.development_tools.continuous_integration_jobs import (
+    ContinuousIntegrationJobLayout,
     LibraryTests,
 )
+
+from cognitive_robot_abstract_machine.repository_files import RepositoryFile
 
 
 def main() -> None:
@@ -28,8 +31,14 @@ def main() -> None:
     )
     arguments = parser.parse_args()
     repository_root = Path(__file__).resolve().parents[1]
+    layout = ContinuousIntegrationJobLayout.from_toml(
+        text=(repository_root / RepositoryFile.CONTINUOUS_INTEGRATION_JOBS).read_text()
+    )
     outcomes = [
-        library_tests.run(repository_root=repository_root)
+        library_tests.run(
+            repository_root=repository_root,
+            environment=layout.test_environments.get(library_tests.library_name, {}),
+        )
         for library_tests in LibraryTests.from_test_paths_json(
             text=arguments.test_paths
         )

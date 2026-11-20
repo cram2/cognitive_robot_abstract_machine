@@ -14,35 +14,33 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass
-from enum import Enum, StrEnum
+from enum import StrEnum
 from functools import cached_property
 from pathlib import Path
 
+from krrood.development_tools.exceptions import (
+    UnknownContinuousIntegrationLibraryError,
+)
+from krrood.development_tools.pyproject import Pyproject
 from krrood.patterns.classproperty import classproperty
-from krrood.patterns.path_enumeration import PathEnumeration
 from krrood.source_analysis.import_graph import ModuleGraph, PythonSourceFile
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from typing_extensions import Any, Iterable
-
-from cognitive_robot_abstract_machine.exceptions import (
-    UnknownContinuousIntegrationLibraryError,
-)
-from cognitive_robot_abstract_machine.pyproject import Pyproject
-from cognitive_robot_abstract_machine.repository_files import (
-    RepositoryDirectory,
-)
 
 # %% keys and names of the files read and written
 
 
 class JobLayoutKey(StrEnum):
     """
-    The keys of :attr:`RepositoryFile.CONTINUOUS_INTEGRATION_JOBS`.
+    The keys of the file declaring a :class:`ContinuousIntegrationJobLayout`.
     """
 
+    TESTS_DIRECTORY = "tests_directory"
+    DOCUMENTATION_PATHS = "documentation_paths"
     SHARED_JOBS = "shared_jobs"
     ASSIGNED_TESTS = "assigned_tests"
+    TEST_ENVIRONMENTS = "test_environments"
     NAME = "name"
     LIBRARIES = "libraries"
     CHECK_RULES = "check_rules"
@@ -125,85 +123,6 @@ class MemberDirectoryName(StrEnum):
     """
 
 
-# %% paths without tests
-
-
-class DocumentationPath(PathEnumeration):
-    """
-    The paths of the repository's own documentation, whose change affects no test of a
-    workspace member.
-    """
-
-    DOCUMENTATION = Path("doc")
-    """
-    The documentation of the repository as a whole.
-    """
-
-    README = Path("README.md")
-    """
-    The introduction to the repository.
-    """
-
-    CHANGELOG = Path("CHANGELOG.md")
-    """
-    The changes of each release.
-    """
-
-    LICENSE = Path("LICENSE")
-    """
-    The license the repository is published under.
-    """
-
-    ISSUE_TEMPLATES = Path(".github") / "ISSUE_TEMPLATE"
-    """
-    The forms an issue is opened with.
-    """
-
-
-# %% environment of a library's tests
-
-
-@dataclass(frozen=True)
-class EnvironmentSetting:
-    """
-    An environment variable the tests of one library need set before Python starts.
-    """
-
-    library_name: str
-    """
-    The name CI lists the library under.
-    """
-
-    variable_name: str
-    """
-    The name of the environment variable.
-    """
-
-    variable_value: str
-    """
-    The value the variable is set to.
-    """
-
-
-class LibraryEnvironmentSetting(EnvironmentSetting, Enum):
-    """
-    The environment variables the tests of a library need, which have to be set
-    before the test process imports the package reading them.
-    """
-
-    OFFSCREEN_QT = "probabilistic_model", "QT_QPA_PLATFORM", "offscreen"
-    """
-    Qt draws the plots of the tests without a display.
-    """
-
-    HEADLESS_MUJOCO = "semantic_digital_twin", "MUJOCO_GL", "egl"
-    """
-    MuJoCo renders its video-recorder tests with EGL. Under xvfb it would pick its
-    windowed GLFW backend and fail to create a context; it locks the backend when
-    imported.
-    """
-
-
 # %% workspace
 
 
@@ -234,16 +153,6 @@ class WorkspaceMember:
         The name CI lists the member's tests under.
         """
         return self.directory.name
-
-    @property
-    def test_directory(self) -> Path:
-        """
-        The test directory named after the member, relative to the repository root.
-        It also holds the tests of the members nested in the member's directory.
-        """
-        return RepositoryDirectory.TESTS / (
-            self.library_name + LibraryTests.directory_suffix
-        )
 
     @classmethod
     def from_directory(
@@ -380,23 +289,13 @@ class LibraryTests:
         """
         return "_test"
 
-    @property
-    def environment(self) -> dict[str, str]:
+    def run(self, *, repository_root: Path, environment: dict[str, str]) -> bool:
         """
-        The environment variables the library's tests need set.
-        """
-        return {
-            setting.variable_name: setting.variable_value
-            for setting in LibraryEnvironmentSetting
-            if setting.library_name == self.library_name
-        }
-
-    def run(self, *, repository_root: Path) -> bool:
-        """
-        Run pytest over the tests in a process of its own, with one worker per core
-        and :attr:`environment` added to the current environment.
+        Run pytest over the tests in a process of its own, with one worker per core.
 
         :param repository_root: The root of the repository the test paths are in.
+        :param environment: The variables added to the current environment for the
+            run.
         :return: Whether every test passed.
         """
         command = [
@@ -407,7 +306,7 @@ class LibraryTests:
             PytestOption.WORKER_PER_CORE,
             *(str(repository_root / test_path) for test_path in self.test_paths),
         ]
-        completed = subprocess.run(command, env=os.environ | self.environment)
+        completed = subprocess.run(command, env=os.environ | environment)
         return completed.returncode == 0
 
     @classmethod
@@ -442,9 +341,9 @@ class RepositoryTestSuite:
     The workspace whose members the tests test.
     """
 
-    assigned_tests: tuple[LibraryTests, ...]
+    layout: ContinuousIntegrationJobLayout
     """
-    The tests assigned to a library by hand, whatever they import.
+    The layout naming the directories of the tests and the tests assigned by hand.
     """
 
     @cached_property
@@ -452,7 +351,7 @@ class RepositoryTestSuite:
         """
         The modules of the tests and of every workspace member.
         """
-        package_directories = [self.repository_root / RepositoryDirectory.TESTS]
+        package_directories = [self.repository_root / self.layout.tests_directory]
         for member in self.workspace.members:
             source = (
                 self.repository_root / member.directory / MemberDirectoryName.SOURCE
@@ -513,7 +412,7 @@ class RepositoryTestSuite:
         return {
             name: path
             for path, name in self.module_names.items()
-            if path.is_relative_to(RepositoryDirectory.TESTS)
+            if path.is_relative_to(self.layout.tests_directory)
             and path.name == PytestFileName.CONFIGURATION
         }
 
@@ -549,7 +448,7 @@ class RepositoryTestSuite:
     def test_libraries(self) -> dict[str, str]:
         """
         The library of each test file, keyed by its dotted module name. A test belongs
-        to its :attr:`assigned_tests` library, else to the member its test directory is
+        to its :attr:`ContinuousIntegrationJobLayout.assigned_tests` library, else to the member its test directory is
         named after or, where members nested in that one depend on every member the
         test uses, to the one of those depending on the fewest members.
         """
@@ -573,7 +472,7 @@ class RepositoryTestSuite:
                     covering,
                     key=lambda nested: len(self.workspace.dependency_closures[nested]),
                 ).library_name
-        for assigned in self.assigned_tests:
+        for assigned in self.layout.assigned_tests:
             for module, path in self.test_files.items():
                 if any(
                     path.is_relative_to(test_path) for test_path in assigned.test_paths
@@ -586,12 +485,12 @@ class RepositoryTestSuite:
         :param path: A path relative to the repository root.
         :return: The test directory of a library that holds the path, or none.
         """
-        if not path.is_relative_to(RepositoryDirectory.TESTS):
+        if not path.is_relative_to(self.layout.tests_directory):
             return None
-        parts = path.relative_to(RepositoryDirectory.TESTS).parts
+        parts = path.relative_to(self.layout.tests_directory).parts
         if len(parts) < 2 or not parts[0].endswith(LibraryTests.directory_suffix):
             return None
-        return RepositoryDirectory.TESTS / parts[0]
+        return self.layout.tests_directory / parts[0]
 
     @functools.cache
     def imported_modules(self, *, module: str) -> tuple[str, ...]:
@@ -637,7 +536,7 @@ class RepositoryTestSuite:
             pending.extend(
                 imported
                 for imported in self.imported_modules(module=name)
-                if imported.partition(".")[0] == RepositoryDirectory.TESTS.name
+                if imported.partition(".")[0] == self.layout.tests_directory.name
             )
         return frozenset(loaded)
 
@@ -663,17 +562,21 @@ class RepositoryTestSuite:
             root.
         :return: The tests that change can affect, per library in the order of
             :attr:`library_names`. A path outside every member, the tests and
-            :class:`DocumentationPath` affects every test, as does a ``conftest.py``
+            :attr:`ContinuousIntegrationJobLayout.documentation_paths` affects every
+            test, as does a ``conftest.py``
             loading a changed test module affect every test below it.
         """
         changed_members = set()
         changed_modules = set()
         changed_test_directories = set()
         for path in changed_paths:
-            if any(path.is_relative_to(document) for document in DocumentationPath):
+            if any(
+                path.is_relative_to(document)
+                for document in self.layout.documentation_paths
+            ):
                 continue
             if (
-                path.is_relative_to(RepositoryDirectory.TESTS)
+                path.is_relative_to(self.layout.tests_directory)
                 and path in self.module_names
             ):
                 changed_modules.add(self.module_names[path])
@@ -752,7 +655,7 @@ class RepositoryTestSuite:
 class SharedJob:
     """
     A CI job that runs the tests of several libraries, as
-    :attr:`RepositoryFile.CONTINUOUS_INTEGRATION_JOBS` declares it.
+    :class:`ContinuousIntegrationJobLayout` declares it.
     """
 
     name: str
@@ -820,6 +723,19 @@ class ContinuousIntegrationJobLayout:
     job run together, every other library in a job of its own.
     """
 
+    tests_directory: Path
+    """
+    The directory holding the test directory of each library, relative to the
+    repository root. A library's test directory is named after it, followed by
+    :attr:`LibraryTests.directory_suffix`.
+    """
+
+    documentation_paths: tuple[Path, ...]
+    """
+    The paths of the repository's own documentation, relative to the repository root,
+    whose change affects no test.
+    """
+
     shared_jobs: tuple[SharedJob, ...]
     """
     The jobs running the tests of several libraries.
@@ -829,6 +745,12 @@ class ContinuousIntegrationJobLayout:
     """
     The tests assigned to a library by hand: those that load the modules of members
     other than by importing them, such as in a subprocess.
+    """
+
+    test_environments: dict[str, dict[str, str]]
+    """
+    The environment variables the tests of a library need set before Python starts,
+    by library.
     """
 
     def jobs_running(
@@ -843,19 +765,24 @@ class ContinuousIntegrationJobLayout:
             that run one library alone.
         :return: The jobs running exactly those tests. A shared job that checks the
             rules is kept even when none of its libraries is affected.
-        :raises UnknownContinuousIntegrationLibraryError: When a shared job or the assigned tests name
-            an unknown library.
+        :raises UnknownContinuousIntegrationLibraryError: When a shared job, the
+            assigned tests or the test environments name an unknown library.
         """
         known_library_names = tuple(known_library_names)
-        unknown_assigned_library_names = {
-            assigned.library_name for assigned in self.assigned_tests
-        }.difference(known_library_names)
-        if unknown_assigned_library_names:
-            raise UnknownContinuousIntegrationLibraryError(
-                section=JobLayoutKey.ASSIGNED_TESTS,
-                library_names=tuple(sorted(unknown_assigned_library_names)),
-                known_library_names=known_library_names,
-            )
+        library_names_by_table = {
+            JobLayoutKey.ASSIGNED_TESTS: {
+                assigned.library_name for assigned in self.assigned_tests
+            },
+            JobLayoutKey.TEST_ENVIRONMENTS: set(self.test_environments),
+        }
+        for table, library_names in library_names_by_table.items():
+            unknown_table_library_names = library_names.difference(known_library_names)
+            if unknown_table_library_names:
+                raise UnknownContinuousIntegrationLibraryError(
+                    section=table,
+                    library_names=tuple(sorted(unknown_table_library_names)),
+                    known_library_names=known_library_names,
+                )
         affected_by_name = {tests.library_name: tests for tests in affected_tests}
         shared_library_names = set()
         shared_jobs = []
@@ -893,11 +820,15 @@ class ContinuousIntegrationJobLayout:
     @classmethod
     def from_toml(cls, *, text: str) -> ContinuousIntegrationJobLayout:
         """
-        :param text: The content of :attr:`RepositoryFile.CONTINUOUS_INTEGRATION_JOBS`.
+        :param text: The content of a file declaring a layout.
         :return: The layout it describes.
         """
         layout = tomllib.loads(text)
         return cls(
+            tests_directory=Path(layout[JobLayoutKey.TESTS_DIRECTORY]),
+            documentation_paths=tuple(
+                Path(path) for path in layout.get(JobLayoutKey.DOCUMENTATION_PATHS, [])
+            ),
             shared_jobs=tuple(
                 SharedJob(
                     name=job[JobLayoutKey.NAME],
@@ -915,6 +846,7 @@ class ContinuousIntegrationJobLayout:
                     JobLayoutKey.ASSIGNED_TESTS, {}
                 ).items()
             ),
+            test_environments=layout.get(JobLayoutKey.TEST_ENVIRONMENTS, {}),
         )
 
 

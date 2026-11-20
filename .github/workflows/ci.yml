@@ -54,9 +54,9 @@ jobs:
       - id: select
         name: Select the test jobs
         env:
-          # krrood-core loads without the rest of krrood, so the job needs no install of the
+          # The selection loads with krrood-core alone, so the job needs no install of the
           # workspace.
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/krrood/krrood-core/src
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/krrood/krrood-core/src:${{ github.workspace }}/krrood/krrood-development-tools/src
         run: |
           since=()
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then

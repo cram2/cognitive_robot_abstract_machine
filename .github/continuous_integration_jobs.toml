@@ -1,6 +1,17 @@
 # How CI divides the tests of the libraries into jobs. Every library not named in a
 # shared job runs in a job of its own, named after it. A pull request runs only the tests
-# its change can affect: see cognitive_robot_abstract_machine/continuous_integration_jobs.py.
+# its change can affect: see krrood.development_tools.continuous_integration_jobs.
+
+tests_directory = "test"
+
+# The repository's own documentation, whose change runs none of the members' tests.
+documentation_paths = [
+    "doc",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    ".github/ISSUE_TEMPLATE",
+]
 
 [[shared_jobs]]
 # The krrood distributions, whose tests all live in test/krrood_test, share one job
@@ -46,3 +57,12 @@ krrood = [
     "test/krrood_test/test_declared_dependencies.py",
     "test/krrood_test/test_namespace_package.py",
 ]
+
+[test_environments.probabilistic_model]
+# Qt draws the plots of the tests without a display.
+QT_QPA_PLATFORM = "offscreen"
+
+[test_environments.semantic_digital_twin]
+# MuJoCo renders its video-recorder tests with EGL. Under xvfb it would pick its windowed
+# GLFW backend and fail to create a context; it locks the backend when imported.
+MUJOCO_GL = "egl"

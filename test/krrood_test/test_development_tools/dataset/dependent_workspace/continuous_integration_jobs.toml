@@ -1,3 +1,6 @@
+tests_directory = "test"
+documentation_paths = ["doc"]
+
 [[shared_jobs]]
 name = "chain"
 libraries = ["base", "middle"]
@@ -9,3 +12,6 @@ check_rules = true
 
 [assigned_tests]
 family = ["test/family_test/test_family_both.py"]
+
+[test_environments.base]
+CHAIN_RENDERING = "offscreen"

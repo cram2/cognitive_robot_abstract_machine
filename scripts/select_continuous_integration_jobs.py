@@ -13,7 +13,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from cognitive_robot_abstract_machine.continuous_integration_jobs import (
+from krrood.development_tools.continuous_integration_jobs import (
     ContinuousIntegrationJobLayout,
     ContinuousIntegrationJobMatrix,
     GitHubActionsName,
@@ -49,7 +49,7 @@ def main() -> None:
     test_suite = RepositoryTestSuite(
         repository_root=repository_root,
         workspace=Workspace.from_repository_root(repository_root=repository_root),
-        assigned_tests=layout.assigned_tests,
+        layout=layout,
     )
     affected_tests = test_suite.all_tests()
     if arguments.since is not None:

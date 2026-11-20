@@ -16,7 +16,7 @@ from pathlib import Path
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
-from cognitive_robot_abstract_machine.pyproject import Pyproject, PyprojectKey
+from krrood.development_tools.pyproject import Pyproject, PyprojectKey
 
 
 # %% names the script reads

@@ -1,5 +1,5 @@
 """
-The parts of a ``pyproject.toml`` the repository's tools read.
+The parts of a ``pyproject.toml`` the development tools read.
 """
 
 from __future__ import annotations
@@ -9,15 +9,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from krrood.patterns.classproperty import classproperty
 from packaging.utils import canonicalize_name
-
-from cognitive_robot_abstract_machine.repository_files import RepositoryFile
 
 # %% keys of a pyproject.toml
 
 
 class PyprojectKey(StrEnum):
-    """The keys of a ``pyproject.toml`` the repository's tools read."""
+    """The keys of a ``pyproject.toml`` the development tools read."""
 
     PROJECT = "project"
     NAME = "name"
@@ -42,7 +41,7 @@ class PyprojectKey(StrEnum):
 # %% the pyproject.toml model
 @dataclass(frozen=True, kw_only=True)
 class Pyproject:
-    """The parts of a ``pyproject.toml`` the repository's tools read.
+    """The parts of a ``pyproject.toml`` the development tools read.
 
     Only :meth:`from_text` knows where in the file they are.
     """
@@ -74,6 +73,13 @@ class Pyproject:
 
     workspace_members: list[str]
     """The ``[tool.uv.workspace]`` members; empty without a workspace."""
+
+    @classproperty
+    def file_name(cls) -> str:
+        """
+        The name of the file that declares a Python project.
+        """
+        return "pyproject.toml"
 
     @classmethod
     def from_text(cls, *, text: str) -> Pyproject:
@@ -116,4 +122,4 @@ class Pyproject:
         :param directory: A directory holding a ``pyproject.toml``.
         :return: What the tools read of that file.
         """
-        return cls.from_text(text=(directory / RepositoryFile.PYPROJECT).read_text())
+        return cls.from_text(text=(directory / Pyproject.file_name).read_text())
