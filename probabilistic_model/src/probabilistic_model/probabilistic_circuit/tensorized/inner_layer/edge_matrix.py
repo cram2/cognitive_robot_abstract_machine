@@ -539,7 +539,7 @@ class DenseEdgeMatrix(EdgeMatrix):
 
 
 @dataclass(kw_only=True)
-class BlockStack:
+class EdgeBlockStack:
     """
     Full blocks of one shape of an edge matrix: every row of a block has an edge to
     every column of the block.
@@ -606,7 +606,7 @@ class BlockEdgeMatrix(EdgeMatrix):
     region graph.
     """
 
-    stacks: list[BlockStack]
+    stacks: list[EdgeBlockStack]
     """
     The blocks of every shape, their edges in this order.
     """
@@ -692,7 +692,7 @@ class BlockEdgeMatrix(EdgeMatrix):
         stacks = []
         first_position = 0
         for blocks in blocks_by_shape.values():
-            stack = BlockStack(
+            stack = EdgeBlockStack(
                 block_rows=np.array([rows for rows, _ in blocks], dtype=np.int64),
                 block_columns=np.array([cols for _, cols in blocks], dtype=np.int64),
                 first_position=first_position,

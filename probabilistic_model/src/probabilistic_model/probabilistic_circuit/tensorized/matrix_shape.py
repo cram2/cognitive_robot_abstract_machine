@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class MatrixShape2D:
     """
     The number of rows and of columns of a matrix.
@@ -29,8 +29,8 @@ class MatrixShape2D:
         """
         Store the numbers as Python integers, whatever integer type they were given as.
         """
-        object.__setattr__(self, "number_of_rows", int(self.number_of_rows))
-        object.__setattr__(self, "number_of_columns", int(self.number_of_columns))
+        self.number_of_rows = int(self.number_of_rows)
+        self.number_of_columns = int(self.number_of_columns)
 
     def to_tuple(self) -> tuple[int, int]:
         """
