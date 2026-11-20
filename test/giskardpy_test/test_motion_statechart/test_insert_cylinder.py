@@ -1,3 +1,7 @@
+"""
+Tests of inserting a held cylinder into a hole.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -32,6 +36,10 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
+    """
+    Tracy inserts the cylinder it holds into a hole: the cylinder's bottom ends at the
+    hole, its axis pointing straight down.
+    """
     world = deepcopy(tracy_world)
     robot = world.get_semantic_annotations_by_type(Tracy)[0]
     tool_frame = world.get_body_by_name("r_gripper_tool_frame")
@@ -76,7 +84,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
         tip_link=cylinder,
         tip_P_tool=Point3(0.0, 0.0, cylinder_height / 2, reference_frame=cylinder),
         tip_V_axis=Vector3(0.0, 0.0, -1.0, reference_frame=cylinder),
-        up_axis=Vector3(0.0, 0.0, 1.0, reference_frame=world.root),
+        hole_normal=Vector3(0.0, 0.0, 1.0, reference_frame=world.root),
         hole_point=hole_point,
         pre_grasp_height=0.1,
     )

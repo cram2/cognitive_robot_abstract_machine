@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from control_msgs.action import ParallelGripperCommand
 from rclpy.task import Future
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from krrood.patterns.called_positionally import called_positionally
 from giskardpy.motion_statechart.tasks.gripper import (
@@ -87,8 +87,8 @@ class RobotiqGripperActionServerTask(
         cls,
         *,
         configuration: GripperConfiguration,
-        stall_minimum_time: float | None = None,
-        tolerate_stall: bool = False,
+        finger_stall_minimum_time: float | None = None,
+        tolerate_finger_stall: bool = False,
     ) -> StatechartNode:
         """
         Differs from :meth:`MovesGripperToConfiguration.create_gripper_goal` in driving
@@ -107,8 +107,8 @@ class RobotiqGripperActionServerTask(
         if not isinstance(end_effector, HasParallelGripperCommandServer):
             return MoveFingers.create_gripper_goal(
                 configuration=configuration,
-                stall_minimum_time=stall_minimum_time,
-                tolerate_stall=tolerate_stall,
+                finger_stall_minimum_time=finger_stall_minimum_time,
+                tolerate_finger_stall=tolerate_finger_stall,
             )
         return cls(
             action_topic=end_effector.action_topic_serving(
@@ -160,17 +160,17 @@ class RobotiqGripperActionServerTask(
             f"Stalled: {self._result.result.stalled}"
         )
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         """
         :return: ``TRUE`` once the server reported the fingers at the goal or stalled
             on an object or their limit, ``FALSE`` once it rejected the goal or
             reported neither, and ``UNKNOWN`` until it answered.
         """
         if not self._done:
-            return ObservationStateValues.UNKNOWN
+            return ObservationStateValue.UNKNOWN
         if not self._goal_accepted:
-            return ObservationStateValues.FALSE
+            return ObservationStateValue.FALSE
         action_result = self._result.result
         if action_result.reached_goal or action_result.stalled:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE

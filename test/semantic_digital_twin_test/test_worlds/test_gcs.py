@@ -411,7 +411,9 @@ def test_from_world_with_rotated_box():
         # Box 1: at origin
         axis_aligned_box_body = Body(name=PrefixedName("box_one"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world, root_body, axis_aligned_box_body)
+            FixedConnection.create_with_dofs(
+                world=world, parent=root_body, child=axis_aligned_box_body
+            )
         )
         axis_aligned_box = Box(scale=Scale(1, 1, 1))
         axis_aligned_box_body.collision.append(axis_aligned_box)
@@ -423,9 +425,9 @@ def test_from_world_with_rotated_box():
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root_body,
-                rotated_box_body,
+                world=world,
+                parent=root_body,
+                child=rotated_box_body,
                 parent_T_connection_expression=rotated_box_body_pose,
             )
         )
@@ -621,9 +623,9 @@ def _floor_with_an_obstacle_standing_on_it() -> Floor:
         obstacle = Body(name=PrefixedName("obstacle"))
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                world.root,
-                obstacle,
+                world=world,
+                parent=world.root,
+                child=obstacle,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.0, 0.0, 0.5, reference_frame=world.root
                 ),
@@ -721,6 +723,30 @@ def test_planar_free_space_computes_a_missing_supporting_surface():
     assert len(graph.graph.nodes()) > 0
 
 
+def test_planar_free_space_lays_its_path_on_the_surface_top():
+    """
+    The free space starts at the top of the surface, so the path laid out through it
+    lies on that top rather than inside the slab the surface belongs to.
+    """
+    floor = _floor_with_an_obstacle_standing_on_it()
+    world = floor._world
+    floor_top = (
+        floor.root.collision.as_bounding_box_collection_in_frame(world.root)
+        .bounding_box()
+        .max_z
+    )
+
+    graph = floor.planar_free_space(max_height=2.0)
+    path = graph.path_from_to(
+        Point2(-1.5, 0.0, reference_frame=world.root),
+        Point2(1.5, 0.0, reference_frame=world.root),
+    )
+
+    for waypoint in path:
+        world_P_waypoint = world.transform(waypoint.to_point3(), world.root)
+        assert float(world_P_waypoint.z) == pytest.approx(float(floor_top))
+
+
 def test_planar_free_space_rejects_an_annotation_without_any_surface():
     """
     An annotation whose geometry offers nothing to stand on cannot have a free space
@@ -761,9 +787,9 @@ def test_path_from_to_answers_every_waypoint_in_the_search_spaces_frame():
         wall = Body(name=PrefixedName("wall"))
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                world.root,
-                wall,
+                world=world,
+                parent=world.root,
+                child=wall,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     10.0, 0.0, 0.5, reference_frame=world.root
                 ),
@@ -1053,7 +1079,9 @@ def test_free_space_from_world_keeps_the_given_height_clearance_off_obstacles():
         world.add_kinematic_structure_entity(root_body)
         box_body = Body(name=PrefixedName("box"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world, root_body, box_body)
+            FixedConnection.create_with_dofs(
+                world=world, parent=root_body, child=box_body
+            )
         )
         box_body.collision.append(Box(scale=Scale(1, 1, 1)))
     search_space = BoundingBoxCollection(

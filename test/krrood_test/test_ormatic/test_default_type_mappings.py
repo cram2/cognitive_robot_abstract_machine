@@ -1,3 +1,10 @@
+"""
+Tests of the types ORMatic stores by default and of the type mappings a caller gives.
+"""
+
+from __future__ import annotations
+
+
 import datetime
 import decimal
 import fractions
@@ -171,6 +178,37 @@ def test_array_keeps_its_values_shape_and_dtype(array, session, database):
 
     np.testing.assert_array_equal(reconstructed.value, array)
     assert reconstructed.value.shape == array.shape
+    assert reconstructed.value.dtype == array.dtype
+
+
+def test_array_typed_with_its_element_type_survives_a_round_trip(session, database):
+    """
+    A field hinted with a parametrized :data:`numpy.typing.NDArray` is stored like one
+    hinted :class:`numpy.ndarray`.
+    """
+    array = np.arange(6, dtype=np.float64).reshape(2, 3)
+
+    reconstructed = store_and_load(StoredTypedArray(value=array), session)
+
+    np.testing.assert_array_equal(reconstructed.value, array)
+    assert reconstructed.value.dtype == array.dtype
+
+
+@pytest.mark.parametrize(
+    "array_holder_class", [StoredAliasedArray, StoredAliasedTypedArray]
+)
+def test_array_typed_with_a_type_alias_survives_a_round_trip(
+    array_holder_class, session, database
+):
+    """
+    A field hinted with a type alias of :class:`numpy.ndarray`, parametrized or not, is
+    stored like one hinted :class:`numpy.ndarray`.
+    """
+    array = np.arange(6, dtype=np.float64).reshape(2, 3)
+
+    reconstructed = store_and_load(array_holder_class(value=array), session)
+
+    np.testing.assert_array_equal(reconstructed.value, array)
     assert reconstructed.value.dtype == array.dtype
 
 

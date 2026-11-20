@@ -1,4 +1,4 @@
-# Hooks for krrood's development tools (krrood/src/krrood/development_tools). They run the
+# Hooks for krrood's development tools (krrood/krrood-development-tools/src/krrood/development_tools). They run the
 # installed `krrood` command, so the repository using them installs
 # `krrood[development-tools]` in its development environment; see
 # krrood/doc/development_tools.md.

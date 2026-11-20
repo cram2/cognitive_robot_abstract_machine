@@ -97,6 +97,13 @@ class DatasetFile(PathEnumeration):
     and the path of the module declaring it.
     """
 
+    EXCLUDING_PYPROJECT = (
+        Path(__file__).parent / "dataset" / "check_exclusion" / "pyproject.toml"
+    )
+    """
+    A ``pyproject.toml`` keeping the files under ``excluded/`` out of ``krrood check``.
+    """
+
     PROJECT_ISSUE_FORMS_MODULE = (
         Path(__file__).parent / "dataset" / "project_issue_forms_module.py"
     )
@@ -273,6 +280,11 @@ class DatasetMarker(StrEnum):
     An import the core boundary checker reports.
     """
 
+    RUFF_FINDING = "# reported"
+    """
+    A line the rule whose lint rules a snippet of :class:`RuffSnippet` breaks reports.
+    """
+
 
 class MimicModule(StrEnum):
     """
@@ -344,4 +356,127 @@ class MethodNameSnippet(PathEnumeration):
     """
     A module whose method names are verb phrases, an alternative constructor and a
     conversion.
+    """
+
+
+class RuffSnippet(PathEnumeration):
+    """
+    The Python sources the checkers built on ruff read, each breaking the rule it names
+    on the lines marked with :attr:`DatasetMarker.RUFF_FINDING`.
+    """
+
+    DIRECTORY = Path(__file__).parent / "dataset" / "ruff_findings"
+    """
+    The directory holding the snippets.
+    """
+
+    MUTABLE_DEFAULT = DIRECTORY / "mutable_default.py"
+    """
+    A function defaulting a parameter to a list, which also asserts on an unmarked line.
+    """
+
+    ASSERTION = DIRECTORY / "assertion.py"
+    """
+    A function checking a precondition with ``assert``.
+    """
+
+    MISSING_TYPE_HINTS = DIRECTORY / "missing_type_hints.py"
+    """
+    Every kind of parameter and return value left unannotated once, and a function
+    annotated with ``Any``.
+    """
+
+    TYPING_CONSTRUCTS = DIRECTORY / "typing_constructs.py"
+    """
+    Imports from ``typing`` and annotations with its generic aliases.
+    """
+
+    MISSING_FUTURE_IMPORT = DIRECTORY / "missing_future_import.py"
+    """
+    A module without the import of postponed annotations.
+    """
+
+    QUOTED_ANNOTATIONS = DIRECTORY / "quoted_annotations.py"
+    """
+    A module postponing its annotations that still quotes a parameter and a return type.
+    """
+
+    RELATIVE_IMPORTS = DIRECTORY / "relative_imports.py"
+    """
+    Imports of modules of the same package, written relatively.
+    """
+
+    UNITTEST_CASE = DIRECTORY / "unittest_case.py"
+    """
+    A test on :class:`unittest.TestCase` using its assertion methods.
+    """
+
+    IMPORT_AFTER_CODE = DIRECTORY / "import_after_code.py"
+    """
+    An import after code has run, next to the blocks of imports that may follow
+    other imports.
+    """
+
+    PROTOCOL_INTERFACE = DIRECTORY / "protocol_interface.py"
+    """
+    Interfaces declared as protocols, imported by name and through their module.
+    """
+
+    MUTABLE_DATACLASS_DEFAULT = DIRECTORY / "mutable_dataclass_default.py"
+    """
+    A dataclass field defaulting to a list, next to one using a default factory.
+    """
+
+    VANILLA_EXCEPTIONS = DIRECTORY / "vanilla_exceptions.py"
+    """
+    :class:`Exception` raised itself and a message worded where it is raised, next to
+    a custom exception.
+    """
+
+    GLOBAL_STATEMENT = DIRECTORY / "global_statement.py"
+    """
+    A function rebinding a module variable.
+    """
+
+    BUILTIN_NAMES = DIRECTORY / "builtin_names.py"
+    """
+    A variable, a parameter and a method named after builtins.
+    """
+
+    BUILTIN_IMPORT_NAMES = DIRECTORY / "builtin_import_names.py"
+    """
+    An import and a lambda parameter named after builtins.
+    """
+
+    REBOUND_NAMES = DIRECTORY / "rebound_names.py"
+    """
+    An import bound twice, a loop variable assigned in its loop, a loop over a
+    parameter's name and a loop over an import's name.
+    """
+
+    STANDARD_LIBRARY_NAME = DIRECTORY / "standard_library_name.py"
+    """
+    A module that breaks no rule but its name, once copied under the name of a standard
+    library module.
+    """
+
+    SUPERFLUOUS_NESTING = DIRECTORY / "superfluous_nesting.py"
+    """
+    An ``else`` after a return and after a raise, an ``if`` that could join its
+    parent's, and blocks nested six deep.
+    """
+
+    COMMENTED_OUT_CODE = DIRECTORY / "commented_out_code.py"
+    """
+    A line of code commented out, next to an explaining comment.
+    """
+
+    TYPE_CHECKING_RUNTIME_IMPORT = DIRECTORY / "type_checking_runtime_import.py"
+    """
+    Imports under ``TYPE_CHECKING``, one of them used when the module runs.
+    """
+
+    SUPPRESSED_FINDING = DIRECTORY / "suppressed_finding.py"
+    """
+    A mutable default marked as a deliberate exception with ruff's ``noqa`` comment.
     """

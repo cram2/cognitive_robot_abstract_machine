@@ -11,9 +11,27 @@ And of course the books about object oriented design.
 ```bash
 pip install krrood
 ```
-If you want to use the visualization feature, you will also need to install [rustworkx_utils](https://github.com/AbdelrhmanBassiouny/rustworkx_utils).
+`krrood` installs every krrood distribution. Each part can also be installed on its own,
+and every part keeps its `krrood.*` import path:
+
+| distribution | modules |
+|---|---|
+| `krrood-core` | `krrood.class_diagrams`, `krrood.exceptions`, `krrood.patterns`, `krrood.singleton`, `krrood.source_analysis`, `krrood.symbol_graph`, `krrood.utils`, `krrood.bounds` |
+| `krrood-serialization` | `krrood.adapters` |
+| `krrood-code-generation` | `krrood.code_generation` |
+| `krrood-symbolic-math` | `krrood.symbolic_math` |
+| `krrood-rustworkx-utils` | `krrood.rustworkx_utils` |
+| `krrood-eql` | `krrood.entity_query_language`, `krrood.inheritance_path_length` |
+| `krrood-planning` | `krrood.planning` |
+| `krrood-ormatic` | `krrood.ormatic` |
+| `krrood-probabilistic` | `krrood.parametrization` |
+| `krrood-rdr` | `krrood.ripple_down_rules` |
+| `krrood-ontomatic` | `krrood.ontomatic` |
+| `krrood-development-tools` | `krrood.development_tools` and the `krrood` command |
+
+The graph visualizers need the `visualization` extra:
 ```bash
-pip install rustworkx_utils
+pip install "krrood[visualization]"
 ```
 
 ## Entity Query Language (EQL)

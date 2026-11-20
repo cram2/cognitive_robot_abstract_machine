@@ -27,8 +27,11 @@ from giskardpy.motion_control import WorldStateTrajectoryRecording, MotionContro
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.query.match import Match
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -42,6 +45,7 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from ..plan_running import robot_extensions, run_plan
 
 # %% a kitchen with a bowl and a cup in a drawer
@@ -193,55 +197,75 @@ def kitchen_with_filled_drawer(
 # %% taking both objects out of the drawer and setting them down
 
 
-def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
+def pick_ups_from_above(kitchen: KitchenWithFilledDrawer) -> list[PickUpAction]:
     """
     :param kitchen: The kitchen the plan is performed in.
+    :return: The pick-up of the bowl with the left arm and of the cup with the right
+        arm, each coming down onto it from above.
+    """
+    return [
+        PickUpAction.from_above(graspable=kitchen.bowl, arm=kitchen.robot.left_arm),
+        PickUpAction.from_above(graspable=kitchen.cup, arm=kitchen.robot.right_arm),
+    ]
+
+
+def transport_plan(
+    kitchen: KitchenWithFilledDrawer, *, pick_ups: list[PickUpAction | Match]
+) -> Sequence:
+    """
+    :param kitchen: The kitchen the plan is performed in.
+    :param pick_ups: The pick-up of the bowl and of the cup, run at once.
     :return: The plan that opens the drawer, takes the bowl with the left arm and the
         cup with the right arm at once, and sets both down on the kitchen island at
         once.
     """
     world, robot = kitchen.world, kitchen.robot
-    in_front_of_the_closed_drawer = Pose.from_xyz_rpy(
+    in_front_of_the_closed_drawer = Pose2D.from_xy_yaw(
         x=0.4, y=0.7, reference_frame=world.root
     )
-    in_front_of_the_open_drawer = Pose.from_xyz_rpy(
+    in_front_of_the_open_drawer = Pose2D.from_xy_yaw(
         x=0.3, y=0.89, reference_frame=world.root
     )
-    facing_the_kitchen_island = Pose.from_xyz_rpy(
+    facing_the_kitchen_island = Pose2D.from_xy_yaw(
         x=-0.25, y=1.85, yaw=np.pi, reference_frame=world.root
     )
     return Sequence(
         nodes=[
             # The arms start stretched out, which would reach into the counter.
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(target_location=in_front_of_the_closed_drawer),
+            NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
             OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(target_location=in_front_of_the_open_drawer),
+            NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
             Parallel(
                 nodes=[
                     HoldPose(
-                        root_link=kitchen.world.root, tip_link=robot.mobile_base.root
+                        kinematic_chain=KinematicChain(
+                            root=kitchen.world.root, tip=robot.mobile_base.root
+                        )
                     ),
-                    PickUpAction.from_above(kitchen.bowl, robot.left_arm),
-                    PickUpAction.from_above(kitchen.cup, robot.right_arm),
+                    *pick_ups,
                 ]
             ),
             ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(target_location=facing_the_kitchen_island),
+            NavigateAction(planar_goal_pose=facing_the_kitchen_island),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             Parallel(
                 nodes=[
                     HoldPose(
-                        root_link=kitchen.world.root, tip_link=robot.mobile_base.root
+                        kinematic_chain=KinematicChain(
+                            root=kitchen.world.root, tip=robot.mobile_base.root
+                        )
                     ),
                     PlaceAction(
-                        object_designator=kitchen.bowl,
-                        target_location=kitchen.world_T_bowl_goal,
+                        arm=robot.left_arm,
+                        graspable=kitchen.bowl,
+                        goal_pose=kitchen.world_T_bowl_goal,
                     ),
                     PlaceAction(
-                        object_designator=kitchen.cup,
-                        target_location=kitchen.world_T_cup_goal,
+                        arm=robot.right_arm,
+                        graspable=kitchen.cup,
+                        goal_pose=kitchen.world_T_cup_goal,
                     ),
                 ]
             ),
@@ -282,7 +306,7 @@ def test_bowl_and_cup_are_moved_from_the_drawer_onto_the_kitchen_island(
     recording = WorldStateTrajectoryRecording()
 
     run_plan(
-        transport_plan(kitchen),
+        transport_plan(kitchen, pick_ups=pick_ups_from_above(kitchen)),
         kitchen.context_extensions,
         collision_avoidance=True,
         extensions=[
@@ -297,6 +321,28 @@ def test_bowl_and_cup_are_moved_from_the_drawer_onto_the_kitchen_island(
     assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
 
 
+def test_bowl_and_cup_picked_up_as_statements_are_moved_onto_the_kitchen_island(
+    kitchen_with_filled_drawer: KitchenWithFilledDrawer,
+) -> None:
+    """
+    A pick-up described by a statement is grounded only once it starts, so the places
+    after it are built before anything says how the objects will be held.
+    """
+    kitchen = kitchen_with_filled_drawer
+    pick_ups = [
+        a(PickUpAction)(grasp_candidate=pick_up.grasp_candidate, arm=pick_up.arm)
+        for pick_up in pick_ups_from_above(kitchen)
+    ]
+
+    run_plan(
+        transport_plan(kitchen, pick_ups=pick_ups),
+        kitchen.context_extensions,
+        collision_avoidance=True,
+    )
+
+    assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
+
+
 def test_the_drawer_stays_open_while_its_contents_are_carried_away(
     kitchen_with_filled_drawer: KitchenWithFilledDrawer,
 ) -> None:
@@ -306,7 +352,9 @@ def test_the_drawer_stays_open_while_its_contents_are_carried_away(
     ).parent_connection
 
     run_plan(
-        transport_plan(kitchen), kitchen.context_extensions, collision_avoidance=True
+        transport_plan(kitchen, pick_ups=pick_ups_from_above(kitchen)),
+        kitchen.context_extensions,
+        collision_avoidance=True,
     )
 
     # Opening ends once the goal driving the drawer to the joint's limit is within its

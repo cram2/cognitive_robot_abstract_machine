@@ -1,3 +1,10 @@
+"""
+Fixtures shared by the semantic_digital_twin tests: worlds, a mesh and database
+sessions.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
@@ -91,6 +98,18 @@ def millimetre_wall_strip() -> trimesh.Trimesh:
         faces=np.array([[2, 1, 0], [1, 2, 3]]),
         process=False,
     )
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load semantic_digital_twin's ORM interface, whose import registers the mappers of it
+    and the interfaces it builds on for every test.
+    """
+    import semantic_digital_twin.orm.ormatic_interface  # noqa: F401
 
 
 # %% ROS packages holding mesh files

@@ -1,3 +1,10 @@
+"""
+Tests of storing worlds, their robots and semantic annotations in a database.
+"""
+
+from __future__ import annotations
+
+from typing_extensions import TYPE_CHECKING
 import dataclasses
 import os
 import time
@@ -22,7 +29,12 @@ from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Actuator, Body
+from semantic_digital_twin.world_description.inertial_properties import (
+    Inertial,
+    InertiaTensor,
+)
+from semantic_digital_twin.adapters.multi_sim import MujocoCamera
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
@@ -36,7 +48,9 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
 from krrood.class_diagrams.class_diagram import WrappedClass
-from semantic_digital_twin.orm.ormatic_interface import *
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.orm.ormatic_interface import DegreeOfFreedomLimitsDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 
 
@@ -50,6 +64,12 @@ def engine():
 
 @pytest.fixture
 def session(engine):
+    """
+    :return: A session on *engine* holding semantic_digital_twin's tables, which are dropped
+        again after the test.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import Base
+
     session = Session(engine)
     Base.metadata.create_all(bind=session.bind)
     yield session
@@ -58,6 +78,15 @@ def session(engine):
 
 
 def test_table_world(session, table_world):
+    """
+    A stored world keeps all its bodies and comes back with the state and kinematics of
+    its revolute connection.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import (
+        KinematicStructureEntityDAO,
+        WorldMappingDAO,
+    )
+
     revolute_connection = table_world.get_connections_by_type(RevoluteConnection)[0]
     revolute_connection.position = 1
     revolute_connection.velocity = 23
@@ -91,6 +120,12 @@ def test_table_world(session, table_world):
 
 
 def test_insert(session):
+    """
+    A body keeps the origin of its collision shapes in the database, and comes back as
+    the reference frame of that origin.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import BodyDAO, BoxDAO, ShapeDAO
+
     origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
     scale = Scale(1.0, 1.0, 1.0)
     color = Color.from_rgba(red=0.0, green=1.0, blue=1.0)
@@ -137,6 +172,15 @@ def test_degree_of_freedom_limits(session):
 
 
 def test_pr2_world(pr2_world_state_reset, session):
+    """
+    The PR2's world can be stored, read back and copied, and its revolute connections
+    are stored as rows.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import (
+        RevoluteConnectionDAO,
+        WorldMappingDAO,
+    )
+
     dao: WorldMappingDAO = to_dao(pr2_world_state_reset)
     session.add(dao)
     session.commit()
@@ -241,6 +285,8 @@ def test_hsrb_world(hsr_world_state_reset, session):
     Verify that an HSRB world can be serialised, inserted into a database, queried back,
     and fully reconstructed — including the robot's mobile base.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     dao: WorldMappingDAO = to_dao(hsr_world_state_reset)
     session.add(dao)
     session.commit()
@@ -264,6 +310,8 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     type still carries the marker, the marked-field discovery must still find it, and
     the field *values* (handle, entry_way) must survive the round trip.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     world = World.create_with_root_body("root")
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
@@ -307,6 +355,8 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     A door whose origin sits away from its hinge must still swing about the hinge once
     reconstructed, so the offset of the door from its joint has to be persisted.
     """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
     hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
     world = World.create_with_root_body("root")
     with world.modify_world():
@@ -328,3 +378,99 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
         reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
         hinge_T_door.to_np(),
     )
+
+
+# %% what a simulation needs of a world after a round trip
+
+
+@pytest.fixture
+def world_with_box() -> World:
+    """
+    :return: A world holding one box named ``box`` with a full inertia tensor.
+    """
+    world = World()
+    box = Body(
+        name=PrefixedName("box"),
+        collision=ShapeCollection([Box(scale=Scale(0.1, 0.2, 0.3))]),
+        inertial=Inertial(
+            mass=2.0,
+            inertia=InertiaTensor.from_values(
+                ixx=0.3, iyy=0.4, izz=0.5, ixy=0.01, ixz=0.02, iyz=0.03
+            ),
+        ),
+    )
+    with world.modify_world():
+        world.add_kinematic_structure_entity(box)
+    return world
+
+
+def load_after_storing(world: World, session: Session) -> World:
+    """
+    :return: The world as it is read back from the database it was stored in.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
+    session.add(to_dao(world))
+    session.commit()
+    return session.scalar(select(WorldMappingDAO)).from_dao()
+
+
+def test_the_inertia_tensor_of_a_body_survives_a_round_trip(session, world_with_box):
+    """
+    A body read back from the database has the inertia tensor it was stored with.
+    """
+    box = world_with_box.get_body_by_name("box")
+
+    loaded = load_after_storing(world_with_box, session)
+
+    loaded_box = loaded.get_body_by_name("box")
+    assert np.array_equal(loaded_box.inertial.inertia.data, box.inertial.inertia.data)
+
+
+def test_a_camera_keeps_the_body_it_is_attached_to_through_a_round_trip(
+    session, world_with_box
+):
+    """
+    A camera read back from the database is attached to the body read back with it.
+    """
+    box = world_with_box.get_body_by_name("box")
+    with world_with_box.modify_world():
+        box.add_simulator_property(MujocoCamera(name="eye", body=box))
+
+    loaded = load_after_storing(world_with_box, session)
+
+    loaded_box = loaded.get_body_by_name("box")
+    [camera] = [
+        simulator_property
+        for simulator_property in loaded_box.simulator_additional_properties
+        if isinstance(simulator_property, MujocoCamera)
+    ]
+    assert camera.body is loaded_box
+
+
+def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
+    session, world_with_box
+):
+    """
+    An actuator read back from the database drives the degree of freedom it drove when
+    it was stored.
+    """
+    box = world_with_box.get_body_by_name("box")
+    arm = Body(name=PrefixedName("arm"))
+    actuator = Actuator(name=PrefixedName("servo"))
+    with world_with_box.modify_world():
+        world_with_box.add_kinematic_structure_entity(arm)
+        joint = RevoluteConnection.create_with_dofs(
+            world=world_with_box,
+            parent=box,
+            child=arm,
+            axis=Vector3.Z(reference_frame=box),
+        )
+        world_with_box.add_connection(joint)
+        actuator.add_dof(joint.dof)
+        world_with_box.add_actuator(actuator)
+
+    loaded = load_after_storing(world_with_box, session)
+
+    [loaded_actuator] = loaded.actuators
+    assert [dof.id for dof in loaded_actuator.dofs] == [joint.dof.id]

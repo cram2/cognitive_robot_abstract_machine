@@ -372,19 +372,6 @@ class RobotWithoutMobileBaseError(MotionStatechartError):
 
 
 @dataclass(kw_only=True)
-class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
-    """
-    Raised when a plot is requested but no debug expression samples were recorded.
-    """
-
-    def error_message(self) -> str:
-        return "Cannot plot: no debug expression samples were recorded."
-
-    def suggest_correction(self) -> str:
-        return "Call tick() at least once before plotting, or configure debug expressions to record."
-
-
-@dataclass(kw_only=True)
 class MarkerPublishingThreadEndedError(DataclassException):
     """
     Raised when markers are submitted for publishing after the thread publishing them

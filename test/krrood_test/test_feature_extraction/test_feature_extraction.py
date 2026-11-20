@@ -16,7 +16,6 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from random_events.set import Set
 from random_events.variable import Symbolic
-from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     ApproachSceneObject,
     NestedAction,

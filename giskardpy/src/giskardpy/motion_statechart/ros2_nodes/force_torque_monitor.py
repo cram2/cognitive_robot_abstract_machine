@@ -1,10 +1,16 @@
+"""
+Nodes that read a force-torque sensor from a ROS 2 topic.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 import numpy as np
 from geometry_msgs.msg import WrenchStamped
 
 from giskardpy.motion_statechart.ros2_nodes.topics import TopicSubscriberNode
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -44,15 +50,22 @@ class ForceTorqueNode(TopicSubscriberNode[WrenchStamped]):
 @dataclass(eq=False, repr=False, kw_only=True)
 class ForceImpactMonitor(ForceTorqueNode):
     """
-    This node checks if the force magnitude is above a threshold.
+    This node checks if the force magnitude is above :attr:`force_threshold`.
     """
 
-    threshold: float
+    force_threshold: float
+    """
+    The force magnitude above which this monitor observes true, in newtons.
+    """
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
+        """
+        :return: :attr:`ObservationStateValue.UNKNOWN` until a message arrives, then
+            whether the measured force exceeds :attr:`force_threshold`.
+        """
         super().on_tick()
         if not self.has_msg():
-            return ObservationStateValues.UNKNOWN
-        if self.force_magnitude() > self.threshold:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.UNKNOWN
+        if self.force_magnitude() > self.force_threshold:
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE

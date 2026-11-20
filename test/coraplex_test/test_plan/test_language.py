@@ -1,10 +1,17 @@
+"""
+Tests of composing plans from actions with sequences, parallels and the ways of trying
+alternatives, and of how their failures propagate.
+"""
+
+from __future__ import annotations
+
 import threading
 
 import numpy as np
 import pytest
 from typing_extensions import Never
 
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 
 from coraplex.datastructures.enums import DetectionTechnique
 
@@ -24,14 +31,17 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from cramph.monitors import CountNodeResets
 from cramph.nodes_for_testing import ConstFalseNode, ConstTrueNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from cramph.threaded_nodes import FunctionCall
 from ...plan_running import run_plan
 
 
 def test_factory_construction():
-    act = NavigateAction(target_location=Pose())
+    """
+    A sequence holds the actions it was built from as its children.
+    """
+    act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -41,7 +51,10 @@ def test_factory_construction():
 
 
 def test_parallel_construction():
-    act = NavigateAction(target_location=Pose())
+    """
+    A parallel holds the actions it was built from as its children.
+    """
+    act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -51,7 +64,10 @@ def test_parallel_construction():
 
 
 def test_try_in_order_construction():
-    act = NavigateAction(target_location=Pose())
+    """
+    Trying in order holds the actions it was built from as its children.
+    """
+    act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -61,7 +77,10 @@ def test_try_in_order_construction():
 
 
 def test_try_all_construction():
-    act = NavigateAction(target_location=Pose())
+    """
+    Trying all holds the actions it was built from as its children.
+    """
+    act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -71,7 +90,10 @@ def test_try_all_construction():
 
 
 def test_combination_construction():
-    act = NavigateAction(target_location=Pose())
+    """
+    A parallel can hold a sequence beside an action.
+    """
+    act = NavigateAction(planar_goal_pose=Pose2D())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
     root = Parallel(nodes=[Sequence(nodes=[act, act2]), act3])
@@ -82,9 +104,13 @@ def test_combination_construction():
 
 
 def test_perform_execute_single(pr2_apartment_context):
+    """
+    A sequence of a navigation, a torso motion and a detection moves the PR2 to the goal
+    and its torso to the height asked for.
+    """
     world, robot_view, extensions = pr2_apartment_context
     act = NavigateAction(
-        target_location=Pose.from_xyz_rpy(0.3, -1.3, 0, reference_frame=world.root)
+        planar_goal_pose=Pose2D.from_xy_yaw(x=0.3, y=-1.3, reference_frame=world.root)
     )
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = ParkArmsAction(arms=robot_view.all_arms)
@@ -125,7 +151,7 @@ def test_perform_parallel(pr2_apartment_context):
     run_plan(plan, extensions)
 
     assert [node.life_cycle_state for node in plan.children] == [
-        LifeCycleValues.SUCCEEDED
+        LifeCycleValue.SUCCEEDED
     ] * 3
 
 
@@ -156,17 +182,20 @@ def test_perform_repeat_runs_a_succeeding_motion_once(pr2_apartment_context):
     assert world.state[
         world.get_degree_of_freedom_by_name("torso_lift_joint").id
     ].position == pytest.approx(0.3, abs=0.05)
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_exception_sequential(pr2_apartment_context):
+    """
+    A step of a sequence raising a plan failure fails the sequence, which raises it.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     def raise_except():
         raise PlanFailure()
 
     act = NavigateAction(
-        target_location=Pose.from_xyz_rpy(1, -1, reference_frame=world.root)
+        planar_goal_pose=Pose2D.from_xy_yaw(x=1, y=-1, reference_frame=world.root)
     )
     act2 = FunctionCall(function=raise_except, failure_types=(PlanFailure,))
 
@@ -178,34 +207,40 @@ def test_exception_sequential(pr2_apartment_context):
     with pytest.raises(PlanFailure):
         perform_plan()
     assert len(plan.children) == 2
-    assert plan.life_cycle_state == LifeCycleValues.FAILED
+    assert plan.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_exception_try_in_order(pr2_apartment_context):
+    """
+    Trying in order succeeds once one step succeeds, although a later one would fail.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     def raise_except():
         raise PlanFailure()
 
     act = NavigateAction(
-        target_location=Pose.from_xyz_rpy(1, -1, reference_frame=world.root)
+        planar_goal_pose=Pose2D.from_xy_yaw(x=1, y=-1, reference_frame=world.root)
     )
     act2 = FunctionCall(function=raise_except, failure_types=(PlanFailure,))
 
     plan = TryInOrder(nodes=[act, act2])
     run_plan(plan, extensions)
     assert len(plan.children) == 2
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_exception_try_all(pr2_apartment_context):
+    """
+    Trying all succeeds although one of its steps fails.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     def raise_except() -> Never:
         raise PlanFailure()
 
     act = NavigateAction(
-        target_location=Pose.from_xyz_rpy(x=-2, reference_frame=world.root)
+        planar_goal_pose=Pose2D.from_xy_yaw(x=-2, reference_frame=world.root)
     )
     act2 = FunctionCall(function=raise_except, failure_types=(PlanFailure,))
 
@@ -213,7 +248,7 @@ def test_exception_try_all(pr2_apartment_context):
     run_plan(plan, extensions)
 
     assert type(plan) is TryAll
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% children run only as part of the chart
@@ -240,7 +275,7 @@ def test_try_in_order_recovers_from_a_failing_code_step(pr2_apartment_context) -
         robot_view.get_torso().get_joint_state_by_type(TorsoState.HIGH).target_values
     )
     assert _torso_position(world) == pytest.approx(torso_up, abs=0.05)
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_children_report_the_outcome_of_the_chart_they_ran_in(
@@ -260,8 +295,8 @@ def test_children_report_the_outcome_of_the_chart_they_ran_in(
     run_plan(root, extensions)
 
     assert [child.life_cycle_state for child in root.children] == [
-        LifeCycleValues.SUCCEEDED,
-        LifeCycleValues.SUCCEEDED,
+        LifeCycleValue.SUCCEEDED,
+        LifeCycleValue.SUCCEEDED,
     ]
 
 
@@ -353,4 +388,4 @@ def test_never_firing_cancel_monitor_leaves_the_motion_alone(pr2_apartment_conte
     run_plan(plan, extensions)
 
     assert _torso_position(world) == pytest.approx(0.3, abs=0.05)
-    assert plan.last_observation_state == ObservationStateValues.TRUE
+    assert plan.last_observation_state == ObservationStateValue.TRUE
