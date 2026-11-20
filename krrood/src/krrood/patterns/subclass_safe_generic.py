@@ -28,6 +28,7 @@ from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.interface import Interface
 from krrood.exceptions import (
     MismatchingNumberOfGenericParametersAndResolvedTypes,
@@ -61,6 +62,24 @@ ResolvableType: TypeAlias = (
     | tuple["ResolvableType", ...]
     | Any
 )
+
+
+@dataclass(kw_only=True, frozen=True)
+class DerivedGenericParameter:
+    """
+    A type parameter a class does not take, read from the type the class binds another
+    of its parameters to, so the two can never be bound inconsistently.
+    """
+
+    parameter: TypeVar
+    """
+    The type parameter read from the type bound to :attr:`source`.
+    """
+
+    source: TypeVar
+    """
+    The type parameter whose bound type binds :attr:`parameter`.
+    """
 
 
 @dataclass(kw_only=True, eq=False)
@@ -144,6 +163,41 @@ class SubClassSafeGeneric(ABC):
             if name in vars(base).get("__annotations__", {})
         )
         return Interface.is_interface(class_=declaring_class)
+
+    @classproperty
+    def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+        """
+        The type parameters this class reads from the types it binds other parameters
+        to, which then count as bound wherever a bound parameter does.
+        """
+        return ()
+
+    @classmethod
+    def _derived_substitutions(
+        cls, *, substitutions: dict[Any, ResolvableType]
+    ) -> dict[Any, ResolvableType]:
+        """
+        :param substitutions: The type parameters this class binds, resolved.
+        :return: The type each :attr:`derived_generic_parameters` entry reads from the
+            type bound to its source, for the sources bound to a class that binds it.
+        """
+        derived = {}
+        for derived_parameter in cls.derived_generic_parameters:
+            source_type = substitutions.get(derived_parameter.source)
+            if not (
+                isclass(source_type)
+                and issubclass(source_type, SubClassSafeGeneric)
+                and source_type.binds_generic_parameter(
+                    parameter=derived_parameter.parameter
+                )
+            ):
+                continue
+            derived[derived_parameter.parameter] = (
+                source_type.get_type_of_generic_parameter(
+                    parameter=derived_parameter.parameter
+                )
+            )
+        return derived
 
     @classmethod
     def get_generic_type_parameters(cls) -> list[type]:
@@ -289,6 +343,7 @@ class SubClassSafeGeneric(ABC):
             substitutions = cls._resolve_substitutions_transitively(
                 substitutions=substitutions
             )
+        substitutions.update(cls._derived_substitutions(substitutions=substitutions))
 
         cls._subclass_safe_substitutions = substitutions
         return substitutions
