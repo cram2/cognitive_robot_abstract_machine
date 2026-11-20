@@ -348,25 +348,6 @@ class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
 
 
 @dataclass(eq=False)
-class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
-    axis_angle: AxisAngle
-    reference_frame: KinematicStructureEntity | None
-
-    @classmethod
-    def from_domain_object(cls, *, obj: RotationMatrix):
-        return cls(axis_angle=obj.axis_angle, reference_frame=obj.reference_frame)
-
-    def to_domain_object(self) -> RotationMatrix:
-        rotation_matrix = self.axis_angle.rotation_matrix
-        rotation_matrix.reference_frame = self.reference_frame
-        return rotation_matrix
-
-    @classmethod
-    def required_pre_build_classes(cls) -> list[type]:
-        return [AxisAngle]
-
-
-@dataclass(eq=False)
 class HomogeneousTransformationMatrix3DimensionalMapping(
     AlternativeMapping[HomogeneousTransformationMatrix3Dimensional]
 ):
@@ -399,6 +380,22 @@ class HomogeneousTransformationMatrix3DimensionalMapping(
 
 
 @dataclass(eq=False)
+class RotationMatrixMapping(
+    HomogeneousTransformationMatrix3DimensionalMapping,
+    AlternativeMapping[RotationMatrix],
+):
+    """
+    A stored rotation: a stored transformation whose position is the origin.
+    """
+
+    def to_domain_object(self) -> RotationMatrix:
+        rotation_matrix = self.axis_angle.rotation_matrix
+        rotation_matrix.reference_frame = self.reference_frame
+        rotation_matrix.child_frame = self.child_frame
+        return rotation_matrix
+
+
+@dataclass(eq=False)
 class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
     position: Point3Dimensional
     axis_angle: AxisAngle
@@ -425,16 +422,16 @@ class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
         reference_frame: KinematicStructureEntity,
     ) -> Pose3Dimensional:
         """
-        Creates a Pose3Dimensional instance from a Point3DimensionalMapping and
-        a QuaternionMapping.
+        Creates a Pose3Dimensional instance from a Point3DimensionalMapping and a
+        QuaternionMapping.
 
         This method constructs a Pose3Dimensional object by utilizing the provided
-        Point3DimensionalMapping for the position and the QuaternionMapping for
-        the orientation. The resulting Pose3Dimensional is associated with the specified
+        Point3DimensionalMapping for the position and the QuaternionMapping for the
+        orientation. The resulting Pose3Dimensional is associated with the specified
         reference frame.
 
-        :param position: A Point3DimensionalMapping object that provides the
-            position data for the Pose3Dimensional.
+        :param position: A Point3DimensionalMapping object that provides the position
+            data for the Pose3Dimensional.
         :param orientation: A QuaternionMapping object that provides the orientation
             data for the Pose3Dimensional.
         :param reference_frame: The reference frame to which the Pose3Dimensional will

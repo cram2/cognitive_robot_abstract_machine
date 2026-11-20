@@ -16,6 +16,7 @@ from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
 )
 from krrood_spatial_math.exceptions import (
+    FramesOnDifferentPlanesError,
     ReferenceFrameMismatchError,
     SpatialTypesError,
 )
@@ -29,6 +30,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional
 from krrood_spatial_math.spatial_types_2_dimensional import (
+    HomogeneousTransformationMatrix2Dimensional,
     Point2Dimensional,
     Pose2Dimensional,
 )
@@ -217,7 +219,7 @@ class TestRotationMatrix:
             ).reference_frame
             == reference_frame
         )
-        assert m1.inverse().reference_frame == reference_frame
+        assert m1.inverse().child_frame == reference_frame
 
     def test_matmul_type_preservation(self):
         rotation_matrix = RotationMatrix()
@@ -1505,6 +1507,10 @@ class TestVector3:
 
 
 class TestTransformationMatrix:
+    """
+    Rigid transformations of 3D frames, and how values are re-expressed through them.
+    """
+
     def test_json(self):
         """
         Test that the JSON serialization works correctly.
@@ -1597,7 +1603,6 @@ class TestTransformationMatrix:
         works = [
             Vector3Dimensional(x=1, y=1, z=1),
             transform,
-            RotationMatrix(),
             Pose3Dimensional(),
             Point3Dimensional(x=1, y=1, z=1),
             Quaternion(),
@@ -1615,6 +1620,7 @@ class TestTransformationMatrix:
 
         for other in works:
             assert isinstance(transform @ other, type(other))
+        assert type(transform @ RotationMatrix()) is type(transform)
         for other in does_not_work:
             with pytest.raises(UnsupportedOperationError):
                 # noinspection PyTypeChecker
@@ -1625,8 +1631,7 @@ class TestTransformationMatrix:
     @staticmethod
     def _transformation() -> HomogeneousTransformationMatrix3Dimensional:
         """
-        A transformation that rotates about all three axes, so that dropping z, roll or
-        pitch is visible in the result.
+        A transformation that shifts and rotates about all three axes.
         """
         return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 2, 3, roll=0.3, pitch=-0.2, yaw=0.5
@@ -1663,41 +1668,55 @@ class TestTransformationMatrix:
             atol=1e-12,
         )
 
-    def test_transforming_a_point_2_dimensional_projects_onto_the_target_plane(self):
+    @pytest.mark.parametrize(
+        "planar_value",
+        [Point2Dimensional(x=1, y=2), Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4)],
+    )
+    def test_transforming_a_planar_value_within_its_plane_is_the_planar_change(
+        self, *, planar_value
+    ):
         """
-        A Point2Dimensional carries no z, so it comes back as the transformed
-        3D point with its z dropped.
+        Between frames on one plane, re-expressing a planar value is the SE(2) change.
         """
-        transformation = self._transformation()
-        point = Point2Dimensional(x=1, y=2)
-
-        transformed = point.transform(transformation)
-
-        assert isinstance(transformed, Point2Dimensional)
-        np.testing.assert_allclose(
-            transformed.to_np(),
-            (transformation @ point.to_point_3_dimensional()).to_np()[:2],
-            atol=1e-12,
+        transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=0.5, y=-1, yaw=0.3
         )
 
-    def test_transforming_a_pose_2_dimensional_projects_onto_the_target_plane(self):
-        """
-        A Pose2Dimensional carries no z, roll or pitch, so it comes back as the
-        transformed 3D pose with those dropped.
-        """
-        transformation = self._transformation()
-        pose_2_dimensional = Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4)
+        transformed = planar_value.transform(transformation)
 
-        transformed = pose_2_dimensional.transform(transformation)
-
-        assert isinstance(transformed, Pose2Dimensional)
+        assert type(transformed) is type(planar_value)
         np.testing.assert_allclose(
             transformed.to_np(),
-            Pose2Dimensional.from_pose(
-                transformation @ pose_2_dimensional.pose
+            (
+                HomogeneousTransformationMatrix2Dimensional.from_transformation(
+                    transformation
+                )
+                @ planar_value
             ).to_np(),
             atol=1e-12,
         )
+
+    @pytest.mark.parametrize(
+        "planar_value",
+        [Point2Dimensional(x=1, y=2), Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4)],
+    )
+    @pytest.mark.parametrize(
+        "transformation",
+        [
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=1),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(roll=0.2),
+        ],
+        ids=["parallel plane", "tilted plane"],
+    )
+    def test_transforming_a_planar_value_onto_another_plane_raises(
+        self, *, planar_value, transformation
+    ):
+        """
+        A value on a parallel plane is another point, so moving it there is a
+        projection, never a change of its coordinates.
+        """
+        with pytest.raises(FramesOnDifferentPlanesError):
+            planar_value.transform(transformation)
 
     @pytest.mark.parametrize("x", numbers)
     @pytest.mark.parametrize("y", numbers)
@@ -1865,7 +1884,7 @@ class TestTransformationMatrix:
 
     def test_properties(self):
         """
-        Test x, y, z property getters and setters.
+        Test x, y, z property getters.
         """
         t = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 2, 3, 0.1, 0.2, 0.3
@@ -1875,14 +1894,6 @@ class TestTransformationMatrix:
         assert t.x.to_np() == 1
         assert t.y.to_np() == 2
         assert t.z.to_np() == 3
-
-        # Test setters
-        t.x = 10
-        t.y = 20
-        t.z = 30
-        assert t[0, 3].to_np() == 10
-        assert t[1, 3].to_np() == 20
-        assert t[2, 3].to_np() == 30
 
         # Bottom row should remain unchanged
         assert t[3, 3] == 1

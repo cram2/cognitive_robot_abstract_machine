@@ -78,7 +78,6 @@ spatial_values = [
     Vector3Dimensional,
     Quaternion,
     AxisAngle,
-    RotationMatrix,
     Pose3Dimensional,
 ]
 

@@ -51,13 +51,16 @@ coordinate system. Its base depends on `krrood` alone.
   `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`,
   `Pose3Dimensional`, `Displacement`, `Twist` and `ScrewAxis`, as symbolic expressions
   that can also hold plain numbers. Values derive from `SymbolicSpatialValue` and changes
-  from `SymbolicSpatialChange`; a value names the groups that act on it:
-  `SpecialEuclideanGroupAction`, the rigid motions of its kind of frame, and
-  `SpecialOrthogonalGroupAction` (SO(3)), the rotations of a 3D value.
+  from `SymbolicSpatialChange`; a value or change the rigid motions of its kind of
+  frame act on is a `SpecialEuclideanGroupAction`. A `RotationMatrix` is the
+  transformation without translation, so SO(3) acts through the same interface, and
+  `Quaternion` and `AxisAngle` are orientations, which a transformation only turns.
 - `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
   counterparts on a plane, `Point2Dimensional`, `Vector2Dimensional` and
   `Pose2Dimensional`, which lie on the x-y plane of their reference frame, an
-  `EmbeddedPlane`, and are given in its `CartesianFrame2Dimensional`.
+  `EmbeddedPlane`, and are given in its `CartesianFrame2Dimensional`. They are
+  re-expressed only in frames on that plane; reaching another plane, even a parallel
+  one, is an `EmbeddedPlaneProjection`.
   `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two frames
   on one plane, and `EmbeddedPlaneProjection` the orthogonal projection onto a frame's
   plane. They derive from `SymbolicSpatialValue` too, and SE(2) acts on them through the

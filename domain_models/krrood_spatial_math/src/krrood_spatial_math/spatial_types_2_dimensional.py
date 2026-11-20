@@ -18,6 +18,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     EmbeddedPlaneRelation,
 )
+from krrood.patterns.mixin import Mixin
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
@@ -43,14 +44,49 @@ from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
 )
 
+# %% values on a plane
+
+
+class ValueOnEmbeddedPlane(SpecialEuclideanGroupAction, Mixin):
+    """
+    A value given on the x-y plane of its reference frame, which SE(2) moves within that
+    plane and which is re-expressed only in frames on the same plane.
+    """
+
+    def transform(
+        self,
+        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
+    ) -> Self:
+        """
+        Overrides
+        :meth:`~krrood_spatial_math.spatial_types.SymbolicSpatialType.transform`: the
+        transformation is taken as the change between the frames on the plane, as
+        :meth:`HomogeneousTransformationMatrix2Dimensional.from_transformation` gives
+        it.
+
+        :raises FramesOnDifferentPlanesError: If the transformation is constant, or its
+            frames are known, and its frames span different planes, parallel ones
+            included.
+        :raises MirroredPlaneFramesError: If the transformation is constant, or its
+            frames are known, and its frames span one plane with z-axes pointing in
+            opposite directions.
+        """
+        return (
+            HomogeneousTransformationMatrix2Dimensional.from_transformation(
+                target_frame_T_reference_frame
+            )
+            @ self
+        )
+
+
 # %% vectors and points on a plane
 
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
+    ValueOnEmbeddedPlane,
     SymbolicSpatialValue,
     Vector[CartesianFrame2Dimensional, sm.Scalar],
-    SpecialEuclideanGroupAction,
 ):
     """
     A translation within the x-y plane of its reference frame, given in the :class:`~krr
@@ -109,30 +145,6 @@ class Vector2Dimensional(
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
 
-    def transform(
-        self,
-        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
-    ) -> Vector2Dimensional:
-        """
-        This vector re-expressed in ``target_frame_T_reference_frame``'s reference
-        frame.
-
-        .. warning::
-            Between frames whose x-y planes are not parallel this is not a change of
-            coordinates but a projection: the vector is turned in 3D space and projected
-            onto the target plane. The height the rotation produced is lost.
-
-        :param target_frame_T_reference_frame: The transformation from this vector's
-            reference frame to the frame it should be expressed in.
-        :return: The vector in the transformation's reference frame.
-        """
-        turned = target_frame_T_reference_frame @ Vector3Dimensional(
-            self.x, self.y, 0, reference_frame=self.reference_frame
-        )
-        return Vector2Dimensional(
-            turned.x, turned.y, reference_frame=turned.reference_frame
-        )
-
     def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
     ) -> Vector2Dimensional:
@@ -173,9 +185,9 @@ class Vector2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point2Dimensional(
+    ValueOnEmbeddedPlane,
     SymbolicSpatialValue,
     Point[Vector2Dimensional],
-    SpecialEuclideanGroupAction,
 ):
     """
     Represents a 2D point with reference frame handling.
@@ -282,27 +294,6 @@ class Point2Dimensional(
         )
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
-
-    def transform(
-        self,
-        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
-    ) -> Point2Dimensional:
-        """
-        This point re-expressed in ``target_frame_T_reference_frame``'s reference frame.
-
-        .. warning::
-            Between frames whose x-y planes are not parallel this is not a change of
-            coordinates but a projection: the point is placed at height 0 through an
-            :class:`EmbeddedPlaneProjection`, moved, and projected onto the target plane.
-            The height the rotation produced is lost.
-
-        :param target_frame_T_reference_frame: The transformation from this point's
-            reference frame to the frame it should be expressed in.
-        :return: The point in the transformation's reference frame.
-        """
-        return Point2Dimensional.from_point_3_dimensional(
-            target_frame_T_reference_frame @ self.to_point_3_dimensional()
-        )
 
     def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
@@ -412,8 +403,8 @@ class EmbeddedPlaneProjection(
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose2Dimensional(
+    ValueOnEmbeddedPlane,
     SymbolicSpatialValue[CartesianFrame2Dimensional],
-    SpecialEuclideanGroupAction,
 ):
     """
     Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
@@ -561,25 +552,6 @@ class Pose2Dimensional(
             yaw=sm.atan2(x_axis_y, x_axis_x),
             reference_frame=frame,
         )
-
-    def transform(
-        self,
-        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
-    ) -> Pose2Dimensional:
-        """
-        This pose re-expressed in ``target_frame_T_reference_frame``'s reference frame.
-
-        .. warning::
-            A Pose2Dimensional carries no z, roll or pitch, so it is transformed as the pose flat
-            on its own plane and the result is projected back onto the target frame's
-            x-y plane. Transforming into a frame tilted against this one therefore loses
-            the height and tilt the rotation produced.
-
-        :param target_frame_T_reference_frame: The transformation from this pose's
-            reference frame to the frame it should be expressed in.
-        :return: The pose in the transformation's reference frame.
-        """
-        return Pose2Dimensional.from_pose(target_frame_T_reference_frame @ self.pose)
 
     def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
