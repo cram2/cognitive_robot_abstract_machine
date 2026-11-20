@@ -247,10 +247,14 @@ print("rotation vector:", quarter_turn.rotation_vector[:3].to_list())
 print("translation:    ", quarter_turn.translation[:3].to_list())
 ```
 
-A screw axis says how far the lid moves per radian; a twist says how fast it moves per
-second. `ScrewAxis.to_twist` multiplies both parts of the screw axis by how fast the
-position changes. Turned at 0.5 rad/s, the lid turns at $\omega = (0, 0, 0.5)$ rad/s and
-rises at $v = (0, 0, 0.001)$ m/s:
+The screw axis and the twist are both derivatives of the lid's pose, taken with respect
+to different things. The screw axis is the derivative with respect to the lid's
+position: how far the lid moves per radian it is turned. The twist is the derivative
+with respect to time: how far the lid moves per second. The twist is not the derivative
+of the screw axis. By the chain rule, it is the screw axis times how fast the position
+changes, $\dot\theta$, and that is what `ScrewAxis.to_twist` computes. Turned at
+$\dot\theta = 0.5$ rad/s, the lid turns at $\omega = (0, 0, 0.5)$ rad/s and rises at
+$v = (0, 0, 0.001)$ m/s:
 
 ```{code-cell} ipython3
 twist = lid.to_twist(position_velocity=0.5)
@@ -280,12 +284,24 @@ t + A(\varphi)\,(r \times t) + B(\varphi)\,(r \times (r \times t)),
 \qquad
 A(\varphi) = \frac{1 - \cos\varphi}{\varphi^2},
 \quad
-B(\varphi) = \frac{\varphi - \sin\varphi}{\varphi^3},
+B(\varphi) = \frac{\varphi - \sin\varphi}{\varphi^3}.
 $$
 
-where $\varphi = |r|$, the length of $r$, is the angle the body turns by, and $\times$ is
-the cross product. This is the exponential of the rate {cite}`sola2018micro`
-(equation (172)), and the factor in front of $t$ is the *left Jacobian* of $r$
+Here $\times$ is the cross product, and $\varphi$ is the angle the body turns by. Since
+the rotation vector $r$ is the axis scaled by that angle, $\varphi$ is the length of $r$:
+$\varphi = |r|$. This is the exponential of the rate {cite}`sola2018micro`
+(equation (172)).
+
+Every term of the sum is a fixed matrix times $t$, so the sum is one matrix times $t$:
+
+$$
+J(r)\,t,
+\qquad
+J(r) = I + A(\varphi)\,[r]_\times + B(\varphi)\,[r]_\times^2,
+$$
+
+where $I$ is the identity and $[r]_\times$ is the matrix that takes the cross product
+with $r$, $[r]_\times\,t = r \times t$. This matrix $J(r)$ is the *left Jacobian* of $r$
 {cite}`eade2017lie` (section 3.2, equation (83)).
 
 Take a body that drives forward at $v = (1, 0, 0)$ m/s while it turns at
