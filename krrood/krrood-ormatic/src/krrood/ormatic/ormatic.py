@@ -1,0 +1,643 @@
+"""
+Generate an SQLAlchemy interface, a data access object per class, from a class diagram.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field, is_dataclass
+from functools import cached_property
+from inspect import isclass
+from types import ModuleType
+
+import rustworkx as rx
+import sqlalchemy
+import krrood.ormatic.custom_types  # type: ignore
+import krrood.ormatic.data_access_objects.alternative_mappings  # type: ignore
+import krrood
+from krrood.ormatic.helper import (
+    get_classes_of_ormatic_interface,
+    OrmaticInterfaceChain,
+    OrmaticInterfaceInformation,
+)
+from sortedcontainers import SortedSet
+from typing_extensions import Optional, TextIO
+
+from krrood.ormatic.default_type_mappings import DefaultTypeMapping
+from krrood.ormatic.field_storage import FieldClassifier
+from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.data_access_objects.dao import (
+    DataAccessObject,
+    PartDataAccessObject,
+    RelationshipInformationKey,
+)
+from krrood.ormatic.stored_object import StoredObjectDAO
+from krrood.patterns.interface import Interface
+
+from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
+from krrood.ormatic.type_dict import TypeDict
+from krrood.class_diagrams.utils import classes_of_package
+from krrood.code_generation.object_to_source import extract_types
+from krrood.utils import module_and_class_name, recursive_subclasses, get_module_of_type
+from krrood.ormatic.wrapped_table import (
+    WrappedTable,
+    ExternalTable,
+    AssociationObject,
+    TableLike,
+)
+from krrood.class_diagrams.class_diagram import (
+    ClassDiagram,
+    ClassRelation,
+    Inheritance,
+    WrappedClass,
+)
+from krrood.class_diagrams.wrapped_field import WrappedField
+
+logger = logging.getLogger(__name__)
+
+
+class AlternativelyMaps(ClassRelation):
+    """
+    Edge type that says that the source alternativly maps the target, e.
+
+    g. `AlternativeMaps(source=PointMapping, target=Point)` means that PointMapping is
+    the mapping for Point.
+    """
+
+
+@dataclass(kw_only=True)
+class ORMatic:
+    """
+    ORMatic is a tool for generating SQLAlchemy ORM models from a set of dataclasses.
+    """
+
+    class_dependency_graph: ClassDiagram
+    """
+    The class diagram to add the orm for.
+    """
+
+    interface_information: OrmaticInterfaceInformation = field(
+        default_factory=OrmaticInterfaceInformation
+    )
+    """
+    The alternative mappings, type mappings, and externally-mapped classes to use.
+    """
+
+    ormatic_interface_dependencies: list[ModuleType] = field(default_factory=list)
+    """
+    The already-generated ormatic-interface modules this interface builds on, if any.
+
+    Every generated interface shares one declarative ``Base``
+    (:class:`krrood.ormatic.base.Base`), so any number of dependencies can be listed.
+    """
+
+    foreign_key_postfix = "_id"
+    """
+    The postfix that will be added to foreign key columns (not the relationships).
+    """
+
+    imported_modules: SortedSet[str] = field(default_factory=SortedSet, init=False)
+    """
+    A set of modules that need to be imported.
+    """
+
+    type_annotation_map: dict[str, str] = field(default_factory=dict, init=False)
+    """
+    The string version of type mappings that is used in jinja.
+    """
+
+    inheritance_graph: rx.PyDiGraph[int] = field(default=None, init=False)
+    """
+    A graph that represents the inheritance structure of the classes.
+
+    Extracted from the class dependency graph.
+    """
+
+    wrapped_tables: dict[WrappedClass, WrappedTable] = field(
+        default_factory=dict, init=False
+    )
+    """
+    The wrapped tables instances for the SQLAlchemy conversion.
+    """
+
+    external_tables: dict[WrappedClass, ExternalTable] = field(
+        default_factory=dict, init=False
+    )
+    """
+    Lookup-only stand-ins for classes already mapped by an ormatic-interface dependency
+    (see :attr:`externally_mapped_classes`).
+
+    Never rendered by the generator; consulted only to resolve foreign keys,
+    relationships, and parent classes that point at them.
+    """
+
+    association_objects: list[AssociationObject] = field(
+        default_factory=list, init=False
+    )
+    """
+    List of association tables for many-to-many relationships.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Decide on the tables of the class diagram's classes and of the interfaces their
+        fields are typed with, and on the modules the generated interface imports.
+        """
+        self.imported_modules.add(get_module_of_type(TypeDict))
+        self.imported_modules.add("krrood.ormatic.base")
+        self.imported_modules.add(get_module_of_type(StoredObjectDAO))
+        # optional columns are annotated with typing.Optional
+        self.imported_modules.add(get_module_of_type(Optional))
+        for dependency in self.ormatic_interface_dependencies:
+            self.imported_modules.add(dependency.__name__)
+        self._fill_type_mappings()
+        self._add_field_typed_interfaces_to_class_diagram()
+        self._create_inheritance_graph()
+        self._add_alternative_mappings_to_class_diagram()
+        self._create_wrapped_tables()
+        self.create_type_annotations_map()
+
+        # a specialized generic's DAO names the classes of its type arguments too
+        for wrapped_table in self.wrapped_tables.values():
+            self.imported_modules.update(
+                get_module_of_type(named_class)
+                for named_class in extract_types(wrapped_table.wrapped_clazz.clazz)
+            )
+
+        # externally-mapped classes may live further up the chain than the immediate dependency
+        for external_table in self.external_tables.values():
+            self.imported_modules.add(get_module_of_type(external_table.dao_class))
+
+        # part classes generated for dependencies' tables name their relationships' types
+        for external_table in self.external_tables_needing_part_classes:
+            self.imported_modules.add(
+                get_module_of_type(external_table.dao_class.original_class())
+            )
+            for relationship in sqlalchemy.inspect(
+                external_table.dao_class
+            ).relationships:
+                self.imported_modules.add(
+                    get_module_of_type(relationship.mapper.class_)
+                )
+                declared_type = relationship.info.get(
+                    RelationshipInformationKey.DECLARED_TYPE
+                )
+                if declared_type is not None:
+                    self.imported_modules.add(get_module_of_type(declared_type))
+
+    @property
+    def alternative_mappings(self) -> list[type[AlternativeMapping]]:
+        return self.interface_information.alternative_mappings
+
+    @property
+    def type_mappings(self) -> TypeDict:
+        return TypeDict(_dict=self.interface_information.type_mappings)
+
+    @property
+    def externally_mapped_classes(self) -> dict[type, type]:
+        return self.interface_information.externally_mapped_classes
+
+    def _fill_type_mappings(self):
+        """
+        Add the default type mappings for every type that has no mapping yet.
+        """
+        for default in DefaultTypeMapping:
+            if default.python_type not in self.type_mappings.keys():
+                self.type_mappings[default.python_type] = default.column_type
+
+        for key in self.type_mappings.keys():
+            self.imported_modules.add(get_module_of_type(key))
+
+    @cached_property
+    def field_typed_interfaces(self) -> set[type]:
+        """
+        :return: The interfaces that a stored field of a class of the class diagram is
+            typed with; each is mapped as a table without fields.
+        """
+        result = set()
+        for wrapped_class in list(self.class_dependency_graph.wrapped_classes):
+            clazz = wrapped_class.clazz
+            if not isclass(clazz) or Interface.is_interface(class_=clazz):
+                continue
+            for wrapped_field in wrapped_class.fields:
+                type_endpoint = wrapped_field.type_endpoint
+                if (
+                    not wrapped_field.field.name.startswith("_")
+                    and isclass(type_endpoint)
+                    and Interface.is_interface(class_=type_endpoint)
+                    and not any(
+                        alternative_mapping.original_class() is type_endpoint
+                        for alternative_mapping in self.alternative_mappings
+                    )
+                ):
+                    result.add(type_endpoint)
+        return result
+
+    def _add_field_typed_interfaces_to_class_diagram(self) -> None:
+        """
+        Add the interfaces stored fields are typed with to the class diagram, inherited
+        by the classes of the diagram that name them among their bases.
+        """
+        implementers = list(self.class_dependency_graph.wrapped_classes)
+        classes_in_diagram = {implementer.clazz for implementer in implementers}
+        for interface in self.field_typed_interfaces - classes_in_diagram:
+            self.class_dependency_graph.add_node(clazz=interface)
+            wrapped_interface = self.class_dependency_graph.get_wrapped_class(
+                clazz=interface
+            )
+            for implementer in implementers:
+                if (
+                    isclass(implementer.clazz)
+                    and interface in implementer.clazz.__bases__
+                ):
+                    self.class_dependency_graph.add_relation(
+                        relation=Inheritance(
+                            source=wrapped_interface, target=implementer
+                        )
+                    )
+
+    @cached_property
+    def stored_object_table(self) -> ExternalTable:
+        """
+        :return: The table every generated table inherits, which krrood maps once.
+        """
+        return ExternalTable(
+            wrapped_clazz=WrappedClass(clazz=object), dao_class=StoredObjectDAO
+        )
+
+    def _create_wrapped_tables(self) -> None:
+        """
+        Decide on the table of every class of the class diagram: one a dependency maps,
+        the table of its alternative mapping, its own, or none for an interface no
+        stored field is typed with.
+        """
+        for wrapped_clazz in self.wrapped_classes_in_topological_order:
+            # already mapped by a dependency: reuse it instead of regenerating it
+            if dao_class := self.externally_mapped_classes.get(wrapped_clazz.clazz):
+                self.external_tables[wrapped_clazz] = ExternalTable(
+                    wrapped_clazz=wrapped_clazz, dao_class=dao_class
+                )
+                continue
+
+            # check if the class has an alternative mapping
+            if alternative_mapping := self.get_alternative_mapping(
+                wrapped_class=wrapped_clazz
+            ):
+                # add the alternative mapping
+                self.wrapped_tables[wrapped_clazz] = WrappedTable(
+                    wrapped_clazz=alternative_mapping, ormatic=self
+                )
+                continue
+
+            if (
+                isclass(wrapped_clazz.clazz)
+                and Interface.is_interface(class_=wrapped_clazz.clazz)
+                and wrapped_clazz.clazz not in self.field_typed_interfaces
+            ):
+                continue
+
+            # add the class normally
+            self.wrapped_tables[wrapped_clazz] = WrappedTable(
+                wrapped_clazz=wrapped_clazz, ormatic=self
+            )
+
+    def _create_inheritance_graph(self):
+        self.inheritance_graph = rx.PyDiGraph()
+        self.inheritance_graph.add_nodes_from(
+            [w.index for w in self.class_dependency_graph.wrapped_classes]
+        )
+        for edge in self.class_dependency_graph.inheritance_relations:
+            self.inheritance_graph.add_edge(edge.source.index, edge.target.index, None)
+
+    def _add_alternative_mappings_to_class_diagram(self):
+        """
+        Add alternative mappings to the class diagram.
+        """
+        for alternative_mapping in self.alternative_mappings:
+            wrapped_alternative_mapping = WrappedClass(clazz=alternative_mapping)
+            self.class_dependency_graph.add_node(clazz=wrapped_alternative_mapping)
+            self.class_dependency_graph.add_relation(
+                relation=AlternativelyMaps(
+                    source=wrapped_alternative_mapping,
+                    target=self.class_dependency_graph.get_wrapped_class(
+                        clazz=alternative_mapping.original_class()
+                    ),
+                )
+            )
+
+    @property
+    def alternatively_maps_relations(self) -> list[AlternativelyMaps]:
+        return [
+            edge
+            for edge in self.class_dependency_graph._dependency_graph.edges()
+            if isinstance(edge, AlternativelyMaps)
+        ]
+
+    @staticmethod
+    def register_externally_mapped_class(
+        *, dao_class: type, externally_mapped_classes: dict[type, type]
+    ) -> None:
+        """
+        Register the domain class(es) ``dao_class`` maps as already-mapped, so a
+        dependent interface reuses ``dao_class`` instead of regenerating it.
+        """
+        original_class = dao_class.original_class()
+
+        if not isclass(original_class):
+            externally_mapped_classes[original_class] = dao_class
+            return
+
+        if issubclass(original_class, AlternativeMapping):
+            externally_mapped_classes[original_class] = dao_class
+            externally_mapped_classes[original_class.original_class()] = dao_class
+        else:
+            externally_mapped_classes[original_class] = dao_class
+
+    def get_alternative_mapping(
+        self, *, wrapped_class: WrappedClass
+    ) -> WrappedClass | None:
+        """
+        Finds and returns an alternative mapping for the given wrapped class, if one
+        exists, based on the relations specified in `alternatively_maps_relations`.
+
+        :param wrapped_class: The wrapped class for which an alternative mapping is to
+            be searched.
+        :return: An alternate mapping of the type WrappedClass if found, otherwise None.
+        """
+        for rel in self.alternatively_maps_relations:
+            if rel.target == wrapped_class:
+                return rel.source
+        return None
+
+    def create_type_annotations_map(self):
+        self.type_annotation_map = {}
+        for clazz, custom_type in self.type_mappings.items():
+            self.type_annotation_map[module_and_class_name(clazz)] = (
+                module_and_class_name(custom_type)
+            )
+            self.imported_modules.add(get_module_of_type(clazz))
+            self.imported_modules.add(get_module_of_type(custom_type))
+
+    @property
+    def wrapped_classes_in_topological_order(self) -> list[WrappedClass]:
+        """
+        :return: All wrapped classes in topological order (a parent precedes its children).
+
+        Sibling classes with no ordering constraint between them are emitted in a stable order keyed
+        on the class identity, so generation does not depend on the (hash-seed-dependent) order in
+        which classes were discovered. In particular, parametrised generic variants such as
+        ``GenericClass[float]`` and ``GenericClass[int]`` — which share a ``__name__`` — get a
+        deterministic relative order.
+        """
+        wrapped_by_index = {
+            wrapped.index: wrapped
+            for wrapped in self.class_dependency_graph.wrapped_classes
+        }
+        tie_break_key = {
+            index: self._topological_tie_break_key(wrapped_class=wrapped)
+            for index, wrapped in wrapped_by_index.items()
+        }
+        return [
+            wrapped_by_index[index]
+            for index in rx.lexicographical_topological_sort(
+                self.inheritance_graph, key=lambda index: tie_break_key[index]
+            )
+        ]
+
+    @staticmethod
+    def _topological_tie_break_key(*, wrapped_class: WrappedClass) -> str:
+        """:return: A stable, total-ordering string for a wrapped class — its ``str`` form, which
+        keeps parametrised generic variants (``GenericClass[float]`` vs ``GenericClass[int]``)
+        distinct even where their ``__name__`` coincides."""
+        return str(wrapped_class.clazz)
+
+    @cached_property
+    def open_classes(self) -> set[type]:
+        """
+        :return: The mapped classes whose objects may lie outside their table's
+            hierarchy: interfaces with a table, and every class that some mapped class
+            inherits next to its primary chain. Fields typed with one of them refer to
+            :class:`~krrood.ormatic.stored_object.StoredObjectDAO`, and they
+            get a part class for their rows held by other classes' DAOs.
+        """
+        result = set(self.field_typed_interfaces)
+        for external_table in self.external_tables.values():
+            if self.part_class_of_external_table(external_table=external_table):
+                result.add(external_table.wrapped_clazz.clazz)
+        for wrapped_table in self.wrapped_tables.values():
+            result.update(
+                secondary_base.domain_class
+                for secondary_base in wrapped_table.secondary_base_tables
+            )
+        return result
+
+    @cached_property
+    def tables_by_class(self) -> dict[type, TableLike]:
+        """
+        :return: The table of every mapped class, generated here or by a dependency.
+        """
+        result = {}
+        for wrapped_class, table in [
+            *self.external_tables.items(),
+            *self.wrapped_tables.items(),
+        ]:
+            if isclass(wrapped_class.clazz):
+                result[wrapped_class.clazz] = table
+        return result
+
+    @staticmethod
+    def part_class_of_external_table(
+        *, external_table: ExternalTable
+    ) -> type[PartDataAccessObject] | None:
+        """
+        :param external_table: A table a dependency maps.
+        :return: A part class an interface already generated for the table, if any.
+        """
+        table = external_table.dao_class.__table__
+        return next(
+            (
+                part_class
+                for part_class in recursive_subclasses(PartDataAccessObject)
+                if part_class.__dict__.get("__table__") is table
+            ),
+            None,
+        )
+
+    @property
+    def external_tables_needing_part_classes(self) -> list[ExternalTable]:
+        """
+        :return: The tables of dependencies that a class of this interface inherits next
+            to its primary base, but that no interface generated a part class for yet;
+            this interface generates them.
+        """
+        result = []
+        for wrapped_table in self.wrapped_tables.values():
+            for table in wrapped_table.secondary_base_tables:
+                if (
+                    isinstance(table, ExternalTable)
+                    and self.part_class_of_external_table(external_table=table) is None
+                    and not any(table is known for known in result)
+                ):
+                    result.append(table)
+        return result
+
+    @property
+    def mapped_classes(self) -> list[type]:
+        return [key.clazz for key in self.wrapped_tables.keys()] + [
+            key.clazz for key in self.external_tables.keys()
+        ]
+
+    @cached_property
+    def field_classifier(self) -> FieldClassifier:
+        """
+        :return: The classifier that decides how each field of the mapped classes is
+            stored.
+        """
+        return FieldClassifier(ormatic=self)
+
+    def table_for(self, *, wrapped_class: WrappedClass) -> TableLike:
+        """
+        :param wrapped_class: The wrapped class to find the table of.
+        :return: The :class:`WrappedTable` generated for it, or the
+            :class:`ExternalTable` standing in for it if it is already mapped by a
+            dependency.
+        :raises KeyError: If neither exists for the given class.
+        """
+        if wrapped_class in self.wrapped_tables:
+            return self.wrapped_tables[wrapped_class]
+        return self.external_tables[wrapped_class]
+
+    def make_all_tables(self):
+        for table in self.wrapped_tables.values():
+            table.parse_fields()
+
+    @classmethod
+    def get_type_mappings(cls) -> TypeDict:
+        """
+        :return: The default type mappings that are used by ORMatic.
+        """
+        ormatic = cls(class_dependency_graph=ClassDiagram(classes=[]))
+        return ormatic.type_mappings
+
+    def foreign_key_name(self, *, wrapped_field: WrappedField) -> str:
+        """
+        :return: A foreign key name for the given field.
+        """
+        return f"_{wrapped_field.clazz.clazz.__name__.lower()}_{wrapped_field.field.name}{self.foreign_key_postfix}"
+
+    def to_sqlalchemy_file(self, *, file: TextIO):
+        """
+        Generate a Python file with SQLAlchemy declarative mappings from the ORMatic
+        models.
+
+        :param file: The file to write to
+        """
+        sqlalchemy_generator = SQLAlchemyGenerator(ormatic=self)
+        sqlalchemy_generator.to_sqlalchemy_file(file=file)
+
+    @classmethod
+    def from_package(
+        cls,
+        *,
+        packages: list[ModuleType],
+        ormatic_interface_dependencies: list[ModuleType],
+        ignored_classes: set[type],
+        type_mappings: dict[type, type],
+        ignore_krrood_test_classes: bool = True,
+    ) -> ORMatic:
+        """
+        Create an instance from a list of packages, dependencies, and ignored classes.
+
+        The interface reuses the tables of its dependencies and of every interface they
+        build on, and takes the alternative mappings of those interfaces, of *packages*
+        and of krrood itself, whatever else is loaded in the process.
+
+        :param packages: The packages that should be scanned for dataclasses.
+        :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
+        :param ignored_classes: The classes that should be ignored.
+        :param type_mappings: The type mappings that should be used.
+        :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test
+            package.
+        :return: The ORMatic instance.
+        """
+        all_classes, all_alternative_mappings, all_type_mappings = set(), set(), {}
+        all_externally_mapped_classes: dict[type, type] = {}
+
+        dependency_chain = OrmaticInterfaceChain(
+            interfaces=list(ormatic_interface_dependencies)
+        )
+        for dao_class in dependency_chain.data_access_objects:
+            cls.register_externally_mapped_class(
+                dao_class=dao_class,
+                externally_mapped_classes=all_externally_mapped_classes,
+            )
+
+        # classes already mapped by a dependency are kept in the class diagram but not
+        # remapped, so inheritance/association edges to them still resolve
+        for ormatic_interface in ormatic_interface_dependencies:
+            interface_information = get_classes_of_ormatic_interface(ormatic_interface)
+            all_classes |= set(interface_information.classes)
+            all_type_mappings.update(interface_information.type_mappings)
+        all_alternative_mappings |= set(dependency_chain.alternative_mappings)
+
+        # externally_mapped_classes is transitive across the whole chain, unlike classes above
+        all_classes |= set(all_externally_mapped_classes.keys())
+
+        for package in packages:
+            all_classes |= set(classes_of_package(package))
+
+        all_classes -= ignored_classes
+
+        mapping_module_names = [package.__name__ for package in [*packages, krrood]]
+        all_alternative_mappings |= set(
+            alternative_mapping
+            for alternative_mapping in recursive_subclasses(AlternativeMapping)
+            if any(
+                alternative_mapping.__module__ == module_name
+                or alternative_mapping.__module__.startswith(f"{module_name}.")
+                for module_name in mapping_module_names
+            )
+            and (
+                not ignore_krrood_test_classes
+                or "krrood_test"
+                not in get_module_of_type(alternative_mapping.original_class())
+            )
+        )
+
+        # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses
+        all_classes = {
+            domain_class
+            for domain_class in all_classes
+            if is_dataclass(domain_class)
+            and not issubclass(domain_class, (DataAccessObject, AlternativeMapping))
+        }
+
+        all_classes |= {
+            alternative_mapping.original_class()
+            for alternative_mapping in all_alternative_mappings
+        }
+
+        all_type_mappings.update(type_mappings)
+
+        # create the new ormatic interface
+        class_diagram = ClassDiagram(
+            classes=list(
+                sorted(
+                    all_classes,
+                    key=lambda domain_class: domain_class.__name__,
+                    reverse=True,
+                )
+            )
+        )
+
+        # Create an ORMatic object with the classes to be mapped
+        ormatic = ORMatic(
+            class_dependency_graph=class_diagram,
+            interface_information=OrmaticInterfaceInformation(
+                alternative_mappings=list(all_alternative_mappings),
+                type_mappings=all_type_mappings,
+                externally_mapped_classes=all_externally_mapped_classes,
+            ),
+            ormatic_interface_dependencies=list(ormatic_interface_dependencies),
+        )
+        return ormatic

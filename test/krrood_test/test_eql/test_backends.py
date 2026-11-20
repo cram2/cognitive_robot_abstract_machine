@@ -25,10 +25,10 @@ from ..dataset.identity_hashed_values_created_on_access import (
 )
 from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
-    SQLAlchemyBackend,
     EntityQueryLanguageBackend,
     EntityQueryLanguageGenerativeBackend,
 )
+from krrood.ormatic.eql_interface import SQLAlchemyBackend
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,

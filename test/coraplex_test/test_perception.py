@@ -68,6 +68,7 @@ from semantic_digital_twin.world import World
 from .conftest import motion_nodes_in_physics_of, motion_nodes_of
 from ..plan_running import robot_executor, statechart_of
 from ..plan_running import run_plan
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 PERCEIVED_MILK_POSITION = (2.6, 2.2, 1.05)
 """
@@ -445,7 +446,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     )
 
     plan = PickUpAction(
-        grasp=milk.grasp_candidates()[0],
+        grasp_candidate=milk.grasp_candidates()[0],
         arm=view.right_arm,
     )
     targets = [
@@ -1052,8 +1053,9 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     detection = PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
     reach = CartesianPosition(
-        root_link=world.root,
-        tip_link=view.right_arm.end_effector.tool_frame,
+        kinematic_chain=KinematicChain(
+            root=world.root, tip=view.right_arm.end_effector.tool_frame
+        ),
         goal_point=Point3(reference_frame=milk_body),
         name="MoveTCP",
     )

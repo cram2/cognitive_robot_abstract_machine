@@ -456,7 +456,7 @@ intervening on several of them together would.
 ### Selective backends and `EntityQueryLanguageGenerativeBackend`
 
 Neither has a notion of a causal graph. Rather than failing the whole query, they
-**warn** (via `krrood.logger`) and treat `cause` exactly like an ordinary
+**warn** (via the `krrood` logger) and treat `cause` exactly like an ordinary
 unspecified field (`...`) -- a selective backend naturally selects nothing (nothing
 equals `cause`'s wrapped `Ellipsis`), and the generative backend enumerates it if the
 field is an enum, or raises the same

@@ -1,3 +1,8 @@
+"""
+Example dataclasses the krrood tests build class diagrams, queries and ORM interfaces
+from.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -28,7 +33,9 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
-from krrood import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from random_events.interval import Bound, SimpleInterval

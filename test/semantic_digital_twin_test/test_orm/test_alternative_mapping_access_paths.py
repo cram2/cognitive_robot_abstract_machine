@@ -1,10 +1,16 @@
+"""
+Tests of the alternative mappings in :mod:`semantic_digital_twin.orm.model`.
+"""
+
+from __future__ import annotations
+
 import dataclasses
 import inspect
 
 import numpy as np
 import pytest
 
-from krrood.entity_query_language.orm.model import (
+from krrood.ormatic.data_access_objects.symbol_graph_mappings import (
     SymbolGraphMapping,
     WrappedInstanceMapping,
 )
@@ -19,6 +25,8 @@ from semantic_digital_twin.orm.model import (
     QuaternionMapping,
     RotationMatrixMapping,
     DisplacementMapping,
+    ScrewAxisMapping,
+    TwistMapping,
     Vector3Mapping,
     WorldMapping,
     WorldStateMapping,
@@ -30,6 +38,8 @@ from krrood_spatial_math.spatial_types import (
     Pose2D,
     RotationMatrix,
     Displacement,
+    ScrewAxis,
+    Twist,
     Vector3,
 )
 from semantic_digital_twin.world import World
@@ -51,6 +61,8 @@ from semantic_digital_twin.world_description.world_entity import Body
         Point2Mapping,
         Pose2DMapping,
         DisplacementMapping,
+        TwistMapping,
+        ScrewAxisMapping,
         SymbolGraphMapping,
         WrappedInstanceMapping,
     ],
@@ -110,26 +122,37 @@ def test_rotation_survives_being_stored_as_axis_angle(
     assert np.allclose(restored.to_np(), rotation.to_np())
 
 
-def test_a_displacement_survives_being_stored():
+@pytest.mark.parametrize(
+    "mapping, vector_pair_type",
+    [
+        (DisplacementMapping, Displacement),
+        (TwistMapping, Twist),
+        (ScrewAxisMapping, ScrewAxis),
+    ],
+    ids=["Displacement", "Twist", "ScrewAxis"],
+)
+def test_a_vector_pair_survives_being_stored(mapping, vector_pair_type):
     """
-    Storing a displacement through its mapping keeps its values and reference frame.
+    Storing a displacement, twist or screw axis through its mapping keeps its values and
+    reference frame.
     """
     world = World()
     with world.modify_world():
         root = Body(name="root")
         world.add_kinematic_structure_entity(root)
-    displacement = Displacement(
-        translation=Vector3(0.1, 0.0, -0.2),
-        rotation_vector=Vector3(0.0, 0.4, 0.0),
+    vector_pair = vector_pair_type(
+        **{
+            vector_pair_type._rotational_part_name: Vector3(0.0, 0.4, 0.0),
+            vector_pair_type._translational_part_name: Vector3(0.1, 0.0, -0.2),
+        },
         reference_frame=root,
     )
 
-    restored = DisplacementMapping.from_domain_object(
-        obj=displacement
-    ).to_domain_object()
+    restored = mapping.from_domain_object(obj=vector_pair).to_domain_object()
 
+    assert type(restored) is vector_pair_type
     assert restored.reference_frame is root
-    assert np.allclose(restored.to_np(), displacement.to_np())
+    assert np.allclose(restored.to_np(), vector_pair.to_np())
 
 
 def test_world_state_data_and_ids_follow_the_stored_state():

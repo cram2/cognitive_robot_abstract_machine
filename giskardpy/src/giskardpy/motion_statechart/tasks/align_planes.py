@@ -4,66 +4,50 @@ Tasks turning a plane of a link onto a goal plane.
 
 from dataclasses import dataclass, field
 
-from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
+)
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
     DebugExpression,
 )
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseAngularVelocityParameter,
+    HasKinematicChainParameter,
+    HasReferenceNormalParameter,
+    HasRootLinkParameter,
+    HasTipNormalParameter,
+)
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% aligning a plane of a link
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AlignPlanes(ConvergingTask):
+class AlignPlanes(
+    ConvergingTask,
+    HasKinematicChainParameter,
+    HasTipNormalParameter,
+    HasReferenceNormalParameter,
+    HasCruiseAngularVelocityParameter,
+):
     """
-    Will orient the tip plane to align with the goal plane.
+    Will orient the plane fixed on the tip of :attr:`kinematic_chain` to align with the
+    plane fixed on its root, with an error in radians.
 
-    The planes are represented as normal vectors.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain.
-    """
-
-    goal_normal: Vector3
-    """
-    Normal vector of the goal plane.
-    """
-
-    tip_normal: Vector3
-    """
-    Normal vector of the tip plane.
-    """
-
-    threshold: float = 0.01
-    """
-    Angle in radians below which the planes are considered aligned.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
-    """
-    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
+    The planes are represented by their normal vectors, :attr:`tip_normal` and
+    :attr:`reference_normal`.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Priority weight relative to other tasks.
+    Above collision avoidance by default.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -74,51 +58,52 @@ class AlignPlanes(ConvergingTask):
             plane normals.
         """
         artifacts = MotionNodeArtifacts()
-        tip_V_tip_normal = self.express_tip_normal_in_tip_link()
+        tip_V_tip_normal = self.express_tip_normal_in_tip()
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_normal
+            target_frame=self.kinematic_chain.root, spatial_object=self.reference_normal
         )
         root_V_root_normal.scale(1)
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
         root_V_tip_normal = root_R_tip @ tip_V_tip_normal
         root_V_tip_normal.scale(1)
 
-        root_V_tip_normal.visualisation_frame = self.tip_link
+        root_V_tip_normal.visualisation_frame = self.kinematic_chain.tip
         current_normal_debug_expression = DebugExpression(
             name=f"{self.name}/current_normal",
             expression=root_V_tip_normal,
             color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
-        # a copy, since transforming returns the goal normal itself if it is in the root
-        root_V_goal_normal_at_tip = Vector3.from_iterable(root_V_root_normal)
-        root_V_goal_normal_at_tip.visualisation_frame = self.tip_link
-        goal_normal_debug_expression = DebugExpression(
-            name=f"{self.name}/goal_normal",
-            expression=root_V_goal_normal_at_tip,
+        # a copy, as transforming returns the reference normal itself when it is in the root
+        root_V_reference_normal_at_tip = Vector3.from_iterable(root_V_root_normal)
+        root_V_reference_normal_at_tip.visualisation_frame = self.kinematic_chain.tip
+        reference_normal_debug_expression = DebugExpression(
+            name=f"{self.name}/reference_normal",
+            expression=root_V_reference_normal_at_tip,
             color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
         )
         artifacts.debug_expressions.append(current_normal_debug_expression)
-        artifacts.debug_expressions.append(goal_normal_debug_expression)
+        artifacts.debug_expressions.append(reference_normal_debug_expression)
 
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_root_normal,
-            cruise_velocity=self.cruise_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)
         return artifacts
 
-    def express_tip_normal_in_tip_link(self) -> Vector3:
+    def express_tip_normal_in_tip(self) -> Vector3:
         """
-        :return: The normal of the tip plane, expressed in :attr:`tip_link`.
+        :return: The normal of the tip plane, expressed in the tip of
+            :attr:`kinematic_chain`.
         """
         return self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_normal
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
         )
 
 
@@ -126,7 +111,7 @@ class AlignPlanes(ConvergingTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class KeepHeldBodyUpright(AlignPlanes):
+class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
     """
     Turns the body an end effector holds when this task starts until its z-axis points
     along the z-axis of :attr:`root_link`.
@@ -140,12 +125,12 @@ class KeepHeldBodyUpright(AlignPlanes):
     The end effector holding the body.
     """
 
-    tip_link: KinematicStructureEntity = field(init=False)
+    kinematic_chain: KinematicChain = field(init=False)
     """
-    The tool frame of :attr:`end_effector`.
+    The chain from :attr:`root_link` to the tool frame of :attr:`end_effector`.
     """
 
-    goal_normal: Vector3 = field(init=False)
+    reference_normal: Vector3 = field(init=False)
     """
     The z-axis of :attr:`root_link`.
     """
@@ -165,21 +150,21 @@ class KeepHeldBodyUpright(AlignPlanes):
         Expresses the plane to align over the pose this task binds when it starts.
         """
         super().set_up()
-        self.tip_link = self.end_effector.tool_frame
-        self.goal_normal = Vector3.Z(reference_frame=self.root_link)
+        tool_frame = self.end_effector.tool_frame
+        self.kinematic_chain = KinematicChain(root=self.root_link, tip=tool_frame)
+        self.reference_normal = Vector3.Z(reference_frame=self.root_link)
         self._tool_T_held_body = ForwardKinematicsBinding(
             name=PrefixedName("tool_T_held_body", str(self.name)),
-            root=self.tip_link,
-            tip=self.tip_link,
+            kinematic_chain=KinematicChain(root=tool_frame, tip=tool_frame),
             float_variable_data=self.context.float_variable_data,
         )
         self._tool_T_held_body.bind(world=self.context.world)
-        self.tip_normal = Vector3.Z(reference_frame=self.tip_link)
+        self.tip_normal = Vector3.Z(reference_frame=tool_frame)
 
-    def express_tip_normal_in_tip_link(self) -> Vector3:
+    def express_tip_normal_in_tip(self) -> Vector3:
         """
-        Unlike :meth:`AlignPlanes.express_tip_normal_in_tip_link`, applies the pose of
-        the held body in the tool frame, bound when this task starts.
+        Unlike :meth:`AlignPlanes.express_tip_normal_in_tip`, applies the pose of the
+        held body in the tool frame, bound when this task starts.
         """
         return self._tool_T_held_body.root_T_tip @ self.tip_normal
 
