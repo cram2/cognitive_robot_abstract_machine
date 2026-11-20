@@ -250,7 +250,7 @@ class FramesOfDifferentSpacesError(SpatialTypesError):
 # %% values and changes on the x-y plane of a frame
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoPlanarTransformationError(SpatialTypesError):
     """
     A change between two three-dimensional frames has no rigid counterpart between the
@@ -268,7 +268,7 @@ class NoPlanarTransformationError(SpatialTypesError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FramesOnDifferentPlanesError(NoPlanarTransformationError):
     """
     Raised when the x-y planes of two frames are different planes, so no change between
@@ -289,7 +289,7 @@ class FramesOnDifferentPlanesError(NoPlanarTransformationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MirroredPlaneFramesError(NoPlanarTransformationError):
     """
     Raised when two frames span one plane but their z-axes point to opposite sides of
@@ -310,7 +310,7 @@ class MirroredPlaneFramesError(NoPlanarTransformationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class XAxisNormalToPlaneError(SpatialTypesError):
     """
     Raised when a pose is flattened onto a plane its x-axis is normal to, so the x-axis

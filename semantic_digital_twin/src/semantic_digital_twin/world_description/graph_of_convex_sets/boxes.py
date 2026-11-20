@@ -447,22 +447,10 @@ class GraphOfBoundingBoxes(
     def constrain_to_free_space(self, variable: MappedVariable) -> ConditionType:
         """
         Add a where condition to ``variable``'s query, restricting it to lie within this
-        graph's free space.
+        graph's free space: an ``OR`` over one ``AND`` per box of a lower and an upper
+        bound per coordinate of :attr:`free_space_event`.
 
-        The free space is a union of boxes, so the condition is an ``OR`` over one
-        ``AND`` per box, each conjoining a lower and an upper bound per coordinate.
-        Which coordinates that is -- x, y for a planar graph; x, y, z for a
-        volumetric one -- follows from :attr:`free_space_event` alone, so this one
-        implementation serves every :class:`GraphOfBoundingBoxes` subclass.
-
-        ``variable`` is rerooted onto its query's own ``selected_variable`` before
-        its fields are read: a query's own type does not resolve (what it selects
-        lives on ``selected_variable`` instead), and a condition built directly
-        against the selection is exactly what evaluates correctly per query result
-        without needing the query's own rerooting machinery to intervene.
-
-        :param variable: The eql variable to constrain, e.g. a Pose2Dimensional- or
-            Point3Dimensional-typed attribute of a query, or the query itself.
+        :param variable: The eql variable to constrain, or the query itself.
         :return: The condition that was added.
         :raises NotNumberLikeFieldError: If ``variable`` has no number-like field for
             one of this graph's spatial coordinates.

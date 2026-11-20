@@ -53,9 +53,6 @@ except ModuleNotFoundError:
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
-from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix3Dimensional,
-)
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 from .world_snapshot import WorldSnapshot

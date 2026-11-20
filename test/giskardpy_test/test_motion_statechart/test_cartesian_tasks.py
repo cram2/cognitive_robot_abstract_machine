@@ -463,8 +463,8 @@ class TestCartesianPositionTrajectory:
         self, *, positions: list[Point3Dimensional] | np.ndarray
     ) -> np.ndarray:
         """
-        Convert a sequence of `Point3Dimensional` or an `ndarray` of shape (N,
-        3) into an `ndarray` of shape (N, 3).
+        Convert a sequence of `Point3Dimensional` or an `ndarray` of shape (N, 3) into
+        an `ndarray` of shape (N, 3).
         """
         if isinstance(positions, np.ndarray):
             if positions.ndim != 2 or positions.shape[1] != 3:
@@ -493,13 +493,11 @@ class TestCartesianPositionTrajectory:
         """
         Compare an executed Cartesian path against a reference list of positions.
 
-        The executed path is reconstructed from the `world_state_trajectory` by
-        computing forward kinematics for `tip_link` in the `root_link` frame at each
-        recorded state. For each executed point, the minimum Euclidean distance to the
-        reference path is computed and asserted to be within `tolerance`.
+        Asserts that the minimum Euclidean distance from each executed point to the
+        reference path is within `tolerance`.
 
-        :param positions: Reference path as `Point3Dimensional` iterable or an
-            array of shape (N, 3). All points are with respect to root_link
+        :param positions: Reference path as `Point3Dimensional` iterable or an array of
+            shape (N, 3). All points are with respect to root_link
         :param world_state_trajectory: Recorded joint-space trajectory with access to
             the world.
         :param root_link: Root kinematic frame for forward kinematics.

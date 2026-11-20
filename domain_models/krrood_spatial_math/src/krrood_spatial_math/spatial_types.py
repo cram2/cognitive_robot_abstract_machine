@@ -322,7 +322,7 @@ the value a frame expresses in its own coordinates.
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialChange(
     SymbolicSpatialType,
     RigidCoordinateChange[GenericCartesianFrame, sm.Scalar],
@@ -360,7 +360,7 @@ class SymbolicSpatialChange(
                 data=data, identified_object=self.child_frame
             )
 
-    def _frames_from_json(self, data: dict[str, Any], **kwargs) -> None:
+    def _frames_from_json(self, data: dict[str, Any], **kwargs: Any) -> None:
         super()._frames_from_json(data, **kwargs)
         self.child_frame = self._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.CHILD, **kwargs
@@ -502,21 +502,13 @@ class HomogeneousTransformationMatrix3Dimensional(
     SymbolicSpatialChange[CartesianFrame3Dimensional],
 ):
     """
-    Represents a 4x4 transformation matrix used in kinematics and transformations.
-
-    A `TransformationMatrix` encapsulates relationships between a parent coordinate
-    system (reference frame) and a child coordinate system through rotation and
-    translation. It provides utilities to derive transformations, compute dot products,
-    and create transformations from various inputs such as Euler angles or quaternions.
-
-    It is only a change of coordinates from its :attr:`child_frame` into its
-    :attr:`reference_frame`, never a value given in a frame: the value it corresponds to
-    is a :class:`Pose3Dimensional`.
+    A 4x4 change of coordinates from its :attr:`child_frame` into its
+    :attr:`reference_frame`, never a value given in a frame: that is a
+    :class:`Pose3Dimensional`.
 
     .. warning::
         The matrix must be rigid: its upper left 3x3 block a rotation and its last row
-        ``[0, 0, 0, 1]``. :meth:`inverse` and the rotation it is composed of are wrong
-        for a matrix that scales or shears.
+        ``[0, 0, 0, 1]``. :meth:`inverse` is wrong for a matrix that scales or shears.
     """
 
     def __init__(
@@ -1326,17 +1318,9 @@ class Vector3Dimensional(
     Vector,
 ):
     """
-    Representation of a 3D vector with reference frame support for homogenous
-    transformations.
+    A vector in 3D space, given in a reference frame.
 
-    This class provides a structured representation of 3D vectors. It includes
-    support for operations such as addition, subtraction, scaling, dot product,
-    cross product, and more. It is compatible with symbolic computations and
-    provides methods to define standard basis vectors, normalize a vector, and
-    compute geometric properties such as the angle between vectors. The class
-    also includes support for working in different reference frames.
-
-    .. note:: this is represented as a 4d vector, where the last entry is always a 0.
+    .. note:: It is stored as a 4d vector whose last entry is always a 0.
     """
 
     visualisation_frame: CartesianFrame3Dimensional = field(default=None)
@@ -1375,7 +1359,7 @@ class Vector3Dimensional(
         self._casadi_sx[3] = 0
 
     @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -1391,22 +1375,12 @@ class Vector3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Vector3Dimensional:
         """
-        Creates an instance of Vector3Dimensional from provided iterable data.
+        Creates a :class:`Vector3Dimensional` from 1D array-like data.
 
-        This class method is used to construct a Vector3Dimensional object by processing the given
-        data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a Vector3Dimensional
-        instance. The provided iterable or array should follow a 1D structure to avoid
-        raised errors.
-
-        :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the Vector3Dimensional instance.
-        :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the Vector3Dimensional instance. If the data
-            has a `reference_frame` attribute, and this parameter is not specified, it
-            will be taken from the data.
-        :return: Returns an instance of Vector3Dimensional initialized with the processed data and
-            an optional reference frame.
+        :param data: The array-like data, such as a list, tuple or numpy array.
+        :param reference_frame: The frame the result is given in. Taken from `data` if it
+            has one and this is not given.
+        :return: The :class:`Vector3Dimensional` holding `data`.
         """
         if isinstance(data, SymbolicSpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
@@ -1498,7 +1472,7 @@ class Vector3Dimensional(
         return self[0]
 
     @x.setter
-    def x(self, value: sm.ScalarData):
+    def x(self, value: sm.ScalarData) -> None:
         self[0] = value
 
     @property
@@ -1506,7 +1480,7 @@ class Vector3Dimensional(
         return self[1]
 
     @y.setter
-    def y(self, value: sm.ScalarData):
+    def y(self, value: sm.ScalarData) -> None:
         self[1] = value
 
     @property
@@ -1582,12 +1556,8 @@ class Vector3Dimensional(
         if_nan: Vector3Dimensional | None = None,
     ) -> sm.GenericSymbolicType:
         """
-        A version of division where no sub-expression is ever NaN.
-
-        The expression would evaluate to 'if_nan', but you should probably never work
-        with the 'if_nan' result. However, if one sub-expressions is NaN, the whole
-        expression evaluates to NaN, even if it is only in a branch of an if-else, that
-        is not returned. This method is a workaround for such cases.
+        A division in which no sub-expression is NaN, as a NaN in a branch of an if-else
+        that is not returned would still make the whole expression NaN.
         """
         if if_nan is None:
             if_nan = Vector3Dimensional()
@@ -1618,7 +1588,7 @@ class Vector3Dimensional(
         result.reference_frame = self.reference_frame
         return result
 
-    def scale(self, a: sm.ScalarData, unsafe: bool = False):
+    def scale(self, a: sm.ScalarData, unsafe: bool = False) -> None:
         if unsafe:
             self.casadi_sx = ((self / self.norm()) * a).casadi_sx
         else:
@@ -1630,18 +1600,12 @@ class Vector3Dimensional(
         cone_theta: sm.ScalarData,
     ) -> Vector3Dimensional:
         """
-        Projects a given vector onto the boundary of a cone defined by its axis and
-        angle.
-
-        This function computes the projection of a vector onto the boundary of a cone
-        specified by its axis and half-angle. It handles special cases where the input
-        vector is collinear with the cone's axis. The projection ensures the resulting
-        vector lies within the cone's boundary.
+        Projects a vector onto the boundary of a cone, handling a vector collinear with the
+        cone's axis.
 
         :param frame_V_cone_axis: The axis of the cone.
-        :param cone_theta: The half-angle of the cone in radians. Can be a symbolic
-            value or a float.
-        :return: The projection of the input vector onto the cone's boundary.
+        :param cone_theta: The half-angle of the cone in radians.
+        :return: The projection of this vector onto the cone's boundary.
         """
         frame_V_current = self
         frame_V_cone_axis_normed = copy(frame_V_cone_axis)
@@ -1715,14 +1679,9 @@ class Point3Dimensional(
     Point[Vector3Dimensional],
 ):
     """
-    Represents a 3D point with reference frame handling.
+    A point in 3D space, given in a reference frame.
 
-    This class provides a representation of a point in 3D space, including support
-    for operations such as addition, subtraction, projection onto planes/lines, and
-    distance calculations. It incorporates a reference frame for kinematic computations
-    and facilitates mathematical operations essential for 3D geometry modeling.
-
-    .. note:: this is represented as a 4d vector, where the last entry is always a 1.
+    .. note:: It is stored as a 4d vector whose last entry is always a 1.
     """
 
     def __init__(
@@ -1761,22 +1720,12 @@ class Point3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Point3Dimensional:
         """
-        Creates an instance of Point3Dimensional from provided iterable data.
+        Creates a :class:`Point3Dimensional` from 1D array-like data.
 
-        This class method is used to construct a Point3Dimensional object by processing the given
-        data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a Point3Dimensional
-        instance. The provided iterable or array should follow a 1D structure to avoid
-        raised errors.
-
-        :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the Point3Dimensional instance.
-        :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the Point3Dimensional instance. If the data has
-            a `reference_frame` attribute, and this parameter is not specified, it will
-            be taken from the data.
-        :return: Returns an instance of Point3Dimensional initialized with the processed data and
-            an optional reference frame.
+        :param data: The array-like data, such as a list, tuple or numpy array.
+        :param reference_frame: The frame the result is given in. Taken from `data` if it
+            has one and this is not given.
+        :return: The :class:`Point3Dimensional` holding `data`.
         """
         if isinstance(data, SymbolicSpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
@@ -1785,7 +1734,7 @@ class Point3Dimensional(
         return result
 
     @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -1986,7 +1935,7 @@ class Point3Dimensional(
         return sm.Vector.from_casadi_sx(casadi_sx=copy(self.casadi_sx[:3]))
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Line3Dimensional(Line[Point3Dimensional]):
     """
     An infinite straight line in 3D space.
@@ -2094,22 +2043,12 @@ class Quaternion(
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Quaternion:
         """
-        Creates an instance of Quaternion from provided iterable data.
+        Creates a :class:`Quaternion` from 1D array-like data.
 
-        This class method is used to construct a Quaternion object by processing the
-        given data and optionally assigning a reference frame. The data can represent
-        different array-like objects compatible with the desired format for a Quaternion
-        instance. The provided iterable or array should follow a 1D structure to avoid
-        raised errors.
-
-        :param data: The array-like data or object such as a list, tuple, or numpy array
-            used to initialize the Quaternion instance.
-        :param reference_frame: A reference to a `CartesianFrame3Dimensional` object,
-            representing the frame of reference for the Quaternion instance. If the data
-            has a `reference_frame` attribute, and this parameter is not specified, it
-            will be taken from the data.
-        :return: Returns an instance of Quaternion initialized with the processed data
-            and an optional reference frame.
+        :param data: The array-like data, such as a list, tuple or numpy array.
+        :param reference_frame: The frame the result is given in. Taken from `data` if it
+            has one and this is not given.
+        :return: The :class:`Quaternion` holding `data`.
         """
         if hasattr(data, "shape") and len(data.shape) > 1 and data.shape[1] != 1:
             raise ValueError("The iterable must be a 1d list, tuple or array")
@@ -3099,21 +3038,17 @@ class Pose3Dimensional(
         reference_frame: CartesianFrame3Dimensional | None = None,
     ) -> Self:
         """
-        Creates a `Pose3Dimensional` instance from the provided position coordinates and quaternion
-        values representing rotation. This method constructs a 3D point for the position
-        and a rotation matrix derived from the quaternion, and initializes the
-        transformation matrix with these along with optional reference and child frame
-        entities.
+        Creates a :class:`Pose3Dimensional` from a position and a quaternion.
 
-        :param pos_x: X coordinate of the position in space.
-        :param pos_y: Y coordinate of the position in space.
-        :param pos_z: Z coordinate of the position in space.
-        :param quat_w: W component of the quaternion representing rotation.
-        :param quat_x: X component of the quaternion representing rotation.
-        :param quat_y: Y component of the quaternion representing rotation.
-        :param quat_z: Z component of the quaternion representing rotation.
-        :param reference_frame: Optional reference frame for the transformation matrix.
-        :return: A `Pose3Dimensional` object constructed from the given parameters.
+        :param pos_x: X coordinate of the position.
+        :param pos_y: Y coordinate of the position.
+        :param pos_z: Z coordinate of the position.
+        :param quat_w: W component of the rotation quaternion.
+        :param quat_x: X component of the rotation quaternion.
+        :param quat_y: Y component of the rotation quaternion.
+        :param quat_z: Z component of the rotation quaternion.
+        :param reference_frame: The frame the pose is given in, if any.
+        :return: The pose at the position with the rotation.
         """
         p = Point3Dimensional(x=pos_x, y=pos_y, z=pos_z)
         r = Quaternion(w=quat_w, x=quat_x, y=quat_y, z=quat_z)

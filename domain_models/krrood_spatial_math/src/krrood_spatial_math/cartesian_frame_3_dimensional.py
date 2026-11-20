@@ -211,14 +211,16 @@ class CartesianFrame3DimensionalResolver(Interface):
 # %% referring to a frame in a serialized coordinate representation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CartesianFrame3DimensionalReference(ObjectReference):
     """
     How a serialized coordinate representation points at a
     :class:`CartesianFrame3Dimensional`.
     """
 
-    def resolve(self, *, data: dict[str, Any], **kwargs) -> CartesianFrame3Dimensional:
+    def resolve(
+        self, *, data: dict[str, Any], **kwargs: Any
+    ) -> CartesianFrame3Dimensional:
         """
         :param data: The serialized spatial type that refers to the frame.
         :param kwargs: The keyword arguments of the ``from_json`` call, which carry the

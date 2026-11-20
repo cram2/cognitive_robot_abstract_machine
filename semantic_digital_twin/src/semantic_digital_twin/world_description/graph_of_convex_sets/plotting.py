@@ -369,7 +369,7 @@ class ConvexSetAdjacency:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FloorPlan:
     """
     The x-y plane of the search space's reference frame, which the top-down panels draw
@@ -466,7 +466,9 @@ class NavigationScene:
         :return: The plane the top-down panels draw on.
         """
         return FloorPlan(
-            EmbeddedPlaneProjection(plane_frame=self.search_space.reference_frame)
+            projection=EmbeddedPlaneProjection(
+                plane_frame=self.search_space.reference_frame
+            )
         )
 
     @property

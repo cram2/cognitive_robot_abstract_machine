@@ -15,15 +15,13 @@ from krrood.patterns.exceptions import (
 
 class Interface(ABC):
     """
-    A class that only declares the typed attributes and methods its subclasses provide,
-    as fields or properties. It cannot be instantiated, and a class that implements all
-    of its abstract methods cannot be defined without providing every attribute its
-    interfaces declare.
+    A class that only declares the typed attributes and methods its subclasses provide.
+    It cannot be instantiated, and a class implementing all of its abstract methods
+    cannot be defined without every attribute its interfaces declare.
 
     .. note::
-        Never make an interface a dataclass, which turns its declarations into fields.
-        A base class with fields or behaviour of its own subclasses :class:`abc.ABC`.
-        Only a class naming :class:`Interface` among its own bases is an interface.
+        Never make an interface a dataclass. A base class with fields or behaviour of its
+        own subclasses :class:`abc.ABC`; only one naming :class:`Interface` is an interface.
     """
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
