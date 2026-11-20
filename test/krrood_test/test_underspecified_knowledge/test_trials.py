@@ -6,6 +6,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import multiprocessing
+import os
+import signal
+import time
+
 import numpy as np
 import pytest
 from sqlalchemy.orm import Session
@@ -25,6 +30,7 @@ from krrood.parametrization.trials.exceptions import (
     OutcomeDidNotVaryInPilot,
     ParameterWithoutCentre,
 )
+from krrood.parametrization.trials.workers import WorkerPool
 from krrood.parametrization.trials.parameter_spaces import (
     DrawnParameters,
     GivenParameters,
@@ -310,7 +316,11 @@ def test_several_workers_keep_every_trial_of_their_share(database_url, court_id)
     """
     setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
     source = uniformly_drawn_throws(number_of_draws=8)
-    campaign = TrialCampaign(setup=setup, parameter_source=source, number_of_workers=2)
+    campaign = TrialCampaign(
+        setup=setup,
+        parameter_source=source,
+        worker_pool=WorkerPool(number_of_workers=2),
+    )
 
     kept = campaign.run()
     angles = [throw.parameters.angle for throw in setup.create_store().stored_trials()]
@@ -331,12 +341,76 @@ def test_workers_that_need_more_memory_than_is_free_are_refused(
     campaign = TrialCampaign(
         setup=ThrowingSetup(database_url=database_url),
         parameter_source=uniformly_drawn_throws(number_of_draws=2),
-        number_of_workers=2,
-        memory_per_worker=10**18,
+        worker_pool=WorkerPool(number_of_workers=2, memory_per_worker=10**18),
     )
     with pytest.raises(NotEnoughMemoryForWorkers):
         campaign.run()
     assert not database_path.exists()
+
+
+# %% memory and stopping
+
+
+def test_the_workers_are_as_many_as_fit_into_the_memory_budget():
+    """
+    Of more workers than the budget holds, only as many run as fit into it.
+    """
+    pool = WorkerPool(
+        number_of_workers=8, memory_per_worker=10**6, memory_budget=3 * 10**6
+    )
+    assert pool.workers_that_fit() == pool.memory_budget // pool.memory_per_worker
+
+
+def test_no_more_workers_run_than_asked_for():
+    """
+    However much memory is left, no more workers run than asked for.
+    """
+    pool = WorkerPool(number_of_workers=2, memory_per_worker=1)
+    assert pool.workers_that_fit() == pool.number_of_workers
+
+
+def number_of_stored_trials(*, setup: ThrowingSetup) -> int:
+    """
+    :param setup: The setup whose store to read.
+    :return: How many trials the store holds.
+    """
+    return len(setup.create_store().stored_trials())
+
+
+def test_a_terminated_campaign_stops_cleanly_and_keeps_its_finished_trials(
+    database_url, database_path, court_id
+):
+    """
+    Asked to terminate, a campaign lets its workers finish their throws and stop: it
+    ends without an error, keeps the throws finished, and no worker throws on.
+    """
+    setup = ThrowingSetup(
+        database_url=database_url,
+        starting_state_id=court_id,
+        performer=SteepThrowsLand(seconds_per_throw=0.2),
+    )
+    source = uniformly_drawn_throws(number_of_draws=40)
+    campaign = TrialCampaign(
+        setup=setup,
+        parameter_source=source,
+        worker_pool=WorkerPool(number_of_workers=2),
+    )
+    process = multiprocessing.get_context("spawn").Process(target=campaign.run)
+    process.start()
+    deadline = time.monotonic() + 60
+    while (
+        not database_path.exists() or number_of_stored_trials(setup=setup) < 2
+    ) and time.monotonic() < deadline:
+        time.sleep(0.1)
+
+    os.kill(process.pid, signal.SIGTERM)
+    process.join(timeout=30)
+    kept = number_of_stored_trials(setup=setup)
+    time.sleep(1)
+
+    assert process.exitcode == 0
+    assert 2 <= kept < source.number_of_draws
+    assert number_of_stored_trials(setup=setup) == kept
 
 
 # %% checking the outcome before scaling up
@@ -358,7 +432,7 @@ def test_a_campaign_whose_pilot_trials_all_fail_stops_after_them(
         setup=setup,
         parameter_source=uniformly_drawn_throws(number_of_draws=20),
         pilot_trials=5,
-        number_of_workers=2,
+        worker_pool=WorkerPool(number_of_workers=2),
     )
 
     with pytest.raises(OutcomeDidNotVaryInPilot):
@@ -411,7 +485,7 @@ def test_each_parameters_is_tried_as_often_as_it_is_repeated(
         setup=setup,
         parameter_source=central_and_edge_throws,
         repetitions=3,
-        number_of_workers=2,
+        worker_pool=WorkerPool(number_of_workers=2),
     )
 
     kept = campaign.run()

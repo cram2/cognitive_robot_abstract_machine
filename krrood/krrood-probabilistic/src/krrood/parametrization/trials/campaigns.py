@@ -4,21 +4,17 @@ Trying trials of a behaviour and keeping them, many at once in worker processes.
 
 from __future__ import annotations
 
-import os
 from abc import ABC, abstractmethod
-from concurrent.futures import ProcessPoolExecutor
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
-from multiprocessing import get_context
+from dataclasses import dataclass, field
+from multiprocessing.managers import EventProxy
 
 from typing_extensions import Generic
 
-from krrood.parametrization.trials.exceptions import (
-    NotEnoughMemoryForWorkers,
-    OutcomeDidNotVaryInPilot,
-)
+from krrood.parametrization.trials.exceptions import OutcomeDidNotVaryInPilot
 from krrood.parametrization.trials.parameter_spaces import ParameterSource
 from krrood.parametrization.trials.records import TParameters, TTrial
+from krrood.parametrization.trials.workers import ParallelJob, WorkerPool
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 # %% trying and storing
@@ -82,7 +78,7 @@ class TrialSetup(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
 
 
 @dataclass(kw_only=True)
-class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
+class TrialCampaign(ParallelJob[TParameters, bool], Generic[TParameters, TTrial]):
     """
     Tries the parameters of a source, each :attr:`repetitions` times, in several worker
     processes at once, keeping every trial as soon as it is tried.
@@ -110,25 +106,21 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
     make sure their outcome varies; none when ``0``.
     """
 
-    number_of_workers: int = 1
+    worker_pool: WorkerPool = field(default_factory=WorkerPool)
     """
-    How many processes try trials at once; a single worker tries them in this process.
-    """
-
-    memory_per_worker: int | None = None
-    """
-    How much working memory a worker needs at most, in bytes; ``None`` when it is not
-    checked.
+    The workers that try the trials after the pilot.
     """
 
     def run(self) -> int:
         """
-        :return: How many trials were kept.
-        :raises NotEnoughMemoryForWorkers: If the workers would need more working
-            memory than is free.
+        :return: How many trials were kept; fewer than given when the campaign was
+            stopped.
+        :raises NotEnoughMemoryForWorkers: If not even one worker fits into the
+            working memory.
         :raises OutcomeDidNotVaryInPilot: If every pilot trial came out the same.
         """
-        self.raise_unless_the_workers_fit_into_memory()
+        # refuse before anything is tried or created
+        self.worker_pool.workers_that_fit()
         self.setup.create_store().prepare()
         parameters = [
             parameters_to_repeat
@@ -137,34 +129,19 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
         ]
         pilot = parameters[: self.pilot_trials]
         if pilot:
-            self.raise_unless_the_outcome_varies(
-                successes=self.try_trials(parameters=pilot)
-            )
+            successes = WorkerPool().run(job=self, items=pilot)
+            self.raise_unless_the_outcome_varies(successes=successes)
         remaining = parameters[len(pilot) :]
-        if self.number_of_workers == 1:
-            return len(pilot) + len(self.try_trials(parameters=remaining))
-        shares = [
-            remaining[worker :: self.number_of_workers]
-            for worker in range(self.number_of_workers)
-        ]
-        with ProcessPoolExecutor(
-            max_workers=self.number_of_workers, mp_context=get_context("spawn")
-        ) as pool:
-            workers = [
-                pool.submit(self.try_trials, parameters=share) for share in shares
-            ]
-            return len(pilot) + sum(len(worker.result()) for worker in workers)
+        return len(pilot) + len(self.worker_pool.run(job=self, items=remaining))
 
-    def try_trials(self, *, parameters: list[TParameters]) -> list[bool]:
-        """
-        :param parameters: The parameters to try, in order.
-        :return: Whether each trial succeeded, in the order they were tried.
-        """
+    def work_through(self, *, items: list[TParameters], stop: EventProxy) -> list[bool]:
         store = self.setup.create_store()
         successes = []
         with self.setup.performing() as performer:
-            for trial_parameters in parameters:
-                trial = performer.perform(parameters=trial_parameters)
+            for parameters in items:
+                if stop.is_set():
+                    break
+                trial = performer.perform(parameters=parameters)
                 store.add(trial=trial)
                 successes.append(trial.succeeded)
         return successes
@@ -180,18 +157,3 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
         raise OutcomeDidNotVaryInPilot(
             number_of_trials=len(successes), succeeded=successes[0]
         )
-
-    def raise_unless_the_workers_fit_into_memory(self) -> None:
-        """
-        :raises NotEnoughMemoryForWorkers: If :attr:`memory_per_worker` is given and the
-            workers would need more working memory than is free.
-        """
-        if self.memory_per_worker is None:
-            return
-        free_memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_AVPHYS_PAGES")
-        if self.number_of_workers * self.memory_per_worker > free_memory:
-            raise NotEnoughMemoryForWorkers(
-                number_of_workers=self.number_of_workers,
-                memory_per_worker=self.memory_per_worker,
-                free_memory=free_memory,
-            )

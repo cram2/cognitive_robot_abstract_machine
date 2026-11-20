@@ -55,14 +55,20 @@ trials of one starting state:
             number_of_draws=160,
         ),
         pilot_trials=20,
-        number_of_workers=8,
-        memory_per_worker=4 * 10**9,
+        worker_pool=WorkerPool(
+            number_of_workers=48, memory_per_worker=4 * 10**9, memory_budget=120 * 10**9
+        ),
     )
     campaign.run()
 
     analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
     [strongest, *_] = analysis.effects_on_success()
     registry = NearCentresRegistry(centres=analysis.successful_parameters(), spread=0.1)
+
+The :class:`~krrood.parametrization.trials.workers.WorkerPool` runs only as many workers as
+fit into the free working memory and its budget, here 30. Stop a campaign by
+interrupting or terminating its own process, never its workers: every worker finishes
+its current trial and stops, and every finished trial stays kept.
 
 The first :attr:`~krrood.parametrization.trials.campaigns.TrialCampaign.pilot_trials`
 are tried before any worker starts. When they all come out the same, the campaign stops

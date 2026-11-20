@@ -79,13 +79,8 @@ class ParameterWithoutCentre(InputError):
 @dataclass(kw_only=True)
 class NotEnoughMemoryForWorkers(DataclassException):
     """
-    Raised when the workers of a campaign of trials would need more working memory than
-    is free.
-    """
-
-    number_of_workers: int
-    """
-    How many workers were asked for.
+    Raised when not even one worker fits into the working memory that is free and
+    budgeted.
     """
 
     memory_per_worker: int
@@ -93,22 +88,19 @@ class NotEnoughMemoryForWorkers(DataclassException):
     How much working memory each worker needs, in bytes.
     """
 
-    free_memory: int
+    available_memory: int
     """
-    How much working memory is free, in bytes.
+    How much working memory the workers may use, in bytes.
     """
 
     def error_message(self) -> str:
         return (
-            f"{self.number_of_workers} workers of {self.memory_per_worker / 1e9:.1f} GB "
-            f"need more than the {self.free_memory / 1e9:.1f} GB of free memory."
+            f"A worker of {self.memory_per_worker / 1e9:.1f} GB needs more than the "
+            f"{self.available_memory / 1e9:.1f} GB the workers may use."
         )
 
     def suggest_correction(self) -> str:
-        return (
-            f"Use at most {self.free_memory // self.memory_per_worker} workers, or "
-            f"free working memory first."
-        )
+        return "Raise the memory budget, or free working memory first."
 
 
 @dataclass(kw_only=True)

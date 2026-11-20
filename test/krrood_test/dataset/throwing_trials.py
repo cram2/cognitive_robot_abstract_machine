@@ -5,6 +5,7 @@ to try parameter spaces, campaigns and analyses on without a simulation.
 
 from __future__ import annotations
 
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
@@ -190,7 +191,13 @@ class SteepThrowsLand(TrialPerformer[ThrowParameters, Throw]):
     The standard deviation of the angle the wind turns the ball by, in radians.
     """
 
+    seconds_per_throw: float = 0.0
+    """
+    How long a throw takes, in seconds.
+    """
+
     def perform(self, *, parameters: ThrowParameters) -> Throw:
+        time.sleep(self.seconds_per_throw)
         reached_angle = float(parameters.angle + np.random.normal(scale=self.wind))
         return Throw(
             parameters=parameters,
