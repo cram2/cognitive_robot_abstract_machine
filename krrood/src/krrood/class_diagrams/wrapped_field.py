@@ -16,6 +16,9 @@ from datetime import datetime
 from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
+
+# Only this class matches the aliases a ``type`` statement makes before Python 3.14.
+from typing import TypeAliasType  # noqa: TID251
 from typing_extensions import (
     Annotated,
     get_origin,
@@ -118,7 +121,8 @@ class WrappedField:
         """
         Resolve the type hint for this field.
 
-        A field typed ``Annotated[T, ...]`` resolves to ``T``.
+        A field typed ``Annotated[T, ...]`` resolves to ``T``, and a field typed with a
+        type alias, such as :data:`numpy.typing.NDArray`, to the type it stands for.
 
         :return: The resolved type hint.
         :raises CouldNotResolveType: If the type cannot be resolved.
@@ -132,9 +136,14 @@ class WrappedField:
                 namespace=tuple(self._build_initial_namespace().items()),
             )[self.field.name]
 
-        if get_origin(type_hint) is not Annotated:
-            return type_hint
-        return type_hint.__origin__
+        if get_origin(type_hint) is Annotated:
+            type_hint = type_hint.__origin__
+        while isinstance(get_origin(type_hint) or type_hint, TypeAliasType):
+            if isinstance(type_hint, TypeAliasType):
+                type_hint = type_hint.__value__
+            else:
+                type_hint = get_origin(type_hint).__value__[get_args(type_hint)]
+        return type_hint
 
     def _build_initial_namespace(self) -> dict:
         """
