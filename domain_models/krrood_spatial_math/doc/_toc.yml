@@ -6,6 +6,7 @@ root: intro
 parts:
 - caption: Explanations
   chapters:
+    - file: frames_and_transformations
     - file: rates_of_motion
 - caption: References
   chapters:
