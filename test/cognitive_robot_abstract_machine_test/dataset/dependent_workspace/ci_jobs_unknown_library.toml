@@ -1,0 +1,3 @@
+[[shared_jobs]]
+name = "chain"
+libraries = ["base", "missing"]

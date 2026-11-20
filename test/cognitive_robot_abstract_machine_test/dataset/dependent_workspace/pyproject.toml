@@ -1,0 +1,6 @@
+# A workspace whose members depend on each other in a chain, next to one depending on none.
+[project]
+name = "dependent-workspace"
+
+[tool.uv.workspace]
+members = ["base", "middle", "top", "side"]

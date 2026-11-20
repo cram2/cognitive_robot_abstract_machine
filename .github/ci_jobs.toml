@@ -1,0 +1,20 @@
+# The CI jobs that run the tests of several libraries in one job. Every library not named
+# here runs in a job of its own, named after it. A pull request runs only the jobs of the
+# libraries its change can affect: see cognitive_robot_abstract_machine/ci_jobs.py.
+
+[[shared_jobs]]
+# Libraries whose tests take a minute or less share one job, which would otherwise spend
+# most of its time setting up the container and take a runner from the others.
+name = "small_packages"
+libraries = [
+    "random_events",
+    "physics_simulators",
+    "krrood_spatial_math",
+    "krrood_compute_resources",
+    "krrood_synchronization",
+    "version",
+    "cognitive_robot_abstract_machine",
+]
+# The job that checks the code a pull request changes against the rules that have a
+# checker, so it runs for every pull request.
+check_rules = true

@@ -169,3 +169,37 @@ class UnorderableOrmInterfacesError(DataclassException):
             "Make each generator import only the interfaces of packages in the "
             "workspace, and none that builds on it."
         )
+
+
+@dataclass(kw_only=True)
+class UnknownSharedJobLibraryError(DataclassException, ValueError):
+    """
+    Raised when a shared CI job names a library the repository has no tests of.
+    """
+
+    job_name: str
+    """
+    Name of the shared job.
+    """
+
+    library_names: tuple[str, ...]
+    """
+    The libraries it names that have no tests.
+    """
+
+    known_library_names: tuple[str, ...]
+    """
+    The libraries the repository has tests of.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The CI job {self.job_name} runs the tests of "
+            f"{', '.join(self.library_names)}, which the repository has none of."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Name only libraries with a test directory: "
+            f"{', '.join(self.known_library_names)}."
+        )

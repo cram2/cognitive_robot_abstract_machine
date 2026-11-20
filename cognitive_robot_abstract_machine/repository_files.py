@@ -30,3 +30,28 @@ class RepositoryFile(PathEnumeration):
     """
     The workflow that finds the public signatures a pull request breaks.
     """
+
+    CI_JOBS = Path(".github") / "ci_jobs.toml"
+    """
+    The CI jobs that run the tests of several libraries together.
+    """
+
+    PYPROJECT = Path("pyproject.toml")
+    """
+    The metadata of a package, at the root of its directory; the repository's own
+    declares the uv workspace.
+    """
+
+
+# %% directories
+
+
+class RepositoryDirectory(PathEnumeration):
+    """
+    The directories of this repository, by their path relative to its root.
+    """
+
+    TESTS = Path("test")
+    """
+    The tests of every library, each in a directory of its own.
+    """
