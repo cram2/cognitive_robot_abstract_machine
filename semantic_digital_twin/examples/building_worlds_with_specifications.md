@@ -684,6 +684,8 @@ it keeps the names of the description, and it localizes a robot with a mobile ba
 `Connection6DoF` and any other robot by a fixed connection.
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
+
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.robots.pr2 import PR2
 
@@ -706,6 +708,8 @@ contribute two joints called `pr2/torso_lift_joint` and two odometry bodies call
 still owns the world it was parsed into.
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
+
 two_robot_world = WorldSpecification.from_urdf(
     file_path=table_urdf,
     robots=[
