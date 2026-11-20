@@ -1,3 +1,9 @@
+"""
+Tests of :mod:`random_events.product_algebra`.
+"""
+
+from __future__ import annotations
+
 import unittest
 
 from sortedcontainers import SortedSet
@@ -461,6 +467,9 @@ class OperationsWithEmptySetsTestCase(unittest.TestCase):
 
 
 def test_fill_missing_variables_updates_simple_sets_read_before():
+    """
+    Filling missing variables reaches simple sets that were read before the fill.
+    """
     x = Continuous(name="x")
     y = Continuous(name="y")
     event = SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()
