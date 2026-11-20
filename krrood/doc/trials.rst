@@ -69,6 +69,14 @@ are tried before any worker starts. When they all come out the same, the campaig
 with :class:`~krrood.parametrization.trials.exceptions.OutcomeDidNotVaryInPilot`: an
 outcome that cannot succeed by construction would make every analysis empty.
 
+A simulation run twice from the same state need not end the same. A campaign tries each
+parameters :attr:`~krrood.parametrization.trials.campaigns.TrialCampaign.repetitions`
+times, and
+:meth:`~krrood.parametrization.trials.analysis.TrialAnalysis.success_rates_of_parameters`
+gives the success rate of each. To retry the most promising parameters of an earlier
+campaign, give them as
+:class:`~krrood.parametrization.trials.parameter_spaces.GivenParameters`.
+
 .. note::
     A pilot cannot tell an outcome that never passes from one that passes rarely. When
     it stops, check the judgement of success on a state where it must pass before trying

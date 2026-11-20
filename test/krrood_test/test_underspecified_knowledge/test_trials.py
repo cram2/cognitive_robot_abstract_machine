@@ -27,6 +27,7 @@ from krrood.parametrization.trials.exceptions import (
 )
 from krrood.parametrization.trials.parameter_spaces import (
     DrawnParameters,
+    GivenParameters,
     NearCentresRegistry,
 )
 from ..dataset.throwing_trials import (
@@ -379,6 +380,76 @@ def test_a_campaign_whose_pilot_trials_vary_tries_every_trial(database_url, cour
 
     assert kept == source.number_of_draws
     assert len(setup.create_store().stored_trials()) == source.number_of_draws
+
+
+# %% repeating trials
+
+
+@pytest.fixture
+def central_and_edge_throws() -> GivenParameters[ThrowParameters]:
+    """
+    A throw aimed at the middle of the steep enough angles and one aimed just above
+    their lower edge.
+    """
+    return GivenParameters(
+        parameters=[
+            ThrowParameters(angle=angle, speed=3.0, release=ReleasePoint(height=1.5))
+            for angle in [0.75, 0.61]
+        ]
+    )
+
+
+def test_each_parameters_is_tried_as_often_as_it_is_repeated(
+    database_url, court_id, central_and_edge_throws
+):
+    """
+    Every given parameters is tried as many times as the campaign repeats it, spread
+    over the workers.
+    """
+    setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
+    campaign = TrialCampaign(
+        setup=setup,
+        parameter_source=central_and_edge_throws,
+        repetitions=3,
+        number_of_workers=2,
+    )
+
+    kept = campaign.run()
+    analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
+
+    assert kept == len(central_and_edge_throws.parameters) * campaign.repetitions
+    assert sorted(
+        rate.number_of_trials for rate in analysis.success_rates_of_parameters()
+    ) == [campaign.repetitions] * len(central_and_edge_throws.parameters)
+
+
+def test_repetitions_tell_apart_parameters_that_succeed_by_chance(
+    database_url, court_id, central_and_edge_throws
+):
+    """
+    With wind, a throw aimed at the middle of the steep enough angles lands more often
+    than one aimed just above their edge, each rate being the fraction of its repeated
+    trials that landed.
+    """
+    setup = ThrowingSetup(
+        database_url=database_url,
+        starting_state_id=court_id,
+        performer=SteepThrowsLand(wind=0.1),
+    )
+    campaign = TrialCampaign(
+        setup=setup, parameter_source=central_and_edge_throws, repetitions=40
+    )
+    np.random.seed(4)
+
+    campaign.run()
+    trials = setup.create_store().stored_trials()
+    best, worst = TrialAnalysis(trials=trials).success_rates_of_parameters()
+
+    assert best.parameters == central_and_edge_throws.parameters[0]
+    assert worst.parameters == central_and_edge_throws.parameters[1]
+    assert best.success_rate == np.mean(
+        [trial.succeeded for trial in trials if trial.parameters == best.parameters]
+    )
 
 
 # %% what made trials succeed

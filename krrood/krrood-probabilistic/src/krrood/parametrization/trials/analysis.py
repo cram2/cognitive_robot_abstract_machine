@@ -63,6 +63,28 @@ class EffectOnSuccess:
         return max(rates) - min(rates)
 
 
+@dataclass(kw_only=True)
+class SuccessRateOfParameters:
+    """
+    How often the trials of the same parameters succeeded.
+    """
+
+    parameters: TrialParameters
+    """
+    The parameters the trials shared.
+    """
+
+    number_of_trials: int
+    """
+    How many trials had these parameters.
+    """
+
+    success_rate: float
+    """
+    The fraction of those trials that succeeded.
+    """
+
+
 # %% what made trials succeed
 
 
@@ -143,6 +165,24 @@ class TrialAnalysis:
                 )
             )
         return rates
+
+    def success_rates_of_parameters(self) -> list[SuccessRateOfParameters]:
+        """
+        :return: The success rate of every distinct parameters, the highest first.
+        """
+        trials_by_parameters: dict[tuple[tuple[str, float], ...], list[Trial]] = {}
+        for trial in self.trials:
+            values = tuple(trial.parameters.values_by_attribute_path().items())
+            trials_by_parameters.setdefault(values, []).append(trial)
+        rates = [
+            SuccessRateOfParameters(
+                parameters=trials[0].parameters,
+                number_of_trials=len(trials),
+                success_rate=float(np.mean([trial.succeeded for trial in trials])),
+            )
+            for trials in trials_by_parameters.values()
+        ]
+        return sorted(rates, key=lambda rate: rate.success_rate, reverse=True)
 
     def successful_parameters(self) -> list[TrialParameters]:
         """

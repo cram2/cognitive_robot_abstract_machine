@@ -245,3 +245,19 @@ class DrawnParameters(ParameterSource[TParameters]):
         return self.parameter_space.drawn_parameters(
             number_of_draws=self.number_of_draws, model_registry=self.model_registry
         )
+
+
+@dataclass(kw_only=True)
+class GivenParameters(ParameterSource[TParameters]):
+    """
+    Parameters chosen beforehand, such as the most promising ones of an earlier
+    campaign, to retry them.
+    """
+
+    parameters: list[TParameters]
+    """
+    The parameters to try, in order.
+    """
+
+    def parameters_to_try(self) -> list[TParameters]:
+        return self.parameters

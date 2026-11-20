@@ -84,7 +84,7 @@ class TrialSetup(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
 @dataclass(kw_only=True)
 class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
     """
-    Tries the parameters of a source, each as often as asked, in several worker
+    Tries the parameters of a source, each :attr:`repetitions` times, in several worker
     processes at once, keeping every trial as soon as it is tried.
     """
 
@@ -96,6 +96,12 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
     parameter_source: ParameterSource[TParameters]
     """
     Gives the parameters to try.
+    """
+
+    repetitions: int = 1
+    """
+    How often each parameters is tried, so that a success rate is learned for it where
+    the same parameters do not always lead to the same outcome.
     """
 
     pilot_trials: int = 0
@@ -124,7 +130,11 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
         """
         self.raise_unless_the_workers_fit_into_memory()
         self.setup.create_store().prepare()
-        parameters = self.parameter_source.parameters_to_try()
+        parameters = [
+            parameters_to_repeat
+            for parameters_to_repeat in self.parameter_source.parameters_to_try()
+            for _ in range(self.repetitions)
+        ]
         pilot = parameters[: self.pilot_trials]
         if pilot:
             self.raise_unless_the_outcome_varies(
