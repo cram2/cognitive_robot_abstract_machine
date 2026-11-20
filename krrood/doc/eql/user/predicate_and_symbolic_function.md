@@ -81,6 +81,12 @@ Let's define a custom predicate and a symbolic function to find robots with spec
 from dataclasses import dataclass
 from krrood.entity_query_language.factories import variable, entity, an, Symbol
 from krrood.entity_query_language.predicate import symbolic_function, Predicate
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
+    Copula,
+    Noun,
+    clause,
+)
 
 @dataclass
 class ExampleRobot(Symbol):
@@ -100,12 +106,17 @@ class ExampleIsOverloaded(Predicate):
         # This is where the actual logic happens during evaluation
         return calculate_stress(self.robot.load) > self.limit
 
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        # How a query states this predicate: "<robot> is overloaded"
+        return clause(Noun(content=fields["robot"]), Copula(), Adjective(word="overloaded"))
+
 # Data
 robots = [ExampleRobot("Heavy", 8.0), ExampleRobot("Light", 2.0)]
 r = variable(ExampleRobot, domain=robots)
 
 # Query using custom logic
-query = an(entity(r).where(ExampleIsOverloaded(r)))
+query = an(entity(r).where(ExampleIsOverloaded(robot=r)))
 
 for robot in query.evaluate():
     print(f"Overloaded Robot: {robot.name} (Load: {robot.load})")

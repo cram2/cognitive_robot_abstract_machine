@@ -248,14 +248,14 @@ role instances.
 
 ```{code-cell} ipython3
 # Check whether alice has a CEO role
-print("has CEO role:", Role.has_role(alice, CEO))
+print("has CEO role:", Role.has_role(role_taker=alice, role_types=CEO))
 
 # Retrieve all CEO roles for alice
-ceos = Role.roles_for(alice, CEO)
+ceos = Role.roles_for(role_taker=alice, role_type=CEO)
 print("CEO roles:", ceos)
 
 # Retrieve all roles of any type
-all_roles = Role.roles_for(alice)
+all_roles = Role.roles_for(role_taker=alice)
 print("all roles:", all_roles)
 ```
 
@@ -285,7 +285,7 @@ print("CEO heads:", ceo.head_of)
 print("Professor teaches:", professor.teaches)
 
 # The taker knows about every role it currently holds
-print("all roles of alice:", Role.roles_for(alice))
+print("all roles of alice:", Role.roles_for(role_taker=alice))
 ```
 
 ## Multiple Roles of the Same Type
@@ -298,7 +298,7 @@ globex = Company(name="Globex")
 ceo_of_globex = CEO(role_taker=alice, head_of=globex)
 
 # Both CEO roles are kept and returned
-same_type_roles = Role.roles_for(alice, CEO)
+same_type_roles = Role.roles_for(role_taker=alice, role_type=CEO)
 print("number of CEO roles:", len(same_type_roles))
 print("companies headed:", sorted(role.head_of.name for role in same_type_roles))
 
@@ -333,10 +333,10 @@ the root entity.
 
 ```{code-cell} ipython3
 # Check roles from the perspective of the root taker
-print("alice has Representative role:", Role.has_role(alice, Representative))
+print("alice has Representative role:", Role.has_role(role_taker=alice, role_types=Representative))
 print(
     "Representative roles of alice:",
-    Role.roles_for(alice, Representative),
+    Role.roles_for(role_taker=alice, role_type=Representative),
 )
 
 # Navigate the chain programmatically
@@ -350,9 +350,9 @@ print("root type:", Representative.get_root_role_taker_type())
 |---|---|
 | Define a role class | Inherit from `Role[T]` and add role-specific fields; the `role_taker` field is inherited |
 | Construct a role | `MyRole(role_taker=taker_instance, ...)` — always explicit |
-| Check whether a taker has a role | `Role.has_role(taker, MyRole)` |
-| Retrieve roles of a type | `Role.roles_for(taker, MyRole)` |
-| Retrieve all roles | `Role.roles_for(taker)` |
+| Check whether a taker has a role | `Role.has_role(role_taker=taker, role_types=MyRole)` |
+| Retrieve roles of a type | `Role.roles_for(role_taker=taker, role_type=MyRole)` |
+| Retrieve all roles | `Role.roles_for(role_taker=taker)` |
 | Access the immediate role taker | `role.role_taker` |
 | Access the root non-role entity | `role.root_persistent_entity` |
 | Check two objects are the same entity | `Role.is_same_semantic_entity(first_entity=a, second_entity=b)`, or `IsSameSemanticEntity(first_entity=a, second_entity=b)` in a query (both see through role chains) |
