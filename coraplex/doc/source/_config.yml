@@ -14,6 +14,8 @@ logo                        : "_static/images/cora-plex-dark.png"  # A path to t
 # See https://jupyterbook.org/content/execute.html
 execute:
   execute_notebooks: auto
+  # a cell that raises fails the build instead of only logging a warning
+  raise_on_error: true
 
 # Define the name of the latex output file for PDF builds
 latex:

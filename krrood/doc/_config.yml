@@ -9,6 +9,8 @@ logo: _static/images/krrood_logo.svg
 # See https://jupyterbook.org/content/execute.html
 execute:
   execute_notebooks: force
+  # a cell that raises fails the build instead of only logging a warning
+  raise_on_error: true
 
 # Define the name of the latex output file for PDF builds
 latex:

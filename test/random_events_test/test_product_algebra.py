@@ -457,5 +457,17 @@ class OperationsWithEmptySetsTestCase(unittest.TestCase):
         self.assertEqual(diff, event)
 
 
+# %% filling missing variables after the simple sets were read
+
+
+def test_fill_missing_variables_updates_simple_sets_read_before():
+    x = Continuous(name="x")
+    y = Continuous(name="y")
+    event = SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()
+    event.simple_sets
+    event.fill_missing_variables((y,))
+    assert event.simple_sets[0][y] == y.domain
+
+
 if __name__ == "__main__":
     unittest.main()
