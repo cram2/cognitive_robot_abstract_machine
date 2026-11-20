@@ -6,14 +6,19 @@ When a behaviour fails in a way no single fix explains, the module
 
 1. Reach the state the failure shows in once and keep it, so every trial starts from it.
 2. Declare what the behaviour may vary by as a dataclass of numbers, a
-   :class:`~krrood.parametrization.trials.TrialParameters`, and bound it with a
-   :class:`~krrood.parametrization.trials.ParameterSpace`.
-3. Try many draws at once with a :class:`~krrood.parametrization.trials.TrialCampaign`,
-   which keeps every trial in a :class:`~krrood.parametrization.trials.TrialStore` as soon
-   as it is tried.
-4. Read with a :class:`~krrood.parametrization.trials.TrialAnalysis` which parameters
-   change the success rate, then draw the next campaign near the successful trials with a
-   :class:`~krrood.parametrization.trials.NearCentresRegistry`.
+   :class:`~krrood.parametrization.trials.records.TrialParameters`, and bound it with a
+   :class:`~krrood.parametrization.trials.parameter_spaces.ParameterSpace`. Declare
+   what is measured while a trial runs, such as the pose actually reached, as a
+   :class:`~krrood.parametrization.trials.records.TrialMeasurements`, and keep both with
+   the outcome in a :class:`~krrood.parametrization.trials.records.Trial`.
+3. Try many draws at once with a
+   :class:`~krrood.parametrization.trials.campaigns.TrialCampaign`, which keeps every
+   trial in a :class:`~krrood.parametrization.trials.campaigns.TrialStore` as soon as it
+   is tried.
+4. Read with a :class:`~krrood.parametrization.trials.analysis.TrialAnalysis` which
+   parameters and measurements change the success rate, then draw the next campaign near
+   the successful trials with a
+   :class:`~krrood.parametrization.trials.parameter_spaces.NearCentresRegistry`.
 
 The parameters may nest dataclasses; every number becomes a parameter, keyed by its path
 of attributes such as ``release.height``. A space states only its conditions, reaching
@@ -32,9 +37,9 @@ each parameter from the pattern it is given:
                 *self.conditions_within(value=parameters.release.height, bounds=self.height),
             ]
 
-A :class:`~krrood.parametrization.trials.TrialSetup` says how a worker tries and keeps its
+A :class:`~krrood.parametrization.trials.campaigns.TrialSetup` says how a worker tries and keeps its
 trials. It is sent to every worker process, so it builds what cannot be pickled, such as
-a simulation, inside :meth:`~krrood.parametrization.trials.TrialSetup.performing`:
+a simulation, inside :meth:`~krrood.parametrization.trials.campaigns.TrialSetup.performing`:
 
 .. code-block:: python
 
@@ -46,8 +51,8 @@ a simulation, inside :meth:`~krrood.parametrization.trials.TrialSetup.performing
     )
     campaign.run()
 
-    analysis = TrialAnalysis(outcomes=outcomes_read_from_the_store)
-    [strongest, *_] = analysis.parameter_effects()
+    analysis = TrialAnalysis(trials=trials_read_from_the_store)
+    [strongest, *_] = analysis.effects_on_success()
     registry = NearCentresRegistry(centres=analysis.successful_parameters(), spread=0.1)
 
 .. note::

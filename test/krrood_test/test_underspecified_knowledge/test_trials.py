@@ -7,27 +7,26 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from krrood.parametrization.exceptions import (
-    NotEnoughMemoryForWorkers,
-    NoTrialOutcomes,
-    ParameterOfUnsupportedType,
-    ParameterWithoutCentre,
-)
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from krrood.parametrization.trials import (
-    NearCentresRegistry,
-    TrialAnalysis,
-    TrialCampaign,
-    TrialOutcome,
+from krrood.parametrization.trials.analysis import TrialAnalysis
+from krrood.parametrization.trials.campaigns import TrialCampaign
+from krrood.parametrization.trials.exceptions import (
+    FieldOfUnsupportedType,
+    NotEnoughMemoryForWorkers,
+    NoTrials,
+    ParameterWithoutCentre,
 )
+from krrood.parametrization.trials.parameter_spaces import NearCentresRegistry
 from ..dataset.throwing_trials import (
     FastThrowSpace,
     NamedThrowParameters,
     ReleasePoint,
     SpeedOnlyParameters,
     SteepThrowsLand,
+    Throw,
     ThrowingSetup,
+    ThrowMeasurements,
     ThrowParameters,
     ThrowSpace,
     ThrowsInAFile,
@@ -52,8 +51,25 @@ def test_parameters_with_a_field_that_is_no_number_have_no_values():
     """
     A field that holds text cannot be drawn, so it has no value as a parameter.
     """
-    with pytest.raises(ParameterOfUnsupportedType):
+    with pytest.raises(FieldOfUnsupportedType):
         NamedThrowParameters(angle=0.7, thrower="Alice").values_by_attribute_path()
+
+
+def test_the_values_of_a_trial_are_keyed_by_their_paths_from_the_trial():
+    """
+    The parameters and the measurements of a trial are keyed by their paths from the
+    trial, so a parameter and a measurement of the same name stay apart.
+    """
+    parameters = ThrowParameters(angle=0.7, speed=3.0, release=ReleasePoint(height=1.5))
+    measurements = ThrowMeasurements(reached_angle=0.65)
+    throw = Throw(parameters=parameters, measurements=measurements, succeeded=True)
+    assert throw.values_by_attribute_path() == {
+        **{
+            f"parameters.{path}": value
+            for path, value in parameters.values_by_attribute_path().items()
+        },
+        "measurements.reached_angle": measurements.reached_angle,
+    }
 
 
 # %% drawing parameters
@@ -209,13 +225,7 @@ def analysis(drawn) -> TrialAnalysis:
     """
     performer = SteepThrowsLand()
     return TrialAnalysis(
-        outcomes=[
-            TrialOutcome(
-                parameters=parameters,
-                succeeded=performer.perform(parameters=parameters).landed_in_the_basket,
-            )
-            for parameters in drawn
-        ]
+        trials=[performer.perform(parameters=parameters) for parameters in drawn]
     )
 
 
@@ -223,25 +233,45 @@ def test_the_success_rate_is_the_fraction_of_trials_that_succeeded(analysis):
     """
     The success rate counts every trial once.
     """
-    succeeded = [outcome.succeeded for outcome in analysis.outcomes]
+    succeeded = [trial.succeeded for trial in analysis.trials]
     assert analysis.success_rate == sum(succeeded) / len(succeeded)
 
 
-def test_the_parameter_success_depends_on_has_the_strongest_effect(analysis):
+def test_the_values_success_depends_on_have_the_strongest_effects(analysis):
     """
-    Since only the angle decides whether a throw lands, its effect comes first.
+    Without wind, the aimed and the reached angle are the same and alone decide whether
+    a throw lands, so their effects come first.
     """
-    [strongest, *_] = analysis.parameter_effects()
-    assert strongest.attribute_path == "angle"
+    first, second, *_ = analysis.effects_on_success()
+    assert {first.attribute_path, second.attribute_path} == {
+        "parameters.angle",
+        "measurements.reached_angle",
+    }
+
+
+def test_a_measurement_that_decides_success_has_a_stronger_effect_than_its_cause(
+    drawn,
+):
+    """
+    With wind, the reached angle alone decides whether a throw lands, so its effect is
+    stronger than that of the aimed angle.
+    """
+    np.random.seed(3)
+    performer = SteepThrowsLand(wind=0.2)
+    analysis = TrialAnalysis(
+        trials=[performer.perform(parameters=parameters) for parameters in drawn * 10]
+    )
+    [strongest, *_] = analysis.effects_on_success()
+    assert strongest.attribute_path == "measurements.reached_angle"
 
 
 def test_the_ranges_of_a_parameter_cover_every_trial(analysis):
     """
     Each trial falls into exactly one range of each parameter.
     """
-    for effect in analysis.parameter_effects():
+    for effect in analysis.effects_on_success():
         assert sum(success.number_of_trials for success in effect.ranges) == len(
-            analysis.outcomes
+            analysis.trials
         )
 
 
@@ -250,13 +280,13 @@ def test_the_successful_parameters_are_those_of_the_trials_that_succeeded(analys
     Exactly the parameters of the successful trials are returned, in order.
     """
     assert analysis.successful_parameters() == [
-        outcome.parameters for outcome in analysis.outcomes if outcome.succeeded
+        trial.parameters for trial in analysis.trials if trial.succeeded
     ]
 
 
-def test_an_analysis_without_outcomes_is_refused():
+def test_an_analysis_without_trials_is_refused():
     """
-    There is nothing to analyse without any outcome.
+    There is nothing to analyse without any trial.
     """
-    with pytest.raises(NoTrialOutcomes):
-        TrialAnalysis(outcomes=[])
+    with pytest.raises(NoTrials):
+        TrialAnalysis(trials=[])

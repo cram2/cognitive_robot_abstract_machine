@@ -5,24 +5,29 @@ to try parameter spaces, campaigns and analyses on without a simulation.
 
 from __future__ import annotations
 
-import dataclasses
 import json
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 from typing_extensions import Iterator
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import UniformPriorRegistry
-from krrood.parametrization.trials import (
-    ParameterSpace,
-    TrialParameters,
+from krrood.parametrization.trials.campaigns import (
     TrialPerformer,
     TrialSetup,
     TrialStore,
+)
+from krrood.parametrization.trials.parameter_spaces import ParameterSpace
+from krrood.parametrization.trials.records import (
+    Trial,
+    TrialMeasurements,
+    TrialParameters,
 )
 
 # %% the parameters of a throw
@@ -132,6 +137,9 @@ class FastThrowSpace(ThrowSpace):
     """
 
     def accepts(self, *, parameters: ThrowParameters) -> bool:
+        """
+        Unlike :meth:`ParameterSpace.accepts`, only throws of at least 3 m/s are tried.
+        """
         return parameters.speed >= 3.0
 
 
@@ -139,26 +147,29 @@ class FastThrowSpace(ThrowSpace):
 
 
 @dataclass(kw_only=True)
-class Throw:
+class ThrowMeasurements(TrialMeasurements):
     """
-    One throw, with what came of it.
-    """
-
-    parameters: ThrowParameters
-    """
-    How the ball was thrown.
+    What is measured while the ball is thrown.
     """
 
-    landed_in_the_basket: bool
+    reached_angle: float
     """
-    Whether the ball landed in the basket.
+    The angle the ball actually left the hand at, in radians.
+    """
+
+
+@dataclass(kw_only=True)
+class Throw(Trial[ThrowParameters, ThrowMeasurements]):
+    """
+    One throw, with whether the ball landed in the basket.
     """
 
 
 @dataclass(kw_only=True)
 class SteepThrowsLand(TrialPerformer[ThrowParameters, Throw]):
     """
-    Throws that land the ball exactly when the angle is steep enough.
+    Throws that land the ball exactly when the angle the ball leaves the hand at is
+    steep enough; wind turns that angle away from the one the hand aims at.
     """
 
     steepness: Bounds[float] = field(
@@ -168,12 +179,17 @@ class SteepThrowsLand(TrialPerformer[ThrowParameters, Throw]):
     The angles that land the ball.
     """
 
+    wind: float = 0.0
+    """
+    The standard deviation of the angle the wind turns the ball by, in radians.
+    """
+
     def perform(self, *, parameters: ThrowParameters) -> Throw:
+        reached_angle = float(parameters.angle + np.random.normal(scale=self.wind))
         return Throw(
             parameters=parameters,
-            landed_in_the_basket=self.steepness.lower
-            <= parameters.angle
-            < self.steepness.upper,
+            measurements=ThrowMeasurements(reached_angle=reached_angle),
+            succeeded=self.steepness.lower <= reached_angle < self.steepness.upper,
         )
 
 
@@ -191,7 +207,7 @@ class ThrowsInAFile(TrialStore[Throw]):
 
     def add(self, *, trial: Throw) -> None:
         with self.path.open("a") as file:
-            file.write(json.dumps(dataclasses.asdict(trial)) + "\n")
+            file.write(json.dumps(to_json(trial)) + "\n")
 
     def throws(self) -> list[Throw]:
         """
@@ -200,15 +216,7 @@ class ThrowsInAFile(TrialStore[Throw]):
         if not self.path.exists():
             return []
         return [
-            Throw(
-                parameters=ThrowParameters(
-                    angle=stored["parameters"]["angle"],
-                    speed=stored["parameters"]["speed"],
-                    release=ReleasePoint(**stored["parameters"]["release"]),
-                ),
-                landed_in_the_basket=stored["landed_in_the_basket"],
-            )
-            for stored in map(json.loads, self.path.read_text().splitlines())
+            from_json(json.loads(line)) for line in self.path.read_text().splitlines()
         ]
 
 
@@ -234,9 +242,14 @@ class ThrowingSetup(TrialSetup[ThrowParameters, Throw]):
     Draws the throws uniformly.
     """
 
+    wind: float = 0.0
+    """
+    The standard deviation of the angle the wind turns each throw by, in radians.
+    """
+
     @contextmanager
     def performing(self) -> Iterator[SteepThrowsLand]:
-        yield SteepThrowsLand()
+        yield SteepThrowsLand(wind=self.wind)
 
     def create_store(self) -> ThrowsInAFile:
         return ThrowsInAFile(path=self.path)
