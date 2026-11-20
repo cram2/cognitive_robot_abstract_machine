@@ -1,0 +1,12 @@
+[project]
+name = "family-core"
+dynamic = ["version"]
+dependencies = [
+    "third-party>=2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "family._version.__version__"}

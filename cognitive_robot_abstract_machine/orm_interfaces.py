@@ -63,7 +63,7 @@ What a module of a package is named like.
 """
 
 MAPPING_ENGINE_SOURCE_FOLDERS: tuple[Path, ...] = (
-    Path("krrood") / "src" / "krrood",
+    Path("krrood"),
     Path("cognitive_robot_abstract_machine"),
 )
 """

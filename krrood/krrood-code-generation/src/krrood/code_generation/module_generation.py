@@ -1,0 +1,122 @@
+"""
+Rendering of dataclasses created in memory into Python modules.
+"""
+
+from __future__ import annotations
+import os
+from dataclasses import dataclass, fields, field
+from pathlib import Path
+from typing_extensions import Optional, Tuple
+
+import jinja2
+
+from krrood.code_generation.formatting import run_black_on_file
+from krrood.utils import module_and_class_name, is_dynamic_class
+
+
+@dataclass(kw_only=True)
+class DataclassRenderer:
+    """
+    Rendering definition to write dataclasses that have been created in memory into a
+    python module.
+
+    .. note:: Fields are not rendered yet.
+    """
+
+    type_: type
+    """
+    The dataclass to render.
+    """
+
+    imports: set[str] = field(default_factory=set, init=False)
+    """
+    The imports that need to be added to the module.
+
+    They are calculated from the dataclass.
+    """
+
+    base_classes: list[str] = field(default_factory=list, init=False)
+    """
+    The base classes that the dataclass inherits from as list of strings.
+    """
+
+    def __post_init__(self):
+        """
+        Collects the base classes of :attr:`type_` and the imports they need.
+        """
+        self._initialized_base_classes()
+
+    def _initialized_base_classes(self):
+        """
+        Adds each base of :attr:`type_` to :attr:`base_classes`, by name for a class
+        created in memory and by qualified name otherwise, importing the latter's
+        module.
+        """
+        for base in self.type_.__bases__:
+            if is_dynamic_class(base):
+                self.base_classes.append(base.__name__)
+            else:
+                self.base_classes.append(module_and_class_name(base))
+                self.imports.add(base.__module__)
+
+
+@dataclass(kw_only=True)
+class ModuleRenderer:
+    """
+    Rendering definition to write dataclasses that have been created in memory into a
+    python module.
+    """
+
+    classes: list[DataclassRenderer] = field(default_factory=list)
+    """
+    Classes that should be rendered.
+    """
+
+    imports: set[str] = field(default_factory=set)
+    """
+    Imports collected from all classes.
+    """
+
+    def _update_imports(self):
+        """
+        Adds the imports of every class in :attr:`classes` to :attr:`imports`.
+        """
+        for clazz in self.classes:
+            self.imports.update(clazz.imports)
+
+    @classmethod
+    def from_dataclasses(cls, *, classes: list[type]):
+        """
+        :param classes: The dataclasses to render.
+        :return: A renderer of a module holding the classes, with the imports they need.
+        """
+        dataclass_descriptions = [DataclassRenderer(type_=clazz) for clazz in classes]
+        result = cls(classes=dataclass_descriptions)
+        result._update_imports()
+        return result
+
+    def write_to_file(self, *, path: Path):
+        """
+        Write the module to a file.
+
+        :param path: The path to write the module to.
+        """
+        template_dir = os.path.join(os.path.dirname(__file__), "templates")
+        env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(template_dir),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        template = env.get_template("python_module.py.jinja")
+
+        # Render the template
+        output = template.render(
+            module_description=self,
+        )
+
+        with open(path, "w") as file:
+            # Write the output to the file
+            file.write(output)
+
+        # format the output with black
+        run_black_on_file(str(file.name))

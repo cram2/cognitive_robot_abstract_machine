@@ -18,7 +18,7 @@ keywords = ["compute resources", "memory", "gpu", "scheduling"]
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
-    "krrood>=26.10.0",
+    "krrood-core>=26.10.0",
     "typing_extensions",
 ]
 
@@ -56,6 +56,6 @@ core = [
     "krrood_compute_resources.memory",
 ]
 dependencies = [
-    "krrood",
+    "krrood-core",
     "typing-extensions",
 ]
