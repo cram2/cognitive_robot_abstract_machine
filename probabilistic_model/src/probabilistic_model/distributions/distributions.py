@@ -326,13 +326,21 @@ class DiscreteDistribution(UnivariateDistribution):
         if not isinstance(self.probabilities, MissingDict):
             self.probabilities = MissingDict(float, self.probabilities)
 
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
-        events = events[:, 0]
+    @abstractmethod
+    def key_in_probabilities(self, *, value: Any) -> int:
+        """
+        :param value: A value of the variable.
+        :return: The key of the value in :attr:`probabilities`.
+        """
+        raise NotImplementedError
 
-        events = np.array([hash(e) for e in events])
-        result = np.full(len(events), -np.inf)
-        for x, p in self.probabilities.items():
-            result[events == x] = np.log(p)
+    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+        keys = np.array(
+            [self.key_in_probabilities(value=value) for value in events[:, 0]]
+        )
+        result = np.full(len(keys), -np.inf)
+        for key, probability in self.probabilities.items():
+            result[keys == key] = np.log(probability)
         return result
 
     def fit(self, data: npt.NDArray) -> Self:
@@ -349,7 +357,7 @@ class DiscreteDistribution(UnivariateDistribution):
         unique, counts = np.unique(data, return_counts=True)
         probabilities = MissingDict(float)
         for value, count in zip(unique, counts):
-            probabilities[hash(value)] = count / len(data)
+            probabilities[self.key_in_probabilities(value=value)] = count / len(data)
         self.probabilities = probabilities
         return self
 
@@ -442,6 +450,9 @@ class SymbolicDistribution(DiscreteDistribution):
 
     variable: Symbolic = field(kw_only=True)
 
+    def key_in_probabilities(self, *, value: Any) -> int:
+        return hash(value)
+
     def univariate_log_mode(self) -> UnivariateLogMode:
         max_likelihood = max(self.probabilities.values())
 
@@ -533,6 +544,9 @@ class IntegerDistribution(ContinuousDistribution, DiscreteDistribution):
     """
 
     variable: Integer = field(kw_only=True)
+
+    def key_in_probabilities(self, *, value: Any) -> int:
+        return int(value)
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False

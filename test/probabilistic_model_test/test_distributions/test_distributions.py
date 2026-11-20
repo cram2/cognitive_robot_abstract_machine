@@ -173,6 +173,28 @@ def test_integer_fit(integer_distribution):
     assert integer_distribution.probabilities[2] == 3 / 4
 
 
+def test_integer_likelihood_of_minus_one(integer_variable):
+    """
+    The likelihood of -1 is its probability, although Python hashes -1 as -2.
+    """
+    probabilities = MissingDict(float, {-2: 0.1, -1: 0.3, 0: 0.6})
+    distribution = IntegerDistribution(
+        variable=integer_variable, probabilities=probabilities
+    )
+    likelihood = distribution.likelihood(np.array([[-2], [-1], [0]]))
+    assert likelihood == pytest.approx(
+        [probabilities[-2], probabilities[-1], probabilities[0]]
+    )
+
+
+def test_integer_fit_of_minus_one(integer_distribution):
+    """
+    Fitted on data holding -1, the distribution keeps the frequency of -1 at -1.
+    """
+    integer_distribution.fit(np.array([-2, -1, -1, 0]))
+    assert dict(integer_distribution.probabilities) == {-2: 1 / 4, -1: 2 / 4, 0: 1 / 4}
+
+
 def test_integer_support(integer_distribution):
     assert integer_distribution.univariate_support == (
         singleton(1) | singleton(2) | singleton(4)
