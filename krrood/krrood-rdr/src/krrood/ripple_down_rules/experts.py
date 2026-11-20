@@ -1,0 +1,636 @@
+"""
+The experts that answer a ripple down rules tree's questions about a case: a human, an
+AI model or an oracle.
+"""
+
+from __future__ import annotations
+
+import ast
+import importlib
+import json
+import os
+import sys
+from abc import ABC, abstractmethod
+from dataclasses import is_dataclass
+from textwrap import dedent, indent
+from sqlalchemy.orm import DeclarativeBase as SQLTable
+
+from typing_extensions import Any, TYPE_CHECKING
+
+from krrood.ripple_down_rules.datastructures.callable_expression import (
+    CallableExpression,
+)
+from krrood.ripple_down_rules.datastructures.case import (
+    create_case,
+    show_current_and_corner_cases,
+)
+from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
+from krrood.ripple_down_rules.datastructures.enums import PromptFor
+from krrood.ripple_down_rules.exceptions import (
+    NoDistinguishingAttributeFound,
+    NoSavePathFoundForExpertAnswers,
+    NoLoadPathFoundForExpertAnswers,
+    OracleCannotInferConclusionWithoutTarget,
+)
+from krrood.ripple_down_rules.user_interface.template_file_creator import (
+    TemplateFileCreator,
+)
+from krrood.source_analysis.source_extraction import (
+    extract_class_source,
+    extract_function_source,
+)
+from krrood.ripple_down_rules.utils import (
+    dataclass_to_dict,
+    get_imports_from_scope,
+    get_class_file_path,
+    row_to_dict,
+)
+from krrood.source_analysis.import_scope import get_scope_from_imports
+
+from krrood.ripple_down_rules.user_interface.prompt import UserPrompt
+
+if TYPE_CHECKING:
+    from krrood.ripple_down_rules.rdr import Rule
+
+
+class Expert(ABC):
+    """
+    The Abstract Expert class, all experts should inherit from this class.
+
+    An expert is a class that can provide differentiating features and conclusions for a
+    case when asked. The expert can compare a case with a corner case and provide the
+    differentiating features and can also provide one or multiple conclusions for a
+    case.
+    """
+
+    all_expert_answers: list | None = None
+    """
+    A list of all expert answers, used for testing purposes.
+    """
+
+    use_loaded_answers: bool = False
+    """
+    A flag to indicate if the expert should use loaded answers or not.
+    """
+
+    answer_delimiter: str = "'===New Answer==='"
+    """
+    The marker written between consecutive answers in a saved Python answers file.
+    """
+
+    def __init__(
+        self,
+        use_loaded_answers: bool = False,
+        append: bool = False,
+        answers_save_path: str | None = None,
+    ):
+        self.all_expert_answers = []
+        self.use_loaded_answers = use_loaded_answers
+        self.answers_save_path = answers_save_path
+        if answers_save_path is not None and (
+            os.path.exists(answers_save_path + ".py")
+            or os.path.exists(answers_save_path + ".json")
+        ):
+            if use_loaded_answers:
+                self.load_answers(path=answers_save_path)
+            if not append:
+                try:
+                    os.remove(answers_save_path + ".py")
+                except FileNotFoundError:
+                    pass
+        self.append = True
+
+    @abstractmethod
+    def ask_for_conditions(
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
+    ) -> CallableExpression:
+        """
+        Ask the expert to provide the differentiating features between two cases or
+        unique features for a case that doesn't have a corner case to compare to.
+
+        :param case_query: The case query containing the case to classify and the
+            required target.
+        :param last_evaluated_rule: The last evaluated rule.
+        :return: The differentiating features as new rule conditions.
+        """
+        pass
+
+    @abstractmethod
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
+        """
+        Ask the expert to provide a relational conclusion for the case.
+
+        :param case_query: The case query containing the case to find a conclusion for.
+        :return: A callable expression that can be called with a new case as an
+            argument.
+        """
+
+    def clear_answers(self, *, path: str | None = None):
+        """
+        Clear the expert answers.
+
+        :param path: The path to clear the answers from. If None, the answers will be
+            cleared from the answers_save_path attribute.
+        """
+        if path is None and self.answers_save_path is None:
+            raise ValueError(
+                "No path provided to clear expert answers, either provide a path or set the "
+                "answers_save_path attribute."
+            )
+        if path is None:
+            path = self.answers_save_path
+        if os.path.exists(path + ".py"):
+            os.remove(path + ".py")
+        self.all_expert_answers = []
+
+    def save_answers(
+        self,
+        *,
+        path: str | None = None,
+        expert_answers: list[tuple[dict, str]] | None = None,
+    ):
+        """
+        Save the expert answers to a file.
+
+        :param path: The path to save the answers to.
+        :param expert_answers: The expert answers to save.
+        """
+        expert_answers = expert_answers if expert_answers else self.all_expert_answers
+        if not any(expert_answers):
+            return
+        if path is None and self.answers_save_path is None:
+            raise NoSavePathFoundForExpertAnswers(expert=self)
+        if path is None:
+            path = self.answers_save_path
+        self._save_to_python(path=path, expert_answers=expert_answers)
+
+    def _save_to_json(self, *, path: str):
+        """
+        Save the expert answers to a JSON file.
+
+        :param path: The path to save the answers to.
+        """
+        all_answers = self.all_expert_answers
+        if self.append and os.path.exists(path + ".json"):
+            # read the file and append the new answers
+            with open(path + ".json", "r") as f:
+                old_answers = json.load(f)
+                all_answers = old_answers + all_answers
+        with open(path + ".json", "w") as f:
+            json.dump(all_answers, f)
+
+    def _save_to_python(
+        self, *, path: str, expert_answers: list[tuple[dict, str]] | None = None
+    ):
+        """
+        Save the expert answers to a Python file.
+
+        :param path: The path to save the answers to.
+        :param expert_answers: The expert answers to save.
+        """
+        expert_answers = expert_answers if expert_answers else self.all_expert_answers
+        dir_name = os.path.dirname(path)
+        if not os.path.exists(dir_name + "/__init__.py"):
+            os.makedirs(dir_name, exist_ok=True)
+            with open(dir_name + "/__init__.py", "w") as f:
+                f.write(
+                    "# This is an empty init file to make the directory a package.\n"
+                )
+        # Current file data
+        current_file_data = None
+        if os.path.exists(path + ".py"):
+            with open(path + ".py", "r") as f:
+                current_file_data = f.read()
+        action = "a" if self.append and current_file_data is not None else "w"
+        with open(path + ".py", action) as f:
+            for scope, func_source in expert_answers:
+                if len(scope) > 0:
+                    imports = "\n".join(get_imports_from_scope(scope)) + "\n\n\n"
+                else:
+                    imports = ""
+                if func_source is None:
+                    func_source = "pass  # No user input provided for this case.\n"
+                f.write(
+                    imports
+                    + func_source
+                    + "\n\n\n\n"
+                    + self.answer_delimiter
+                    + "\n\n\n"
+                )
+
+    def load_answers(self, *, path: str | None = None):
+        """
+        Load the expert answers from a file.
+
+        :param path: The path to load the answers from.
+        """
+        if path is None and self.answers_save_path is None:
+            raise NoLoadPathFoundForExpertAnswers(expert=self)
+        if path is None:
+            path = self.answers_save_path
+        if os.path.exists(path + ".py"):
+            self._load_answers_from_python(path=path)
+        elif os.path.exists(path + ".json"):
+            self._load_answers_from_json(path=path)
+
+    def _load_answers_from_json(self, *, path: str):
+        """
+        Load the expert answers from a JSON file.
+
+        :param path: The path to load the answers from.
+        """
+        with open(path + ".json", "r") as f:
+            all_answers = json.load(f)
+        self.all_expert_answers = [({}, answer) for answer in all_answers]
+
+    def _load_answers_from_python(self, *, path: str):
+        """
+        Load the expert answers from a Python file.
+
+        Splits on the bare delimiter marker rather than an exact run of surrounding
+        blank lines, since a formatter (e.g. black/docformatter) trimming trailing blank
+        lines at end of file would otherwise leave the delimiter after the last answer
+        without its usual trailing blank lines, silently dropping that last answer.
+
+        :param path: The path to load the answers from.
+        """
+        file_path = path + ".py"
+        with open(file_path, "r") as f:
+            content = f.read()
+        all_answers = [
+            answer.strip()
+            for answer in content.split(self.answer_delimiter)
+            if answer.strip()
+        ]
+        all_function_sources = [
+            definition.source
+            for definition in extract_function_source(
+                [], file_path=file_path
+            ).definitions
+        ]
+        for i, answer in enumerate(all_answers):
+            if "def " not in answer and "pass" in answer:
+                self.all_expert_answers.append(({}, None))
+                continue
+            scope = get_scope_from_imports(tree=ast.parse(answer))
+            func_name = all_function_sources[i].split("def ")[1].split("(")[0]
+            function_source = all_function_sources[i].replace(
+                func_name, CallableExpression.encapsulating_function_name
+            )
+            self.all_expert_answers.append((scope, function_source))
+
+
+class AI(Expert):
+    """
+    The AI Expert class, an expert that uses AI to provide differentiating features and
+    conclusions.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize the AI expert.
+        """
+        super().__init__(**kwargs)
+        self.user_prompt = UserPrompt()
+
+    def ask_for_conditions(
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
+    ) -> CallableExpression:
+        prompt_str = self.get_prompt_for_ai(
+            case_query=case_query, prompt_for=PromptFor.Conditions
+        )
+        print(prompt_str)
+        sys.exit()
+
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
+        prompt_str = self.get_prompt_for_ai(
+            case_query=case_query, prompt_for=PromptFor.Conclusion
+        )
+        output_type_source = self.get_output_type_class_source(case_query=case_query)
+        prompt_str = (
+            f"\n\n\nOutput type(s) class source:\n{output_type_source}\n\n" + prompt_str
+        )
+        print(prompt_str)
+        sys.exit()
+
+    def get_output_type_class_source(self, *, case_query: CaseQuery) -> str:
+        """
+        Get the output type class source for the AI expert.
+
+        :param case_query: The case query containing the case to classify.
+        :return: The output type class source.
+        """
+        output_types = case_query.core_attribute_type
+
+        def get_class_source(cls):
+            cls_source_file = get_class_file_path(cls)
+            found_class_source = extract_class_source(
+                [cls.__name__], file_path=cls_source_file
+            ).source_of(name=cls.__name__)
+            class_signature = found_class_source.split("\n")[0]
+            if "(" in class_signature:
+                parent_class_names = list(
+                    map(
+                        lambda x: x.strip(),
+                        class_signature.split("(")[1].split(")")[0].split(","),
+                    )
+                )
+                parent_classes = [
+                    importlib.import_module(cls.__module__).__dict__.get(
+                        cls_name.strip()
+                    )
+                    for cls_name in parent_class_names
+                ]
+            else:
+                parent_classes = []
+            if is_dataclass(cls):
+                found_class_source = f"@dataclass\n{found_class_source}"
+            return "\n".join(
+                [get_class_source(pcls) for pcls in parent_classes]
+                + [found_class_source]
+            )
+
+        found_class_sources = []
+        for output_type in output_types:
+            found_class_sources.append(get_class_source(output_type))
+        found_class_sources = "\n\n\n".join(found_class_sources)
+        return found_class_sources
+
+    def get_prompt_for_ai(self, *, case_query: CaseQuery, prompt_for: PromptFor) -> str:
+        """
+        Get the prompt for the AI expert.
+
+        :param case_query: The case query containing the case to classify.
+        :param prompt_for: The type of prompt to get.
+        :return: The prompt for the AI expert.
+        """
+        # data_to_show = show_current_and_corner_cases(case_query.case)
+        data_to_show = f"\nCase ({case_query.case_name}):\n {case_query.case.__dict__}"
+        template_file_creator = TemplateFileCreator(case_query, prompt_for=prompt_for)
+        boilerplate_code = template_file_creator.build_boilerplate_code()
+        initial_prompt_str = data_to_show + "\n\n" + boilerplate_code + "\n\n"
+        return self.user_prompt.build_prompt_str_for_ai(
+            case_query=case_query,
+            prompt_for=prompt_for,
+            initial_prompt_str=initial_prompt_str,
+        )
+
+
+class Human(Expert):
+    """
+    The Human Expert class, an expert that asks the human to provide differentiating
+    features and conclusions.
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize the Human expert.
+        """
+        super().__init__(**kwargs)
+        self.user_prompt = UserPrompt()
+
+    def ask_for_conditions(
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
+    ) -> CallableExpression:
+        data_to_show = None
+        if not self.use_loaded_answers or len(self.all_expert_answers) == 0:
+            data_to_show = show_current_and_corner_cases(
+                case_query.case,
+                {case_query.attribute_name: case_query.target_value},
+                last_evaluated_rule=last_evaluated_rule,
+            )
+        return self._get_conditions(case_query=case_query, data_to_show=data_to_show)
+
+    def _get_conditions(
+        self, *, case_query: CaseQuery, data_to_show: str | None = None
+    ) -> CallableExpression:
+        """
+        Ask the expert to provide the differentiating features between two cases or
+        unique features for a case that doesn't have a corner case to compare to.
+
+        :param case_query: The case query containing the case to classify.
+        :return: The differentiating features as new rule conditions.
+        """
+        user_input = None
+        if (
+            self.use_loaded_answers
+            and len(self.all_expert_answers) == 0
+            and self.append
+        ):
+            self.use_loaded_answers = False
+        if self.use_loaded_answers:
+            try:
+                loaded_scope, user_input = self.all_expert_answers.pop(0)
+            except IndexError:
+                self.use_loaded_answers = False
+        if user_input is not None:
+            case_query.scope.update(loaded_scope)
+            condition = CallableExpression(user_input, bool, scope=case_query.scope)
+            if self.answers_save_path is not None and not any(loaded_scope):
+                self.convert_json_answer_to_python_answer(
+                    case_query=case_query,
+                    user_input=user_input,
+                    callable_expression=condition,
+                    prompt_for=PromptFor.Conditions,
+                )
+        else:
+            user_input, condition = self.user_prompt.prompt_user_for_expression(
+                case_query=case_query,
+                prompt_for=PromptFor.Conditions,
+                prompt_str=data_to_show,
+            )
+        if user_input in ["exit", "quit"]:
+            sys.exit()
+        if not self.use_loaded_answers:
+            self.all_expert_answers.append((condition.scope, user_input))
+            if self.answers_save_path is not None:
+                self.save_answers()
+        case_query.conditions = condition
+        return condition
+
+    def convert_json_answer_to_python_answer(
+        self,
+        *,
+        case_query: CaseQuery,
+        user_input: str,
+        callable_expression: CallableExpression,
+        prompt_for: PromptFor,
+    ):
+        """
+        Convert a JSON answer to a Python answer and save it.
+
+        This is used for backward compatibility for answers that were saved as JSON but
+        need to be converted to Python code.
+
+        :param case_query: The case query containing the case to classify.
+        :param user_input: The user input to convert.
+        :param callable_expression: The callable expression to use for the answer.
+        :param prompt_for: The prompt for the expert.
+        """
+        tfc = TemplateFileCreator(case_query, prompt_for=prompt_for)
+        code = tfc.build_boilerplate_code()
+        if user_input.startswith("def"):
+            user_input = "\n".join(user_input.split("\n")[1:])
+            user_input = indent(dedent(user_input), " " * 4).strip()
+            code = code.replace("pass", user_input)
+        else:
+            code = code.replace("pass", f"return {user_input}")
+        self.save_answers(expert_answers=[({}, code)])
+
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
+        """
+        Ask the expert to provide a conclusion for the case.
+
+        :param case_query: The case query containing the case to find a conclusion for.
+        :return: The conclusion for the case as a callable expression.
+        """
+        expression: CallableExpression | None = None
+        expert_input: str | None = None
+        if (
+            self.use_loaded_answers
+            and len(self.all_expert_answers) == 0
+            and self.append
+        ):
+            self.use_loaded_answers = False
+        if self.use_loaded_answers:
+            try:
+                loaded_scope, expert_input = self.all_expert_answers.pop(0)
+                if expert_input is not None:
+                    case_query.scope.update(loaded_scope)
+                    expression = CallableExpression(
+                        expert_input,
+                        case_query.attribute_type,
+                        scope=case_query.scope,
+                        mutually_exclusive=case_query.mutually_exclusive,
+                    )
+                    if self.answers_save_path is not None and not any(loaded_scope):
+                        self.convert_json_answer_to_python_answer(
+                            case_query=case_query,
+                            user_input=expert_input,
+                            callable_expression=expression,
+                            prompt_for=PromptFor.Conclusion,
+                        )
+            except IndexError:
+                self.use_loaded_answers = False
+        if not self.use_loaded_answers:
+            data_to_show = show_current_and_corner_cases(case_query.case)
+            expert_input, expression = self.user_prompt.prompt_user_for_expression(
+                case_query=case_query,
+                prompt_for=PromptFor.Conclusion,
+                prompt_str=data_to_show,
+            )
+            if expert_input is None:
+                self.all_expert_answers.append(({}, None))
+            elif expert_input not in ["exit", "quit"]:
+                self.all_expert_answers.append((expression.scope, expert_input))
+            if self.answers_save_path is not None and expert_input not in [
+                "exit",
+                "quit",
+            ]:
+                self.save_answers()
+        if expert_input in ["exit", "quit"]:
+            sys.exit()
+        case_query.target = expression
+        return expression
+
+
+class Oracle(Expert):
+    """
+    A programmatic expert that answers ripple-down-rule queries by comparing a case's
+    attributes with those of the corner case it conflicts with, instead of asking a
+    human or replaying pre-recorded answers.
+
+    Every case query fit against this expert must already carry a known target value:
+    the oracle never guesses a conclusion, it only ever describes which of the case's
+    simple (bool/int/float/str) attributes single it out from the corner case, mirroring
+    how a human expert would compare two rows of a table and point at the column that
+    differs.
+    """
+
+    simple_attribute_value_types: tuple[type, ...] = (bool, int, float, str, type(None))
+    """
+    The attribute value types the oracle is willing to build a differentiating condition
+    from.
+    """
+
+    def ask_for_conditions(
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
+    ) -> CallableExpression:
+        condition_source = self._differentiating_condition_source(
+            case_query=case_query, last_evaluated_rule=last_evaluated_rule
+        )
+        condition = CallableExpression(condition_source, bool, scope=case_query.scope)
+        self.all_expert_answers.append((condition.scope, condition_source))
+        case_query.conditions = condition
+        return condition
+
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
+        if case_query._target is None:
+            raise OracleCannotInferConclusionWithoutTarget(case_query=case_query)
+        return case_query.target
+
+    def _differentiating_condition_source(
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None
+    ) -> str:
+        """
+        Build the source of a condition that is true for the case in the given case
+        query, and, if a corner case is available, false for that corner case.
+
+        :param case_query: The case query containing the case to build a condition for.
+        :param last_evaluated_rule: The last evaluated rule, whose corner case (if any)
+            the built condition must exclude.
+        :return: The source code of a ``return`` statement usable as a
+            :class:`CallableExpression`.
+        """
+        corner_case = (
+            last_evaluated_rule.corner_case if last_evaluated_rule is not None else None
+        )
+        if corner_case is None:
+            return "return True"
+        attribute_name, attribute_value = self._first_distinguishing_attribute(
+            case=case_query.case,
+            corner_case=corner_case,
+            exclude={case_query.attribute_name.lower()},
+        )
+        return f"return case.{attribute_name} == {attribute_value!r}"
+
+    def _first_distinguishing_attribute(
+        self, *, case: Any, corner_case: Any, exclude: set
+    ) -> tuple[str, Any]:
+        """
+        Find the first simple attribute that differs between a case and its corner case.
+
+        :param case: The case to classify.
+        :param corner_case: The corner case to differentiate the case from.
+        :param exclude: Attribute names to never consider, such as the attribute the
+            case query is trying to determine a value for.
+        :return: The name and value of the first differing simple attribute, taken from
+            ``case``.
+        :raises NoDistinguishingAttributeFound: if no such attribute exists.
+        """
+        case_attributes = self._attribute_dict(obj=case)
+        corner_case_attributes = self._attribute_dict(obj=corner_case)
+        for name, value in case_attributes.items():
+            if name in exclude or not isinstance(
+                value, self.simple_attribute_value_types
+            ):
+                continue
+            if corner_case_attributes.get(name, object()) != value:
+                return name, value
+        raise NoDistinguishingAttributeFound(case=case, corner_case=corner_case)
+
+    @staticmethod
+    def _attribute_dict(*, obj: Any) -> dict[str, Any]:
+        """
+        Get a name-to-value mapping of an object's attributes, regardless of whether it
+        is a SQLAlchemy mapped instance, a dataclass, or any other object.
+
+        :param obj: The object to get the attributes of.
+        :return: The name-to-value mapping of the object's attributes.
+        """
+        if isinstance(obj, SQLTable):
+            return row_to_dict(obj)
+        elif is_dataclass(obj):
+            return dataclass_to_dict(obj)
+        else:
+            return dict(create_case(obj).items())

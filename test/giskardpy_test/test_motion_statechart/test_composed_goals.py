@@ -1,4 +1,9 @@
-import json
+"""
+Tests that goals composed of other nodes arrange them as intended, either in parallel or
+in a sequence.
+"""
+
+from __future__ import annotations
 
 from cramph.composites import Parallel, Sequence
 from cramph.context import StatechartContext
@@ -13,18 +18,13 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,
     CartesianPositionStraight,
-    CartesianPositionVelocityLimit,
-    CartesianRotationVelocityLimit,
-    CartesianVelocityLimit,
+    HoldOrientation,
 )
 from giskardpy.motion_statechart.graph_node import EndMotion
 from semantic_digital_twin.robots.robot_parts import MobileBase
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
-from ..motion_control_context import create_context_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% goals that are a parallel of their tasks
 
@@ -41,14 +41,16 @@ def _create_executor(world: World) -> StatechartExecutor:
 def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A pose goal is a parallel of a position and an orientation task, in that order.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=(
             pose := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -69,21 +71,20 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     cylinder_bot_world: World,
 ) -> None:
     """
-    Whatever accompanies a pose, such as a speed cap or a collision allowance, runs in
-    the pose itself rather than in another parallel around it.
+    Whatever accompanies a pose, such as a task holding the orientation or a collision
+    allowance, runs in the pose itself rather than in another parallel around it.
     """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     pose = CartesianPose(
-        root_link=cylinder_bot_world.root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
         goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
     )
-    speed_cap = CartesianPositionVelocityLimit(
-        root_link=cylinder_bot_world.root, tip_link=tip
+    hold_orientation = HoldOrientation(
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip)
     )
-    pose.add_node(node=speed_cap)
+    pose.add_node(node=hold_orientation)
     statechart.add_node(node=pose)
     statechart.add_node(node=EndMotion.when_true(node=pose))
     executor.compile(statechart=statechart)
@@ -92,23 +93,25 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     assert [type(node) for node in pose.nodes] == [
         CartesianPosition,
         CartesianOrientation,
-        CartesianPositionVelocityLimit,
+        HoldOrientation,
     ]
-    assert speed_cap.parent_node is pose
+    assert hold_orientation.parent_node is pose
     assert pose.last_observation_state == ObservationStateValue.TRUE
 
 
 def test_cartesian_pose_observes_its_goal_reached(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A pose goal observes true once both its tasks do.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=(
             pose := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -128,14 +131,17 @@ def test_cartesian_pose_observes_its_goal_reached(
 def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A straight-line pose goal is a parallel of a straight-line position task and an
+    orientation task, in that order.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=(
             pose := CartesianPoseStraight(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -149,32 +155,6 @@ def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     assert [type(task) for task in pose.nodes] == [
         CartesianPositionStraight,
         CartesianOrientation,
-    ]
-
-
-def test_velocity_limit_has_its_two_limits_after_a_json_round_trip(
-    cylinder_bot_world: World,
-) -> None:
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    statechart = Statechart(
-        context=create_context_with_motion_control(cylinder_bot_world)
-    )
-    statechart.add_node(
-        node=CartesianVelocityLimit(root_link=cylinder_bot_world.root, tip_link=tip)
-    )
-    json_data = json.loads(json.dumps(statechart.to_json()))
-    tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
-    executor = _create_executor(cylinder_bot_world)
-    statechart_copy = Statechart.from_json(
-        data=json_data, context=executor.context, **tracker.create_kwargs()
-    )
-    (limit_copy,) = statechart_copy.top_level_nodes
-    executor.compile(statechart=statechart_copy)
-
-    assert isinstance(limit_copy, Parallel)
-    assert [type(limit) for limit in limit_copy.nodes] == [
-        CartesianPositionVelocityLimit,
-        CartesianRotationVelocityLimit,
     ]
 
 

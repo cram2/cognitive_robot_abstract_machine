@@ -7,7 +7,6 @@ from sqlalchemy import select
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from ..dataset.example_classes import GenericJSONWrapper, TextJSONSerializableClass
-from ..dataset.ormatic_interface import GenericJSONWrapperDAO
 
 
 def test_a_field_typed_as_an_unparameterized_generic_is_mapped():
@@ -15,6 +14,8 @@ def test_a_field_typed_as_an_unparameterized_generic_is_mapped():
     The free type parameter says nothing about how the value is stored, so the field
     gets its column rather than being dropped as underspecified.
     """
+    from ..dataset.ormatic_interface import GenericJSONWrapperDAO
+
     assert hasattr(GenericJSONWrapperDAO, "json_serializable_object")
 
 
@@ -24,6 +25,8 @@ def test_a_value_stored_as_json_under_an_unparameterized_generic_field_round_tri
     """
     The subclass that was stored comes back, not only the base the field is typed with.
     """
+    from ..dataset.ormatic_interface import GenericJSONWrapperDAO
+
     value = TextJSONSerializableClass(label="colours")
     session.add(to_dao(GenericJSONWrapper(json_serializable_object=value)))
     session.commit()

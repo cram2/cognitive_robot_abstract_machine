@@ -87,8 +87,8 @@ class RobotiqGripperActionServerTask(
         cls,
         *,
         configuration: GripperConfiguration,
-        stall_minimum_time: float | None = None,
-        tolerate_stall: bool = False,
+        finger_stall_minimum_time: float | None = None,
+        tolerate_finger_stall: bool = False,
     ) -> StatechartNode:
         """
         Differs from :meth:`MovesGripperToConfiguration.create_gripper_goal` in driving
@@ -107,8 +107,8 @@ class RobotiqGripperActionServerTask(
         if not isinstance(end_effector, HasParallelGripperCommandServer):
             return MoveFingers.create_gripper_goal(
                 configuration=configuration,
-                stall_minimum_time=stall_minimum_time,
-                tolerate_stall=tolerate_stall,
+                finger_stall_minimum_time=finger_stall_minimum_time,
+                tolerate_finger_stall=tolerate_finger_stall,
             )
         return cls(
             action_topic=end_effector.action_topic_serving(

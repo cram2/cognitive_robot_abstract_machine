@@ -1,3 +1,9 @@
+"""
+Fixtures shared by the cramph tests: worlds, statechart contexts and executors.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
@@ -58,3 +64,15 @@ def statechart_executor(
     :return: An executor ticking statecharts in :func:`statechart_context`.
     """
     return StatechartExecutor(context=statechart_context)
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load cramph's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import cramph.orm.ormatic_interface  # noqa: F401

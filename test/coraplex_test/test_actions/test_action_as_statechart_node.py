@@ -1,3 +1,8 @@
+"""
+Tests of actions as nodes of a statechart: how they expand into steps and goals and
+how they end.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -682,7 +687,9 @@ def test_a_pick_up_and_its_grasp_and_reach_let_the_gripper_touch(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
 
     _expanded(pick_up, extensions)
 
@@ -697,13 +704,18 @@ def test_a_pick_up_and_its_grasp_and_reach_let_the_gripper_touch(
 def test_a_place_lets_the_gripper_holding_its_object_touch(
     pr2_apartment_context,
 ) -> None:
+    """
+    The allowance covers the gripper of the arm the place is given, and the place declares it rather than running a node of its own for it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
     statechart_of(simulated_executor(extensions), Sequence(nodes=[pick_up, place]))
@@ -714,9 +726,15 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
 
 
 def test_opening_lets_the_gripper_on_the_handle_touch(pr2_apartment_context) -> None:
+    """
+    Opening lets the gripper on the handle touch it, through a collision rule of the
+    action rather than a node of its own.
+    """
     world, robot, extensions = pr2_apartment_context
     handle = _handle_annotation(world, "handle_cab10_m")
-    action = OpenAction(grasp=handle.grasp_candidates()[0], arm=robot.right_arm)
+    action = OpenAction(
+        grasp_candidate=handle.grasp_candidates()[0], arm=robot.right_arm
+    )
 
     _expanded(action, extensions)
 
@@ -739,8 +757,8 @@ def test_fixating_an_object_keeps_the_gripper_where_it_is(simple_pr2_context) ->
 
     [holding] = action.nodes
     assert type(holding) is CartesianPose
-    assert holding.root_link is world.root
-    assert holding.tip_link is tool_frame
+    assert holding.kinematic_chain.root is world.root
+    assert holding.kinematic_chain.tip is tool_frame
     assert holding.goal_pose.reference_frame is tool_frame
     [rule] = action.temporary_collision_rules
     assert rule.end_effector is end_effector
@@ -781,9 +799,15 @@ def _goal_moving_the_tool(step: StatechartNode) -> StatechartNode:
 def test_a_pick_up_grasps_reattaches_and_lifts_as_its_own_steps(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pick-up grasps, moves the object onto the gripper and lifts it, each as a step of
+    its own.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
 
     _expanded(pick_up, extensions)
 
@@ -797,13 +821,18 @@ def test_a_pick_up_grasps_reattaches_and_lifts_as_its_own_steps(
 def test_a_place_reattaches_and_retracts_as_its_own_steps(
     pr2_apartment_context,
 ) -> None:
+    """
+    Putting the object back under the world and retracting are the last two steps directly below the place, not a sequence nested inside it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
         arm=robot.left_arm,
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
     statechart_of(simulated_executor(extensions), Sequence(nodes=[pick_up, place]))
