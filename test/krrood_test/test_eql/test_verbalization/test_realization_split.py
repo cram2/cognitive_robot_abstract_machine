@@ -5,13 +5,18 @@ realized later, so building one loads none of the libraries realization depends 
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.metadata
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
 from pathlib import Path
 
+import pytest
+
+import krrood
 from krrood.development_tools.agents.core_boundary import CoreBoundary
+from krrood.source_analysis.import_graph import ModuleGraph
 from ...test_core_boundary.test_core_boundary import (
     krrood_core_boundary,
     packages_imported_while_running,
@@ -84,23 +89,45 @@ class RealizationLibraries:
         }
 
 
+@pytest.fixture
+def core_boundary_over_every_krrood_module(
+    request: pytest.FixtureRequest,
+) -> CoreBoundary:
+    """
+    :return: krrood-core's boundary, over the modules of every krrood distribution, so
+        the imports of a module beyond core can be read.
+    """
+    return dataclasses.replace(
+        request.getfixturevalue(krrood_core_boundary.__name__),
+        graph=ModuleGraph.from_packages(
+            package_directories=[
+                Path(portion)
+                for portion in krrood.__path__
+                if Path(portion).parent.name == "src"
+            ]
+        ),
+    )
+
+
 # %% building a clause
 
 
 def test_realization_libraries_include_what_the_realization_modules_import(
-    krrood_core_boundary: CoreBoundary,
+    core_boundary_over_every_krrood_module: CoreBoundary,
 ) -> None:
     """
     The libraries derived from the realization modules include the ones those modules
     import by name, so the check below forbids them.
     """
-    packages = RealizationLibraries(boundary=krrood_core_boundary).packages
+    packages = RealizationLibraries(
+        boundary=core_boundary_over_every_krrood_module
+    ).packages
 
     assert {"inflect", "lemminflect", "jinja2"} <= packages
 
 
 def test_building_clauses_loads_no_realization_library(
-    krrood_core_boundary: CoreBoundary,
+    core_boundary_over_every_krrood_module: CoreBoundary,
 ) -> None:
     """
     Every vocabulary path that decides an inflected word - a verb read off a class name,
@@ -111,5 +138,7 @@ def test_building_clauses_loads_no_realization_library(
 
     loaded = {imported.package for imported in packages_imported_while_running(source)}
 
-    realization_libraries = RealizationLibraries(boundary=krrood_core_boundary)
+    realization_libraries = RealizationLibraries(
+        boundary=core_boundary_over_every_krrood_module
+    )
     assert loaded & realization_libraries.packages == set()

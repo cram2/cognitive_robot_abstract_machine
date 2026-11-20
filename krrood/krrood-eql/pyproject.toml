@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood-eql"
+dynamic = ["version"]
+description = "The entity query language."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "LGPL-3.0-only"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+]
+authors = [
+    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"}
+]
+dependencies = [
+    "krrood-core==26.10.0",
+    "krrood-code-generation==26.10.0",
+    "krrood-rustworkx-utils==26.10.0",
+    "jinja2",
+    "inflect",
+    "lemminflect",
+    "ordered_set>=4",
+    "rustworkx>=0.14.0",
+]
+
+[project.optional-dependencies]
+# Queries for probabilities and distributions.
+probabilistic = [
+    "krrood-probabilistic",
+    "random_events",
+    "probabilistic_model",
+]
+# Symbolic scalars in class diagrams.
+symbolic-math = [
+    "krrood-symbolic-math",
+]
+
+[project.urls]
+Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood*"]
+
+[tool.setuptools.package-data]
+"*" = ["templates/*.jinja", "visualization/templates/*.jinja"]
+
+[tool.setuptools.dynamic]
+version = {attr = "krrood.entity_query_language._version.__version__"}
