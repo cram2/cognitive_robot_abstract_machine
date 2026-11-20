@@ -1,0 +1,12 @@
+[project]
+name = "loner"
+dynamic = ["version"]
+dependencies = [
+    "family-core",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "loner._version.__version__"}

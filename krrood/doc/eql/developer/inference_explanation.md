@@ -74,7 +74,7 @@ flowchart TD
 
 ### Design: eager extraction via `StackFrame.from_frame_info`
 
-`StackFrame` (`krrood/src/krrood/entity_query_language/_stack.py`) is an immutable data class
+`StackFrame` (`krrood/krrood-eql/src/krrood/entity_query_language/_stack.py`) is an immutable data class
 that eagerly extracts everything needed from a live `inspect.FrameInfo` at construction time
 and immediately drops the frame reference. This satisfies constraint 4: no live frame objects
 are retained, so all frame-local variables can be collected normally.
@@ -85,7 +85,7 @@ only frames that belong to user code or a specified package.
 
 ### Design: `MonitoredRegistry` — a class decorator that hooks `__post_init__`
 
-`MonitoredRegistry` (`krrood/src/krrood/entity_query_language/_monitoring.py`) is a singleton
+`MonitoredRegistry` (`krrood/krrood-eql/src/krrood/entity_query_language/_monitoring.py`) is a singleton
 registry that doubles as a class decorator. Applying `@monitored` to a dataclass class patches
 its `__post_init__` method to capture a `CallStack` immediately after the dataclass constructor
 runs, storing it as `self._creation_stack`. The original `__post_init__` is preserved and
@@ -104,7 +104,7 @@ between `variable.py` and `explanation.py`.
 
 ### Hook points in `_evaluate_`
 
-`SymbolicExpression._evaluate_` (`krrood/src/krrood/entity_query_language/core/base_expressions.py`)
+`SymbolicExpression._evaluate_` (`krrood/krrood-eql/src/krrood/entity_query_language/core/base_expressions.py`)
 is the single wrapper that manages the evaluation context lifecycle and notifies observers. It
 calls four hooks:
 
@@ -233,7 +233,7 @@ drops to zero.
 To add a new built-in observer (one that participates in every EQL evaluation):
 
 1. Subclass `EvaluationObserver` and implement whichever hook methods you need.
-2. Add an instance of your observer to the list returned by `create_default_evaluation_context` in `krrood/src/krrood/entity_query_language/evaluation.py`.
+2. Add an instance of your observer to the list returned by `create_default_evaluation_context` in `krrood/krrood-eql/src/krrood/entity_query_language/evaluation.py`.
 
 To add a one-off custom observer without touching global behaviour:
 
@@ -242,7 +242,7 @@ To add a one-off custom observer without touching global behaviour:
 
 To extend `InferenceExplanation` with a new meta-query method:
 
-1. Add the method to `InferenceExplanation` in `krrood/src/krrood/entity_query_language/explanation/explanation.py`.
+1. Add the method to `InferenceExplanation` in `krrood/krrood-eql/src/krrood/entity_query_language/explanation/explanation.py`.
 2. Build the query body using `create_explanation_variable()` and `create_query_node_variable()` as the starting points; these provide the explanation and its query-node variable, from which any traversal of the expression tree can be built.
 
 To monitor a new class (so its creation stack is captured):

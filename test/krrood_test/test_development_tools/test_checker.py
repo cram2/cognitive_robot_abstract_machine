@@ -120,3 +120,28 @@ def test_comparing_with_an_unknown_revision_fails(repository: Path) -> None:
         LinesChangedSince(
             repository=repository, revision="no-such-revision"
         ).find_changed_files()
+
+
+# %% a moved file
+
+
+@pytest.mark.parametrize("changed_lines_type", [StagedLines, LinesChangedSince])
+def test_code_a_moved_file_keeps_is_not_reported(
+    repository: Path, changed_lines_type: type[StagedLines] | type[LinesChangedSince]
+) -> None:
+    """
+    Moving a file changes none of its lines, so the violation it carries along is left
+    out.
+    """
+    (repository / "moved").mkdir()
+    git(repository, "mv", "module.py", "moved/module.py")
+    changed_lines = (
+        StagedLines(repository=repository)
+        if changed_lines_type is StagedLines
+        else LinesChangedSince(repository=repository, revision="HEAD")
+    )
+    check = CodeRulesCheck(
+        checkers=(ProseLengthChecker(),), changed_lines=changed_lines
+    )
+
+    assert check.violations(paths=[repository / "moved" / "module.py"]) == []
