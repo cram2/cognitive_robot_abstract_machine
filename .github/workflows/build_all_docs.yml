@@ -57,10 +57,11 @@ jobs:
             doc_path: doc
             artifact_name: random-events-doc
             use_container: false
+          # giskardpy's examples load robot descriptions from ROS packages, which only the ROS container provides
           - lib: giskardpy
             doc_path: doc
             artifact_name: giskardpy-doc
-            use_container: false
+            use_container: true
           - lib: cramph
             doc_path: doc
             artifact_name: cramph-doc
