@@ -423,6 +423,7 @@ class Event(AbstractCompositeSet):
             {variable.cpp_object for variable in all_variables}
         )
         self._variables = SortedSet(all_variables)
+        self._simple_sets_cache = None
 
     def fill_missing_variables_pure(self, variables: Iterable[Variable] | None = None):
         """

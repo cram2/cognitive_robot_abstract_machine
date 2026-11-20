@@ -4,17 +4,18 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    types: [ opened, synchronize, reopened, ready_for_review ]
   workflow_dispatch: {}
 
-# Serialize Pages deployments so concurrent runs do not race. Never cancel a run in
-# progress: the deploy job is what republishes the site, so cancelling it would leave
-# the previous merge's docs live with no further deployment coming.
+# main never cancels a deploy; a pull request cancels its outdated run
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('docs-{0}', github.event.pull_request.number) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   to-lowercase:
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     outputs:
       repo_lowercase: ${{ steps.lowercase.outputs.repository }}
@@ -32,10 +33,11 @@ jobs:
             doc_path: doc
             artifact_name: krrood-doc
             use_container: false
+          # needs rclpy
           - lib: coraplex
             doc_path: doc/source
             artifact_name: coraplex-doc
-            use_container: false
+            use_container: true
           - lib: semantic_digital_twin
             doc_path: doc
             artifact_name: semantic-digital-twin-doc
@@ -48,10 +50,11 @@ jobs:
             doc_path: doc
             artifact_name: random-events-doc
             use_container: false
+          # needs ROS robot descriptions
           - lib: giskardpy
             doc_path: doc
             artifact_name: giskardpy-doc
-            use_container: false
+            use_container: true
           - lib: cramph
             doc_path: doc
             artifact_name: cramph-doc
@@ -70,6 +73,7 @@ jobs:
 
   deploy-all-docs:
     needs: [build-docs]
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       pages: write
