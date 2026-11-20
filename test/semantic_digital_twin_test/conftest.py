@@ -10,7 +10,6 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
 
-import os
 import shutil
 from pathlib import Path
 
@@ -66,17 +65,9 @@ def in_memory_session_maker():
 
 @pytest.fixture
 def table_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
-    table_path = os.path.join(urdf_dir, "table.urdf")
-
-    return URDFParser.from_file(file_path=table_path).create_world()
+    return URDFParser.from_file(
+        file_path="package://iai_objects/urdf/table.urdf"
+    ).create_world()
 
 
 # %% flat meshes

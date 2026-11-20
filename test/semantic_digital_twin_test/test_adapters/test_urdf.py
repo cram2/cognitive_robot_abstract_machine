@@ -174,19 +174,10 @@ def urdf_paths():
     """
     Fixture providing paths to various URDF files.
     """
-    urdf_directory = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
     return URDFPaths(
-        table=os.path.join(urdf_directory, "table.urdf"),
+        table="package://iai_objects/urdf/table.urdf",
         kitchen="package://iai_kitchen/urdf_obj/kitchen-small.urdf",
-        apartment=os.path.join(urdf_directory, "apartment.urdf"),
+        apartment="package://iai_apartment/urdf/apartment.urdf",
         pr2=PR2.get_ros_file_path(),
     )
 

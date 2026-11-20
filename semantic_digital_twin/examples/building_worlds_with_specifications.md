@@ -612,15 +612,12 @@ time, so one specification can produce many independent worlds and no two of the
 identifier.
 
 ```{code-cell} ipython3
-import os
 from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
-table_urdf = os.path.join(
-    Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "table.urdf"
-)
+table_urdf = "package://iai_objects/urdf/table.urdf"
 
 specification = WorldSpecification.from_urdf(
     table_urdf,

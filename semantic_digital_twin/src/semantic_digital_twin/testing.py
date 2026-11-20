@@ -266,10 +266,7 @@ def ray_test_world():
 
 @pytest.fixture
 def two_arm_robot_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
-    )
-    robot = os.path.join(urdf_dir, "simple_two_arm_robot.urdf")
+    robot = "package://iai_objects/urdf/simple_two_arm_robot.urdf"
     world = World()
     with world.modify_world():
         localization_body = Body(name=PrefixedName("odom_combined"))
