@@ -82,7 +82,7 @@ because each injected member resolves to the *real* declaration in the taker cla
 This plugin lives inside the cram monorepo at `krrood/plugins/pycharm/pyroles-pycharm/`. It is a
 self-contained Gradle project — all commands below run from this directory — and is built and
 published independently of the Python workspace. The krrood `Role` base it targets is defined at
-`krrood/src/krrood/patterns/role.py`.
+`krrood/krrood-core/src/krrood/patterns/role.py`.
 
 ```
 pyroles-pycharm/

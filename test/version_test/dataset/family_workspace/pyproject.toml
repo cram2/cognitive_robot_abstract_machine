@@ -1,0 +1,22 @@
+[project]
+name = "family-root"
+dynamic = ["version"]
+dependencies = [
+    "family",
+    "loner",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["family_root*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "family_root._version.__version__"}
+
+[tool.uv.workspace]
+members = [
+    "family",
+    "family/family-core",
+    "family/family-extra",
+    "loner",
+]

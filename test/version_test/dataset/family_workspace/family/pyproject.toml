@@ -1,0 +1,11 @@
+[project]
+name = "family"
+version = "1.0.0"
+dependencies = [
+    "family-core",
+    "family-extra>=1.0",
+    "third-party>=2.0",
+]
+
+[tool.setuptools]
+packages = []
