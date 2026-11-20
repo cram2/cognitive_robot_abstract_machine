@@ -22,6 +22,7 @@ forms the package writes a rotation in. The names follow semantic_digital_twin's
 ```{code-cell} ipython3
 :tags: [hide-input]
 
+import json
 import math
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
@@ -44,13 +45,18 @@ from krrood_spatial_math.spatial_types import (
 )
 
 
-def show(figure):
+def show(figure, script=None):
+    """
+    :param script: JavaScript to run once the figure is drawn, in which
+        ``{plot_id}`` stands for the id of the figure's element.
+    """
     return HTML(
         figure.to_html(
             full_html=False,
             include_plotlyjs="cdn",
             include_mathjax=False,
             config=dict(displayModeBar=False),
+            post_script=script,
         )
     )
 
@@ -76,7 +82,7 @@ def slider(labels, prefix, active, states, traces):
 
     def trace_changes(state_traces):
         changes = {}
-        for key in ("x", "y", "name"):
+        for key in ("x", "y", "z", "name"):
             values = [getattr(trace, key, None) for trace in state_traces]
             if all(value is not None for value in values):
                 changes[key] = [
@@ -622,84 +628,274 @@ Reading the angles back from such a matrix can find only the difference. The cod
 returns a yaw of 0 and puts the difference, roll − yaw, into the roll, as Lynch and
 Park's algorithm does {cite}`lynch2017modern` (appendix B.1.1).
 
-The figure starts from a roll of 0.3 rad and a yaw of 0.5 rad and changes both by $s$:
-once in the same direction, once in opposite directions. It plots how far each rotation
-is from the one at $s = 0$, as the angle of the rotation between them. Drag the slider
-towards a pitch of 90°: the curve for the same direction flattens, until it is zero
-everywhere. The box shows the angles the code reads back from the matrix at $s = 0$.
+The figure shows how this happens. Read as the ZYX Euler angles, each angle turns the
+body about its own axis: yaw about the z axis of the reference frame, pitch about the y
+axis once the yaw has turned it, and roll about the body's own x axis. The figure draws
+these three axes through the body, and the three sliders set the angles. Each circle
+shows where the marked corner of the body goes when one angle changes and the others
+stay: changing an angle turns the body about that angle's axis. The box at the top left
+shows the angle between the roll and yaw axes, and the angles the code reads back from
+the matrix.
+
+Move the pitch towards 90°. The pitch turns the roll axis onto the line of the yaw axis,
+and the roll and yaw circles merge into one. At 90°, move the roll and the yaw: both
+move the corner along the same circle, and raising both by the same amount leaves the
+body where it is. Only two ways to turn the body are left, and the read-back angles
+show only roll − yaw. Drag the figure to look at it from another side.
 
 ```{code-cell} ipython3
 :tags: [hide-input]
 
-change = sm.FloatVariable(name="s")
-pitch_variable = sm.FloatVariable(name="pitch")
-parameters = sm.VariableParameters.from_lists([change, pitch_variable])
-start = RotationMatrix.from_rpy(0.3, pitch_variable, 0.5)
-distances = {
-    name: RotationMatrix.from_rpy(
-        0.3 + change, pitch_variable, 0.5 + sign * change
+start_angles = dict(roll=20, pitch=45, yaw=30)
+circle_changes = np.arange(-180, 181, 5)
+corner = [0.45, 0.6, 0.05]
+box_corners = [
+    [x, y, z] for x in (-0.45, 0.45) for y in (-0.6, 0.6) for z in (-0.05, 0.05)
+]
+box_faces = dict(
+    i=[0, 0, 4, 4, 0, 0, 2, 2, 0, 0, 1, 1],
+    j=[1, 3, 5, 7, 1, 5, 3, 7, 2, 6, 3, 7],
+    k=[3, 2, 7, 6, 5, 4, 7, 6, 6, 4, 7, 5],
+)
+angle_colors = dict(roll="#d62728", pitch="#2ca02c", yaw="#1f77b4")
+
+
+def oriented(angles):
+    return RotationMatrix.from_rpy(
+        *(math.radians(angles[name]) for name in ("roll", "pitch", "yaw"))
     )
-    .rotational_distance(start)
-    .compile(parameters=parameters)
-    for name, sign in (("same", 1), ("opposite", -1))
-}
-changes = np.linspace(-1.5, 1.5, 151)
-pitches = np.array([0, 15, 30, 45, 60, 70, 80, 85, 88, 89, 90])
 
 
-def lock_state(index):
-    pitch = math.radians(pitches[index])
-    traces = [
-        go.Scatter(
-            x=changes,
-            y=[distances[name](np.array([s, pitch]))[0] for s in changes],
-            mode="lines",
-            line=dict(color=color, width=3),
-            name=label,
-        )
-        for name, color, label in (
-            ("same", "#1f77b4", "roll + s, yaw + s"),
-            ("opposite", "#ff7f0e", "roll + s, yaw − s"),
-        )
+def columns(points):
+    return [[float(point[axis]) for point in points] for axis in range(3)]
+
+
+def line_3d(direction, color, name, width=6):
+    x, y, z = columns([[-value for value in direction], direction])
+    return go.Scatter3d(
+        x=x,
+        y=y,
+        z=z,
+        mode="lines",
+        line=dict(color=color, width=width),
+        name=name,
+    )
+
+
+def circle(angles, name):
+    points = [
+        np.asarray(
+            oriented(dict(angles, **{name: angles[name] + change}))
+            @ Vector3(*corner)
+        )[:3]
+        for change in circle_changes
     ]
+    x, y, z = columns(points)
+    return go.Scatter3d(
+        x=x,
+        y=y,
+        z=z,
+        mode="lines",
+        line=dict(
+            color=angle_colors[name],
+            width=9 if name == "yaw" else 5,
+            dash="dash" if name == "roll" else None,
+        ),
+        name=f"where the corner goes when the {name} changes",
+    )
+
+
+def lock_title(angles):
+    rotation = np.asarray(oriented(angles))[:3, :3]
+    between = math.degrees(math.acos(min(1.0, abs(rotation[2, 0]))))
     read_back = [
-        math.degrees(float(angle))
-        for angle in RotationMatrix.from_rpy(0.3, pitch, 0.5).rpy
+        round(math.degrees(float(angle))) for angle in oriented(angles).rpy
     ]
-    title = (
-        f"pitch = {pitches[index]}°<br>"
-        f"read back: roll {read_back[0]:.1f}°, pitch {read_back[1]:.1f}°,"
-        f" yaw {read_back[2]:.1f}°"
+    return (
+        f"angle between roll and yaw axes: {round(between)}°<br>"
+        f"read back: roll {read_back[0]}°, pitch {read_back[1]}°,"
+        f" yaw {read_back[2]}°"
     )
-    return traces, {"legend.title.text": title}
 
 
-initial = int(np.argmin(np.abs(pitches - 45)))
-lock_figure = go.Figure(data=lock_state(initial)[0])
+def lock_traces(angles):
+    matrix = oriented(angles)
+    rotation = np.asarray(matrix)[:3, :3]
+    pitch_axis = np.asarray(
+        oriented(dict(roll=0, pitch=0, yaw=angles["yaw"])) @ Vector3(0, 1, 0)
+    )[:3]
+    x, y, z = columns([rotation @ point for point in box_corners])
+    marked = columns([rotation @ corner])
+    return [
+        go.Mesh3d(
+            x=x,
+            y=y,
+            z=z,
+            **box_faces,
+            color="#9e9e9e",
+            opacity=0.45,
+            flatshading=True,
+            name="the body",
+            showlegend=True,
+        ),
+        line_3d(
+            rotation[:, 0], angle_colors["roll"], "roll axis: the body's x axis"
+        ),
+        line_3d(pitch_axis, angle_colors["pitch"], "pitch axis"),
+        circle(angles, "yaw"),
+        circle(angles, "roll"),
+        circle(angles, "pitch"),
+        go.Scatter3d(
+            x=marked[0],
+            y=marked[1],
+            z=marked[2],
+            mode="markers",
+            marker=dict(color="#333333", size=6),
+            name="the marked corner",
+        ),
+    ]
+
+
+def angle_slider(name, values, y):
+    return dict(
+        name=name,
+        active=int(np.argmin(np.abs(values - start_angles[name]))),
+        currentvalue=dict(
+            prefix=f"{name} (°): ", font=dict(size=13, color=angle_colors[name])
+        ),
+        font=dict(color="rgba(0, 0, 0, 0)"),
+        ticklen=3,
+        minorticklen=0,
+        len=0.9,
+        x=0.05,
+        y=y,
+        yanchor="top",
+        pad=dict(t=0, b=0),
+        steps=[
+            dict(label=str(value), value=str(value), method="skip", args=[])
+            for value in values
+        ],
+    )
+
+
+lock_figure = go.Figure(
+    data=[
+        line_3d(
+            [0, 0, 1],
+            angle_colors["yaw"],
+            "yaw axis: the reference z axis",
+            width=14,
+        ),
+        *lock_traces(start_angles),
+    ]
+)
 lock_figure.update_layout(
     template="plotly_white",
-    height=480,
-    margin=dict(l=55, r=5, t=5, b=0),
+    height=820,
+    margin=dict(l=0, r=0, t=0, b=0),
     legend=dict(
-        x=0.5,
-        xanchor="center",
-        y=0.99,
-        bgcolor=legend_box["bgcolor"],
-        title=dict(text=lock_state(initial)[1]["legend.title.text"]),
+        **legend_box,
+        font=dict(size=11),
+        title=dict(text=lock_title(start_angles)),
     ),
-    xaxis=dict(range=[-1.5, 1.5], title="change s of roll and yaw (rad)"),
-    yaxis=dict(range=[-0.1, 3.3], title="angle to the rotation at s = 0 (rad)"),
+    scene=dict(
+        domain=dict(y=[0.27, 1.0]),
+        xaxis=dict(range=[-1.0, 1.0], title="x"),
+        yaxis=dict(range=[-1.0, 1.0], title="y"),
+        zaxis=dict(range=[-1.0, 1.0], title="z"),
+        aspectmode="cube",
+        camera=dict(eye=dict(x=1.2, y=-1.7, z=0.7)),
+    ),
+    uirevision="lock",
     sliders=[
-        slider(
-            [str(pitch) for pitch in pitches],
-            "pitch (°): ",
-            active=initial,
-            states=[lock_state(index) for index in range(len(pitches))],
-            traces=[0, 1],
-        )
+        angle_slider("roll", np.arange(-180, 181, 5), 0.24),
+        angle_slider("pitch", np.arange(-90, 91, 5), 0.155),
+        angle_slider("yaw", np.arange(-180, 181, 5), 0.07),
     ],
 )
-show(lock_figure)
+
+# The browser redraws the figure when a slider moves, with the same computation as
+# lock_traces and lock_title above.
+lock_script = """
+const plot = document.getElementById('{plot_id}');
+const settings = SETTINGS;
+const angles = Object.assign({}, settings.start);
+const radians = Math.PI / 180;
+function about(axis, angle) {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  if (axis === 'x') return [[1, 0, 0], [0, c, -s], [0, s, c]];
+  if (axis === 'y') return [[c, 0, s], [0, 1, 0], [-s, 0, c]];
+  return [[c, -s, 0], [s, c, 0], [0, 0, 1]];
+}
+function times(a, b) {
+  return a.map(row => [0, 1, 2].map(
+    j => row[0] * b[0][j] + row[1] * b[1][j] + row[2] * b[2][j]));
+}
+function apply(m, v) {
+  return m.map(row => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+}
+function oriented(a) {
+  return times(about('z', a.yaw * radians),
+    times(about('y', a.pitch * radians), about('x', a.roll * radians)));
+}
+function readBack(m) {
+  const cy = Math.hypot(m[0][0], m[1][0]);
+  if (cy - settings.eps > 0) {
+    return [Math.atan2(m[2][1], m[2][2]), Math.atan2(-m[2][0], cy),
+      Math.atan2(m[1][0], m[0][0])];
+  }
+  return [Math.atan2(-m[1][2], m[1][1]), Math.atan2(-m[2][0], cy), 0];
+}
+function columns(points) {
+  return [0, 1, 2].map(axis => points.map(point => point[axis]));
+}
+function circle(name) {
+  return columns(settings.circle.map(change => apply(
+    oriented(Object.assign({}, angles, {[name]: angles[name] + change})),
+    settings.corner)));
+}
+function line(direction) {
+  return columns([direction.map(value => -value), direction]);
+}
+function degrees(angle) {
+  return Math.round(angle / radians) + 0;
+}
+function title(m) {
+  const between = Math.acos(Math.min(1, Math.abs(m[2][0])));
+  const back = readBack(m).map(degrees);
+  return 'angle between roll and yaw axes: ' + degrees(between) + '°<br>'
+    + 'read back: roll ' + back[0] + '°, pitch ' + back[1] + '°, yaw ' + back[2] + '°';
+}
+function redraw() {
+  const m = oriented(angles);
+  const traces = [
+    columns(settings.box.map(point => apply(m, point))),
+    line([m[0][0], m[1][0], m[2][0]]),
+    line(apply(about('z', angles.yaw * radians), [0, 1, 0])),
+    circle('yaw'), circle('roll'), circle('pitch'),
+    columns([apply(m, settings.corner)]),
+  ];
+  Plotly.update(plot,
+    {x: traces.map(t => t[0]), y: traces.map(t => t[1]), z: traces.map(t => t[2])},
+    {'legend.title.text': title(m)}, [1, 2, 3, 4, 5, 6, 7]);
+}
+plot.on('plotly_sliderchange', event => {
+  angles[event.slider.name] = Number(event.step.value);
+  redraw();
+});
+""".replace(
+    "SETTINGS",
+    json.dumps(
+        dict(
+            start=start_angles,
+            eps=sm.EPS,
+            circle=circle_changes.tolist(),
+            corner=corner,
+            box=box_corners,
+        )
+    ),
+)
+show(lock_figure, lock_script)
 ```
 
 In code, at a pitch of exactly 90°:
