@@ -697,7 +697,7 @@ def test_a_shape_sorting_piece_reaches_another_world_with_its_grasp_height(
     other_world = World()
     sent = from_json(to_json(block), **WorldEntityWithIDKwargsTracker().create_kwargs())
     with other_world.modify_world():
-        sent.apply(other_world)
+        sent.apply(world=other_world)
 
     [arrived] = other_world.get_semantic_annotations_by_type(ShapeSortingPiece)
     assert arrived.grasp_height == shape_sorting_piece.grasp_height
