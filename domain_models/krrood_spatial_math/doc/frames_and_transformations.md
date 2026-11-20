@@ -447,8 +447,10 @@ print(
 ```
 
 It does not compare the two inner frames: a product of $_aT_b$ and a transformation
-from some frame $d$ to $c$ would be labelled as going from $d$ to $a$ all the same.
-Keeping the names of the variables right is what keeps a chain right.
+from some frame $d$ to $c$ would be labelled as going from $d$ to $a$ all the same. This
+is deliberate: products of transformations are performance critical, and a comparison
+would cost time in every one of them. Keeping the names of the variables right is what
+keeps a chain right.
 
 ## Order matters
 
