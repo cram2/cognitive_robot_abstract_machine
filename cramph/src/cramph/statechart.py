@@ -672,7 +672,7 @@ class Statechart(SubclassJSONSerializer):
             raise NotHeldByControlStructureNodeError(node=node, parent=holder)
         if self.compiler.is_compiled and self.compiler.latest_compile_covers(node=node):
             raise StatechartAlreadyCompiledError()
-        replacement = ControlStructureNode._as_node(node=replacement)
+        replacement = ControlStructureNode._to_node(node=replacement)
         if holder is not None:
             holder._check_is_not_a_child(node=replacement)
             holder._check_can_be_a_child(node=replacement)

@@ -15,8 +15,12 @@ from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 
 from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import GeneratedInstance, GenerativeBackend
-from krrood.entity_query_language.core.base_expressions import Bindings
-from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.core.base_expressions import (
+    Bindings,
+    SymbolicExpression,
+)
+from krrood.entity_query_language.query.match import AbstractMatchExpression, Match
+from krrood.entity_query_language.query.quantifiers import The
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
@@ -31,6 +35,7 @@ from cramph.data_types import (
     ObservationStateValue,
 )
 from cramph.exceptions import (
+    ControlStructureStatementLeavesAChoiceError,
     NoChildChooserForNodeError,
     SeveralChildChoosersForNodeError,
     NoControlStructureNodeAboveError,
@@ -126,8 +131,8 @@ class ControlStructureNode(CompositeNode, ABC):
     :meth:`~cramph.statechart.Statechart.replace` rewire the conditions of the current
     children accordingly.
 
-    Wherever it is handed a node, it also takes an underspecified `a(...)` statement,
-    for which it takes a :class:`StatementNode` as its child.
+    Wherever it is handed a node, it also takes a statement of one, see
+    :meth:`_to_node`.
     """
 
     nodes: list[StatechartNode] = field(default_factory=list, init=True)
@@ -135,19 +140,67 @@ class ControlStructureNode(CompositeNode, ABC):
     The children of this goal, in order.
     """
 
+    statement: Match | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        metadata=JSONMetadata(serialize=False).as_dict(),
+    )
+    """
+    The `a(...)` statement stating the nodes this structure was built from, see
+    :meth:`from_statement`, None for a structure constructed directly.
+
+    The statements among its nodes are parts of it, which share the variables it gives
+    them.
+    """
+
     def __post_init__(self) -> None:
+        """
+        Turn every statement among :attr:`nodes` into the node running it, see
+        :meth:`_to_node`.
+        """
         super().__post_init__()
-        self.nodes = [self._as_node(node=node) for node in self.nodes]
+        self.nodes = [self._to_node(node=node) for node in self.nodes]
+
+    @classmethod
+    def from_statement(cls, *, statement: Match[Self]) -> Self:
+        """
+        :param statement: An `a(...)` statement of a control structure that states its
+            nodes.
+        :return: The structure the statement states, built from what it states.
+        :raises ControlStructureStatementLeavesAChoiceError: If the statement leaves
+            open anything but the statements among its nodes.
+        """
+        open_keywords = [
+            keyword
+            for keyword, value in statement._kwargs_.items()
+            if value is ...
+            or isinstance(value, (SymbolicExpression, AbstractMatchExpression))
+        ]
+        if open_keywords:
+            raise ControlStructureStatementLeavesAChoiceError(
+                statement=statement, open_keywords=open_keywords
+            )
+        structure = cls(**statement._kwargs_)
+        structure.statement = statement
+        return structure
 
     @staticmethod
-    def _as_node(*, node: StatechartNode | Match) -> StatechartNode:
+    def _to_node(*, node: StatechartNode | Match) -> StatechartNode:
         """
         :param node: A node this goal was handed, or a statement of one.
-        :return: `node` itself, or a :class:`StatementNode` grounding the statement.
+        :return: `node` itself; for a `the(...)` statement a
+            :class:`DefiniteStatementNode`; for an `a(...)` statement of a control
+            structure stating its nodes that structure, see :meth:`from_statement`; for
+            any other statement a :class:`StatementNode` grounding it.
         """
-        if isinstance(node, Match):
-            return StatementNode(statement=node)
-        return node
+        if not isinstance(node, Match):
+            return node
+        if issubclass(node._quantifier_type_, The):
+            return DefiniteStatementNode(statement=node)
+        if issubclass(node._type_, ControlStructureNode) and "nodes" in node._kwargs_:
+            return node._type_.from_statement(statement=node)
+        return StatementNode(statement=node)
 
     def add_node(self, *, node: StatechartNode) -> None:
         """
@@ -157,7 +210,7 @@ class ControlStructureNode(CompositeNode, ABC):
 
         :param node: The node to add as a child of this goal.
         """
-        node = self._as_node(node=node)
+        node = self._to_node(node=node)
         if self._has_child(node=node):
             return
         self._add_node_sanity_check(node=node)
@@ -296,7 +349,7 @@ class ControlStructureNode(CompositeNode, ABC):
         :raises StatechartAlreadyCompiledError: If this goal accepts no children any
             more, see :meth:`_check_accepts_children`.
         """
-        node = self._as_node(node=node)
+        node = self._to_node(node=node)
         self._check_is_not_a_child(node=node)
         if not self.belongs_to_statechart():
             self.nodes.insert(position, node)
@@ -1617,6 +1670,34 @@ class StatementNode(CompositeNodeChoosingItsChild):
 
     def __repr__(self) -> str:
         return f"{self.statement._type_.__name__}"
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class DefiniteStatementNode(StatementNode):
+    """
+    Runs the one node a definite `the(...)` statement describes once the statements
+    before it bound the variables it shares with them, see :class:`StatementBindings`.
+
+    It has nothing to choose, so its chooser runs that node without trying it out first
+    and does not ground the statement again once the node failed.
+    """
+
+    def sole_candidate(
+        self, *, query_backend: GenerativeBackend, bound_values: Bindings
+    ) -> Any:
+        """
+        :param query_backend: The backend answering the statement.
+        :param bound_values: The values chosen for variables the statement shares,
+            keyed by the identifier of each variable.
+        :return: The one node the statement describes while its variables keep
+            `bound_values`.
+        :raises MultipleSolutionFound: If the statement describes more than one node.
+        :raises NoSolutionFound: If it describes none.
+        """
+        (generated,) = query_backend.generate(
+            expression=self.statement, bound_values=bound_values
+        )
+        return generated.instance
 
 
 # %% grounding statements together

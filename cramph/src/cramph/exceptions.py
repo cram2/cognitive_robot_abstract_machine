@@ -1,3 +1,7 @@
+"""
+The errors a statechart, its nodes and the nodes choosing their children raise.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -14,6 +18,7 @@ if TYPE_CHECKING:
     from cramph.context import ContextExtension
     from cramph.data_types import TransitionKind
     from cramph.node import NodeStateVariable, StatechartNode, TransitionCondition
+    from krrood.entity_query_language.query.match import Match
 
 
 @dataclass(kw_only=True)
@@ -742,6 +747,37 @@ class SeveralChildChoosersForNodeError(StatechartError):
         return (
             f"keep one chooser for {type(self.node).__name__} in the ChildChooserAccess "
             f"of the context."
+        )
+
+
+@dataclass(kw_only=True)
+class ControlStructureStatementLeavesAChoiceError(StatechartError):
+    """
+    Raised when an `a(...)` statement of a control structure that states its nodes
+    leaves open something other than its nodes, since the structure is built from what
+    it states rather than chosen.
+    """
+
+    statement: Match
+    """
+    The statement of the control structure.
+    """
+
+    open_keywords: list[str]
+    """
+    The keyword arguments the statement leaves open.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.statement} leaves {', '.join(self.open_keywords)} open, but a "
+            f"control structure stating its nodes is built from what it states."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "state a value for each of them, and leave choices to the statements among "
+            "its nodes."
         )
 
 
