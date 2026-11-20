@@ -33,6 +33,7 @@ from krrood_spatial_math.spatial_types_2_dimensional import (
     HomogeneousTransformationMatrix2Dimensional,
     Point2Dimensional,
     Pose2Dimensional,
+    Vector2Dimensional,
 )
 from krrood_spatial_math.spatial_types import Pose3Dimensional, SymbolicSpatialType
 from krrood_spatial_math.testing.orientation_comparison import (
@@ -1670,13 +1671,19 @@ class TestTransformationMatrix:
 
     @pytest.mark.parametrize(
         "planar_value",
-        [Point2Dimensional(x=1, y=2), Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4)],
+        [
+            Vector2Dimensional(x=1, y=2),
+            Point2Dimensional(x=1, y=2),
+            Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4),
+            HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4),
+        ],
     )
     def test_transforming_a_planar_value_within_its_plane_is_the_planar_change(
         self, *, planar_value
     ):
         """
-        Between frames on one plane, re-expressing a planar value is the SE(2) change.
+        Between frames on one plane, re-expressing a planar value or change is the SE(2)
+        change.
         """
         transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.5, y=-1, yaw=0.3
@@ -1689,7 +1696,7 @@ class TestTransformationMatrix:
             transformed.to_np(),
             (
                 HomogeneousTransformationMatrix2Dimensional.from_transformation(
-                    transformation
+                    transformation=transformation,
                 )
                 @ planar_value
             ).to_np(),
@@ -1698,7 +1705,12 @@ class TestTransformationMatrix:
 
     @pytest.mark.parametrize(
         "planar_value",
-        [Point2Dimensional(x=1, y=2), Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4)],
+        [
+            Vector2Dimensional(x=1, y=2),
+            Point2Dimensional(x=1, y=2),
+            Pose2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4),
+            HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(x=1, y=2, yaw=0.4),
+        ],
     )
     @pytest.mark.parametrize(
         "transformation",

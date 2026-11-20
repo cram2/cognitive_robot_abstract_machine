@@ -1033,6 +1033,132 @@ def test_a_class_binding_a_derived_parameter_to_another_type_is_refused():
             """
 
 
+def test_the_derived_parameters_of_every_base_apply_together():
+    """
+    A class inheriting two bases that each derive a parameter from their own source
+    reads both.
+    """
+    UnitType = TypeVar("UnitType")
+    ScaleType = TypeVar("ScaleType")
+    MeasurementType = TypeVar("MeasurementType")
+    InstrumentType = TypeVar("InstrumentType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Instrument(Generic[ScaleType], SubClassSafeGeneric):
+        """
+        A device reading values off a scale.
+        """
+
+    @dataclass(kw_only=True)
+    class Ruler(Instrument[int]):
+        """
+        An instrument with an integer scale.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement, whose unit the measurement type fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class Recording(Generic[InstrumentType], SubClassSafeGeneric):
+        """
+        A record of an instrument, whose scale the instrument type fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=ScaleType, source=InstrumentType),
+            )
+
+    @dataclass(kw_only=True)
+    class RulerReading(Reading[Metres], Recording[Ruler]):
+        """
+        A length in metres read off a ruler.
+        """
+
+    assert RulerReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert RulerReading.get_type_of_generic_parameter(parameter=ScaleType) is int
+
+
+def test_two_sources_fixing_a_parameter_to_unrelated_types_are_refused():
+    """
+    A class whose two bases derive one parameter from their sources fails where it is
+    defined when the sources fix it to unrelated types.
+    """
+    UnitType = TypeVar("UnitType")
+    MeasurementType = TypeVar("MeasurementType")
+    LabelType = TypeVar("LabelType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Count(Measurement[int]):
+        """
+        A number of things.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement, whose unit the measurement type fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class Label(Generic[LabelType], SubClassSafeGeneric):
+        """
+        A label naming the unit of the measurement it is given.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (DerivedGenericParameter(parameter=UnitType, source=LabelType),)
+
+    with pytest.raises(DerivedGenericParameterConflictError):
+
+        @dataclass(kw_only=True)
+        class MislabelledReading(Reading[Metres], Label[Count]):
+            """
+            A reading in metres labelled with the unit of a count.
+            """
+
+
 # %% attributes an interface declares
 
 

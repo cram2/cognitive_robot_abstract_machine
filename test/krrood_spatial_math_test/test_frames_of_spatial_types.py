@@ -15,7 +15,6 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.line import Line
 from krrood_spatial_math.point import GenericPoint, Point
 from krrood_spatial_math.vector import GenericVector, Vector
-from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
@@ -43,7 +42,10 @@ from krrood_spatial_math.spatial_types import (
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
     EmbeddedPlaneProjection,
+    HomogeneousTransformationMatrix2Dimensional,
+    Point2Dimensional,
     Pose2Dimensional,
+    Vector2Dimensional,
 )
 
 from .dataset.frames import KnownFrames, NamedFrame, Room
@@ -148,15 +150,42 @@ def test_a_three_dimensional_point_is_moved_by_a_three_dimensional_vector():
     )
 
 
+@pytest.mark.parametrize(
+    "value_type, change_type",
+    [
+        (Vector3Dimensional, HomogeneousTransformationMatrix3Dimensional),
+        (Point3Dimensional, HomogeneousTransformationMatrix3Dimensional),
+        (Pose3Dimensional, HomogeneousTransformationMatrix3Dimensional),
+        (Quaternion, HomogeneousTransformationMatrix3Dimensional),
+        (AxisAngle, HomogeneousTransformationMatrix3Dimensional),
+        (Vector2Dimensional, HomogeneousTransformationMatrix2Dimensional),
+        (Point2Dimensional, HomogeneousTransformationMatrix2Dimensional),
+        (Pose2Dimensional, HomogeneousTransformationMatrix2Dimensional),
+    ],
+)
+def test_a_value_shares_its_kind_of_frame_and_coordinate_type_with_its_change_type(
+    *, value_type, change_type
+):
+    """
+    A value type binds only the change that re-expresses it, which fixes its kind of
+    frame and its coordinate type.
+    """
+    assert value_type.get_change_type() is change_type
+    for parameter in (GenericCoordinateSystem, GenericCoordinate):
+        assert value_type.get_type_of_generic_parameter(
+            parameter=parameter
+        ) is change_type.get_type_of_generic_parameter(parameter=parameter)
+
+
 def test_a_point_given_in_another_kind_of_frame_than_its_vector_is_refused():
     """
-    A point's kind of frame is its vector's, so naming another one on its value base
-    fails where the point type is defined.
+    A point's kind of frame is its vector's, so a change type of another kind of frame
+    on its value base fails where the point type is defined.
     """
     with pytest.raises(DerivedGenericParameterConflictError):
 
         class MisframedPoint(
-            SymbolicSpatialValue[CartesianFrame2Dimensional],
+            SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
             Point[Vector3Dimensional],
         ):
             """

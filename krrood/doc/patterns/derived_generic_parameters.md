@@ -61,11 +61,18 @@ Derive only where the bound type determines the derived one. A vector type fixes
 of frame, but a kind of frame has a vector type for each coordinate type, so a point
 binds its vector type and derives its frame, never the other way round.
 
+## Several bases
+
+The derived parameters every class in the inheritance chain declares apply together, so a
+class declares only the parameters it adds. A class inheriting a `Reading` and a base that
+derives its scale from an instrument type reads both the unit and the scale.
+
 ## Conflicts
 
 A class that binds a derived parameter through another base, to a type that is neither
 the derived type nor a base of it, raises `DerivedGenericParameterConflictError` where it
-is defined.
+is defined. So does a class whose bases derive one parameter from two sources that fix
+it to unrelated types.
 
 ## Limits
 

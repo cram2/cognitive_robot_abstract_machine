@@ -672,8 +672,8 @@ class CartesianOrientation(
         """
         artifacts = MotionNodeArtifacts()
         root_R_goal = (
-            self.root_T_goal_reference_frame @ self.goal_orientation
-        ).rotation_matrix
+            self.root_T_goal_reference_frame.rotation_matrix @ self.goal_orientation
+        )
 
         # Get current tip orientation in root frame
         root_T_current = self.context.world.compose_forward_kinematics_expression(

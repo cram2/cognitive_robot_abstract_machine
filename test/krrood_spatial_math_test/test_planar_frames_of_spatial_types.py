@@ -467,7 +467,7 @@ def test_a_change_within_one_plane_becomes_the_planar_transformation_of_its_moti
 ):
     floor_T_robot_base = (
         HomogeneousTransformationMatrix2Dimensional.from_transformation(
-            robot_base_frame.mount_T_self
+            transformation=robot_base_frame.mount_T_self,
         )
     )
 
@@ -487,7 +487,7 @@ def test_a_change_between_two_planes_has_no_planar_transformation(
 
     with pytest.raises(FramesOnDifferentPlanesError):
         HomogeneousTransformationMatrix2Dimensional.from_transformation(
-            frame.mount_T_self
+            transformation=frame.mount_T_self,
         )
 
 
@@ -516,7 +516,7 @@ def test_a_change_to_a_frame_facing_the_other_side_of_a_plane_has_no_planar_tran
 ):
     with pytest.raises(MirroredPlaneFramesError):
         HomogeneousTransformationMatrix2Dimensional.from_transformation(
-            upside_down_frame.mount_T_self
+            transformation=upside_down_frame.mount_T_self,
         )
 
 
@@ -527,7 +527,7 @@ def test_a_symbolic_change_becomes_a_planar_transformation_unchecked(floor_frame
     )
 
     floor_T_lifted = HomogeneousTransformationMatrix2Dimensional.from_transformation(
-        lifted
+        transformation=lifted,
     )
 
     assert np.allclose(floor_T_lifted.x.to_np(), [1])
@@ -654,7 +654,7 @@ def test_a_planar_transformation_moves_a_point_as_its_change_does(
 
     point_on_floor = (
         HomogeneousTransformationMatrix2Dimensional.from_transformation(
-            floor_T_robot_base
+            transformation=floor_T_robot_base,
         )
         @ point
     )

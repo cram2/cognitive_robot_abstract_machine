@@ -14,13 +14,14 @@ from enum import Enum, StrEnum
 
 import casadi as ca
 import numpy as np
-from typing_extensions import Any, overload, Self, Callable, TypeVar
+from typing_extensions import Any, overload, Self, Callable, Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.patterns.interface import Interface
 from krrood.patterns.mixin import Mixin
 from krrood.patterns.classproperty import classproperty
+from krrood.patterns.subclass_safe_generic import DerivedGenericParameter
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
     UnsupportedOperationError,
@@ -33,6 +34,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 )
 from krrood_spatial_math.coordinate_system import (
     GenericCartesianFrame,
+    GenericCoordinate,
     GenericCoordinateSystem,
     CoordinateRepresentation,
     RigidCoordinateChange,
@@ -98,19 +100,39 @@ class SymbolicSpatialType(sm.SymbolicMathType, SubclassJSONSerializer, ABC):
     Can be None if no reference frame is required or applicable.
     """
 
+    @classmethod
+    @abstractmethod
+    def get_change_type(cls) -> type[SymbolicSpatialChange]:
+        """
+        :return: The kind of change that re-expresses this kind of value or change in
+            another frame of its kind.
+        """
+
     def transform(
         self,
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         This object re-expressed in ``target_frame_T_reference_frame``'s reference
-        frame.
+        frame, which :meth:`get_change_type` takes as a change between frames of its
+        kind.
 
         :param target_frame_T_reference_frame: The transformation from this object's
             reference frame to the frame it should be expressed in.
         :return: The object in the transformation's reference frame.
+        :raises FramesOnDifferentPlanesError: If this object is given on a plane, and
+            the transformation is constant or its frames are known, and its frames span
+            different planes, parallel ones included.
+        :raises MirroredPlaneFramesError: If this object is given on a plane, and the
+            transformation is constant or its frames are known, and its frames span one
+            plane with z-axes pointing in opposite directions.
         """
-        return target_frame_T_reference_frame @ self
+        return (
+            self.get_change_type().from_transformation(
+                transformation=target_frame_T_reference_frame
+            )
+            @ self
+        )
 
     def ensure_same_reference_frame(
         self, other: SymbolicSpatialType, context: str
@@ -299,7 +321,7 @@ the value a frame expresses in its own coordinates.
 @dataclass(eq=False, repr=False)
 class SymbolicSpatialChange(
     SymbolicSpatialType,
-    RigidCoordinateChange[GenericCartesianFrame],
+    RigidCoordinateChange[GenericCartesianFrame, sm.Scalar],
     ABC,
 ):
     """
@@ -312,6 +334,20 @@ class SymbolicSpatialChange(
     """
     The frame the coordinates this change acts on are given in.
     """
+
+    @classmethod
+    def get_change_type(cls) -> type[Self]:
+        return cls
+
+    @classmethod
+    @abstractmethod
+    def from_transformation(
+        cls, *, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> SymbolicSpatialChange:
+        """
+        :param transformation: A change between two three-dimensional frames.
+        :return: The same change, between the frames of this kind that its frames fix.
+        """
 
     def _frames_to_json(self, data: dict[str, Any]) -> None:
         super()._frames_to_json(data)
@@ -368,19 +404,52 @@ class SymbolicSpatialChange(
             )
 
 
+GenericSymbolicSpatialChange = TypeVar(
+    "GenericSymbolicSpatialChange", bound=SymbolicSpatialChange
+)
+"""
+The kind of change that re-expresses a value in another frame.
+"""
+
+
 @dataclass(eq=False, repr=False, kw_only=True)
 class SymbolicSpatialValue(
     SymbolicSpatialType,
-    CoordinateRepresentation[GenericCartesianFrame],
+    CoordinateRepresentation,
+    Generic[GenericSymbolicSpatialChange],
     ABC,
 ):
     """
     A value, as a symbolic matrix, such as a point or a pose, given relative to its
-    :attr:`~SymbolicSpatialType.reference_frame` in a frame of the kind its type binds.
+    :attr:`~SymbolicSpatialType.reference_frame` in a frame of the kind its change type
+    changes.
+
+    .. note::
+        The type parameter is the change type, which fixes the kind of frame and the
+        coordinate type, so a value and the changes that re-express it always share
+        them.
     """
 
+    @classproperty
+    def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+        """
+        The kind of frame and the coordinate type, read from the change type.
+        """
+        return (
+            DerivedGenericParameter(
+                parameter=GenericCoordinateSystem, source=GenericSymbolicSpatialChange
+            ),
+            DerivedGenericParameter(
+                parameter=GenericCoordinate, source=GenericSymbolicSpatialChange
+            ),
+        )
+
+    @classmethod
+    def get_change_type(cls) -> type[SymbolicSpatialChange]:
+        return cls.get_type_of_generic_parameter(parameter=GenericSymbolicSpatialChange)
+
     @property
-    def coordinate_system(self) -> GenericCartesianFrame | None:
+    def coordinate_system(self) -> GenericCoordinateSystem | None:
         """
         The frame of this value's kind that its reference frame fixes; ``None`` for a
         value without a reference frame.
@@ -772,6 +841,12 @@ class HomogeneousTransformationMatrix3Dimensional(
         self, other: GenericSpecialEuclideanGroupAction
     ) -> GenericSpecialEuclideanGroupAction:
         return self.dot(other)
+
+    @classmethod
+    def from_transformation(
+        cls, *, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> HomogeneousTransformationMatrix3Dimensional:
+        return transformation
 
     def inverse(self) -> HomogeneousTransformationMatrix3Dimensional:
         inv = HomogeneousTransformationMatrix3Dimensional(
@@ -1299,9 +1374,9 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
-    SymbolicSpatialValue,
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
     HomogeneousCoordinates,
-    Vector[CartesianFrame3Dimensional, sm.Scalar],
+    Vector,
 ):
     """
     Representation of a 3D vector with reference frame support for homogenous
@@ -1689,7 +1764,7 @@ class Vector3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point3Dimensional(
-    SymbolicSpatialValue,
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
     HomogeneousCoordinates,
     Point[Vector3Dimensional],
 ):
@@ -2014,7 +2089,7 @@ class LineSegment3Dimensional(LineSegment[Line3Dimensional]):
 
 @dataclass(eq=False, init=False, repr=False)
 class Quaternion(
-    SymbolicSpatialValue[CartesianFrame3Dimensional],
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
     Orientation,
 ):
     """
@@ -2366,7 +2441,7 @@ class Quaternion(
 
 @dataclass(eq=False, init=False, repr=False)
 class AxisAngle(
-    SymbolicSpatialValue[CartesianFrame3Dimensional],
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
     Orientation,
 ):
     """
@@ -2538,7 +2613,7 @@ class AxisAngle(
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class VectorPair(
-    SymbolicSpatialValue[CartesianFrame3Dimensional],
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
     ABC,
 ):
     """
@@ -2839,7 +2914,7 @@ class ScrewAxis(VectorPair):
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose3Dimensional(
-    SymbolicSpatialValue[CartesianFrame3Dimensional],
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
     HomogeneousCoordinates,
 ):
     """

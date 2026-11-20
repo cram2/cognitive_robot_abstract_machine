@@ -18,7 +18,6 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     EmbeddedPlaneRelation,
 )
-from krrood.patterns.mixin import Mixin
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
@@ -44,39 +43,269 @@ from krrood_spatial_math.spatial_types import (
     Vector3Dimensional,
 )
 
-# %% values on a plane
+# %% rigid changes between frames on one plane
 
 
-class ValueOnEmbeddedPlane(SpecialEuclideanGroupAction, Mixin):
+@dataclass(eq=False, init=False, repr=False)
+class HomogeneousTransformationMatrix2Dimensional(
+    SymbolicSpatialChange[CartesianFrame2Dimensional],
+    SpecialEuclideanGroupAction,
+):
     """
-    A value given on the x-y plane of its reference frame, which SE(2) moves within that
-    plane and which is re-expressed only in frames on the same plane.
+    A 3x3 homogeneous matrix of SE(2): the rigid change from the :class:`~krrood_spatial
+    _math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of its
+    :attr:`~SymbolicSpatialChange.child_frame` into that of its
+    :attr:`~SymbolicSpatialType.reference_frame`, two frames on one plane.
+
+    It is only a change of coordinates, never a value given in a frame: the value it
+    corresponds to is a :class:`Pose2Dimensional`.
+
+    .. warning::
+        The matrix must be rigid: its upper left 2x2 block a rotation and its last row
+        ``[0, 0, 1]``.
     """
 
-    def transform(
+    def __init__(
         self,
-        target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
-    ) -> Self:
+        data: sm.MatrixData | None = None,
+        reference_frame: CartesianFrame3Dimensional | None = None,
+        child_frame: CartesianFrame3Dimensional | None = None,
+    ):
         """
-        Overrides
-        :meth:`~krrood_spatial_math.spatial_types.SymbolicSpatialType.transform`: the
-        transformation is taken as the change between the frames on the plane, as
-        :meth:`HomogeneousTransformationMatrix2Dimensional.from_transformation` gives
-        it.
+        :param data: A rigid 3x3 homogeneous matrix. Defaults to the identity.
+        :param reference_frame: The frame on whose plane the change ends.
+        :param child_frame: The frame on whose plane the change starts.
+        :raises FramesOnDifferentPlanesError: If both frames are given and span
+            different planes.
+        :raises MirroredPlaneFramesError: If both frames are given and span one plane
+            with z-axes pointing in opposite directions.
+        """
+        if reference_frame is not None and child_frame is not None:
+            self._ensure_rigid_change_on_one_plane(
+                relation=reference_frame.compare_embedded_plane(frame=child_frame),
+                reference_frame=reference_frame,
+                child_frame=child_frame,
+            )
+        self.reference_frame = reference_frame
+        self.child_frame = child_frame
+        if data is None:
+            self._casadi_sx = ca.SX.eye(3)
+        else:
+            self.casadi_sx = sm.to_sx(data)
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (3, 3):
+            raise WrongDimensionsError(
+                expected_dimensions=(3, 3), actual_dimensions=self.shape
+            )
+        self[2, :] = [0, 0, 1]
+
+    @property
+    def source_coordinate_system(self) -> CartesianFrame2Dimensional | None:
+        """
+        The frame on the x-y plane of :attr:`~SymbolicSpatialChange.child_frame`;
+        ``None`` for a change without a child frame.
+        """
+        if self.child_frame is None:
+            return None
+        return CartesianFrame2Dimensional(frame_3_dimensional=self.child_frame)
+
+    @property
+    def target_coordinate_system(self) -> CartesianFrame2Dimensional | None:
+        """
+        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
+        ``None`` for a change without a reference frame.
+        """
+        if self.reference_frame is None:
+            return None
+        return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
+
+    # %% construction
+
+    @classmethod
+    def from_xy_yaw(
+        cls,
+        x: sm.ScalarData = 0,
+        y: sm.ScalarData = 0,
+        yaw: sm.ScalarData = 0,
+        reference_frame: CartesianFrame3Dimensional | None = None,
+        child_frame: CartesianFrame3Dimensional | None = None,
+    ) -> HomogeneousTransformationMatrix2Dimensional:
+        """
+        :param x: The x-coordinate of the child frame's origin in the reference frame.
+        :param y: The y-coordinate of the child frame's origin in the reference frame.
+        :param yaw: The angle from the reference frame's x-axis to the child frame's,
+            counterclockwise.
+        :param reference_frame: The frame on whose plane the change ends.
+        :param child_frame: The frame on whose plane the change starts.
+        :return: The change that rotates by ``yaw`` and then shifts by ``(x, y)``.
+        """
+        cosine, sine = sm.cos(yaw), sm.sin(yaw)
+        return cls(
+            [[cosine, -sine, x], [sine, cosine, y], [0, 0, 1]],
+            reference_frame=reference_frame,
+            child_frame=child_frame,
+        )
+
+    @classmethod
+    def from_transformation(
+        cls, *, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> HomogeneousTransformationMatrix2Dimensional:
+        """
+        Overrides :meth:`~krrood_spatial_math.spatial_types.SymbolicSpatialChange.from_t
+        ransformation` for frames that span one x-y plane and whose z-axes point the
+        same way.
 
         :raises FramesOnDifferentPlanesError: If the transformation is constant, or its
-            frames are known, and its frames span different planes, parallel ones
-            included.
+            frames are known, and its frames span different planes.
         :raises MirroredPlaneFramesError: If the transformation is constant, or its
             frames are known, and its frames span one plane with z-axes pointing in
             opposite directions.
+
+        .. note::
+            A transformation that is not constant, between frames whose planes are not
+            known, is taken to be planar unchecked.
         """
-        return (
-            HomogeneousTransformationMatrix2Dimensional.from_transformation(
-                target_frame_T_reference_frame
-            )
-            @ self
+        cls._ensure_rigid_change_on_one_plane(
+            relation=transformation.embedded_plane_relation,
+            reference_frame=transformation.reference_frame,
+            child_frame=transformation.child_frame,
         )
+        rotation = transformation.rotation_matrix
+        return cls.from_xy_yaw(
+            x=transformation.x,
+            y=transformation.y,
+            yaw=sm.atan2(rotation[1, 0], rotation[0, 0]),
+            reference_frame=transformation.reference_frame,
+            child_frame=transformation.child_frame,
+        )
+
+    @staticmethod
+    def _ensure_rigid_change_on_one_plane(
+        *,
+        relation: EmbeddedPlaneRelation,
+        reference_frame: CartesianFrame3Dimensional | None,
+        child_frame: CartesianFrame3Dimensional | None,
+    ) -> None:
+        """
+        :param relation: How the x-y plane of ``child_frame`` lies relative to that of
+            ``reference_frame``.
+        :param reference_frame: The frame on whose plane the change ends.
+        :param child_frame: The frame on whose plane the change starts.
+        :raises FramesOnDifferentPlanesError: If the frames span different planes.
+        :raises MirroredPlaneFramesError: If the frames span one plane with z-axes
+            pointing in opposite directions.
+        """
+        if relation is EmbeddedPlaneRelation.DIFFERENT_PLANES:
+            raise FramesOnDifferentPlanesError(
+                reference_frame=reference_frame, child_frame=child_frame
+            )
+        if relation is EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL:
+            raise MirroredPlaneFramesError(
+                reference_frame=reference_frame, child_frame=child_frame
+            )
+
+    # %% motion
+
+    @property
+    def x(self) -> sm.Scalar:
+        """
+        The x-coordinate of the child frame's origin in the reference frame.
+        """
+        return self[0, 2]
+
+    @property
+    def y(self) -> sm.Scalar:
+        """
+        The y-coordinate of the child frame's origin in the reference frame.
+        """
+        return self[1, 2]
+
+    @property
+    def yaw(self) -> sm.Scalar:
+        """
+        The angle from the reference frame's x-axis to the child frame's,
+        counterclockwise.
+        """
+        return sm.atan2(self[1, 0], self[0, 0])
+
+    @property
+    def pose(self) -> Pose2Dimensional:
+        """
+        :return: The pose this change moves its reference frame's plane frame to.
+        """
+        return Pose2Dimensional.from_xy_yaw(
+            x=self.x, y=self.y, yaw=self.yaw, reference_frame=self.reference_frame
+        )
+
+    # %% acting on values and changes
+
+    def __matmul__(
+        self, other: GenericSpecialEuclideanGroupAction
+    ) -> GenericSpecialEuclideanGroupAction:
+        """
+        :param other: A change into this change's child frame, or a point or pose given
+            in it.
+        :return: The change applied after ``other``, or the point or pose given in this
+            change's reference frame.
+        :raises UnsupportedOperationError: If this change does not act on ``other``.
+        :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
+            this change's child frame.
+        """
+        self.ensure_acts_on(operand=other, operation="@")
+        return other.apply_transformation(transformation=self)
+
+    def apply_transformation(
+        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
+    ) -> HomogeneousTransformationMatrix2Dimensional:
+        return HomogeneousTransformationMatrix2Dimensional(
+            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
+            reference_frame=transformation.reference_frame,
+            child_frame=self.child_frame,
+        )
+
+    def inverse(self) -> HomogeneousTransformationMatrix2Dimensional:
+        inverse = HomogeneousTransformationMatrix2Dimensional(
+            reference_frame=self.child_frame, child_frame=self.reference_frame
+        )
+        inverse[:2, :2] = self[:2, :2].T
+        inverse[:2, 2] = (-inverse[:2, :2]).dot(other=self[:2, 2])
+        return inverse
+
+    # %% JSON serialization
+
+    @classmethod
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        return cls.from_xy_yaw(
+            *data["data"],
+            reference_frame=cls._parse_optional_frame_from_json(
+                data, frame=SpatialFrameKey.REFERENCE, **kwargs
+            ),
+            child_frame=cls._parse_optional_frame_from_json(
+                data, frame=SpatialFrameKey.CHILD, **kwargs
+            ),
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            "data": [
+                float(self.x.to_np()[0]),
+                float(self.y.to_np()[0]),
+                float(self.yaw.to_np()[0]),
+            ]
+        }
+
+    def __hash__(self):
+        if self.is_constant():
+            return hash(
+                (
+                    *self.to_np().flatten().tolist(),
+                    self.reference_frame,
+                    self.child_frame,
+                )
+            )
+        return super().__hash__()
 
 
 # %% vectors and points on a plane
@@ -84,9 +313,9 @@ class ValueOnEmbeddedPlane(SpecialEuclideanGroupAction, Mixin):
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
-    ValueOnEmbeddedPlane,
-    SymbolicSpatialValue,
-    Vector[CartesianFrame2Dimensional, sm.Scalar],
+    SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
+    SpecialEuclideanGroupAction,
+    Vector,
 ):
     """
     A translation within the x-y plane of its reference frame, given in the :class:`~krr
@@ -185,8 +414,8 @@ class Vector2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point2Dimensional(
-    ValueOnEmbeddedPlane,
-    SymbolicSpatialValue,
+    SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
+    SpecialEuclideanGroupAction,
     Point[Vector2Dimensional],
 ):
     """
@@ -403,8 +632,8 @@ class EmbeddedPlaneProjection(
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose2Dimensional(
-    ValueOnEmbeddedPlane,
-    SymbolicSpatialValue[CartesianFrame2Dimensional],
+    SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
+    SpecialEuclideanGroupAction,
 ):
     """
     Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
@@ -596,268 +825,4 @@ class Pose2Dimensional(
     def __hash__(self):
         if self.is_constant():
             return hash((*self.to_np().tolist(), self.reference_frame))
-        return super().__hash__()
-
-
-# %% rigid changes between frames on one plane
-
-
-@dataclass(eq=False, init=False, repr=False)
-class HomogeneousTransformationMatrix2Dimensional(
-    SymbolicSpatialChange[CartesianFrame2Dimensional],
-    SpecialEuclideanGroupAction,
-):
-    """
-    A 3x3 homogeneous matrix of SE(2): the rigid change from the :class:`~krrood_spatial
-    _math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of its
-    :attr:`~SymbolicSpatialChange.child_frame` into that of its
-    :attr:`~SymbolicSpatialType.reference_frame`, two frames on one plane.
-
-    It is only a change of coordinates, never a value given in a frame: the value it
-    corresponds to is a :class:`Pose2Dimensional`.
-
-    .. warning::
-        The matrix must be rigid: its upper left 2x2 block a rotation and its last row
-        ``[0, 0, 1]``.
-    """
-
-    def __init__(
-        self,
-        data: sm.MatrixData | None = None,
-        reference_frame: CartesianFrame3Dimensional | None = None,
-        child_frame: CartesianFrame3Dimensional | None = None,
-    ):
-        """
-        :param data: A rigid 3x3 homogeneous matrix. Defaults to the identity.
-        :param reference_frame: The frame on whose plane the change ends.
-        :param child_frame: The frame on whose plane the change starts.
-        :raises FramesOnDifferentPlanesError: If both frames are given and span
-            different planes.
-        :raises MirroredPlaneFramesError: If both frames are given and span one plane
-            with z-axes pointing in opposite directions.
-        """
-        if reference_frame is not None and child_frame is not None:
-            self._ensure_rigid_change_on_one_plane(
-                relation=reference_frame.compare_embedded_plane(frame=child_frame),
-                reference_frame=reference_frame,
-                child_frame=child_frame,
-            )
-        self.reference_frame = reference_frame
-        self.child_frame = child_frame
-        if data is None:
-            self._casadi_sx = ca.SX.eye(3)
-        else:
-            self.casadi_sx = sm.to_sx(data)
-        super().__post_init__()
-
-    def _verify_type(self):
-        if self.shape != (3, 3):
-            raise WrongDimensionsError(
-                expected_dimensions=(3, 3), actual_dimensions=self.shape
-            )
-        self[2, :] = [0, 0, 1]
-
-    @property
-    def source_coordinate_system(self) -> CartesianFrame2Dimensional | None:
-        """
-        The frame on the x-y plane of :attr:`~SymbolicSpatialChange.child_frame`;
-        ``None`` for a change without a child frame.
-        """
-        if self.child_frame is None:
-            return None
-        return CartesianFrame2Dimensional(frame_3_dimensional=self.child_frame)
-
-    @property
-    def target_coordinate_system(self) -> CartesianFrame2Dimensional | None:
-        """
-        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
-        ``None`` for a change without a reference frame.
-        """
-        if self.reference_frame is None:
-            return None
-        return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
-
-    # %% construction
-
-    @classmethod
-    def from_xy_yaw(
-        cls,
-        x: sm.ScalarData = 0,
-        y: sm.ScalarData = 0,
-        yaw: sm.ScalarData = 0,
-        reference_frame: CartesianFrame3Dimensional | None = None,
-        child_frame: CartesianFrame3Dimensional | None = None,
-    ) -> HomogeneousTransformationMatrix2Dimensional:
-        """
-        :param x: The x-coordinate of the child frame's origin in the reference frame.
-        :param y: The y-coordinate of the child frame's origin in the reference frame.
-        :param yaw: The angle from the reference frame's x-axis to the child frame's,
-            counterclockwise.
-        :param reference_frame: The frame on whose plane the change ends.
-        :param child_frame: The frame on whose plane the change starts.
-        :return: The change that rotates by ``yaw`` and then shifts by ``(x, y)``.
-        """
-        cosine, sine = sm.cos(yaw), sm.sin(yaw)
-        return cls(
-            [[cosine, -sine, x], [sine, cosine, y], [0, 0, 1]],
-            reference_frame=reference_frame,
-            child_frame=child_frame,
-        )
-
-    @classmethod
-    def from_transformation(
-        cls, transformation: HomogeneousTransformationMatrix3Dimensional
-    ) -> HomogeneousTransformationMatrix2Dimensional:
-        """
-        :param transformation: A change between two frames that span one x-y plane and
-            whose z-axes point the same way.
-        :return: The same change, between the frames on that plane.
-        :raises FramesOnDifferentPlanesError: If the transformation is constant, or its
-            frames are known, and its frames span different planes.
-        :raises MirroredPlaneFramesError: If the transformation is constant, or its
-            frames are known, and its frames span one plane with z-axes pointing in
-            opposite directions.
-
-        .. note::
-            A transformation that is not constant, between frames whose planes are not
-            known, is taken to be planar unchecked.
-        """
-        cls._ensure_rigid_change_on_one_plane(
-            relation=transformation.embedded_plane_relation,
-            reference_frame=transformation.reference_frame,
-            child_frame=transformation.child_frame,
-        )
-        rotation = transformation.rotation_matrix
-        return cls.from_xy_yaw(
-            x=transformation.x,
-            y=transformation.y,
-            yaw=sm.atan2(rotation[1, 0], rotation[0, 0]),
-            reference_frame=transformation.reference_frame,
-            child_frame=transformation.child_frame,
-        )
-
-    @staticmethod
-    def _ensure_rigid_change_on_one_plane(
-        *,
-        relation: EmbeddedPlaneRelation,
-        reference_frame: CartesianFrame3Dimensional | None,
-        child_frame: CartesianFrame3Dimensional | None,
-    ) -> None:
-        """
-        :param relation: How the x-y plane of ``child_frame`` lies relative to that of
-            ``reference_frame``.
-        :param reference_frame: The frame on whose plane the change ends.
-        :param child_frame: The frame on whose plane the change starts.
-        :raises FramesOnDifferentPlanesError: If the frames span different planes.
-        :raises MirroredPlaneFramesError: If the frames span one plane with z-axes
-            pointing in opposite directions.
-        """
-        if relation is EmbeddedPlaneRelation.DIFFERENT_PLANES:
-            raise FramesOnDifferentPlanesError(
-                reference_frame=reference_frame, child_frame=child_frame
-            )
-        if relation is EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL:
-            raise MirroredPlaneFramesError(
-                reference_frame=reference_frame, child_frame=child_frame
-            )
-
-    # %% motion
-
-    @property
-    def x(self) -> sm.Scalar:
-        """
-        The x-coordinate of the child frame's origin in the reference frame.
-        """
-        return self[0, 2]
-
-    @property
-    def y(self) -> sm.Scalar:
-        """
-        The y-coordinate of the child frame's origin in the reference frame.
-        """
-        return self[1, 2]
-
-    @property
-    def yaw(self) -> sm.Scalar:
-        """
-        The angle from the reference frame's x-axis to the child frame's,
-        counterclockwise.
-        """
-        return sm.atan2(self[1, 0], self[0, 0])
-
-    @property
-    def pose(self) -> Pose2Dimensional:
-        """
-        :return: The pose this change moves its reference frame's plane frame to.
-        """
-        return Pose2Dimensional.from_xy_yaw(
-            x=self.x, y=self.y, yaw=self.yaw, reference_frame=self.reference_frame
-        )
-
-    # %% acting on values and changes
-
-    def __matmul__(
-        self, other: GenericSpecialEuclideanGroupAction
-    ) -> GenericSpecialEuclideanGroupAction:
-        """
-        :param other: A change into this change's child frame, or a point or pose given
-            in it.
-        :return: The change applied after ``other``, or the point or pose given in this
-            change's reference frame.
-        :raises UnsupportedOperationError: If this change does not act on ``other``.
-        :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
-            this change's child frame.
-        """
-        self.ensure_acts_on(operand=other, operation="@")
-        return other.apply_transformation(transformation=self)
-
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> HomogeneousTransformationMatrix2Dimensional:
-        return HomogeneousTransformationMatrix2Dimensional(
-            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
-            reference_frame=transformation.reference_frame,
-            child_frame=self.child_frame,
-        )
-
-    def inverse(self) -> HomogeneousTransformationMatrix2Dimensional:
-        inverse = HomogeneousTransformationMatrix2Dimensional(
-            reference_frame=self.child_frame, child_frame=self.reference_frame
-        )
-        inverse[:2, :2] = self[:2, :2].T
-        inverse[:2, 2] = (-inverse[:2, :2]).dot(other=self[:2, 2])
-        return inverse
-
-    # %% JSON serialization
-
-    @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        return cls.from_xy_yaw(
-            *data["data"],
-            reference_frame=cls._parse_optional_frame_from_json(
-                data, frame=SpatialFrameKey.REFERENCE, **kwargs
-            ),
-            child_frame=cls._parse_optional_frame_from_json(
-                data, frame=SpatialFrameKey.CHILD, **kwargs
-            ),
-        )
-
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "data": [
-                float(self.x.to_np()[0]),
-                float(self.y.to_np()[0]),
-                float(self.yaw.to_np()[0]),
-            ]
-        }
-
-    def __hash__(self):
-        if self.is_constant():
-            return hash(
-                (
-                    *self.to_np().flatten().tolist(),
-                    self.reference_frame,
-                    self.child_frame,
-                )
-            )
         return super().__hash__()

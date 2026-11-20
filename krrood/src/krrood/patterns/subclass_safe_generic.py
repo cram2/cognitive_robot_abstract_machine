@@ -170,8 +170,29 @@ class SubClassSafeGeneric(ABC):
         """
         The type parameters this class reads from the types it binds other parameters
         to, which then count as bound wherever a bound parameter does.
+
+        .. note::
+            The declarations of every class in the inheritance chain apply together, so
+            a class declares only the parameters it adds.
         """
         return ()
+
+    @classmethod
+    def _inherited_derived_generic_parameters(
+        cls,
+    ) -> tuple[DerivedGenericParameter, ...]:
+        """
+        :return: The :attr:`derived_generic_parameters` every class in the inheritance
+            chain declares, each once.
+        """
+        return tuple(
+            dict.fromkeys(
+                derived_parameter
+                for base in cls.__mro__
+                if "derived_generic_parameters" in vars(base)
+                for derived_parameter in base.derived_generic_parameters
+            )
+        )
 
     @classmethod
     def _derived_substitutions(
@@ -179,13 +200,15 @@ class SubClassSafeGeneric(ABC):
     ) -> dict[Any, ResolvableType]:
         """
         :param substitutions: The type parameters this class binds, resolved.
-        :return: The type each :attr:`derived_generic_parameters` entry reads from the
-            type bound to its source, for the sources bound to a class that binds it.
+        :return: The type each derived generic parameter of the inheritance chain reads
+            from the type bound to its source, for the sources bound to a class that
+            binds it.
         :raises DerivedGenericParameterConflictError: If another base binds a derived
-            parameter to a type that is not the derived one or a base of it.
+            parameter to a type that is not the derived one or a base of it, or two
+            sources fix one parameter to unrelated types.
         """
         derived = {}
-        for derived_parameter in cls.derived_generic_parameters:
+        for derived_parameter in cls._inherited_derived_generic_parameters():
             source_type = substitutions.get(derived_parameter.source)
             if not (
                 isclass(source_type)
@@ -198,20 +221,49 @@ class SubClassSafeGeneric(ABC):
             derived_type = source_type.get_type_of_generic_parameter(
                 parameter=derived_parameter.parameter
             )
-            bound_type = substitutions.get(derived_parameter.parameter)
-            if (
-                isclass(bound_type)
-                and isclass(derived_type)
-                and not issubclass(derived_type, bound_type)
-            ):
-                raise DerivedGenericParameterConflictError(
-                    clazz=cls,
+            cls._ensure_derived_type_fits(
+                parameter=derived_parameter.parameter,
+                bound_type=substitutions.get(derived_parameter.parameter),
+                derived_type=derived_type,
+            )
+            derived_before = derived.get(derived_parameter.parameter)
+            if isclass(derived_before) and isclass(derived_type):
+                if issubclass(derived_before, derived_type):
+                    continue
+                cls._ensure_derived_type_fits(
                     parameter=derived_parameter.parameter,
-                    bound_type=bound_type,
+                    bound_type=derived_before,
                     derived_type=derived_type,
                 )
             derived[derived_parameter.parameter] = derived_type
         return derived
+
+    @classmethod
+    def _ensure_derived_type_fits(
+        cls,
+        *,
+        parameter: TypeVar,
+        bound_type: ResolvableType,
+        derived_type: ResolvableType,
+    ) -> None:
+        """
+        :param parameter: A derived type parameter.
+        :param bound_type: The type the parameter is otherwise bound to, if any.
+        :param derived_type: The type a source fixes the parameter to.
+        :raises DerivedGenericParameterConflictError: If both are classes and
+            ``derived_type`` is not ``bound_type`` or a subclass of it.
+        """
+        if (
+            isclass(bound_type)
+            and isclass(derived_type)
+            and not issubclass(derived_type, bound_type)
+        ):
+            raise DerivedGenericParameterConflictError(
+                clazz=cls,
+                parameter=parameter,
+                bound_type=bound_type,
+                derived_type=derived_type,
+            )
 
     @classmethod
     def get_generic_type_parameters(cls) -> list[type]:

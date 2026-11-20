@@ -245,7 +245,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
 
 
 class CoordinateChange(
-    Generic[GenericCoordinateSystem], SubClassSafeGeneric, Interface
+    Generic[GenericCoordinateSystem, GenericCoordinate], SubClassSafeGeneric, Interface
 ):
     """
     Turns coordinates given in one coordinate system into those of the same points in
@@ -253,7 +253,8 @@ class CoordinateChange(
 
     .. note::
         Each implementation binds the kind of coordinate system once, so the kind of
-        change a space allows is part of its type. A map between two spaces is a
+        change a space allows is part of its type, and the coordinate type, which is
+        :class:`float` unless given. A map between two spaces is a
         :class:`~krrood_spatial_math.space_map.SpaceMap`, not a coordinate change.
     """
 
@@ -289,7 +290,9 @@ The kind of affine frame coordinates are given in.
 """
 
 
-class AffineCoordinateChange(CoordinateChange[GenericAffineFrame], Interface):
+class AffineCoordinateChange(
+    CoordinateChange[GenericAffineFrame, GenericCoordinate], Interface
+):
     """
     A coordinate change between two affine frames, which scales, shears, rotates or
     reflects the axes and shifts the origin.
@@ -304,7 +307,9 @@ The kind of Cartesian frame coordinates are given in.
 """
 
 
-class RigidCoordinateChange(AffineCoordinateChange[GenericCartesianFrame], Interface):
+class RigidCoordinateChange(
+    AffineCoordinateChange[GenericCartesianFrame, GenericCoordinate], Interface
+):
     """
     An affine coordinate change between two Cartesian frames, which only rotates the
     axes and shifts the origin.
