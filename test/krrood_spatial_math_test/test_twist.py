@@ -8,13 +8,14 @@ import json
 
 import numpy as np
 import pytest
+from scipy.linalg import expm
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
 from krrood_spatial_math.spatial_types import RigidMotionRate, Twist, Vector3
 
 from .dataset.frames import KnownFrames
-from .reference_implementations import matrix_exponential, rigid_motion_rate_matrix
+from .reference_implementations import rigid_motion_rate_matrix
 
 # %% the parts of a twist
 
@@ -116,7 +117,7 @@ def test_the_displacement_of_a_twist_agrees_with_the_matrix_exponential(
         angular_velocity=Vector3(0.2, -0.4, 0.9),
         linear_velocity=Vector3(0.5, 0.1, -0.3),
     )
-    expected = matrix_exponential(
+    expected = expm(
         rigid_motion_rate_matrix(
             rotation=twist.angular_velocity.to_np()[:3],
             translation=twist.linear_velocity.to_np()[:3],
