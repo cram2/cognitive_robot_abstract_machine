@@ -74,9 +74,7 @@ class AlignPlanes(ConvergingTask):
             plane normals.
         """
         artifacts = MotionNodeArtifacts()
-        tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_normal
-        )
+        tip_V_tip_normal = self.express_tip_normal_in_tip_link()
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
             target_frame=self.root_link, spatial_object=self.goal_normal
@@ -115,6 +113,14 @@ class AlignPlanes(ConvergingTask):
         artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)
         return artifacts
 
+    def express_tip_normal_in_tip_link(self) -> Vector3:
+        """
+        :return: The normal of the tip plane, expressed in :attr:`tip_link`.
+        """
+        return self.context.world.transform(
+            target_frame=self.tip_link, spatial_object=self.tip_normal
+        )
+
 
 # %% keeping what a gripper holds upright
 
@@ -146,7 +152,7 @@ class KeepHeldBodyUpright(AlignPlanes):
 
     tip_normal: Vector3 = field(init=False)
     """
-    The z-axis of the held body in the tool frame, as bound when this task starts.
+    The z-axis of the held body, before its pose in the tool frame is applied.
     """
 
     _tool_T_held_body: ForwardKinematicsBinding = field(init=False, repr=False)
@@ -168,9 +174,14 @@ class KeepHeldBodyUpright(AlignPlanes):
             float_variable_data=self.context.float_variable_data,
         )
         self._tool_T_held_body.bind(world=self.context.world)
-        self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3.Z(
-            reference_frame=self.tip_link
-        )
+        self.tip_normal = Vector3.Z(reference_frame=self.tip_link)
+
+    def express_tip_normal_in_tip_link(self) -> Vector3:
+        """
+        Unlike :meth:`AlignPlanes.express_tip_normal_in_tip_link`, applies the pose of
+        the held body in the tool frame, bound when this task starts.
+        """
+        return self._tool_T_held_body.root_T_tip @ self.tip_normal
 
     def on_start(self) -> None:
         """
