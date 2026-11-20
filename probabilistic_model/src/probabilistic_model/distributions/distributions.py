@@ -760,4 +760,4 @@ class DiracDeltaDistribution(ContinuousDistribution):
         self.location += translation[self.variable]
 
     def apply_scaling(self, scaling: VariableMap[Variable, float]):
-        self.location += scaling[self.variable]
+        self.location *= scaling[self.variable]

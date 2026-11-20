@@ -379,6 +379,16 @@ def test_dirac_delta_moments(dirac_delta, x):
     assert dirac_delta.moment(VariableMap({x: 3}), expectation)[x] == 0
 
 
+def test_dirac_delta_scaling_multiplies_the_location(x):
+    """
+    Scaled, a Dirac delta keeps its mass at the scaled location.
+    """
+    location, factor = 2.0, 3.0
+    distribution = DiracDeltaDistribution(variable=x, location=location)
+    distribution.apply_scaling({x: factor})
+    assert distribution.location == location * factor
+
+
 # %% events compatible with truncation to singletons
 
 
