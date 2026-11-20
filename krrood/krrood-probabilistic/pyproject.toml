@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood-probabilistic"
+dynamic = ["version"]
+description = "Probabilistic queries and feature extraction over entity queries."
+requires-python = ">=3.10"
+license = "LGPL-3.0-only"
+authors = [
+    {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"},
+    {name = "Naren Vasantakumaar", email = "naren@uni-bremen.de"},
+    {name = "David Prüser", email = "david@pruesernet.de"}
+]
+dependencies = [
+    "krrood-core==26.10.0",
+    "krrood-eql==26.10.0",
+    "krrood-ormatic==26.10.0",
+    "krrood-symbolic-math==26.10.0",
+    "numpy",
+    "pandas",
+    "sqlalchemy",
+    "probabilistic_model>=26.10.0",
+    "random_events>=26.10.0",
+]
+
+[project.urls]
+Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood*"]
+
+[tool.setuptools.package-data]
+"*" = ["templates/*.jinja", "visualization/templates/*.jinja"]
+
+[tool.setuptools.dynamic]
+version = {attr = "krrood.parametrization._version.__version__"}

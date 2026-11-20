@@ -32,8 +32,21 @@ sphinx:
       - references.bib
     # AutoAPI configuration
     autoapi_type: python
+    # krrood is a namespace package, shipped in parts by the krrood-* distributions.
+    autoapi_python_use_implicit_namespaces: True
     autoapi_dirs:
-      - ../src
+      - ../krrood-code-generation/src
+      - ../krrood-core/src
+      - ../krrood-development-tools/src
+      - ../krrood-eql/src
+      - ../krrood-ontomatic/src
+      - ../krrood-ormatic/src
+      - ../krrood-planning/src
+      - ../krrood-probabilistic/src
+      - ../krrood-rdr/src
+      - ../krrood-rustworkx-utils/src
+      - ../krrood-serialization/src
+      - ../krrood-symbolic-math/src
     autoapi_options:
       - members
       - undoc-members

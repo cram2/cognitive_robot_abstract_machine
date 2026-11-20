@@ -1,5 +1,11 @@
+"""
+Tests finding the classes a module or a package defines.
+"""
+
+from __future__ import annotations
+
 import krrood.entity_query_language
-from krrood.ormatic.utils import classes_of_module, classes_of_package
+from krrood.class_diagrams.utils import classes_of_module, classes_of_package
 
 
 def test_classes_of_package():
