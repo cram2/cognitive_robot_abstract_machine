@@ -42,7 +42,7 @@ If you have `rustworkx` and `matplotlib` installed, you can visualize any query 
 ```python
 # Create a query graph from an expression
 from krrood.entity_query_language.query_graph import QueryGraph
-graph = QueryGraph(query)
+graph = QueryGraph(query=query)
 
 # Render the graph
 graph.visualize()
@@ -74,10 +74,10 @@ class ExampleRobot:
 robots = [ExampleRobot("R2D2", 100), ExampleRobot("C3PO", 0)]
 
 # Define a complex nested query
-query = an(ExampleRobot)(name="R2D2", battery=100).from_(robots)
+query = an(ExampleRobot)(name="R2D2", battery=100).from_(domain=robots)
 
 # Visualize (QueryGraph takes the query the match stands for, not the Match builder)
-query_graph = QueryGraph(query._get_expression_())
+query_graph = QueryGraph(query=query._get_expression_())
 
 # Note: This requires rustworkx and matplotlib
 # query_graph.visualize()

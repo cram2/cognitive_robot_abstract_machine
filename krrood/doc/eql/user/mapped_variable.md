@@ -46,7 +46,7 @@ config_val = robot.qp_controller_config["battery_limit"] # -> returns IndexedVar
 ## A Variable Over a Collection
 
 `robot.parts` is the list of parts itself. To range over the parts one at a time, create a variable whose domain is
-that expression, with `variable_from(...)`, `variable(Type, ...)` or `a(Type).from_(...)`:
+that expression, with `variable_from(...)`, `variable(Type, ...)` or `a(Type).from_(domain=...)`:
 
 ```python
 from krrood.entity_query_language.factories import a, variable_from
