@@ -178,22 +178,3 @@ class NoRowsToFitError(ProbabilisticModelException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Fit on at least one row."
-
-
-@dataclass(kw_only=True)
-class KernelOfNonContinuousVariableError(ProbabilisticModelException, TypeError):
-    """
-    Exception raised when a Gaussian kernel is to be put on a variable that is not
-    continuous.
-    """
-
-    variable: Variable
-    """
-    The variable that is not continuous.
-    """
-
-    def error_message(self) -> str:
-        return f"The variable {self.variable.name} is not continuous."
-
-    def suggest_correction(self) -> str:
-        return "Fit the kernels on the continuous columns only."

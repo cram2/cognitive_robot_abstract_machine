@@ -131,7 +131,7 @@ Closing the loop
 ----------------
 
 :meth:`~krrood.parametrization.trials.models.TrialModel.registry_near_successes` fits a
-:class:`~probabilistic_model.learning.kernel_density.GaussianKernelDensity` to the
+:class:`~probabilistic_model.learning.kernel_density.KernelDensity` to the
 parameters of the trials that succeeded, as wide as the parameters of all trials vary,
 and draws the next campaign from it. A space declares in
 :attr:`~krrood.parametrization.trials.parameter_spaces.ParameterSpace.informed_fields`
