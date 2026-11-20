@@ -97,7 +97,7 @@ fixed_conns = [
 
 A `Drawer` is inferred wherever a `FixedConnection` shares a parent with a
 `PrismaticConnection`'s child, and its other end connects to a `Handle`.
-We use `an(Type)(...).from_(domain)` to express this structural constraint directly in the
+We use `an(Type)(...).from_(domain=...)` to express this structural constraint directly in the
 variable definition rather than a separate `.where()` clause.
 
 ```{code-cell} ipython3
@@ -105,7 +105,7 @@ handle_var = variable(ExampleHandle, handles)
 prismatic_conn = variable(ExamplePrismaticConnection, prismatic_conns)
 fixed_conn = an(ExampleFixedConnection)(
     parent=prismatic_conn.child, child=handle_var
-).from_(fixed_conns)
+).from_(domain=fixed_conns)
 # The match reads like an instance, so .parent / .child are symbolic attributes of
 # the query it stands for and carry its pattern
 drawers = inference(ExampleDrawer)(
@@ -115,7 +115,7 @@ drawers = inference(ExampleDrawer)(
 print(f"Inferred {len(drawers)} drawer(s): {drawers}")
 ```
 
-The `an(Type)(...).from_(domain)` call implicitly generates two equality conditions that must hold for
+The `an(Type)(...).from_(domain=...)` call implicitly generates two equality conditions that must hold for
 each candidate `FixedConnection`:
 
 1. `fixed_conn.parent == prismatic_conn.child`
@@ -204,7 +204,7 @@ from krrood.entity_query_language.explanation.explanation import ConditionAndBin
 comparator_conds = expl.get_satisfied_comparator_conditions().tolist()
 print(f"{len(comparator_conds)} satisfied comparator condition(s):")
 for c in comparator_conds:
-    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+    print(" ", ConditionAndBindings(condition=c, bindings=expl.operation_result.all_bindings))
 ```
 
 `get_satisfied_comparator_conditions_between_attributes()` narrows this further to comparators
@@ -216,7 +216,7 @@ the planner uses to link variables together:
 attr_conds = expl.get_satisfied_comparator_conditions_between_attributes().tolist()
 print(f"{len(attr_conds)} attribute-to-attribute comparator(s):")
 for c in attr_conds:
-    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+    print(" ", ConditionAndBindings(condition=c, bindings=expl.operation_result.all_bindings))
 ```
 
 ---
@@ -272,13 +272,13 @@ for the first drawer from the drawer rule above.
 ### Which conditions were satisfied?
 
 Returns all satisfied condition expressions, including `LogicalOperator` wrappers produced by
-`an(Type)(...).from_(domain)` and the inference root.
+`an(Type)(...).from_(domain=...)` and the inference root.
 
 ```{code-cell} ipython3
 conditions = expl.get_satisfied_condition_expressions_for_the_instance().tolist()
 print(f"{len(conditions)} condition expression(s) (comparators + logical wrappers):")
 for c in conditions:
-    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+    print(" ", ConditionAndBindings(condition=c, bindings=expl.operation_result.all_bindings))
 ```
 
 ### Which variable nodes participated (by type)?
@@ -288,10 +288,10 @@ Because `ExampleFixedConnection` and `ExamplePrismaticConnection` both inherit f
 `ExampleConnection`, the base-type query returns both:
 
 ```{code-cell} ipython3
-conn_nodes = expl.get_variable_nodes_of_given_type(ExampleConnection).tolist()
+conn_nodes = expl.get_variable_nodes_of_given_type(type_=ExampleConnection).tolist()
 print("Connection variable nodes:", [n._type_.__name__ for n in conn_nodes])
 
-handle_nodes = expl.get_variable_nodes_of_given_type(ExampleHandle).tolist()
+handle_nodes = expl.get_variable_nodes_of_given_type(type_=ExampleHandle).tolist()
 print("Handle variable nodes:", [n._type_.__name__ for n in handle_nodes])
 ```
 
@@ -300,7 +300,7 @@ print("Handle variable nodes:", [n._type_.__name__ for n in handle_nodes])
 Returns the concrete domain objects that were bound to variable nodes of the given type:
 
 ```{code-cell} ipython3
-bound_handles = expl.get_values_of_variable_nodes_of_given_type(ExampleHandle).tolist()
+bound_handles = expl.get_values_of_variable_nodes_of_given_type(type_=ExampleHandle).tolist()
 print("Bound handle value(s):", bound_handles)
 ```
 
@@ -314,10 +314,10 @@ Because `ExampleFixedConnection` and `ExamplePrismaticConnection` are both subcl
 `ExampleConnection`-typed descendants. It is therefore returned here:
 
 ```{code-cell} ipython3
-same_conn = expl.get_conditions_that_relate_the_variables_of_type(ExampleConnection).tolist()
+same_conn = expl.get_conditions_that_relate_the_variables_of_type(type_=ExampleConnection).tolist()
 print("Conditions relating two Connection variables:")
 for c in same_conn:
-    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+    print(" ", ConditionAndBindings(condition=c, bindings=expl.operation_result.all_bindings))
 ```
 
 ### Which conditions relate variables of two different types?
@@ -328,18 +328,18 @@ Here `fixed_conn.parent == prismatic_conn.child` joins an `ExampleFixedConnectio
 
 ```{code-cell} ipython3
 cross = expl.get_conditions_that_relate_variables_of_types(
-    ExampleFixedConnection, ExamplePrismaticConnection
+    type_a=ExampleFixedConnection, type_b=ExamplePrismaticConnection
 ).tolist()
 print("Conditions relating FixedConnection ↔ PrismaticConnection:")
 for c in cross:
-    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+    print(" ", ConditionAndBindings(condition=c, bindings=expl.operation_result.all_bindings))
 ```
 
 The method is symmetric — swapping the two types returns the same set:
 
 ```{code-cell} ipython3
 cross_rev = expl.get_conditions_that_relate_variables_of_types(
-    ExamplePrismaticConnection, ExampleFixedConnection
+    type_a=ExamplePrismaticConnection, type_b=ExampleFixedConnection
 ).tolist()
 print("Symmetric result:", {c._id_ for c in cross} == {c._id_ for c in cross_rev})
 ```
@@ -348,11 +348,11 @@ And the condition that links `ExampleFixedConnection` to `ExampleHandle`:
 
 ```{code-cell} ipython3
 fixed_to_handle = expl.get_conditions_that_relate_variables_of_types(
-    ExampleFixedConnection, ExampleHandle
+    type_a=ExampleFixedConnection, type_b=ExampleHandle
 ).tolist()
 print("Conditions relating FixedConnection ↔ Handle:")
 for c in fixed_to_handle:
-    print(" ", ConditionAndBindings(c, expl.operation_result.all_bindings))
+    print(" ", ConditionAndBindings(condition=c, bindings=expl.operation_result.all_bindings))
 ```
 
 ---
@@ -396,13 +396,13 @@ print("Triggering function(s):", [f.__name__ if hasattr(f, "__name__") else repr
 
 ### Locating the outermost entry point into a package
 
-`root_frame_in(package)` returns the outermost (highest in the call hierarchy) frame whose
+`root_frame_in(package=...)` returns the outermost (highest in the call hierarchy) frame whose
 `module_name` contains the given package string. This identifies the highest-level entry point
 into your library that triggered the inference — useful when you want to know where inside your
 own codebase the query originated:
 
 ```{code-cell} ipython3
-frame = expl.root_frame_in("krrood")
+frame = expl.root_frame_in(package="krrood")
 if frame is not None:
     import os
     print(f"Root krrood frame: {frame.function_name} at {os.path.basename(frame.filename)}:{frame.lineno}")

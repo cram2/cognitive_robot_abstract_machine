@@ -229,8 +229,7 @@ wrong_max_likelihood = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].
 mode_trace = model.univariate_mode_traces(wrong_mode, wrong_max_likelihood)
 
 wrong_mode = model.root.subcircuits[0].distribution.mode().event
-wrong_max_likelihood
- = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].simple_sets[0].lower]]))[0]
+wrong_max_likelihood = model.likelihood(np.array([[wrong_mode.simple_sets[0][x].simple_sets[0].lower]]))[0]
 mode_trace += model.univariate_mode_traces(wrong_mode, wrong_max_likelihood)
 
 fig = go.Figure(model.plot(), model.plotly_layout())
