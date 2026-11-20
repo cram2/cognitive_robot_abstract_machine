@@ -1,3 +1,7 @@
+"""
+The world: its kinematic structure, its state and the modifications made to it.
+"""
+
 from __future__ import absolute_import
 from __future__ import annotations
 
@@ -397,11 +401,17 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
     """
 
     def _decorate(func):
-
+        """
+        :return: ``func``, wrapped so that each call is recorded as a ``modification``.
+        """
         sig = inspect.signature(func)
 
         @wraps(func)
         def wrapper(current_world: World, *args, **kwargs):
+            """
+            Call ``func`` on ``current_world`` and record the call as a modification of
+            that world.
+            """
             if current_world._current_active_atomic_world_modification is not None:
                 raise AtomicWorldModificationNotAtomic(func, current_world)
             if not current_world._model_manager.has_open_modification:
@@ -418,7 +428,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
             # Build a dict with all arguments (including positional), excluding 'self'
             bound_args = dict(bound.arguments)
             bound_args.pop("self", None)
-            recorded_modification = modification.from_kwargs(bound_args)
+            recorded_modification = modification.from_kwargs(kwargs=bound_args)
 
             try:
                 result = func(current_world, *args, **kwargs)
@@ -1930,7 +1940,7 @@ class World(HasSimulatorProperties, EuclideanSpace):
             other_root_id = other.root.id
             other._clear_world_entities()
             for modification in other._model_manager.model_modification_blocks:
-                modification.apply(self)
+                modification.apply(world=self)
 
             self.state.merge_state(other_state)
 
@@ -2209,8 +2219,8 @@ class World(HasSimulatorProperties, EuclideanSpace):
         Announce a change of the state of this world to its state change callbacks.
 
         Within :meth:`batch_state_changes` the batch announces it once when it ends,
-        with its own ``publish_changes``. Within :meth:`modify_world` the outermost block
-        announces it when it ends.
+        with its own ``publish_changes``. Within :meth:`modify_world` the outermost
+        block announces it when it ends.
         """
         if self._state_change_batch_depth > 0:
             self._state_change_batch_has_collected_change = True
@@ -2866,7 +2876,7 @@ class World(HasSimulatorProperties, EuclideanSpace):
         )
         for block in blocks_to_roll_back:
             with self.modify_world():
-                block.revert(self)
+                block.revert(world=self)
         return blocks_to_roll_back
 
     def rollback_to_version(self, version: int) -> list[WorldModelModificationBlock]:

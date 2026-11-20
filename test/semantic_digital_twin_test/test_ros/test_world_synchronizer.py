@@ -1105,6 +1105,9 @@ def test_synchronized_attribute_modification(rclpy_node):
 
 
 def test_attribute_update_modification_apply_direct():
+    """
+    An attribute update applied directly to a world changes the attributes it names.
+    """
     w = World(name="w")
     b1 = Body(name=PrefixedName("b1"))
     anno = TestAnnotation(name=PrefixedName("anno"))
@@ -1121,7 +1124,7 @@ def test_attribute_update_modification_apply_direct():
             )
         ],
     )
-    mod.apply(w)
+    mod.apply(world=w)
     assert anno.value == "direct_value"
 
     # Test entity reference update
@@ -1131,7 +1134,7 @@ def test_attribute_update_modification_apply_direct():
             JSONAttributeDiff(attribute_name="entity", added_values=[to_json(b1.id)])
         ],
     )
-    mod.apply(w)
+    mod.apply(world=w)
     assert anno.entity == b1
 
     # Test list update (add)
@@ -1141,7 +1144,7 @@ def test_attribute_update_modification_apply_direct():
             JSONAttributeDiff(attribute_name="entities", added_values=[to_json(b1.id)])
         ],
     )
-    mod.apply(w)
+    mod.apply(world=w)
     assert b1 in anno.entities
 
     # Test list update (remove)
@@ -1153,7 +1156,7 @@ def test_attribute_update_modification_apply_direct():
             )
         ],
     )
-    mod.apply(w)
+    mod.apply(world=w)
     assert b1 not in anno.entities
 
 

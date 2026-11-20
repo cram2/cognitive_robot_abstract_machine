@@ -1,0 +1,646 @@
+"""
+Generic classes whose field types narrow to the concrete types a subclass binds.
+"""
+
+from __future__ import annotations
+
+from abc import ABC
+from copy import copy
+from dataclasses import dataclass, Field
+from functools import lru_cache
+from inspect import isclass
+from typing_extensions import (
+    TypeVar,
+    Any,
+    get_origin,
+    get_args,
+    TypeAlias,
+    TypeVarTuple,
+    Unpack,
+    Union,
+)
+
+
+import logging
+from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood.class_diagrams.exceptions import CouldNotResolveType
+from krrood.class_diagrams.utils import (
+    get_and_resolve_generic_type_hints_of_object_using_substitutions,
+)
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.exceptions import DerivedGenericParameterConflictError
+from krrood.patterns.interface import Interface
+from krrood.exceptions import (
+    MismatchingNumberOfGenericParametersAndResolvedTypes,
+    UnboundGenericParameter,
+)
+from krrood.utils import (
+    get_generic_type_parameters,
+    ensure_hashable,
+    get_existing_field_by_name,
+)
+
+logger = logging.getLogger(__name__)
+
+TRANSIENT_TYPE_RESOLUTION_ERRORS = (
+    ImportError,
+    NameError,
+    TypeError,
+    CouldNotResolveType,
+)
+"""
+Exceptions raised while importing and resolving a field's type annotation when that type
+is not yet available (typically a circular import during module load).
+
+They are transient: the field is narrowed later, once a subclass binds the parameter to
+a concrete type. Any other exception is a genuine fault and is left to propagate.
+"""
+
+ResolvableType: TypeAlias = (
+    type
+    | TypeVar
+    | TypeVarTuple
+    | list["ResolvableType"]
+    | tuple["ResolvableType", ...]
+    | Any
+)
+
+
+@dataclass(kw_only=True, frozen=True)
+class DerivedGenericParameter:
+    """
+    A type parameter a class does not take, read from the type the class binds another
+    of its parameters to, so the two can never be bound inconsistently.
+    """
+
+    parameter: TypeVar
+    """
+    The type parameter read from the type bound to :attr:`source`.
+    """
+
+    source: TypeVar
+    """
+    The type parameter whose bound type binds :attr:`parameter`.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class SubClassSafeGeneric(ABC):
+    """
+    Generic-agnostic engine that updates field types when a subclass binds the generic type
+    parameters of its generic base to concrete types. It resolves every parameter (multiple
+    ``TypeVar`` s and ``TypeVarTuple`` s) across the whole inheritance chain.
+
+    A class that wants safe subclassing declares its **own** ``Generic[...]`` and inherits this
+    class alongside it — for a single parameter (``Generic[T]``), multiple parameters
+    (``Generic[T, T2]``), or a ``TypeVarTuple`` (``Generic[Unpack[Ts]]``). Put ``Generic[...]``
+    before ``SubClassSafeGeneric`` in the bases.
+
+    Example:
+        >>> T = TypeVar("T")
+        >>> @dataclass
+        ... class MyClass(Generic[T], SubClassSafeGeneric):
+        ...     my_attribute: T
+        >>>
+        >>> @dataclass
+        ... class MyClass2(MyClass[int]): ...
+        >>> assert next(f for f in fields(MyClass2) if f.name == "my_attribute").type is int
+
+    ..note::
+        This class is intentionally **not** ``Generic`` itself; it only carries the field-updating
+        engine. The parameterization always comes from the subclass's own ``Generic[...]`` base, so
+        one class serves every generic shape.
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Automatically updates the field types that use the generic type parameters with
+        the new specified types, before the class is initialized.
+
+        The base classes' own subclass hooks run afterwards, so they see the updated
+        fields.
+        """
+        cls._narrow_fields_to_bound_types()
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def _narrow_fields_to_bound_types(cls) -> None:
+        """
+        Update the type of every field that uses a type parameter this class binds.
+        """
+        substitutions = cls._get_generic_type_substitutions()
+        if not substitutions:
+            return
+        try:
+            resolution_results = (
+                get_and_resolve_generic_type_hints_of_object_using_substitutions(
+                    cls, substitutions
+                )
+            )
+        except TRANSIENT_TYPE_RESOLUTION_ERRORS as error:
+            # The annotation is not resolvable yet (typically a circular import at module load). The
+            # class must stay definable; the field is narrowed later when a subclass binds the
+            # parameter to a concrete type.
+            message = (
+                f"SubClassSafeGeneric: could not resolve type hints for {cls}; "
+                f"field types will not be updated. Cause: {error}"
+            )
+            logger.debug(message)
+            return
+        for name, result in resolution_results.items():
+            if not result.resolved or cls._is_declared_by_an_interface(name=name):
+                continue
+            cls._update_field_kwargs(name=name, kwargs={"type": result.resolved_type})
+
+    @classmethod
+    def _is_declared_by_an_interface(cls, *, name: str) -> bool:
+        """
+        :param name: The name of an annotated attribute of this class.
+        :return: Whether the nearest class annotating it is an interface, which
+            declares the attribute without making it a field.
+        """
+        declaring_class = next(
+            base
+            for base in cls.__mro__
+            if name in vars(base).get("__annotations__", {})
+        )
+        return Interface.is_interface(class_=declaring_class)
+
+    @classproperty
+    def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+        """
+        The type parameters this class reads from the types it binds other parameters
+        to, which then count as bound wherever a bound parameter does.
+
+        .. note::
+            The declarations of every class in the inheritance chain apply together, so
+            a class declares only the parameters it adds.
+        """
+        return ()
+
+    @classmethod
+    def _inherited_derived_generic_parameters(
+        cls,
+    ) -> tuple[DerivedGenericParameter, ...]:
+        """
+        :return: The :attr:`derived_generic_parameters` every class in the inheritance
+            chain declares, each once.
+        """
+        return tuple(
+            dict.fromkeys(
+                derived_parameter
+                for base in cls.__mro__
+                if "derived_generic_parameters" in vars(base)
+                for derived_parameter in base.derived_generic_parameters
+            )
+        )
+
+    @classmethod
+    def _derived_substitutions(
+        cls, *, substitutions: dict[Any, ResolvableType]
+    ) -> dict[Any, ResolvableType]:
+        """
+        :param substitutions: The type parameters this class binds, resolved.
+        :return: The type each derived generic parameter of the inheritance chain reads
+            from the type bound to its source, for the sources bound to a class that
+            binds it.
+        :raises DerivedGenericParameterConflictError: If another base binds a derived
+            parameter to a type that is not the derived one or a base of it, or two
+            sources fix one parameter to unrelated types.
+        """
+        derived = {}
+        for derived_parameter in cls._inherited_derived_generic_parameters():
+            source_type = substitutions.get(derived_parameter.source)
+            if not (
+                isclass(source_type)
+                and issubclass(source_type, SubClassSafeGeneric)
+                and source_type.binds_generic_parameter(
+                    parameter=derived_parameter.parameter
+                )
+            ):
+                continue
+            derived_type = source_type.get_type_of_generic_parameter(
+                parameter=derived_parameter.parameter
+            )
+            cls._ensure_derived_type_fits(
+                parameter=derived_parameter.parameter,
+                bound_type=substitutions.get(derived_parameter.parameter),
+                derived_type=derived_type,
+            )
+            derived_before = derived.get(derived_parameter.parameter)
+            if isclass(derived_before) and isclass(derived_type):
+                if issubclass(derived_before, derived_type):
+                    continue
+                cls._ensure_derived_type_fits(
+                    parameter=derived_parameter.parameter,
+                    bound_type=derived_before,
+                    derived_type=derived_type,
+                )
+            derived[derived_parameter.parameter] = derived_type
+        return derived
+
+    @classmethod
+    def _ensure_derived_type_fits(
+        cls,
+        *,
+        parameter: TypeVar,
+        bound_type: ResolvableType,
+        derived_type: ResolvableType,
+    ) -> None:
+        """
+        :param parameter: A derived type parameter.
+        :param bound_type: The type the parameter is otherwise bound to, if any.
+        :param derived_type: The type a source fixes the parameter to.
+        :raises DerivedGenericParameterConflictError: If both are classes and
+            ``derived_type`` is not ``bound_type`` or a subclass of it.
+        """
+        if (
+            isclass(bound_type)
+            and isclass(derived_type)
+            and not issubclass(derived_type, bound_type)
+        ):
+            raise DerivedGenericParameterConflictError(
+                clazz=cls,
+                parameter=parameter,
+                bound_type=bound_type,
+                derived_type=derived_type,
+            )
+
+    @classmethod
+    def get_generic_type_parameters(cls) -> list[type]:
+        """
+        :return: The generic type parameters of this class.
+        """
+        return get_generic_type_parameters(cls, SubClassSafeGeneric)
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def get_type_of_generic_parameter(cls, *, parameter: TypeVar) -> ResolvableType:
+        """
+        Read back the type this class binds one type parameter to.
+
+        The parameter may be declared anywhere in the inheritance chain, so a class that
+        binds its own parameter still reports what its bases bound theirs to.
+
+        :param parameter: The type parameter to read.
+        :return: The concrete type it is bound to.
+        :raises UnboundGenericParameter: If it is bound to no concrete type.
+        """
+        if not cls.binds_generic_parameter(parameter=parameter):
+            raise UnboundGenericParameter(affected_class=cls, parameter=parameter)
+        return cls._get_generic_type_substitutions()[parameter]
+
+    @classmethod
+    def binds_generic_parameter(cls, *, parameter: TypeVar) -> bool:
+        """
+        :param parameter: A type parameter declared anywhere in the inheritance chain.
+        :return: Whether this class or one of its bases binds it to a concrete type.
+        """
+        bound_type = cls._get_generic_type_substitutions().get(parameter)
+        return bound_type is not None and not isinstance(
+            bound_type, (TypeVar, TypeVarTuple)
+        )
+
+    @staticmethod
+    def _substitutions_bind_a_concrete_type(
+        *,
+        substitutions: dict[Any, ResolvableType],
+    ) -> bool:
+        """
+        Report whether the substitution map assigns at least one type parameter to a
+        concrete type, rather than only renaming type variables.
+
+        When resolution fails, this distinguishes a genuine loss (a field would have
+        been narrowed to a concrete type — worth a warning) from a pure type-variable
+        rename (a no-op).
+
+        :param substitutions: The substitution map that could not be applied.
+        :return: True if any substitution assigns a concrete type; False if every
+            substitution only renames a type variable, or the map is empty.
+        """
+        return any(
+            not isinstance(value, (TypeVar, TypeVarTuple))
+            for value in substitutions.values()
+        )
+
+    @classmethod
+    def _update_field_kwargs(
+        cls, *, name: str, kwargs: dict[str, Any], type_: type | None = None
+    ) -> None:
+        """
+        Update the field kwargs with the provided keyword arguments.
+
+        :param name: The name of the field.
+        :param kwargs: Keyword arguments to update the field with.
+        :param type_: The type of the field.
+        """
+        existing_field = get_existing_field_by_name(cls, name)
+
+        # Check if we should update an existing attribute or field on the current class
+        target_field = None
+        if hasattr(cls, name):
+            attr = getattr(cls, name)
+            if isinstance(attr, Field):
+                target_field = attr
+
+        # If no direct field, but we found one in MRO, we might need to copy it
+        if target_field is None and existing_field is not None:
+            target_field = existing_field
+
+        if target_field is not None:
+            new_field = copy(target_field)
+            for key, value in kwargs.items():
+                setattr(new_field, key, value)
+            setattr(cls, name, new_field)
+
+        # Update annotations
+        if "type" in kwargs:
+            resolved_type = kwargs["type"]
+        elif type_ is not None:
+            resolved_type = type_
+        elif existing_field is not None:
+            resolved_type = existing_field.type
+        else:
+            resolved_type = Any
+        if "__annotations__" not in vars(cls):
+            # Without annotations of its own, ``cls.__annotations__`` may resolve to a
+            # base class's annotations, e.g. once :class:`abc.ABCMeta` has its own.
+            cls.__annotations__ = {}
+        vars(cls)["__annotations__"][name] = resolved_type
+
+    @classmethod
+    def _get_generic_type_substitutions(cls) -> dict[Any, ResolvableType]:
+        """
+        Get the generic type substitutions for this class.
+
+        :return: A mapping from each old generic type (as declared on the parent class)
+            to the new generic type used by this class, for every position whose binding
+            changed.
+        """
+        if cls is SubClassSafeGeneric or not issubclass(cls, SubClassSafeGeneric):
+            return {}
+
+        # Use a class-level cache to avoid redundant recursive calculations
+        # Check ONLY the current class's dict to avoid using an inherited cache
+        if "_subclass_safe_substitutions" in cls.__dict__:
+            return cls._subclass_safe_substitutions
+
+        substitutions = {}
+        for base in getattr(cls, "__orig_bases__", []):
+            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(
+                base=base
+            )
+            if base_origin is None or not issubclass(base_origin, SubClassSafeGeneric):
+                continue
+
+            # Map the root TypeVars of the base to the concrete arguments provided here
+            if resolved_types:
+                substitutions.update(
+                    cls._get_resolved_type_substitutions(
+                        base_origin=base_origin, resolved_types=resolved_types
+                    )
+                )
+
+            # Recursively pull substitutions already defined by the parent
+            if base_origin is cls:
+                continue
+            substitutions.update(base_origin._get_generic_type_substitutions())
+
+        if substitutions:
+            substitutions = cls._resolve_substitutions_transitively(
+                substitutions=substitutions
+            )
+        substitutions.update(cls._derived_substitutions(substitutions=substitutions))
+
+        cls._subclass_safe_substitutions = substitutions
+        return substitutions
+
+    @classmethod
+    def _get_resolved_type_substitutions(
+        cls,
+        *,
+        base_origin: type,
+        resolved_types: tuple[type, ...],
+    ) -> dict[Any, ResolvableType]:
+        """
+        Retrieves resolved type substitutions for a given base origin and resolved
+        types.
+
+        :param base_origin: The base origin type for which substitutions are retrieved.
+        :param resolved_types: The resolved types to match against the base origin's
+            generic parameters.
+        :return: A dictionary of resolved type substitutions.
+        """
+        root_parameters = get_generic_type_parameters(
+            base_origin,
+            SubClassSafeGeneric,
+            include_root_generic_base=True,
+            include_specialized_generic_base=False,
+        )
+
+        type_var_tuple_index = next(
+            (i for i, p in enumerate(root_parameters) if isinstance(p, TypeVarTuple)),
+            -1,
+        )
+
+        if type_var_tuple_index == -1:
+            if len(root_parameters) != len(resolved_types):
+                raise MismatchingNumberOfGenericParametersAndResolvedTypes(
+                    affected_class=base_origin,
+                    parameters=root_parameters,
+                    resolved_types=resolved_types,
+                )
+            matched_pairs = zip(root_parameters, resolved_types)
+        else:
+            matched_pairs = cls._match_type_var_tuple_variable_to_resolved_type(
+                type_var_tuple_index=type_var_tuple_index,
+                root_parameters=root_parameters,
+                resolved_types=resolved_types,
+                base_origin=base_origin,
+            )
+
+        return {
+            ensure_hashable(old_type): new_type
+            for old_type, new_type in matched_pairs
+            if cls._fulfills_substitution_condition(
+                old_type=old_type, new_type=new_type
+            )
+        }
+
+    @classmethod
+    def _fulfills_substitution_condition(
+        cls,
+        *,
+        old_type: Any,
+        new_type: type | tuple[type, ...] | None,
+    ) -> bool:
+        """
+        Determines if a substitution condition is fulfilled based on the old and new
+        types.
+
+        :param old_type: The old type to compare against.
+        :param new_type: The new type to compare with.
+        :return: True if the substitution condition is fulfilled, False otherwise.
+        """
+        if not isinstance(old_type, (TypeVar, TypeVarTuple)):
+            return False
+
+        if old_type is new_type or new_type is None:
+            return False
+
+        if not (
+            isinstance(old_type, TypeVarTuple)
+            and isinstance(new_type, tuple)
+            and len(new_type) == 1
+        ):
+            return True
+
+        inner = new_type[0]
+        return not (get_origin(inner) is Unpack and get_args(inner)[0] is old_type)
+
+    @classmethod
+    def _match_type_var_tuple_variable_to_resolved_type(
+        cls,
+        *,
+        type_var_tuple_index: int,
+        root_parameters: list[Any],
+        resolved_types: tuple[type, ...],
+        base_origin: type,
+    ) -> list[tuple[type, type]]:
+        """
+        Matches type variables in a tuple with resolved types, considering prefix and
+        suffix lengths.
+
+        :param type_var_tuple_index: Index of the TypeVarTuple within root_parameters.
+        :param root_parameters: List of root parameters to match against resolved types.
+        :param resolved_types: Tuple of resolved types to match with root parameters.
+        :param base_origin: Base origin type for substitutions.
+        :return: List of matched type variable tuples.
+        """
+        prefix_length = type_var_tuple_index
+        suffix_length = len(root_parameters) - type_var_tuple_index - 1
+        if len(resolved_types) < prefix_length + suffix_length:
+            raise MismatchingNumberOfGenericParametersAndResolvedTypes(
+                affected_class=base_origin,
+                parameters=root_parameters,
+                resolved_types=resolved_types,
+            )
+        type_var_tuple_content_length = (
+            len(resolved_types) - prefix_length - suffix_length
+        )
+        matched_pairs = [
+            (root_parameters[index], resolved_types[index])
+            for index in range(prefix_length)
+        ]
+        matched_pairs.append(
+            (
+                root_parameters[type_var_tuple_index],
+                tuple(
+                    resolved_types[
+                        prefix_length : prefix_length + type_var_tuple_content_length
+                    ]
+                ),
+            )
+        )
+        for index in range(suffix_length):
+            matched_pairs.append(
+                (
+                    root_parameters[type_var_tuple_index + 1 + index],
+                    resolved_types[
+                        prefix_length + type_var_tuple_content_length + index
+                    ],
+                )
+            )
+        return matched_pairs
+
+    @classmethod
+    def _resolve_substitutions_transitively(
+        cls, *, substitutions: dict[Any, ResolvableType]
+    ) -> dict[Any, ResolvableType]:
+        """
+        Recursively resolve TypeVars in the substitution map to their most concrete form
+        using cycle detection to handle complex generic hierarchies safely.
+
+        :param substitutions: The substitution map to resolve.
+        :return: A new substitution map with fully resolved types.
+        """
+        resolved_substitutions = {}
+
+        def _resolve_recursive(
+            current_type: ResolvableType, visited: set[Any]
+        ) -> ResolvableType:
+            if isinstance(current_type, (TypeVar, TypeVarTuple)):
+                type_key = ensure_hashable(current_type)
+                if type_key in visited:
+                    return current_type
+
+                if type_key in substitutions:
+                    return _resolve_recursive(
+                        substitutions[type_key], visited | {type_key}
+                    )
+                return current_type
+
+            if isinstance(current_type, CollectionKind.ELEMENT_SEQUENCE.value):
+                resolved_items = []
+                for item in current_type:
+                    result = _resolve_recursive(item, visited)
+                    if get_origin(item) is Unpack and isinstance(
+                        result, CollectionKind.ELEMENT_SEQUENCE.value
+                    ):
+                        resolved_items.extend(result)
+                    else:
+                        resolved_items.append(result)
+                return type(current_type)(resolved_items)
+
+            origin = get_origin(current_type)
+            if origin is None:
+                return current_type
+
+            if origin is Unpack:
+                inner_arg = get_args(current_type)[0]
+                resolved_inner = _resolve_recursive(inner_arg, visited)
+                if isinstance(resolved_inner, tuple):
+                    return resolved_inner
+                return Unpack[resolved_inner]
+
+            args = get_args(current_type)
+            resolved_args = []
+            for arg in args:
+                result = _resolve_recursive(arg, visited)
+                if get_origin(arg) is Unpack and isinstance(result, tuple):
+                    resolved_args.extend(result)
+                else:
+                    resolved_args.append(result)
+            resolved_args = tuple(resolved_args)
+
+            if resolved_args == args:
+                return current_type
+
+            return origin[resolved_args]
+
+        for old_type, new_type in substitutions.items():
+            resolved_substitutions[old_type] = _resolve_recursive(new_type, set())
+
+        return resolved_substitutions
+
+    @classmethod
+    def _resolve_base_origin_and_arguments(
+        cls, *, base: type
+    ) -> tuple[type | None, tuple[type, ...]]:
+        """
+        Resolve the origin and generic arguments for a base class.
+
+        :param base: The base to resolve.
+        :return: A tuple of the origin class and its generic arguments.
+        """
+        # Not issubclass: it corrupts the ABC caches of the class being created.
+        origin = get_origin(base)
+        if origin is None:
+            if isclass(base) and SubClassSafeGeneric in base.__mro__:
+                return base, ()
+            return None, ()
+
+        if isclass(origin) and SubClassSafeGeneric in origin.__mro__:
+            return origin, get_args(base)
+
+        return None, ()
