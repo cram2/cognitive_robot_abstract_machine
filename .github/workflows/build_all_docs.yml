@@ -4,17 +4,25 @@ on:
   push:
     branches:
       - main
+  # every book is built for a pull request too, so one that breaks a book fails before
+  # it is merged instead of blocking the Pages deploy on main
+  pull_request:
+    # ready_for_review runs the jobs a draft pull request skipped
+    types: [ opened, synchronize, reopened, ready_for_review ]
   workflow_dispatch: {}
 
-# Serialize Pages deployments so concurrent runs do not race. Never cancel a run in
-# progress: the deploy job is what republishes the site, so cancelling it would leave
-# the previous merge's docs live with no further deployment coming.
+# Serialize Pages deployments so concurrent runs do not race. Never cancel a run on main:
+# the deploy job is what republishes the site, so cancelling it would leave the previous
+# merge's docs live with no further deployment coming. A new push to a pull request
+# cancels the run still going for its previous commit.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('docs-{0}', github.event.pull_request.number) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   to-lowercase:
+    # a draft pull request builds no documentation; marking it ready for review starts the run
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     outputs:
       repo_lowercase: ${{ steps.lowercase.outputs.repository }}
@@ -32,10 +40,11 @@ jobs:
             doc_path: doc
             artifact_name: krrood-doc
             use_container: false
+          # coraplex imports rclpy, which only the ROS container provides
           - lib: coraplex
             doc_path: doc/source
             artifact_name: coraplex-doc
-            use_container: false
+            use_container: true
           - lib: semantic_digital_twin
             doc_path: doc
             artifact_name: semantic-digital-twin-doc
@@ -66,6 +75,8 @@ jobs:
 
   deploy-all-docs:
     needs: [build-docs]
+    # a pull request only checks that every book builds; only main publishes them
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       pages: write
