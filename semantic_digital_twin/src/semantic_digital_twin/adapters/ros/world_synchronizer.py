@@ -653,7 +653,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         state.
         """
         with self._world.modify_world(publish_changes=False):
-            modification_block_message.modifications.apply(self._world)
+            modification_block_message.modifications.apply(world=self._world)
 
     def _check_state_update(
         self,

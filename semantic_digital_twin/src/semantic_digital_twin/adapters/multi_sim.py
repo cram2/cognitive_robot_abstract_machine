@@ -295,9 +295,9 @@ class MultiSimCamera(SimulatorAdditionalProperty):
     The name of the camera.
     """
 
-    body: Any = None
+    body: Body | None = None
     """
-    The body that the camera is attached to. This can be set to the name of the body or a reference to the body object itself.
+    The body the camera is attached to.
     """
 
 

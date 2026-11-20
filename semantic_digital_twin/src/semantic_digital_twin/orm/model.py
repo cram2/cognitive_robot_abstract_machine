@@ -50,6 +50,11 @@ from semantic_digital_twin.world_description.world_state import WorldState
 
 @dataclass(eq=False)
 class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
+    """
+    A world as ORMatic stores it: the modifications that build it again, its state and
+    its entities.
+    """
+
     kinematic_structure_entities: list[KinematicStructureEntity]
     connections: list[Connection]
     semantic_annotations: list[SemanticAnnotation]
@@ -76,7 +81,7 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
 
         with result.modify_world():
             for modification_block in self.modification_history:
-                modification_block.apply(result)
+                modification_block.apply(world=result)
 
             result.state = self.state
             result.state._world = result
