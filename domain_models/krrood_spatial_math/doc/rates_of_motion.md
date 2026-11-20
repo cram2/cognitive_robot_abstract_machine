@@ -223,23 +223,45 @@ screw_figure.update_layout(
 show(screw_figure)
 ```
 
-A lid that rises 2 mm for every radian it turns, about the z axis of its frame:
+### The three types in code
+
+This example is separate from the figure above, and no figure shows it. It is a screw-on
+lid whose screw axis runs along the z axis of the lid's frame, through the frame's
+origin. The lid's position is the angle it has turned by, in radians, and the lid rises
+2 mm for every radian:
 
 ```{code-cell} ipython3
 lid = ScrewAxis(
     rotation_per_unit_position=Vector3(0, 0, 1),
     translation_per_unit_position=Vector3(0, 0, 0.002),
 )
+```
+
+A quarter turn is the position $\theta = \pi/2$. The lid has then turned by $\pi/2$
+about z, and, since its axis runs through its origin, the origin has only risen, by
+$\pi/2 \cdot 2\,\text{mm} \approx 3.1\,\text{mm}$:
+
+```{code-cell} ipython3
 quarter_turn = lid.to_displacement(position=math.pi / 2)
 print("rotation vector:", quarter_turn.rotation_vector[:3].to_list())
 print("translation:    ", quarter_turn.translation[:3].to_list())
 ```
 
-Turning the lid at 0.5 rad/s gives a twist, and moving at that twist for $\pi$ seconds
-gives the same displacement:
+A screw axis says how far the lid moves per radian; a twist says how fast it moves per
+second. `ScrewAxis.to_twist` multiplies both parts of the screw axis by how fast the
+position changes. Turned at 0.5 rad/s, the lid turns at $\omega = (0, 0, 0.5)$ rad/s and
+rises at $v = (0, 0, 0.001)$ m/s:
 
 ```{code-cell} ipython3
 twist = lid.to_twist(position_velocity=0.5)
+print("angular velocity:", twist.angular_velocity[:3].to_list())
+print("linear velocity: ", twist.linear_velocity[:3].to_list())
+```
+
+At 0.5 rad/s, the quarter turn of $\pi/2$ rad takes $(\pi/2) / 0.5 = \pi$ seconds. So
+moving at the twist for $\pi$ seconds gives the same displacement as the quarter turn:
+
+```{code-cell} ipython3
 same_turn = twist.to_displacement(duration=math.pi)
 assert np.allclose(same_turn, quarter_turn)
 ```
