@@ -1,10 +1,6 @@
-"""Synchronize the root VERSION file into every package of the workspace.
-
-For each package that reads its version from a module of its own, the
-script writes that module and raises every dependency on another such
-package to ``>=`` the repository's version, so no package is installable
-next to an older release of another. The packages are the root's and the
-members of its ``[tool.uv.workspace]``.
+"""Synchronize the root VERSION file into every package of the workspace: the root and
+the members of its ``[tool.uv.workspace]``. Dependencies between them require at least
+that version, and exactly it between packages released together.
 
 ``--check`` writes nothing and exits non-zero when a file would change.
 """
@@ -62,8 +58,18 @@ class CommandFlag(StrEnum):
     CHECK = "--check"
 
 
+class VersionOperator(StrEnum):
+    """How a dependency on another package of the workspace is bounded."""
+
+    AT_LEAST = ">="
+    """A package released on its own accepts any later release of the other."""
+
+    EXACTLY = "=="
+    """Packages released together install only with each other's release."""
+
+
 # %% the pyproject.toml model
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Pyproject:
     """The parts of a ``pyproject.toml`` this script reads.
 
@@ -72,6 +78,9 @@ class Pyproject:
 
     distribution_name: str
     """The ``[project]`` name as an installer compares names."""
+
+    declared_version: str | None
+    """The version the ``[project]`` table states; ``None`` when it states none."""
 
     dependencies: list[str]
     """The ``[project]`` dependencies as written."""
@@ -96,7 +105,7 @@ class Pyproject:
     """The ``[tool.uv.workspace]`` members; empty without a workspace."""
 
     @classmethod
-    def from_text(cls, text: str) -> Pyproject:
+    def from_text(cls, *, text: str) -> Pyproject:
         """
         :param text: The content of a ``pyproject.toml``.
         :return: What this script reads of it.
@@ -117,6 +126,7 @@ class Pyproject:
         )
         return cls(
             distribution_name=canonicalize_name(project[PyprojectKey.NAME]),
+            declared_version=project.get(PyprojectKey.VERSION),
             dependencies=project.get(PyprojectKey.DEPENDENCIES, []),
             version_attribute=setuptools.get(PyprojectKey.DYNAMIC, {})
             .get(PyprojectKey.VERSION, {})
@@ -130,19 +140,19 @@ class Pyproject:
         )
 
     @classmethod
-    def from_directory(cls, directory: Path) -> Pyproject:
+    def from_directory(cls, *, directory: Path) -> Pyproject:
         """
         :param directory: A directory holding a ``pyproject.toml``.
         :return: What this script reads of that file.
         """
-        return cls.from_text((directory / RepositoryFile.PYPROJECT).read_text())
+        return cls.from_text(text=(directory / RepositoryFile.PYPROJECT).read_text())
 
 
 # %% a package
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class VersionedPackage:
     """A package whose version setuptools reads from a module of the package's
-    own."""
+    own, or one that declares the version of the packages its directory holds."""
 
     directory: Path
     """The directory the package's ``pyproject.toml`` is in."""
@@ -151,17 +161,32 @@ class VersionedPackage:
     """What this script reads of that file."""
 
     @classmethod
-    def from_directory(cls, directory: Path) -> VersionedPackage | None:
+    def from_directory(
+        cls, *, directory: Path, holds_other_packages: bool
+    ) -> VersionedPackage | None:
         """
         :param directory: A directory holding a ``pyproject.toml``.
+        :param holds_other_packages: Whether another package of the workspace is in the
+            directory.
         :return: Its package, or ``None`` when it reads no version from a module of its
-            own - a ``__version__`` set in the package's ``__init__`` is not this script's
-            to write.
+            own and declares none for packages it holds - a ``__version__`` set in the
+            package's ``__init__`` is not this script's to write.
         """
-        package = cls(directory, Pyproject.from_directory(directory))
-        if len(package.version_module_path) < 2:
-            return None
-        return package
+        package = cls(
+            directory=directory, pyproject=Pyproject.from_directory(directory=directory)
+        )
+        if package.has_version_module:
+            return package
+        if holds_other_packages and package.pyproject.declared_version is not None:
+            return package
+        return None
+
+    @property
+    def has_version_module(self) -> bool:
+        """
+        :return: Whether setuptools reads the version from a module of the package.
+        """
+        return len(self.version_module_path) >= 2
 
     @property
     def distribution_name(self) -> str:
@@ -210,50 +235,84 @@ class VersionedPackage:
         """
         return self.directory / RepositoryFile.PYPROJECT
 
-    def version_module_text(self, version: str) -> str:
+    def version_module_text(self, *, version: str) -> str:
         """
         :param version: The version the package is to carry.
         :return: The content its version module is to have.
         """
         return f'__version__ = "{version}"\n'
 
-    def pyproject_text(self, siblings: set[str], version: str) -> str:
+    def pyproject_text(
+        self, *, siblings: set[str], released_together: set[str], version: str
+    ) -> str:
         """
         :param siblings: The names, as an installer compares them, of the packages whose
             release carries ``version``.
+        :param released_together: The names of the siblings released together with this
+            package.
         :param version: The version every sibling is released at.
         :return: The content of the package's ``pyproject.toml`` with every ``[project]``
-            dependency on a sibling bounded to ``>=version``. A bound already there is
-            replaced; extras and markers stay, and so does everything else in the file.
+            dependency on a sibling bounded to ``==version`` if it is released together
+            with this package and to ``>=version`` otherwise, and the declared version, if
+            any, set to ``version``. A bound already there is replaced; extras and markers
+            stay, and so does everything else in the file.
         """
         text = self.pyproject_file.read_text()
+        if self.pyproject.declared_version is not None:
+            text = self.replace_declared_version(text=text, version=version)
         for specifier in self.pyproject.dependencies:
             requirement = Requirement(specifier)
             name = canonicalize_name(requirement.name)
             if name not in siblings or name == self.distribution_name:
                 continue
+            operator = (
+                VersionOperator.EXACTLY
+                if name in released_together
+                else VersionOperator.AT_LEAST
+            )
             text = self.replace_dependency(
-                text, specifier, self.bounded(specifier, version)
+                text=text,
+                old=specifier,
+                new=self.bounded(
+                    specifier=specifier, operator=operator, version=version
+                ),
             )
         return text
 
     @staticmethod
-    def bounded(specifier: str, version: str) -> str:
+    def replace_declared_version(*, text: str, version: str) -> str:
+        """
+        :param text: The content of a ``pyproject.toml`` whose ``[project]`` table states
+            a version.
+        :param version: The version to state instead.
+        :return: ``text`` with that version replaced.
+        """
+        return re.sub(
+            rf'^({PyprojectKey.VERSION}\s*=\s*)(["\'])[^"\']*\2',
+            lambda match: f"{match[1]}{match[2]}{version}{match[2]}",
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
+    @staticmethod
+    def bounded(*, specifier: str, operator: VersionOperator, version: str) -> str:
         """
         :param specifier: A dependency as the ``dependencies`` array lists it.
-        :param version: The lowest version it may be satisfied by.
-        :return: The dependency with its version specifier replaced by ``>=version``;
-            its extras and its environment marker, written as they were, stay.
+        :param operator: How the dependency is bounded by ``version``.
+        :param version: The version that bounds it.
+        :return: The dependency with its version specifier replaced by ``operator`` and
+            ``version``; its extras and its environment marker, written as they were, stay.
         """
         requirement = Requirement(specifier)
         extras = (
             f"[{','.join(sorted(requirement.extras))}]" if requirement.extras else ""
         )
         marker = specifier[specifier.index(";") :] if requirement.marker else ""
-        return f"{requirement.name}{extras}>={version}{marker}"
+        return f"{requirement.name}{extras}{operator}{version}{marker}"
 
     @staticmethod
-    def replace_dependency(text: str, old: str, new: str) -> str:
+    def replace_dependency(*, text: str, old: str, new: str) -> str:
         """
         :param text: The content of a ``pyproject.toml``.
         :param old: A dependency as the ``[project]`` ``dependencies`` array lists it.
@@ -290,7 +349,7 @@ class ManagedFile:
         return not self.path.exists() or self.path.read_text() != self.text
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Repository:
     """This repository, whose root holds the version every package carries."""
 
@@ -298,11 +357,11 @@ class Repository:
     """The repository's root directory."""
 
     @classmethod
-    def of_this_script(cls) -> Repository:
+    def from_this_checkout(cls) -> Repository:
         """
         :return: The repository this script is checked out in.
         """
-        return cls(Path(__file__).resolve().parents[1])
+        return cls(root=Path(__file__).resolve().parents[1])
 
     @property
     def version(self) -> str:
@@ -316,19 +375,53 @@ class Repository:
         """
         :return: The root and every member of the root's ``[tool.uv.workspace]``.
         """
-        members = Pyproject.from_directory(self.root).workspace_members
+        members = Pyproject.from_directory(directory=self.root).workspace_members
         return [self.root] + sorted(self.root / member for member in members)
 
     def versioned_packages(self) -> list[VersionedPackage]:
         """
         :return: The packages among the root and the workspace members that read their
-            version from a module of their own.
+            version from a module of their own or declare it for packages they hold.
         """
         packages = (
-            VersionedPackage.from_directory(directory)
+            VersionedPackage.from_directory(
+                directory=directory,
+                holds_other_packages=bool(self.packages_held_by(directory=directory)),
+            )
             for directory in self.package_directories
         )
         return [package for package in packages if package is not None]
+
+    def packages_held_by(self, *, directory: Path) -> list[Path]:
+        """
+        :param directory: A package directory.
+        :return: The other package directories inside it; none for the root, whose
+            members are released on their own.
+        """
+        if directory == self.root:
+            return []
+        return [
+            other
+            for other in self.package_directories
+            if other != directory and other.is_relative_to(directory)
+        ]
+
+    def release_directory(self, *, package: VersionedPackage) -> Path:
+        """
+        :param package: A package of the workspace.
+        :return: The outermost package directory, the root aside, that holds the package
+            or is its own; packages with the same one are released together.
+        """
+        return min(
+            (
+                directory
+                for directory in self.package_directories
+                if directory != self.root
+                and package.directory.is_relative_to(directory)
+            ),
+            key=lambda directory: len(directory.parts),
+            default=self.root,
+        )
 
     def expected_files(self) -> list[ManagedFile]:
         """
@@ -338,15 +431,27 @@ class Repository:
         siblings = {package.distribution_name for package in packages}
         files = []
         for package in packages:
-            files.append(
-                ManagedFile(
-                    package.version_file, package.version_module_text(self.version)
+            if package.has_version_module:
+                files.append(
+                    ManagedFile(
+                        package.version_file,
+                        package.version_module_text(version=self.version),
+                    )
                 )
-            )
+            released_together = {
+                other.distribution_name
+                for other in packages
+                if self.release_directory(package=other)
+                == self.release_directory(package=package)
+            }
             files.append(
                 ManagedFile(
                     package.pyproject_file,
-                    package.pyproject_text(siblings, self.version),
+                    package.pyproject_text(
+                        siblings=siblings,
+                        released_together=released_together,
+                        version=self.version,
+                    ),
                 )
             )
         return files
@@ -379,7 +484,7 @@ def main() -> int:
         action="store_true",
         help="Write nothing; fail when a file is outdated.",
     )
-    repository = Repository.of_this_script()
+    repository = Repository.from_this_checkout()
     if parser.parse_args().check:
         outdated = repository.outdated_files()
         for file in outdated:

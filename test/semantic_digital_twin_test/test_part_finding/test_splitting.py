@@ -211,6 +211,10 @@ def test_rolling_back_a_split_restores_the_whole_shape():
 
 
 def test_a_split_is_reproduced_in_a_synchronized_world():
+    """
+    The modifications of a split, sent through JSON, split the copy of the world the
+    same way.
+    """
     annotation = annotated_mug()
     world = annotation._world
     split_handle(annotation)
@@ -219,7 +223,7 @@ def test_a_split_is_reproduced_in_a_synchronized_world():
     for block in world.modification_history:
         kwargs = WorldEntityWithIDKwargsTracker.from_world(copy).create_kwargs()
         with copy.modify_world():
-            from_json(to_json(block), **kwargs).apply(copy)
+            from_json(to_json(block), **kwargs).apply(world=copy)
 
     root = copy.get_kinematic_structure_entity_by_id(annotation.root.id)
     assert len(copy.bodies) == 2

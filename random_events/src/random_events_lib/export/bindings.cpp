@@ -102,7 +102,7 @@ PYBIND11_MODULE(random_events_lib, handle) {
 
 
     handle.def("closed", &closed, "Create a closed interval");
-    handle.def("open", &open, "Create an open interval");
+    handle.def("open", py::overload_cast<const double, const double>(&open), "Create an open interval");
     handle.def("closed_open", &closed_open, "Create a closed-open interval");
     handle.def("open_closed", &open_closed, "Create an open-closed interval");
     handle.def("singleton", &singleton, "Create a singleton interval");

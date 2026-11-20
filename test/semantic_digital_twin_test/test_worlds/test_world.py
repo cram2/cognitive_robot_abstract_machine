@@ -2887,7 +2887,7 @@ def assert_rebuilds_to_same_structure(world: World, other_world: World) -> None:
     rebuilt = World(name=world.name)
     with rebuilt.modify_world():
         for block in recorded_blocks:
-            block.apply(rebuilt)
+            block.apply(world=rebuilt)
 
     assert {
         entity.name.name for entity in rebuilt.kinematic_structure_entities
