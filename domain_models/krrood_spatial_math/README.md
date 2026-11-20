@@ -37,9 +37,10 @@ coordinate system. Its base depends on `krrood` alone.
   by its coordinates in an affine frame, the fields a subclass marks with
   `AxisCoordinate`. A second parameter names the coordinate type when it is not
   `float`. Its `norm` and `dot` are measured by the kind of frame, and an affine one
-  that is not Cartesian raises `FrameMeasuresNoLengthsError`. A change of frame maps
-  its axes but never shifts it, as homogeneous coordinates with weight 0.
-  `CrossProductVector` is a vector of three-dimensional space with a `cross` product.
+  that is not Cartesian raises `FrameMeasuresNoLengthsError`. Its `cross` is the kind
+  of frame's too: only a `CartesianFrame3Dimensional` has a cross product, and any
+  other kind raises `FrameHasNoCrossProductError`. A change of frame maps its axes but
+  never shifts it, as homogeneous coordinates with weight 0.
 - `krrood_spatial_math.point`: `Point[vector]`, a point of an affine space, given in the
   kind of frame of its vector type and measured by it in the same way. The difference
   of two points is a vector, and a point moved by a vector is a point. A change of frame

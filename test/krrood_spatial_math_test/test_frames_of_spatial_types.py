@@ -497,3 +497,86 @@ def test_a_point_without_a_frame_is_read_without_a_resolver():
 
     assert point_copy.reference_frame is None
     assert np.allclose(point_copy.to_np(), point.to_np())
+
+
+# %% building a symbolic value from its coordinates
+
+
+@pytest.mark.parametrize(
+    "value_type, coordinate_names",
+    [
+        (Vector3Dimensional, ("x", "y", "z")),
+        (Point3Dimensional, ("x", "y", "z")),
+        (Vector2Dimensional, ("x", "y")),
+        (Point2Dimensional, ("x", "y")),
+    ],
+)
+def test_a_symbolic_value_names_the_coordinates_it_is_built_from(
+    value_type, coordinate_names
+):
+    """
+    The names a symbolic value's constructor takes its coordinates under, in axis order.
+    """
+    assert value_type.coordinate_names == coordinate_names
+
+
+def test_a_symbolic_value_is_placed_in_a_coordinate_system_by_its_reference_frame(
+    table_frame,
+):
+    """
+    A symbolic value is given in a frame through its reference frame, not a field.
+    """
+    assert SymbolicSpatialValue.coordinate_system_arguments(
+        coordinate_system=table_frame
+    ) == {"reference_frame": table_frame}
+
+
+def test_a_symbolic_value_placed_in_no_coordinate_system_has_no_reference_frame():
+    """
+    A value given in no coordinate system is built without a reference frame.
+    """
+    assert SymbolicSpatialValue.coordinate_system_arguments(coordinate_system=None) == {
+        "reference_frame": None
+    }
+
+
+def test_a_three_dimensional_vector_is_built_from_its_coordinates_in_a_frame(
+    table_frame,
+):
+    """
+    The generic construction from coordinates gives a symbolic vector its reference
+    frame.
+    """
+    vector = Vector3Dimensional.from_coordinates(
+        coordinates=(1, 2, 3), coordinate_system=table_frame
+    )
+
+    assert (
+        vector.reference_frame,
+        [float(coordinate) for coordinate in vector.coordinates],
+    ) == (
+        table_frame,
+        [1.0, 2.0, 3.0],
+    )
+
+
+def test_a_planar_point_is_built_on_the_plane_of_its_frames_reference_frame(
+    table_frame,
+):
+    """
+    A planar value's coordinate system is a 2D frame; it is built with the 3D frame that
+    2D frame lies on.
+    """
+    plane_frame = Point2Dimensional(reference_frame=table_frame).coordinate_system
+
+    point = Point2Dimensional.from_coordinates(
+        coordinates=(1, 2), coordinate_system=plane_frame
+    )
+
+    assert (
+        point.reference_frame,
+        [float(coordinate) for coordinate in point.coordinates],
+    ) == (
+        table_frame,
+        [1.0, 2.0],
+    )

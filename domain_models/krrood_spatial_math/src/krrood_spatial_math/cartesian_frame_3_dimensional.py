@@ -86,6 +86,23 @@ class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interfac
     """
 
     @classmethod
+    def cross_product(cls, *, first: Vector, second: Vector) -> Vector:
+        """
+        Computed from the coordinates and given in the frame of ``first``, unlike
+        :meth:`~krrood_spatial_math.coordinate_system.AffineFrame.cross_product`.
+        """
+        (first_x, first_y, first_z) = first.coordinates
+        (second_x, second_y, second_z) = second.coordinates
+        return first.from_coordinates(
+            coordinates=(
+                first_y * second_z - first_z * second_y,
+                first_z * second_x - first_x * second_z,
+                first_x * second_y - first_y * second_x,
+            ),
+            coordinate_system=first.coordinate_system,
+        )
+
+    @classmethod
     def from_frame_3_dimensional(
         cls, *, frame: CartesianFrame3Dimensional
     ) -> CartesianFrame3Dimensional:

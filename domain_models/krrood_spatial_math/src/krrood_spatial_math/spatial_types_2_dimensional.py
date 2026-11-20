@@ -10,6 +10,7 @@ import casadi as ca
 import numpy as np
 from typing_extensions import Any, Self
 import krrood.symbolic_math.symbolic_math as sm
+from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
 )
@@ -38,7 +39,6 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     GenericSpatialType,
     SpatialFrameKey,
-    SymbolicAxisCoordinates,
     SymbolicSpatialChange,
     SymbolicSpatialValue,
     Vector3Dimensional,
@@ -313,7 +313,6 @@ class HomogeneousTransformationMatrix2Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
-    SymbolicAxisCoordinates,
     Vector,
 ):
     """
@@ -355,9 +354,13 @@ class Vector2Dimensional(
     def y(self, value: sm.ScalarData):
         self[1] = value
 
-    @property
-    def coordinates(self) -> tuple[sm.Scalar, sm.Scalar]:
-        return self.x, self.y
+    @classproperty
+    def coordinate_names(cls) -> tuple[str, ...]:
+        """
+        The constructor's coordinate parameters, unlike
+        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
+        """
+        return ("x", "y")
 
     def _verify_type(self):
         if self.shape != (2, 1):
@@ -406,7 +409,6 @@ class Vector2Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Point2Dimensional(
     SymbolicSpatialValue,
-    SymbolicAxisCoordinates,
     Point[Vector2Dimensional],
 ):
     """
@@ -451,9 +453,13 @@ class Point2Dimensional(
     def y(self, value: sm.ScalarData):
         self[1] = value
 
-    @property
-    def coordinates(self) -> tuple[sm.Scalar, sm.Scalar]:
-        return self.x, self.y
+    @classproperty
+    def coordinate_names(cls) -> tuple[str, ...]:
+        """
+        The constructor's coordinate parameters, unlike
+        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
+        """
+        return ("x", "y")
 
     def _verify_type(self):
         if self.shape != (2, 1):

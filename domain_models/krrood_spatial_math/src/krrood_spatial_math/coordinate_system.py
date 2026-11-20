@@ -16,6 +16,7 @@ from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_spatial_math.exceptions import (
+    FrameHasNoCrossProductError,
     FrameMeasuresNoLengthsError,
     ReferenceFrameMismatchError,
 )
@@ -90,6 +91,19 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
         """
         return cls.norm(vector=first - second)
+
+    @classmethod
+    def cross_product(cls, *, first: Vector, second: Vector) -> Vector:
+        """
+        :param first: A vector given in a frame of this kind.
+        :param second: A vector given in the same frame.
+        :return: The vector perpendicular to both, as long as the area of the
+            parallelogram they span, such that ``first``, ``second`` and the result are
+            right-handed.
+        :raises FrameHasNoCrossProductError: If this kind of frame is not an oriented
+            three-dimensional Cartesian frame.
+        """
+        raise FrameHasNoCrossProductError(frame_kind=cls)
 
 
 GenericEuclideanSpace = TypeVar("GenericEuclideanSpace", bound=EuclideanSpace)
@@ -173,6 +187,17 @@ class CoordinateRepresentation(
                 context=context,
             )
 
+    @classmethod
+    def coordinate_system_arguments(
+        cls, *, coordinate_system: GenericCoordinateSystem | None
+    ) -> dict[str, Any]:
+        """
+        :param coordinate_system: The coordinate system a new value is to be given in.
+        :return: The keyword arguments of this type's constructor that give a new value
+            in ``coordinate_system``.
+        """
+        return {"coordinate_system": coordinate_system}
+
     @abstractmethod
     def apply_transformation(self, *, transformation: CoordinateChange) -> Self:
         """
@@ -220,7 +245,19 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         The amounts along the axes of the coordinate system, one per axis, in the order
         of the axes.
         """
-        return tuple(getattr(self, name) for name in self._coordinate_field_names())
+        return tuple(getattr(self, name) for name in self.coordinate_names)
+
+    @classproperty
+    def coordinate_names(cls) -> tuple[str, ...]:
+        """
+        The names of the coordinates, one per axis in the order of the axes, under which
+        the constructor takes them: the fields marked with :class:`AxisCoordinate`.
+        """
+        return tuple(
+            coordinate_field.name
+            for coordinate_field in fields(cls)
+            if AxisCoordinate in coordinate_field.metadata
+        )
 
     @classmethod
     def from_coordinates(
@@ -235,8 +272,8 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         :return: The value with these coordinates.
         """
         return cls(
-            **dict(zip(cls._coordinate_field_names(), coordinates, strict=True)),
-            coordinate_system=coordinate_system,
+            **dict(zip(cls.coordinate_names, coordinates, strict=True)),
+            **cls.coordinate_system_arguments(coordinate_system=coordinate_system),
         )
 
     @classproperty
@@ -255,17 +292,6 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         return self.from_coordinates(
             coordinates=moved[:-1],
             coordinate_system=transformation.target_coordinate_system,
-        )
-
-    @classmethod
-    def _coordinate_field_names(cls) -> tuple[str, ...]:
-        """
-        :return: The names of the fields marked with :class:`AxisCoordinate`, in order.
-        """
-        return tuple(
-            coordinate_field.name
-            for coordinate_field in fields(cls)
-            if AxisCoordinate in coordinate_field.metadata
         )
 
 

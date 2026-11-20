@@ -123,6 +123,28 @@ class FrameMeasuresNoLengthsError(SpatialTypesError):
         )
 
 
+@dataclass(kw_only=True)
+class FrameHasNoCrossProductError(SpatialTypesError):
+    """
+    Raised when a cross product is asked of a kind of frame that is not an oriented
+    three-dimensional Cartesian frame, such as a planar or an affine pixel frame.
+    """
+
+    frame_kind: type
+    """
+    The kind of frame that was asked for the cross product.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.frame_kind.__name__} has no cross product."
+
+    def suggest_correction(self) -> str:
+        return (
+            "lift the vectors into a three-dimensional Cartesian frame first, or give "
+            "their type a kind of frame that subclasses CartesianFrame3Dimensional."
+        )
+
+
 @dataclass
 class MissingReferenceFrameError(SpatialTypesError):
     """

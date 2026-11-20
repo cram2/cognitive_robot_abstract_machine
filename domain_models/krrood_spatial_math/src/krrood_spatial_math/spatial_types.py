@@ -21,7 +21,6 @@ from typing_extensions import Any, overload, Self, Callable, Generic, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood.patterns.mixin import Mixin
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import DerivedGenericParameter
 from krrood.symbolic_math.exceptions import (
@@ -46,7 +45,7 @@ from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.pose import Orientation, Pose
-from krrood_spatial_math.vector import CrossProductVector, Vector
+from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
     ReferenceFrameMismatchError,
@@ -485,32 +484,17 @@ class SymbolicSpatialValue(
         )
         return frame_kind.from_frame_3_dimensional(frame=self.reference_frame)
 
-
-# %% values given by one coordinate per axis
-
-
-class SymbolicAxisCoordinates(Mixin):
-    """
-    A symbolic value given by one coordinate per axis of its frame, built from its
-    coordinates and the reference frame its frame lies on.
-    """
-
     @classmethod
-    def from_coordinates(
-        cls,
-        *,
-        coordinates: tuple[sm.ScalarData, ...],
-        coordinate_system: GenericCoordinateSystem | None,
-    ) -> Self:
+    def coordinate_system_arguments(
+        cls, *, coordinate_system: GenericCoordinateSystem | None
+    ) -> dict[str, Any]:
         """
-        Overrides :meth:`~krrood_spatial_math.coordinate_system.AxisCoordinates.from_coor
-        dinates`, which builds a value from its fields: a symbolic value is built from
-        its coordinates and reference frame.
+        Gives the reference frame ``coordinate_system`` lies on, unlike
+        :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.coordinate_system_arguments`.
         """
-        reference_frame = (
-            None if coordinate_system is None else coordinate_system.frame_3_dimensional
-        )
-        return cls(*coordinates, reference_frame=reference_frame)
+        if coordinate_system is None:
+            return {"reference_frame": None}
+        return {"reference_frame": coordinate_system.frame_3_dimensional}
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -1339,9 +1323,7 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
-    SymbolicAxisCoordinates,
     Vector,
-    CrossProductVector,
 ):
     """
     Representation of a 3D vector with reference frame support for homogenous
@@ -1535,9 +1517,13 @@ class Vector3Dimensional(
     def z(self, value: sm.ScalarData):
         self[2] = value
 
-    @property
-    def coordinates(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
-        return self.x, self.y, self.z
+    @classproperty
+    def coordinate_names(cls) -> tuple[str, ...]:
+        """
+        The constructor's coordinate parameters, unlike
+        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
+        """
+        return ("x", "y", "z")
 
     def __add__(self, other: Vector3Dimensional) -> Vector3Dimensional:
         """
@@ -1631,6 +1617,10 @@ class Vector3Dimensional(
         return self.dot(other)
 
     def cross(self, *, other: Vector3Dimensional) -> Vector3Dimensional:
+        """
+        Computed on the casadi matrices, unlike :meth:`~krrood_spatial_math.vector.Vector.cross`.
+        """
+        self.ensure_same_coordinate_system(other=other, context="the crossed vector")
         result = ca.cross(self.casadi_sx[:3], other.casadi_sx[:3])
         result = self.__class__.from_iterable(result)
         result.reference_frame = self.reference_frame
@@ -1730,7 +1720,6 @@ class Vector3Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class Point3Dimensional(
     SymbolicSpatialValue,
-    SymbolicAxisCoordinates,
     Point[Vector3Dimensional],
 ):
     """
@@ -1866,9 +1855,13 @@ class Point3Dimensional(
     def z(self, value: sm.ScalarData):
         self[2] = value
 
-    @property
-    def coordinates(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
-        return self.x, self.y, self.z
+    @classproperty
+    def coordinate_names(cls) -> tuple[str, ...]:
+        """
+        The constructor's coordinate parameters, unlike
+        :attr:`~krrood_spatial_math.coordinate_system.AxisCoordinates.coordinate_names`.
+        """
+        return ("x", "y", "z")
 
     def __add__(self, other: Vector3Dimensional) -> Point3Dimensional:
         """

@@ -4,13 +4,11 @@ Vectors of an affine space: the translations that move its points.
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from dataclasses import dataclass
 
 from typing_extensions import Generic, Self, TypeVar
 
 from krrood.patterns.classproperty import classproperty
-from krrood.patterns.interface import Interface
 from krrood.symbolic_math.exceptions import UnsupportedOperationError
 from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
@@ -88,10 +86,7 @@ class Vector(
         :return: The length of this vector.
         :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
-        frame_kind = self.get_type_of_generic_parameter(
-            parameter=GenericCoordinateSystem
-        )
-        return frame_kind.norm(vector=self)
+        return self.frame_kind.norm(vector=self)
 
     def dot(self, other: Self) -> GenericCoordinate:
         """
@@ -105,40 +100,35 @@ class Vector(
         if not isinstance(other, type(self)):
             raise UnsupportedOperationError(operation="dot", left=self, right=other)
         self.ensure_same_coordinate_system(other=other, context="the multiplied vector")
-        frame_kind = self.get_type_of_generic_parameter(
-            parameter=GenericCoordinateSystem
-        )
-        return frame_kind.inner_product(first=self, second=other)
+        return self.frame_kind.inner_product(first=self, second=other)
 
-
-GenericVector = TypeVar("GenericVector", bound=Vector)
-"""
-The kind of vector the points of an affine space are moved by.
-"""
-
-
-# %% vectors of an oriented three-dimensional Euclidean space
-
-
-class CrossProductVector(Interface):
-    """
-    A vector of an oriented three-dimensional Euclidean space, where two vectors have a
-    cross product.
-    """
-
-    @abstractmethod
     def cross(self, *, other: Self) -> Self:
         """
         :param other: A vector given in the same frame.
         :return: The vector perpendicular to both, as long as the area of the
             parallelogram they span, such that this vector, ``other`` and the result
             are right-handed.
+        :raises UnsupportedOperationError: If ``other`` is not a vector of this type.
+        :raises ReferenceFrameMismatchError: If both vectors are given in a frame and the
+            frames differ.
+        :raises FrameHasNoCrossProductError: If its kind of frame is not an oriented
+            three-dimensional Cartesian frame.
         """
+        if not isinstance(other, type(self)):
+            raise UnsupportedOperationError(operation="cross", left=self, right=other)
+        self.ensure_same_coordinate_system(other=other, context="the crossed vector")
+        return self.frame_kind.cross_product(first=self, second=other)
+
+    @classproperty
+    def frame_kind(cls) -> type[GenericAffineFrame]:
+        """
+        The kind of frame vectors of this type are given in, which measures their
+        lengths and angles.
+        """
+        return cls.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
 
 
-GenericCrossProductVector = TypeVar(
-    "GenericCrossProductVector", bound=CrossProductVector
-)
+GenericVector = TypeVar("GenericVector", bound=Vector)
 """
-The kind of vector whose cross products a value is built with.
+The kind of vector the points of an affine space are moved by.
 """

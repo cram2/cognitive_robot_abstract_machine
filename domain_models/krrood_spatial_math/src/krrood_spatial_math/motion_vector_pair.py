@@ -13,14 +13,12 @@ from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
     RigidCoordinateChange,
 )
-from krrood_spatial_math.vector import GenericCrossProductVector
+from krrood_spatial_math.vector import GenericVector
 
 # %% a rigid motion as how it turns and how the origin moves
 
 
-class MotionVectorPair(
-    CoordinateRepresentation, Generic[GenericCrossProductVector], ABC
-):
+class MotionVectorPair(CoordinateRepresentation, Generic[GenericVector], ABC):
     """
     A rigid motion of a body given by two vectors along the axes of one frame: how the
     body turns, and how the point of the body at the frame's origin moves.
@@ -31,14 +29,14 @@ class MotionVectorPair(
 
     @property
     @abstractmethod
-    def rotational_part(self) -> GenericCrossProductVector:
+    def rotational_part(self) -> GenericVector:
         """
         How the body turns.
         """
 
     @property
     @abstractmethod
-    def translational_part(self) -> GenericCrossProductVector:
+    def translational_part(self) -> GenericVector:
         """
         How the point of the body at the frame's origin moves.
         """
@@ -48,8 +46,8 @@ class MotionVectorPair(
     def from_parts(
         cls,
         *,
-        rotational_part: GenericCrossProductVector,
-        translational_part: GenericCrossProductVector,
+        rotational_part: GenericVector,
+        translational_part: GenericVector,
     ) -> Self:
         """
         :param rotational_part: How the body turns.

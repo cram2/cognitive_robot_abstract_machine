@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import fields
 
+import numpy as np
 import pytest
 
 from krrood.patterns.exceptions import InterfaceInstantiationError
@@ -18,15 +19,18 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinateSystem,
 )
 from krrood_spatial_math.exceptions import (
+    FrameHasNoCrossProductError,
     FrameMeasuresNoLengthsError,
     ReferenceFrameMismatchError,
 )
 from krrood_spatial_math.line import Line, LineSegment
+from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point, GenericPoint
 from krrood_spatial_math.spatial_types import (
     Point3Dimensional,
     Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Vector2Dimensional
 from krrood_spatial_math.vector import Vector, GenericVector
 
 from .dataset.frames import NamedFrame
@@ -297,3 +301,93 @@ def test_vectors_of_two_frames_have_no_inner_product():
     second = Vector3Dimensional(1, 0, 0, reference_frame=NamedFrame(name="gripper"))
     with pytest.raises(ReferenceFrameMismatchError):
         first.dot(second)
+
+
+# %% the cross product of an oriented three-dimensional Cartesian frame kind
+
+
+def test_a_three_dimensional_cartesian_frame_kind_crosses_two_vectors():
+    """
+    The cross product is computed from the coordinates, right-handed, without a frame.
+    """
+    first, second = (1.0, 2.0, 3.0), (4.0, 5.0, 6.0)
+
+    product = CartesianFrame3Dimensional.cross_product(
+        first=Vector3Dimensional(*first), second=Vector3Dimensional(*second)
+    )
+
+    assert [float(coordinate) for coordinate in product.coordinates] == list(
+        np.cross(first, second)
+    )
+
+
+def test_the_cross_product_is_given_in_the_frame_of_the_crossed_vectors():
+    """
+    Crossing two vectors of one frame gives a vector of that frame.
+    """
+    table = NamedFrame(name="table")
+
+    product = CartesianFrame3Dimensional.cross_product(
+        first=Vector3Dimensional(1, 0, 0, reference_frame=table),
+        second=Vector3Dimensional(0, 1, 0, reference_frame=table),
+    )
+
+    assert product.reference_frame is table
+
+
+def test_a_vectors_cross_product_is_the_one_its_frame_kind_gives():
+    """
+    A symbolic vector's casadi cross product agrees with the one its frame kind
+    computes.
+    """
+    first, second = Vector3Dimensional(1, 0, 2), Vector3Dimensional(3, 1, 1)
+
+    assert [
+        float(coordinate) for coordinate in first.cross(other=second).coordinates
+    ] == [
+        float(coordinate)
+        for coordinate in CartesianFrame3Dimensional.cross_product(
+            first=first, second=second
+        ).coordinates
+    ]
+
+
+def test_a_vector_of_a_frame_that_is_not_cartesian_has_no_cross_product():
+    """
+    An affine kind of frame has no cross product, as it measures no lengths or angles.
+    """
+    vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
+
+    with pytest.raises(FrameHasNoCrossProductError):
+        vector.cross(other=vector)
+
+
+def test_a_vector_of_a_planar_cartesian_frame_has_no_cross_product():
+    """
+    A Cartesian frame has a cross product only when it is three-dimensional.
+    """
+    vector = Vector2Dimensional(1, 2)
+
+    with pytest.raises(FrameHasNoCrossProductError):
+        vector.cross(other=vector)
+
+
+def test_vectors_of_two_frames_have_no_cross_product():
+    """
+    Crossing vectors of two frames is refused, as their inner product is.
+    """
+    first = Vector3Dimensional(1, 0, 0, reference_frame=NamedFrame(name="table"))
+    second = Vector3Dimensional(0, 1, 0, reference_frame=NamedFrame(name="gripper"))
+
+    with pytest.raises(ReferenceFrameMismatchError):
+        first.cross(other=second)
+
+
+def test_a_motion_vector_pair_is_built_from_plain_vectors():
+    """
+    The vectors of a rigid motion need no interface of their own: their frame kind gives
+    the cross product the adjoint action uses.
+    """
+    (vector_parameter,) = MotionVectorPair.__parameters__
+
+    assert vector_parameter.__bound__ is Vector
