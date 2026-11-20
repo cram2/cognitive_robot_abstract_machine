@@ -49,6 +49,7 @@ from krrood.ormatic.exceptions import (
     QueryCannotBePersisted,
     StoredObjectTableNotUniqueError,
 )
+from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.exceptions import NoGenericError
 from krrood.patterns.has_generic import HasGeneric
 from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
@@ -1424,6 +1425,7 @@ class DataAccessObject(HasGeneric[T]):
         return self.parts_in_memory[part_class]
 
     @staticmethod
+    @called_positionally
     def register_owner_of_unloaded_parts(
         target: Any, context: sqlalchemy.orm.QueryContext
     ) -> None:
@@ -1731,6 +1733,7 @@ class StoredObjectRow:
         return self.object_dao.from_dao(state=state)
 
     @classmethod
+    @called_positionally
     def insert_rows_of_new_objects(
         cls, session: sqlalchemy.orm.Session, flush_context: Any, instances: Any
     ) -> None:

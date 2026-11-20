@@ -116,6 +116,11 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
 
 @dataclass(eq=False)
 class Vector3Mapping(AlternativeMapping[Vector3]):
+    """
+    The coordinates of a :class:`Vector3`, as they evaluate in the world's state when
+    it is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -136,6 +141,11 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
 
 @dataclass(eq=False)
 class Point3Mapping(AlternativeMapping[Point3]):
+    """
+    The coordinates of a :class:`Point3`, as they evaluate in the world's state when it
+    is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -156,6 +166,11 @@ class Point3Mapping(AlternativeMapping[Point3]):
 
 @dataclass(eq=False)
 class QuaternionMapping(AlternativeMapping[Quaternion]):
+    """
+    The components of a :class:`Quaternion`, as they evaluate in the world's state when
+    it is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -181,6 +196,11 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
 @dataclass(eq=False)
 class AxisAngleMapping(AlternativeMapping[AxisAngle]):
+    """
+    The axis of an :class:`AxisAngle` and its angle, as the angle evaluates in the
+    world's state when it is stored, and the frame it is expressed in.
+    """
+
     axis: Vector3
     angle: float
     reference_frame: KinematicStructureEntity | None
@@ -427,6 +447,11 @@ class PoseMapping(AlternativeMapping[Pose]):
 
 @dataclass(eq=False)
 class Point2Mapping(AlternativeMapping[Point2]):
+    """
+    The coordinates of a :class:`Point2`, as they evaluate in the world's state when it
+    is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
 
@@ -444,6 +469,11 @@ class Point2Mapping(AlternativeMapping[Point2]):
 
 @dataclass(eq=False)
 class Pose2DMapping(AlternativeMapping[Pose2D]):
+    """
+    The position of a :class:`Pose2D` and its yaw, as the yaw evaluates in the world's
+    state when it is stored, and the frame it is expressed in.
+    """
+
     position: Point2
     yaw: float
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
