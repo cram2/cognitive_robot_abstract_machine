@@ -15,7 +15,10 @@ from krrood.development_tools.agents.ruff_rules import (
     RuffRuleChecker,
     RuffSetting,
 )
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.patterns.subclass_safe_generic import (
+    DerivedGenericParameter,
+    SubClassSafeGeneric,
+)
 
 
 class TypeHintsRules(Section):
@@ -84,4 +87,12 @@ class TypeHintsRules(Section):
         "when a subclass binds a parameter. Read a bound type with "
         f"{CodeReference(target=SubClassSafeGeneric.get_type_of_generic_parameter).name}, "
         "never via `__orig_bases__`. Such classes cannot be frozen dataclasses"
+    )
+
+    DERIVED_GENERIC_PARAMETERS = (
+        "Bind only the most specific type a generic class depends on, and derive the "
+        "parameters that type already fixes as "
+        f"{CodeReference(target=DerivedGenericParameter).name}s: "
+        "a point type binds its vector type and reads the frame and the coordinate type "
+        "from it, so no class names one fact twice"
     )

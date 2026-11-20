@@ -29,6 +29,7 @@ from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
 from krrood.patterns.classproperty import classproperty
+from krrood.patterns.exceptions import DerivedGenericParameterConflictError
 from krrood.patterns.interface import Interface
 from krrood.exceptions import (
     MismatchingNumberOfGenericParametersAndResolvedTypes,
@@ -180,6 +181,8 @@ class SubClassSafeGeneric(ABC):
         :param substitutions: The type parameters this class binds, resolved.
         :return: The type each :attr:`derived_generic_parameters` entry reads from the
             type bound to its source, for the sources bound to a class that binds it.
+        :raises DerivedGenericParameterConflictError: If another base binds a derived
+            parameter to a type that is not the derived one or a base of it.
         """
         derived = {}
         for derived_parameter in cls.derived_generic_parameters:
@@ -192,11 +195,22 @@ class SubClassSafeGeneric(ABC):
                 )
             ):
                 continue
-            derived[derived_parameter.parameter] = (
-                source_type.get_type_of_generic_parameter(
-                    parameter=derived_parameter.parameter
-                )
+            derived_type = source_type.get_type_of_generic_parameter(
+                parameter=derived_parameter.parameter
             )
+            bound_type = substitutions.get(derived_parameter.parameter)
+            if (
+                isclass(bound_type)
+                and isclass(derived_type)
+                and not issubclass(derived_type, bound_type)
+            ):
+                raise DerivedGenericParameterConflictError(
+                    clazz=cls,
+                    parameter=derived_parameter.parameter,
+                    bound_type=bound_type,
+                    derived_type=derived_type,
+                )
+            derived[derived_parameter.parameter] = derived_type
         return derived
 
     @classmethod

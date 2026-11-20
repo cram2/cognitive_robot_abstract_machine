@@ -244,3 +244,43 @@ class NoGenericError(DataclassException, TypeError):
 
     def suggest_correction(self) -> str:
         return "did you forget to parameterise the generic base class?"
+
+
+@dataclass(kw_only=True)
+class DerivedGenericParameterConflictError(DataclassException, TypeError):
+    """
+    Raised when a class binds a derived type parameter, through another of its bases, to
+    a type that the type bound to the parameter's source contradicts.
+    """
+
+    clazz: type
+    """
+    The class that was defined.
+    """
+
+    parameter: Any
+    """
+    The derived type parameter bound twice.
+    """
+
+    bound_type: Any
+    """
+    The type another base binds :attr:`parameter` to.
+    """
+
+    derived_type: Any
+    """
+    The type read for :attr:`parameter` from the type bound to its source.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.clazz.__name__} binds {self.parameter} to {self.bound_type}, but its "
+            f"source type binds it to {self.derived_type}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Leave {self.parameter} unbound on {self.clazz.__name__}'s other bases, or "
+            f"bind it to {self.derived_type} or a base of it."
+        )

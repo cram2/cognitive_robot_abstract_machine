@@ -30,6 +30,7 @@ from typing_extensions import (
 
 from krrood.entity_query_language.factories import variable_from
 from krrood.exceptions import UnboundGenericParameter
+from krrood.patterns.exceptions import DerivedGenericParameterConflictError
 from krrood.patterns.interface import Interface
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import (
@@ -968,6 +969,68 @@ def test_a_derived_parameter_is_read_from_the_type_its_source_is_bound_to():
         reading_field.name: reading_field.type
         for reading_field in fields(LengthReading)
     } == {"measurement": Metres, "unit": str}
+
+
+def test_a_class_binding_a_derived_parameter_to_another_type_is_refused():
+    """
+    A class that binds a derived parameter through another base, to a type its source
+    type contradicts, fails where it is defined.
+    """
+    UnitType = TypeVar("UnitType")
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Labelled(Generic[UnitType], SubClassSafeGeneric):
+        """
+        Something labelled with a unit of its own.
+        """
+
+        label: UnitType
+        """
+        The unit the label names.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement, whose unit the measurement type fixes.
+        """
+
+        measurement: MeasurementType
+        """
+        The measurement read.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    with pytest.raises(DerivedGenericParameterConflictError):
+
+        @dataclass(kw_only=True)
+        class MislabelledReading(Reading[Metres], Labelled[int]):
+            """
+            A reading in metres labelled with another unit.
+            """
 
 
 # %% attributes an interface declares
