@@ -388,8 +388,9 @@ def test_screw_connection_json_serialization_with_world():
     )
     assert connection == restored_connection
     assert np.allclose(
-        restored_connection.screw_axis.linear_velocity,
-        restored_connection.screw_axis.angular_velocity * (screw_pitch / (2 * np.pi)),
+        restored_connection.screw_axis.translation_per_unit_position,
+        restored_connection.screw_axis.rotation_per_unit_position
+        * (screw_pitch / (2 * np.pi)),
     )
     assert restored_connection.multiplier == connection.multiplier
     assert restored_connection.offset == connection.offset

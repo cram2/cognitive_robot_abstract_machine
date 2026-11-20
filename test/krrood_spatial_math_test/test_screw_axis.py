@@ -12,6 +12,7 @@ from scipy.linalg import expm
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.symbolic_math.exceptions import HasFreeVariablesError
 from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
 from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
 
@@ -137,6 +138,98 @@ def test_the_direction_of_a_zero_screw_axis_is_the_zero_vector():
     A screw axis that neither turns nor moves the body has no direction.
     """
     np.testing.assert_allclose(ScrewAxis().unit_direction.to_np()[:3], [0.0, 0.0, 0.0])
+
+
+# %% normalization and the position of the axis
+
+
+@pytest.mark.parametrize(
+    "rotation, translation",
+    [
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 0.0)),
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 0.5)),
+        ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0)),
+        ((0.0, 0.0, 0.0), (0.0, 0.6, 0.8)),
+    ],
+    ids=["revolute", "helical", "off-origin revolute", "prismatic"],
+)
+def test_a_screw_axis_with_a_unit_rotation_or_only_a_unit_translation_is_normalized(
+    rotation, translation
+):
+    """
+    Whatever the translation, a unit rotation normalizes a screw axis; one that does not
+    turn is normalized by a unit translation.
+    """
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(*rotation),
+        translation_per_unit_position=Vector3(*translation),
+    )
+
+    assert screw_axis.is_normalized
+
+
+@pytest.mark.parametrize(
+    "rotation, translation",
+    [
+        ((0.0, 0.0, 2.0), (0.0, 0.0, 0.0)),
+        ((0.0, 0.0, 0.5), (0.0, 0.0, 1.0)),
+        ((0.0, 0.0, 0.0), (0.0, 0.0, 2.0)),
+        ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    ],
+    ids=["fast rotation", "slow rotation with unit translation", "long slide", "zero"],
+)
+def test_a_screw_axis_without_a_unit_rotation_or_only_a_unit_translation_is_not_normalized(
+    rotation, translation
+):
+    """
+    A unit translation does not normalize a screw axis that turns, and a screw axis that
+    neither turns nor moves is never normalized.
+    """
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(*rotation),
+        translation_per_unit_position=Vector3(*translation),
+    )
+
+    assert not screw_axis.is_normalized
+
+
+@pytest.mark.parametrize(
+    "rotation, translation, passes_through_origin",
+    [
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 0.5), True),
+        ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), True),
+        ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), False),
+    ],
+    ids=["helical through the origin", "prismatic", "revolute off the origin"],
+)
+def test_a_screw_axis_passes_through_the_origin_if_its_translation_is_parallel_to_its_rotation(
+    rotation, translation, passes_through_origin
+):
+    """
+    A translation across the rotation is that of the origin circling an axis elsewhere;
+    a screw axis that does not turn has no line to miss the origin.
+    """
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(*rotation),
+        translation_per_unit_position=Vector3(*translation),
+    )
+
+    assert screw_axis.passes_through_origin is passes_through_origin
+
+
+@pytest.mark.parametrize("check", ["is_normalized", "passes_through_origin"])
+def test_checking_a_symbolic_screw_axis_raises(check):
+    """
+    Whether a screw axis with free variables is normalized, or passes through the
+    origin, depends on their values, so the checks refuse to answer.
+    """
+    angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position)
+    )
+
+    with pytest.raises(HasFreeVariablesError):
+        getattr(screw_axis, check)
 
 
 # %% the twist at a given speed of the position

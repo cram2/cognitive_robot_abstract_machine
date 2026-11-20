@@ -37,7 +37,7 @@ class ArtVipObject:
     A link with a :class:`~pxr.UsdPhysics.RevoluteJoint`/:class:`~pxr.UsdPhysics.PrismaticJoint` to its
     parent is connected by a
     :class:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection`
-    with the matching revolute or prismatic normalized twist and the joint's own authored
+    with the matching revolute or prismatic screw axis and the joint's own authored
     limits and axis; every other link (including a link
     joined by a :class:`~pxr.UsdPhysics.FixedJoint`) is connected by a
     :class:`~semantic_digital_twin.world_description.connections.FixedConnection`.

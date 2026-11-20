@@ -396,8 +396,7 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
     session, world_with_two_bodies
 ):
     """
-    The normalized twist and the child's pose survive storing the world and reading it
-    back.
+    The screw axis and the child's pose survive storing the world and reading it back.
     """
     from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 

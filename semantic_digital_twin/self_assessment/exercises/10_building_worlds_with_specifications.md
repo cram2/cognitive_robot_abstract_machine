@@ -33,7 +33,7 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
-from krrood_spatial_math.spatial_types import Twist
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
@@ -118,7 +118,7 @@ Your goal:
 sliding_drawer = BodySpecification.box(
     name="sliding_drawer",
     scale=Scale(0.4, 0.5, 0.2),
-    connection_specification=ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X())),
+    connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X())),
 ).spawn(world)
 ```
 

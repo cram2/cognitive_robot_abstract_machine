@@ -24,7 +24,7 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
-from krrood_spatial_math.spatial_types import Twist
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import (
@@ -70,7 +70,7 @@ body = Body(name=PrefixedName("body"))
 with world.modify_world():
     root_C_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
     base_C_body = ScrewAxisConnection.create_with_dofs(
-            screw_axis=Twist(angular_velocity=Vector3.Z(reference_frame=base)), parent=base,
+            screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z(reference_frame=base)), parent=base,
             child=body,
             world=world
         )

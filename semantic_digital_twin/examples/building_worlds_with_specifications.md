@@ -283,8 +283,8 @@ parameters that family needs:
 Every entity specification carries an optional `connection_specification`; when it is left unset,
 `spawn` attaches the entity with a fixed connection. Set it to give the entity a degree of freedom.
 A `ScrewAxisConnectionSpecification` requires a `screw_axis`, and optionally accepts a `multiplier`, an
-`offset`, and `dof_limits`. The `screw_axis` is a `Twist`: how fast the child rotates and translates per
-unit of position. `ScrewAxisConnection.create_revolute_screw_axis(axis=axis)` builds the screw axis of a
+`offset`, and `dof_limits`. The `screw_axis` is a `ScrewAxis`: how far the child rotates and translates
+per unit of position. `ScrewAxisConnection.create_revolute_screw_axis(axis=axis)` builds the screw axis of a
 revolute connection, `create_prismatic_screw_axis(axis=axis)` that of a prismatic connection, and
 `create_helical_screw_axis(axis=axis, pitch=pitch)` that of a helical one, such as a thread.
 [Screw axis connections](screw_axis_connections.md) explains the screw axis and these connections.

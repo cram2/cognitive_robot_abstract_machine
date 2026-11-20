@@ -39,7 +39,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
-    Twist,
+    ScrewAxis,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
@@ -93,7 +93,7 @@ class SdfJointType(StrEnum):
             SdfJointType.FIXED: FixedConnectionSpecification,
         }[self]
 
-    def create_screw_axis(self, *, direction: Vector3) -> Twist:
+    def create_screw_axis(self, *, direction: Vector3) -> ScrewAxis:
         """
         :param direction: The unit vector this movable joint moves along or about.
         :return: The screw axis of the connection this movable joint type becomes.
@@ -800,7 +800,8 @@ class GazeboParser(WorldModelParser):
         :param element: The ``joint`` element to parse.
         :param joint_name: The name of the joint, used to report an unsupported frame.
         :param parent_body: The parent of the joint, used as the reference frame.
-        :return: The axis the joint moves along, scaled to unit length as SDF defines it.
+        :return: The axis the joint moves along, scaled to unit length as SDF defines
+            it.
         :raises UnsupportedAxisReference: If the axis is expressed in another frame.
         """
         axis_element = element.find("axis")

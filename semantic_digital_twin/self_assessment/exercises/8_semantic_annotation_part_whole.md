@@ -30,7 +30,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from krrood_spatial_math.spatial_types import Twist
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.semantic_annotations.mixins import HasHandle, HasRootBody
 from semantic_digital_twin.semantic_annotations.part_whole import IsPartWholeRelationship
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
@@ -50,7 +50,7 @@ Your goal:
 - Inside one `with world.modify_world():` block, use `create_with_new_body_in_world` to create
   a `Dresser` named `dresser` (scale `Scale(0.31, 0.31, 0.21)`), a `Drawer` named `drawer`
   (scale `Scale(0.3, 0.3, 0.2)`) that slides on
-  `ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X()))`, and a `Handle` named `drawer_handle`
+  `ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()))`, and a `Handle` named `drawer_handle`
 - Wire them together with `add`: the handle onto the drawer, the drawer onto the dresser
 - Store the annotations in variables named `dresser`, `drawer`, and `handle`
 
@@ -60,7 +60,7 @@ Your goal:
 # world = World.create_with_root_body()
 # with world.modify_world():
 #     dresser = Dresser.create_with_new_body_in_world(name="dresser", scale=Scale(0.31, 0.31, 0.21), world=world)
-#     drawer = ...  # pass parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X()))
+#     drawer = ...  # pass parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()))
 #     handle = ...
 #     drawer.add(...)
 #     dresser.add(...)
@@ -77,7 +77,7 @@ with world.modify_world():
         name="drawer",
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
-        parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=Twist(linear_velocity=Vector3.X())),
+        parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X())),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",

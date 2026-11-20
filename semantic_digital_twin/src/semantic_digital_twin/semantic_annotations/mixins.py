@@ -793,7 +793,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         placed_specification = dataclasses.replace(
             connection_specification,
             connection_T_child=self.calculate_self_T_movable_joint(
-                connection_specification.screw_axis.screw_axis_direction
+                connection_specification.screw_axis.unit_direction
             ).inverse(),
         )
         return placed_specification.reconnect(self._world, self.root)

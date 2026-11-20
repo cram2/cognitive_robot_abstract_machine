@@ -16,16 +16,17 @@ kernelspec:
 A [revolute connection](https://en.wikipedia.org/wiki/Revolute_joint) rotates its child about an axis,
 like a door on its hinges. A [prismatic connection](https://en.wikipedia.org/wiki/Prismatic_joint) moves
 its child along an axis, like a drawer. In the semantic digital twin, both are a `ScrewAxisConnection`:
-the connection describes how its child moves with one
-[screw axis](https://en.wikipedia.org/wiki/Screw_axis), the twist the child performs per unit of the
-connection's position. The idea of describing every such connection with one screw axis was inspired by
-MoMa-SG {cite:p}`buechner2026articulated`.
+the connection describes how its child moves with one screw axis, how the child's pose changes per unit
+of the connection's position. What a screw axis holds, and how it relates to a twist, is explained in
+[Displacements, twists and screw axes](https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math/rates_of_motion.html#displacements-twists-and-screw-axes)
+in the krrood_spatial_math book. The idea of describing every such connection with one screw axis was
+inspired by MoMa-SG {cite:p}`buechner2026articulated`.
 
 The screw axis is normalized as {cite:t}`lynch2017modern` define it in
 [Definition 3.24 of Modern Robotics](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122).
-If the child rotates, the angular velocity of the screw axis is a unit vector, so the position of a
-revolute connection is an angle in radians. If the child only translates, the linear velocity is a unit
-vector, so the position of a prismatic connection is a distance in meters.
+If the child rotates, the rotation per unit of position of the screw axis is a unit vector, so the
+position of a revolute connection is an angle in radians. If the child only translates, the translation
+per unit of position is a unit vector, so the position of a prismatic connection is a distance in meters.
 
 The axis passes through the origin of the *connection frame*. `parent_T_connection_expression` places
 the connection frame relative to the parent, and `connection_T_child_expression` places the child
@@ -290,7 +291,8 @@ Code that has to tell revolute and prismatic connections apart asks
 
 ## Beyond revolute and prismatic connections
 
-Because the screw axis is a twist, the child can also rotate and translate at once: a bottle cap, a jar
+Because the screw axis holds both a rotation and a translation per unit of position, the child can also
+rotate and translate at once: a bottle cap, a jar
 lid or the spindle of a vice turns and advances along its axis in proportion. Such a *helical* motion is
 described by its pitch, the distance the child advances per revolution.
 
@@ -341,7 +343,7 @@ Half a pitch is half a revolution, so the cap turned by $\pi$ radians. The same 
 connection's position unchanged, and a revolute connection, which never translates its child, refuses it
 with a `ScrewAxisWithoutTranslationError`.
 
-## Why a twist
+## Why a rotation and a translation per unit of position
 
 A screw axis is often described by three quantities, as in
 [section 3.3.2.2 of Modern Robotics](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=121):
@@ -468,31 +470,60 @@ prismatic connections: a pure translation rotates by no angle at all, so its pit
 as nothing turns about its axis, every point in space could serve as $q$. A connection built on it would
 have to treat translation as a special case.
 
-The twist $\mathcal{S} = (\omega, v)$ of
-[Definition 3.24](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122) has no such gap. It
+The screw axis $\mathcal{S} = (\omega, v)$ of
+[Definition 3.24](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122), a rotation $\omega$
+and a translation $v$ per unit of position, has no such gap. It
 gives every motion of the family with finite numbers:
 
-| Connection | Angular velocity $\omega$ | Linear velocity $v$ |
+| Connection | Rotation per unit of position $\omega$ | Translation per unit of position $v$ |
 |---|---|---|
 | Revolute | unit vector along the axis | zero |
 | Prismatic | zero | unit vector along the axis |
 | Helical | unit vector along the axis | $\omega \cdot p / 2\pi$ |
 
-The normalization fixes the unit of the position, radians when the child rotates and meters when it only
-translates. A connection that moves its child faster or slower per unit of position keeps the normalized
-screw axis and scales its position with its `multiplier`.
+### Why the screw axis is normalized
 
-The pose the child reaches when it follows the screw axis for a position $\theta$ is the
-[matrix exponential](https://en.wikipedia.org/wiki/Matrix_exponential)
-$e^{[\mathcal{S}]\theta} = I + [\mathcal{S}]\theta + ([\mathcal{S}]\theta)^2 / 2! + \ldots$ of the
-$4 \times 4$ matrix $[\mathcal{S}]$ that holds the twist: the skew-symmetric matrix $[\omega]$ of the
-angular velocity in its upper left, the linear velocity $v$ in its upper right, and zeros below. Just as a
-quantity growing at the rate $a$ is multiplied by $e^{at}$ after the time $t$, a body moving with the
-twist $\mathcal{S}$ is moved by the transformation $e^{[\mathcal{S}]\theta}$ after $\theta$.
-[Proposition 3.25](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=123) gives it in closed form: if the child rotates, it rotates the child by
-$\theta$ about $\omega$ and translates it by
-$(I\theta + (1 - \cos\theta)[\omega] + (\theta - \sin\theta)[\omega]^2)\,v$. If the child only
-translates, it translates the child by $v\theta$.
+Following $k\,\mathcal{S}$ for $\theta / k$ moves the child as following $\mathcal{S}$ for $\theta$ does,
+for any $k \neq 0$. The normalization fixes $k$:
+
+- The position is in radians when the child rotates and in meters when it only translates. Limits of
+  degrees of freedom, the joints of URDF, MJCF and SDF files, and MuJoCo's hinge and slide joints all
+  assume these units.
+- Connections that move their child alike have equal screw axes.
+- Observed poses determine only $\theta\,\mathcal{S}$, so an estimator does not have to find the scale.
+
+The sign stays open: $-\mathcal{S}$ at $-\theta$ moves the child like $\mathcal{S}$ at $\theta$. To move
+the child faster or slower per unit of position, keep the screw axis normalized and set the connection's
+`multiplier`. `ScrewAxis.is_normalized` checks the normalization, and a `ScrewAxisConnection` raises an
+`UnnormalizedScrewAxisError` for a screw axis that fails it.
+
+```{code-cell} ipython3
+:tags: [remove-cell]
+
+from krrood_spatial_math.spatial_types import ScrewAxis
+
+normalized = ScrewAxisConnection.create_helical_screw_axis(axis=Vector3.Z(), pitch=0.004)
+scaled = ScrewAxis(
+    rotation_per_unit_position=normalized.rotation_per_unit_position * 2.5,
+    translation_per_unit_position=normalized.translation_per_unit_position * 2.5,
+)
+flipped = ScrewAxis(
+    rotation_per_unit_position=-normalized.rotation_per_unit_position,
+    translation_per_unit_position=-normalized.translation_per_unit_position,
+)
+assert normalized.is_normalized and not scaled.is_normalized and flipped.is_normalized
+for position in [-1.2, 0.0, 0.7]:
+    expected = normalized.to_displacement(position=position).to_np()
+    assert np.allclose(scaled.to_displacement(position=position / 2.5).to_np(), expected)
+    assert np.allclose(flipped.to_displacement(position=-position).to_np(), expected)
+```
+
+Following the screw axis for a position $\theta$ moves the child by the displacement that the screw axis
+produces over that change of position.
+[From a rate to a displacement](https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math/rates_of_motion.html#from-a-rate-to-a-displacement)
+in the krrood_spatial_math book derives it: the child turns by the rotation vector $r = \theta\,\omega$,
+and its origin moves by $t = \theta\,v$ plus two correction terms built from $r \times t$, which carry it
+along the arc it follows while it turns.
 
 ## The transformation matrix
 
@@ -552,14 +583,18 @@ translation grows with the angle by the pitch $h = p / 2\pi$ per radian. For an 
 direction $\hat{s}$, a helical connection rotates about $\hat{s}$ and translates by $h\theta$ along
 $\hat{s}$, not along $z$.
 
-$T(\theta)$ is the matrix exponential $e^{[\mathcal{S}]\theta}$ described above, for a screw axis through
-the origin of the connection frame: there $v$ is parallel to $\omega$, so $[\omega]v = 0$, and the
-translation of Proposition 3.25 reduces to $v\theta$.
+$T(\theta)$ is the displacement of the screw axis described above, for a screw axis through the origin of
+the connection frame. There $v$ is parallel to $\omega$, so $t = \theta\,v$ is parallel to
+$r = \theta\,\omega$, both correction terms vanish with $r \times t = 0$, and the translation is
+$v\theta$.
 
 ## Where the axis lies
 
-In general, a screw axis may lie anywhere in the frame it is expressed in. The linear velocity then
-carries the position of the axis, $v = -\omega \times q + h\omega$ for a point $q$ on the axis. The
+In general, a screw axis may lie anywhere in the frame it is expressed in. Its translation $v$ is
+that of the point of the child at the frame's origin, which circles an axis that misses the origin, as
+[Displacements, twists and screw axes](https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math/rates_of_motion.html#displacements-twists-and-screw-axes)
+explains. The translation therefore carries the position of the axis,
+$v = -\omega \times q + h\omega$ for a point $q$ on the axis. The
 [product of exponentials formula](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=159) uses
 this: it expresses the screw axes of all joints of a robot in one base frame, each at its own place.
 
@@ -567,19 +602,19 @@ A `ScrewAxisConnection` instead requires its axis to pass through the origin of 
 that $q = 0$ and $v = h\omega$ is parallel to $\omega$. The connection frame, placed by
 `parent_T_connection_expression`, carries the position of the axis. This has three consequences:
 
-- **The twist says how the child moves, the connection frame where.** The screw axis holds only the
+- **The screw axis says how the child moves, the connection frame where.** The screw axis holds only the
   direction of the axis in the connection frame and the pitch. Where the axis lies is held by the
   connection frame alone.
 - **Joints from robot and scene descriptions map directly.** A
   [URDF joint](https://wiki.ros.org/urdf/XML/joint), and the joints of MJCF, SDF and USD, consist of an
   origin and an axis direction through it, which become the connection frame and the screw axis.
-- **The translation simplifies.** As $v$ is parallel to $\omega$, $[\omega]v = 0$, and the translation
-  of Proposition 3.25 reduces to $v\theta$.
+- **The translation simplifies.** As $v$ is parallel to $\omega$, the correction terms of the
+  displacement vanish, and the translation is $v\theta$, as in the transformation matrix above.
 
 A connection given a screw axis that misses the origin of its connection frame raises a
 `ScrewAxisOffConnectionOriginError`. A screw axis $(\omega, v)$ in the general form, with
 $\lVert\omega\rVert = 1$, is converted by moving the connection frame to the point $q = \omega \times v$
-on the axis, placing the child relative to the moved frame, and keeping the twist
+on the axis, placing the child relative to the moved frame, and keeping the screw axis
 $(\omega, (\omega \cdot v)\,\omega)$ there.
 
 ```{code-cell} ipython3

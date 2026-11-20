@@ -224,8 +224,8 @@ class TestFactories(unittest.TestCase):
             )
         assert bottle_cap.movable_joint.behaves_like_a_screw_connection
         assert np.allclose(
-            bottle_cap.movable_joint.screw_axis.linear_velocity,
-            bottle_cap.movable_joint.screw_axis.angular_velocity
+            bottle_cap.movable_joint.screw_axis.translation_per_unit_position,
+            bottle_cap.movable_joint.screw_axis.rotation_per_unit_position
             * (screw_pitch / (2 * np.pi)),
         )
         assert bottle_cap.movable_joint.parent == world.root

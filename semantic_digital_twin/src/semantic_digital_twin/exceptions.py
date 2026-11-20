@@ -21,7 +21,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from krrood_spatial_math.spatial_types import Twist
+    from krrood_spatial_math.spatial_types import ScrewAxis
     from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
@@ -833,7 +833,7 @@ class ScrewJointUnsupportedByMujocoError(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            "export only connections whose normalized twist behaves like a revolute or "
+            "export only connections whose screw axis behaves like a revolute or "
             "prismatic connection."
         )
 
@@ -846,7 +846,7 @@ class UnnormalizedScrewAxisError(UsageError):
     must translate one meter per unit of position.
     """
 
-    screw_axis: Twist
+    screw_axis: ScrewAxis
     """
     The screw axis the connection was given.
     """
@@ -859,8 +859,9 @@ class UnnormalizedScrewAxisError(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            "give a rotating screw axis a unit angular velocity, and a translating one "
-            "a unit linear velocity; use the multiplier to scale the position."
+            "give a rotating screw axis a unit rotation per unit of position, and one "
+            "that only translates a unit translation; use the multiplier to scale the "
+            "position."
         )
 
 
@@ -871,7 +872,7 @@ class ScrewAxisOffConnectionOriginError(UsageError):
     origin of the connection frame, which places the axis.
     """
 
-    screw_axis: Twist
+    screw_axis: ScrewAxis
     """
     The screw axis the connection was given.
     """
@@ -885,7 +886,7 @@ class ScrewAxisOffConnectionOriginError(UsageError):
     def suggest_correction(self) -> str:
         return (
             "place the axis with parent_T_connection_expression and give the screw "
-            "axis a linear velocity parallel to its angular velocity."
+            "axis a translation parallel to its rotation."
         )
 
 
@@ -896,7 +897,7 @@ class ScrewAxisWithoutTranslationError(UsageError):
     child, so that no position advances the child along the axis.
     """
 
-    screw_axis: Twist
+    screw_axis: ScrewAxis
     """
     The screw axis of the connection.
     """
@@ -904,7 +905,7 @@ class ScrewAxisWithoutTranslationError(UsageError):
     def error_message(self) -> str:
         return (
             f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} has no "
-            f"linear velocity, so the child never translates along it."
+            f"translation, so the child never translates along it."
         )
 
     def suggest_correction(self) -> str:

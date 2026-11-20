@@ -87,7 +87,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
-    Twist,
+    ScrewAxis,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasApertures,
@@ -1118,7 +1118,7 @@ def test_connection_6dof_spec_binds_type_without_params():
 
 def test_active_1dof_spec_captures_parameters():
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.0)
-    screw_axis = Twist(linear_velocity=Vector3.Z())
+    screw_axis = ScrewAxis(translation_per_unit_position=Vector3.Z())
     spec = ScrewAxisConnectionSpecification(
         screw_axis=screw_axis,
         multiplier=2.0,
@@ -1133,7 +1133,7 @@ def test_active_1dof_spec_captures_parameters():
 
 
 def test_active_1dof_spec_defaults():
-    screw_axis = Twist(angular_velocity=Vector3.Z())
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3.Z())
     spec = ScrewAxisConnectionSpecification(screw_axis=screw_axis)
     assert spec.connection_type is ScrewAxisConnection
     assert spec._create_with_dofs_kwargs() == {
@@ -1256,8 +1256,8 @@ def test_screw_connection_spec_connect_forwards_pitch(empty_world):
         ),
     ).connect(empty_world, child=child)
     assert np.allclose(
-        connection.screw_axis.linear_velocity,
-        connection.screw_axis.angular_velocity * (0.005 / (2 * np.pi)),
+        connection.screw_axis.translation_per_unit_position,
+        connection.screw_axis.rotation_per_unit_position * (0.005 / (2 * np.pi)),
     )
 
 

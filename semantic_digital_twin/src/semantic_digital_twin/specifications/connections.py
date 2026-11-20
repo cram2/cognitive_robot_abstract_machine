@@ -13,7 +13,7 @@ from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospect
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.exceptions import MissingConnectionParentError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Twist
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, ScrewAxis
 from semantic_digital_twin.specifications.base import NamedSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -295,9 +295,9 @@ class ScrewAxisConnectionSpecification(
     thread of its bottle, depending on its :attr:`screw_axis`.
     """
 
-    screw_axis: Twist = field(kw_only=True)
+    screw_axis: ScrewAxis = field(kw_only=True)
     """
-    The twist of the child per unit of position, see
+    How the child's pose changes per unit of position, see
     :attr:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection.screw_axis`.
     """
 

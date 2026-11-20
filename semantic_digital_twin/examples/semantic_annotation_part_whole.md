@@ -49,7 +49,7 @@ drawer hangs from, which `drawer.movable_joint` returns.
 import numpy as np
 
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
-from krrood_spatial_math.spatial_types import Twist
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -71,7 +71,7 @@ with world.modify_world():
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=Twist(linear_velocity=Vector3.X()),
+            screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()),
         ),
     )
     handle = Handle.create_with_new_body_in_world(

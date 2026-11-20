@@ -20,7 +20,7 @@ from krrood_spatial_math.exceptions import MissingReferenceFrameError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
-    Twist,
+    ScrewAxis,
 )
 from scipy.spatial.transform import Rotation
 
@@ -730,14 +730,16 @@ def _random_screw_axis_setup(seed: int) -> tuple[np.ndarray, np.ndarray]:
 
 def _screw_axis_along(
     axis: np.ndarray, rotation_per_position: float, translation_per_position: float
-) -> Twist:
+) -> ScrewAxis:
     """
     The screw axis that rotates ``rotation_per_position`` radians about ``axis`` and
     translates ``translation_per_position`` meters along it per unit of position.
     """
-    return Twist(
-        angular_velocity=Vector3.from_iterable(axis * rotation_per_position),
-        linear_velocity=Vector3.from_iterable(axis * translation_per_position),
+    return ScrewAxis(
+        rotation_per_unit_position=Vector3.from_iterable(axis * rotation_per_position),
+        translation_per_unit_position=Vector3.from_iterable(
+            axis * translation_per_position
+        ),
     )
 
 
@@ -893,8 +895,9 @@ def test_screw_axis_connection_rejects_a_screw_axis_off_the_connection_origin(
             world=world,
             parent=parent,
             child=child,
-            screw_axis=Twist(
-                angular_velocity=Vector3.Z(), linear_velocity=Vector3(0, -0.4, 0)
+            screw_axis=ScrewAxis(
+                rotation_per_unit_position=Vector3.Z(),
+                translation_per_unit_position=Vector3(0, -0.4, 0),
             ),
         )
 
@@ -944,7 +947,7 @@ def test_position_for_translation_advances_the_child_by_that_distance(
 
     assert_allclose(
         parent_T_child_after[:3, 3] - parent_T_child_before[:3, 3],
-        distance * screw_axis.screw_axis_direction.to_np()[:3],
+        distance * screw_axis.unit_direction.to_np()[:3],
         atol=1e-9,
     )
 

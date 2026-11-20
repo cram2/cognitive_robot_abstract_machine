@@ -753,9 +753,7 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
             {
                 self.pos_str: joint_pos,
                 self.quat_str: joint_quat,
-                self.axis_str: entity.screw_axis.screw_axis_direction.to_np().tolist()[
-                    :3
-                ],
+                self.axis_str: entity.screw_axis.unit_direction.to_np().tolist()[:3],
                 self.range_str: joint_range,
                 self.armature_str: entity.dynamics.armature,
                 self.dry_friction_str: entity.dynamics.dry_friction,
@@ -1725,7 +1723,7 @@ class MujocoScrewAxisJointConverter(
 ):
     """
     Converts a screw axis connection to a MuJoCo hinge or slide joint, after how its
-    normalized twist behaves.
+    screw axis behaves.
     """
 
     def _post_convert(

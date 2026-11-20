@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from typing_extensions import ClassVar
 
-from krrood_spatial_math.spatial_types import Twist, Vector3
+from krrood_spatial_math.spatial_types import ScrewAxis, Vector3
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
     ModelUriResolver,
@@ -279,7 +279,9 @@ class TestJointParsing:
     def test_parses_axis(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
         screw_axis = connection_named(world, "hinge").screw_axis
-        assert np.allclose(screw_axis, Twist(angular_velocity=Vector3.X()))
+        assert np.allclose(
+            screw_axis, ScrewAxis(rotation_per_unit_position=Vector3.X())
+        )
 
     def test_parses_limits(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()

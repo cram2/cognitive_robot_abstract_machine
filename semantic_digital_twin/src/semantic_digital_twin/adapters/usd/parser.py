@@ -43,7 +43,7 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     RotationMatrix,
     Vector3,
-    Twist,
+    ScrewAxis,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -233,7 +233,7 @@ class USDPhysicsJointType(StrEnum):
             USDPhysicsJointType.PRISMATIC: ScrewAxisConnectionSpecification,
         }[self]
 
-    def create_screw_axis(self, *, direction: Vector3) -> Twist:
+    def create_screw_axis(self, *, direction: Vector3) -> ScrewAxis:
         """
         :param direction: The unit vector this movable joint moves along or about.
         :return: The screw axis of the connection this movable joint type becomes.

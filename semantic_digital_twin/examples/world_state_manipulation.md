@@ -31,7 +31,7 @@ import time
 import numpy as np
 from krrood.entity_query_language.factories import entity, variable, in_, the
 
-from krrood_spatial_math.spatial_types import Twist
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
@@ -53,7 +53,7 @@ with world.modify_world():
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=Twist(linear_velocity=Vector3.X()),
+            screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()),
         ),
     )
     handle = Handle.create_with_new_body_in_world(
