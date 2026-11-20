@@ -108,13 +108,14 @@ class ComputationSetting:
     def reference(cls) -> Self:
         """
         :return: The setting every method that trains on the GPU is measured in first,
-            with dense edges since jax takes minutes to compile sparse ones.
+            with block edges, which jax compiles fast and which grow with the edges of a
+            folded circuit rather than with the square of its nodes.
         """
         return cls(
             array_library=ArrayLibrary.JAX,
             device=Device.GRAPHICS_PROCESSOR,
             floating_point_type=FloatingPointType.FLOAT32,
-            edge_representation=EdgeRepresentation.DENSE,
+            edge_representation=EdgeRepresentation.BLOCK,
         )
 
     @classmethod
