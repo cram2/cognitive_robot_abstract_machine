@@ -37,7 +37,6 @@ dependencies = [
     "sqlalchemy",
     "probabilistic_model>=26.10.0",
     "random_events>=26.10.0",
-    "scipy",
 ]
 
 [project.urls]

@@ -1,35 +1,27 @@
 """
-The values the parameters of a trial may take, and the models that draw them.
+The values the parameters of a trial may take, and the parameters a campaign tries.
 """
 
 from __future__ import annotations
 
-import math
+import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
-from probabilistic_model.distributions.gaussian import GaussianDistribution
-from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
-    ProbabilisticCircuit,
-    ProductUnit,
-    SumUnit,
-    leaf,
-)
-from typing_extensions import TYPE_CHECKING, Generic, Self
+from typing_extensions import TYPE_CHECKING, Generic, get_type_hints
 
 from krrood.bounds import Bounds
-from krrood.entity_query_language.factories import ConditionType
+from krrood.entity_query_language.factories import ConditionType, a
 from krrood.entity_query_language.query.match import Match
-from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import ModelRegistry
-from krrood.parametrization.parameterizer import ModelQueryParameters
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
-from krrood.parametrization.trials.exceptions import (
-    NoSuccessfulTrials,
-    ParameterWithoutCentre,
+from krrood.parametrization.trials.records import (
+    AdoptedValue,
+    InformedField,
+    TParameters,
 )
-from krrood.parametrization.trials.records import TParameters, Trial, TrialParameters
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 if TYPE_CHECKING:
@@ -58,11 +50,54 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
 
     def pattern(self) -> Match[TParameters]:
         """
-        :return: The pattern of the parameters, with every number left to be drawn.
-        :raises FieldOfUnsupportedType: If a field is neither a number nor a
-            dataclass.
+        :return: The pattern of the parameters, with every field left to be drawn.
         """
-        return self.get_type_of_generic_parameter(parameter=TParameters).pattern()
+        return self.underspecified_pattern(
+            parameter_type=self.get_type_of_generic_parameter(parameter=TParameters)
+        )
+
+    @classmethod
+    def underspecified_pattern(cls, *, parameter_type: type) -> Match:
+        """
+        :param parameter_type: The parameters or a dataclass nested in them.
+        :return: The pattern of the dataclass, with every field that is no dataclass
+            left to be drawn.
+        """
+        hints = get_type_hints(parameter_type)
+        return a(parameter_type)(
+            **{
+                parameter_field.name: (
+                    cls.underspecified_pattern(
+                        parameter_type=hints[parameter_field.name]
+                    )
+                    if dataclasses.is_dataclass(hints[parameter_field.name])
+                    else ...
+                )
+                for parameter_field in dataclasses.fields(parameter_type)
+            }
+        )
+
+    @classproperty
+    def informed_fields(cls) -> list[InformedField]:
+        """
+        The fields of actions whose defaults the parameters inform; none by default.
+        """
+        return []
+
+    def adopted_values(self, *, parameters: TParameters) -> list[AdoptedValue]:
+        """
+        :param parameters: Parameters of this space, such as those that worked best.
+        :return: Their value for every field they inform.
+        """
+        return [
+            AdoptedValue(
+                informed_field=informed_field,
+                value=informed_field.parameter.apply_mapping_on_external_root(
+                    instance=parameters
+                ),
+            )
+            for informed_field in self.informed_fields
+        ]
 
     def statement(self) -> Match[TParameters]:
         """
@@ -105,84 +140,6 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
         :return: The conditions that keep the parameter within the bounds.
         """
         return [value >= bounds.lower, value < bounds.upper]
-
-
-# %% drawing near parameters that worked
-
-
-@dataclass(kw_only=True)
-class NearCentresRegistry(ModelRegistry):
-    """
-    Answers a statement of trial parameters with an equal mixture of one Gaussian around
-    each of :attr:`centres`, whose standard deviation along every parameter is
-    :attr:`spread` times the range the statement allows that parameter.
-    """
-
-    centres: list[TrialParameters]
-    """
-    The parameters the draws are biased towards, such as those of successful trials.
-    """
-
-    spread: float = 0.1
-    """
-    The standard deviation of each Gaussian along a parameter, as a fraction of the
-    range the statement allows the parameter.
-    """
-
-    @classmethod
-    def from_successful_trials(
-        cls, *, trials: list[Trial], spread: float = 0.1
-    ) -> Self:
-        """
-        :param trials: The trials of a campaign.
-        :param spread: The spread of the registry, as in :attr:`spread`.
-        :return: A registry that draws near the parameters of every trial that
-            succeeded, so that the next campaign tries more like them.
-        :raises NoSuccessfulTrials: If no trial succeeded.
-        """
-        centres = [trial.parameters for trial in trials if trial.succeeded]
-        if not centres:
-            raise NoSuccessfulTrials(number_of_trials=len(trials))
-        return cls(centres=centres, spread=spread)
-
-    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticCircuit:
-        """
-        :raises UnboundedParameterError: If the statement leaves a parameter without a
-            lower or an upper bound.
-        :raises ParameterWithoutCentre: If a parameter of the statement is not one of
-            :meth:`TrialParameters.values_by_attribute_path`.
-        """
-        allowed = parameters.truncation_assignments_from_where_conditions
-        if allowed is None:
-            raise UnboundedParameterError(
-                parameter_name=", ".join(parameters.variables)
-            )
-        [box] = allowed.simple_sets
-        prefix = f"{parameters.queried_class.__name__}."
-        circuit = ProbabilisticCircuit()
-        mixture = SumUnit(probabilistic_circuit=circuit)
-        for centre in self.centres:
-            values = centre.values_by_attribute_path()
-            component = ProductUnit(probabilistic_circuit=circuit)
-            for name, variable in parameters.variables.items():
-                path = name.removeprefix(prefix)
-                if path not in values:
-                    raise ParameterWithoutCentre(parameter_name=name)
-                if variable not in box.keys():
-                    raise UnboundedParameterError(parameter_name=name)
-                [interval] = box[variable].simple_sets
-                component.add_subcircuit(
-                    leaf(
-                        GaussianDistribution(
-                            variable=variable,
-                            location=values[path],
-                            scale=self.spread * (interval.upper - interval.lower),
-                        ),
-                        circuit,
-                    )
-                )
-            mixture.add_subcircuit(component, -math.log(len(self.centres)))
-        return circuit
 
 
 # %% the parameters a campaign tries

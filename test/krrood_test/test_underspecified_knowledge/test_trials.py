@@ -6,28 +6,33 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 import numpy as np
 import pytest
 
-
+from krrood.bounds import Bounds
+from krrood.entity_query_language.factories import (
+    a,
+    and_,
+    average,
+    probability_of,
+    set_of,
+    variable,
+)
+from krrood.entity_query_language.query.match import Match
+from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from krrood.parametrization.trials.analysis import CausalTrialAnalysis, TrialAnalysis
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.parametrization.trials.campaigns import TrialCampaign
-from krrood.bounds import Bounds
 from krrood.parametrization.trials.exceptions import (
-    FieldOfUnsupportedType,
     InformedFieldMissing,
     NoSuccessfulTrials,
-    NoTrials,
     OutcomeDidNotVaryInPilot,
-    ParameterWithoutCentre,
 )
+from krrood.parametrization.trials.models import TrialModel
 from krrood.parametrization.trials.parameter_spaces import (
     DrawnParameters,
     GivenParameters,
-    NearCentresRegistry,
 )
 from krrood.parametrization.trials.records import InformedField
 from krrood_compute_resources.exceptions import NotEnoughMemoryForWorkers
@@ -37,9 +42,7 @@ from ..dataset.throwing_trials import (
     CourtRecipe,
     CourtsInADatabase,
     FastThrowSpace,
-    NamedThrowParameters,
     ReleasePoint,
-    SpeedOnlyParameters,
     SteepThrowsLand,
     Throw,
     ThrowBall,
@@ -49,46 +52,6 @@ from ..dataset.throwing_trials import (
     ThrowSpace,
     ThrowsInADatabase,
 )
-
-# %% the parameters of a trial
-
-
-def test_the_values_of_parameters_are_keyed_by_their_attribute_paths():
-    """
-    A number in a nested dataclass is keyed by the path of attributes leading to it.
-    """
-    parameters = ThrowParameters(angle=0.7, speed=3.0, release=ReleasePoint(height=1.5))
-    assert parameters.values_by_attribute_path() == {
-        "angle": 0.7,
-        "speed": 3.0,
-        "release.height": 1.5,
-    }
-
-
-def test_parameters_with_a_field_that_is_no_number_have_no_values():
-    """
-    A field that holds text cannot be drawn, so it has no value as a parameter.
-    """
-    with pytest.raises(FieldOfUnsupportedType):
-        NamedThrowParameters(angle=0.7, thrower="Alice").values_by_attribute_path()
-
-
-def test_the_values_of_a_trial_are_keyed_by_their_paths_from_the_trial():
-    """
-    The parameters and the measurements of a trial are keyed by their paths from the
-    trial, so a parameter and a measurement of the same name stay apart.
-    """
-    parameters = ThrowParameters(angle=0.7, speed=3.0, release=ReleasePoint(height=1.5))
-    measurements = ThrowMeasurements(reached_angle=0.65)
-    throw = Throw(parameters=parameters, measurements=measurements, succeeded=True)
-    assert throw.values_by_attribute_path() == {
-        **{
-            f"parameters.{path}": value
-            for path, value in parameters.values_by_attribute_path().items()
-        },
-        "measurements.reached_angle": measurements.reached_angle,
-    }
-
 
 # %% drawing parameters
 
@@ -125,17 +88,16 @@ def test_every_drawn_parameter_lies_within_its_bounds(drawn):
             assert bounds.lower <= value < bounds.upper
 
 
-def test_the_statement_has_a_variable_for_every_number_of_the_parameters():
+def test_the_statement_names_its_variables_like_the_features_of_the_parameters():
     """
-    Every number of the parameters, the nested one included, is left to be drawn.
+    Every field of the parameters, the nested one included, is left to be drawn, named
+    as a model learned from parameters names it.
     """
+    example = ThrowParameters(angle=0.0, speed=0.0, release=ReleasePoint(height=0.0))
     statement = ThrowSpace().statement()
     names = UnderspecifiedParameters(statement=statement).variables
-    assert {name.removeprefix("ThrowParameters.") for name in names} == set(
-        ThrowParameters(
-            angle=0.0, speed=0.0, release=ReleasePoint(height=0.0)
-        ).values_by_attribute_path()
-    )
+    features = FeatureExtractor.from_instances(instances=[example])
+    assert set(names) == set(features.create_dataframe(instances=[example]).columns)
 
 
 def test_draws_the_space_does_not_accept_are_left_out():
@@ -148,42 +110,6 @@ def test_draws_the_space_does_not_accept_are_left_out():
     )
     assert 0 < len(drawn) < 30
     assert all(parameters.speed >= 3.0 for parameters in drawn)
-
-
-# %% drawing near parameters that worked
-
-
-def test_parameters_drawn_near_a_centre_lie_near_it():
-    """
-    With a small spread, every draw lies within five standard deviations of the centre
-    along every parameter.
-    """
-    space = ThrowSpace()
-    centre = ThrowParameters(angle=0.75, speed=2.0, release=ReleasePoint(height=1.4))
-    registry = NearCentresRegistry(centres=[centre], spread=0.01)
-    np.random.seed(2)
-    drawn = space.drawn_parameters(number_of_draws=20, model_registry=registry)
-    ranges = {
-        "angle": space.angle.upper - space.angle.lower,
-        "speed": space.speed.upper - space.speed.lower,
-        "release.height": space.height.upper - space.height.lower,
-    }
-    expected = centre.values_by_attribute_path()
-
-    assert len(drawn) == 20
-    for parameters in drawn:
-        for path, value in parameters.values_by_attribute_path().items():
-            assert abs(value - expected[path]) < 5 * registry.spread * ranges[path]
-
-
-def test_a_centre_without_a_value_for_a_parameter_is_refused():
-    """
-    A centre that gives no value for one of the statement's parameters cannot be drawn
-    near.
-    """
-    registry = NearCentresRegistry(centres=[SpeedOnlyParameters(speed=2.0)])
-    with pytest.raises(ParameterWithoutCentre):
-        ThrowSpace().drawn_parameters(number_of_draws=1, model_registry=registry)
 
 
 # %% keeping trials in a database
@@ -439,6 +365,20 @@ def central_and_edge_throws() -> GivenParameters[ThrowParameters]:
     )
 
 
+def success_rates_by_angle(*, trials: list[Throw]) -> dict[float, float]:
+    """
+    :param trials: Throws, some of them of the same parameters.
+    :return: The fraction of the throws of each aimed angle that landed.
+    """
+    throw = variable(Throw, domain=trials)
+    angle = throw.parameters.angle
+    success_rate = average(throw.succeeded)
+    return {
+        row[angle]: row[success_rate]
+        for row in set_of(angle, success_rate).grouped_by(angle).evaluate()
+    }
+
+
 def test_each_parameters_is_tried_as_often_as_it_is_repeated(
     database_url, court_id, central_and_edge_throws
 ):
@@ -455,112 +395,57 @@ def test_each_parameters_is_tried_as_often_as_it_is_repeated(
     )
 
     kept = campaign.run()
-    analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
+    angles = [throw.parameters.angle for throw in setup.create_store().stored_trials()]
 
     assert kept == len(central_and_edge_throws.parameters) * campaign.repetitions
-    assert sorted(
-        rate.number_of_trials for rate in analysis.success_rates_of_parameters()
-    ) == [campaign.repetitions] * len(central_and_edge_throws.parameters)
+    assert sorted(angles) == sorted(
+        parameters.angle
+        for parameters in central_and_edge_throws.parameters
+        for _ in range(campaign.repetitions)
+    )
 
 
-def test_repetitions_tell_apart_parameters_that_succeed_by_chance(
+@pytest.fixture
+def repeated_throws_in_the_wind(
     database_url, court_id, central_and_edge_throws
-):
+) -> list[Throw]:
     """
-    With wind, a throw aimed at the middle of the steep enough angles lands more often
-    than one aimed just above their edge, each rate being the fraction of its repeated
-    trials that landed.
+    The central and the edge throw, each tried forty times in the wind.
     """
     setup = ThrowingSetup(
         database_url=database_url,
         starting_state_id=court_id,
         performer=SteepThrowsLand(wind=0.1),
     )
-    campaign = TrialCampaign(
-        setup=setup, parameter_source=central_and_edge_throws, repetitions=40
-    )
     np.random.seed(4)
-
-    campaign.run()
-    trials = setup.create_store().stored_trials()
-    best, worst = TrialAnalysis(trials=trials).success_rates_of_parameters()
-
-    assert best.parameters == central_and_edge_throws.parameters[0]
-    assert worst.parameters == central_and_edge_throws.parameters[1]
-    assert best.success_rate == np.mean(
-        [trial.succeeded for trial in trials if trial.parameters == best.parameters]
-    )
+    TrialCampaign(
+        setup=setup, parameter_source=central_and_edge_throws, repetitions=40
+    ).run()
+    return setup.create_store().stored_trials()
 
 
-# %% what made trials succeed
-
-
-@pytest.fixture(scope="module")
-def analysis(drawn) -> TrialAnalysis:
-    """
-    The analysis of the drawn throws, which land exactly when they are steep enough.
-    """
-    performer = SteepThrowsLand()
-    return TrialAnalysis(
-        trials=[performer.perform(parameters=parameters) for parameters in drawn]
-    )
-
-
-def test_the_success_rate_is_the_fraction_of_trials_that_succeeded(analysis):
-    """
-    The success rate counts every trial once.
-    """
-    succeeded = [trial.succeeded for trial in analysis.trials]
-    assert analysis.success_rate == sum(succeeded) / len(succeeded)
-
-
-def test_the_values_success_depends_on_have_the_strongest_effects(analysis):
-    """
-    Without wind, the aimed and the reached angle are the same and alone decide whether
-    a throw lands, so their effects come first.
-    """
-    first, second, *_ = analysis.effects_on_success()
-    assert {first.attribute_path, second.attribute_path} == {
-        "parameters.angle",
-        "measurements.reached_angle",
-    }
-
-
-def test_a_measurement_that_decides_success_has_a_stronger_effect_than_its_cause(
-    drawn,
+def test_repetitions_tell_apart_parameters_that_succeed_by_chance(
+    repeated_throws_in_the_wind, central_and_edge_throws
 ):
     """
-    With wind, the reached angle alone decides whether a throw lands, so its effect is
-    stronger than that of the aimed angle.
+    With wind, a throw aimed at the middle of the steep enough angles lands more often
+    than one aimed just above their edge, each rate being the fraction of its repeated
+    trials that landed.
     """
-    np.random.seed(3)
-    performer = SteepThrowsLand(wind=0.2)
-    analysis = TrialAnalysis(
-        trials=[performer.perform(parameters=parameters) for parameters in drawn * 10]
+    central, edge = central_and_edge_throws.parameters
+    rates = success_rates_by_angle(trials=repeated_throws_in_the_wind)
+
+    assert rates[central.angle] > rates[edge.angle]
+    assert rates[central.angle] == np.mean(
+        [
+            throw.succeeded
+            for throw in repeated_throws_in_the_wind
+            if throw.parameters.angle == central.angle
+        ]
     )
-    [strongest, *_] = analysis.effects_on_success()
-    assert strongest.attribute_path == "measurements.reached_angle"
 
 
-def test_the_ranges_of_a_parameter_cover_every_trial(analysis):
-    """
-    Each trial falls into exactly one range of each parameter.
-    """
-    for effect in analysis.effects_on_success():
-        assert sum(success.number_of_trials for success in effect.ranges) == len(
-            analysis.trials
-        )
-
-
-def test_an_analysis_without_trials_is_refused():
-    """
-    There is nothing to analyse without any trial.
-    """
-    with pytest.raises(NoTrials):
-        TrialAnalysis(trials=[])
-
-
-# %% how sure an effect is and what causes success
+# %% what the model of the trials tells
 
 
 @pytest.fixture(scope="module")
@@ -574,118 +459,138 @@ def many_drawn() -> list[ThrowParameters]:
     )
 
 
-def effect_on_success(*, analysis: TrialAnalysis, attribute_path: str):
-    """
-    :param analysis: The analysis to read.
-    :param attribute_path: The parameter or measurement.
-    :return: Its effect on success.
-    """
-    [effect] = [
-        effect
-        for effect in analysis.effects_on_success()
-        if effect.attribute_path == attribute_path
-    ]
-    return effect
-
-
-def test_the_effect_of_the_value_that_decides_success_is_sure(many_drawn):
-    """
-    That the steepness of a throw decides whether it lands is told apart from chance.
-    """
-    performer = SteepThrowsLand()
-    analysis = TrialAnalysis(
-        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
-    )
-    effect = effect_on_success(analysis=analysis, attribute_path="parameters.angle")
-    assert effect.p_value < 0.01
-
-
-def test_the_effect_of_a_value_without_influence_is_not_sure(many_drawn):
-    """
-    That the speed seems to change whether a throw lands is put down to chance.
-    """
-    performer = SteepThrowsLand()
-    analysis = TrialAnalysis(
-        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
-    )
-    effect = effect_on_success(analysis=analysis, attribute_path="parameters.speed")
-    assert effect.p_value > 0.05
-
-
-def test_an_effect_on_trials_that_all_failed_has_no_p_value(many_drawn):
-    """
-    When no throw lands, no effect on landing can be told.
-    """
-    performer = SteepThrowsLand(steepness=Bounds(lower=2.0, upper=3.0))
-    analysis = TrialAnalysis(
-        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
-    )
-    effect = effect_on_success(analysis=analysis, attribute_path="parameters.angle")
-    assert effect.p_value is None
-
-
 @pytest.fixture(scope="module")
-def causes_in_the_wind(many_drawn) -> list:
+def throws_in_the_wind(many_drawn) -> list[Throw]:
     """
-    The causes of landing of throws turned by the wind, so that only the angle the ball
-    actually leaves the hand at decides whether it lands.
+    Throws turned by the wind, so that only the angle the ball actually leaves the hand
+    at decides whether it lands.
     """
     np.random.seed(7)
     performer = SteepThrowsLand(wind=0.2)
-    return CausalTrialAnalysis(
-        trials=[performer.perform(parameters=parameters) for parameters in many_drawn]
-    ).causes_of_success()
+    return [performer.perform(parameters=parameters) for parameters in many_drawn]
+
+
+@pytest.fixture(scope="module")
+def model_in_the_wind(throws_in_the_wind) -> TrialModel:
+    """
+    The model of the throws turned by the wind.
+    """
+    return TrialModel(trials=throws_in_the_wind)
+
+
+def test_the_probability_of_success_is_the_fraction_of_trials_that_succeeded(
+    model_in_the_wind, throws_in_the_wind
+):
+    """
+    The model says throws land as often as the throws it was learned from did.
+    """
+    throw = variable(Throw, domain=throws_in_the_wind)
+    probability = probability_of(throw.succeeded == True).first(  # noqa: E712
+        backend=ProbabilisticBackend(model_registry=model_in_the_wind.registry)
+    )
+    assert probability == pytest.approx(
+        np.mean([trial.succeeded for trial in throws_in_the_wind]), abs=1e-6
+    )
+
+
+def test_steep_throws_succeed_more_often_than_flat_ones(
+    model_in_the_wind, throws_in_the_wind
+):
+    """
+    Given the angle the ball leaves the hand at is steep enough, a throw is more likely
+    to land than given it is too flat.
+    """
+    steepness = SteepThrowsLand().steepness
+    throw = variable(Throw, domain=throws_in_the_wind)
+    reached = throw.measurements.reached_angle
+    backend = ProbabilisticBackend(model_registry=model_in_the_wind.registry)
+
+    steep = probability_of(
+        throw.succeeded == True,  # noqa: E712
+        and_(reached >= steepness.lower, reached < steepness.upper),
+    ).first(backend=backend)
+    flat = probability_of(
+        throw.succeeded == True,  # noqa: E712
+        reached < steepness.lower,
+    ).first(backend=backend)
+
+    assert steep > flat
+
+
+def landing() -> Match[Throw]:
+    """
+    :return: What causes a throw to land, with no cause marked, so that the learned
+        structure says which features are its causes.
+    """
+    throw = a(Throw)(
+        parameters=a(ThrowParameters)(
+            angle=..., speed=..., release=a(ReleasePoint)(height=...)
+        ),
+        measurements=a(ThrowMeasurements)(reached_angle=...),
+        succeeded=...,
+    )
+    throw.causes_effect(throw.succeeded == True)  # noqa: E712
+    return throw
+
+
+def test_only_the_features_joined_to_success_are_its_causes(model_in_the_wind):
+    """
+    The aimed and the reached angle are causes of landing; the speed and the release
+    height, which do not change whether a throw lands, are not.
+    """
+    causes = model_in_the_wind.causal_backend.rank_causes(expression=landing())
+    throw = variable(Throw, domain=[])
+    assert {found.cause_variable.name for found in causes} == {
+        throw.parameters.angle._name_,
+        throw.measurements.reached_angle._name_,
+    }
 
 
 def test_the_measurement_that_decides_success_is_its_strongest_cause(
-    causes_in_the_wind,
+    model_in_the_wind,
 ):
     """
-    The reached angle is the strongest cause of landing, and its region, where nearly
-    every throw lands, lies within the steep enough angles to 0.05 rad.
+    Setting the reached angle within its best region makes nearly every throw land.
     """
-    steepness = SteepThrowsLand().steepness
-    [strongest, *_] = causes_in_the_wind
-
-    assert strongest.attribute_path == "measurements.reached_angle"
-    assert steepness.lower - 0.05 <= strongest.region.lower
-    assert strongest.region.upper <= steepness.upper + 0.05
-    assert strongest.success_probability > 0.9
-
-
-def test_the_aimed_angle_causes_success_more_than_the_speed(causes_in_the_wind):
-    """
-    Aiming the throw at a steep angle makes landing more likely than any speed does.
-    """
-    probabilities = {
-        found.attribute_path: found.success_probability for found in causes_in_the_wind
-    }
-    assert probabilities["parameters.angle"] > probabilities["parameters.speed"]
+    [strongest, *_] = model_in_the_wind.causal_backend.rank_causes(expression=landing())
+    assert (
+        strongest.cause_variable.name
+        == variable(Throw, domain=[]).measurements.reached_angle._name_
+    )
+    assert strongest.effect_probability_given_region > 0.9
 
 
 # %% closing the loop
 
 
-def test_the_next_campaign_drawn_near_the_successes_succeeds_more_often(drawn):
+@pytest.fixture(scope="module")
+def drawn_throws(drawn) -> list[Throw]:
+    """
+    The drawn throws, which land exactly when they are steep enough.
+    """
+    performer = SteepThrowsLand()
+    return [performer.perform(parameters=parameters) for parameters in drawn]
+
+
+def test_the_next_campaign_drawn_near_the_successes_succeeds_more_often(
+    drawn, drawn_throws
+):
     """
     Throws drawn near the throws that landed land more often than throws drawn
     uniformly.
     """
-    performer = SteepThrowsLand()
-    trials = [performer.perform(parameters=parameters) for parameters in drawn]
-    registry = NearCentresRegistry.from_successful_trials(trials=trials, spread=0.05)
+    registry = TrialModel(trials=drawn_throws).registry_near_successes()
     np.random.seed(8)
-    next_trials = [
+    performer = SteepThrowsLand()
+    next_throws = [
         performer.perform(parameters=parameters)
         for parameters in ThrowSpace().drawn_parameters(
             number_of_draws=len(drawn), model_registry=registry
         )
     ]
 
-    assert registry.centres == [trial.parameters for trial in trials if trial.succeeded]
-    assert (
-        TrialAnalysis(trials=next_trials).success_rate
-        > TrialAnalysis(trials=trials).success_rate
+    assert np.mean([throw.succeeded for throw in next_throws]) > np.mean(
+        [throw.succeeded for throw in drawn_throws]
     )
 
 
@@ -696,40 +601,37 @@ def test_drawing_near_the_successes_of_trials_that_all_failed_is_refused(drawn):
     performer = SteepThrowsLand(steepness=Bounds(lower=2.0, upper=3.0))
     trials = [performer.perform(parameters=parameters) for parameters in drawn]
     with pytest.raises(NoSuccessfulTrials):
-        NearCentresRegistry.from_successful_trials(trials=trials)
+        TrialModel(trials=trials).registry_near_successes()
 
 
 def test_the_best_values_are_adopted_for_the_fields_they_inform(
-    database_url, court_id, central_and_edge_throws
+    repeated_throws_in_the_wind, central_and_edge_throws
 ):
     """
     The values of the throw that landed most often are adopted for the fields of the
     action its parameters inform.
     """
-    setup = ThrowingSetup(
-        database_url=database_url,
-        starting_state_id=court_id,
-        performer=SteepThrowsLand(wind=0.1),
-    )
-    np.random.seed(4)
-    TrialCampaign(
-        setup=setup, parameter_source=central_and_edge_throws, repetitions=40
-    ).run()
-    analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
-    [best, *_] = analysis.success_rates_of_parameters()
+    rates = success_rates_by_angle(trials=repeated_throws_in_the_wind)
+    [best] = [
+        parameters
+        for parameters in central_and_edge_throws.parameters
+        if rates[parameters.angle] == max(rates.values())
+    ]
+
+    space = ThrowSpace()
 
     adopted = {
-        value.informed_field.field_name: value.value
-        for value in analysis.adopted_values()
+        value.informed_field.informed._attribute_name_: value.value
+        for value in space.adopted_values(parameters=best)
     }
 
     assert adopted == {
-        informed_field.field_name: best.parameters.values_by_attribute_path()[
-            informed_field.attribute_path
-        ]
-        for informed_field in ThrowParameters.informed_fields
+        informed_field.informed._attribute_name_: (
+            informed_field.parameter.apply_mapping_on_external_root(instance=best)
+        )
+        for informed_field in space.informed_fields
     }
-    assert adopted["aim_angle"] == central_and_edge_throws.parameters[0].angle
+    assert best == central_and_edge_throws.parameters[0]
 
 
 def test_an_informed_field_knows_the_default_it_would_replace():
@@ -737,14 +639,19 @@ def test_an_informed_field_knows_the_default_it_would_replace():
     The default an informed field has now is the one its action declares.
     """
     informed_field = InformedField(
-        attribute_path="angle", owner=ThrowBall, field_name="aim_angle"
+        parameter=variable(ThrowParameters, domain=[]).angle,
+        informed=variable(ThrowBall, domain=[]).aim_angle,
     )
     assert informed_field.current_default == ThrowBall().aim_angle
 
 
 def test_informing_a_field_the_action_does_not_declare_is_refused():
     """
-    A misspelt field is refused when it is declared, not when a value is adopted.
+    A misspelt field, which the entity query language accepts as an attribute, is
+    refused when it is declared, not when a value is adopted.
     """
     with pytest.raises(InformedFieldMissing):
-        InformedField(attribute_path="angle", owner=ThrowBall, field_name="aim_angel")
+        InformedField(
+            parameter=variable(ThrowParameters, domain=[]).angle,
+            informed=variable(ThrowBall, domain=[]).aim_angel,
+        )

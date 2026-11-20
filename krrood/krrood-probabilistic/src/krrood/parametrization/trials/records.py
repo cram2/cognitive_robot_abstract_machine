@@ -8,95 +8,15 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 
-from typing_extensions import Any, Generic, Self, TypeVar, get_type_hints
+from typing_extensions import TYPE_CHECKING, Any, Generic, TypeVar
 
-from krrood.entity_query_language.factories import a
-from krrood.entity_query_language.query.match import Match
-from krrood.parametrization.trials.exceptions import (
-    FieldOfUnsupportedType,
-    InformedFieldMissing,
-)
-from krrood.patterns.classproperty import classproperty
+from krrood.parametrization.trials.exceptions import InformedFieldMissing
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
-# %% records of numbers
+if TYPE_CHECKING:
+    from krrood.entity_query_language.core.mapped_variable import Attribute
 
-
-@dataclass(kw_only=True)
-class RecordOfNumbers:
-    """
-    Numbers, directly or in nested dataclasses of numbers.
-    """
-
-    def values_by_attribute_path(self) -> dict[str, float]:
-        """
-        :return: Every number, keyed by the path of attributes that leads to it from
-            this object, such as ``stand_offset.forward``.
-        :raises FieldOfUnsupportedType: If a field holds neither a number nor a
-            dataclass.
-        """
-        return self.numbers_below(values=dataclasses.asdict(self), prefix="")
-
-    @classmethod
-    def numbers_below(cls, *, values: dict[str, Any], prefix: str) -> dict[str, float]:
-        """
-        :param values: The fields of the record or of a dataclass nested in it, by
-            name, with nested dataclasses as dictionaries of their fields.
-        :param prefix: The path of attributes that leads to the fields, ending in a dot,
-            or empty for the record itself.
-        :return: Every number among the fields, keyed by its path of attributes.
-        :raises FieldOfUnsupportedType: If a field holds neither a number nor a
-            dataclass.
-        """
-        numbers = {}
-        for name, value in values.items():
-            path = f"{prefix}{name}"
-            if isinstance(value, dict):
-                numbers.update(cls.numbers_below(values=value, prefix=f"{path}."))
-                continue
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise FieldOfUnsupportedType(
-                    owner=cls, field_name=path, field_type=type(value)
-                )
-            numbers[path] = float(value)
-        return numbers
-
-    @classmethod
-    def pattern(cls, *, marker: Any = ...) -> Match[Self]:
-        """
-        :param marker: What every number is matched with, such as ``...`` to leave it
-            to be drawn or ``cause`` to search it as a cause.
-        :return: The pattern of the record, with every number matched with the marker.
-        :raises FieldOfUnsupportedType: If a field is neither a number nor a
-            dataclass.
-        """
-        return cls.pattern_of_numbers(record_type=cls, marker=marker)
-
-    @classmethod
-    def pattern_of_numbers(cls, *, record_type: type, marker: Any) -> Match:
-        """
-        :param record_type: The record or a dataclass nested in it.
-        :param marker: What every number is matched with.
-        :return: The pattern of the dataclass, with every number matched with the
-            marker.
-        :raises FieldOfUnsupportedType: If a field is neither a number nor a
-            dataclass.
-        """
-        hints = get_type_hints(record_type)
-        assigned = {}
-        for record_field in dataclasses.fields(record_type):
-            hint = hints[record_field.name]
-            if dataclasses.is_dataclass(hint):
-                assigned[record_field.name] = cls.pattern_of_numbers(
-                    record_type=hint, marker=marker
-                )
-                continue
-            if hint not in (float, int):
-                raise FieldOfUnsupportedType(
-                    owner=record_type, field_name=record_field.name, field_type=hint
-                )
-            assigned[record_field.name] = marker
-        return a(record_type)(**assigned)
+# %% fields of actions that trials inform
 
 
 @dataclass(kw_only=True)
@@ -106,29 +26,31 @@ class InformedField:
     that worked best becomes that default.
     """
 
-    attribute_path: str
+    parameter: Attribute
     """
-    The parameter, as :meth:`RecordOfNumbers.values_by_attribute_path` names it.
-    """
-
-    owner: type
-    """
-    The dataclass of the action that declares the field.
+    The parameter, reached from a variable of the parameters, such as
+    ``variable(ThrowParameters, domain=[]).angle``.
     """
 
-    field_name: str
+    informed: Attribute
     """
-    The name of the field.
+    The field of the action, reached from a variable of the action.
     """
 
     def __post_init__(self) -> None:
         """
-        :raises InformedFieldMissing: If :attr:`owner` declares no field of that name.
+        :raises InformedFieldMissing: If the parameter or the field is not declared by
+            the dataclass it is reached from, such as when it is misspelt.
         """
-        if self.field_name not in {
-            declared.name for declared in dataclasses.fields(self.owner)
-        }:
-            raise InformedFieldMissing(owner=self.owner, field_name=self.field_name)
+        for attribute in [self.parameter, self.informed]:
+            if attribute._attribute_name_ not in {
+                declared.name
+                for declared in dataclasses.fields(attribute._owner_class_)
+            }:
+                raise InformedFieldMissing(
+                    owner=attribute._owner_class_,
+                    field_name=attribute._attribute_name_,
+                )
 
     @property
     def current_default(self) -> Any:
@@ -137,8 +59,8 @@ class InformedField:
         """
         [informed] = [
             declared
-            for declared in dataclasses.fields(self.owner)
-            if declared.name == self.field_name
+            for declared in dataclasses.fields(self.informed._owner_class_)
+            if declared.name == self.informed._attribute_name_
         ]
         if informed.default_factory is not dataclasses.MISSING:
             return informed.default_factory()
@@ -146,21 +68,35 @@ class InformedField:
 
 
 @dataclass(kw_only=True)
-class TrialParameters(RecordOfNumbers):
+class AdoptedValue:
     """
-    Everything one trial of a behaviour varies by.
+    The value of a parameter that worked best, to become the default of the field of an
+    action it informs.
     """
 
-    @classproperty
-    def informed_fields(cls) -> list[InformedField]:
-        """
-        The fields of actions whose defaults the parameters inform; none by default.
-        """
-        return []
+    informed_field: InformedField
+    """
+    The field whose default the parameter informs.
+    """
+
+    value: Any
+    """
+    The value of the parameter.
+    """
+
+
+# %% what a trial varies by and measures
 
 
 @dataclass(kw_only=True)
-class TrialMeasurements(RecordOfNumbers):
+class TrialParameters:
+    """
+    Everything one trial of a behaviour varies by, each a feature of the trial.
+    """
+
+
+@dataclass(kw_only=True)
+class TrialMeasurements:
     """
     What was measured while a trial ran, such as the pose actually reached or the
     contacts made, which may mediate between the parameters and the outcome.
@@ -209,20 +145,6 @@ class Trial(Generic[TParameters, TMeasurements], SubClassSafeGeneric):
     The database id of the state the trial started from; ``None`` while it is not
     stored.
     """
-
-    def values_by_attribute_path(self) -> dict[str, float]:
-        """
-        :return: Every number of the parameters and the measurements, keyed by its path
-            of attributes from the trial, such as ``parameters.release.height``.
-        """
-        return {
-            f"{record_name}.{path}": value
-            for record_name, record in [
-                ("parameters", self.parameters),
-                ("measurements", self.measurements),
-            ]
-            for path, value in record.values_by_attribute_path().items()
-        }
 
 
 TTrial = TypeVar("TTrial", bound=Trial)

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import Iterator
 
 from krrood.bounds import Bounds
-from krrood.entity_query_language.factories import ConditionType
+from krrood.entity_query_language.factories import ConditionType, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.utils import create_engine
@@ -85,52 +85,6 @@ class ThrowParameters(TrialParameters):
     release: ReleasePoint
     """
     Where the hand lets go.
-    """
-
-    @classproperty
-    def informed_fields(cls) -> list[InformedField]:
-        """
-        Unlike :attr:`TrialParameters.informed_fields`, the aimed angle and the release
-        height inform the defaults of :class:`ThrowBall`.
-        """
-        return [
-            InformedField(
-                attribute_path="angle", owner=ThrowBall, field_name="aim_angle"
-            ),
-            InformedField(
-                attribute_path="release.height",
-                owner=ThrowBall,
-                field_name="release_height",
-            ),
-        ]
-
-
-@dataclass(kw_only=True)
-class NamedThrowParameters(TrialParameters):
-    """
-    Parameters with a field that is not a number.
-    """
-
-    angle: float
-    """
-    The angle above the horizon the ball leaves the hand at, in radians.
-    """
-
-    thrower: str
-    """
-    Who throws.
-    """
-
-
-@dataclass(kw_only=True)
-class SpeedOnlyParameters(TrialParameters):
-    """
-    Parameters with fewer fields than a throw has.
-    """
-
-    speed: float
-    """
-    How fast the ball leaves the hand, in m/s.
     """
 
 
@@ -279,6 +233,21 @@ class ThrowSpace(ParameterSpace[ThrowParameters]):
     """
     The values of :attr:`ReleasePoint.height`.
     """
+
+    @classproperty
+    def informed_fields(cls) -> list[InformedField]:
+        """
+        Unlike :attr:`ParameterSpace.informed_fields`, the aimed angle and the release
+        height inform the defaults of :class:`ThrowBall`.
+        """
+        parameters = variable(ThrowParameters, domain=[])
+        action = variable(ThrowBall, domain=[])
+        return [
+            InformedField(parameter=parameters.angle, informed=action.aim_angle),
+            InformedField(
+                parameter=parameters.release.height, informed=action.release_height
+            ),
+        ]
 
     def conditions(self, *, parameters: Match[ThrowParameters]) -> list[ConditionType]:
         return [
