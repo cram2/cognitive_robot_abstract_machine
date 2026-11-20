@@ -5,15 +5,13 @@ arithmetic and frame checks :class:`Point` and :class:`Vector` implement on them
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
 from krrood_spatial_math.coordinate_system import GenericCoordinate
-from krrood_spatial_math.exceptions import (
-    PointAndVectorFramesDifferError,
-    ReferenceFrameMismatchError,
-)
+from krrood_spatial_math.coordinate_system import AxisCoordinate
+from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.point import Point
 
 from .dataset.spaces import (
@@ -22,7 +20,6 @@ from .dataset.spaces import (
     ScalablePlanePoint,
     ScalablePlaneVector,
 )
-from .dataset.frames import NamedFrame
 
 # %% fixtures
 
@@ -181,22 +178,37 @@ def test_a_point_is_not_moved_by_a_vector_of_another_frame(
         point + vector
 
 
-# %% a point and its vector share their kind of frame
+# %% coordinates are only the fields marked as coordinates
 
 
-def test_a_point_whose_vector_is_given_in_another_kind_of_frame_is_refused():
+def test_a_field_not_marked_as_a_coordinate_is_no_coordinate(scalable_plane_frame):
     """
-    A point type and its vector type must be given in one kind of frame.
+    A field a point type declares without marking it is kept out of its coordinates.
     """
-    with pytest.raises(PointAndVectorFramesDifferError):
 
-        @dataclass(kw_only=True)
-        class MisfitPoint(Point[NamedFrame, ScalablePlaneVector]):
-            """
-            A point of a 3D frame that claims to be moved by a vector of a plane.
-            """
+    @dataclass(kw_only=True)
+    class LabelledPoint(Point[ScalablePlaneVector]):
+        """
+        A point on a scalable plane that also carries a label.
+        """
 
-            x: float
-            """
-            The first coordinate.
-            """
+        x: float = field(metadata=AxisCoordinate().as_dict())
+        """
+        The first coordinate.
+        """
+
+        label: str
+        """
+        What the point marks.
+        """
+
+        y: float = field(metadata=AxisCoordinate().as_dict())
+        """
+        The second coordinate.
+        """
+
+    point = LabelledPoint(
+        x=1.0, label="corner", y=2.0, coordinate_system=scalable_plane_frame
+    )
+
+    assert point.coordinates == (1.0, 2.0)

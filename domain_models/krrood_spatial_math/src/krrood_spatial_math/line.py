@@ -7,7 +7,11 @@ from __future__ import annotations
 from typing_extensions import Generic, TypeVar
 
 from krrood.patterns.interface import Interface
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.subclass_safe_generic import (
+    DerivedGenericParameter,
+    SubClassSafeGeneric,
+)
 from krrood_spatial_math.coordinate_system import GenericCoordinate
 from krrood_spatial_math.point import GenericPoint
 from krrood_spatial_math.vector import GenericVector
@@ -15,10 +19,11 @@ from krrood_spatial_math.vector import GenericVector
 # %% straight lines given by a point and a direction
 
 
-class Line(Generic[GenericPoint, GenericVector], SubClassSafeGeneric, Interface):
+class Line(Generic[GenericPoint], SubClassSafeGeneric, Interface):
     """
     A straight line of an affine space: the points ``point + direction * t`` for every
-    number ``t``.
+    number ``t``. Its type parameter is the point type, whose vector type is the type of
+    :attr:`direction`.
 
     A direction alone fixes only which way a line runs, and every parallel line shares
     it; :attr:`point` fixes which of those lines this one is.
@@ -33,6 +38,13 @@ class Line(Generic[GenericPoint, GenericVector], SubClassSafeGeneric, Interface)
     """
     The vector the line runs along, given in the frame of :attr:`point`.
     """
+
+    @classproperty
+    def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+        """
+        The vector type, read from the point type.
+        """
+        return (DerivedGenericParameter(parameter=GenericVector, source=GenericPoint),)
 
     def point_at_position(
         self, *, position_along_line: GenericCoordinate
@@ -54,17 +66,26 @@ The kind of straight line of an affine space.
 # %% straight lines between two points
 
 
-class LineSegment(Generic[GenericPoint, GenericLine], SubClassSafeGeneric, Interface):
+class LineSegment(Generic[GenericLine], SubClassSafeGeneric, Interface):
     """
     The part of a straight line between two of its points: the points of :attr:`line`
     from position 0 at :attr:`start` to position 1 at :attr:`end`.
+
+    Its type parameter is the line type, whose point type is the type of :attr:`start`
+    and :attr:`end`.
     """
+
+    @classproperty
+    def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+        """
+        The point type, read from the line type.
+        """
+        return (DerivedGenericParameter(parameter=GenericPoint, source=GenericLine),)
 
     start: GenericPoint
     """
     The point the segment runs from.
     """
-
     end: GenericPoint
     """
     The point the segment runs to, given in the frame of :attr:`start`.

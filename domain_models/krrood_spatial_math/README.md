@@ -31,16 +31,17 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the
   right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
   with that frame's origin, x-axis and y-axis, that values on the plane are given in.
-- `krrood_spatial_math.point`: `Point[frame, vector]`, a point of an affine space given
-  by its coordinates in an affine frame, which are the fields a subclass declares. Its
-  `euclidean_distance` needs a Cartesian kind of frame and raises
-  `FrameMeasuresNoLengthsError` for any other. A third parameter names the coordinate
-  type when it is not `float`.
-- `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space, whose
-  `norm` and `dot` need a Cartesian kind of frame in the same way. The difference of
-  two points is a vector, and a point moved by a vector is a point.
-- `krrood_spatial_math.line`: `Line`, the points `point + direction * t` for every
-  number `t`.
+- `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space given
+  by its coordinates in an affine frame, the fields a subclass marks with
+  `AxisCoordinate`. A second parameter names the coordinate type when it is not
+  `float`. Its `norm` and `dot` are measured by the kind of frame, and an affine one
+  that is not Cartesian raises `FrameMeasuresNoLengthsError`.
+- `krrood_spatial_math.point`: `Point[vector]`, a point of an affine space, given in the
+  kind of frame of its vector type and measured by it in the same way. The difference
+  of two points is a vector, and a point moved by a vector is a point.
+- `krrood_spatial_math.line`: `Line[point]`, the points `point + direction * t` for every
+  number `t`, running along its point type's vector type, and `LineSegment[line]`, the
+  part of a line between two of its points.
 - `krrood_spatial_math.space_map`: `SpaceMap`, a map from the points of one space to
   those of another, such as a camera, and `OrthogonalProjection`, one onto a plane along
   its unit normal, which derives its projection lines and `unproject` from that normal
@@ -49,17 +50,19 @@ coordinate system. Its base depends on `krrood` alone.
   `Point3Dimensional`, `Vector3Dimensional`, `Line3Dimensional`,
   `RotationMatrix`, `Quaternion`, `AxisAngle`, `HomogeneousTransformationMatrix3Dimensional`,
   `Pose3Dimensional`, `Displacement`, `Twist` and `ScrewAxis`, as symbolic expressions
-  that can also hold plain numbers. Values derive from `SymbolicSpatialValue3Dimensional`
-  and changes from `SymbolicSpatialChange`; a value names the group that acts on it:
-  `SpecialEuclideanGroupAction` (SE(3)) or `SpecialOrthogonalGroupAction` (SO(3)).
+  that can also hold plain numbers. Values derive from `SymbolicSpatialValue` and changes
+  from `SymbolicSpatialChange`; a value names the groups that act on it:
+  `SpecialEuclideanGroupAction`, the rigid motions of its kind of frame, and
+  `SpecialOrthogonalGroupAction` (SO(3)), the rotations of a 3D value.
 - `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
   counterparts on a plane, `Point2Dimensional`, `Vector2Dimensional` and
   `Pose2Dimensional`, which lie on the x-y plane of their reference frame, an
   `EmbeddedPlane`, and are given in its `CartesianFrame2Dimensional`.
   `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two frames
   on one plane, and `EmbeddedPlaneProjection` the orthogonal projection onto a frame's
-  plane. Values derive from `SymbolicSpatialValue2Dimensional`, and SE(2) acts on them
-  as `PlanarSpecialEuclideanGroupAction`.
+  plane. They derive from `SymbolicSpatialValue` too, and SE(2) acts on them through the
+  same `SpecialEuclideanGroupAction`; a transformation refuses a value of the other
+  dimension.
 
 | Space | Frame | Coordinate change | Kept by the change |
 |---|---|---|---|
@@ -72,16 +75,16 @@ example, adds image planes, whose pixel frames are affine and related by affine 
 ## Adding a space
 
 A new space needs a space, a kind of frame on it with a frame of that kind, and a
-point and vector type given in that kind of frame. `Point` and `Vector` declare the
-frame field, do the arithmetic and refuse values of two frames, so the point and vector
-only declare their coordinates:
+vector type given in that kind of frame and a point type moved by it. `Point` and
+`Vector` declare the frame field, do the arithmetic and refuse values of two frames, so
+the point and vector only mark their coordinates:
 
 ```python
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 from krrood.patterns.interface import Interface
-from krrood_spatial_math.coordinate_system import AffineFrame
+from krrood_spatial_math.coordinate_system import AffineFrame, AxisCoordinate
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.vector import Vector
@@ -106,21 +109,21 @@ class CameraPixels(PixelFrame):
 
 @dataclass(kw_only=True)
 class PixelVector(Vector[PixelFrame]):
-    u: float
-    v: float
+    u: float = field(metadata=AxisCoordinate().as_dict())
+    v: float = field(metadata=AxisCoordinate().as_dict())
 
 
 @dataclass(kw_only=True)
-class PixelPoint(Point[PixelFrame, PixelVector]):
-    u: float
-    v: float
+class PixelPoint(Point[PixelVector]):
+    u: float = field(metadata=AxisCoordinate().as_dict())
+    v: float = field(metadata=AxisCoordinate().as_dict())
 ```
 
 With `frame = CameraPixels(name="camera")`,
 `PixelPoint(u=4, v=2, coordinate_system=frame) - PixelPoint(u=1, v=1, coordinate_system=frame)`
 is `PixelVector(u=3, v=1, coordinate_system=frame)`. Combining values of two frames
-raises `ReferenceFrameMismatchError`, and binding a point to a vector of another kind
-of frame raises `PointAndVectorFramesDifferError` when the class is defined. A change
+raises `ReferenceFrameMismatchError`, and the point's kind of frame is always its
+vector's, since it is read from the vector type. A change
 between two pixel frames implements `AffineCoordinateChange[PixelFrame]`.
 
 Points of two spaces, such as a body and an image of it, relate only through a map

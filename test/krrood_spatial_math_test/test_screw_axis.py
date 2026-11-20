@@ -11,7 +11,7 @@ import numpy as np
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.spatial_types import (
     ScrewAxis,
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     Twist,
     Vector3Dimensional,
 )
@@ -68,7 +68,7 @@ def test_a_screw_axis_is_a_value_given_in_a_cartesian_frame():
     """
     A screw axis is expressed in a reference frame.
     """
-    assert issubclass(ScrewAxis, SymbolicSpatialValue3Dimensional)
+    assert issubclass(ScrewAxis, SymbolicSpatialValue)
 
 
 def test_the_parts_of_a_screw_axis_are_expressed_in_its_frame(table_frame):

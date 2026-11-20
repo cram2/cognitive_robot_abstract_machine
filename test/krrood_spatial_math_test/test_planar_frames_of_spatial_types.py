@@ -28,9 +28,7 @@ from krrood_spatial_math.exceptions import (
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import (
-    SymbolicSpatialValue3Dimensional,
     HomogeneousTransformationMatrix3Dimensional,
-    Point3Dimensional,
     Pose3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
@@ -306,8 +304,14 @@ def test_a_planar_value_without_a_reference_frame_has_no_coordinate_system(
 
 
 @pytest.mark.parametrize("planar_value", planar_values)
-def test_a_planar_value_is_no_value_given_in_a_three_dimensional_frame(planar_value):
-    assert not issubclass(planar_value, SymbolicSpatialValue3Dimensional)
+def test_a_planar_value_is_given_in_a_frame_on_a_plane(planar_value):
+    """
+    A planar value binds the frame on its reference frame's plane, not a 3D frame.
+    """
+    assert (
+        planar_value.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
+        is CartesianFrame2Dimensional
+    )
 
 
 def test_a_two_dimensional_point_is_given_in_a_two_dimensional_cartesian_frame():

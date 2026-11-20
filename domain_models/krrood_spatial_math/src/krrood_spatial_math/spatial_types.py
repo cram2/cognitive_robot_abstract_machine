@@ -33,6 +33,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
 )
 from krrood_spatial_math.coordinate_system import (
     GenericCartesianFrame,
+    GenericCoordinateSystem,
     CoordinateRepresentation,
     RigidCoordinateChange,
 )
@@ -330,6 +331,25 @@ class SymbolicSpatialChange(
         result.child_frame = self.child_frame
         return result
 
+    def ensure_acts_on(self, *, operand: Any, operation: str) -> None:
+        """
+        :param operand: A value or change this change is applied to.
+        :param operation: The operator applying it, for the error message.
+        :raises UnsupportedOperationError: If ``operand`` is not moved by a rigid change,
+            or is given in another kind of frame than this change's.
+        :raises ReferenceFrameMismatchError: If ``operand`` is given in a frame other
+            than this change's child frame.
+        """
+        if not (
+            isinstance(operand, SpecialEuclideanGroupAction)
+            and operand.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
+            is self.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
+        ):
+            raise UnsupportedOperationError(
+                operation=operation, left=self, right=operand
+            )
+        self.ensure_operand_in_child_frame(operand)
+
     def ensure_operand_in_child_frame(self, operand: SymbolicSpatialType) -> None:
         """
         :param operand: A value or change this change is applied to.
@@ -349,19 +369,28 @@ class SymbolicSpatialChange(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SymbolicSpatialValue3Dimensional(
+class SymbolicSpatialValue(
     SymbolicSpatialType,
-    CoordinateRepresentation[CartesianFrame3Dimensional],
+    CoordinateRepresentation[GenericCartesianFrame],
     ABC,
 ):
     """
-    A value, as a symbolic matrix, such as a point or a pose, given in its
-    :attr:`~SymbolicSpatialType.reference_frame`, its coordinate system.
+    A value, as a symbolic matrix, such as a point or a pose, given relative to its
+    :attr:`~SymbolicSpatialType.reference_frame` in a frame of the kind its type binds.
     """
 
     @property
-    def coordinate_system(self) -> CartesianFrame3Dimensional | None:
-        return self.reference_frame
+    def coordinate_system(self) -> GenericCartesianFrame | None:
+        """
+        The frame of this value's kind that its reference frame fixes; ``None`` for a
+        value without a reference frame.
+        """
+        if self.reference_frame is None:
+            return None
+        frame_kind = self.get_type_of_generic_parameter(
+            parameter=GenericCoordinateSystem
+        )
+        return frame_kind.from_frame_3_dimensional(frame=self.reference_frame)
 
 
 # %% how a change or a rotation acts on a value
@@ -391,21 +420,18 @@ The kind of value or change a rotation is applied to.
 """
 
 
-class SpecialEuclideanGroupAction(SpecialOrthogonalGroupAction, Interface):
+class SpecialEuclideanGroupAction(Interface):
     """
-    A value or change the rigid motion group SE(3) acts on: a
-    :class:`HomogeneousTransformationMatrix3Dimensional` moves it, giving one of the same type.
-
-    SO(3) is the subgroup of SE(3) that keeps the origin, so it acts on it too.
+    A value or change the rigid motion group of its kind of frame acts on, SE(3) for a
+    3D frame and SE(2) for a frame on a plane: a homogeneous transformation between two
+    frames of that kind moves it, giving one of the same type.
     """
 
     @abstractmethod
-    def apply_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
-    ) -> Self:
+    def apply_transformation(self, *, transformation: SymbolicSpatialChange) -> Self:
         """
-        :param transformation: A transformation whose child frame is this value's
-            reference frame.
+        :param transformation: A transformation of this value's kind of frame whose
+            child frame is this value's reference frame.
         :return: This value, given in the reference frame of ``transformation``.
         """
 
@@ -418,7 +444,9 @@ The kind of value or change a transformation is applied to.
 """
 
 
-class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
+class HomogeneousCoordinates(
+    SpecialEuclideanGroupAction, SpecialOrthogonalGroupAction, Mixin
+):
     """
     A value stored as homogeneous coordinates, which a transformation or a rotation acts
     on by multiplying them from the left.
@@ -447,7 +475,7 @@ class HomogeneousCoordinates(SpecialEuclideanGroupAction, Mixin):
         return result
 
 
-class Orientation(SpecialEuclideanGroupAction, Mixin):
+class Orientation(SpecialEuclideanGroupAction, SpecialOrthogonalGroupAction, Mixin):
     """
     An orientation, which a transformation turns by its rotation and never shifts, since
     an orientation has no position.
@@ -463,6 +491,7 @@ class Orientation(SpecialEuclideanGroupAction, Mixin):
 class HomogeneousTransformationMatrix3Dimensional(
     SymbolicSpatialChange[CartesianFrame3Dimensional],
     SpecialEuclideanGroupAction,
+    SpecialOrthogonalGroupAction,
 ):
     """
     Represents a 4x4 transformation matrix used in kinematics and transformations.
@@ -759,9 +788,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
             this transformation's child frame.
         """
-        if not isinstance(other, SpecialEuclideanGroupAction):
-            raise UnsupportedOperationError(operation="dot", left=self, right=other)
-        self.ensure_operand_in_child_frame(other)
+        self.ensure_acts_on(operand=other, operation="dot")
         return other.apply_transformation(transformation=self)
 
     def apply_transformation(
@@ -898,7 +925,7 @@ class HomogeneousTransformationMatrix3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class RotationMatrix(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue[CartesianFrame3Dimensional],
     HomogeneousCoordinates,
 ):
     """
@@ -1298,7 +1325,7 @@ class RotationMatrix(
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     HomogeneousCoordinates,
     Vector[CartesianFrame3Dimensional, sm.Scalar],
 ):
@@ -1688,9 +1715,9 @@ class Vector3Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point3Dimensional(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     HomogeneousCoordinates,
-    Point[CartesianFrame3Dimensional, Vector3Dimensional, sm.Scalar],
+    Point[Vector3Dimensional],
 ):
     """
     Represents a 3D point with reference frame handling.
@@ -1969,7 +1996,7 @@ class Point3Dimensional(
 
 
 @dataclass(eq=False)
-class Line3Dimensional(Line[Point3Dimensional, Vector3Dimensional]):
+class Line3Dimensional(Line[Point3Dimensional]):
     """
     An infinite straight line in 3D space.
     """
@@ -1986,7 +2013,7 @@ class Line3Dimensional(Line[Point3Dimensional, Vector3Dimensional]):
 
 
 @dataclass(eq=False, kw_only=True)
-class LineSegment3Dimensional(LineSegment[Point3Dimensional, Line3Dimensional]):
+class LineSegment3Dimensional(LineSegment[Line3Dimensional]):
     """
     The part of a straight line in 3D space between two points.
     """
@@ -2013,7 +2040,7 @@ class LineSegment3Dimensional(LineSegment[Point3Dimensional, Line3Dimensional]):
 
 @dataclass(eq=False, init=False, repr=False)
 class Quaternion(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue[CartesianFrame3Dimensional],
     Orientation,
 ):
     """
@@ -2365,7 +2392,7 @@ class Quaternion(
 
 @dataclass(eq=False, init=False, repr=False)
 class AxisAngle(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue[CartesianFrame3Dimensional],
     Orientation,
 ):
     """
@@ -2537,7 +2564,7 @@ class AxisAngle(
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class VectorPair(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue[CartesianFrame3Dimensional],
     ABC,
 ):
     """
@@ -2838,7 +2865,7 @@ class ScrewAxis(VectorPair):
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose3Dimensional(
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue[CartesianFrame3Dimensional],
     HomogeneousCoordinates,
 ):
     """

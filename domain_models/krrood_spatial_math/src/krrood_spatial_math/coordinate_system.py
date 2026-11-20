@@ -10,6 +10,7 @@ from dataclasses import dataclass, fields
 
 from typing_extensions import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
+from krrood.patterns.field_metadata import FieldMetadata
 from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -57,8 +58,37 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
     coordinates of a point are its amounts along the axes from the origin.
 
     The axes may differ in length and need not be perpendicular, as the axes of an
-    image's pixels may.
+    image's pixels may, so an affine frame measures no lengths or angles.
     """
+
+    @classmethod
+    def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
+        """
+        :param first: A vector given in a frame of this kind.
+        :param second: A vector given in the same frame.
+        :return: The product of both lengths and the cosine of the angle between them.
+        :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
+        """
+        raise FrameMeasuresNoLengthsError(frame_kind=cls)
+
+    @classmethod
+    def norm(cls, *, vector: Vector) -> GenericCoordinate:
+        """
+        :param vector: A vector given in a frame of this kind.
+        :return: The length of ``vector``.
+        :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
+        """
+        return cls.inner_product(first=vector, second=vector) ** 0.5
+
+    @classmethod
+    def distance(cls, *, first: Point, second: Point) -> GenericCoordinate:
+        """
+        :param first: A point given in a frame of this kind.
+        :param second: A point given in the same frame.
+        :return: The straight-line distance between both points.
+        :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
+        """
+        return cls.norm(vector=first - second)
 
 
 GenericEuclideanSpace = TypeVar("GenericEuclideanSpace", bound=EuclideanSpace)
@@ -70,18 +100,16 @@ The kind of Euclidean space a Cartesian frame charts.
 class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
     """
     An affine frame whose axes are perpendicular and one unit of its Euclidean space
-    long.
+    long, so it measures lengths and angles.
 
-    Every Cartesian frame measures lengths and angles the same way, so the metric belongs
-    to the kind of frame and needs no frame instance.
+    Every Cartesian frame measures them the same way, so the metric belongs to the kind
+    of frame and needs no frame instance.
     """
 
     @classmethod
     def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
         """
-        :param first: A vector given in a frame of this kind.
-        :param second: A vector given in the same frame.
-        :return: The product of both lengths and the cosine of the angle between them.
+        The sum of the products of the coordinates, unlike :meth:`AffineFrame.inner_product`.
         """
         return sum(
             first_coordinate * second_coordinate
@@ -89,23 +117,6 @@ class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
                 first.coordinates, second.coordinates, strict=True
             )
         )
-
-    @classmethod
-    def norm(cls, *, vector: Vector) -> GenericCoordinate:
-        """
-        :param vector: A vector given in a frame of this kind.
-        :return: The length of ``vector``.
-        """
-        return cls.inner_product(first=vector, second=vector) ** 0.5
-
-    @classmethod
-    def distance(cls, *, first: Point, second: Point) -> GenericCoordinate:
-        """
-        :param first: A point given in a frame of this kind.
-        :param second: A point given in the same frame.
-        :return: The straight-line distance between both points.
-        """
-        return cls.norm(vector=first - second)
 
 
 # %% values given in a coordinate system
@@ -173,11 +184,19 @@ The kind of value given in a coordinate system.
 # %% values given by one coordinate per axis of a frame
 
 
+@dataclass(kw_only=True)
+class AxisCoordinate(FieldMetadata):
+    """
+    Marks a field of an :class:`AxisCoordinates` value as its coordinate along one axis.
+    The marked fields are the axes in the order they are declared.
+    """
+
+
 @dataclass(kw_only=True, eq=False)
 class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
     """
     A value given by one coordinate per axis of its coordinate system, such as a point or
-    a vector. Its coordinates are the fields its class declares, in declaration order.
+    a vector, whose coordinates are the fields its class marks with :class:`AxisCoordinate`.
     """
 
     coordinate_system: GenericCoordinateSystem | None
@@ -213,28 +232,13 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
     @classmethod
     def _coordinate_field_names(cls) -> tuple[str, ...]:
         """
-        :return: The names of the fields this class declares as coordinates, in order.
+        :return: The names of the fields marked with :class:`AxisCoordinate`, in order.
         """
-        own_field_names = {own_field.name for own_field in fields(AxisCoordinates)}
         return tuple(
             coordinate_field.name
             for coordinate_field in fields(cls)
-            if coordinate_field.name not in own_field_names
+            if AxisCoordinate in coordinate_field.metadata
         )
-
-    @classmethod
-    def cartesian_frame_kind(cls) -> type[CartesianFrame]:
-        """
-        :return: The kind of Cartesian frame this value is given in, which measures its
-            lengths and angles.
-        :raises FrameMeasuresNoLengthsError: If the kind of frame is not Cartesian.
-        """
-        frame_kind = cls.get_type_of_generic_parameter(
-            parameter=GenericCoordinateSystem
-        )
-        if not issubclass(frame_kind, CartesianFrame):
-            raise FrameMeasuresNoLengthsError(value_type=cls, frame_kind=frame_kind)
-        return frame_kind
 
 
 # %% changing coordinates within one space

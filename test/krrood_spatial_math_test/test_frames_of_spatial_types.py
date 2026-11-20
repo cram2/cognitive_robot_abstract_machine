@@ -29,7 +29,7 @@ from krrood_spatial_math.exceptions import (
     ReferenceFrameMismatchError,
 )
 from krrood_spatial_math.spatial_types import (
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,
     Point3Dimensional,
@@ -88,15 +88,19 @@ def test_a_spatial_value_is_a_value_given_in_a_cartesian_frame(spatial_value):
     """
     A shelf fixed on the table, one metre along its x-axis and two up.
     """
-    assert issubclass(spatial_value, SymbolicSpatialValue3Dimensional)
+    assert issubclass(spatial_value, SymbolicSpatialValue)
 
 
-def test_a_value_in_a_cartesian_frame_is_a_coordinate_representation():
-    assert issubclass(SymbolicSpatialValue3Dimensional, CoordinateRepresentation)
+@pytest.mark.parametrize("spatial_value", spatial_values)
+def test_a_spatial_value_is_given_in_a_three_dimensional_cartesian_frame(
+    spatial_value,
+):
+    """
+    Each 3D value binds the kind of frame it is given in, through its value type.
+    """
+    assert issubclass(spatial_value, CoordinateRepresentation)
     assert (
-        SymbolicSpatialValue3Dimensional.get_type_of_generic_parameter(
-            parameter=GenericCoordinateSystem
-        )
+        spatial_value.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
         is CartesianFrame3Dimensional
     )
 

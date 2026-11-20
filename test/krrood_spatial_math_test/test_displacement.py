@@ -10,7 +10,7 @@ import numpy as np
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.spatial_types import (
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     Displacement,
     Vector3Dimensional,
 )
@@ -78,7 +78,7 @@ def test_a_displacement_is_a_value_given_in_a_cartesian_frame():
     """
     A displacement is expressed in a reference frame.
     """
-    assert issubclass(Displacement, SymbolicSpatialValue3Dimensional)
+    assert issubclass(Displacement, SymbolicSpatialValue)
 
 
 def test_the_parts_of_a_displacement_are_expressed_in_its_frame(table_frame):

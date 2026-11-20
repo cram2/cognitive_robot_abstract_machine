@@ -13,6 +13,7 @@ from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
     GenericAffineFrame,
     GenericCoordinate,
+    GenericCoordinateSystem,
 )
 
 # %% vectors given in an affine frame
@@ -25,7 +26,8 @@ class Vector(
 ):
     """
     A translation of an affine space, given by its amounts along the axes of an affine
-    frame; a subclass declares one field per axis, such as ``u`` and ``v``.
+    frame; a subclass marks one field per axis, such as ``u`` and ``v``, with
+    :class:`~krrood_spatial_math.coordinate_system.AxisCoordinate`.
 
     A vector has no position: a change of frame turns its axes but never shifts it.
 
@@ -79,7 +81,10 @@ class Vector(
         :return: The length of this vector.
         :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
-        return self.cartesian_frame_kind().norm(vector=self)
+        frame_kind = self.get_type_of_generic_parameter(
+            parameter=GenericCoordinateSystem
+        )
+        return frame_kind.norm(vector=self)
 
     def dot(self, other: Self) -> GenericCoordinate:
         """
@@ -93,7 +98,10 @@ class Vector(
         if not isinstance(other, type(self)):
             raise UnsupportedOperationError(operation="dot", left=self, right=other)
         self.ensure_same_coordinate_system(other=other, context="the multiplied vector")
-        return self.cartesian_frame_kind().inner_product(first=self, second=other)
+        frame_kind = self.get_type_of_generic_parameter(
+            parameter=GenericCoordinateSystem
+        )
+        return frame_kind.inner_product(first=self, second=other)
 
 
 GenericVector = TypeVar("GenericVector", bound=Vector)

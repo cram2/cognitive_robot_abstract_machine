@@ -8,6 +8,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from krrood.symbolic_math.exceptions import UnsupportedOperationError
+
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
     RigidCoordinateChange,
@@ -24,18 +26,34 @@ from krrood_spatial_math.spatial_types import (
     SpecialEuclideanGroupAction,
     SpecialOrthogonalGroupAction,
     SymbolicSpatialChange,
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
     HomogeneousTransformationMatrix2Dimensional,
+    Point2Dimensional,
 )
 
-# %% the rotation group is a subgroup of the rigid motion group
+# %% rigid motions of either dimension, and rotations of 3D values
 
 
-def test_whatever_rigid_motions_act_on_rotations_act_on_too():
-    assert issubclass(SpecialEuclideanGroupAction, SpecialOrthogonalGroupAction)
+def test_rigid_motions_and_rotations_are_separate_group_actions():
+    """
+    A planar value is moved by rigid motions of its plane but turned by no rotation.
+    """
+    assert not issubclass(SpecialEuclideanGroupAction, SpecialOrthogonalGroupAction)
+    assert issubclass(Point2Dimensional, SpecialEuclideanGroupAction)
+    assert not issubclass(Point2Dimensional, SpecialOrthogonalGroupAction)
+
+
+def test_a_transformation_refuses_a_value_of_another_dimension():
+    """
+    A 3D transformation does not act on a planar point, nor a planar one on a 3D point.
+    """
+    with pytest.raises(UnsupportedOperationError):
+        HomogeneousTransformationMatrix3Dimensional() @ Point2Dimensional(x=1, y=0)
+    with pytest.raises(UnsupportedOperationError):
+        HomogeneousTransformationMatrix2Dimensional() @ Point3Dimensional(x=1)
 
 
 @pytest.mark.parametrize(
@@ -45,8 +63,12 @@ def test_whatever_rigid_motions_act_on_rotations_act_on_too():
 def test_values_stored_as_homogeneous_coordinates_are_moved_by_rigid_motions(
     spatial_type,
 ):
+    """
+    Values stored as homogeneous coordinates are moved and turned by multiplying them.
+    """
     assert issubclass(spatial_type, HomogeneousCoordinates)
     assert issubclass(spatial_type, SpecialEuclideanGroupAction)
+    assert issubclass(spatial_type, SpecialOrthogonalGroupAction)
 
 
 @pytest.mark.parametrize("orientation_type", [Quaternion, AxisAngle])
@@ -81,7 +103,10 @@ def test_a_transformation_turns_an_orientation_by_its_rotation_only():
     ],
 )
 def test_a_symbolic_value_is_a_coordinate_representation(value_type):
-    assert issubclass(value_type, SymbolicSpatialValue3Dimensional)
+    """
+    Every symbolic 3D value is a value given in a coordinate system.
+    """
+    assert issubclass(value_type, SymbolicSpatialValue)
     assert issubclass(value_type, CoordinateRepresentation)
 
 
@@ -93,6 +118,9 @@ def test_a_symbolic_value_is_a_coordinate_representation(value_type):
     ],
 )
 def test_a_symbolic_change_is_a_rigid_change_and_never_a_value(change_type):
+    """
+    A transformation of either dimension changes coordinates; it is no value itself.
+    """
     assert issubclass(change_type, SymbolicSpatialChange)
     assert issubclass(change_type, RigidCoordinateChange)
-    assert not issubclass(change_type, SymbolicSpatialValue3Dimensional)
+    assert not issubclass(change_type, SymbolicSpatialValue)

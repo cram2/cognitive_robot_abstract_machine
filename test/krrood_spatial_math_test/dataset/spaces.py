@@ -15,6 +15,7 @@ from krrood_spatial_math.vector import GenericVector, Vector
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
+    AxisCoordinate,
     AffineFrame,
     RigidCoordinateChange,
 )
@@ -67,32 +68,32 @@ class NamedScalablePlaneFrame(ScalablePlaneFrame):
 @dataclass(kw_only=True)
 class ScalablePlaneVector(Vector[ScalablePlaneFrame]):
     """
-    A vector on a scalable plane whose coordinates are its fields.
+    A vector on a scalable plane whose coordinates are its marked fields.
     """
 
-    x: float
+    x: float = field(metadata=AxisCoordinate().as_dict())
     """
     The amount along the first axis.
     """
 
-    y: float
+    y: float = field(metadata=AxisCoordinate().as_dict())
     """
     The amount along the second axis.
     """
 
 
 @dataclass(kw_only=True)
-class ScalablePlanePoint(Point[ScalablePlaneFrame, ScalablePlaneVector]):
+class ScalablePlanePoint(Point[ScalablePlaneVector]):
     """
-    A point on a scalable plane whose coordinates are its fields.
+    A point on a scalable plane whose coordinates are its marked fields.
     """
 
-    x: float
+    x: float = field(metadata=AxisCoordinate().as_dict())
     """
     The first coordinate.
     """
 
-    y: float
+    y: float = field(metadata=AxisCoordinate().as_dict())
     """
     The second coordinate.
     """
@@ -102,7 +103,7 @@ class ScalablePlanePoint(Point[ScalablePlaneFrame, ScalablePlaneVector]):
 
 
 @dataclass(kw_only=True)
-class StoredLine(Line[GenericPoint, GenericVector]):
+class StoredLine(Line[GenericPoint]):
     """
     A line that stores its point and direction as given.
     """
@@ -119,7 +120,7 @@ class StoredLine(Line[GenericPoint, GenericVector]):
 
 
 @dataclass(kw_only=True)
-class StoredScalablePlaneLine(StoredLine[ScalablePlanePoint, ScalablePlaneVector]):
+class StoredScalablePlaneLine(StoredLine[ScalablePlanePoint]):
     """
     A line on a scalable plane that stores its point and direction as given.
     """
@@ -129,9 +130,7 @@ class StoredScalablePlaneLine(StoredLine[ScalablePlanePoint, ScalablePlaneVector
 
 
 @dataclass(kw_only=True)
-class StoredScalablePlaneLineSegment(
-    LineSegment[ScalablePlanePoint, StoredScalablePlaneLine]
-):
+class StoredScalablePlaneLineSegment(LineSegment[StoredScalablePlaneLine]):
     """
     A segment on a scalable plane that stores its ends as given.
     """

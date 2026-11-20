@@ -10,7 +10,7 @@ import numpy as np
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.spatial_types import (
-    SymbolicSpatialValue3Dimensional,
+    SymbolicSpatialValue,
     Twist,
     Vector3Dimensional,
 )
@@ -59,7 +59,7 @@ def test_a_twist_is_a_value_given_in_a_cartesian_frame():
     """
     A twist is expressed in a reference frame.
     """
-    assert issubclass(Twist, SymbolicSpatialValue3Dimensional)
+    assert issubclass(Twist, SymbolicSpatialValue)
 
 
 def test_the_velocities_of_a_twist_are_expressed_in_its_frame(table_frame):

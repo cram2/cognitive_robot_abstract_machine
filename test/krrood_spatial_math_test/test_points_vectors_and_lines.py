@@ -12,10 +12,10 @@ import pytest
 from krrood.patterns.exceptions import InterfaceInstantiationError
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
-    AffineFrame,
     GenericAffineFrame,
     CoordinateRepresentation,
     GenericCoordinate,
+    GenericCoordinateSystem,
 )
 from krrood_spatial_math.exceptions import (
     FrameMeasuresNoLengthsError,
@@ -63,13 +63,12 @@ def test_a_point_is_moved_by_a_vector():
     assert point + vector == ScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
 
 
-def test_a_point_is_given_in_an_affine_frame():
+def test_a_point_type_binds_only_the_vector_type_it_is_moved_by():
     """
-    A point's frame may be any affine frame, and it is moved by a vector of that frame.
+    A point's only type parameter is its vector type; its frame is the vector's.
     """
-    frame_parameter, vector_parameter, _ = Point.__parameters__
+    (vector_parameter,) = Point.__parameters__
 
-    assert frame_parameter.__bound__ is AffineFrame
     assert vector_parameter.__bound__ is Vector
 
 
@@ -93,14 +92,13 @@ def test_points_of_a_frame_that_is_not_cartesian_have_no_distance():
         point.euclidean_distance(point)
 
 
-def test_a_point_reports_the_kind_of_frame_it_is_given_in():
+def test_a_point_is_given_in_the_kind_of_frame_of_its_vector_type():
     """
-    The kind of frame a point type binds is read back from the class.
+    The kind of frame a point type reports is the one its vector type binds.
     """
-    assert (
-        ScalablePlanePoint.get_type_of_generic_parameter(parameter=GenericAffineFrame)
-        is ScalablePlaneFrame
-    )
+    assert ScalablePlanePoint.get_type_of_generic_parameter(
+        parameter=GenericCoordinateSystem
+    ) is ScalablePlaneVector.get_type_of_generic_parameter(parameter=GenericAffineFrame)
 
 
 def test_a_point_reports_what_its_coordinates_are_stored_as():
@@ -165,14 +163,22 @@ def test_a_line_cannot_be_instantiated():
         Line()
 
 
-def test_a_line_runs_through_a_point_along_a_vector():
-    assert Line.__parameters__ == (GenericPoint, GenericVector)
+def test_a_line_binds_only_its_point_type_and_runs_along_its_vector_type():
+    """
+    A line's only type parameter is its point type, whose vector type it runs along.
+    """
+    assert Line.__parameters__ == (GenericPoint,)
     assert GenericPoint.__bound__ is Point
+    assert (
+        StoredScalablePlaneLine.get_type_of_generic_parameter(parameter=GenericVector)
+        is ScalablePlaneVector
+    )
 
 
 def test_a_lines_fields_are_narrowed_to_the_bound_types():
     """
-    A line type that binds its point and vector types gives its fields those types.
+    A line type that binds its point type gives its fields that type and its vector
+    type.
     """
     line_types = {
         line_field.name: line_field.type

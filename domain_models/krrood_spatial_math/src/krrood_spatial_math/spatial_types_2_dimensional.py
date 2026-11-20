@@ -1,28 +1,22 @@
 """
 The symbolic casadi spatial types on a plane: points, vectors and poses given in a
-Cartesian frame on the x-y plane of a three-dimensional frame, the rigid changes
-between such frames, and the projection of three-dimensional points onto a plane.
+Cartesian frame on the x-y plane of a three-dimensional frame, the rigid changes between
+such frames, and the projection of three-dimensional points onto a plane.
 """
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import casadi as ca
 import numpy as np
-from typing_extensions import Any, Self, TypeVar
+from typing_extensions import Any, Self
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.patterns.interface import Interface
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
-    UnsupportedOperationError,
 )
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     EmbeddedPlaneRelation,
-)
-from krrood_spatial_math.coordinate_system import (
-    CoordinateRepresentation,
 )
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.vector import Vector
@@ -41,78 +35,27 @@ from krrood_spatial_math.spatial_types import (
     Pose3Dimensional,
     Quaternion,
     RotationMatrix,
+    GenericSpecialEuclideanGroupAction,
     SpatialFrameKey,
+    SpecialEuclideanGroupAction,
     SymbolicSpatialChange,
-    SymbolicSpatialType,
+    SymbolicSpatialValue,
     Vector3Dimensional,
 )
 
-
-# %% how a planar change acts on a value
-
-
-class PlanarSpecialEuclideanGroupAction(Interface):
-    """
-    A value or change on a plane the planar rigid motion group SE(2) acts on: a
-    :class:`HomogeneousTransformationMatrix2Dimensional` moves it, giving one of the same type.
-    """
-
-    @abstractmethod
-    def apply_planar_transformation(
-        self, *, transformation: HomogeneousTransformationMatrix2Dimensional
-    ) -> Self:
-        """
-        :param transformation: A transformation whose child frame is this value's
-            reference frame.
-        :return: This value, on the x-y plane of the reference frame of
-            ``transformation``.
-        """
-
-
-GenericPlanarSpecialEuclideanGroupAction = TypeVar(
-    "GenericPlanarSpecialEuclideanGroupAction", bound=PlanarSpecialEuclideanGroupAction
-)
-"""
-The kind of value or change on a plane a planar transformation is applied to.
-"""
-
-
-# %% values on a plane
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class SymbolicSpatialValue2Dimensional(
-    SymbolicSpatialType,
-    CoordinateRepresentation[CartesianFrame2Dimensional],
-    ABC,
-):
-    """
-    A value, as a symbolic matrix, such as a point or a pose, on the x-y plane of its
-    :attr:`~SymbolicSpatialType.reference_frame`, given in the
-    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional`
-    on that plane.
-    """
-
-    @property
-    def coordinate_system(self) -> CartesianFrame2Dimensional | None:
-        """
-        The frame on the x-y plane of :attr:`~SymbolicSpatialType.reference_frame`;
-        ``None`` for a value without a reference frame.
-        """
-        if self.reference_frame is None:
-            return None
-        return CartesianFrame2Dimensional(frame_3_dimensional=self.reference_frame)
+# %% vectors and points on a plane
 
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector2Dimensional(
-    SymbolicSpatialValue2Dimensional,
+    SymbolicSpatialValue,
     Vector[CartesianFrame2Dimensional, sm.Scalar],
-    PlanarSpecialEuclideanGroupAction,
+    SpecialEuclideanGroupAction,
 ):
     """
-    A translation within the x-y plane of its reference frame, given in the
-    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of that frame.
+    A translation within the x-y plane of its reference frame, given in the :class:`~krr
+    ood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of that
+    frame.
 
     Stored as a bare 2×1 symbolic vector ``[x, y]``, like :class:`Point2Dimensional`.
     """
@@ -171,7 +114,8 @@ class Vector2Dimensional(
         target_frame_T_reference_frame: HomogeneousTransformationMatrix3Dimensional,
     ) -> Vector2Dimensional:
         """
-        This vector re-expressed in ``target_frame_T_reference_frame``'s reference frame.
+        This vector re-expressed in ``target_frame_T_reference_frame``'s reference
+        frame.
 
         .. warning::
             Between frames whose x-y planes are not parallel this is not a change of
@@ -189,7 +133,7 @@ class Vector2Dimensional(
             turned.x, turned.y, reference_frame=turned.reference_frame
         )
 
-    def apply_planar_transformation(
+    def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
     ) -> Vector2Dimensional:
         turned = ca.mtimes(transformation.casadi_sx, ca.vertcat(self.casadi_sx, 0))
@@ -229,18 +173,19 @@ class Vector2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False)
 class Point2Dimensional(
-    SymbolicSpatialValue2Dimensional,
-    Point[CartesianFrame2Dimensional, Vector2Dimensional, sm.Scalar],
-    PlanarSpecialEuclideanGroupAction,
+    SymbolicSpatialValue,
+    Point[Vector2Dimensional],
+    SpecialEuclideanGroupAction,
 ):
     """
     Represents a 2D point with reference frame handling.
 
     Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous augmentation --
-    the same convention :class:`Pose2Dimensional` uses. The point lies on its reference frame's
-    own x-y plane and has no height; it relates to 3D space only through an
-    :class:`EmbeddedPlaneProjection` onto that plane, which :meth:`from_point_3_dimensional`,
-    :meth:`from_pose` and :meth:`to_point_3_dimensional` apply.
+    the same convention :class:`Pose2Dimensional` uses. The point lies on its reference
+    frame's own x-y plane and has no height; it relates to 3D space only through an
+    :class:`EmbeddedPlaneProjection` onto that plane, which
+    :meth:`from_point_3_dimensional`, :meth:`from_pose` and
+    :meth:`to_point_3_dimensional` apply.
     """
 
     def __init__(
@@ -320,8 +265,8 @@ class Point2Dimensional(
 
     def to_point_3_dimensional(self, height: sm.ScalarData = 0) -> Point3Dimensional:
         """
-        The :meth:`EmbeddedPlaneProjection.unproject` of this point into its own reference
-        frame.
+        The :meth:`EmbeddedPlaneProjection.unproject` of this point into its own
+        reference frame.
 
         :param height: The z-coordinate the point is placed at.
         :return: The 3D point at ``height`` above this point.
@@ -359,7 +304,7 @@ class Point2Dimensional(
             target_frame_T_reference_frame @ self.to_point_3_dimensional()
         )
 
-    def apply_planar_transformation(
+    def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
     ) -> Point2Dimensional:
         moved = ca.mtimes(transformation.casadi_sx, ca.vertcat(self.casadi_sx, 1))
@@ -419,9 +364,9 @@ class EmbeddedPlaneProjection(
     """
     The frame whose x-y plane points are projected onto.
 
-    ``None`` is the plane of points that have no reference frame. Their coordinates
-    are taken as they are, so such a projection only relates points without a
-    reference frame to each other.
+    ``None`` is the plane of points that have no reference frame. Their coordinates are
+    taken as they are, so such a projection only relates points without a reference
+    frame to each other.
     """
 
     def project(self, point: Point3Dimensional) -> Point2Dimensional:
@@ -442,8 +387,8 @@ class EmbeddedPlaneProjection(
     @property
     def plane_normal(self) -> Vector3Dimensional:
         """
-        The :attr:`~krrood_spatial_math.embedded_plane.EmbeddedPlane.normal` of the plane
-        of :attr:`plane_frame`; the z-axis of no frame when there is none.
+        The :attr:`~krrood_spatial_math.embedded_plane.EmbeddedPlane.normal` of the
+        plane of :attr:`plane_frame`; the z-axis of no frame when there is none.
         """
         if self.plane_frame is None:
             return Vector3Dimensional.Z(reference_frame=None)
@@ -467,8 +412,8 @@ class EmbeddedPlaneProjection(
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose2Dimensional(
-    SymbolicSpatialValue2Dimensional,
-    PlanarSpecialEuclideanGroupAction,
+    SymbolicSpatialValue[CartesianFrame2Dimensional],
+    SpecialEuclideanGroupAction,
 ):
     """
     Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
@@ -587,16 +532,14 @@ class Pose2Dimensional(
         plane_frame: CartesianFrame3Dimensional | None = None,
     ) -> Pose2Dimensional:
         """
-        Flatten a 3D Pose3Dimensional onto the x-y plane of a frame: its position is projected onto
-        the plane, and it faces the way its x-axis, projected onto the plane, points.
-
-        That heading, ``atan2(r21, r11)`` of the pose's rotation matrix, equals the yaw
-        of its ZYX Euler angles.
+        Flatten a 3D pose onto the x-y plane of a frame: its position is projected onto
+        the plane, and it faces the way its x-axis, projected onto the plane, points,
+        which is the yaw of its ZYX Euler angles.
 
         :param pose: The pose to flatten.
-        :param plane_frame: The frame whose x-y plane to flatten the pose onto.
-            Defaults to ``pose``'s reference frame; any other frame must belong to the
-            same world as ``pose``'s.
+        :param plane_frame: The frame whose x-y plane to flatten the pose onto. Defaults
+            to ``pose``'s reference frame; any other frame must belong to the same world
+            as ``pose``'s.
         :return: The Pose2Dimensional on the x-y plane of ``plane_frame``.
         :raises XAxisNormalToPlaneError: If the pose's x-axis is constant and normal to
             the plane.
@@ -638,13 +581,13 @@ class Pose2Dimensional(
         """
         return Pose2Dimensional.from_pose(target_frame_T_reference_frame @ self.pose)
 
-    def apply_planar_transformation(
+    def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
     ) -> Pose2Dimensional:
         flat_pose = HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
             x=self.x, y=self.y, yaw=self.yaw
         )
-        return flat_pose.apply_planar_transformation(transformation=transformation).pose
+        return flat_pose.apply_transformation(transformation=transformation).pose
 
     @classmethod
     def from_xy_yaw(
@@ -690,11 +633,12 @@ class Pose2Dimensional(
 @dataclass(eq=False, init=False, repr=False)
 class HomogeneousTransformationMatrix2Dimensional(
     SymbolicSpatialChange[CartesianFrame2Dimensional],
-    PlanarSpecialEuclideanGroupAction,
+    SpecialEuclideanGroupAction,
 ):
     """
-    A 3x3 homogeneous matrix of SE(2): the rigid change from the
-    :class:`~krrood_spatial_math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of its :attr:`~SymbolicSpatialChange.child_frame` into that of its
+    A 3x3 homogeneous matrix of SE(2): the rigid change from the :class:`~krrood_spatial
+    _math.cartesian_frame_2_dimensional.CartesianFrame2Dimensional` of its
+    :attr:`~SymbolicSpatialChange.child_frame` into that of its
     :attr:`~SymbolicSpatialType.reference_frame`, two frames on one plane.
 
     It is only a change of coordinates, never a value given in a frame: the value it
@@ -881,8 +825,8 @@ class HomogeneousTransformationMatrix2Dimensional(
     # %% acting on values and changes
 
     def __matmul__(
-        self, other: GenericPlanarSpecialEuclideanGroupAction
-    ) -> GenericPlanarSpecialEuclideanGroupAction:
+        self, other: GenericSpecialEuclideanGroupAction
+    ) -> GenericSpecialEuclideanGroupAction:
         """
         :param other: A change into this change's child frame, or a point or pose given
             in it.
@@ -892,12 +836,10 @@ class HomogeneousTransformationMatrix2Dimensional(
         :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
             this change's child frame.
         """
-        if not isinstance(other, PlanarSpecialEuclideanGroupAction):
-            raise UnsupportedOperationError(operation="@", left=self, right=other)
-        self.ensure_operand_in_child_frame(other)
-        return other.apply_planar_transformation(transformation=self)
+        self.ensure_acts_on(operand=other, operation="@")
+        return other.apply_transformation(transformation=self)
 
-    def apply_planar_transformation(
+    def apply_transformation(
         self, *, transformation: HomogeneousTransformationMatrix2Dimensional
     ) -> HomogeneousTransformationMatrix2Dimensional:
         return HomogeneousTransformationMatrix2Dimensional(

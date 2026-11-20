@@ -85,6 +85,16 @@ class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interfac
     such as the frame of a robot's body.
     """
 
+    @classmethod
+    def from_frame_3_dimensional(
+        cls, *, frame: CartesianFrame3Dimensional
+    ) -> CartesianFrame3Dimensional:
+        """
+        :param frame: The reference frame of a value given in a frame of this kind.
+        :return: The frame of this kind that ``frame`` fixes, which is ``frame`` itself.
+        """
+        return frame
+
     def express_in_own_frame(
         self, *, value: GenericCoordinateRepresentation
     ) -> GenericCoordinateRepresentation:
