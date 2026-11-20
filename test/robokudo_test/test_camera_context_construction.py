@@ -21,7 +21,7 @@ def test_camera_context_resolver_preserves_injected_loader() -> None:
     configuration = RayTracingCameraConfiguration()
     loader = ModuleLoader()
     resolver = RayTracingContextResolver(configuration, module_loader=loader)
-    assert resolver.camera_config is configuration
+    assert resolver.camera_configuration is configuration
     assert resolver.module_loader is loader
 
 

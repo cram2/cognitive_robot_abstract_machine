@@ -1,3 +1,7 @@
+"""
+Verify annotation helpers preserve spatial transformations and CAS contracts.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -70,10 +74,14 @@ def _camera_observation(
 
 
 class TestUtilsAnnotatorHelper(object):
+    """
+    Check transformations between object, camera, and world frames.
+    """
+
     @pytest.fixture()
     def annotator_in_pipeline(self) -> BaseAnnotator:
         root = Pipeline("Sequence")
-        annotator = ImagePreprocessorAnnotator("1")
+        annotator = ImagePreprocessorAnnotator(name="1")
         root.add_child(annotator)
         return annotator
 

@@ -1,3 +1,9 @@
+"""
+Build perception tasks selected from incoming object queries.
+"""
+
+from __future__ import annotations
+
 from py_trees.composites import Sequence
 
 from robokudo.analysis_engine import AnalysisEngineInterface
@@ -14,6 +20,10 @@ from robokudo.utils.tree import add_children_to_parent
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Dispatch object queries to configured perception tasks.
+    """
+
     def name(self) -> str:
         return "job_scheduler"
 
@@ -26,8 +36,8 @@ class AnalysisEngine(AnalysisEngineInterface):
         # Annotator definition
         collection_reader = CollectionReaderAnnotator(descriptor=kinect_config)
         image_preprocessor = ImagePreprocessorAnnotator()
-        slow1 = SlowAnnotator("Slow1")
-        slow2 = SlowAnnotator("Slow2")
+        slow1 = SlowAnnotator(name="Slow1")
+        slow2 = SlowAnnotator(name="Slow2")
 
         # Subtree construction
         # A subtree is tailored towards solving a specific perception task

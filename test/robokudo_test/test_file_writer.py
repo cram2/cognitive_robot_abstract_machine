@@ -1,3 +1,7 @@
+"""
+Verify recorded camera data and annotations can be exported to files.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -72,7 +76,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
         timestamp_nanoseconds=timestamp_nanoseconds,
     )
     descriptor = FileWriter.Descriptor()
-    descriptor.parameters.target_dir = str(tmp_path)
+    descriptor.parameters.target_directory = str(tmp_path)
     writer = FileWriter(descriptor=descriptor)
     monkeypatch.setattr(writer, "get_cas", lambda: cas)
 
@@ -100,7 +104,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
 
     reader = RGBDFileReaderInterface(
         FileReaderCameraConfig(
-            target_dir=str(tmp_path),
+            target_directory=str(tmp_path),
             loop=False,
             color_to_depth_ratio=ColorToDepthRatio(),
         )

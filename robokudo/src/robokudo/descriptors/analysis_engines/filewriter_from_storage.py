@@ -17,6 +17,8 @@ The pipeline implements the following functionality:
     the FileReader interface.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.file_writer import FileWriter
@@ -74,7 +76,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 FileWriter(),
             ]
         )

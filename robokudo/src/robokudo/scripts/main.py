@@ -1,3 +1,7 @@
+"""
+Run the selected RoboKudo analysis engine with ROS and visualization services.
+"""
+
 #!/usr/bin/env python3
 
 from __future__ import annotations
@@ -226,7 +230,7 @@ def main() -> None:
     # 7. Dynamically load the requested Analysis Engine (AE) using the **refactored** ModuleLoader
     loader = ModuleLoader()
     logger.info(f"Loading AE '{args.ae}' from package '{args.ros_pkg}'...")
-    loaded_ae = loader.load_ae(ros_pkg_name=args.ros_pkg, module_name=args.ae)
+    loaded_ae = loader.load_ae(ros_package_name=args.ros_pkg, module_name=args.ae)
 
     # 8. Build your Behavior Tree from the loaded AE
     #    (Assuming loaded_ae.implementation() returns a py_trees root or something similar)

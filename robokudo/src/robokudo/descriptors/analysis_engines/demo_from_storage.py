@@ -1,7 +1,16 @@
+"""
+Build an object perception pipeline that replays camera data from MongoDB.
+"""
+
+from __future__ import annotations
+
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outlier_removal_objecthypothesis import (
@@ -16,7 +25,6 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.world import world_instance
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -56,13 +64,12 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
-                ClusterPoseBBAnnotator(),
-                # SlowAnnotator("SlowAnnotator",sleep_in_s=0),
+                ClusterPoseBoundingBoxAnnotator(),
             ]
         )
         return seq

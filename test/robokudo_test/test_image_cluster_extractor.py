@@ -1,3 +1,7 @@
+"""
+Verify image segmentation produces configured object regions and point clouds.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -71,7 +75,7 @@ class TestHueThresholds:
     """
 
     def annotator(self) -> ImageClusterExtractor:
-        return ImageClusterExtractor("test")
+        return ImageClusterExtractor(name="test")
 
     def image_with_hues(self, hue_values: list[int]) -> np.ndarray:
         """

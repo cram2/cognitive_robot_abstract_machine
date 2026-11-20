@@ -1,3 +1,9 @@
+"""
+Verify storage writers acquire resources at the intended lifecycle stage.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import robokudo.annotators.storage as storage_module
@@ -32,7 +38,7 @@ def test_storage_writer_defers_database_reset_until_setup(monkeypatch) -> None:
     A storage writer resets its database exactly once during setup.
     """
     descriptor = StorageWriter.Descriptor()
-    storage = StorageResetRecorder(database_name=descriptor.parameters.db_name)
+    storage = StorageResetRecorder(database_name=descriptor.parameters.database_name)
     monkeypatch.setattr(storage_module, "Storage", lambda database_name: storage)
 
     writer = StorageWriter(descriptor=descriptor)

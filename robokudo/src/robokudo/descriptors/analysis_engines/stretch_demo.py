@@ -18,8 +18,12 @@ grasping it.
     other change.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_cluster_extractor import (
     ColorName,
@@ -28,7 +32,7 @@ from robokudo.annotators.image_cluster_extractor import (
 )
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
+from robokudo.annotators.query import GenerateQueryResult, QueryAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -113,12 +117,12 @@ class AnalysisEngine(AnalysisEngineInterface):
         # this engine is meant to find.
         crop_descriptor = PointcloudCropAnnotator.Descriptor()
         crop_descriptor.parameters.relative_to_world = True
-        crop_descriptor.parameters.min_x = TARGET_SHELF_MIN_WORLD_X
-        crop_descriptor.parameters.max_x = TARGET_SHELF_MAX_WORLD_X
-        crop_descriptor.parameters.min_y = TARGET_SHELF_MIN_WORLD_Y
-        crop_descriptor.parameters.max_y = TARGET_SHELF_MAX_WORLD_Y
-        crop_descriptor.parameters.min_z = TARGET_SHELF_LAYER_MIN_WORLD_Z
-        crop_descriptor.parameters.max_z = TARGET_SHELF_LAYER_MAX_WORLD_Z
+        crop_descriptor.parameters.minimum_x = TARGET_SHELF_MIN_WORLD_X
+        crop_descriptor.parameters.maximum_x = TARGET_SHELF_MAX_WORLD_X
+        crop_descriptor.parameters.minimum_y = TARGET_SHELF_MIN_WORLD_Y
+        crop_descriptor.parameters.maximum_y = TARGET_SHELF_MAX_WORLD_Y
+        crop_descriptor.parameters.minimum_z = TARGET_SHELF_LAYER_MIN_WORLD_Z
+        crop_descriptor.parameters.maximum_z = TARGET_SHELF_LAYER_MAX_WORLD_Z
 
         # The target object (a cereal box) is glossy enough that the RealSense returns no
         # depth on its face, and depth-based clustering has no way to bound its search to
@@ -138,13 +142,8 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ColorRangeBound.UPPER
             ]
         )
-        # The depth hole leaves few valid 3D points under the color mask. Lowered to
-        # ClusterPoseBBAnnotator's own floor (it needs more than 10 points to compute a
-        # pose, cluster_pose_bb.py:161-165) rather than the class default of 62, so a
-        # sparse-but-real detection reaches pose estimation instead of being dropped here
-        # first. Outlier removal is skipped too: pruning an already-sparse, hole-riddled
-        # cloud for statistical outliers risks stripping the real points further.
-        cluster_descriptor.parameters.min_points_threshold = 11
+        # Keep sparse depth detections eligible for pose estimation.
+        cluster_descriptor.parameters.minimum_points_threshold = 11
         cluster_descriptor.parameters.outlier_removal = True
 
         # ..note:: PointcloudCropAnnotator crops CASViews.CLOUD, but
@@ -158,16 +157,13 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=camera_descriptor),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=crop_descriptor),
                 ImageClusterExtractor(descriptor=cluster_descriptor),
-                ClusterPoseBBAnnotator(),
+                ClusterPoseBoundingBoxAnnotator(),
                 # Left unconfigured so that filtering by query stays off: it compares the
                 # requested type against Classification annotations, which this pipeline
                 # does not produce, so filtering a typed query would discard every object.
-                # ..warning:: `GenerateQueryResult.Descriptor.parameters` is a class
-                #     attribute shared by every instance, so overriding it here would
-                #     change the setting for other pipelines in the same process too.
                 GenerateQueryResult(),
             ]
         )

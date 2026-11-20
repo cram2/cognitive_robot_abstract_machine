@@ -16,6 +16,8 @@ The pipeline implements the following functionality:
     of pipeline behavior, as it allows manual control over frame processing.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -83,8 +85,8 @@ class AnalysisEngine(AnalysisEngineInterface):
             PipelineTrigger(),
             pipeline_init(),
             CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-            SlowAnnotator("SlowAnnotator"),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
+            SlowAnnotator(name="SlowAnnotator"),
         ]:
             seq.add_child(annotator)
 

@@ -19,15 +19,11 @@ from robokudo.types.cv import ColorToDepthRatio
 @dataclass(slots=True)
 class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     """
-    Configuration class for file-based camera data playback.
-
-    This class defines the configuration parameters for reading camera data from files,
-    typically used for offline processing or testing. It supports reading from both
-    ROS package directories and regular filesystem paths.
+    Configure playback of recorded camera images and calibration.
 
     .. note::
-        If target_ros_package is None, target_dir is used as an absolute or relative
-        path. Otherwise, target_dir is appended to the ROS package path.
+        Without :attr:`target_ros_package`, :attr:`target_directory` is a filesystem
+        path; otherwise it is relative to that ROS package.
     """
 
     @classproperty
@@ -59,14 +55,15 @@ class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     target_ros_package: str | None = None
     """
     Files for the FileReaderInterface should be in a ROS package If you don't want that,
-    leave target_ros_package to None and define target_dir either absolute or relative
-    to your executable.
+    leave target_ros_package to None and define target_directory either absolute or
+    relative to your executable.
     """
-    target_dir: str = "/tmp"
+    target_directory: str = "/tmp"
     """
-    If target_ros_package is None, try to load target_dir directly.
+    If target_ros_package is None, try to load target_directory directly.
 
-    Otherwise, append target_dir to target_ros_package and load the files from there.
+    Otherwise, append target_directory to target_ros_package and load the files from
+    there.
     """
     color_to_depth_ratio: ColorToDepthRatio | None = field(
         default_factory=lambda: ColorToDepthRatio(horizontal=0.5, vertical=0.5)

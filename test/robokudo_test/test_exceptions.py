@@ -1,23 +1,26 @@
+"""
+Verify RoboKudo errors preserve structured context and corrective guidance.
+"""
+
 from __future__ import annotations
 
 # %% Imports
 import numpy as np
 import pytest
-
-from robokudo.cas import CAS, CASViews
+from robokudo.cas import CAS
 from robokudo.exceptions import (
+    CameraDataMissing,
     CASCheckConfigurationError,
     CASCheckFailed,
-    CameraDataMissing,
     ColorToDepthRatioMissing,
     CVBridgeImageConversionError,
     CVBridgeImageShapeError,
-    CVBridgeUnsupportedEncoding,
-    CVBridgeUnsupportedTargetEncoding,
+    CVBridgeROSImagePayloadError,
     CVBridgeROSImageShapeError,
     CVBridgeROSImageStepError,
-    CVBridgeROSImagePayloadError,
+    CVBridgeUnsupportedEncoding,
     CVBridgeUnsupportedImageData,
+    CVBridgeUnsupportedTargetEncoding,
     EmptyPointCloud,
     ImageContourMissing,
     PlaneModelMissing,
@@ -34,6 +37,10 @@ from robokudo.utils.cv_helper import (
 
 
 class TestRoboKudoExceptions:
+    """
+    Check structured exception messages and corrective guidance.
+    """
+
     def test_color_to_depth_ratio_missing_message(self) -> None:
         exception = ColorToDepthRatioMissing(operation="scale coordinates")
 
@@ -115,9 +122,9 @@ class TestRoboKudoExceptions:
         assert "channels=1" in str(exception)
 
     def test_cas_check_configuration_error_message(self) -> None:
-        exception = CASCheckConfigurationError(component_name="CASCheckFunc")
+        exception = CASCheckConfigurationError(component_name="CASCheckFunction")
 
-        assert "CASCheckFunc needs a check function" in str(exception)
+        assert "CASCheckFunction needs a check function" in str(exception)
 
     def test_cas_check_failed_message(self) -> None:
         exception = CASCheckFailed(reason="object hypothesis missing")
