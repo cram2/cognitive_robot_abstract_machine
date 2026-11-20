@@ -1775,7 +1775,9 @@ class World(HasSimulatorProperties, EuclideanSpace):
         result never share mutable state. Each object is rebound once, so objects that
         refer to each other, or one object reached from several places, keep that shape
         in the result. A type that defines how it is deep-copied is copied its own way
-        rather than walked.
+        rather than walked, except a spatial value or change, which is copied with the
+        frames it is given in rebound too: a frame of another world fails every
+        operation that checks it against this world's frames.
 
         An entity this world does not contain is left as it is: it is not this world's
         state to rebind, and leaving it behaves exactly as not rebinding at all.
