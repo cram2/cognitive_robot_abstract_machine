@@ -10,10 +10,12 @@ import numpy as np
 import pytest
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.patterns.exceptions import DerivedGenericParameterConflictError
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.line import Line
 from krrood_spatial_math.point import GenericPoint, Point
 from krrood_spatial_math.vector import GenericVector, Vector
+from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
@@ -144,6 +146,22 @@ def test_a_three_dimensional_point_is_moved_by_a_three_dimensional_vector():
         Point3Dimensional.get_type_of_generic_parameter(parameter=GenericVector)
         is Vector3Dimensional
     )
+
+
+def test_a_point_given_in_another_kind_of_frame_than_its_vector_is_refused():
+    """
+    A point's kind of frame is its vector's, so naming another one on its value base
+    fails where the point type is defined.
+    """
+    with pytest.raises(DerivedGenericParameterConflictError):
+
+        class MisframedPoint(
+            SymbolicSpatialValue[CartesianFrame2Dimensional],
+            Point[Vector3Dimensional],
+        ):
+            """
+            A point of 3D vectors claiming to be given on a plane.
+            """
 
 
 # %% a vector in a frame's space

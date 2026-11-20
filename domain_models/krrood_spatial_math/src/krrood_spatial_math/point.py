@@ -23,14 +23,14 @@ from krrood_spatial_math.vector import GenericVector
 @dataclass(kw_only=True, eq=False)
 class Point(AxisCoordinates, Generic[GenericVector]):
     """
-    A point of an affine space, given by its amounts along an affine frame's axes from
-    the frame's origin, the fields a subclass marks with
-    :class:`~krrood_spatial_math.coordinate_system.AxisCoordinate`. Two points differ by
-    a vector, and a point moved by a vector is a point.
+    A point of the affine space its vector type translates: the difference of two points
+    is such a vector, and adding one moves the point. It is given by its amounts along
+    an affine frame's axes, the fields a subclass marks with
+    :class:`~krrood_spatial_math.coordinate_system.AxisCoordinate`.
 
     .. note::
-        The type parameter is the vector type. The kind of frame and the coordinate type
-        are the vector type's, so a point and its vector always share them.
+        The type parameter is the vector type, which fixes the kind of frame and the
+        coordinate type, so a point and its vector always share them.
     """
 
     @classproperty
