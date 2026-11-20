@@ -23,6 +23,7 @@ from krrood_compute_resources.devices import Device
 from typing_extensions import Any, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    BlockEdgeMatrix,
     DenseEdgeMatrix,
     EdgeMatrix,
     SparseEdgeMatrix,
@@ -59,7 +60,19 @@ class EdgeRepresentation(StrEnum):
     """
 
     SPARSE = "sparse"
+    """
+    The row and the column of every edge, as :class:`SparseEdgeMatrix` stores them.
+    """
+
     DENSE = "dense"
+    """
+    Every entry of the matrix, as :class:`DenseEdgeMatrix` stores them.
+    """
+
+    BLOCK = "block"
+    """
+    Stacked full blocks, as :class:`BlockEdgeMatrix` stores them.
+    """
 
 
 # %% setting
@@ -201,6 +214,8 @@ class ComputationSetting:
         """
         if self.edge_representation is EdgeRepresentation.DENSE:
             return DenseEdgeMatrix
+        if self.edge_representation is EdgeRepresentation.BLOCK:
+            return BlockEdgeMatrix
         return SparseEdgeMatrix
 
     def placed(
@@ -208,10 +223,10 @@ class ComputationSetting:
     ) -> LayeredProbabilisticCircuit:
         """
         :param circuit: A circuit with host parameters.
-        :return: A copy of the circuit with its edges and parameters stored as this
-            setting says.
+        :return: A folded copy of the circuit with its edges and parameters stored as
+            this setting says.
         """
-        host = circuit.to_namespace(np)
+        host = circuit.to_namespace(np).folded()
         host.store_edges_as(self.edge_matrix_type)
         return host.to_namespace(
             self.namespace, device=self.device_object, floating_point_type=self.dtype

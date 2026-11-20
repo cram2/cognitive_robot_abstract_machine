@@ -402,7 +402,11 @@ class JointProbabilityTreeBaseline(BenchmarkMethod):
             minimum_samples_per_leaf=self.minimum_samples_per_leaf
         ).fit(dataset.train, variables)
         return LearnedCircuit(
-            circuit=CircuitRepresentations().convert(tree, LayeredProbabilisticCircuit),
+            circuit=setting.placed(
+                circuit=CircuitRepresentations().convert(
+                    tree, LayeredProbabilisticCircuit
+                )
+            ),
             history=None,
         )
 
