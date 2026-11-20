@@ -220,6 +220,22 @@ def test_a_condition_set_outside_a_modification_closes_a_block_of_its_own(sender
     assert (change.owner, change.kind) == (second, TransitionKind.PAUSE)
 
 
+def test_a_condition_set_twice_in_one_modification_is_written_once(sender):
+    """
+    The block holds the condition once, with the value it has when the block closes.
+    """
+    first, second = sender.nodes[1:3]
+
+    with sender.modify():
+        second.pause_condition = first.is_running
+        second.pause_condition = first.is_succeeded
+
+    [change] = sender.structure_change_recorder.change_blocks[-1].changes
+    assert isinstance(change, ConditionChange)
+    assert (change.owner, change.kind) == (second, TransitionKind.PAUSE)
+    assert change.expression is second.pause_condition
+
+
 def test_equal_nodes_are_recorded_one_by_one(sender):
     """
     Nodes that compare equal are still different nodes, each with its own conditions.
