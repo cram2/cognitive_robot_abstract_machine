@@ -240,10 +240,9 @@ show(screw_figure)
 
 ### The three types in code
 
-This example is separate from the figure above, and no figure shows it. It is a screw-on
-lid whose screw axis runs along the z axis of the lid's frame, through the frame's
-origin. The lid's position is the angle it has turned by, in radians, and the lid rises
-2 mm for every radian:
+A screw-on lid shows the three types in code. Its screw axis runs along the z axis of
+the lid's frame, through the frame's origin. The lid's position is the angle it has
+turned by, in radians, and the lid rises 2 mm for every radian:
 
 ```{code-cell} ipython3
 lid = ScrewAxis(
@@ -433,7 +432,13 @@ above uses only operations the symbolic math has, so it works on those variables
 
 ## Closed form and series
 
-$A$ and $B$ can be computed in two ways.
+The formulas for $A$ and $B$ divide by a power of $\varphi$, and $\varphi$ is often
+zero: a drawer slides without turning, and a hinge at its zero position has not turned
+yet. At $\varphi = 0$ both formulas are $0/0$, although $A$ and $B$ themselves are well
+defined there: $A$ tends to $1/2$ and $B$ to $1/6$. Close to zero, the formulas still
+give a number, but an inaccurate one. The code therefore computes $A$ and $B$ in two
+ways: with the formulas far from zero, and with a series that divides by nothing near
+it. This section introduces the series, and the next one shows where the code switches.
 
 - **Closed form:** the formulas above, a fixed number of steps with standard
   functions such as $\cos$ and $\sin$.
