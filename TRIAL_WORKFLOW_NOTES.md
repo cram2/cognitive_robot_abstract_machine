@@ -1,6 +1,6 @@
 # Trial workflow: notes and requirements
 
-Working notes for the branch `trial-workflow` (draft PR cram2#1039, "Find out by trials
+Working notes for the branch `trial-workflow` (draft PR cram2#1040, "Find out by trials
 what makes a behaviour succeed"). Read this first in a new session. Delete this file
 before the pull request is marked ready for review.
 
