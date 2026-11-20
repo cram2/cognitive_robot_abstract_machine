@@ -227,10 +227,24 @@ class ControlStructureNode(CompositeNode, ABC):
         them.
         """
         self._check_accepts_children()
+        self.check_handed_children()
         for node in list(self.nodes):
-            self._check_can_be_a_child(node=node)
-            self._place_child_in_statechart(node=node)
+            self._add_listed_child_to_statechart(node=node)
         self._wire_children()
+
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects every handed child :meth:`_check_can_be_a_child` or
+        :meth:`~cramph.node.CompositeNode._add_node_sanity_check` rejects, see
+        :meth:`~cramph.node.CompositeNode.check_handed_children`.
+        """
+        for node in self.nodes:
+            if node is taken_over:
+                continue
+            self._check_can_be_a_child(node=node)
+            self._add_node_sanity_check(node=node)
 
     def check_children(self) -> None:
         """
@@ -297,12 +311,12 @@ class ControlStructureNode(CompositeNode, ABC):
         node = self._as_node(node=node)
         self._check_is_not_a_child(node=node)
         if not self.belongs_to_statechart():
-            self.nodes.insert(position, node)
+            self.insert_child(position=position, node=node)
             return
         self._check_can_be_a_child(node=node)
         self._check_accepts_children()
-        self.nodes.insert(position, node)
-        self._place_child_in_statechart(node=node)
+        self.insert_child(position=position, node=node)
+        self._add_listed_child_to_statechart(node=node)
         self._wire_children()
         if self.statechart.compiler.latest_compile_covers(node=self):
             self.statechart.request_rebuild(node=self)
@@ -1245,6 +1259,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         self._add_child_to_statechart(node=child)
         self._chosen_children.append(child)
+        self._structure_change_recorder._record_changed_chosen_children(node=self)
         self.success_condition = logic_or(self.success_condition, child.is_succeeded)
         self.statechart.request_rebuild(node=self)
 
@@ -1256,6 +1271,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         :param children: Children of this node, in the order they were chosen.
         """
         self._chosen_children = list(children)
+        self._structure_change_recorder._record_changed_chosen_children(node=self)
 
     def give_up_on_child_when(
         self, *, child: StatechartNode, failure_monitors: list[StatechartNode]

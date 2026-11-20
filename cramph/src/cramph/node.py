@@ -10,6 +10,7 @@ import logging
 import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
+from copy import deepcopy
 from dataclasses import MISSING, field, dataclass, fields
 from enum import StrEnum
 
@@ -56,7 +57,9 @@ from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     SubclassJSONSerializer,
+    from_json,
 )
+from krrood.adapters.keyword_argument import SerializationKeywordArgument
 from krrood.exceptions import DataclassException
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
@@ -64,6 +67,10 @@ from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     GenericSymbolicType,
     Scalar,
+)
+from cramph.structure_change_recorder import (
+    StructureChangeRecorder,
+    StructureChangeRecorderOutsideStatechart,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -85,6 +92,18 @@ class NodeJSONKey(StrEnum):
     """
     Tells apart the nodes of one JSON document, so every place referring to the same node
     deserializes to the same instance.
+    """
+
+    TICKING_FRAMEWORK = "ticking_framework"
+    """
+    The name of the framework that ticks the node, see
+    :attr:`StatechartNode.ticking_framework`.
+    """
+
+    TICKED_NODE = "ticked_node"
+    """
+    The document of a node that a framework ticks, carried by the document of its
+    stand-in, which every other framework reads instead.
     """
 
 
@@ -180,6 +199,10 @@ class TransitionCondition(SubclassJSONSerializer):
         self._sanity_check(new_expression=new_expression)
         self.expression = new_expression
         self._child = child
+        if self.owner is not None:
+            self.owner._structure_change_recorder._record_changed_condition(
+                node=self.owner, transition_kind=self.kind
+            )
 
     def _sanity_check(self, *, new_expression: Scalar) -> None:
         """
@@ -860,6 +883,14 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
     The name is not unique, use :attr:`unique_name`, if you need a unique identifier.
     """
 
+    ticking_framework: str | None = field(
+        default=None, metadata=JSONMetadata(serialize=False).as_dict()
+    )
+    """
+    The name of the framework that ticks this node, None if every framework that reads
+    it builds it. Any other framework reads it as a stand-in, see :class:`ReadingFramework`.
+    """
+
     _statechart: Statechart = field(init=False, default=None)
     """
     Back reference to the statechart that owns this node.
@@ -1178,22 +1209,50 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return self.statechart.top_level_nodes
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
-        return {
-            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
+        """
+        A node that a framework ticks is written as the document of its stand-in, which
+        carries the document of the node, see :class:`ReadingFramework`.
+
+        .. warning:: A stand-in written again carries only itself, so even the framework
+            that ticks its node reads a stand-in from that document.
+        """
+        identification = {
             NodeJSONKey.NODE_ID: self._node_id,
+            NodeJSONKey.TICKING_FRAMEWORK: self.ticking_framework,
+        }
+        document = {
+            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
+            **identification,
+        }
+        if self.ticking_framework is None:
+            return document
+        stand_in = self.stand_in_type(name=self.name)
+        stand_in.plot_specifications = deepcopy(self.plot_specifications)
+        return {
+            **DataclassJSONSerializer.to_json(instance=stand_in, **kwargs),
+            **identification,
+            NodeJSONKey.TICKED_NODE: document,
         }
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Deserializes the node, or returns the instance already deserialized for the same
-        node of the document, so that nodes referring to it share it.
+        node of the document, so that nodes referring to it share it. A stand-in becomes
+        the node it stands in for only if the reading framework ticks that node.
         """
         tracker = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         node_id = data[NodeJSONKey.NODE_ID]
         if tracker.has(key=node_id):
             return tracker.get(key=node_id)
+        ticking_framework = data.get(NodeJSONKey.TICKING_FRAMEWORK)
+        ticked_node_document = data.get(NodeJSONKey.TICKED_NODE)
+        if ticked_node_document is not None and ReadingFramework.is_ticked_by_reader(
+            ticking_framework=ticking_framework, from_json_kwargs=kwargs
+        ):
+            return from_json(ticked_node_document, **kwargs)
         node = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
+        node.ticking_framework = ticking_framework
         node._take_over_node_id(node_id=node_id)
         tracker.add(key=node_id, tracked_object=node)
         return node
@@ -1230,6 +1289,9 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 self._interrupt_condition = transition
             case _:
                 raise UnknownTransitionKindError(transition_kind=transition.kind)
+        self._structure_change_recorder._record_changed_condition(
+            node=self, transition_kind=transition.kind
+        )
 
     def create_lifecycle_transitions(
         self, *, own_transitions_allowed: sm.Scalar
@@ -1532,6 +1594,16 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         self._statechart = statechart
 
     @property
+    def _structure_change_recorder(self) -> StructureChangeRecorder:
+        """
+        :return: The recorder of the statechart this node belongs to, or a recorder
+            that records nothing if it belongs to none.
+        """
+        if self._statechart is None:
+            return StructureChangeRecorderOutsideStatechart()
+        return self._statechart.structure_change_recorder
+
+    @property
     def context(self) -> StatechartContext:
         """
         :return: The context of the statechart this node belongs to.
@@ -1556,12 +1628,31 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return ()
 
+    @classproperty
+    def stand_in_type(cls) -> type[StatechartNode]:
+        """
+        :return: The class of the node read in place of a node of this class, which every
+            framework can import, see :class:`ReadingFramework`.
+        """
+        return StructureCopyNode
+
     def create_structure_copy(self) -> StatechartNode:
         """
         :return: A node of the base class of this node's kind, with the same name, see
             :meth:`~cramph.statechart.Statechart.create_structure_copy`.
         """
-        return StructureCopyNode(name=self.name)
+        return self.stand_in_type(name=self.name)
+
+    def create_structure_counterpart(self) -> StatechartNode:
+        """
+        :return: The structure copy of this node, see :meth:`create_structure_copy`,
+            with the id and the plot specifications of this node, so that a document
+            naming this node by its id names the copy too.
+        """
+        counterpart = self.create_structure_copy()
+        counterpart._take_over_node_id(node_id=self._node_id)
+        counterpart.plot_specifications = deepcopy(self.plot_specifications)
+        return counterpart
 
     def set_up(self) -> None:
         """
@@ -2333,6 +2424,33 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
         return None
 
 
+@dataclass(kw_only=True)
+class ReadingFramework(SerializationKeywordArgument):
+    """
+    The framework a document of nodes is read by. It builds the nodes it ticks, and
+    reads a stand-in for every node another framework ticks, without importing the
+    class of that node. A reader naming no framework reads a stand-in for every node a
+    framework ticks.
+    """
+
+    framework_name: str
+    """
+    The name of the framework, as :attr:`StatechartNode.ticking_framework` names it.
+    """
+
+    @classmethod
+    def is_ticked_by_reader(
+        cls, *, ticking_framework: str | None, from_json_kwargs: dict[str, Any]
+    ) -> bool:
+        """
+        :param ticking_framework: The name of the framework that ticks a node.
+        :param from_json_kwargs: The keyword arguments of a ``from_json`` call.
+        :return: Whether the framework reading the document ticks that node.
+        """
+        reader = from_json_kwargs.get(cls._keyword())
+        return reader is not None and reader.framework_name == ticking_framework
+
+
 def expanded_child_field(default: Any = MISSING) -> Any:
     """
     Declares a field of a composite node that holds a child the node creates in
@@ -2377,6 +2495,45 @@ class CompositeNode(StatechartNode):
         """
         return list(self.nodes)
 
+    def set_children(self, *, children: list[StatechartNode]) -> None:
+        """
+        Holds `children` as the children of this node from now on, in that order, and
+        records the change in the statechart this node belongs to.
+
+        .. warning:: Changing :attr:`nodes` in place goes unrecorded once the
+            :meth:`~cramph.statechart.Statechart.modify` block this node joined in has
+            ended, so a copy of the statechart repeating its changes misses it.
+
+        :param children: The nodes to hold as children.
+        """
+        self.nodes = list(children)
+        self._structure_change_recorder._record_changed_children(node=self)
+
+    def insert_child(self, *, position: int, node: StatechartNode) -> None:
+        """
+        Lists `node` among the children at `position`, without adding it to the
+        statechart, and records the change like :meth:`set_children`. See
+        :meth:`_add_listed_child_to_statechart` for adding it.
+
+        :param position: The index among the children `node` takes.
+        :param node: The node to list as a child.
+        """
+        self.set_children(
+            children=[*self.nodes[:position], node, *self.nodes[position:]]
+        )
+
+    def remove_child(self, *, child: StatechartNode) -> None:
+        """
+        Stops listing `child` itself among the children, whatever other child it
+        compares equal to, without removing it from the statechart, and records the
+        change like :meth:`set_children`.
+
+        :param child: One of :attr:`nodes`.
+        """
+        self.set_children(
+            children=[listed for listed in self.nodes if listed is not child]
+        )
+
     @classproperty
     def context_extensions_required_to_expand(
         cls,
@@ -2388,8 +2545,12 @@ class CompositeNode(StatechartNode):
         """
         return ()
 
-    def create_structure_copy(self) -> CompositeNode:
-        return StructureCopyCompositeNode(name=self.name)
+    @classproperty
+    def stand_in_type(cls) -> type[CompositeNode]:
+        """
+        :return: A composite node class, see :meth:`StatechartNode.stand_in_type`.
+        """
+        return StructureCopyCompositeNode
 
     def adopt_handed_children(self) -> None:
         """
@@ -2397,6 +2558,18 @@ class CompositeNode(StatechartNode):
         unless overridden.
 
         Called once, when this node joins a statechart, right before :meth:`expand`.
+        """
+        return None
+
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects the children this node was handed that it cannot adopt, see
+        :meth:`adopt_handed_children`. Rejects none unless overridden.
+
+        :param taken_over: A handed child this node takes over before it adopts its
+            children, see :meth:`take_over`, which it can adopt then.
         """
         return None
 
@@ -2429,13 +2602,13 @@ class CompositeNode(StatechartNode):
         self._add_node_sanity_check(node=node)
         self._check_accepts_children()
         if node not in self.nodes:
-            self.nodes.append(node)
-        self._place_child_in_statechart(node=node)
+            self.insert_child(position=len(self.nodes), node=node)
+        self._add_listed_child_to_statechart(node=node)
 
-    def _place_child_in_statechart(self, *, node: StatechartNode) -> None:
+    def _add_listed_child_to_statechart(self, *, node: StatechartNode) -> None:
         """
-        Makes `node` a child of this node in the statechart this node belongs to,
-        without touching :attr:`nodes`.
+        Adds `node`, which :attr:`nodes` lists already, to the statechart this node
+        belongs to, as a child of this node, without touching :attr:`nodes`.
 
         .. note:: It does not check :meth:`_check_accepts_children`; check that before
             changing :attr:`nodes`, so a rejected node leaves this node as it was.
@@ -2501,10 +2674,11 @@ class CompositeNode(StatechartNode):
         :param child: One of :attr:`nodes`.
         :param substitute: The node to list in its place.
         """
-        position = next(
-            index for index, listed in enumerate(self.nodes) if listed is child
+        self.set_children(
+            children=[
+                substitute if listed is child else listed for listed in self.nodes
+            ]
         )
-        self.nodes[position] = substitute
 
     def take_over(self, *, node: StatechartNode) -> None:
         """
