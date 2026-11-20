@@ -203,6 +203,7 @@ class EdgeMatrix(ABC):
     @abstractmethod
     def from_edge_positions(
         cls,
+        *,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
         shape: MatrixShape2D,
@@ -216,7 +217,7 @@ class EdgeMatrix(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
+    def stored_values(self, *, entries: SparseEntries, padding: float) -> BackendArray:
         """
         :param entries: Values at edges of this matrix, in any order if this matrix
             stores entries that are not edges, in its own order otherwise.
@@ -226,7 +227,7 @@ class EdgeMatrix(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def edge_values(self, stored: BackendArray) -> EdgeValues:
+    def edge_values(self, *, stored: BackendArray) -> EdgeValues:
         """
         :param stored: Values as this matrix stores them.
         :return: The value of every edge, in the order of this matrix.
@@ -234,7 +235,7 @@ class EdgeMatrix(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def values_of_columns(self, values: BackendArray) -> BackendArray:
+    def values_of_columns(self, *, values: BackendArray) -> BackendArray:
         """
         :param values: One value per column, the columns in the last axis.
         :return: The value of the column of every edge, as this matrix stores values.
@@ -242,7 +243,7 @@ class EdgeMatrix(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def values_of_rows(self, values: NodeValues) -> BackendArray:
+    def values_of_rows(self, *, values: NodeValues) -> BackendArray:
         """
         :param values: One value per node of a layer.
         :return: The value of the node of every edge, as this matrix stores values.
@@ -251,7 +252,7 @@ class EdgeMatrix(ABC):
 
     @abstractmethod
     def reduce_by_row(
-        self, values: BackendArray, reduction: RowReduction
+        self, *, values: BackendArray, reduction: RowReduction
     ) -> BackendArray:
         """
         Combine the values along the edges of every node, giving the identity of the
@@ -360,7 +361,11 @@ class SparseEdgeMatrix(EdgeMatrix):
     that taking the columns of the edges from a row of values is the identity.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """
+        Derive the order of the nodes by their number of edges and the positions of
+        their edges by rank.
+        """
         self.edge_rows = np.asarray(self.edge_rows, dtype=np.int64)
         self.edge_columns = np.asarray(self.edge_columns, dtype=np.int64)
 
@@ -400,30 +405,31 @@ class SparseEdgeMatrix(EdgeMatrix):
     @classmethod
     def from_edge_positions(
         cls,
+        *,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
         shape: MatrixShape2D,
     ) -> Self:
         return cls(rows, columns, shape)
 
-    def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
+    def stored_values(self, *, entries: SparseEntries, padding: float) -> BackendArray:
         return entries.data
 
-    def edge_values(self, stored: BackendArray) -> EdgeValues:
+    def edge_values(self, *, stored: BackendArray) -> EdgeValues:
         return stored
 
-    def values_of_columns(self, values: BackendArray) -> BackendArray:
+    def values_of_columns(self, *, values: BackendArray) -> BackendArray:
         # usually every column is an edge once and in order, in which case the gather
         # would copy an array with one entry per event per column for nothing
         if self.stores_every_column_once_in_order:
             return values
         return values[..., self.edge_columns]
 
-    def values_of_rows(self, values: NodeValues) -> BackendArray:
+    def values_of_rows(self, *, values: NodeValues) -> BackendArray:
         return values[..., self.edge_rows]
 
     def reduce_by_row(
-        self, values: BackendArray, reduction: RowReduction
+        self, *, values: BackendArray, reduction: RowReduction
     ) -> BackendArray:
         namespace = array_namespace(values)
         batch_shape = tuple(values.shape[:-1])
@@ -499,6 +505,7 @@ class DenseEdgeMatrix(EdgeMatrix):
     @classmethod
     def from_edge_positions(
         cls,
+        *,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
         shape: MatrixShape2D,
@@ -509,7 +516,7 @@ class DenseEdgeMatrix(EdgeMatrix):
         ] = True
         return cls(is_edge)
 
-    def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
+    def stored_values(self, *, entries: SparseEntries, padding: float) -> BackendArray:
         result = np.full(self.shape.to_tuple(), padding)
         result[
             np.asarray(entries.rows, dtype=np.int64),
@@ -517,17 +524,17 @@ class DenseEdgeMatrix(EdgeMatrix):
         ] = np.asarray(entries.data)
         return array_namespace(entries.data).asarray(result)
 
-    def edge_values(self, stored: BackendArray) -> EdgeValues:
+    def edge_values(self, *, stored: BackendArray) -> EdgeValues:
         return stored[self.rows, self.columns]
 
-    def values_of_columns(self, values: BackendArray) -> BackendArray:
+    def values_of_columns(self, *, values: BackendArray) -> BackendArray:
         return array_namespace(values).expand_dims(values, axis=-2)
 
-    def values_of_rows(self, values: NodeValues) -> BackendArray:
+    def values_of_rows(self, *, values: NodeValues) -> BackendArray:
         return array_namespace(values).expand_dims(values, axis=-1)
 
     def reduce_by_row(
-        self, values: BackendArray, reduction: RowReduction
+        self, *, values: BackendArray, reduction: RowReduction
     ) -> BackendArray:
         namespace = array_namespace(values)
         masked = namespace.where(
@@ -661,6 +668,7 @@ class BlockEdgeMatrix(EdgeMatrix):
     @classmethod
     def from_edge_positions(
         cls,
+        *,
         rows: npt.NDArray[np.int64],
         columns: npt.NDArray[np.int64],
         shape: MatrixShape2D,
@@ -699,7 +707,7 @@ class BlockEdgeMatrix(EdgeMatrix):
             first_position += stack.number_of_edges
         return cls(stacks=stacks, matrix_shape=shape)
 
-    def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
+    def stored_values(self, *, entries: SparseEntries, padding: float) -> BackendArray:
         # the value of an edge is found by its key row * #columns + column
         width = self.matrix_shape.number_of_columns
         entry_keys = np.asarray(entries.rows, dtype=np.int64) * width + np.asarray(
@@ -715,17 +723,17 @@ class BlockEdgeMatrix(EdgeMatrix):
             namespace.asarray(positions, device=array_api_compat.device(entries.data)),
         )
 
-    def edge_values(self, stored: BackendArray) -> EdgeValues:
+    def edge_values(self, *, stored: BackendArray) -> EdgeValues:
         return stored
 
-    def values_of_columns(self, values: BackendArray) -> BackendArray:
+    def values_of_columns(self, *, values: BackendArray) -> BackendArray:
         return values[..., self.columns]
 
-    def values_of_rows(self, values: NodeValues) -> BackendArray:
+    def values_of_rows(self, *, values: NodeValues) -> BackendArray:
         return values[..., self.rows]
 
     def reduce_by_row(
-        self, values: BackendArray, reduction: RowReduction
+        self, *, values: BackendArray, reduction: RowReduction
     ) -> BackendArray:
         namespace = array_namespace(values)
         batch_shape = tuple(values.shape[:-1])

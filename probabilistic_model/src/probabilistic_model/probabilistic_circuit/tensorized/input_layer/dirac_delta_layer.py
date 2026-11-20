@@ -77,6 +77,10 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         return dataclasses.replace(self, location=location, density_cap=density_cap)
 
     def validate_own(self):
+        """
+        :raises ShapeMismatchError: If there is not one density cap per location, in
+            addition to what :meth:`Layer.validate_own` raises.
+        """
         super().validate_own()
         if self.location.shape != self.density_cap.shape:
             raise ShapeMismatchError(self.location.shape, self.density_cap.shape)
@@ -232,7 +236,13 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         return LayerWithLogProbabilities(conditioned, log_likelihood)
 
     def apply_translation_own(self, translation: VariableValues):
+        """
+        Translate the locations of the nodes, see :meth:`Layer.apply_translation_own`.
+        """
         self.location = self.location + self.node_variable_values(values=translation)
 
     def apply_scaling_own(self, scaling: VariableValues):
+        """
+        Scale the locations of the nodes, see :meth:`Layer.apply_scaling_own`.
+        """
         self.location = self.location * self.node_variable_values(values=scaling)

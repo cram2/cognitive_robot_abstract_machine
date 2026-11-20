@@ -95,10 +95,16 @@ def test_shape(table, probabilities):
 
 
 def test_log_probabilities_of_states(table, probabilities):
+    """
+    Every table reads the log-probability of each state index, and minus infinity for
+    an index that is no state.
+    """
     indices = np.array([2, 3, -1, 0, 2, 4])
     expected = log_of(probabilities)[:, np.where(indices >= 0, indices, 0)].T
     expected[indices < 0] = -np.inf
-    np.testing.assert_allclose(table.log_probabilities_of_states(indices), expected)
+    np.testing.assert_allclose(
+        table.log_probabilities_of_states(indices=indices), expected
+    )
 
 
 def test_probability_of_states(table, probabilities):

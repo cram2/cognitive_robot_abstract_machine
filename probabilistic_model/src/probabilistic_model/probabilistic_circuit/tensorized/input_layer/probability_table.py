@@ -137,7 +137,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
 
     @abstractmethod
     def log_probabilities_of_states(
-        self, indices: LeafStateIndices
+        self, *, indices: LeafStateIndices
     ) -> SampleNodeValues:
         """
         :param indices: One state index per value for every node, shape (#values,), or
@@ -362,7 +362,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return int(self.log_probabilities.size)
 
     def log_probabilities_of_states(
-        self, indices: LeafStateIndices
+        self, *, indices: LeafStateIndices
     ) -> SampleNodeValues:
         """
         :meth:`ProbabilityTable.log_probabilities_of_states` read from the log-
@@ -560,7 +560,7 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
         return int(self.log_probabilities.nnz)
 
     def log_probabilities_of_states(
-        self, indices: LeafStateIndices
+        self, *, indices: LeafStateIndices
     ) -> SampleNodeValues:
         if indices.ndim == 2:
             nodes = np.broadcast_to(np.arange(self.number_of_nodes), indices.shape)

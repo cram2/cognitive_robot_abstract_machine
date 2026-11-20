@@ -130,7 +130,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         self.node_variables = np.asarray(remap)[self.node_variables]
         self.validate_own()
 
-    def column_of(self, events: SampleArray) -> LeafValues:
+    def column_of(self, *, events: SampleArray) -> LeafValues:
         """
         Select the values of the variables of the nodes from an event array.
 
@@ -204,7 +204,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         """
         raise NotImplementedError
 
-    def node_distributions(self, variables: SortedSet) -> list[UnivariateDistribution]:
+    def node_distributions(
+        self, *, variables: SortedSet
+    ) -> list[UnivariateDistribution]:
         """
         :param variables: The variables of the circuit.
         :return: Every node of this layer as a univariate distribution over its
@@ -222,7 +224,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         self, variables: SortedSet, cache: QueryCache | None = None
     ) -> list[Event]:
         return [
-            distribution.support for distribution in self.node_distributions(variables)
+            distribution.support
+            for distribution in self.node_distributions(variables=variables)
         ]
 
     @memoized
@@ -231,7 +234,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     ) -> tuple[list[Event], NodeValues]:
         modes = [
             distribution.log_mode()
-            for distribution in self.node_distributions(variables)
+            for distribution in self.node_distributions(variables=variables)
         ]
         return [mode.event for mode in modes], np.array(
             [mode.log_likelihood for mode in modes], dtype=float
@@ -405,7 +408,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     ) -> LayerWithLogProbabilities:
         return query.log_probabilities.record(
             SumLayer.concatenation_of_pieces(
-                [
+                pieces=[
                     group.log_truncated_of_assignment(
                         assignment=event[query.variables[group.variable]],
                         variable=query.variables[group.variable],
@@ -484,7 +487,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
                 )
             else:
                 pieces.append(group.log_conditional_of_value(point[variable]))
-        return query.log_probabilities.record(SumLayer.concatenation_of_pieces(pieces))
+        return query.log_probabilities.record(
+            SumLayer.concatenation_of_pieces(pieces=pieces)
+        )
 
     def rebuild(
         self,
@@ -525,7 +530,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
     def log_likelihood_of_nodes(
         self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
-        return self.log_likelihood_of_nodes_from_column(self.column_of(events))
+        return self.log_likelihood_of_nodes_from_column(self.column_of(events=events))
 
     @abstractmethod
     def log_likelihood_of_nodes_from_column(
@@ -575,7 +580,9 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
     def cumulative_distribution_of_nodes(
         self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
-        return self.cumulative_distribution_of_nodes_from_column(self.column_of(events))
+        return self.cumulative_distribution_of_nodes_from_column(
+            self.column_of(events=events)
+        )
 
     @abstractmethod
     def cumulative_distribution_of_nodes_from_column(

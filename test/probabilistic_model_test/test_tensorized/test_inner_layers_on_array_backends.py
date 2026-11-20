@@ -360,14 +360,15 @@ def test_reduce_by_row_on_every_backend(
     edges.
     """
     edges = edge_matrix_type.from_edge_positions(
-        uneven_rows.rows, uneven_rows.columns, uneven_rows.shape
+        rows=uneven_rows.rows, columns=uneven_rows.columns, shape=uneven_rows.shape
     )
     values = np.array(
         [[0.5, -1.0, 2.0, 0.25, -0.5, 1.5], [1.0, 2.0, -3.0, 0.5, 0.75, -0.25]]
     )
     assert_result_of_backend_equals(
         edges.reduce_by_row(
-            edges.values_of_columns(array_backend.asarray(values)), reduction
+            values=edges.values_of_columns(values=array_backend.asarray(values)),
+            reduction=reduction,
         ),
         reduced_by_definition(values, edges, reduction),
         array_backend,

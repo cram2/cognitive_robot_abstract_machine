@@ -106,13 +106,17 @@ class SumLayer(HasParameterArrays, InnerLayer):
         """
         number_of_child_nodes = sum(layer.number_of_nodes for layer in child_layers)
         edges = edge_matrix_type.from_edge_positions(
-            log_weights.rows,
-            log_weights.columns,
-            MatrixShape2D(
+            rows=log_weights.rows,
+            columns=log_weights.columns,
+            shape=MatrixShape2D(
                 number_of_rows=number_of_nodes, number_of_columns=number_of_child_nodes
             ),
         )
-        return cls(child_layers, edges, edges.stored_values(log_weights, -np.inf))
+        return cls(
+            child_layers,
+            edges,
+            edges.stored_values(entries=log_weights, padding=-np.inf),
+        )
 
     @classmethod
     def mixture_of(
@@ -224,7 +228,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
 
     @classmethod
     def concatenation_of_pieces(
-        cls, pieces: list[LayerWithLogProbabilities]
+        cls, *, pieces: list[LayerWithLogProbabilities]
     ) -> LayerWithLogProbabilities:
         """
         Join the pieces a query splits the nodes of a layer into, in their order.
@@ -354,7 +358,9 @@ class SumLayer(HasParameterArrays, InnerLayer):
             self.edge_log_weights, self.edges.rows, self.edges.columns
         )
         super().store_edges_as(edge_matrix_type)
-        self.log_weights = self.edges.stored_values(log_weights, -np.inf)
+        self.log_weights = self.edges.stored_values(
+            entries=log_weights, padding=-np.inf
+        )
 
     # %% weights
 
@@ -363,14 +369,16 @@ class SumLayer(HasParameterArrays, InnerLayer):
         """
         :return: The logarithmic weight of every edge, in the order of :attr:`edges`.
         """
-        return self.edges.edge_values(self.log_weights)
+        return self.edges.edge_values(stored=self.log_weights)
 
     @property
     def log_normalization_constants(self) -> NodeValues:
         """
         :return: ``log(sum(exp(w)))`` over the weights of each node, shape (#nodes,).
         """
-        return self.edges.reduce_by_row(self.log_weights, RowReduction.LOG_SUM_EXP)
+        return self.edges.reduce_by_row(
+            values=self.log_weights, reduction=RowReduction.LOG_SUM_EXP
+        )
 
     @property
     def normalized_log_weights(self) -> BackendArray:
@@ -379,7 +387,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
             :attr:`log_weights`.
         """
         return self.log_weights - self.edges.values_of_rows(
-            self.log_normalization_constants
+            values=self.log_normalization_constants
         )
 
     @property
@@ -387,7 +395,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
         """
         :return: The logarithmic weight of every edge, normalized per node.
         """
-        return self.edges.edge_values(self.normalized_log_weights)
+        return self.edges.edge_values(stored=self.normalized_log_weights)
 
     @property
     def normalized_weights(self) -> BackendArray:
@@ -418,10 +426,10 @@ class SumLayer(HasParameterArrays, InnerLayer):
         :return: The result for the nodes of this layer, shape (..., #nodes).
         """
         values = self.edges.values_of_columns(
-            self.namespace.concat(child_results, axis=-1)
+            values=self.namespace.concat(child_results, axis=-1)
         )
         return self.edges.reduce_by_row(
-            values * self.normalized_weights, RowReduction.SUM
+            values=values * self.normalized_weights, reduction=RowReduction.SUM
         )
 
     def _weighted_forward_over_nodes(
@@ -447,11 +455,11 @@ class SumLayer(HasParameterArrays, InnerLayer):
         :return: The log-result of the nodes of this layer with shape (..., #nodes).
         """
         values = self.edges.values_of_columns(
-            self.namespace.concat(child_results, axis=-1)
+            values=self.namespace.concat(child_results, axis=-1)
         )
         return (
             self.edges.reduce_by_row(
-                values + self.log_weights, RowReduction.LOG_SUM_EXP
+                values=values + self.log_weights, reduction=RowReduction.LOG_SUM_EXP
             )
             - self.log_normalization_constants
         )
@@ -570,7 +578,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
     ):
         # the padding slot gets a weight of zero, so it is never drawn
         weights = self.edges.pad(
-            np.asarray(self.edges.edge_values(self.normalized_weights)), 0.0
+            np.asarray(self.edges.edge_values(stored=self.normalized_weights)), 0.0
         )
         for node, rows_of_node in enumerate(assignment.rows_of(self)):
             if not rows_of_node.is_empty:
@@ -682,7 +690,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
         result = self.__class__(
             [child_result.layer for child_result in child_results],
             self.edges,
-            self.edges.stored_values(log_weights, -np.inf),
+            self.edges.stored_values(entries=log_weights, padding=-np.inf),
         )
         # the probability of a node is the sum of its updated weights
         return query.log_probabilities.record(

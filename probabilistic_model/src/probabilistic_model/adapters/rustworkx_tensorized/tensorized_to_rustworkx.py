@@ -130,9 +130,12 @@ class UnivariateInputLayerToLeavesConverter(
     def convert(
         cls, data: UnivariateInputLayer, builder: RustworkxCircuitBuilder
     ) -> list[Unit]:
+        """
+        Convert a layer into one leaf per node, see :meth:`Converter.convert`.
+        """
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(builder.variables)
+            for distribution in data.node_distributions(variables=builder.variables)
         ]
 
 
@@ -154,7 +157,7 @@ class MultivariateGaussianLayerToLeavesConverter(
     ) -> list[Unit]:
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(builder.variables)
+            for distribution in data.node_distributions(variables=builder.variables)
         ]
 
 

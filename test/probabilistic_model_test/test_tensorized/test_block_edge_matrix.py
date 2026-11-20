@@ -40,9 +40,9 @@ def test_rows_with_the_same_columns_form_one_block(
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
     matrix = BlockEdgeMatrix.from_edge_positions(
-        entries.rows,
-        entries.columns,
-        MatrixShape2D(number_of_rows=5, number_of_columns=5),
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
     )
     shapes = sorted(
         stack.block_rows.shape + stack.block_columns.shape[1:]
@@ -64,13 +64,16 @@ def test_block_reduction_is_the_sparse_reduction(
     results = []
     for matrix_type in (SparseEdgeMatrix, BlockEdgeMatrix):
         matrix = matrix_type.from_edge_positions(
-            entries.rows,
-            entries.columns,
-            MatrixShape2D(number_of_rows=5, number_of_columns=5),
+            rows=entries.rows,
+            columns=entries.columns,
+            shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
         )
-        stored = matrix.stored_values(entries, 0.0)
+        stored = matrix.stored_values(entries=entries, padding=0.0)
         results.append(
-            matrix.reduce_by_row(matrix.values_of_columns(values) + stored, reduction)
+            matrix.reduce_by_row(
+                values=matrix.values_of_columns(values=values) + stored,
+                reduction=reduction,
+            )
         )
     np.testing.assert_allclose(results[1], results[0])
 
@@ -84,11 +87,13 @@ def test_stored_values_follow_their_edges(
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
     matrix = BlockEdgeMatrix.from_edge_positions(
-        entries.rows,
-        entries.columns,
-        MatrixShape2D(number_of_rows=5, number_of_columns=5),
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
     )
-    edge_values = matrix.edge_values(matrix.stored_values(entries, 0.0))
+    edge_values = matrix.edge_values(
+        stored=matrix.stored_values(entries=entries, padding=0.0)
+    )
     expected = {
         (int(row), int(column)): value
         for row, column, value in zip(entries.rows, entries.columns, entries.data)
@@ -112,9 +117,9 @@ def test_sums_of_one_shape_are_one_stack():
         np.arange(products_per_region), regions * sums_per_region
     )
     matrix = BlockEdgeMatrix.from_edge_positions(
-        rows,
-        columns,
-        MatrixShape2D(
+        rows=rows,
+        columns=columns,
+        shape=MatrixShape2D(
             number_of_rows=regions * sums_per_region,
             number_of_columns=regions * products_per_region,
         ),

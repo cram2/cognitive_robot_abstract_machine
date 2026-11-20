@@ -125,6 +125,10 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         )
 
     def validate_own(self):
+        """
+        :raises ShapeMismatchError: If the table does not have one column per state, in
+            addition to what :meth:`Layer.validate_own` raises.
+        """
         super().validate_own()
         if self.table.number_of_states != self.number_of_states:
             raise ShapeMismatchError(
@@ -143,7 +147,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         """
         raise NotImplementedError
 
-    def state_indices_of(self, values: LeafValues) -> LeafStateIndices:
+    def state_indices_of(self, *, values: LeafValues) -> LeafStateIndices:
         """
         Look up the index of every value in :attr:`states`.
 
@@ -176,7 +180,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.table.log_probabilities_of_states(
-            self.state_indices_of(self.column_of(events))
+            indices=self.state_indices_of(values=self.column_of(events=events))
         )
 
     @memoized
@@ -225,7 +229,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     def log_conditional_of_value(self, value: Any) -> LayerWithLogProbabilities:
         # the value is read like the values of events, see state_indices_of
         selected = np.zeros(self.number_of_states, dtype=bool)
-        [index] = self.state_indices_of(np.array([value], dtype=float))
+        [index] = self.state_indices_of(values=np.array([value], dtype=float))
         if index >= 0:
             selected[index] = True
         return self.renormalized_to(selected)
@@ -510,7 +514,9 @@ class IntegerLayer(DiscreteLayer):
                 ],
                 axis=1,
             )
-        reached = self.float_column(values=self.column_of(events)) >= self.float_states
+        reached = (
+            self.float_column(values=self.column_of(events=events)) >= self.float_states
+        )
         return self.table.dot(
             self.namespace.astype(reached, self.floating_point_type).T
         ).T

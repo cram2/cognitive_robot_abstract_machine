@@ -202,7 +202,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         """
         raise NotImplementedError
 
-    def node_distributions(self, variables: SortedSet) -> list[Any]:
+    def node_distributions(self, *, variables: SortedSet) -> list[Any]:
         """
         :param variables: The variables of the circuit.
         :return: The distribution of every node.
@@ -232,7 +232,8 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         self, variables: SortedSet, cache: QueryCache | None = None
     ) -> list[Event]:
         return [
-            distribution.support for distribution in self.node_distributions(variables)
+            distribution.support
+            for distribution in self.node_distributions(variables=variables)
         ]
 
     def sample_forward(

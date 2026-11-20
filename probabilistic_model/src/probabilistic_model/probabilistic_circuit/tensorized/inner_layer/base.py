@@ -915,7 +915,7 @@ class InnerLayer(Layer, ABC):
             for a layer whose nodes are connected to most child nodes.
         """
         self.edges = edge_matrix_type.from_edge_positions(
-            self.edges.rows, self.edges.columns, self.edges.shape
+            rows=self.edges.rows, columns=self.edges.columns, shape=self.edges.shape
         )
         self.__dict__.pop(InnerLayer.inner_layer_edges.attrname, None)
 

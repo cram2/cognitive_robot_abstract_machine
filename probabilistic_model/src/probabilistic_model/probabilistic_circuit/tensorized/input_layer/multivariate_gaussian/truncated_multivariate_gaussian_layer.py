@@ -1,3 +1,8 @@
+"""
+Input layers whose nodes are each a Gaussian over several continuous variables,
+confined to a hyperrectangle.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -261,7 +266,7 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
     ) -> tuple[list[Event], NodeValues]:
         modes = [
             distribution.log_mode()
-            for distribution in self.node_distributions(variables)
+            for distribution in self.node_distributions(variables=variables)
         ]
         return [mode.event for mode in modes], np.array(
             [mode.log_likelihood for mode in modes], dtype=float
@@ -280,7 +285,9 @@ class TruncatedMultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             return result
         order = {variables[index]: int(query.order[index]) for index in requested}
         center = {variables[index]: float(query.center[index]) for index in requested}
-        for node, distribution in enumerate(self.node_distributions(variables)):
+        for node, distribution in enumerate(
+            self.node_distributions(variables=variables)
+        ):
             moments = distribution.moment(order, center)
             for index in requested:
                 result[node, index] = moments[variables[index]]

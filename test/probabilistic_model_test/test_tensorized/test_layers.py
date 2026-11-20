@@ -155,7 +155,8 @@ def test_reduce_by_row_with_logaddexp_is_the_logsumexp_of_every_row(uneven_rows)
         axis=-1,
     )
     np.testing.assert_allclose(
-        uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP), expected
+        uneven_rows.reduce_by_row(values=values, reduction=RowReduction.LOG_SUM_EXP),
+        expected,
     )
 
 
@@ -172,7 +173,7 @@ def test_reduce_by_row_with_add_is_the_sum_of_every_row(uneven_rows):
         axis=-1,
     )
     np.testing.assert_allclose(
-        uneven_rows.reduce_by_row(values, RowReduction.SUM), expected
+        uneven_rows.reduce_by_row(values=values, reduction=RowReduction.SUM), expected
     )
 
 
@@ -185,7 +186,9 @@ def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
     """
     values = np.full((3, uneven_rows.number_of_edges), -np.inf)
     with np.errstate(all="raise"):
-        result = uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP)
+        result = uneven_rows.reduce_by_row(
+            values=values, reduction=RowReduction.LOG_SUM_EXP
+        )
     np.testing.assert_array_equal(
         result, np.full((3, uneven_rows.shape.number_of_rows), -np.inf)
     )
@@ -193,10 +196,15 @@ def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
 
 @pytest.mark.parametrize("reduction", [RowReduction.SUM, RowReduction.LOG_SUM_EXP])
 def test_reduce_by_row_gives_a_row_without_entries_the_identity(uneven_rows, reduction):
+    """
+    A row without entries reduces to the identity of the reduction.
+    """
     values = np.random.normal(size=(3, uneven_rows.number_of_edges))
     row_without_entries = 3
     np.testing.assert_array_equal(
-        uneven_rows.reduce_by_row(values, reduction)[:, row_without_entries],
+        uneven_rows.reduce_by_row(values=values, reduction=reduction)[
+            :, row_without_entries
+        ],
         reduction.identity,
     )
 
