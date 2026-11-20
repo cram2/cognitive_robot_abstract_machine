@@ -15,6 +15,8 @@ Key features:
 
 from __future__ import annotations
 
+# %% Imports
+
 import logging
 import timeit
 
@@ -29,6 +31,9 @@ import robokudo.annotators.outputs
 import robokudo.cas as cas
 import robokudo.defs as defs
 import robokudo.utils.tree
+
+
+# %% Pipeline lifecycle
 
 
 class Pipeline(Sequence):
@@ -74,14 +79,14 @@ class Pipeline(Sequence):
         # self.update_gui_for_this_pipeline = False
         # self.annotator_outputs = AnnotatorOutputs()
 
-    def create_new_cas(self) -> None:
+    def create_new_cas(self, *, acquired_cas: cas.CAS | None = None) -> None:
         """
-        Create a new Common Analysis Structure (CAS) for this pipeline.
+        Begin a processing cycle with a fresh or successfully acquired CAS.
 
-        Also resets the execution timer.
+        Assign the next pipeline identifier and reset the processing timer.
         """
         self._cas_counter += 1
-        self.cas = cas.CAS()
+        self.cas = acquired_cas if acquired_cas is not None else cas.CAS()
         self.cas.cas_id = self._cas_counter
         self.cas_start_timer = timeit.default_timer()
 

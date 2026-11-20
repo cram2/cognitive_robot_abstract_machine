@@ -31,6 +31,7 @@ from sensor_msgs.msg import CameraInfo, Image
 from typing_extensions import Any, TYPE_CHECKING
 
 from robokudo.cas import CASViews
+from robokudo.datastructures import ROSImageEncoding
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.image import ImageRotation
@@ -266,7 +267,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         :param camera_info: Camera calibration info message, defaults to None
         """
         self.lock.acquire()
-        self.color = self.bridge.imgmsg_to_cv2(color_data, desired_encoding="bgr8")
+        self.color = self.bridge.imgmsg_to_cv2(
+            color_data, desired_encoding=ROSImageEncoding.BGR8
+        )
         self.timestamp = color_data.header.stamp
 
         self.camera_info = camera_info
