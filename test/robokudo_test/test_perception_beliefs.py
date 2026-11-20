@@ -37,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from robokudo.annotators.cluster_color import ClusterColorAnnotator, Color
 from robokudo.cas import CAS
 from robokudo.defs import PACKAGE_NAME
-from robokudo.exceptions import CameraPoseOutsideWorldError
+from robokudo.annotators.exceptions import CameraPoseOutsideWorldError
 from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.process import RoboKudo
 from robokudo.types.annotation import BoundingBox3DAnnotation, Cylinder, SemanticColor
@@ -1072,7 +1072,9 @@ class TestConcurrentChanges:
         cas = cas_seen_from(world, camera_pose())
         concurrent_change = ConcurrentChange(changed_world=world)
         matcher = MatcherFacingAConcurrentChange(concurrent_change=concurrent_change)
-        monkeypatch.setattr("robokudo.process.ObjectMatcher", lambda: matcher)
+        monkeypatch.setattr(
+            "robokudo.annotators.world_updating.ObjectMatcher", lambda: matcher
+        )
 
         put_pass_into_world(robokudo, cas, make_object_hypothesis())
 

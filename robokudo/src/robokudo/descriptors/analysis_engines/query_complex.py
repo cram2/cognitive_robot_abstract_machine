@@ -20,6 +20,7 @@ from robokudo.behaviours.action_server_checks import ActionServerNoPreemptReques
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -64,6 +65,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 conditional_selector,
+                WorldUpdatingAnnotator(),
                 GenerateQueryResult(),
             ]
         )

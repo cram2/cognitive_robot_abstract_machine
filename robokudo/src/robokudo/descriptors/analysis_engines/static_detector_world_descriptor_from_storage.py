@@ -17,6 +17,7 @@ from robokudo.annotators.world_descriptor_bootstrap import (
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
@@ -47,6 +48,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(descriptor=oh_vis),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

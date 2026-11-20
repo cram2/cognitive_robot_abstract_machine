@@ -39,15 +39,12 @@ import robokudo.pipeline
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
 from robokudo.exceptions import (
-    CameraPoseOutsideWorldError,
     EngineRootIsNotAPipelineError,
     RoboKudoAlreadyRunningError,
 )
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.pipeline import Pipeline
-from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.tree import setup_with_descendants_on_behavior
 
 if TYPE_CHECKING:
@@ -97,12 +94,6 @@ class RoboKudo:
     A shared world is published by the process serving it.
     """
 
-    minimum_class_confidence: float = 0.5
-    """
-    How confident a classification has to be for an object to be believed of the class
-    it names; a less confident one is believed an :class:`UnknownObject`.
-    """
-
     world: World = field(init=False)
     """
     The world perception perceives into: the shared world, or an empty world of its own
@@ -128,8 +119,8 @@ class RoboKudo:
 
     pipeline: Pipeline | None = field(init=False, default=None)
     """
-    The pipeline at the root of the tree of :attr:`analysis_engine`, whose finished
-    passes are put into the world; None until :meth:`start`.
+    The pipeline at the root of the tree of :attr:`analysis_engine`; None until
+    :meth:`start`.
     """
 
     executor: SingleThreadedExecutor = field(init=False)
@@ -256,16 +247,12 @@ class RoboKudo:
 
     def tick_tree(self) -> None:
         """
-        Tick the behaviour tree once, and put the objects found by a pass of
-        :attr:`pipeline` that finished successfully in this tick into the world.
+        Tick the behaviour tree once.
 
         Publishing a world of its own starts once it has a world frame, as
         :attr:`publishes_own_world` asks.
         """
         self.tree.tick()
-        if self.pipeline.status != Status.SUCCESS:
-            return
-        self.update_world_with_perception_beliefs(pipeline=self.pipeline)
         if (
             self.publishes_own_world
             and self.synchronizer is None
@@ -291,64 +278,6 @@ class RoboKudo:
                 frame_names=TfFrameNames(prefix=f"{PACKAGE_NAME}/"),
             ),
         )
-
-    def update_world_with_perception_beliefs(self, *, pipeline: Pipeline) -> None:
-        """
-        Form a belief about each object the last pass of ``pipeline`` found and match
-        the beliefs to the perceivable objects of :attr:`world`. A matched object is
-        updated as :meth:`PerceptionBelief.update_object_in_world` describes; any other
-        belief is added to :attr:`world`. The whole pass is one modification of
-        :attr:`world`: no other thread changes :attr:`world` meanwhile, and the changes
-        are published once it has ended.
-
-        A pass without a camera pose in the world is left out, with a warning logged.
-
-        :param pipeline: A pipeline whose last pass finished successfully.
-        :raises CameraPoseOutsideWorldError: If the camera pose of the pass is measured
-            against a body that is not part of :attr:`world`.
-        """
-        matcher = ObjectMatcher()
-        cas = pipeline.cas
-        observation = cas.camera_observation
-        if (
-            observation is None
-            or observation.world_T_camera is None
-            or observation.world_T_camera.reference_frame is None
-        ):
-            logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE).warning(
-                "Leaving out a pass without a camera pose in the world."
-            )
-            return
-        world_T_camera = observation.world_T_camera
-        with self.world.modify_world():
-            if (
-                world_T_camera.reference_frame
-                not in self.world.kinematic_structure_entities
-            ):
-                raise CameraPoseOutsideWorldError(
-                    reference_frame_name=str(world_T_camera.reference_frame.name)
-                )
-            beliefs = [
-                belief
-                for hypothesis in cas.filter_annotations_by_type(ObjectHypothesis)
-                if (
-                    belief := PerceptionBelief.from_hypothesis(
-                        hypothesis=hypothesis,
-                        world_T_camera=world_T_camera,
-                        minimum_class_confidence=self.minimum_class_confidence,
-                    )
-                )
-                is not None
-            ]
-            matches = matcher.match(beliefs=beliefs, world=self.world)
-            for belief in beliefs:
-                object_in_world = matches.get(belief)
-                if object_in_world is None:
-                    belief.add_to_world(world=self.world)
-                    continue
-                belief.update_object_in_world(
-                    object_in_world=object_in_world, world=self.world
-                )
 
     def close(self) -> None:
         """

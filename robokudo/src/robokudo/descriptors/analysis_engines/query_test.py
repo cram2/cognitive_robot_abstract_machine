@@ -28,6 +28,7 @@ from robokudo.cas import CASViews
 from robokudo.identifier import BBIdentifier
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class PrintNumbers(BaseAnnotator):
@@ -125,6 +126,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),  # Initialize the pipeline
                 QueryAnnotator(),  # Handle incoming queries
                 conditional_selector,  # Preemption-aware task execution
+                WorldUpdatingAnnotator(),
             ]
         )
 

@@ -37,6 +37,7 @@ from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnot
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -115,6 +116,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ObjectHypothesisVisualizer(),
                 WorldVisualizer(),
                 ClusterColorAnnotator(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

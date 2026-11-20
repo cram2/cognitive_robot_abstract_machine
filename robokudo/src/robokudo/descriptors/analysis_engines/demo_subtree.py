@@ -13,6 +13,7 @@ from robokudo.descriptors.analysis_engines.subtree_tabletop_object_localization 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.pipeline import Pipeline
 from robokudo.idioms import pipeline_init
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -39,6 +40,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorHistogramAnnotator(),
                 ClusterPositionAnnotator(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

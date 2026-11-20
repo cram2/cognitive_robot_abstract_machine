@@ -37,6 +37,7 @@ from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -133,6 +134,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # robokudo.annotators.query.QueryAnnotator(),
                 pre,
                 annotators,
+                WorldUpdatingAnnotator(),
                 # GenerateQueryResult(),
                 # QueryReply(),
             ]

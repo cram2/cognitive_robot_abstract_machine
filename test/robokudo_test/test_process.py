@@ -42,7 +42,6 @@ from semantic_digital_twin.world_description.world_entity import Body
 from std_srvs.srv import Trigger
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.annotators.core import BaseAnnotator
 from robokudo.exceptions import (
     EngineRootIsNotAPipelineError,
     RoboKudoAlreadyRunningError,
@@ -54,7 +53,9 @@ from robokudo.types.annotation import BoundingBox3DAnnotation
 
 from ._object_hypotheses import make_object_hypothesis
 from ._perception_process import (
+    EngineFindingAnObject,
     EngineRunningABehaviour,
+    FindsAnObjectInView,
     put_pass_into_world,
     robokudo_of_its_own,
 )
@@ -63,7 +64,6 @@ from ._perception_world import (
     SharedWorld,
     camera_pose,
     cas_seen_from,
-    place_camera_of,
     wait_until,
 )
 
@@ -84,42 +84,6 @@ class EngineWithoutPipeline:
 
     def implementation(self) -> Behaviour:
         return self.tree
-
-
-class FindsAnObjectInView(BaseAnnotator):
-    """
-    Finds one object in front of the camera and ends the pass with ``outcome``.
-    """
-
-    def __init__(self, outcome: Status) -> None:
-        super().__init__(name="FindsAnObjectInView")
-        self.outcome = outcome
-
-    def update(self) -> Status:
-        cas = self.get_cas()
-        place_camera_of(cas, self.world, camera_pose())
-        cas.annotations.append(make_object_hypothesis())
-        return self.outcome
-
-
-@dataclass(kw_only=True)
-class EngineFindingAnObject:
-    """
-    An analysis engine whose pipeline finds one object per pass.
-    """
-
-    outcome: Status = Status.SUCCESS
-    """
-    How each pass ends.
-    """
-
-    def name(self) -> str:
-        return type(self).__name__
-
-    def implementation(self) -> Pipeline:
-        pipeline = Pipeline("FindingAnObject")
-        pipeline.add_child(FindsAnObjectInView(self.outcome))
-        return pipeline
 
 
 def robokudo_joining_a_shared_world(
@@ -275,8 +239,9 @@ class TestPerceptionWorld:
 
         robokudo.start(include_gui=False)
 
-        [annotator] = robokudo.pipeline.children
-        assert annotator.world is robokudo.world
+        assert [annotator.world for annotator in robokudo.pipeline.children] == [
+            robokudo.world
+        ] * len(robokudo.pipeline.children)
         robokudo.close()
 
     def test_without_a_shared_world_perceives_into_an_empty_world_of_its_own(
@@ -846,6 +811,23 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick_tree()
 
+        assert robokudo.world.get_semantic_annotations_by_type(UnknownObject) == []
+        robokudo.close()
+
+    def test_pass_without_a_world_updating_annotator_puts_nothing_into_the_world(
+        self, *, node: Node
+    ) -> None:
+        robokudo = robokudo_of_its_own(
+            node,
+            EngineRunningABehaviour(
+                behaviour=FindsAnObjectInView(outcome=Status.SUCCESS)
+            ),
+        )
+        robokudo.start(include_gui=False)
+
+        robokudo.tick_tree()
+
+        assert robokudo.pipeline.status == Status.SUCCESS
         assert robokudo.world.get_semantic_annotations_by_type(UnknownObject) == []
         robokudo.close()
 

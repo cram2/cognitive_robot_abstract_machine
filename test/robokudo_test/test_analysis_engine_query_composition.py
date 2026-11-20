@@ -196,21 +196,20 @@ def discovered_analysis_engine_module_names() -> list[str]:
     ]
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    discovered_analysis_engine_module_names(),
-)
-def test_no_analysis_engine_discards_its_real_answer_with_query_reply(
-    module_name: str,
-    monkeypatch,
-):
+def built_analysis_engine_pipeline(
+    module_name: str, monkeypatch: pytest.MonkeyPatch
+) -> Pipeline:
     """
-    No analysis engine may chain ``QueryReply`` after ``GenerateQueryResult``.
+    The pipeline the ``AnalysisEngine`` of ``module_name`` builds, without live cameras.
 
     Modules that fail to import, that define no ``AnalysisEngine``, or whose
     ``implementation()`` needs resources this test does not provide (for example a
-    running storage backend) are skipped rather than failed, since that is a missing
-    fixture or an unrelated environment issue, not evidence about this composition rule.
+    running storage backend) skip the test rather than fail it, since that is a missing
+    fixture or an unrelated environment issue, not evidence about a composition rule.
+
+    :param module_name: The fully qualified name of the analysis engine module.
+    :param monkeypatch: Replaces the collection reader descriptors for the build.
+    :return: The built pipeline.
     """
     try:
         module = importlib.import_module(module_name)
@@ -224,8 +223,22 @@ def test_no_analysis_engine_discards_its_real_answer_with_query_reply(
     install_fake_collection_reader_descriptor(monkeypatch)
     try:
         with bounded_build_time():
-            pipeline = analysis_engine_class().implementation()
+            return analysis_engine_class().implementation()
     except Exception as error:
         pytest.skip(f"{module_name} could not be built here: {error}")
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    discovered_analysis_engine_module_names(),
+)
+def test_no_analysis_engine_discards_its_real_answer_with_query_reply(
+    module_name: str,
+    monkeypatch,
+):
+    """
+    No analysis engine may chain ``QueryReply`` after ``GenerateQueryResult``.
+    """
+    pipeline = built_analysis_engine_pipeline(module_name, monkeypatch)
 
     assert_query_reply_does_not_follow_generate_query_result(pipeline)

@@ -15,6 +15,7 @@ from robokudo.pipeline import Pipeline
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -41,6 +42,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterColorHistogramAnnotator(),
                 ClusterPoseBBAnnotator(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq
