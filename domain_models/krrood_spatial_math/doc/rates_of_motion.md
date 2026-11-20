@@ -28,6 +28,7 @@ import numpy as np
 import plotly.graph_objects as go
 from IPython.display import HTML
 from plotly.subplots import make_subplots
+from scipy.linalg import expm
 from scipy.spatial.transform import Rotation
 
 from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
@@ -373,6 +374,37 @@ turning_figure.update_layout(
 )
 show(turning_figure)
 ```
+
+### Why not scipy's matrix exponential
+
+The same displacement is also the exponential of a 4×4 matrix: the rate times $\Delta$,
+with the cross-product matrix of $\omega$ in the top left, $v$ to its right, and a row of
+zeros below. SciPy computes this as `scipy.linalg.expm`, and for the body above it gives
+the same displacement:
+
+```{code-cell} ipython3
+rate = np.zeros((4, 4))
+rate[:3, :3] = [[0, -1, 0], [1, 0, 0], [0, 0, 0]]
+rate[:3, 3] = [1, 0, 0]
+pose = expm(rate * angle)
+displacement = driving.to_displacement(duration=angle)
+assert np.allclose(pose[:3, 3], displacement.translation[:3])
+assert np.allclose(
+    pose[:3, :3],
+    Rotation.from_rotvec(displacement.rotation_vector[:3]).as_matrix(),
+)
+```
+
+The package still computes the formula itself, because its displacements are usually not
+numbers. In semantic_digital_twin, the position of a connection is a symbolic variable.
+The world builds the pose of each body as an expression in these variables, compiles it
+once and evaluates it in every control cycle, and the controller differentiates it with
+respect to the positions. `expm` takes an array of numbers and returns one: it cannot
+take a variable, and it gives no derivative. The formula above uses only operations the
+symbolic math has, such as $\cos$, $\sin$ and the cross product, so it gives an
+expression in the position directly, and a derivative of it, as
+{ref}`why-not-the-value-at-zero` below shows. The package's tests check the formula
+against `expm`.
 
 ## Closed form and series
 
@@ -764,6 +796,7 @@ three. With them, $A$ is accurate to $2.6 \cdot 10^{-13}$, less than a picometre
 displacement of a metre. Four or five terms would gain one more digit in $A$, and two to
 three more in its slope.
 
+(why-not-the-value-at-zero)=
 ### Why not just the value at zero
 
 Todesco and Brüls also describe a simpler way around $0/0$ {cite}`todesco2023highly`
