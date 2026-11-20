@@ -4,8 +4,14 @@ Tests of finding out by trials what makes a behaviour succeed.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
+from sqlalchemy.orm import Session
+
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.utils import create_engine
 
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
@@ -19,6 +25,7 @@ from krrood.parametrization.trials.exceptions import (
 )
 from krrood.parametrization.trials.parameter_spaces import NearCentresRegistry
 from ..dataset.throwing_trials import (
+    Court,
     FastThrowSpace,
     NamedThrowParameters,
     ReleasePoint,
@@ -29,7 +36,7 @@ from ..dataset.throwing_trials import (
     ThrowMeasurements,
     ThrowParameters,
     ThrowSpace,
-    ThrowsInAFile,
+    ThrowsInADatabase,
 )
 
 # %% the parameters of a trial
@@ -168,51 +175,146 @@ def test_a_centre_without_a_value_for_a_parameter_is_refused():
         ThrowSpace().drawn_parameters(number_of_draws=1, model_registry=registry)
 
 
+# %% keeping trials in a database
+
+
+@pytest.fixture
+def database_path(tmp_path) -> Path:
+    """
+    The file of a database of the test ORM interface, which several processes can share.
+    """
+    return tmp_path / "throws.sqlite"
+
+
+@pytest.fixture
+def database_url(database_path) -> str:
+    """
+    Where the database of :func:`database_path` is, as SQLAlchemy names it.
+    """
+    return f"sqlite:///{database_path}"
+
+
+def stored_court_id(*, database_url: str, basket_distance: float) -> int:
+    """
+    :param database_url: Where to store the court.
+    :param basket_distance: How far the basket stands from the thrower.
+    :return: The database id of a court stored as a starting state.
+    """
+    from ..dataset.ormatic_interface import Base
+
+    engine = create_engine(database_url)
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        court = to_dao(Court(basket_distance=basket_distance))
+        session.add(court)
+        session.commit()
+        return court.database_id
+
+
+@pytest.fixture
+def court_id(database_url) -> int:
+    """
+    The database id of the court the throws of a test start from.
+    """
+    return stored_court_id(database_url=database_url, basket_distance=2.0)
+
+
+@pytest.fixture
+def throw() -> Throw:
+    """
+    A throw steep enough to land.
+    """
+    return SteepThrowsLand().perform(
+        parameters=ThrowParameters(
+            angle=0.7, speed=3.0, release=ReleasePoint(height=1.5)
+        )
+    )
+
+
+def test_a_trial_round_trips_through_the_database(database_url, court_id, throw):
+    """
+    A trial read back from the database equals the trial kept, marked as started from
+    the store's starting state.
+    """
+    store = ThrowsInADatabase(database_url=database_url, starting_state_id=court_id)
+    store.prepare()
+
+    store.add(trial=throw)
+
+    assert throw.starting_state_id == court_id
+    assert store.stored_trials() == [throw]
+
+
+def test_trials_are_read_back_by_the_state_they_started_from(
+    database_url, court_id, throw
+):
+    """
+    A store reads back only the trials of its own starting state.
+    """
+    other_court_id = stored_court_id(database_url=database_url, basket_distance=3.0)
+    store = ThrowsInADatabase(database_url=database_url, starting_state_id=court_id)
+    other_store = ThrowsInADatabase(
+        database_url=database_url, starting_state_id=other_court_id
+    )
+    store.prepare()
+    other_throw = SteepThrowsLand().perform(parameters=throw.parameters)
+
+    store.add(trial=throw)
+    other_store.add(trial=other_throw)
+
+    assert store.stored_trials() == [throw]
+    assert other_store.stored_trials() == [other_throw]
+
+
 # %% many trials at once
 
 
-def test_a_single_worker_keeps_every_trial_it_draws(tmp_path):
+def test_a_single_worker_keeps_every_trial_it_draws(database_url, court_id):
     """
     A campaign of one worker keeps as many trials as the worker draws.
     """
-    setup = ThrowingSetup(path=tmp_path / "throws.jsonl")
+    setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
     campaign = TrialCampaign(setup=setup, trials_per_worker=5)
 
     kept = campaign.run()
 
     assert kept == campaign.trials_per_worker
-    assert len(setup.create_store().throws()) == campaign.trials_per_worker
+    assert len(setup.create_store().stored_trials()) == campaign.trials_per_worker
 
 
-def test_several_workers_keep_every_trial_with_draws_of_their_own(tmp_path):
+def test_several_workers_keep_every_trial_with_draws_of_their_own(
+    database_url, court_id
+):
     """
-    Two workers in processes of their own keep all their trials in the shared store,
+    Two workers in processes of their own keep all their trials in the shared database,
     each with draws of its own seed.
     """
-    setup = ThrowingSetup(path=tmp_path / "throws.jsonl")
+    setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
     campaign = TrialCampaign(setup=setup, number_of_workers=2, trials_per_worker=4)
 
     kept = campaign.run()
-    throws = setup.create_store().throws()
+    throws = setup.create_store().stored_trials()
 
     assert kept == campaign.number_of_workers * campaign.trials_per_worker
     assert len(throws) == kept
     assert len({throw.parameters.angle for throw in throws}) == kept
 
 
-def test_workers_that_need_more_memory_than_is_free_are_refused(tmp_path):
+def test_workers_that_need_more_memory_than_is_free_are_refused(
+    database_url, database_path
+):
     """
     A campaign whose workers would need more working memory than any machine has does
     not start.
     """
     campaign = TrialCampaign(
-        setup=ThrowingSetup(path=tmp_path / "throws.jsonl"),
+        setup=ThrowingSetup(database_url=database_url),
         number_of_workers=2,
         memory_per_worker=10**18,
     )
     with pytest.raises(NotEnoughMemoryForWorkers):
         campaign.run()
-    assert not ThrowsInAFile(path=tmp_path / "throws.jsonl").path.exists()
+    assert not database_path.exists()
 
 
 # %% what made trials succeed

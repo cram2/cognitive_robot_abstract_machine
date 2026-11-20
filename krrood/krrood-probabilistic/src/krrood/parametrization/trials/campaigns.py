@@ -43,6 +43,12 @@ class TrialStore(Generic[TTrial], SubClassSafeGeneric, ABC):
     Keeps trials, each as soon as it is tried.
     """
 
+    def prepare(self) -> None:
+        """
+        Makes the store ready for workers to keep trials in at once, such as by creating
+        its tables; by default there is nothing to make ready.
+        """
+
     @abstractmethod
     def add(self, *, trial: TTrial) -> None:
         """
@@ -125,6 +131,7 @@ class TrialCampaign(Generic[TParameters, TTrial], SubClassSafeGeneric):
             memory than is free.
         """
         self.raise_unless_the_workers_fit_into_memory()
+        self.setup.create_store().prepare()
         seeds = [
             self.first_draw_seed + worker for worker in range(self.number_of_workers)
         ]

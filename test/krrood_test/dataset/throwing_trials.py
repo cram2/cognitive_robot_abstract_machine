@@ -5,24 +5,19 @@ to try parameter spaces, campaigns and analyses on without a simulation.
 
 from __future__ import annotations
 
-import json
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 from typing_extensions import Iterator
 
-from krrood.adapters.json_serializer import from_json, to_json
 from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.parametrization.model_registries import UniformPriorRegistry
-from krrood.parametrization.trials.campaigns import (
-    TrialPerformer,
-    TrialSetup,
-    TrialStore,
-)
+from krrood.parametrization.trials.campaigns import TrialPerformer, TrialSetup
+from krrood.parametrization.trials.database import DatabaseTrialStore
 from krrood.parametrization.trials.parameter_spaces import ParameterSpace
 from krrood.parametrization.trials.records import (
     Trial,
@@ -93,6 +88,18 @@ class SpeedOnlyParameters(TrialParameters):
     speed: float
     """
     How fast the ball leaves the hand, in m/s.
+    """
+
+
+@dataclass(kw_only=True)
+class Court:
+    """
+    Where throws are made from, as the state every throw starts from.
+    """
+
+    basket_distance: float
+    """
+    How far the basket stands from the thrower, in metres.
     """
 
 
@@ -194,42 +201,33 @@ class SteepThrowsLand(TrialPerformer[ThrowParameters, Throw]):
 
 
 @dataclass(kw_only=True)
-class ThrowsInAFile(TrialStore[Throw]):
+class ThrowsInADatabase(DatabaseTrialStore[Throw]):
     """
-    Keeps every throw as a line of JSON at the end of a file, which several processes
-    can share.
-    """
-
-    path: Path
-    """
-    The file.
+    Keeps throws in a database of the ORM interface of the krrood tests.
     """
 
-    def add(self, *, trial: Throw) -> None:
-        with self.path.open("a") as file:
-            file.write(json.dumps(to_json(trial)) + "\n")
+    @property
+    def data_access_object_class(self) -> type[DataAccessObject]:
+        from .ormatic_interface import ThrowDAO
 
-    def throws(self) -> list[Throw]:
-        """
-        :return: The throws kept so far, in the order they were kept.
-        """
-        if not self.path.exists():
-            return []
-        return [
-            from_json(json.loads(line)) for line in self.path.read_text().splitlines()
-        ]
+        return ThrowDAO
 
 
 @dataclass(kw_only=True)
 class ThrowingSetup(TrialSetup[ThrowParameters, Throw]):
     """
     Steep throws landing, drawn uniformly from the throws a person can make and kept in
-    a file.
+    a database.
     """
 
-    path: Path
+    database_url: str
     """
-    The file the throws are kept in.
+    Where the throws are kept.
+    """
+
+    starting_state_id: int | None = None
+    """
+    The database id of the court the throws are made on.
     """
 
     parameter_space: ThrowSpace = field(default_factory=ThrowSpace)
@@ -251,5 +249,7 @@ class ThrowingSetup(TrialSetup[ThrowParameters, Throw]):
     def performing(self) -> Iterator[SteepThrowsLand]:
         yield SteepThrowsLand(wind=self.wind)
 
-    def create_store(self) -> ThrowsInAFile:
-        return ThrowsInAFile(path=self.path)
+    def create_store(self) -> ThrowsInADatabase:
+        return ThrowsInADatabase(
+            database_url=self.database_url, starting_state_id=self.starting_state_id
+        )

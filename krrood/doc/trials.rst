@@ -39,19 +39,23 @@ each parameter from the pattern it is given:
 
 A :class:`~krrood.parametrization.trials.campaigns.TrialSetup` says how a worker tries and keeps its
 trials. It is sent to every worker process, so it builds what cannot be pickled, such as
-a simulation, inside :meth:`~krrood.parametrization.trials.campaigns.TrialSetup.performing`:
+a simulation, inside :meth:`~krrood.parametrization.trials.campaigns.TrialSetup.performing`.
+A :class:`~krrood.parametrization.trials.database.DatabaseTrialStore` keeps every trial
+through ormatic as an episode of the stored state it started from, and reads back the
+trials of one starting state:
 
 .. code-block:: python
 
+    setup = ThrowingSetup(database_url="sqlite:///throws.sqlite", starting_state_id=1)
     campaign = TrialCampaign(
-        setup=ThrowingSetup(path=Path("throws.jsonl")),
+        setup=setup,
         number_of_workers=8,
         trials_per_worker=20,
         memory_per_worker=4 * 10**9,
     )
     campaign.run()
 
-    analysis = TrialAnalysis(trials=trials_read_from_the_store)
+    analysis = TrialAnalysis(trials=setup.create_store().stored_trials())
     [strongest, *_] = analysis.effects_on_success()
     registry = NearCentresRegistry(centres=analysis.successful_parameters(), spread=0.1)
 
