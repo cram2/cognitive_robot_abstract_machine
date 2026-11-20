@@ -8,17 +8,29 @@ on:
       - 'krrood/**'
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: krrood
-
 jobs:
   check-version:
-    name: Check if version is new
+    name: Check if ${{ matrix.distribution }}'s version is new
     runs-on: ubuntu-latest
-    outputs:
-      should_publish: ${{ steps.check.outputs.should_publish }}
-      version: ${{ steps.check.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The krrood distribution and every krrood-* distribution it depends on, by
+        # directory; all of them are released at the repository's VERSION.
+        distribution:
+          - krrood
+          - krrood-core
+          - krrood-serialization
+          - krrood-code-generation
+          - krrood-symbolic-math
+          - krrood-rustworkx-utils
+          - krrood-eql
+          - krrood-planning
+          - krrood-ormatic
+          - krrood-probabilistic
+          - krrood-rdr
+          - krrood-ontomatic
+          - krrood-development-tools
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,10 +43,10 @@ jobs:
       - name: Check version against PyPI
         id: check
         run: |
-          LOCAL_VERSION=$(grep -oP '(?<=__version__ = ")[^"]+' src/krrood/_version.py)
+          LOCAL_VERSION=$(cat VERSION)
           echo "Local version: $LOCAL_VERSION"
 
-          PYPI_VERSION=$(pip index versions krrood 2>/dev/null \
+          PYPI_VERSION=$(pip index versions ${{ matrix.distribution }} 2>/dev/null \
             | grep -oP '(?<=Available versions: )[^,]+' \
             | tr -d ' ')
           PYPI_VERSION=${PYPI_VERSION:-0.0.0}
@@ -47,53 +59,43 @@ jobs:
           sys.exit(0 if parse('$LOCAL_VERSION') > parse('$PYPI_VERSION') else 1)
           " && echo "should_publish=true" >> $GITHUB_OUTPUT \
             || echo "should_publish=false" >> $GITHUB_OUTPUT
-          echo "version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
-
-  build:
-    name: Build distribution
-    runs-on: ubuntu-latest
-    needs: check-version
-    if: needs.check-version.outputs.should_publish == 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
 
       - name: Build
+        if: steps.check.outputs.should_publish == 'true'
         run: |
           pip install build
-          python -m build
+          directory=krrood
+          if [[ "${{ matrix.distribution }}" != "krrood" ]]; then
+            directory=krrood/${{ matrix.distribution }}
+          fi
+          python -m build "$directory" --outdir dist/
 
       - name: Upload dist
+        if: steps.check.outputs.should_publish == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: krrood/dist/
+          name: dist-${{ matrix.distribution }}
+          path: dist/
 
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: build
-    defaults:
-      run:
-        working-directory: .
+    needs: check-version
     environment:
       name: pypi
       url: https://pypi.org/p/krrood
     permissions:
       id-token: write  # required for trusted publishing
     steps:
-      - name: Download dist
+      - name: Download dists
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          pattern: dist-*
+          merge-multiple: true
           path: dist/
 
       - name: Publish to PyPI
+        if: hashFiles('dist/*') != ''
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
