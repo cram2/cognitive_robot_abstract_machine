@@ -5,6 +5,7 @@ Tests that CI runs the tests a change can affect, and only those.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,8 @@ from cognitive_robot_abstract_machine.continuous_integration_jobs import (
     ContinuousIntegrationJobLayout,
     ContinuousIntegrationJobMatrix,
     DocumentationPath,
+    GitHubActionsName,
+    LibraryEnvironmentSetting,
     LibraryTests,
     MatrixKey,
     RepositoryTestSuite,
@@ -430,10 +433,9 @@ def test_repository_jobs_run_every_library_once(
     )
 
 
-def test_matrix_lists_the_tests_of_each_library_of_a_job_as_json() -> None:
+def test_matrix_entry_gives_back_the_tests_of_each_library() -> None:
     """
-    The tests of each library of a job are JSON, as the reusable test workflow reads
-    them.
+    The tests of each library a matrix entry lists are those of its job.
     """
     library = LibraryTests(
         library_name="base", test_paths=(RepositoryDirectory.TESTS / "base_test",)
@@ -442,6 +444,61 @@ def test_matrix_lists_the_tests_of_each_library_of_a_job_as_json() -> None:
     [entry] = json.loads(ContinuousIntegrationJobMatrix(jobs=(job,)).to_json())[
         MatrixKey.INCLUDE
     ]
-    assert json.loads(entry[MatrixKey.TEST_PATHS]) == {
-        library.library_name: [str(path) for path in library.test_paths]
-    }
+    assert (
+        LibraryTests.from_test_paths_json(text=entry[MatrixKey.TEST_PATHS])
+        == job.libraries
+    )
+
+
+def test_matrix_is_appended_to_the_step_output(tmp_path: Path) -> None:
+    """
+    The matrix is added to the outputs a step already wrote, under its output name.
+    """
+    output_file = tmp_path / "output"
+    earlier_output = "earlier=output\n"
+    output_file.write_text(earlier_output)
+    matrix = ContinuousIntegrationJobMatrix(
+        jobs=(ContinuousIntegrationJob(name="rules", libraries=(), check_rules=True),)
+    )
+    matrix.write_github_output(output_file=output_file)
+    assert output_file.read_text() == (
+        f"{earlier_output}{GitHubActionsName.MATRIX_OUTPUT}={matrix.to_json()}\n"
+    )
+
+
+# %% running the tests of a library
+
+
+@pytest.fixture
+def library_test_runs(tmp_path: Path) -> Path:
+    """
+    A copy of the tests run in a pytest process of their own, outside the repository so
+    that process loads none of its ``conftest.py`` files.
+    """
+    shutil.copytree(
+        Path(dataset.__file__).parent / "library_test_runs",
+        tmp_path,
+        dirs_exist_ok=True,
+    )
+    return tmp_path
+
+
+def test_library_tests_pass_with_their_environment(library_test_runs: Path) -> None:
+    """
+    A library's tests run with the environment variables that library needs.
+    """
+    setting = LibraryEnvironmentSetting.HEADLESS_MUJOCO
+    library_tests = LibraryTests(
+        library_name=setting.library_name, test_paths=(Path("environment_check.py"),)
+    )
+    assert library_tests.run(repository_root=library_test_runs)
+
+
+def test_failing_library_tests_report_a_failure(library_test_runs: Path) -> None:
+    """
+    A run with a failing test reports that not every test passed.
+    """
+    library_tests = LibraryTests(
+        library_name="base", test_paths=(Path("failing_check.py"),)
+    )
+    assert not library_tests.run(repository_root=library_test_runs)

@@ -9,9 +9,12 @@ from __future__ import annotations
 import ast
 import functools
 import json
+import os
+import subprocess
+import sys
 import tomllib
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum, StrEnum
 from functools import cached_property
 from pathlib import Path
 
@@ -79,6 +82,38 @@ class PytestFileName(StrEnum):
     """
 
 
+class GitHubActionsName(StrEnum):
+    """
+    The names GitHub Actions gives a meaning to.
+    """
+
+    OUTPUT_FILE_VARIABLE = "GITHUB_OUTPUT"
+    """
+    The environment variable naming the file a step writes its outputs to.
+    """
+
+    MATRIX_OUTPUT = "matrix"
+    """
+    The output of the selection step the CI workflow expands into its test jobs.
+    """
+
+
+class PytestOption(StrEnum):
+    """
+    The command-line options and values of pytest that the test jobs pass.
+    """
+
+    WORKER_COUNT = "-n"
+    """
+    The option of pytest-xdist setting how many processes run the tests.
+    """
+
+    WORKER_PER_CORE = "auto"
+    """
+    The worker count starting one process per processor core.
+    """
+
+
 class MemberDirectoryName(StrEnum):
     """
     The names of directories inside a workspace member.
@@ -122,6 +157,50 @@ class DocumentationPath(PathEnumeration):
     ISSUE_TEMPLATES = Path(".github") / "ISSUE_TEMPLATE"
     """
     The forms an issue is opened with.
+    """
+
+
+# %% environment of a library's tests
+
+
+@dataclass(frozen=True)
+class EnvironmentSetting:
+    """
+    An environment variable the tests of one library need set before Python starts.
+    """
+
+    library_name: str
+    """
+    The name CI lists the library under.
+    """
+
+    variable_name: str
+    """
+    The name of the environment variable.
+    """
+
+    variable_value: str
+    """
+    The value the variable is set to.
+    """
+
+
+class LibraryEnvironmentSetting(EnvironmentSetting, Enum):
+    """
+    The environment variables the tests of a library need, which have to be set
+    before the test process imports the package reading them.
+    """
+
+    OFFSCREEN_QT = "probabilistic_model", "QT_QPA_PLATFORM", "offscreen"
+    """
+    Qt draws the plots of the tests without a display.
+    """
+
+    HEADLESS_MUJOCO = "semantic_digital_twin", "MUJOCO_GL", "egl"
+    """
+    MuJoCo renders its video-recorder tests with EGL. Under xvfb it would pick its
+    windowed GLFW backend and fail to create a context; it locks the backend when
+    imported.
     """
 
 
@@ -300,6 +379,50 @@ class LibraryTests:
         The suffix that follows a library's name in the name of its test directory.
         """
         return "_test"
+
+    @property
+    def environment(self) -> dict[str, str]:
+        """
+        The environment variables the library's tests need set.
+        """
+        return {
+            setting.variable_name: setting.variable_value
+            for setting in LibraryEnvironmentSetting
+            if setting.library_name == self.library_name
+        }
+
+    def run(self, *, repository_root: Path) -> bool:
+        """
+        Run pytest over the tests in a process of its own, with one worker per core
+        and :attr:`environment` added to the current environment.
+
+        :param repository_root: The root of the repository the test paths are in.
+        :return: Whether every test passed.
+        """
+        command = [
+            sys.executable,
+            "-m",
+            "pytest",
+            PytestOption.WORKER_COUNT,
+            PytestOption.WORKER_PER_CORE,
+            *(str(repository_root / test_path) for test_path in self.test_paths),
+        ]
+        completed = subprocess.run(command, env=os.environ | self.environment)
+        return completed.returncode == 0
+
+    @classmethod
+    def from_test_paths_json(cls, *, text: str) -> tuple[LibraryTests, ...]:
+        """
+        :param text: The :attr:`MatrixKey.TEST_PATHS` of a matrix entry.
+        :return: The tests of each library it lists, in its order.
+        """
+        return tuple(
+            cls(
+                library_name=library_name,
+                test_paths=tuple(Path(test_path) for test_path in test_paths),
+            )
+            for library_name, test_paths in json.loads(text).items()
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -813,3 +936,14 @@ class ContinuousIntegrationJobMatrix:
         return json.dumps(
             {MatrixKey.INCLUDE: [job.to_matrix_entry() for job in self.jobs]}
         )
+
+    def write_github_output(self, *, output_file: Path) -> None:
+        """
+        Append the matrix to a step's output file as its
+        :attr:`GitHubActionsName.MATRIX_OUTPUT`.
+
+        :param output_file: The file :attr:`GitHubActionsName.OUTPUT_FILE_VARIABLE`
+            names.
+        """
+        with output_file.open("a") as output:
+            output.write(f"{GitHubActionsName.MATRIX_OUTPUT}={self.to_json()}\n")

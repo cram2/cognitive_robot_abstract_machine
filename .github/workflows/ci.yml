@@ -62,9 +62,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             since=(--since HEAD^1)
           fi
-          matrix=$(python scripts/select_continuous_integration_jobs.py "${since[@]}")
-          echo "$matrix"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          python scripts/select_continuous_integration_jobs.py "${since[@]}"
+          cat "$GITHUB_OUTPUT"
 
   test_each_lib:
     needs: [to-lowercase, select_test_jobs]

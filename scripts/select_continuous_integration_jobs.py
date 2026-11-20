@@ -1,5 +1,6 @@
 """
-Print the matrix of the CI test jobs a change needs, as JSON.
+Write the matrix of the CI test jobs a change needs, as JSON, to the step's output file
+under GitHub Actions and to the standard output elsewhere.
 
 With ``--since``, the jobs run the tests the files changed since that revision can
 affect; without it, every test.
@@ -8,12 +9,14 @@ affect; without it, every test.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from pathlib import Path
 
 from cognitive_robot_abstract_machine.continuous_integration_jobs import (
     ContinuousIntegrationJobLayout,
     ContinuousIntegrationJobMatrix,
+    GitHubActionsName,
     RepositoryTestSuite,
     Workspace,
 )
@@ -22,7 +25,7 @@ from cognitive_robot_abstract_machine.repository_files import RepositoryFile
 
 def main() -> None:
     """
-    Print the matrix of the jobs the change since the given revision needs.
+    Write the matrix of the jobs the change since the given revision needs.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -64,7 +67,12 @@ def main() -> None:
         affected_tests=affected_tests,
         known_library_names=test_suite.library_names,
     )
-    print(ContinuousIntegrationJobMatrix(jobs=jobs).to_json())
+    matrix = ContinuousIntegrationJobMatrix(jobs=jobs)
+    output_file = os.environ.get(GitHubActionsName.OUTPUT_FILE_VARIABLE)
+    if output_file is None:
+        print(matrix.to_json())
+        return
+    matrix.write_github_output(output_file=Path(output_file))
 
 
 if __name__ == "__main__":
