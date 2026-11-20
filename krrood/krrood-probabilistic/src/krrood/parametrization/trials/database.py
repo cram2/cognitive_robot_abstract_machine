@@ -15,13 +15,13 @@ from sqlalchemy.orm import Session
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.utils import create_engine
 from krrood.parametrization.trials.campaigns import TrialStore
-from krrood.parametrization.trials.records import TTrial
+from krrood.parametrization.trials.records import TrialTypeVar
 
 # %% trials in a database
 
 
 @dataclass(kw_only=True)
-class DatabaseTrialStore(TrialStore[TTrial], ABC):
+class DatabaseTrialStore(TrialStore[TrialTypeVar], ABC):
     """
     Keeps the trials of one starting state in a database through ormatic, each in a
     transaction of its own, so that workers in other processes can keep theirs at once.
@@ -65,7 +65,7 @@ class DatabaseTrialStore(TrialStore[TTrial], ABC):
         self.data_access_object_class.metadata.create_all(engine)
         engine.dispose()
 
-    def add(self, *, trial: TTrial) -> None:
+    def add(self, *, trial: TrialTypeVar) -> None:
         """
         Unlike :meth:`TrialStore.add`, the trial is first marked as started from
         :attr:`starting_state_id`.
@@ -74,7 +74,7 @@ class DatabaseTrialStore(TrialStore[TTrial], ABC):
         self.session.add(self.data_access_object_class.to_dao(source_object=trial))
         self.session.commit()
 
-    def stored_trials(self) -> list[TTrial]:
+    def stored_trials(self) -> list[TrialTypeVar]:
         """
         :return: Every trial kept from :attr:`starting_state_id`, in the order they were
             kept.

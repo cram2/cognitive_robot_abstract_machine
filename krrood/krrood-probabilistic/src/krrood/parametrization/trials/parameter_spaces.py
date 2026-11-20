@@ -19,7 +19,7 @@ from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.parametrization.trials.records import (
     AdoptedValue,
     InformedField,
-    TParameters,
+    ParametersTypeVar,
 )
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -31,13 +31,15 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
+class ParameterSpace(Generic[ParametersTypeVar], SubClassSafeGeneric, ABC):
     """
     The values the parameters of a trial may take, as a statement a model answers.
     """
 
     @abstractmethod
-    def conditions(self, *, parameters: Match[TParameters]) -> list[ConditionType]:
+    def conditions(
+        self, *, parameters: Match[ParametersTypeVar]
+    ) -> list[ConditionType]:
         """
         :param parameters: The pattern of the parameters, to reach every parameter
             from.
@@ -48,12 +50,14 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
             ``parameters.offset.forward``, so the model's backend can bound it.
         """
 
-    def pattern(self) -> Match[TParameters]:
+    def pattern(self) -> Match[ParametersTypeVar]:
         """
         :return: The pattern of the parameters, with every field left to be drawn.
         """
         return self.underspecified_pattern(
-            parameter_type=self.get_type_of_generic_parameter(parameter=TParameters)
+            parameter_type=self.get_type_of_generic_parameter(
+                parameter=ParametersTypeVar
+            )
         )
 
     @classmethod
@@ -84,7 +88,7 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
         """
         return []
 
-    def adopted_values(self, *, parameters: TParameters) -> list[AdoptedValue]:
+    def adopted_values(self, *, parameters: ParametersTypeVar) -> list[AdoptedValue]:
         """
         :param parameters: Parameters of this space, such as those that worked best.
         :return: Their value for every field they inform.
@@ -99,14 +103,14 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
             for informed_field in self.informed_fields
         ]
 
-    def statement(self) -> Match[TParameters]:
+    def statement(self) -> Match[ParametersTypeVar]:
         """
         :return: The statement of every parameters this space allows.
         """
         parameters = self.pattern()
         return parameters.where(*self.conditions(parameters=parameters))
 
-    def accepts(self, *, parameters: TParameters) -> bool:
+    def accepts(self, *, parameters: ParametersTypeVar) -> bool:
         """
         :param parameters: Drawn parameters.
         :return: Whether they are tried; by default every draw is.
@@ -115,7 +119,7 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
 
     def drawn_parameters(
         self, *, number_of_draws: int, model_registry: ModelRegistry
-    ) -> list[TParameters]:
+    ) -> list[ParametersTypeVar]:
         """
         :param number_of_draws: How many parameters to draw.
         :param model_registry: Answers the statement of :meth:`statement`.
@@ -146,25 +150,25 @@ class ParameterSpace(Generic[TParameters], SubClassSafeGeneric, ABC):
 
 
 @dataclass(kw_only=True)
-class ParameterSource(Generic[TParameters], SubClassSafeGeneric, ABC):
+class ParameterSource(Generic[ParametersTypeVar], SubClassSafeGeneric, ABC):
     """
     Gives the parameters a campaign tries.
     """
 
     @abstractmethod
-    def parameters_to_try(self) -> list[TParameters]:
+    def parameters_to_try(self) -> list[ParametersTypeVar]:
         """
         :return: The parameters to try, each once, in the order they are tried.
         """
 
 
 @dataclass(kw_only=True)
-class DrawnParameters(ParameterSource[TParameters]):
+class DrawnParameters(ParameterSource[ParametersTypeVar]):
     """
     Parameters a model draws from a space.
     """
 
-    parameter_space: ParameterSpace[TParameters]
+    parameter_space: ParameterSpace[ParametersTypeVar]
     """
     What the parameters are drawn from.
     """
@@ -184,7 +188,7 @@ class DrawnParameters(ParameterSource[TParameters]):
     Seeds the draws, so the same source draws the same parameters.
     """
 
-    def parameters_to_try(self) -> list[TParameters]:
+    def parameters_to_try(self) -> list[ParametersTypeVar]:
         # the probabilistic models draw from numpy's global random state
         np.random.seed(self.draw_seed)
         return self.parameter_space.drawn_parameters(
@@ -193,16 +197,16 @@ class DrawnParameters(ParameterSource[TParameters]):
 
 
 @dataclass(kw_only=True)
-class GivenParameters(ParameterSource[TParameters]):
+class GivenParameters(ParameterSource[ParametersTypeVar]):
     """
     Parameters chosen beforehand, such as the most promising ones of an earlier
     campaign, to retry them.
     """
 
-    parameters: list[TParameters]
+    parameters: list[ParametersTypeVar]
     """
     The parameters to try, in order.
     """
 
-    def parameters_to_try(self) -> list[TParameters]:
+    def parameters_to_try(self) -> list[ParametersTypeVar]:
         return self.parameters

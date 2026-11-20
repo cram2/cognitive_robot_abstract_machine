@@ -13,7 +13,7 @@ from typing_extensions import Generic
 
 from krrood.parametrization.trials.exceptions import OutcomeDidNotVaryInPilot
 from krrood.parametrization.trials.parameter_spaces import ParameterSource
-from krrood.parametrization.trials.records import TParameters, TTrial
+from krrood.parametrization.trials.records import ParametersTypeVar, TrialTypeVar
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_compute_resources.workers import ParallelJob, WorkerPool
 
@@ -21,13 +21,15 @@ from krrood_compute_resources.workers import ParallelJob, WorkerPool
 
 
 @dataclass(kw_only=True)
-class TrialPerformer(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
+class TrialPerformer(
+    Generic[ParametersTypeVar, TrialTypeVar], SubClassSafeGeneric, ABC
+):
     """
     Tries a behaviour with given parameters, each time from the same starting state.
     """
 
     @abstractmethod
-    def perform(self, *, parameters: TParameters) -> TTrial:
+    def perform(self, *, parameters: ParametersTypeVar) -> TrialTypeVar:
         """
         :param parameters: The parameters to try.
         :return: The trial, with what came of it.
@@ -35,7 +37,7 @@ class TrialPerformer(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
 
 
 @dataclass(kw_only=True)
-class TrialStore(Generic[TTrial], SubClassSafeGeneric, ABC):
+class TrialStore(Generic[TrialTypeVar], SubClassSafeGeneric, ABC):
     """
     Keeps trials, each as soon as it is tried.
     """
@@ -47,28 +49,30 @@ class TrialStore(Generic[TTrial], SubClassSafeGeneric, ABC):
         """
 
     @abstractmethod
-    def add(self, *, trial: TTrial) -> None:
+    def add(self, *, trial: TrialTypeVar) -> None:
         """
         :param trial: The trial to keep.
         """
 
 
 @dataclass(kw_only=True)
-class TrialSetup(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
+class TrialSetup(Generic[ParametersTypeVar, TrialTypeVar], SubClassSafeGeneric, ABC):
     """
     Everything a worker of a campaign tries trials with; it is sent to each worker's
     process, so it holds only what can be pickled and builds the rest there.
     """
 
     @abstractmethod
-    def performing(self) -> AbstractContextManager[TrialPerformer[TParameters, TTrial]]:
+    def performing(
+        self,
+    ) -> AbstractContextManager[TrialPerformer[ParametersTypeVar, TrialTypeVar]]:
         """
         :return: A context in which the performer can try trials, such as a running
             simulation of the starting state, closed once the worker is done.
         """
 
     @abstractmethod
-    def create_store(self) -> TrialStore[TTrial]:
+    def create_store(self) -> TrialStore[TrialTypeVar]:
         """
         :return: Where the worker keeps its trials.
         """
@@ -78,18 +82,20 @@ class TrialSetup(Generic[TParameters, TTrial], SubClassSafeGeneric, ABC):
 
 
 @dataclass(kw_only=True)
-class TrialCampaign(ParallelJob[TParameters, bool], Generic[TParameters, TTrial]):
+class TrialCampaign(
+    ParallelJob[ParametersTypeVar, bool], Generic[ParametersTypeVar, TrialTypeVar]
+):
     """
     Tries the parameters of a source, each :attr:`repetitions` times, in several worker
     processes at once, keeping every trial as soon as it is tried.
     """
 
-    setup: TrialSetup[TParameters, TTrial]
+    setup: TrialSetup[ParametersTypeVar, TrialTypeVar]
     """
     What every worker tries its trials with.
     """
 
-    parameter_source: ParameterSource[TParameters]
+    parameter_source: ParameterSource[ParametersTypeVar]
     """
     Gives the parameters to try.
     """
@@ -134,7 +140,9 @@ class TrialCampaign(ParallelJob[TParameters, bool], Generic[TParameters, TTrial]
         remaining = parameters[len(pilot) :]
         return len(pilot) + len(self.worker_pool.run(job=self, items=remaining))
 
-    def work_through(self, *, items: list[TParameters], stop: EventProxy) -> list[bool]:
+    def work_through(
+        self, *, items: list[ParametersTypeVar], stop: EventProxy
+    ) -> list[bool]:
         store = self.setup.create_store()
         successes = []
         with self.setup.performing() as performer:

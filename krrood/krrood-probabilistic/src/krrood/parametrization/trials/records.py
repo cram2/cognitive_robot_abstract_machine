@@ -103,12 +103,12 @@ class TrialMeasurements:
     """
 
 
-TParameters = TypeVar("TParameters", bound=TrialParameters)
+ParametersTypeVar = TypeVar("ParametersTypeVar", bound=TrialParameters)
 """
 The parameters a trial varies by.
 """
 
-TMeasurements = TypeVar("TMeasurements", bound=TrialMeasurements)
+MeasurementsTypeVar = TypeVar("MeasurementsTypeVar", bound=TrialMeasurements)
 """
 What is measured while a trial runs.
 """
@@ -117,7 +117,7 @@ What is measured while a trial runs.
 
 
 @dataclass(kw_only=True)
-class Trial(Generic[TParameters, TMeasurements], SubClassSafeGeneric):
+class Trial(Generic[ParametersTypeVar, MeasurementsTypeVar], SubClassSafeGeneric):
     """
     One try of a behaviour, with what came of it.
 
@@ -125,12 +125,12 @@ class Trial(Generic[TParameters, TMeasurements], SubClassSafeGeneric):
     stage that failed.
     """
 
-    parameters: TParameters
+    parameters: ParametersTypeVar
     """
     What the trial varied by.
     """
 
-    measurements: TMeasurements
+    measurements: MeasurementsTypeVar
     """
     What was measured while the trial ran.
     """
@@ -147,7 +147,7 @@ class Trial(Generic[TParameters, TMeasurements], SubClassSafeGeneric):
     """
 
 
-TTrial = TypeVar("TTrial", bound=Trial)
+TrialTypeVar = TypeVar("TrialTypeVar", bound=Trial)
 """
 A trial, with what came of it.
 """

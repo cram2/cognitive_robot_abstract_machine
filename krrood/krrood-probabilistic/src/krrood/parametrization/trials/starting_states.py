@@ -15,7 +15,7 @@ from typing_extensions import Generic, TypeVar
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_compute_resources.workers import ParallelJob, WorkerPool
 
-TState = TypeVar("TState")
+StateTypeVar = TypeVar("StateTypeVar")
 """
 A state trials start from, such as a world.
 """
@@ -24,13 +24,13 @@ A state trials start from, such as a world.
 
 
 @dataclass(kw_only=True)
-class StateReacher(Generic[TState], SubClassSafeGeneric, ABC):
+class StateReacher(Generic[StateTypeVar], SubClassSafeGeneric, ABC):
     """
     Reaches a state by the steps that lead to it, each time anew.
     """
 
     @abstractmethod
-    def reach(self) -> TState:
+    def reach(self) -> StateTypeVar:
         """
         :return: The state the steps led to, which need not be the one wanted, since
             reaching it can fail and physics varies.
@@ -38,7 +38,7 @@ class StateReacher(Generic[TState], SubClassSafeGeneric, ABC):
 
 
 @dataclass(kw_only=True)
-class StateStore(Generic[TState], SubClassSafeGeneric, ABC):
+class StateStore(Generic[StateTypeVar], SubClassSafeGeneric, ABC):
     """
     Keeps the states trials start from, each as soon as it is reached, under an id the
     trials refer to it by.
@@ -51,7 +51,7 @@ class StateStore(Generic[TState], SubClassSafeGeneric, ABC):
         """
 
     @abstractmethod
-    def add(self, *, state: TState) -> int:
+    def add(self, *, state: StateTypeVar) -> int:
         """
         :param state: The state to keep.
         :return: The id it is kept under, such as its database id.
@@ -62,7 +62,7 @@ class StateStore(Generic[TState], SubClassSafeGeneric, ABC):
 
 
 @dataclass(kw_only=True)
-class StartingStateRecipe(ParallelJob[int, int], Generic[TState], ABC):
+class StartingStateRecipe(ParallelJob[int, int], Generic[StateTypeVar], ABC):
     """
     How to reach the state the trials of a behaviour start from and how to tell it is
     the one wanted; attempts to reach it run in several workers at once, and every state
@@ -70,14 +70,14 @@ class StartingStateRecipe(ParallelJob[int, int], Generic[TState], ABC):
     """
 
     @abstractmethod
-    def reaching(self) -> AbstractContextManager[StateReacher[TState]]:
+    def reaching(self) -> AbstractContextManager[StateReacher[StateTypeVar]]:
         """
         :return: A context in which the reacher can reach states, such as a running
             simulation, closed once the worker is done.
         """
 
     @abstractmethod
-    def is_wanted(self, *, state: TState) -> bool:
+    def is_wanted(self, *, state: StateTypeVar) -> bool:
         """
         :param state: A state the steps led to.
         :return: Whether it is the state the trials are to start from, such as an
@@ -85,7 +85,7 @@ class StartingStateRecipe(ParallelJob[int, int], Generic[TState], ABC):
         """
 
     @abstractmethod
-    def create_store(self) -> StateStore[TState]:
+    def create_store(self) -> StateStore[StateTypeVar]:
         """
         :return: Where a worker keeps the states that are the one wanted.
         """

@@ -21,12 +21,12 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_compute_resources.exceptions import NotEnoughMemoryForWorkers
 from krrood_compute_resources.memory import DeviceMemory, HostMemory
 
-TItem = TypeVar("TItem")
+ItemTypeVar = TypeVar("ItemTypeVar")
 """
 What a job works through, one at a time.
 """
 
-TResult = TypeVar("TResult")
+ResultTypeVar = TypeVar("ResultTypeVar")
 """
 What working through one item gives.
 """
@@ -35,7 +35,7 @@ What working through one item gives.
 
 
 @dataclass(kw_only=True)
-class ParallelJob(Generic[TItem, TResult], SubClassSafeGeneric, ABC):
+class ParallelJob(Generic[ItemTypeVar, ResultTypeVar], SubClassSafeGeneric, ABC):
     """
     Work that is divided among workers, each working through a share of the items.
 
@@ -43,7 +43,9 @@ class ParallelJob(Generic[TItem, TResult], SubClassSafeGeneric, ABC):
     """
 
     @abstractmethod
-    def work_through(self, *, items: list[TItem], stop: EventProxy) -> list[TResult]:
+    def work_through(
+        self, *, items: list[ItemTypeVar], stop: EventProxy
+    ) -> list[ResultTypeVar]:
         """
         :param items: The share of the items of one worker, in order.
         :param stop: Set when the job is to stop; checked before each item.
@@ -97,8 +99,8 @@ class WorkerPool:
         return fitting
 
     def run(
-        self, *, job: ParallelJob[TItem, TResult], items: list[TItem]
-    ) -> list[TResult]:
+        self, *, job: ParallelJob[ItemTypeVar, ResultTypeVar], items: list[ItemTypeVar]
+    ) -> list[ResultTypeVar]:
         """
         :param job: The job to run.
         :param items: What the job works through; each worker gets every n-th item.
