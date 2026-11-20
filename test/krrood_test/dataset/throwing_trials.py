@@ -7,14 +7,17 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import cached_property
 
 import numpy as np
+from sqlalchemy.orm import Session
 from typing_extensions import Iterator
 
 from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.utils import create_engine
 from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.trials.campaigns import TrialPerformer, TrialSetup
 from krrood.parametrization.trials.database import DatabaseTrialStore
@@ -22,6 +25,7 @@ from krrood.parametrization.trials.parameter_spaces import ParameterSpace
 from krrood.parametrization.trials.starting_states import (
     StartingStateRecipe,
     StateReacher,
+    StateStore,
 )
 from krrood.parametrization.trials.records import (
     InformedField,
@@ -167,9 +171,58 @@ class CourtBuilder(StateReacher[Court]):
 
 
 @dataclass(kw_only=True)
+class CourtsInADatabase(StateStore[Court]):
+    """
+    Keeps courts in a database of the ORM interface of the krrood tests.
+    """
+
+    database_url: str
+    """
+    Where the database is, as SQLAlchemy names it.
+    """
+
+    @cached_property
+    def session(self) -> Session:
+        """
+        The session the courts are kept and read in.
+        """
+        return Session(create_engine(self.database_url))
+
+    def prepare(self) -> None:
+        """
+        Unlike :meth:`StateStore.prepare`, creates the tables of the courts.
+        """
+        from .ormatic_interface import Base
+
+        Base.metadata.create_all(create_engine(self.database_url))
+
+    def add(self, *, state: Court) -> int:
+        from .ormatic_interface import CourtDAO
+
+        court = CourtDAO.to_dao(source_object=state)
+        self.session.add(court)
+        self.session.commit()
+        return court.database_id
+
+    def stored_court(self, *, database_id: int) -> Court:
+        """
+        :param database_id: The id a court is kept under.
+        :return: The court, read back from the database.
+        """
+        from .ormatic_interface import CourtDAO
+
+        return self.session.get(CourtDAO, database_id).from_dao()
+
+
+@dataclass(kw_only=True)
 class CourtRecipe(StartingStateRecipe[Court]):
     """
     A court whose basket stands within given distances from the thrower.
+    """
+
+    database_url: str
+    """
+    Where the courts are kept.
     """
 
     wanted_distance: Bounds[float] = field(
@@ -184,11 +237,8 @@ class CourtRecipe(StartingStateRecipe[Court]):
     The standard deviation of the distance the basket ends up at, in metres.
     """
 
-    @property
-    def data_access_object_class(self) -> type[DataAccessObject]:
-        from .ormatic_interface import CourtDAO
-
-        return CourtDAO
+    def create_store(self) -> CourtsInADatabase:
+        return CourtsInADatabase(database_url=self.database_url)
 
     @contextmanager
     def reaching(self) -> Iterator[CourtBuilder]:

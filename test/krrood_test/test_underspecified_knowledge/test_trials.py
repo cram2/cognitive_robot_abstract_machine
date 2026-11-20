@@ -9,10 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from sqlalchemy.orm import Session
 
-from krrood.ormatic.data_access_objects.helper import to_dao
-from krrood.ormatic.utils import create_engine
 
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
@@ -38,6 +35,7 @@ from krrood_compute_resources.workers import WorkerPool
 from ..dataset.throwing_trials import (
     Court,
     CourtRecipe,
+    CourtsInADatabase,
     FastThrowSpace,
     NamedThrowParameters,
     ReleasePoint,
@@ -213,15 +211,9 @@ def stored_court_id(*, database_url: str, basket_distance: float) -> int:
     :param basket_distance: How far the basket stands from the thrower.
     :return: The database id of a court stored as a starting state.
     """
-    from ..dataset.ormatic_interface import Base
-
-    engine = create_engine(database_url)
-    Base.metadata.create_all(engine)
-    with Session(engine) as session:
-        court = to_dao(Court(basket_distance=basket_distance))
-        session.add(court)
-        session.commit()
-        return court.database_id
+    store = CourtsInADatabase(database_url=database_url)
+    store.prepare()
+    return store.add(state=Court(basket_distance=basket_distance))
 
 
 @pytest.fixture
@@ -294,7 +286,8 @@ def test_only_the_states_wanted_are_kept(database_url, number_of_workers):
     stored_ids = recipe.reach_and_store(
         attempts=20, worker_pool=WorkerPool(number_of_workers=number_of_workers)
     )
-    courts = [recipe.stored_object(database_id=court_id) for court_id in stored_ids]
+    store = recipe.create_store()
+    courts = [store.stored_court(database_id=court_id) for court_id in stored_ids]
 
     assert 0 < len(courts) < 20
     assert len(set(stored_ids)) == len(stored_ids)

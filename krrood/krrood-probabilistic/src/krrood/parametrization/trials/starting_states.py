@@ -12,7 +12,6 @@ from multiprocessing.managers import EventProxy
 
 from typing_extensions import Generic, TypeVar
 
-from krrood.parametrization.trials.database import ObjectDatabase
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_compute_resources.workers import ParallelJob, WorkerPool
 
@@ -21,7 +20,7 @@ TState = TypeVar("TState")
 A state trials start from, such as a world.
 """
 
-# %% reaching a state
+# %% reaching and keeping states
 
 
 @dataclass(kw_only=True)
@@ -38,11 +37,32 @@ class StateReacher(Generic[TState], SubClassSafeGeneric, ABC):
         """
 
 
+@dataclass(kw_only=True)
+class StateStore(Generic[TState], SubClassSafeGeneric, ABC):
+    """
+    Keeps the states trials start from, each as soon as it is reached, under an id the
+    trials refer to it by.
+    """
+
+    def prepare(self) -> None:
+        """
+        Makes the store ready for workers to keep states in at once, such as by creating
+        its tables; by default there is nothing to make ready.
+        """
+
+    @abstractmethod
+    def add(self, *, state: TState) -> int:
+        """
+        :param state: The state to keep.
+        :return: The id it is kept under, such as its database id.
+        """
+
+
 # %% the recipe of a starting state
 
 
 @dataclass(kw_only=True)
-class StartingStateRecipe(ParallelJob[int, int], ObjectDatabase, Generic[TState], ABC):
+class StartingStateRecipe(ParallelJob[int, int], Generic[TState], ABC):
     """
     How to reach the state the trials of a behaviour start from and how to tell it is
     the one wanted; attempts to reach it run in several workers at once, and every state
@@ -64,27 +84,33 @@ class StartingStateRecipe(ParallelJob[int, int], ObjectDatabase, Generic[TState]
             object being held and touching its target.
         """
 
+    @abstractmethod
+    def create_store(self) -> StateStore[TState]:
+        """
+        :return: Where a worker keeps the states that are the one wanted.
+        """
+
     def reach_and_store(self, *, attempts: int, worker_pool: WorkerPool) -> list[int]:
         """
         :param attempts: How often to try to reach the state.
         :param worker_pool: The workers the attempts are divided among.
-        :return: The database id of every state reached that is the one wanted; fewer
-            than attempted when the campaign was stopped.
-        :raises NotEnoughMemoryForWorkers: If not even one worker fits into the working
-            memory.
+        :return: The id of every state reached that is the one wanted; fewer than
+            attempted when the attempts were stopped.
+        :raises NotEnoughMemoryForWorkers: If not even one worker fits into the memory.
         """
+        # refuse before anything is created
         worker_pool.workers_that_fit()
-        self.create_tables()
+        self.create_store().prepare()
         return worker_pool.run(job=self, items=list(range(attempts)))
 
     def work_through(self, *, items: list[int], stop: EventProxy) -> list[int]:
+        store = self.create_store()
         stored_ids = []
-        with self.open_session() as session, self.reaching() as reacher:
+        with self.reaching() as reacher:
             for _ in items:
                 if stop.is_set():
                     break
                 state = reacher.reach()
-                if not self.is_wanted(state=state):
-                    continue
-                stored_ids.append(self.store(stored_object=state, session=session))
+                if self.is_wanted(state=state):
+                    stored_ids.append(store.add(state=state))
         return stored_ids
