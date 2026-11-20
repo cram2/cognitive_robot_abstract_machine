@@ -12,9 +12,11 @@ from typing_extensions import Callable, ClassVar, Dict, Iterator, List
 
 from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
-from krrood.entity_query_language.factories import a, variable, variable_from
+from krrood.entity_query_language.exceptions import MultipleSolutionFound
+from krrood.entity_query_language.factories import a, the, variable, variable_from
 from cramph.composites import (
     ChildChooserAccess,
+    DefiniteStatementNode,
     Parallel,
     Sequence,
     StatementBindings,
@@ -501,6 +503,135 @@ def test_a_trial_keeps_the_choices_statements_made_in_the_world_it_copies(
         copied.get_world_entity_with_id_by_id(chosen_arm.id)
     ]
     trial.discard()
+
+
+# %% definite steps after a step
+
+
+def test_a_definite_step_runs_with_the_arm_the_step_before_it_chose(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The first step refuses the first arm and takes the second, which leaves the
+    definite step after it one arm to describe.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    arm = variable(Arm, domain=robot.all_arms)
+    plan = Sequence(
+        nodes=[
+            a(Sequence)(
+                nodes=[
+                    a(ActionRefusingSomeArms)(
+                        arm=arm, refused_arms=[robot.all_arms[0]]
+                    ),
+                    the(ActionRefusingSomeArms)(arm=arm),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [steps] = plan.nodes
+    choosing, describing = steps.nodes
+    assert [step.arm for step in describing.grounded_nodes] == [
+        choosing.grounded_nodes[-1].arm
+    ]
+
+
+def test_a_step_is_tried_with_the_definite_steps_after_it(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The first step would take the first arm, which the definite step after it refuses;
+    tried together with that step, the first step takes the second arm right away.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    arm = variable(Arm, domain=robot.all_arms)
+    plan = Sequence(
+        nodes=[
+            a(Sequence)(
+                nodes=[
+                    a(ActionRefusingSomeArms)(arm=arm),
+                    the(ActionRefusingSomeArms)(
+                        arm=arm, refused_arms=[robot.all_arms[0]]
+                    ),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [steps] = plan.nodes
+    choosing, describing = steps.nodes
+    assert [step.arm for step in choosing.grounded_nodes] == [robot.all_arms[1]]
+    assert [step.arm for step in describing.grounded_nodes] == [robot.all_arms[1]]
+
+
+def test_a_definite_step_whose_node_failed_fails_without_grounding_again(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Outside a structure given as a statement, the first step is tried on its own and
+    takes the first arm, which the definite step after it refuses; with nothing else to
+    run, the definite step fails.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    arm = variable(Arm, domain=robot.all_arms)
+    plan = Sequence(
+        nodes=[
+            a(ActionRefusingSomeArms)(arm=arm),
+            the(ActionRefusingSomeArms)(arm=arm, refused_arms=[robot.all_arms[0]]),
+        ]
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(MotionDidNotFinish):
+        executor.compile(statechart=statechart_of(executor, plan))
+        executor.execute()
+
+    choosing, describing = plan.nodes
+    assert [child.life_cycle_state for child in describing.chosen_children] == [
+        LifeCycleValue.FAILED
+    ]
+
+
+def test_a_definite_step_leaving_a_choice_raises(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A definite step whose arm no step before it chose describes a step per arm.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    plan = Sequence(
+        nodes=[the(ActionRefusingSomeArms)(arm=variable(Arm, domain=robot.all_arms))]
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(MultipleSolutionFound):
+        executor.compile(statechart=statechart_of(executor, plan))
+        executor.execute()
+
+
+def test_a_definite_step_starting_with_a_parallel_is_not_grounded_with_its_statements(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A definite step has nothing to choose, so it is no part of the combinations the
+    statements starting with a parallel are grounded into.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    parallel = Parallel(
+        nodes=[
+            a(ActionRefusingSomeArms)(arm=variable(Arm, domain=robot.all_arms)),
+            the(ActionRefusingSomeArms)(arm=robot.all_arms[0]),
+        ]
+    )
+
+    statements = UnderspecifiedChildChooser.statements_starting_with(parallel)
+
+    assert statements == [parallel.nodes[0]]
 
 
 # %% candidate trials

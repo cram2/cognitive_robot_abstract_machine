@@ -21,8 +21,9 @@ milk together, in one parallel.
 | Piece | Package | What it does |
 |---|---|---|
 | `StatementNode` | cramph | One per `a(...)` statement. Waits until a chooser hands it a child, and waits again when that child fails. |
+| `DefiniteStatementNode` | cramph | One per `the(...)` statement. Runs the one action the statement describes once the statements before it bound its variables. |
 | `StatementsGroundedTogether` | cramph | The combinations of the candidates of several statements, one candidate per statement, lowest rank sum first. |
-| {class}`~coraplex.plans.underspecified.UnderspecifiedChildChooser` | coraplex, chooser | Grounds a statement on its own, or together with the statements that start with the same parallel, and runs the first candidate, or combination, that passes its trial. |
+| {class}`~coraplex.plans.underspecified.UnderspecifiedChildChooser` | coraplex, chooser | Grounds a statement on its own, or together with the statements that start with the same parallel, and runs the first candidate, or combination, that passes its trial. Runs the action a `the(...)` statement describes untried, and nothing after it failed. |
 | {class}`~coraplex.plans.underspecified.CandidateHandOver` | coraplex, chooser | Hands a statement the candidate it was grounded to together with another one. |
 | {class}`~coraplex.plans.underspecified.SubtreeRebuild` | coraplex | Rebuilds what is left to run around a statement onto the world copy, with candidates put in for statements. `unfinished_nodes` picks what is left to run. |
 | {class}`~coraplex.plans.underspecified.ActionTrial` | coraplex | One kinematically simulated world copy that every trial runs in. |
@@ -138,8 +139,8 @@ builds, still ground normally in the trial.
 
 ## How far the remainder reaches
 
-The remainder root is the outermost parallel above the statement being grounded, with no action in between. If there
-is no such parallel, the root is the statement itself. The search stops at an action because a trial rebuilds an
+The remainder root is the outermost parallel or structure given as a statement (see the next section) above the
+statement being grounded, with no action in between. If there is none, the root is the statement itself. The search stops at an action because a trial rebuilds an
 action from its parameters, which would ground everything inside it again.
 
 ```{figure} _static/images/underspecified_grounding/remainder_root.svg
@@ -153,30 +154,41 @@ run is just the proposal, which is how a lone statement is tried.
 
 ## Statements that share a variable
 
-A variable object given to several statements stands for one choice. A pick-up and the place after it can leave the
-arm open and still use the same one:
+A variable object given to several statements stands for one choice. A pick-up chooses the arm, and the place after it
+refers to the arm it chose:
 
 ```python
 arm = variable(Arm, domain=robot.all_arms)
-Sequence(
+a(Sequence)(
     nodes=[
         a(PickUpAction)(arm=arm, grasp=...),
-        a(PlaceAction)(arm=arm, object_designator=milk, target_location=...),
+        the(PlaceAction)(arm=arm, object_designator=milk, target_location=...),
     ]
 )
 ```
 
-Once a statement adopts a candidate, the values that candidate gave the statement's variables are bound in the
-`StatementBindings` context extension. Every other statement grounds under them, so the place above has one arm to
-choose from: the one the pick-up runs with. A statement that tries its next candidate after a failure rebinds its
-variables to that candidate's values, and a statement that is reset releases them. Statements grounded together are
-only combined with candidates that agree on the variables they share. A trial copies the bindings onto its world, so a
-statement grounded inside a trial keeps them too.
+- **`a(...)` chooses.** Once a statement adopts a candidate, the values that candidate gave the statement's variables are
+  bound in the `StatementBindings` context extension. Every later statement grounds under them, so a later `a(...)`
+  statement reusing `arm` chooses only among candidates with that arm. A statement that tries its next candidate after
+  a failure rebinds its variables to that candidate's values, and a statement that is reset releases them. Statements
+  grounded together are only combined with candidates that agree on the variables they share.
+- **`the(...)` refers.** A `the(...)` statement describes the one action left once the statements before it bound its
+  variables. A `DefiniteStatementNode` runs that action without a trial of its own, and if the action fails, the node
+  fails: there is nothing else to run. A `the(...)` statement that still describes several actions raises
+  `MultipleSolutionFound`, one that describes none raises `NoSolutionFound`.
+- **`a(Sequence)(nodes=[...])` is the scope.** An `a(...)` statement of a control structure that states its nodes is
+  that structure, built from what it states, and only the statements among its nodes may leave something open. It is
+  also a remainder root: the trial of a statement in it runs what is left of it, so the `the(...)` statements after the
+  statement run in the trial with the values its proposal gives them. Above, a pick-up arm the place cannot use fails
+  the pick-up's trial, and the pick-up takes another arm before anything moves.
+
+A trial copies the bindings onto its world, so a statement grounded inside a trial keeps them too.
 
 ```{warning}
-**No look ahead.** The statement that binds a variable first chooses its value without the statements after it in
-mind. If no candidate of a later statement passes its trial with the bound value, that statement fails; the earlier
-one is not grounded again.
+**No look ahead past a choice.** A trial still ends before the next `a(...)` statement, so a statement chooses its
+values without the later statements that choose something of their own in mind. If none of their candidates passes
+its trial with the bound values, that statement fails; the earlier one is not grounded again. A `the(...)` statement
+outside a structure given as a statement is never tried at all.
 ```
 
 ## Known gaps
